@@ -25,18 +25,15 @@
   let clients = $state<OAuthClientInfo[]>([]);
   let loading = $state(false);
 
-  // Register form
   let showRegister = $state(false);
   let newName = $state("");
   let newRedirectUris = $state("");
   let newScopes = $state<string[]>(["profile:read"]);
   let registering = $state(false);
 
-  // Secret display
   let displayedSecret = $state<string | null>(null);
   let displayedClientId = $state<string | null>(null);
 
-  // Confirm dialog
   let confirmAction = $state<{ clientId: string; action: string } | null>(null);
 
   async function loadClients() {
@@ -132,7 +129,6 @@
   </button>
   {#if expanded}
     <div class="mt-4 space-y-4">
-      <!-- Header with register button -->
       <div class="flex items-center justify-between">
         <p class="text-ink-muted text-sm">{m.developer_subtitle()}</p>
         <Button variant="primary" size="lg" onclick={() => (showRegister = !showRegister)}>
@@ -141,7 +137,6 @@
         </Button>
       </div>
 
-      <!-- Secret display banner -->
       {#if displayedSecret}
         <div class="p-4 banner-warn border rounded-lg">
           <div class="flex items-start gap-3">
@@ -170,7 +165,6 @@
         </div>
       {/if}
 
-      <!-- Register form -->
       {#if showRegister}
         <div class="bg-surface-muted rounded-lg border border-line-strong p-4">
           <h4 class="text-sm font-medium text-ink-strong mb-3">{m.developer_register_title()}</h4>
@@ -216,7 +210,6 @@
         </div>
       {/if}
 
-      <!-- Client list -->
       {#if loading}
         <div class="flex items-center justify-center py-8">
           <Loader2 class="w-6 h-6 animate-spin text-ink-muted" />
@@ -277,7 +270,6 @@
   {/if}
 </div>
 
-<!-- Confirm dialog -->
 {#if confirmAction}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div

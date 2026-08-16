@@ -4,36 +4,30 @@
   import * as m from '$lib/paraglide/messages.js';
   import { showToast } from '$lib/stores/toast.svelte';
 
-  // Props
   interface Props {
     onSave: (blob: Blob) => Promise<void>;
     onCancel: () => void;
   }
   let { onSave, onCancel }: Props = $props();
 
-  // State
   let fileInput: HTMLInputElement | null = $state(null);
   let canvas: HTMLCanvasElement | null = $state(null);
   let image: HTMLImageElement | null = $state(null);
   let saving = $state(false);
 
-  // Transform state
   let scale = $state(1);
   let offsetX = $state(0);
   let offsetY = $state(0);
 
-  // Dynamic scale limits (computed based on image)
   let minScale = $state(0.1);
   let maxScale = $state(3);
 
-  // Drag state
   let isDragging = $state(false);
   let dragStartX = $state(0);
   let dragStartY = $state(0);
   let dragStartOffsetX = $state(0);
   let dragStartOffsetY = $state(0);
 
-  // Constants
   const CANVAS_SIZE = 256;
 
   function focusOnMount(node: HTMLElement) {
@@ -46,7 +40,6 @@
     const file = input.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       showToast({ type: 'error', message: m.avatar_select_image_file() });
       return;
@@ -57,20 +50,14 @@
       const img = new Image();
       img.onload = () => {
         image = img;
-        // Reset transform
         offsetX = 0;
         offsetY = 0;
 
-        // Compute scale limits based on image size
         const maxDim = Math.max(img.width, img.height);
         const minDim = Math.min(img.width, img.height);
 
-        // Min scale: fit entire image (largest dimension) in canvas
         minScale = CANVAS_SIZE / maxDim;
-        // Max scale: at least 3x the fit scale, or enough to show detail
         maxScale = Math.max(3, (CANVAS_SIZE / minDim) * 3);
-
-        // Initial scale: fit smallest dimension to fill canvas
         scale = CANVAS_SIZE / minDim;
 
         drawCanvas();
@@ -85,10 +72,8 @@
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-    // Draw image centered with transform
     const scaledWidth = image.width * scale;
     const scaledHeight = image.height * scale;
     const x = (CANVAS_SIZE - scaledWidth) / 2 + offsetX;
@@ -150,7 +135,6 @@
     saving = true;
 
     try {
-      // Convert canvas to blob
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas!.toBlob(
           (b) => {
@@ -171,7 +155,6 @@
     }
   }
 
-  // Redraw when scale/offset changes
   $effect(() => {
     if (image) {
       drawCanvas();
@@ -196,7 +179,6 @@
     <h2 id="avatar-modal-title" class="text-lg font-semibold text-ink-strong mb-4">{m.avatar_title()}</h2>
 
     {#if !image}
-      <!-- File selection -->
       <div class="flex flex-col items-center gap-4">
         <button
           onclick={() => fileInput?.click()}
@@ -214,9 +196,7 @@
         />
       </div>
     {:else}
-      <!-- Cropper -->
       <div class="flex flex-col items-center gap-4">
-        <!-- Canvas with circular mask preview -->
         <div
           role="slider"
           aria-label={m.avatar_drag_reposition()}
@@ -239,13 +219,11 @@
             height={CANVAS_SIZE}
             class="rounded-full"
           ></canvas>
-          <!-- Circular overlay to show crop area -->
           <div
             class="absolute inset-0 rounded-full ring-4 ring-accent/50 pointer-events-none"
           ></div>
         </div>
 
-        <!-- Zoom control -->
         <div class="w-full flex items-center gap-3">
           <ZoomOut class="w-5 h-5 text-ink-muted" />
           <input
@@ -264,7 +242,6 @@
       </div>
     {/if}
 
-    <!-- Actions -->
     <div class="flex gap-3 mt-6">
       <Button variant="ghost" size="lg" class="flex-1" onclick={onCancel}>
         {m.common_cancel()}

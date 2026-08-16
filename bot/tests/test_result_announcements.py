@@ -1,23 +1,6 @@
-"""Score-report detection for table voice channels (open reporting = anti-cheat).
-
-``compute_result_announcements`` is the gate that turns the firehose of whole-
-tournament SSE pushes into "post this table's VPs to its channel". It runs on
-EVERY tournament update (sanctions, check-ins, seating swaps, new rounds — all
-re-broadcast the whole object), so a false positive spams every table on every
-push. This pins the contract:
-
-  - announce only when a table's seats are unchanged but a reported score moved;
-  - stay silent on no-op pushes, on seating swaps (different players), and on
-    round/finals context changes (those carry their own seating announcement);
-  - only the table(s) that actually changed are announced, index-aligned to the
-    live table channels; finals is handled like a one-table round.
-
-Pure function, no bot/REST — only env vars to satisfy the config import.
-
-Run from bot/:
-    DISCORD_BOT_TOKEN=x OAUTH_CLIENT_ID=x OAUTH_CLIENT_SECRET=x \
-        uv run --with pytest pytest -q
-"""
+"""Runs on EVERY tournament update (sanctions, check-ins, seating swaps, new
+rounds all re-broadcast the whole object), so a false positive spams every
+table on every push."""
 
 from __future__ import annotations
 
@@ -72,12 +55,8 @@ def test_announces_only_the_table_whose_score_changed() -> None:
 
 
 def test_table_added_mid_round_keeps_original_alignment() -> None:
-    """A table appended mid-round must not shift an original table's channel.
-
-    prev has 1 table; cur has 2 (a table was added) AND table 0's score moved.
-    Only table 0's channel (111) is announced; the fresh table 1 has no prior
-    score to diff and is clamped out.
-    """
+    """A table appended mid-round must not shift an original table's channel;
+    the fresh table has no prior score to diff and is clamped out."""
     prev = _tourney([_table([_seat("alice"), _seat("bob")])])
     cur = _tourney(
         [

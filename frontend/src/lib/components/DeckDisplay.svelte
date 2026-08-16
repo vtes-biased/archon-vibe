@@ -55,7 +55,6 @@
     getCards().then(c => cards = c);
   });
 
-  // Validate deck reactively
   $effect(() => {
     const cardsToValidate = editing ? editedCards : deck.cards;
     if (!format || !Object.keys(cardsToValidate).length) {
@@ -70,7 +69,6 @@
   function startEditing() {
     editedCards = { ...deck.cards };
     editedName = deck.name;
-    // Determine attribution mode from current deck
     if (deck.attribution === null) {
       attrMode = 'anonymous';
     } else if (deck.attribution) {
@@ -116,7 +114,6 @@
       const auth = (await import('$lib/stores/auth.svelte')).getAuthState();
       const targetUid = playerUid || auth.user?.uid;
 
-      // Compute attribution and author from attrMode
       let attrValue: string | null | undefined = undefined;
       let authorValue = deck.author;
       if (attrMode === 'anonymous') {
@@ -203,7 +200,6 @@
     'Reaction', 'Combat', 'Combat/Reaction', 'Event',
   ];
 
-  // Group library by type
   const libraryByType = $derived.by(() => {
     const groups: Record<string, DisplayEntry[]> = {};
     for (const entry of libraryEntries) {
@@ -231,7 +227,6 @@
 </script>
 
 {#if editing}
-  <!-- Editable name -->
   <input
     type="text"
     bind:value={editedName}
@@ -239,7 +234,6 @@
     class="w-full px-3 py-2 mb-2 bg-surface-muted border border-line-strong rounded-lg text-ink-bright placeholder-ink-faint text-sm"
   />
 
-  <!-- Attribution -->
   <AttributionPicker
     bind:mode={attrMode}
     bind:search={attributionSearch}
@@ -277,7 +271,6 @@
 {/if}
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-  <!-- Crypt -->
   <div>
     <h5 class="font-semibold text-ink-bright mb-1">{m.deck_crypt_count({ count: cryptCount.toString() })}</h5>
     <div class="space-y-0.5">
@@ -317,7 +310,6 @@
     </div>
   </div>
 
-  <!-- Library -->
   <div>
     <h5 class="font-semibold text-ink-bright mb-1">{m.deck_library_count({ count: libraryCount.toString() })}</h5>
     {#each libraryByType as [type, entries]}
@@ -386,7 +378,6 @@
   </div>
 {/if}
 
-<!-- Card image modal -->
 {#if cardImageUrl}
   <div
     class="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"

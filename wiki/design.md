@@ -274,6 +274,15 @@ input the server-side computation uses — the viewer can't see sanctions, the r
 isn't in scope, the engine binding isn't loaded — render an em dash and, where it
 helps, say why.
 
+**Player display privacy** — offline events show the real name and VEKN ID;
+online events show the nickname, with the abbreviated real name and VEKN ID in
+parentheses. `seatDisplay`/`seatDisplayParts` in `tournament-utils.ts` own the
+rule.
+
+**Create and edit share sections, not initial state** — a form used for both
+(TournamentFields' `mode` prop) keeps the same sections but differs in what starts
+expanded: creation opens what must be filled, editing opens nothing.
+
 **Country display** — flag then name in body text (`🇫🇷 France`), name then flag in
 `<select>` options (`France 🇫🇷`) so browser type-ahead works.
 
@@ -302,3 +311,10 @@ checks against three rules before adding anything:
 
 The boundary rule: actions that operate on what you are looking at stay on that
 surface as icons; actions that operate on the tournament go in Tools.
+
+**No "Advanced" section.** It names a frequency, not a topic, and becomes a
+dumping ground; every config field lives in the section its subject belongs to.
+
+Two components enforce the console grammar: `FoldableSection` is the one shell
+every config section uses, and `InlineNotice` is the one shape for a notice —
+two tones, chosen by what the reader must *do*, not by severity theatre.

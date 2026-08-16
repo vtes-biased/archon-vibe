@@ -42,7 +42,6 @@
 
   let error = $state<string | null>(null);
 
-  // Alter seating mode
   let alterMode = $state(false);
 
   const canEditSeating = $derived(
@@ -89,12 +88,9 @@
   {#if !hasFinalsCandidate}
     <p class="text-ink-muted">{m.finals_require_rounds()}</p>
   {:else if !tournament.finals}
-    <!-- Who would sit if a final is called — the thing an organizer actually
-         wants from this tab before one exists. Deliberately no Start Finals
-         button: finishing without a final is legitimate (VEKN §3.1.6), so this
-         must not frame a final as the expected next step, and the action bar
-         owns every state transition anyway. It also owns the "toss needed"
-         warning when the cutoff is tied, so this panel does not repeat it. -->
+    <!-- Deliberately no Start Finals button: finishing without a final is
+         legitimate (VEKN §3.1.6), and the action bar already owns state
+         transitions and the toss-needed warning. -->
     <p class="text-ink-muted text-sm">{m.finals_seeding_projected()}</p>
     <div class="bg-surface-muted/50 rounded-lg p-4 space-y-1.5">
       {#each standings.slice(0, 5) as e, i}
@@ -109,14 +105,12 @@
   {:else}
     <h3 class="text-lg font-medium text-ink-strong">{m.finals_title()}</h3>
 
-    <!-- Finals timer (counts down finals_time; organizer gets start/pause/reset + extensions) -->
     {#if (tournament.finals_time || tournament.round_time || 0) > 0 && tournament.state === "Playing"}
       <div class="bg-surface-muted/50 rounded-lg p-4 flex justify-center">
         <TimerDisplay {tournament} {isOrganizer} finals />
       </div>
     {/if}
 
-    <!-- Finals table -->
     <div class="bg-surface-muted/50 rounded-lg p-4">
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-2">
@@ -132,7 +126,6 @@
         </span>
       </div>
       {#if alterMode}
-        <!-- In-place alter seating mode -->
         <p class="text-sm text-ink mb-2">{m.rounds_alter_hint()}</p>
         <p class="text-xs text-ink-muted mb-2">
           {m.finals_seating_procedure_hint()}

@@ -1,12 +1,3 @@
-/**
- * SSE sync manager with snapshot-based initial load.
- *
- * Flow:
- * 1. First connect (no last_sync_timestamp): fetch gzip snapshot, load into IDB
- * 2. Connect SSE with since=<timestamp> for catch-up + real-time updates
- * 3. On resync: re-fetch snapshot, reconnect SSE
- */
-
 import type { User, Sanction, Tournament, DeckObject, League, Promo } from '$lib/types';
 import {
   saveUser,
@@ -59,9 +50,8 @@ import { isOffline, getOfflineTournamentUids, lostOfflineLock, handleOfflineLock
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
-// Must match backend snapshots.SNAPSHOT_FORMAT_VERSION. The header line is checked
-// against it so a format the client can't read is refused outright rather than
-// half-ingested into the stores.
+// Must match backend snapshots.SNAPSHOT_FORMAT_VERSION; a mismatch is refused
+// outright rather than half-ingested into the stores.
 const SNAPSHOT_FORMAT_VERSION = 2;
 
 type SyncEventType = 'connected' | 'user' | 'sanction' | 'tournament' | 'deck' | 'league' | 'judge_call' | 'sync_complete' | 'syncing' | 'resync' | 'error' | 'disconnected';
@@ -82,24 +72,19 @@ interface SyncEvent {
 
 type SyncEventCallback = (event: SyncEvent) => void;
 
-/** Spec for a synced object type */
 interface ObjectSpec<T> {
-  batchType: string;     // "users", "sanctions", "tournaments", "decks", "leagues"
-  singleType: string;    // "user", "sanction", "tournament", "deck", "league"
+  batchType: string;
+  singleType: string;
   save: (item: T) => Promise<void>;
   saveBatch: (items: T[]) => Promise<void>;
-  // All types hard-delete by uid on a tombstone (Universal Soft-Delete, wiki/sync.md).
-  // `item` carries the full soft-deleted payload when available, but isn't needed.
+  // Hard-deletes by uid on a tombstone; `item` carries the soft-deleted
+  // payload when available, but isn't needed.
   del: (uid: string, item?: T) => Promise<void>;
 }
 
 const SPECS: ObjectSpec<any>[] = [
-  // Users hard-delete on a tombstone like every other type. Safe even though
-  // tournament standings/seating store only user_uid (name via getUser): every
-  // deletable member is VEKN-less (delete refuses VEKN-bearing; merge_users and
-  // the import shells omit the id) and tournament participation requires a
-  // vekn_id, so a deleted user is never a live player ref. (A legacy pre-VEKN
-  // imported event may then show a raw uid for a nameless player — cosmetic.)
+  // Users hard-delete safely: every deletable member is VEKN-less, and tournament participation
+  // requires a vekn_id, so a deleted user is never a live player ref.
   { batchType: 'users', singleType: 'user', save: saveUser, saveBatch: saveUsersBatch, del: deleteUser },
   { batchType: 'sanctions', singleType: 'sanction', save: saveSanction, saveBatch: saveSanctionsBatch, del: deleteSanction },
   { batchType: 'tournaments', singleType: 'tournament', save: saveTournament, saveBatch: saveTournamentsBatch, del: deleteTournament },
@@ -114,10 +99,8 @@ const SPECS: ObjectSpec<any>[] = [
   },
 ];
 
-// Prefetch active promo images into the service-worker cache: the cache only
-// populates on fetch, and the offline raffle-winner display needs the bytes
-// present even if this device never viewed the promo online. Versioned URLs
-// are immutable, so a re-fetch of an already-cached version is served locally.
+// Prefetches into the SW cache since it only populates on fetch; offline
+// raffle display needs the bytes even if this device never viewed the promo.
 function prefetchPromoImages(promos: Promo[]): void {
   const apiBase = import.meta.env.VITE_API_URL ?? "";
   for (const p of promos) {
@@ -133,20 +116,13 @@ class SyncManager {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
-  private maxReconnectDelay = 120_000; // 2 minutes ceiling
+  private maxReconnectDelay = 120_000;
 
-  // Consecutive `resync` messages with no intervening `sync_complete`. A single
-  // resync reconnects immediately (stay responsive); a persistent cause (server
-  // av bug, staleness storm) would otherwise be a full-speed clear+reconnect
-  // loop, so the 2nd+ resync routes through exponential backoff. Reset on
-  // sync_complete (a clean full sync landed) — load-bearing: assumes the server
-  // always closes a catch-up stream with sync_complete, else a healthy client
-  // could accrue a false streak and self-throttle.
+  // Resets only on sync_complete; assumes the server always closes a catch-up stream with
+  // sync_complete, else a healthy client accrues a false streak and self-throttles.
   private resyncStreak = 0;
-  // Consecutive non-warm-up snapshot failures (broken: non-503 HTTP, corrupt
-  // gzip, parse error). 503 is the expected first-sync warm-up and never counts.
-  // We keep retrying either way, but surface a console signal once a genuinely
-  // broken snapshot has failed this many times so it isn't silent forever.
+  // Counts non-warm-up failures (503 is expected first-sync warm-up, never counted); surfaces a
+  // console signal once broken repeatedly instead of failing silently forever.
   private snapshotFailStreak = 0;
   private static readonly SNAPSHOT_FAIL_WARN = 5;
   private static readonly RESYNC_BACKOFF_AFTER = 1;
@@ -154,36 +130,23 @@ class SyncManager {
   // heap to one batch; the file itself is streamed, never materialised.
   private static readonly SNAPSHOT_BATCH = 500;
 
-  // Monotonic connect generation. Bumped at the top of every connect(); a
-  // cycle whose epoch is stale aborts at its next await instead of mutating
-  // shared state. Guards against overlapping refresh()/connect() cycles
-  // (e.g. logout→login→claim in quick succession) racing on IndexedDB and
-  // this.eventSource, which could otherwise leave a stale lower-access-level
-  // stream's data installed on top of the newest one's.
+  // Bumped at the top of every connect(); a stale epoch aborts at its next await, guarding overlapping
+  // connect()/refresh() cycles from clobbering IndexedDB with stale data.
   private connectEpoch = 0;
 
-  // Generic buffers keyed by batch type
   private buffers: Map<string, any[]> = new Map();
   public isSynced = false;
 
-  // High-water mark of the sync cursor, mirrored to IndexedDB. Advanced on
-  // sync_complete AND on every applied live event so the `since=` catch-up
-  // window after a reconnect stays minimal (the server re-streams everything
-  // modified after this; if it only moved on sync_complete the backlog would
-  // grow unbounded and eventually trip the 3-day full-resync guard).
+  // Advances on sync_complete AND every applied live event, so the since= catch-up window stays
+  // minimal instead of growing unbounded and tripping the 3-day resync guard.
   private lastTimestamp: string | null = null;
 
-  /** True if a newer connect() has started since `epoch` was captured. */
   private superseded(epoch: number): boolean {
     return epoch !== this.connectEpoch;
   }
 
-  /**
-   * Fetch and load a gzip snapshot from the server.
-   * Returns the snapshot timestamp, or null on failure (or if superseded).
-   * `epoch` is the connect generation that requested this snapshot; if a newer
-   * connect() starts while we're in flight we bail before touching IndexedDB.
-   */
+  // If a newer connect() starts while this snapshot fetch is in flight, bail
+  // before touching IndexedDB.
   private async fetchSnapshot(epoch: number, token: string | null): Promise<string | null> {
     const buildUrl = (t: string | null) => {
       const params = new URLSearchParams();
@@ -206,16 +169,14 @@ class SyncManager {
         }
       }
       if (!response.ok) {
-        // 503 = first-sync warm-up (snapshot generator hasn't run yet): expected,
-        // self-heals, retried indefinitely by connect(). Anything else is a
-        // genuinely broken snapshot that would otherwise retry forever silently.
+        // 503 = first-sync warm-up (snapshot generator hasn't run yet): expected, self-heals, retried
+        // indefinitely by connect(). Anything else is a genuinely broken snapshot.
         this.noteSnapshotFailure(response.status === 503 ? null : `status ${response.status}`);
         return null;
       }
 
-      // Seed the access-version fingerprint from the response header BEFORE opening
-      // /stream, so the first connect echoes a matching `av` and doesn't resync. It's
-      // per-user (not in the shared snapshot body); the client only stores + echoes it.
+      // Seed the access-version fingerprint from the response header BEFORE opening /stream, so the
+      // first connect echoes a matching `av` and doesn't resync — it's per-user, so it can't live in the shared snapshot body.
       const accessVersion = response.headers.get('X-Access-Version');
 
       if (!response.body) {
@@ -223,13 +184,8 @@ class SyncManager {
         return null;
       }
 
-      // Stream the file: gunzip → decode → split lines → parse one → save → drop.
-      // The whole point of the JSONL format is that no step ever holds the corpus;
-      // the previous shape kept the compressed bytes, the decompressed text and the
-      // parsed object graph alive at once, which OOM-killed tabs on mid-range phones.
-      // Content-Encoding: gzip means fetch usually gunzips for us — but not through
-      // every proxy, so sniff the magic bytes off the first chunk and pipe through
-      // DecompressionStream only when the bytes really are still gzip.
+      // Streams gunzip→decode→split→parse→save→drop so no step holds the whole corpus (previous shape
+      // OOM-killed mid-range phones). Sniffs the magic bytes since not every proxy honors Content-Encoding: gzip.
       const reader = response.body.getReader();
       const first = await reader.read();
       const head = first.value;
@@ -252,14 +208,12 @@ class SyncManager {
       if (stillGzipped) byteStream = source.pipeThrough(new DecompressionStream('gzip'));
       const textStream = byteStream.pipeThrough(new TextDecoderStream());
 
-      // A newer connect() may have superseded us while the snapshot was in
-      // flight; bail before touching IndexedDB so we don't clear/clobber the
-      // data the newer cycle is loading.
+      // A newer connect() may have superseded us while the snapshot was in flight; bail before
+      // touching IndexedDB so we don't clear/clobber the data the newer cycle is loading.
       if (this.superseded(epoch)) return null;
 
-      // Mark BEFORE the clear: everything from here to the eof line leaves the
-      // stores in a partial state that looks valid, so a crash/close/truncation
-      // anywhere in between must be detectable on the next boot.
+      // Mark BEFORE the clear: everything from here to the eof line leaves the stores in a partial
+      // state that looks valid, so a crash/close/truncation in between must be detectable on the next boot.
       await setSnapshotIngesting();
       await this.clearAllStores();
       if (this.superseded(epoch)) return null;
@@ -303,18 +257,13 @@ class SyncManager {
           sawEof = true;
           return;
         }
-        // Counted BEFORE the spec lookup: this is a did-the-whole-file-arrive check,
-        // not a did-we-understand-it check. Counting only known types would make a
-        // backend that adds an object type before clients ship support for it look
-        // like a truncated file to every one of them — i.e. nobody can bootstrap.
-        // An unknown type is simply ignored; a genuinely breaking change bumps
-        // SNAPSHOT_FORMAT_VERSION instead.
+        // Counted BEFORE the spec lookup: an unknown type is simply ignored, so a backend that adds
+        // an object type before clients ship support doesn't look truncated to every one of them.
         objectLines++;
         const spec = SPECS.find(s => s.singleType === entry.type);
         if (!spec || !entry.data) return;
-        // Skip tournaments this device holds offline — UNLESS the server shows
-        // we've lost the lock (force-unlock / takeover), in which case reconcile
-        // and apply the authoritative copy so the device "gets the memo".
+        // Skip tournaments this device holds offline — UNLESS the server shows we've lost the lock
+        // (force-unlock/takeover), in which case reconcile and apply the authoritative copy.
         if (spec.batchType === 'tournaments') {
           if (lostOfflineLock(entry.data)) {
             await handleOfflineLockLost(entry.data.uid);
@@ -347,14 +296,12 @@ class SyncManager {
 
       for (const spec of SPECS) await flush(spec);
 
-      // No eof line = the file ended early (dropped connection, partial write).
-      // Leave the ingest marker set so the next boot refetches instead of
-      // trusting a corpus that is silently missing rows.
+      // No eof line = the file ended early (dropped connection, partial write). Leave the ingest marker
+      // set so the next boot refetches instead of trusting a corpus silently missing rows.
       if (!sawEof) throw new Error('snapshot ended without eof');
 
-      // Cleared before the supersede check: eof landed and every batch is flushed, so
-      // the stores are whole even if a newer connect() is about to discard this cycle.
-      // Leaving it set would make the next boot re-download a file we already have.
+      // Cleared before the supersede check: eof landed and every batch is flushed, so the stores are
+      // whole even if a newer connect() is about to discard this cycle.
       await clearSnapshotIngesting();
 
       if (this.superseded(epoch)) return null;
@@ -378,14 +325,8 @@ class SyncManager {
     }
   }
 
-  /**
-   * Record a snapshot fetch outcome. `detail === null` is the expected warm-up
-   * 503 — not counted. A string is a genuinely broken snapshot: we keep retrying
-   * (non-terminal) but surface a console signal once it's failed repeatedly, so
-   * a broken snapshot doesn't loop forever with nothing surfaced. Deliberately
-   * console-only (not emit({type:'error'}), which +layout treats as a terminal
-   * sync failure and shows a Reconnect banner — wrong for an active auto-retry).
-   */
+  /** `detail === null` is the expected warm-up 503 — not counted. A string keeps retrying but warns
+   * once repeated. Deliberately console-only, not emit({type:'error'}) — +layout treats that as terminal and shows a Reconnect banner, wrong for an active auto-retry. */
   private noteSnapshotFailure(detail: string | null): void {
     if (detail === null) return;
     this.snapshotFailStreak++;
@@ -394,17 +335,10 @@ class SyncManager {
     }
   }
 
-  /**
-   * Start syncing with the backend.
-   * First connect: fetch snapshot, then connect SSE for catch-up + real-time.
-   * Subsequent connects: SSE only with since= parameter.
-   * After clearAllStores(), lastSync is null so connect() naturally fetches snapshot first.
-   */
+  /** After clearAllStores(), lastSync is null so connect() naturally fetches snapshot first. */
   async connect(): Promise<void> {
-    // Each connect() supersedes any still-running earlier one. After every
-    // await we re-check the epoch and bail if a newer connect()/refresh() has
-    // started, so a slow stale cycle (e.g. the pre-claim public-level stream)
-    // can't clear IndexedDB or install its EventSource on top of newer data.
+    // Each connect() supersedes any still-running earlier one; after every await we re-check the epoch
+    // and bail if a newer cycle started, so a slow stale one can't clear IndexedDB on top of newer data.
     const epoch = ++this.connectEpoch;
     await this.disconnect();
     if (this.superseded(epoch)) return;
@@ -427,9 +361,8 @@ class SyncManager {
     }
     const token = auth.kind === 'token' ? auth.token : null;
 
-    // A marker surviving from a previous session means the stores hold a partial
-    // snapshot (see setSnapshotIngesting). The rows present look valid, so nothing
-    // downstream could notice — clear and refetch before reading the cursor.
+    // A marker surviving from a previous session means the stores hold a partial snapshot: the rows
+    // present look valid, so nothing downstream could notice — clear and refetch before reading the cursor.
     if (await getSnapshotIngesting()) {
       console.warn('Snapshot ingest was interrupted; discarding partial data');
       await this.clearAllStores();
@@ -440,28 +373,21 @@ class SyncManager {
     let lastSync: string | null = await getLastSyncTimestamp();
     if (this.superseded(epoch)) return;
 
-    // If no sync timestamp, fetch snapshot first
     if (!lastSync) {
       lastSync = await this.fetchSnapshot(epoch, token);
       if (this.superseded(epoch)) return;
       if (!lastSync) {
-        // Snapshot unavailable — typically the first-VEKN-sync warm-up window on a
-        // fresh deploy, where /snapshot 503s until generate_snapshots first runs.
-        // We must NOT fall through to /stream here: with no `av` the server's
-        // entitlement handshake always mismatches and answers with an immediate
-        // `resync`, which clears IDB and reconnects with no delay — a tight loop
-        // (the /stream open/close + 503 churn in the backend log). Back off and
-        // retry the snapshot instead; it self-heals the moment the first sync lands.
+        // Snapshot unavailable (first-VEKN-sync warm-up) — must NOT fall through to /stream: with no
+        // `av` the handshake always mismatches and resyncs immediately, a tight clear/reconnect loop. Retry the snapshot; it self-heals once the first sync lands.
         void this.handleError(true);
         return;
       }
     }
 
-    // Seed the in-memory high-water mark from the cursor we connect with.
     this.lastTimestamp = lastSync;
 
     // Snapshot freshness signal: lets the server's staleness/access guards measure real
-    // client-away time instead of the data's last-modified time (see backend stream guard).
+    // client-away time instead of the data's last-modified time.
     const generatedAt = await getLastSyncGeneratedAt();
     if (this.superseded(epoch)) return;
 
@@ -475,9 +401,8 @@ class SyncManager {
     if (generatedAt) params.set('generated_at', generatedAt);
     if (accessVersion) params.set('av', accessVersion);
     if (token) params.set('token', token);
-    // Identify this device so the server can self-exclude it from its own
-    // offline-lock writes (go-online), whose echo would otherwise race ahead of
-    // the HTTP response — see broadcast_precomputed(exclude_device_id=...).
+    // Identifies this device so the server can self-exclude it from its own offline-lock writes
+    // (go-online), whose echo would otherwise race ahead of the HTTP response.
     params.set('device_id', getDeviceId());
     const qs = params.toString();
     const url = qs ? `${API_URL}/stream?${qs}` : `${API_URL}/stream`;
@@ -494,7 +419,6 @@ class SyncManager {
       try {
         const message = JSON.parse(event.data);
 
-        // Handle resync: server says data is too stale — reconnect with full stream
         if (message.type === 'resync') {
           // Clear buffers before disconnect(): its flushAllBuffers() would
           // otherwise re-populate the stores we just wiped.
@@ -502,9 +426,8 @@ class SyncManager {
           await this.clearAllStores();
           await this.disconnect();
           this.emit({ type: 'resync' });
-          // First resync reconnects immediately; if resyncs keep coming with no
-          // sync_complete between them, back off so a persistent cause can't spin
-          // a full-speed clear+reconnect loop against the server.
+          // First resync reconnects immediately; if resyncs keep coming with no sync_complete between
+          // them, back off so a persistent cause can't spin a full-speed clear+reconnect loop.
           this.resyncStreak++;
           if (this.resyncStreak <= SyncManager.RESYNC_BACKOFF_AFTER) {
             void this.connect();
@@ -519,7 +442,6 @@ class SyncManager {
           return;
         }
 
-        // Handle sync_complete
         if (message.type === 'sync_complete') {
           this.resyncStreak = 0;
           try { await this.flushAllBuffers(); } catch (e) { console.error('Flush failed:', e); }
@@ -535,9 +457,7 @@ class SyncManager {
           return;
         }
 
-        // Generic handling: find matching spec
         for (const spec of SPECS) {
-          // Batch event (catch-up after snapshot)
           if (message.type === spec.batchType) {
             const items = message.data as any[];
             const buf = this.buffers.get(spec.batchType) || [];
@@ -546,12 +466,10 @@ class SyncManager {
             return;
           }
 
-          // Single event (real-time update)
           if (message.type === spec.singleType) {
             const item = message.data as any;
-            // Skip SSE updates for tournaments in local offline mode — unless the
-            // server shows we've lost the lock (force-unlock / takeover): then
-            // reconcile and fall through to apply the authoritative update.
+            // Skip SSE updates for tournaments in local offline mode — unless the server shows we've
+            // lost the lock (force-unlock/takeover): then reconcile and apply the authoritative update.
             if (spec.singleType === 'tournament' && isOffline(item.uid)) {
               if (lostOfflineLock(item)) {
                 await handleOfflineLockLost(item.uid);
@@ -564,22 +482,15 @@ class SyncManager {
             } else {
               await spec.save(item);
             }
-            // Advance the sync cursor past this applied event so a reconnect
-            // resumes from here rather than re-streaming since the last
-            // sync_complete. Use the envelope `ts` (authoritative modified_at,
-            // same value space as the server's `since` filter and sync_complete)
-            // — NOT item.modified, which is an app-clock payload value in a
-            // different format. Monotonic guard against any out-of-order event.
+            // Advances the cursor past this applied event using the envelope `ts` (authoritative
+            // modified_at) — NOT item.modified (an app-clock value in a different format). Monotonic guard against out-of-order events.
             const ts: string | undefined = message.ts;
             if (ts && (this.lastTimestamp === null || ts > this.lastTimestamp)) {
               this.lastTimestamp = ts;
               try { await setLastSyncTimestamp(ts); } catch (e) { console.error('Save cursor failed:', e); }
             }
-            // A targeted entitlement-invalidation frame carries the new fingerprint so
-            // we don't mismatch (and resync needlessly) on the next reconnect. We trust it
-            // blindly, so the server invariant is load-bearing: `av` rides ONLY per-user
-            // (broadcast_personal) frames, never per-level shared ones — a shared av would
-            // be wrong for some recipients and resync-loop them.
+            // A targeted entitlement frame carries the new fingerprint so the next reconnect doesn't
+            // mismatch. Trusted blindly: `av` must ride ONLY per-user frames — a shared av would be wrong for some recipients and resync-loop them.
             const newAv: string | undefined = message.av;
             if (newAv) {
               try { await setLastSyncAccessVersion(newAv); } catch (e) { console.error('Save access version failed:', e); }
@@ -595,25 +506,19 @@ class SyncManager {
     };
 
     this.eventSource.onerror = (error) => {
-      // EventSource fires onerror on every transient drop before auto-reconnecting;
-      // we run our own backoff in handleError(). Log at debug so an expected
-      // reconnect doesn't spam error-level noise — the terminal give-up (below)
-      // is the one that logs at error level.
+      // EventSource fires onerror on every transient drop before auto-reconnecting; we run our own backoff
+      // in handleError(). Log at debug so an expected reconnect doesn't spam error-level noise.
       console.debug('SSE connection error (will reconnect):', error);
       void this.handleError();
     };
   }
 
-  /**
-   * Flush all buffered data to IndexedDB.
-   */
   private async flushAllBuffers(): Promise<void> {
     for (const spec of SPECS) {
       const buf = this.buffers.get(spec.batchType);
       if (buf && buf.length > 0) {
         this.buffers.set(spec.batchType, []);
         try {
-          // Separate deleted items; skip offline tournaments from batch sync
           const toSave: any[] = [];
           const toDelete: any[] = [];
           for (const item of buf) {
@@ -639,17 +544,9 @@ class SyncManager {
     }
   }
 
-  /**
-   * Clear all IndexedDB stores (used on resync and refresh).
-   * Preserves offline tournament data to avoid data loss.
-   */
   private async clearAllStores(): Promise<void> {
-    // Preserve unsynced offline-tournament data before clearing — it isn't
-    // re-fetchable from SSE (offline tournaments are locked to this device).
-    // The offline_* metadata keys survive (only the last_sync_* cursor keys are removed),
-    // but the rows they point to live in the cleared stores, so rescue them too —
-    // otherwise go-online's getSanction/getDeck lookups return undefined and the
-    // offline sanctions/decks are silently dropped from reconciliation.
+    // Preserve unsynced offline-tournament data before clearing (not re-fetchable from SSE): the
+    // offline_* metadata keys survive, but the rows they point to live in the cleared stores — rescue them or go-online's getSanction/getDeck lookups return undefined.
     const offlineUids = getOfflineTournamentUids();
     const tournaments: Tournament[] = [];
     const users: User[] = [];
@@ -682,20 +579,14 @@ class SyncManager {
     await clearLastSyncGeneratedAt();
     await clearLastSyncAccessVersion();
 
-    // Restore preserved offline data.
     if (tournaments.length > 0) await saveTournamentsBatch(tournaments);
     if (users.length > 0) await saveUsersBatch(users);
     if (sanctions.length > 0) await saveSanctionsBatch(sanctions);
     if (decks.length > 0) await saveDecksBatch(decks);
   }
 
-  /**
-   * Handle SSE error: disconnect (flushing buffers) then schedule reconnect.
-   * When any tournament is offline, retry indefinitely with a higher backoff ceiling.
-   * `transient` (snapshot not generated yet — first-sync warm-up) likewise retries
-   * indefinitely with the capped backoff: the snapshot WILL appear once the first
-   * sync completes, so giving up after maxReconnectAttempts would strand the client.
-   */
+  /** When any tournament is offline, or on `transient` (snapshot not generated yet — first-sync
+   * warm-up), retries indefinitely with the capped backoff instead of giving up after maxReconnectAttempts. */
   private async handleError(transient = false): Promise<void> {
     await this.disconnect();
     const hasOfflineTournaments = getOfflineTournamentUids().size > 0;
@@ -716,9 +607,6 @@ class SyncManager {
     }
   }
 
-  /**
-   * Disconnect from SSE stream, flushing any buffered data.
-   */
   async disconnect(): Promise<void> {
     if (this.eventSource) {
       this.eventSource.close();
@@ -728,25 +616,16 @@ class SyncManager {
     }
   }
 
-  /**
-   * Check if currently connected to SSE stream.
-   */
   isConnected(): boolean {
     return this.eventSource !== null && this.eventSource.readyState === EventSource.OPEN;
   }
 
-  /**
-   * Reset: disconnect and clear all local data (used on logout).
-   */
   async reset(): Promise<void> {
     await this.disconnect();
     await this.clearAllStores();
   }
 
-  /**
-   * Perform a full refresh: clear local data and resync everything.
-   * After clearAllStores(), lastSync is null so connect() fetches snapshot first.
-   */
+  /** After clearAllStores(), lastSync is null so connect() fetches snapshot first. */
   async refresh(): Promise<void> {
     await this.clearAllStores();
     await this.connect();
@@ -764,16 +643,11 @@ class SyncManager {
     this.listeners.forEach(callback => callback(event));
   }
 
-  /**
-   * Re-run the same UI refresh hooks SSE events trigger, for LOCAL IndexedDB
-   * mutations on a device-locked offline tournament (no SSE will arrive).
-   * Offline sanction management is the consumer; keep this narrow — online
-   * mutations must keep flowing through the server → SSE path.
-   */
+  /** Re-runs the same UI refresh hooks SSE events trigger, for LOCAL IndexedDB mutations on a device-
+   * locked offline tournament (no SSE will arrive). Keep this narrow — online mutations must keep flowing through server → SSE. */
   notifyLocalMutation(type: 'sanction' | 'deck' | 'tournament', data?: Sanction | DeckObject | Tournament): void {
     this.emit({ type, data });
   }
 }
 
-// Singleton instance
 export const syncManager = new SyncManager();

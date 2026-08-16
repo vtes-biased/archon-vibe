@@ -1,6 +1,3 @@
-/**
- * Plain text generation for sharing tournament results via clipboard.
- */
 import type { Tournament, Deck, DeckObject, VtesCard } from "$lib/types";
 import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
 import { seatDisplay } from "$lib/tournament-utils";
@@ -49,7 +46,6 @@ function formatDeckText(deck: Deck, cardsMap: Map<number, VtesCard>): string[] {
     lines.push("");
   }
 
-  // Group library by type in TWDA order
   if (library.length) {
     lines.push(`Library (${libTotal})`);
     const groups: Record<string, CardEntry[]> = {};
@@ -80,7 +76,6 @@ export async function generateResultsText(
 
   lines.push(`\u{1F3C6} ${tournament.name}`);
 
-  // Date + location
   const parts: string[] = [];
   if (tournament.start) {
     const d = new Date(tournament.start);
@@ -92,7 +87,6 @@ export async function generateResultsText(
   }
   if (parts.length) lines.push(`\u{1F4C5} ${parts.join(" \u00B7 ")}`);
 
-  // Format / rank
   const typeParts: string[] = [];
   if (tournament.format) typeParts.push(tournament.format);
   if (tournament.rank) typeParts.push(tournament.rank);
@@ -103,7 +97,6 @@ export async function generateResultsText(
 
   lines.push("");
 
-  // Winner
   if (tournament.winner) {
     const winnerName = seatDisplay(tournament.winner, playerInfo, tournament.online);
     const winnerEntry = standings.find((e) => e.user_uid === tournament.winner);
@@ -112,7 +105,6 @@ export async function generateResultsText(
     lines.push("");
   }
 
-  // All standings
   if (standings.length > 0) {
     lines.push(`${m.tournament_standings()}:`);
     for (const entry of standings) {
@@ -124,7 +116,6 @@ export async function generateResultsText(
     lines.push("");
   }
 
-  // Winner's decklist (loaded from IDB decks store)
   if (tournament.winner) {
     const decksByUser = await getDecksByTournamentGrouped(tournament.uid);
     const winnerDecks = decksByUser[tournament.winner];
@@ -141,7 +132,6 @@ export async function generateResultsText(
     }
   }
 
-  // Event link
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://archon.vekn.net";
   lines.push(`${baseUrl}/tournaments/${tournament.uid}`);
 

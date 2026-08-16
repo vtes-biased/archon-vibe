@@ -29,12 +29,10 @@
     let showSuggestions = $state(false);
     let selectedIndex = $state(-1);
 
-    // Sync input value with bound value
     $effect(() => {
         inputValue = value;
     });
 
-    // Reload venues when country changes
     $effect(() => {
         const c = country;
         getVenuesByCountry(c).then(v => { allVenues = v; });

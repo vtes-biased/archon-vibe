@@ -1,24 +1,7 @@
-"""Tests for VEKN member sync role seeding (vekn_sync.sync_player).
-
-Invariant pair (one test each), the contract restored after the outright
-removal in 364a7ec — guarding against an *accidental* re-swing of role handling
-in this access-control-sensitive path:
-
-* CREATE seeds derived roles. A vekn.net Prince/NC/admin/judge that this sync
-  imports for the first time gets the corresponding role written. Regression
-  guarded: dropping the seed again strands environments populated by this sync
-  alone (dev-reset, post-decommission rebuild) with zero roles and a locked-out
-  role-edit API (it needs an IC caller).
-* UPDATE never writes roles. A re-sync of an existing user leaves the user's
-  app-managed roles intact even when the incoming vekn data would derive a
-  different set. Regression guarded: re-introducing role derivation on the
-  update path flips access control daily (an IC's app-granted roles wiped, or
-  a revoked Prince silently re-granted, on every sync run).
-
-Both run sync_player end-to-end against the real DB (real save_user /
-get_user_by_vekn_id / _derive_role_seeds) — the shipped interface, no mocks.
-A static-roster admin id (ADMINS in data/vekn_roster.py) is imported so the
-assertion tracks the shipped roster rather than a hand-copied id.
+"""VEKN member sync role seeding (vekn_sync.sync_player): CREATE seeds derived
+roles (Prince/NC/IC); UPDATE never writes roles, so app-managed roles survive
+re-sync — the contract restored after 364a7ec's removal of it. Runs end-to-end
+against the real DB, no mocks.
 """
 
 import pytest
@@ -29,9 +12,9 @@ from src.vekn_sync import VEKNSyncService
 
 @pytest.mark.asyncio
 async def test_create_seeds_derived_roles(test_db):
-    # A static-roster admin, so the create seed must cover Prince (princeid),
-    # NC (coordinatorid) and IC (ADMINS) in a single pass. Judge ranks are no
-    # longer seeded here — they are app-managed (see data/vekn_roster.py).
+    # A static-roster admin, so create must derive Prince (princeid), NC
+    # (coordinatorid) and IC (ADMINS) together. Judge ranks are not seeded —
+    # app-managed, no vekn.net field.
     roster_id = next(iter(ADMINS))
 
     user, action = await VEKNSyncService().sync_player(

@@ -5,9 +5,8 @@ use json::JsonValue;
 use std::collections::HashMap;
 use unicode_normalization::UnicodeNormalization;
 
-/// Fold Latin accents to ASCII so an accent-free spelling matches: NFD-decompose
-/// (é → e + combining mark), drop the combining marks, and map the few letters that
-/// don't decompose (ł, ø, æ, …). Small on purpose — VTES names are Latin-script.
+/// NFD-decomposes (é → e + combining mark), drops combining marks, and maps the
+/// few letters that don't decompose (ł, ø, æ, …) — small on purpose, VTES names are Latin-script.
 fn fold_ascii(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.nfd() {
@@ -58,10 +57,9 @@ pub enum CardKind {
     Library,
 }
 
-/// Normalize a card name for fuzzy lookup: fold accents to ASCII, lowercase, strip
-/// non-alphanumeric. Folding lets an accent-free spelling match ("Francois Villon"
-/// for "François Villon"); the index and the query both pass through here, so both
-/// sides fold identically.
+/// Folds accents to ASCII so an accent-free spelling matches ("Francois Villon"
+/// for "François Villon"). The index and the query both pass through here, so
+/// both sides fold identically.
 pub fn normalize_name(name: &str) -> String {
     fold_ascii(name)
         .chars()
@@ -97,7 +95,6 @@ impl CardMap {
                 .map_err(|_| format!("Invalid card ID: {id_str}"))?;
             let card = parse_card(id, value)?;
 
-            // Collect every normalized name this card answers to.
             let mut keys = vec![
                 normalize_name(&card.printed_name),
                 normalize_name(&card.unique_name),
@@ -113,14 +110,8 @@ impl CardMap {
 
             cards.insert(id, card);
 
-            // Several crypt cards share an ambiguous bare name — e.g. all three
-            // "Theo Bell" printings (G2 / G2 ADV / G6) index "theo bell". Their
-            // adv/grouped forms also get distinct qualified keys ("theo bell g2",
-            // "theo bell g2 adv", "theo bell g6"); the bare key is the only
-            // collision. Resolve it deterministically by preference instead of
-            // "last insert wins": non-advanced first, then lowest id (first
-            // release) — so the parenthesis-less name defaults to the base card,
-            // and a later reprint never silently changes how it resolves.
+            // Ambiguous bare names resolve deterministically by preference — non-advanced
+            // first, then lowest id — not "last insert wins", so a reprint can't change lookups.
             for key in keys {
                 if key.is_empty() {
                     continue;
@@ -150,8 +141,7 @@ impl CardMap {
     }
 
     /// Exact normalized-name lookup only — no prefix fallback. Use where a lenient
-    /// prefix match would misfire: a truncated stem like "channel" (from
-    /// mis-stripping "Channel 10") must NOT resolve back to "Channel 10".
+    /// prefix match would misfire, e.g. a truncated "channel" resolving to "Channel 10".
     pub fn by_name_exact(&self, name: &str) -> Option<&Card> {
         let normalized = normalize_name(name);
         if normalized.is_empty() {
@@ -162,11 +152,8 @@ impl CardMap {
             .and_then(|id| self.cards.get(id))
     }
 
-    /// Look up a crypt card by name, disambiguating a multi-group vampire by an
-    /// explicit group hint from the crypt tail (e.g. the "6" in "Toreador:6").
-    /// Tries the group-qualified key first ("annabelle triabell g6", the
-    /// normalized form of the card name "Annabelle Triabell (G6)"), then falls
-    /// back to an exact bare-name match.
+    /// Disambiguates a multi-group vampire by an explicit group hint from the crypt
+    /// tail (e.g. "6" in "Toreador:6"); falls back to an exact bare-name match.
     pub fn by_name_in_group(&self, name: &str, group: u32) -> Option<&Card> {
         let normalized = normalize_name(name);
         if normalized.is_empty() {
@@ -185,13 +172,11 @@ impl CardMap {
         if normalized.is_empty() {
             return None;
         }
-        // Exact match
         if let Some(&id) = self.name_index.get(&normalized) {
             return self.cards.get(&id);
         }
-        // Prefix match: HashMap iteration order is nondeterministic, so pick a
-        // stable winner — the shortest matching name (closest to the query),
-        // then the lowest id.
+        // HashMap iteration order is nondeterministic, so pick a stable winner:
+        // shortest matching name, then lowest id.
         let mut best: Option<(usize, u32)> = None; // (name length, id)
         for (indexed_name, &id) in &self.name_index {
             if indexed_name.starts_with(&normalized) {
@@ -213,10 +198,8 @@ impl CardMap {
     }
 }
 
-/// Preference key for resolving an ambiguous (shared) normalized name. Lower is
-/// preferred: non-advanced before advanced, then lowest id. The lowest id is the
-/// vampire's first release, which is the non-advanced, lowest-group printing — so
-/// a bare, parenthesis-less name defaults to that base card.
+/// Lower is preferred: non-advanced before advanced, then lowest id (the
+/// vampire's first release) — so a bare name defaults to the base card.
 fn name_pref(card: &Card) -> (u8, u32) {
     (card.adv as u8, card.id)
 }
@@ -314,15 +297,12 @@ mod tests {
         assert_eq!(aabbt.id, 200001);
         assert_eq!(aabbt.kind, CardKind::Crypt);
 
-        // Normalized lookup
         let magnum2 = cm.by_name("44 magnum").unwrap();
         assert_eq!(magnum2.id, 100001);
     }
 
     #[test]
     fn test_accent_folding() {
-        // An accent-free spelling must resolve the accented card: normalize_name
-        // folds both the index and the query to ASCII.
         let json = r#"{
             "200478": {"printed_name":"François Villon","unique_name":"François Villon (G2)","full_name":"François Villon (G2)","name_variants":[]},
             "201528": {"printed_name":"Bolesław Gutowski","unique_name":"Bolesław Gutowski","full_name":"Bolesław Gutowski","name_variants":[]}
@@ -338,11 +318,8 @@ mod tests {
 
     #[test]
     fn test_shipped_names_normalize_to_ascii() {
-        // Invariant guard over the shipped card DB: every name's normalized index
-        // key must be pure ASCII, or an accent-free query silently misses it. A
-        // non-ASCII *letter* fold_ascii doesn't map survives normalize_name's
-        // alphanumeric filter and trips this (non-letter punctuation is stripped, so
-        // it can't). Property test — no ids/names pinned, survives daily rebuilds.
+        // Every name's normalized key must be pure ASCII, or an accent-free query
+        // silently misses it. No ids/names pinned, so this survives daily rebuilds.
         let parsed = json::parse(include_str!("../data/cards.json")).unwrap();
         for (id, card) in parsed.entries() {
             for key in ["printed_name", "unique_name", "full_name"] {
@@ -367,9 +344,7 @@ mod tests {
 
     #[test]
     fn test_prefix_lookup_is_deterministic() {
-        // Several names share the "gov"/"abc" prefixes. HashMap iteration order is
-        // nondeterministic, so the lookup must pick a stable winner: shortest
-        // matching name, then lowest id.
+        // "gov"/"abc" prefixes are shared on purpose, to exercise the tie-break.
         let json = r#"{
             "10": { "unique_name": "Govern", "full_name": "Govern" },
             "20": { "unique_name": "Governing", "full_name": "Governing" },
@@ -387,11 +362,8 @@ mod tests {
 
     #[test]
     fn test_ambiguous_bare_name_prefers_nonadv_first_release() {
-        // Mirrors real data: three "Theo Bell" printings all index the bare key
-        // "theo bell". File order puts G6 last, so "last insert wins" would pick
-        // G6; preference must instead pick the non-adv first release (lowest id,
-        // = G2 here). The (ADV) and (G6) qualifiers still resolve via their unique
-        // exact keys.
+        // Mirrors real data: three "Theo Bell" printings share the bare key, with
+        // G6 last in file order, guarding that preference (not insertion order) wins.
         let json = r#"{
             "201362": {"printed_name":"Theo Bell","unique_name":"Theo Bell (G2)","full_name":"Theo Bell (G2)","adv":false,"group":"2","name_variants":["Theo Bell"]},
             "201363": {"printed_name":"Theo Bell","unique_name":"Theo Bell (G2 ADV)","full_name":"Theo Bell (G2 ADV)","adv":true,"group":"2","name_variants":["Theo Bell (ADV)"]},

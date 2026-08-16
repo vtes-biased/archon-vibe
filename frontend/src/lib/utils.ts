@@ -5,15 +5,8 @@ export function normalizeSearch(s: string): string {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
-/**
- * Split a string into normalized search tokens on any run of non-alphanumerics.
- *
- * Applied to BOTH the indexed field and the typed query, so every search in the
- * app is word-prefix: "vin" finds Vincent, "inc" finds nobody. Splitting on
- * punctuation is what keeps that true for addresses and handles \u2014 matching
- * "vincent.ripoll@example.org" as one substring would quietly re-admit mid-name
- * hits, since emails embed names.
- */
+/** Splits on any run of non-alphanumerics, applied to BOTH the indexed field and the query, so every
+ * search is word-prefix ("vin" finds Vincent, "inc" finds nobody) \u2014 matching an email as one substring would re-admit mid-name hits. */
 export function searchTokens(s: string): string[] {
   return normalizeSearch(s).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 }
@@ -44,12 +37,8 @@ function tzOffsetMs(timeZone: string, date: Date): number {
   return asUtc - date.getTime();
 }
 
-/**
- * Interpret a naive ISO datetime (no offset) as wall-clock time in the given
- * IANA timezone and return the real instant. Tournament.start/finish are stored
- * this way (wall-clock in tournament.timezone) — plain `new Date(iso)` would
- * misread them as browser-local. Strings carrying an offset parse as-is.
- */
+/** Interprets a naive ISO datetime (no offset) as wall-clock time in the given IANA timezone —
+ * Tournament.start/finish are stored this way, so plain `new Date(iso)` would misread them as browser-local. Strings with an offset parse as-is. */
 export function zonedDate(iso: string, timeZone: string): Date {
   if (/(Z|[+-]\d{2}:?\d{2})$/.test(iso)) return new Date(iso);
   const asUtc = new Date(iso + "Z");
@@ -59,14 +48,8 @@ export function zonedDate(iso: string, timeZone: string): Date {
   return new Date(asUtc.getTime() - tzOffsetMs(timeZone, new Date(approx)));
 }
 
-/**
- * Sanctions visible on member-directory surfaces (profile page, member list).
- * Cautions stay private to the tournament where they were issued — they never
- * surface in the directory, not even for managers (IC/Ethics see them inside
- * the tournament instead). Warnings, standings adjustments and DQs are
- * member-visible for 18 months (the window is applied by
- * getActiveSanctionsForUser), and suspension/probation are membership-level.
- */
+/** Sanctions visible on member-directory surfaces. Cautions stay private to their tournament (even
+ * IC/Ethics see them only inside it); warnings/SA/DQ are member-visible for 18 months, suspension/probation are membership-level. */
 export function visibleSanctions(sanctions: Sanction[]): Sanction[] {
   return sanctions.filter(s => s.level !== "caution");
 }

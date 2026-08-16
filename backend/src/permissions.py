@@ -1,11 +1,6 @@
-"""Authorization adapter: a thin marshalling layer over the Rust engine (PyO3).
-
-The authorization LOGIC lives once in ``engine/src/permissions.rs`` as a
-capability table, shared with the frontend via WASM. This module only names the
-capability and marshals the request — it must NOT re-implement any rule, and no
-route may check a role directly. One function per capability; a route that needs
-a new one adds a row to the engine table, not a check of its own.
-"""
+"""Thin marshalling layer over the Rust engine (PyO3) — must NOT re-implement any
+rule, and no route may check a role directly. A new capability is a row in
+``engine/src/permissions.rs``, not a check of its own."""
 
 import json
 
@@ -64,11 +59,6 @@ def is_official(user: User) -> bool:
     return _engine.is_official(json.dumps(user_to_context(user)))
 
 
-# ---------------------------------------------------------------------------
-# Members
-# ---------------------------------------------------------------------------
-
-
 def can_sponsor_member(user: User) -> bool:
     """Bring someone into VEKN: mint a member record, or issue a VEKN ID to an
     account that has none. One authority — both allocate an ID and stamp
@@ -121,11 +111,6 @@ def can_delete_member(actor: User) -> bool:
     return _check("delete_member", actor)
 
 
-# ---------------------------------------------------------------------------
-# Community links
-# ---------------------------------------------------------------------------
-
-
 def can_moderate_link(actor: User, target: User) -> bool:
     """Hide or clear a member's community link (self-moderation included)."""
     return _check("moderate_link", actor, target=target)
@@ -139,11 +124,6 @@ def can_promote_link_national(actor: User, target: User) -> bool:
 def can_promote_link_global(actor: User) -> bool:
     """Promote a link to the global listing."""
     return _check("promote_link_global", actor)
-
-
-# ---------------------------------------------------------------------------
-# Tournaments and leagues
-# ---------------------------------------------------------------------------
 
 
 def can_create_tournament(user: User) -> bool:
@@ -193,11 +173,6 @@ def can_link_tournament_to_league(user: User, league: League) -> bool:
         json.dumps(user_to_context(user)), user.uid, descriptor
     )
     return json.loads(result)["allowed"]
-
-
-# ---------------------------------------------------------------------------
-# Sanctions
-# ---------------------------------------------------------------------------
 
 
 def can_issue_sanction(
@@ -254,11 +229,6 @@ def can_delete_sanction(
         json.dumps(user_to_context(user)), user.uid, ctx
     )
     return json.loads(result)["allowed"]
-
-
-# ---------------------------------------------------------------------------
-# Admin
-# ---------------------------------------------------------------------------
 
 
 def can_manage_promos(user: User) -> bool:

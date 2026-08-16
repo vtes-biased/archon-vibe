@@ -1,16 +1,5 @@
-"""Structured engine rejections.
-
-The Rust engine raises ValueError whose message is the EngineError wire JSON
-``{"code": ..., "params": {...}, "message": ...}`` (see engine/src/error.rs).
-``EngineRejection`` carries that triple to the HTTP error body via the handler
-registered in main.py: ``{"detail": <message>, "code": ..., "params": {...}}``
-— ``detail`` stays a human-readable string so the Discord bot and any legacy
-client keep working; ``code``/``params`` are additive for frontend i18n.
-
-App-level checks that mirror engine rules (e.g. the cross-tournament barred
-check) raise EngineRejection directly, reusing the engine's codes so the same
-condition localizes identically on every path.
-"""
+"""EngineRejection carries the Rust engine's ``{code, params, message}`` wire JSON
+to the HTTP error body."""
 
 import json
 

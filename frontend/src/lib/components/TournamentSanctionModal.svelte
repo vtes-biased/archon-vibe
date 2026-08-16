@@ -22,7 +22,6 @@
     onClose: () => void;
   } = $props();
 
-  // Form state
   let level = $state<SanctionLevel>("caution");
   let category = $state<SanctionCategory>("procedural_error");
   let subcategory = $state<SanctionSubcategory | null>(null);
@@ -31,10 +30,8 @@
   let description = $state("");
   let creating = $state(false);
 
-  // Escalation data
   let priorSanctions = $state<Sanction[]>([]);
 
-  // Load prior sanctions for this player in this tournament
   $effect(() => {
     getPlayerSanctionsInTournament(playerUid, tournament.uid).then(s => {
       priorSanctions = s;
@@ -45,12 +42,10 @@
   // judge can open this modal; null only in the engine-failed degraded state).
   const sanctionRef = getSanctionReference();
 
-  // Available subcategories for selected category
   const availableSubcategories = $derived(
     sanctionRef?.subcategoriesByCategory[category] ?? []
   );
 
-  // Reset subcategory when category changes
   $effect(() => {
     const subs = sanctionRef?.subcategoriesByCategory[category];
     if (subs && subcategory && !subs.includes(subcategory)) {
@@ -58,18 +53,15 @@
     }
   });
 
-  // Baseline penalty hint
   const baselinePenalty = $derived(
     subcategory ? (sanctionRef?.baselinePenalties[subcategory] ?? null) : null
   );
 
-  // Severity ordering for level comparison
   const LEVEL_SEVERITY: Record<SanctionLevel, number> = {
     caution: 0, warning: 1, standings_adjustment: 2,
     disqualification: 3, suspension: 4, probation: 4,
   };
 
-  // All active (non-lifted, non-deleted) prior sanctions in this tournament
   const activePrior = $derived(
     priorSanctions.filter(s => !s.lifted_at && !s.deleted_at)
   );
@@ -93,7 +85,6 @@
     activePrior.filter(s => s.category === category).length
   );
 
-  // Warn if selected level is lower than the highest existing sanction
   const highestExisting = $derived.by(() => {
     let max: SanctionLevel | null = null;
     for (const s of activePrior) {
@@ -118,14 +109,10 @@
     return opts;
   });
 
-  // SA requires round_number
   const roundRequired = $derived(level === "standings_adjustment");
 
-  // SA round is determined by tournament state, not chosen (JG v2 §1.1.3): the −1 VP
-  // lands on the player's current game if one is in progress, else their most-recently
-  // played game — i.e. the finals when the player is a seated finalist (sentinel
-  // len(rounds)), else the highest round index in which they are seated. Frozen at
-  // issue time onto the sanction; null when the player has not been seated yet.
+  // SA round is determined by tournament state, not chosen (JG v2 §1.1.3): the −1 VP lands on the
+  // player's current game if in progress, else their most-recently played game. Frozen at issue time; null when not yet seated.
   const saTargetRound = $derived.by(() => {
     const rounds = tournament.rounds ?? [];
     if (tournament.finals?.seating?.some(s => s.player_uid === playerUid)) {
@@ -138,7 +125,6 @@
   });
   const saTargetIsFinals = $derived(saTargetRound !== null && saTargetRound === (tournament.rounds?.length ?? 0));
 
-  // Level label helper
   function levelLabel(lv: SanctionLevel): string {
     const labels: Record<SanctionLevel, () => string> = {
       caution: () => m.sanction_level_caution(),
@@ -241,7 +227,6 @@
       onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}
       class="p-6 space-y-4"
     >
-      <!-- Escalation hint (per-infraction-type, v2 §1.2.1) -->
       {#if sameInfractionCount > 0}
         <div class="p-3 rounded banner-warn border text-sm">
           <div class="flex items-center gap-2">
@@ -262,7 +247,6 @@
           </div>
         </div>
       {/if}
-      <!-- Downgrade warning -->
       {#if isDowngrade && highestExisting}
         <div class="p-3 rounded bg-accent-soft/30 border border-accent-soft-border/50 text-sm">
           <div class="flex items-center gap-2 text-link-soft">
@@ -272,7 +256,6 @@
         </div>
       {/if}
 
-      <!-- Level -->
       <div>
         <label for="ts-level" class="block text-sm font-medium text-ink-muted mb-1">
           {m.common_level()} *
@@ -289,7 +272,6 @@
         </select>
       </div>
 
-      <!-- Category -->
       <div>
         <label for="ts-category" class="block text-sm font-medium text-ink-muted mb-1">
           {m.common_category()} *
@@ -305,7 +287,6 @@
         </select>
       </div>
 
-      <!-- Subcategory -->
       <div>
         <label for="ts-subcategory" class="block text-sm font-medium text-ink-muted mb-1">
           {m.sanction_subcategory()}
@@ -327,9 +308,7 @@
         {/if}
       </div>
 
-      <!-- Round -->
       {#if roundRequired}
-        <!-- SA target round is determined by state, not chosen (JG v2 §1.1.3). -->
         <div>
           <span class="block text-sm font-medium text-ink-muted mb-1">{m.sanction_round()}</span>
           {#if saTargetIsFinals}
@@ -364,7 +343,6 @@
         </div>
       {/if}
 
-      <!-- Description -->
       <div>
         <label for="ts-description" class="block text-sm font-medium text-ink-muted mb-1">
           {m.common_description()} *
@@ -379,7 +357,6 @@
         ></textarea>
       </div>
 
-      <!-- Actions -->
       <div class="flex gap-2 pt-2">
         <Button
           type="submit"

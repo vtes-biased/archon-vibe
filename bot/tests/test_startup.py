@@ -1,20 +1,6 @@
-"""Startup smoke test — the bot's only guard against a silent wiring regression.
-
-The bot connects to Discord at runtime, so a broken client/DI wiring crash-loops
-in production while CI stays green (this is exactly what happened on the
-lightbulb v2→v3 `.d`/`.di` migration: 69 crash-loops, CI green, no bot coverage).
-
-Without a live gateway this can't exercise command *execution*, but it CAN build
-the client exactly as ``main`` does and prove the two things that actually broke:
-  - ``build_client`` runs — the DI-registry / hook / register_value / register API
-    is still the one the code calls (an API drift raises here);
-  - every command's injected dependencies (the keyword-only ``invoke`` params)
-    resolve from the DI container in the nested COMMAND context the runtime uses.
-
-Run from bot/:
-    DISCORD_BOT_TOKEN=x OAUTH_CLIENT_ID=x OAUTH_CLIENT_SECRET=x \
-        uv run --with pytest --with pytest-asyncio pytest -q
-"""
+"""The bot connects to Discord at runtime, so a broken client/DI wiring
+crash-loops in production while CI stays green — without a live gateway, this
+is the only thing that would catch it before deploy."""
 
 from __future__ import annotations
 

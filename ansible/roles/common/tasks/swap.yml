@@ -1,9 +1,6 @@
 ---
-# Codify the /swapfile that keeps the tiny prod box off the OOM edge (both
-# stacks + one PG cluster share ~945MB). Gated on whether the path is already
-# active swap, so we never fallocate/mkswap/swapon a live swapfile — safe
-# against the swap already added by hand. Steady state (swap active) is a
-# clean no-op; the create/format branch only runs before first activation.
+# Gated on whether the path is already active swap, so we never
+# fallocate/mkswap/swapon a live swapfile — safe against a swap added by hand.
 - name: List active swap devices
   ansible.builtin.command:
     cmd: swapon --show=NAME --noheadings

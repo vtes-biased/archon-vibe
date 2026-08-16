@@ -1,10 +1,3 @@
-/**
- * Auth store for managing authentication state.
- *
- * Uses Svelte 5 runes for reactive state management.
- * Persists tokens in localStorage and handles automatic refresh.
- */
-
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 import * as m from '$lib/paraglide/messages.js';
 import { toUserMessage } from '$lib/errors';
@@ -14,7 +7,7 @@ import { forgetViews } from "$lib/last-view";
 
 const ACCESS_TOKEN_KEY = "archon_access_token";
 const REFRESH_TOKEN_KEY = "archon_refresh_token";
-const REFRESH_THRESHOLD_MS = 60 * 1000; // Refresh 1 minute before expiry
+const REFRESH_THRESHOLD_MS = 60 * 1000;
 
 interface AuthMethod {
   type: string;
@@ -42,7 +35,6 @@ interface MeResponse {
   auth_methods: { type: string; identifier: string; verified: boolean }[];
 }
 
-// Reactive auth state
 let authState = $state<AuthState>({
   user: null,
   authMethods: [],
@@ -51,22 +43,14 @@ let authState = $state<AuthState>({
   error: null,
 });
 
-// Timer for auto-refresh
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
-// Guard so the cross-tab storage listener is registered only once.
 let crossTabSyncRegistered = false;
 
-/**
- * Update auth state with partial values.
- */
 export function setAuthState(updates: Partial<AuthState>) {
   authState = { ...authState, ...updates };
 }
 
-/**
- * Parse JWT token to extract expiry time.
- */
 function parseJwt(token: string): { exp: number; sub: string } | null {
   try {
     const base64Url = token.split(".")[1];
@@ -84,15 +68,11 @@ function parseJwt(token: string): { exp: number; sub: string } | null {
   }
 }
 
-/**
- * Schedule automatic token refresh before expiry.
- */
 function scheduleRefresh(expiresIn: number) {
   if (refreshTimer) {
     clearTimeout(refreshTimer);
   }
 
-  // Refresh 1 minute before expiry (or immediately if less than 1 minute left)
   const refreshIn = Math.max(0, expiresIn * 1000 - REFRESH_THRESHOLD_MS);
 
   refreshTimer = setTimeout(async () => {
@@ -107,18 +87,13 @@ function scheduleRefresh(expiresIn: number) {
   }, refreshIn);
 }
 
-/**
- * Store tokens in localStorage. Exported for passkey module.
- */
+/** Exported for the passkey module. */
 export function storeTokens(tokens: TokenResponse) {
   localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
   localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
   scheduleRefresh(tokens.expires_in);
 }
 
-/**
- * Clear tokens from localStorage.
- */
 function clearTokens() {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
@@ -128,29 +103,12 @@ function clearTokens() {
   }
 }
 
-/**
- * Get the current access token.
- */
 export function getAccessToken(): string | null {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
-/**
- * React to auth changes made in *other* same-origin tabs.
- *
- * Tokens live in shared localStorage, so a login/logout/claim in one tab changes
- * the effective access level for every tab — but only the tab that made the
- * change knows. A tab that doesn't notice keeps its old-level SSE writing into
- * the *shared* IndexedDB, clobbering the other tab's data and silently dropping
- * it to a lower-access view. Here we converge this tab to the new
- * auth level so all same-origin tabs stay at one level and write identical
- * projections.
- *
- * The handler never writes to localStorage (the other tab already did), so it
- * can't trigger a storage-event cascade. Same-user token rotation (an auto
- * refresh in another tab) only re-arms our refresh timer — the access level is
- * unchanged, so the cached data is still valid and no resync is needed.
- */
+/** Tokens live in shared localStorage, so a login/logout/claim in another tab changes this tab's
+ * effective access level; if unnoticed, this tab's old-level SSE clobbers the shared IndexedDB with a lower-access projection. Converges this tab to match. */
 async function handleCrossTabAuthChange(): Promise<void> {
   const token = getAccessToken();
 
@@ -184,9 +142,6 @@ async function handleCrossTabAuthChange(): Promise<void> {
   }
 }
 
-/**
- * Register the cross-tab auth listener once (client-side only).
- */
 function registerCrossTabAuthSync(): void {
   if (crossTabSyncRegistered || typeof window === "undefined") return;
   crossTabSyncRegistered = true;
@@ -197,9 +152,6 @@ function registerCrossTabAuthSync(): void {
   });
 }
 
-/**
- * Store tokens from OAuth callback and initialize auth state.
- */
 export async function storeTokensFromCallback(
   accessToken: string,
   refreshToken: string
@@ -207,14 +159,12 @@ export async function storeTokensFromCallback(
   localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
   localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 
-  // Parse token to get expiry and schedule refresh
   const payload = parseJwt(accessToken);
   if (payload) {
     const expiresIn = payload.exp - Math.floor(Date.now() / 1000);
     scheduleRefresh(expiresIn);
   }
 
-  // Fetch user data to complete auth state
   const result = await fetchCurrentUser();
   if (result) {
     setAuthState({
@@ -224,7 +174,6 @@ export async function storeTokensFromCallback(
       isLoading: false,
       error: null,
     });
-    // Reconnect SSE with new token to get proper data level
     syncManager.refresh();
   }
 }
@@ -233,11 +182,8 @@ export async function storeTokensFromCallback(
 // rotated-out refresh token trips the backend's reuse-detection.
 let refreshInFlight: Promise<boolean> | null = null;
 
-/**
- * Refresh the access token. On failure the side effect distinguishes the cases:
- * a rejected refresh token clears tokens + resets auth state; a transient error
- * keeps them. Callers tell them apart via getAccessToken() afterwards.
- */
+/** On failure the side effect distinguishes the cases: a rejected refresh token clears tokens + resets
+ * auth state; a transient error keeps them. Callers tell them apart via getAccessToken() afterwards. */
 export async function refreshTokens(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight;
   refreshInFlight = doRefreshTokens();
@@ -248,13 +194,8 @@ export async function refreshTokens(): Promise<boolean> {
   }
 }
 
-/**
- * Fetch with the bearer token attached; on a 401, do one single-flighted
- * refresh (refreshTokens dedupes concurrent callers) and one retry with the
- * new token. Returns the final Response — callers handle non-401 errors as
- * usual. Never loops: if the endpoint keeps 401ing after a successful
- * refresh, that 401 is returned rather than hammering the refresh endpoint.
- */
+/** On a 401, does one single-flighted refresh (dedup'd via refreshTokens) and one retry with the new
+ * token. Never loops: if the endpoint keeps 401ing after a successful refresh, that 401 is returned. */
 export async function authorizedFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const doFetch = () => {
     const token = getAccessToken();
@@ -283,7 +224,6 @@ async function doRefreshTokens(): Promise<boolean> {
     });
 
     if (!response.ok) {
-      // Server explicitly rejected the token — clear auth state
       clearTokens();
       setAuthState({ user: null, authMethods: [], isAuthenticated: false, isLoading: false, error: null });
       return false;
@@ -299,14 +239,8 @@ async function doRefreshTokens(): Promise<boolean> {
   }
 }
 
-/**
- * Outcome of resolving a token before opening an SSE/snapshot connection:
- *  - token      authed; refreshed on demand if it was near expiry
- *  - anonymous  no session — connect at public level
- *  - downgrade  refresh token dead → caller must resync (clear-then-refill),
- *               never a since-overlay that mixes member + public rows
- *  - retry      transient refresh failure → back off, don't connect stale
- */
+/** `downgrade`: refresh token dead → caller must resync via clear-then-refill, never a since-overlay
+ * that mixes member + public rows. `retry`: transient failure → back off, don't connect stale. */
 export type SyncToken =
   | { kind: "token"; token: string }
   | { kind: "anonymous" }
@@ -335,9 +269,7 @@ export async function ensureSyncToken(): Promise<SyncToken> {
   return getAccessToken() ? { kind: "retry" } : { kind: "downgrade" };
 }
 
-/**
- * Fetch the current user from the API. Exported for passkey module.
- */
+/** Exported for the passkey module. */
 export async function fetchCurrentUser(): Promise<MeResponse | null> {
   if (!getAccessToken()) return null;
 
@@ -350,10 +282,6 @@ export async function fetchCurrentUser(): Promise<MeResponse | null> {
   }
 }
 
-/**
- * Initialize auth state from stored tokens.
- * Call this on app startup.
- */
 export async function initAuth(): Promise<void> {
   setAuthState({ isLoading: true });
   registerCrossTabAuthSync();
@@ -364,10 +292,8 @@ export async function initAuth(): Promise<void> {
     return;
   }
 
-  // Check if token is expired
   const payload = parseJwt(token);
   if (payload && payload.exp * 1000 < Date.now()) {
-    // Token expired, try to refresh
     const refreshed = await refreshTokens();
     if (!refreshed) {
       // If we still have a refresh token, the server may be temporarily down.
@@ -381,12 +307,10 @@ export async function initAuth(): Promise<void> {
     }
   }
 
-  // Fetch user data
   const result = await fetchCurrentUser();
   if (result) {
     setAuthState({ user: result.user, authMethods: result.auth_methods, isAuthenticated: true, isLoading: false, error: null });
 
-    // Schedule refresh based on current token
     const currentToken = getAccessToken();
     if (currentToken) {
       const currentPayload = parseJwt(currentToken);
@@ -406,9 +330,6 @@ export async function initAuth(): Promise<void> {
   }
 }
 
-/**
- * Register a new user.
- */
 export async function register(
   email: string,
   password: string,
@@ -432,7 +353,6 @@ export async function register(
     const tokens: TokenResponse = await response.json();
     storeTokens(tokens);
 
-    // Fetch user data
     const result = await fetchCurrentUser();
     if (result) {
       setAuthState({ user: result.user, authMethods: result.auth_methods, isAuthenticated: true, isLoading: false, error: null });
@@ -451,9 +371,6 @@ export async function register(
   }
 }
 
-/**
- * Login with email and password.
- */
 export async function login(email: string, password: string): Promise<boolean> {
   setAuthState({ isLoading: true, error: null });
 
@@ -473,7 +390,6 @@ export async function login(email: string, password: string): Promise<boolean> {
     const tokens: TokenResponse = await response.json();
     storeTokens(tokens);
 
-    // Fetch user data
     const result = await fetchCurrentUser();
     if (result) {
       setAuthState({ user: result.user, authMethods: result.auth_methods, isAuthenticated: true, isLoading: false, error: null });
@@ -492,21 +408,15 @@ export async function login(email: string, password: string): Promise<boolean> {
   }
 }
 
-/**
- * Logout the current user.
- */
 export async function logout(): Promise<void> {
   clearTokens();
-  // Remembered list views can hold filters an anonymous viewer has no control
-  // for (state=finished is authenticated-only), so they would filter unaccountably.
+  // Remembered list views can hold filters an anonymous viewer has no control for (state=finished
+  // is authenticated-only), so they would filter unaccountably.
   forgetViews();
   await syncManager.reset();
   setAuthState({ user: null, authMethods: [], isAuthenticated: false, isLoading: false, error: null });
 }
 
-/**
- * Profile update payload.
- */
 export interface ProfileUpdate {
   name?: string;
   nickname?: string;
@@ -519,9 +429,6 @@ export interface ProfileUpdate {
   community_links?: { type: string; url: string; label: string; languages: string[] }[];
 }
 
-/**
- * Update the current user's profile.
- */
 export async function updateProfile(data: ProfileUpdate): Promise<boolean> {
   if (!getAccessToken()) {
     setAuthState({ error: m.auth_error_not_authenticated() });
@@ -557,19 +464,10 @@ export async function updateProfile(data: ProfileUpdate): Promise<boolean> {
   }
 }
 
-
-/**
- * Get the current auth state (reactive).
- */
 export function getAuthState(): AuthState {
   return authState;
 }
 
-/**
- * Request a magic link email for signup or password reset.
- * @param email User's email address
- * @param purpose "signup" for new accounts, "reset" for password reset
- */
 export async function requestMagicLink(
   email: string,
   purpose: "signup" | "reset" = "signup",
@@ -606,20 +504,13 @@ export async function requestMagicLink(
   }
 }
 
-/**
- * Response from verifying a magic link.
- */
 export interface VerifyMagicLinkResult {
   setPasswordToken: string;
   email: string;
   purpose: "signup" | "reset";
 }
 
-/**
- * Verify a magic link token.
- * Returns a set-password token that allows the user to set their password.
- * Does NOT log in directly - user must set password first.
- */
+/** Does NOT log in directly — the caller must call setPassword first. */
 export async function verifyMagicLink(
   token: string
 ): Promise<VerifyMagicLinkResult | null> {
@@ -655,11 +546,6 @@ export async function verifyMagicLink(
   }
 }
 
-/**
- * Set password after magic link verification.
- * Creates user/auth if signup, updates password if reset.
- * Returns true on success and logs in the user.
- */
 export async function setPassword(token: string, password: string): Promise<boolean> {
   setAuthState({ isLoading: true, error: null });
 
@@ -679,7 +565,6 @@ export async function setPassword(token: string, password: string): Promise<bool
     const tokens: TokenResponse = await response.json();
     storeTokens(tokens);
 
-    // Fetch user data
     const result = await fetchCurrentUser();
     if (result) {
       setAuthState({
@@ -704,10 +589,6 @@ export async function setPassword(token: string, password: string): Promise<bool
   }
 }
 
-/**
- * Generate or regenerate a calendar subscription token.
- * Returns { calendar_token, calendar_url } on success, null on failure.
- */
 export async function generateCalendarToken(): Promise<{ calendar_token: string; calendar_url: string } | null> {
   if (!getAccessToken()) return null;
 
@@ -719,7 +600,6 @@ export async function generateCalendarToken(): Promise<{ calendar_token: string;
     if (!response.ok) return null;
 
     const data = await response.json();
-    // Update local auth state with new token
     if (authState.user) {
       setAuthState({ user: { ...authState.user, calendar_token: data.calendar_token } });
     }

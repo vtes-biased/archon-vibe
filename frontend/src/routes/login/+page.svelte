@@ -24,19 +24,15 @@
   const auth = $derived(getAuthState());
   const passkeySupported = $derived(isPasskeySupported());
 
-  // Mode: 'login' or 'signup'
   let mode = $state<"login" | "signup">("login");
   let oauthError = $state<string | null>(null);
 
-  // Form state
   let email = $state("");
   let password = $state("");
 
-  // Magic link sent state (for signup)
   let magicLinkSent = $state(false);
   let magicLinkEmail = $state("");
 
-  // Forgot password mode
   let forgotPassword = $state(false);
   let resetEmailSent = $state(false);
 
@@ -107,7 +103,6 @@
     }
   }
 
-  // Handle OAuth callback tokens from URL
   onMount(async () => {
     const params = new URLSearchParams(window.location.search);
 
@@ -146,16 +141,14 @@
       return;
     }
 
-    // Passkey autofill (conditional UI): surface stored passkeys in the
-    // identifier input's autofill dropdown. Internally gated on
-    // isConditionalUISupported; resolves when the user picks one (then
-    // authenticates) and aborts silently on unmount or explicit-flow start.
+    // Passkey autofill (conditional UI): surfaces stored passkeys in the
+    // identifier input; resolves on pick, aborts silently on unmount or
+    // explicit-flow start.
     startConditionalUI(() => goto(successTarget()));
   });
 
   onDestroy(stopConditionalUI);
 
-  // Redirect if already authenticated
   $effect(() => {
     if (auth.isAuthenticated && !auth.isLoading) {
       goto(successTarget());
@@ -175,7 +168,6 @@
     </div>
 
     <div class="bg-surface-card rounded-lg shadow-lg p-8 border border-line">
-      <!-- Mode toggle (hidden when showing success states) -->
       {#if !magicLinkSent && !resetEmailSent && !forgotPassword}
         <div class="flex mb-6 bg-surface-muted rounded-lg p-1">
           <button
@@ -204,7 +196,6 @@
       {/if}
 
       {#if magicLinkSent}
-        <!-- SIGNUP: MAGIC LINK SENT -->
         <div class="space-y-4 text-center">
           <div class="w-16 h-16 mx-auto badge-info rounded-full flex items-center justify-center">
             <Mail class="w-8 h-8" />
@@ -227,7 +218,6 @@
         </div>
 
       {:else if resetEmailSent}
-        <!-- PASSWORD RESET: EMAIL SENT -->
         <div class="space-y-4 text-center">
           <div class="w-16 h-16 mx-auto badge-info rounded-full flex items-center justify-center">
             <Mail class="w-8 h-8" />
@@ -250,7 +240,6 @@
         </div>
 
       {:else if forgotPassword}
-        <!-- FORGOT PASSWORD FORM -->
         <div class="space-y-4">
           <h2 class="text-lg font-medium text-ink-strong text-center">{m.login_reset_title()}</h2>
           <p class="text-ink-muted text-sm text-center">
@@ -292,13 +281,11 @@
         </div>
 
       {:else if mode === "login"}
-        <!-- LOGIN MODE -->
         <div class="space-y-4">
           <p class="text-ink-muted text-sm text-center mb-4">
             {m.login_welcome_back()}
           </p>
 
-          <!-- Email + Password Form -->
           <form onsubmit={(e) => { e.preventDefault(); handleEmailLogin(); }} class="space-y-4">
             <div>
               <label for="login-email" class="block text-sm text-ink-muted mb-1">{m.common_email()}</label>
@@ -345,7 +332,6 @@
             {m.login_forgot_password()}
           </button>
 
-          <!-- Divider -->
           <div class="relative my-4">
             <div class="absolute inset-0 flex items-center">
               <div class="w-full border-t border-line-strong"></div>
@@ -368,7 +354,6 @@
             </Button>
           {/if}
 
-          <!-- Discord OAuth -->
           <button
             onclick={handleDiscordLogin}
             disabled={auth.isLoading}
@@ -385,13 +370,11 @@
           {/if}
         </div>
       {:else}
-        <!-- SIGNUP MODE -->
         <div class="space-y-4">
           <p class="text-ink-muted text-sm text-center mb-4">
             {m.login_create_account_msg()}
           </p>
 
-          <!-- Consent gate: ToS + Privacy + age/parental self-attestation -->
           <div class="flex items-start gap-2 text-xs text-ink leading-snug">
             <input
               id="signup-consent"
@@ -417,7 +400,6 @@
             </Button>
           {/if}
 
-          <!-- Discord OAuth -->
           <button
             onclick={handleDiscordLogin}
             disabled={auth.isLoading || !consentChecked}
@@ -427,7 +409,6 @@
             {m.login_discord_signup()}
           </button>
 
-          <!-- Divider -->
           <div class="relative my-4">
             <div class="absolute inset-0 flex items-center">
               <div class="w-full border-t border-line-strong"></div>
@@ -437,7 +418,6 @@
             </div>
           </div>
 
-          <!-- Email signup form -->
           <form onsubmit={(e) => { e.preventDefault(); handleSignupMagicLink(); }} class="space-y-3">
             <label for="signup-email" class="sr-only">{m.common_email()}</label>
             <input

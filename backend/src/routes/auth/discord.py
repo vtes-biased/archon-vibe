@@ -56,27 +56,19 @@ async def discord_authorize(
     ),
     authorization: str | None = Header(default=None),
 ) -> RedirectResponse:
-    """Initiate Discord OAuth flow.
-
-    If link=true and user is authenticated, links Discord to their account.
-    Otherwise, creates a new account or logs in with Discord.
-    """
     client_id, client_secret, redirect_uri, frontend_url = _get_discord_config()
 
     if not client_id:
         raise HTTPException(status_code=500, detail="Discord OAuth not configured")
 
-    # Generate random state for CSRF protection
     state = secrets.token_urlsafe(32)
 
-    # Store state with optional user_uid for linking
     state_data: dict = {
         "expires_at": datetime.now(UTC) + timedelta(minutes=5),
         "link_mode": link,
         "redirect": redirect,
     }
 
-    # If linking, verify user is authenticated (accept token from query param or header)
     if link:
         auth_token = token
         if not auth_token and authorization and authorization.startswith("Bearer "):
@@ -93,7 +85,6 @@ async def discord_authorize(
     expires_at = state_data.pop("expires_at", datetime.now(UTC) + timedelta(minutes=5))
     await store_transient_token(f"discord:{state}", state_data, expires_at)
 
-    # Build Discord OAuth URL
     params = {
         "client_id": client_id,
         "redirect_uri": redirect_uri,
@@ -111,30 +102,20 @@ async def discord_callback(
     code: str = Query(..., description="Authorization code from Discord"),
     state: str = Query(..., description="CSRF state token"),
 ) -> RedirectResponse:
-    """Handle Discord OAuth callback.
-
-    Exchanges code for tokens, fetches user info, and either:
-    - Links Discord to existing account (if link mode)
-    - Logs in existing user (if Discord ID found)
-    - Creates new account (if Discord ID not found)
-    """
     client_id, client_secret, redirect_uri, frontend_url = _get_discord_config()
 
-    # Validate state
     stored = await get_transient_token(f"discord:{state}")
     if not stored:
         return RedirectResponse(
             url=f"{frontend_url}/login?error=invalid_state", status_code=302
         )
 
-    # Clean up state (single use)
     await delete_transient_token(f"discord:{state}")
 
     link_mode = stored.get("link_mode", False)
     user_uid_from_state = stored.get("user_uid")
     redirect_path = stored.get("redirect", "/profile" if link_mode else "/")
 
-    # Exchange code for Discord tokens
     async with aiohttp.ClientSession() as session:
         try:
             async with session.post(
@@ -161,7 +142,6 @@ async def discord_callback(
                 url=f"{frontend_url}/login?error=discord_error", status_code=302
             )
 
-        # Fetch Discord user info
         try:
             async with session.get(
                 "https://discord.com/api/users/@me",
@@ -183,29 +163,23 @@ async def discord_callback(
 
     discord_id = discord_user["id"]
     discord_username = discord_user.get("username", "")
-    discord_global_name = discord_user.get("global_name")  # Display name, may be None
-    # Only use Discord email if verified
+    discord_global_name = discord_user.get("global_name")
+    # Only use Discord email if verified.
     discord_email_verified = discord_user.get("verified", False)
     discord_email = discord_user.get("email") if discord_email_verified else None
 
-    # Check if Discord ID is already linked to an account
     existing_auth = await get_auth_method_by_identifier("discord", discord_id)
 
     if link_mode and user_uid_from_state:
-        # === LINK MODE ===
         if existing_auth:
             if existing_auth.user_uid == user_uid_from_state:
-                # Already linked to this user
                 return RedirectResponse(
                     url=f"{frontend_url}{redirect_path}?discord_linked=already",
                     status_code=302,
                 )
             else:
-                # Discord is linked to another account - merge accounts
-                # This reassigns all auth methods (including Discord) to keep_uid
-                # merge_users refuses to absorb a VEKN-bearing account:
-                # re-linking Discord must not let one account swallow another's
-                # VEKN identity. Treat that refusal as a merge failure.
+                # merge_users refuses to absorb a VEKN-bearing account — re-linking
+                # Discord must not swallow another account's VEKN identity.
                 try:
                     merge_result = await merge_users(
                         user_uid_from_state, existing_auth.user_uid
@@ -222,9 +196,8 @@ async def discord_callback(
                 _merged, merge_bds = merge_result
                 for bd in merge_bds:
                     broadcast_precomputed(bd)
-                # Auth method already reassigned by merge - don't create new one
+                # Auth method already reassigned by merge.
         else:
-            # No existing auth - create new auth method linking Discord to this user
             now = datetime.now(UTC)
             auth_method = AuthMethod(
                 uid=str(uuid7()),
@@ -262,7 +235,6 @@ async def discord_callback(
                 user.modified = datetime.now(UTC)
                 broadcast_precomputed(await save_user(user))
 
-        # Store Discord tokens and push Linked Roles metadata
         await _store_and_push_discord_roles(user_uid_from_state, discord_tokens)
 
         return RedirectResponse(
@@ -271,12 +243,9 @@ async def discord_callback(
         )
 
     else:
-        # === LOGIN/SIGNUP MODE ===
         if existing_auth:
-            # Login to existing account
             user_uid = existing_auth.user_uid
 
-            # Update last_used_at
             now = datetime.now(UTC)
             updated_auth = AuthMethod(
                 uid=existing_auth.uid,
@@ -301,20 +270,17 @@ async def discord_callback(
                 user.modified = now
                 await save_user(user)
         else:
-            # Check if verified email matches an existing EMAIL auth user
             email_auth_user_uid = None
             if discord_email:
                 email_auth = await get_auth_method_by_identifier(
                     "email", discord_email.lower()
                 )
                 if email_auth:
-                    # Merge Discord into existing email user
                     email_auth_user_uid = email_auth.user_uid
 
             now = datetime.now(UTC)
 
             if email_auth_user_uid:
-                # Add Discord auth to existing email user
                 user_uid = email_auth_user_uid
                 auth_method = AuthMethod(
                     uid=str(uuid7()),
@@ -352,7 +318,6 @@ async def discord_callback(
                         user.modified = now
                         await save_user(user)
             else:
-                # Create new account
                 user = User(
                     uid=str(uuid7()),
                     modified=now,
@@ -365,7 +330,6 @@ async def discord_callback(
                 await save_user(user)
                 user_uid = user.uid
 
-                # Create Discord auth method
                 auth_method = AuthMethod(
                     uid=str(uuid7()),
                     modified=now,
@@ -379,7 +343,6 @@ async def discord_callback(
                 )
                 await insert_auth_method(auth_method)
 
-        # Store Discord tokens and push Linked Roles metadata
         await _store_and_push_discord_roles(user_uid, discord_tokens)
 
         # A tombstoned (IC-deleted) account keeps its Discord auth method — block a
@@ -390,11 +353,9 @@ async def discord_callback(
                 url=f"{frontend_url}/login?error=account_deleted", status_code=302
             )
 
-        # Generate tokens
         access_token, _ = create_access_token(user_uid)
         refresh_token = create_refresh_token(user_uid)
 
-        # Redirect to frontend with tokens
         params = urlencode({"token": access_token, "refresh": refresh_token})
         return RedirectResponse(
             url=f"{frontend_url}/login?{params}",
@@ -403,11 +364,9 @@ async def discord_callback(
 
 
 async def _store_and_push_discord_roles(user_uid: str, discord_tokens: dict) -> None:
-    """Store Discord OAuth tokens and push Linked Roles metadata."""
     try:
         from ...roles_hook import push_role_metadata
 
-        # Store tokens for future role updates (365-day expiry)
         await store_transient_token(
             f"discord_rc:{user_uid}",
             {
@@ -417,7 +376,6 @@ async def _store_and_push_discord_roles(user_uid: str, discord_tokens: dict) -> 
             datetime.now(UTC) + timedelta(days=365),
         )
 
-        # Push current role metadata
         user = await get_user_by_uid(user_uid)
         if user:
             await push_role_metadata(user, discord_tokens["access_token"])

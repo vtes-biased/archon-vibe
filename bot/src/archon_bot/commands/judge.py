@@ -1,5 +1,3 @@
-"""Judge commands: /sanction."""
-
 import logging
 
 import hikari
@@ -13,9 +11,7 @@ from ._common import fetch_userinfo
 
 logger = logging.getLogger(__name__)
 
-# Judges-Guide tables (categories/subcategories with labels, levels, baselines)
-# come from the backend's public /sanctions/reference endpoint — owned by the
-# Rust engine, never hand-copied here. Fetched once per process.
+# Owned by the Rust engine, never hand-copied here.
 _TABLES: dict | None = None
 
 
@@ -41,12 +37,7 @@ async def get_sanction_tables(api: ArchonAPI) -> dict:
     return _TABLES
 
 
-# --- Step 1: Category select ---
-
-
 class _CategorySelect(miru.TextSelect):
-    """Category select; options come from the fetched reference tables."""
-
     def __init__(self, categories: dict[str, str], **kwargs) -> None:
         super().__init__(
             placeholder="Select infraction category...",
@@ -61,7 +52,6 @@ class _CategorySelect(miru.TextSelect):
         category = self.values[0]
         tables = view._tables
 
-        # Build subcategory options for the modal
         subs = tables["subcategories"].get(category, {})
         sub_options = [miru.SelectOption(label=v, value=k) for k, v in subs.items()]
 
@@ -87,8 +77,6 @@ class _CategorySelect(miru.TextSelect):
 
 
 class CategorySelectView(miru.View):
-    """First step: pick category, then show the sanction modal."""
-
     def __init__(
         self,
         store: TokenStore,
@@ -108,12 +96,7 @@ class CategorySelectView(miru.View):
         self.add_item(_CategorySelect(tables["categories"]))
 
 
-# --- Step 2: Subcategory select ---
-
-
 class _SubcategorySelect(miru.TextSelect):
-    """Dynamic subcategory select that opens the sanction details modal."""
-
     def __init__(self, options: list, **kwargs) -> None:
         super().__init__(placeholder="Select subcategory...", options=options, **kwargs)
 
@@ -152,12 +135,7 @@ class SubcategorySelectView(miru.View):
         await _open_level_select(ctx, self, None, "")
 
 
-# --- Step 3: Penalty level select ---
-
-
 class _LevelSelect(miru.TextSelect):
-    """Penalty-level select; opens the details modal once a level is chosen."""
-
     def __init__(self, baseline: str, levels: dict[str, str], **kwargs) -> None:
         options = [
             miru.SelectOption(label=label, value=value, is_default=(value == baseline))
@@ -216,7 +194,6 @@ async def _open_level_select(
     subcategory: str | None,
     baseline: str,
 ) -> None:
-    """Transition from the subcategory step to the penalty-level select."""
     level_view = LevelSelectView(
         prev._store,
         prev._api,
@@ -234,9 +211,6 @@ async def _open_level_select(
     )
     ctx.client.start_view(level_view)
     prev.stop()
-
-
-# --- Step 4: Details modal (description + conditional round) ---
 
 
 class SanctionDetailsModal(miru.Modal, title="Issue Sanction"):
@@ -320,9 +294,6 @@ class SanctionDetailsModal(miru.Modal, title="Issue Sanction"):
             )
 
 
-# --- /sanction command ---
-
-
 class SanctionCommand(
     lightbulb.SlashCommand,
     name="sanction",
@@ -345,7 +316,6 @@ class SanctionCommand(
 
         discord_id = str(ctx.user.id)
 
-        # Verify issuer is authenticated
         tokens = await store.get_tokens(discord_id)
         if not tokens:
             await ctx.respond(
@@ -355,12 +325,10 @@ class SanctionCommand(
             )
             return
 
-        # Verify issuer account
         info = await fetch_userinfo(api, ctx, discord_id)
         if info is None:
             return
 
-        # Find target player's Archon UID
         target_discord_id = str(self.player.id)
         target_tokens = await store.get_tokens(target_discord_id)
         if not target_tokens:
@@ -385,7 +353,6 @@ class SanctionCommand(
             )
             return
 
-        # Show category selection (step 1 of the flow)
         view = CategorySelectView(
             store, api, tournament_uid, target_uid, target_display, tables
         )

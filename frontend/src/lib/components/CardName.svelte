@@ -9,9 +9,8 @@
 
   const circle = $derived(groupCircle(card.group ?? ''));
 
-  // Advanced badge uses the Ankha-font glyph; until that font is ready show a plain
-  // "A". The font is bundled + service-worker-precached, so this only covers the
-  // brief first-paint FOUT — offline it's always there.
+  // Advanced badge uses the Ankha-font glyph; until that font is ready show a plain "A". The font is
+  // bundled + service-worker-precached, so this only covers the brief first-paint FOUT.
   let fontReady = $state(false);
   $effect(() => {
     const fonts = document.fonts;

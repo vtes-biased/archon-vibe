@@ -6,13 +6,8 @@ import pytest
 from src.access_levels import compute_full, compute_member, compute_public
 from src.models import ObjectType
 
-# ---------------------------------------------------------------------------
-# User fixtures
-# ---------------------------------------------------------------------------
-
 
 def _make_user(**overrides) -> dict:
-    """Create a base user dict with sensible defaults."""
     base = {
         "uid": "u-001",
         "modified": "2026-01-01T00:00:00",
@@ -38,10 +33,8 @@ def _make_user(**overrides) -> dict:
         "local_modifications": [],
         "vekn_prefix": None,
         "calendar_token": "cal_secret_token",
-        # In-memoriam marker (deceased member feature)
         "deceased_at": "2026-05-01T00:00:00",
         "deceased_by_uid": "u-nc-fr",
-        # Rating fields (after merge)
         "constructed_online": {"total": 100, "tournaments": []},
         "constructed_offline": None,
         "limited_online": None,
@@ -52,19 +45,12 @@ def _make_user(**overrides) -> dict:
     return base
 
 
-# ---------------------------------------------------------------------------
-# User: public level
-# ---------------------------------------------------------------------------
-
-
 class TestUserPublic:
     def test_regular_user_hidden(self):
-        """Regular users (no NC/Prince role, no community links) are hidden at public level."""
         user = _make_user(roles=[], community_links=[])
         assert compute_public(ObjectType.USER, user) is None
 
     def test_regular_user_with_links_visible(self):
-        """Regular users with community_links get a minimal public projection (links only)."""
         user = _make_user(roles=[])
         result = compute_public(ObjectType.USER, user)
         assert result is not None
@@ -72,12 +58,10 @@ class TestUserPublic:
             {"type": "discord", "url": "https://discord.gg/test", "label": "Test"}
         ]
         assert result["country"] == "FR"
-        # No name or contact info for regular users
         assert "name" not in result
         assert "contact_email" not in result
 
     def test_nc_user_visible(self):
-        """NC users get a public representation with contact info."""
         user = _make_user(roles=["NC"], vekn_prefix="100")
         result = compute_public(ObjectType.USER, user)
         assert result is not None
@@ -86,9 +70,8 @@ class TestUserPublic:
         assert result["country"] == "FR"
         assert result["roles"] == ["NC"]
         assert result["vekn_prefix"] == "100"
-        # Contact info included for NC/Prince, but email/phone are cloaked in the
-        # public projection (base64, decoded client-side) so the plaintext never
-        # appears in the public snapshot. Discord isn't a harvest target.
+        # Email/phone are base64-cloaked in the public projection (decoded client-side)
+        # so the plaintext never appears in the public snapshot; Discord isn't cloaked.
         assert result["contact_email"].startswith("#b64#")
         assert "alice@example.com" not in result["contact_email"]
         assert (
@@ -100,14 +83,12 @@ class TestUserPublic:
         assert result["contact_discord"] == "alice#1234"
 
     def test_prince_user_visible(self):
-        """Prince users get a public representation."""
         user = _make_user(roles=["Prince"])
         result = compute_public(ObjectType.USER, user)
         assert result is not None
         assert result["roles"] == ["Prince"]
 
     def test_public_excludes_member_fields(self):
-        """Public projection should not include member-only fields."""
         user = _make_user(roles=["NC"])
         result = compute_public(ObjectType.USER, user)
         assert result is not None
@@ -120,7 +101,6 @@ class TestUserPublic:
         assert "calendar_token" not in result
 
     def test_nc_includes_community_links(self):
-        """NC public projection includes community_links."""
         user = _make_user(roles=["NC"])
         result = compute_public(ObjectType.USER, user)
         assert result is not None
@@ -129,7 +109,6 @@ class TestUserPublic:
         ]
 
     def test_ic_user_visible_with_community_links_only(self):
-        """IC user gets public representation with community_links but no contact info."""
         user = _make_user(roles=["IC"])
         result = compute_public(ObjectType.USER, user)
         assert result is not None
@@ -137,34 +116,25 @@ class TestUserPublic:
         assert result["community_links"] == [
             {"type": "discord", "url": "https://discord.gg/test", "label": "Test"}
         ]
-        # IC should NOT have contact info at public level
         assert "contact_email" not in result
         assert "contact_discord" not in result
         assert "contact_phone" not in result
 
     def test_deleted_user_preserves_deleted_at(self):
-        """Deleted NC user still has deleted_at in public projection."""
         user = _make_user(roles=["NC"], deleted_at="2026-02-01T00:00:00")
         result = compute_public(ObjectType.USER, user)
         assert result is not None
         assert result["deleted_at"] == "2026-02-01T00:00:00"
 
 
-# ---------------------------------------------------------------------------
-# User: member level
-# ---------------------------------------------------------------------------
-
-
 class TestUserMember:
     def test_all_users_visible(self):
-        """All users are visible at member level."""
         user = _make_user(roles=[])
         result = compute_member(ObjectType.USER, user)
         assert result is not None
         assert result["uid"] == "u-001"
 
     def test_includes_identity_fields(self):
-        """Member projection includes name, country, vekn_id, city, etc."""
         user = _make_user()
         result = compute_member(ObjectType.USER, user)
         assert result is not None
@@ -176,7 +146,6 @@ class TestUserMember:
         assert result["avatar_path"] == "/avatars/alice.webp"
 
     def test_includes_rating_fields(self):
-        """Member projection includes embedded rating data."""
         user = _make_user()
         result = compute_member(ObjectType.USER, user)
         assert result is not None
@@ -184,7 +153,6 @@ class TestUserMember:
         assert result["wins"] == ["t-001"]
 
     def test_excludes_contact_for_regular_users(self):
-        """Member projection does not include contact info for regular users."""
         user = _make_user(roles=[], community_links=[])
         result = compute_member(ObjectType.USER, user)
         assert result is not None
@@ -194,7 +162,6 @@ class TestUserMember:
         assert "community_links" not in result
 
     def test_includes_community_links_for_regular_users_who_have_them(self):
-        """Member projection includes community_links for regular users with links."""
         user = _make_user(roles=[])
         result = compute_member(ObjectType.USER, user)
         assert result is not None
@@ -204,7 +171,6 @@ class TestUserMember:
         assert "contact_email" not in result
 
     def test_nc_includes_contact_and_community_links(self):
-        """Member projection includes contact info + community_links for NC."""
         user = _make_user(roles=["NC"])
         result = compute_member(ObjectType.USER, user)
         assert result is not None
@@ -216,7 +182,6 @@ class TestUserMember:
         ]
 
     def test_prince_includes_contact_and_community_links(self):
-        """Member projection includes contact info + community_links for Prince."""
         user = _make_user(roles=["Prince"])
         result = compute_member(ObjectType.USER, user)
         assert result is not None
@@ -226,7 +191,6 @@ class TestUserMember:
         ]
 
     def test_ic_includes_community_links_no_contact(self):
-        """Member projection includes community_links but no contact for IC."""
         user = _make_user(roles=["IC"])
         result = compute_member(ObjectType.USER, user)
         assert result is not None
@@ -238,7 +202,6 @@ class TestUserMember:
         assert "contact_phone" not in result
 
     def test_excludes_internal_fields(self):
-        """Member projection excludes internal sync/admin fields."""
         user = _make_user()
         result = compute_member(ObjectType.USER, user)
         assert result is not None
@@ -249,14 +212,8 @@ class TestUserMember:
         assert "calendar_token" not in result
 
 
-# ---------------------------------------------------------------------------
-# User: full level
-# ---------------------------------------------------------------------------
-
-
 class TestUserFull:
     def test_includes_everything_except_calendar_token(self):
-        """Full projection includes everything except calendar_token."""
         user = _make_user()
         result = compute_full(ObjectType.USER, user)
         assert result["contact_email"] == "alice@example.com"
@@ -264,25 +221,14 @@ class TestUserFull:
         assert "calendar_token" not in result
 
     def test_calendar_token_stripped(self):
-        """Calendar token is always stripped from full projection."""
         user = _make_user(calendar_token="secret123")
         result = compute_full(ObjectType.USER, user)
         assert "calendar_token" not in result
 
 
-# ---------------------------------------------------------------------------
-# User: in-memoriam privacy boundary (deceased member feature)
-# ---------------------------------------------------------------------------
-
-
 class TestUserDeceasedPrivacyBoundary:
-    """The in-memoriam marker is split by access level: members see the public
-    fact of death (deceased_at), but the administrative actor (deceased_by_uid,
-    "who marked this person dead") stays full-only. A regression that leaks
-    deceased_by_uid into the member projection exposes admin attribution to
-    every member; one that drops deceased_at from member hides the marker.
-    Asserted on a regular (no-role) user so neither field rides in on a
-    role-specific field set.
+    """deceased_at is member-visible; deceased_by_uid (admin attribution) is full-only.
+    Asserted on a no-role user so neither field rides in on a role-specific field set.
     """
 
     def test_member_sees_date_not_actor(self):
@@ -296,11 +242,6 @@ class TestUserDeceasedPrivacyBoundary:
         result = compute_full(ObjectType.USER, user)
         assert result["deceased_at"] == "2026-05-01T00:00:00"
         assert result["deceased_by_uid"] == "u-nc-fr"
-
-
-# ---------------------------------------------------------------------------
-# Tournament fixtures
-# ---------------------------------------------------------------------------
 
 
 def _make_tournament(**overrides) -> dict:
@@ -353,14 +294,8 @@ def _make_tournament(**overrides) -> dict:
     return base
 
 
-# ---------------------------------------------------------------------------
-# Tournament: public level
-# ---------------------------------------------------------------------------
-
-
 class TestTournamentPublic:
     def test_minimal_fields_only(self):
-        """Public projection only has core scheduling fields."""
         t = _make_tournament()
         result = compute_public(ObjectType.TOURNAMENT, t)
         assert result is not None
@@ -370,7 +305,6 @@ class TestTournamentPublic:
         assert result["country"] == "FR"
 
     def test_excludes_sensitive_fields(self):
-        """Public projection excludes organizer details, checkin code, etc."""
         t = _make_tournament()
         result = compute_public(ObjectType.TOURNAMENT, t)
         assert result is not None
@@ -382,7 +316,8 @@ class TestTournamentPublic:
         assert "vekn_pushed_at" not in result
 
     def test_includes_attend_decision_fields(self):
-        """Omitting a boolean makes the UI assert its negative, not withhold it."""
+        # Booleans are always present: omitting one would make the UI assert its
+        # negative rather than withhold it.
         t = _make_tournament(proxies=True, multideck=True, decklist_required=True)
         result = compute_public(ObjectType.TOURNAMENT, t)
         assert result is not None
@@ -394,7 +329,7 @@ class TestTournamentPublic:
         assert result["description"] == t["description"]
 
     def test_online_event_withholds_venue_url(self):
-        """On an online event venue_url is the join link, not a venue website."""
+        # On an online event venue_url is the join link, not a venue website.
         offline = compute_public(ObjectType.TOURNAMENT, _make_tournament(online=False))
         online = compute_public(
             ObjectType.TOURNAMENT,
@@ -403,17 +338,11 @@ class TestTournamentPublic:
         assert offline is not None and online is not None
         assert offline["venue_url"] == "https://example.com"
         assert "venue_url" not in online
-        assert online["venue"] == "Le Dernier Bar"  # the name still advertises
-
-
-# ---------------------------------------------------------------------------
-# Tournament: member level
-# ---------------------------------------------------------------------------
+        assert online["venue"] == "Le Dernier Bar"
 
 
 class TestTournamentMember:
     def test_includes_most_fields(self):
-        """Member projection includes nearly everything."""
         t = _make_tournament()
         result = compute_member(ObjectType.TOURNAMENT, t)
         assert result is not None
@@ -423,38 +352,25 @@ class TestTournamentMember:
         assert result["external_ids"] == {"vekn": "12345"}
 
     def test_excludes_checkin_code(self):
-        """Member projection strips checkin_code."""
         t = _make_tournament(checkin_code="secret123")
         result = compute_member(ObjectType.TOURNAMENT, t)
         assert result is not None
         assert "checkin_code" not in result
 
     def test_excludes_vekn_pushed_at(self):
-        """Member projection strips vekn_pushed_at."""
         t = _make_tournament(vekn_pushed_at="2026-02-01T00:00:00")
         result = compute_member(ObjectType.TOURNAMENT, t)
         assert result is not None
         assert "vekn_pushed_at" not in result
 
 
-# ---------------------------------------------------------------------------
-# Tournament: full level
-# ---------------------------------------------------------------------------
-
-
 class TestTournamentFull:
     def test_includes_everything(self):
-        """Full projection includes all fields."""
         t = _make_tournament()
         result = compute_full(ObjectType.TOURNAMENT, t)
         assert result["checkin_code"] == "secret_checkin"
         assert result["vekn_pushed_at"] == "2026-02-01T00:00:00"
         assert result["organizers_uids"] == ["u-org1"]
-
-
-# ---------------------------------------------------------------------------
-# Sanction
-# ---------------------------------------------------------------------------
 
 
 def _make_sanction(**overrides) -> dict:
@@ -481,12 +397,10 @@ def _make_sanction(**overrides) -> dict:
 
 class TestSanction:
     def test_public_hidden(self):
-        """Sanctions are not visible at public level."""
         s = _make_sanction()
         assert compute_public(ObjectType.SANCTION, s) is None
 
     def test_member_sees_full(self):
-        """Members see full sanction data."""
         s = _make_sanction()
         result = compute_member(ObjectType.SANCTION, s)
         assert result is not None
@@ -495,16 +409,10 @@ class TestSanction:
         assert result["description"] == "Minor rules violation"
 
     def test_full_same_as_member(self):
-        """Full projection is identical to member for sanctions."""
         s = _make_sanction()
         assert compute_member(ObjectType.SANCTION, s) == compute_full(
             ObjectType.SANCTION, s
         )
-
-
-# ---------------------------------------------------------------------------
-# Deck
-# ---------------------------------------------------------------------------
 
 
 def _make_deck(**overrides) -> dict:
@@ -527,17 +435,14 @@ def _make_deck(**overrides) -> dict:
 
 class TestDeck:
     def test_public_hidden(self):
-        """Decks are never visible at public level."""
         d = _make_deck()
         assert compute_public(ObjectType.DECK, d) is None
 
     def test_member_hidden_when_not_public(self):
-        """Decks without public flag are hidden at member level."""
         d = _make_deck()
         assert compute_member(ObjectType.DECK, d) is None
 
     def test_member_visible_when_public(self):
-        """Decks with public=True are visible at member level."""
         d = _make_deck(public=True)
         result = compute_member(ObjectType.DECK, d)
         assert result is not None
@@ -546,22 +451,15 @@ class TestDeck:
         assert result["public"] is True
 
     def test_member_hidden_when_public_false(self):
-        """Decks with explicit public=False are hidden at member level."""
         d = _make_deck(public=False)
         assert compute_member(ObjectType.DECK, d) is None
 
     def test_full_visible(self):
-        """Full access always sees decks."""
         d = _make_deck()
         result = compute_full(ObjectType.DECK, d)
         assert result["uid"] == "d-001"
         assert result["name"] == "Ventrue Lawfirm"
         assert result["cards"] == {"100001": 4, "100002": 2}
-
-
-# ---------------------------------------------------------------------------
-# League
-# ---------------------------------------------------------------------------
 
 
 def _make_league(**overrides) -> dict:
@@ -586,7 +484,7 @@ def _make_league(**overrides) -> dict:
 
 class TestLeague:
     def test_public_omits_organizers(self):
-        """Members have no public projection, so the uids would not resolve."""
+        # Members have no public projection, so the uids would not resolve.
         lg = _make_league()
         result = compute_public(ObjectType.LEAGUE, lg)
         assert result is not None
@@ -595,7 +493,6 @@ class TestLeague:
         assert "organizers_uids" not in result
 
     def test_member_and_full_identical(self):
-        """Leagues are unfiltered from member level up."""
         lg = _make_league()
         mem = compute_member(ObjectType.LEAGUE, lg)
         full = compute_full(ObjectType.LEAGUE, lg)
@@ -603,14 +500,8 @@ class TestLeague:
         assert mem["organizers_uids"] == ["u-nc-fr"]
 
 
-# ---------------------------------------------------------------------------
-# Dispatch / error handling
-# ---------------------------------------------------------------------------
-
-
 class TestDispatch:
     def test_unknown_type_raises(self):
-        """Unknown object type raises ValueError."""
         with pytest.raises(ValueError, match="Unknown object type"):
             compute_public("foobar", {})
         with pytest.raises(ValueError, match="Unknown object type"):

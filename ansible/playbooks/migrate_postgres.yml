@@ -1,27 +1,6 @@
 ---
-# One-shot PostgreSQL 16 -> 17 migration for prod.
-# Runs pg_dumpall on the current 16 cluster, installs PG17 via PGDG, restores
-# into it on port 5433, swaps ports. The 16 cluster is left stopped on disk
-# for ~48h as a rollback path.
-#
-# SEQUENCING: run this BEFORE the Phase-1 stand-up (`just database-prod` /
-# deploys). With PG16 still on 5432, apt puts the 17 cluster on 5433 while the
-# postgresql role tasks and DATABASE_URL (unix socket, no port) silently
-# target 5432 — i.e. the legacy cluster. Migrating first moves archondb to
-# PG17 on 5432, then `just database-prod` creates the new archon db/user (and
-# applies tunings) in that shared cluster. One cluster also halves PG RAM on
-# the ~2GB box.
-#
-# Stops BOTH stacks around the dump: legacy archon (archon_web) keeps writing
-# to the PG16 cluster being dumped and port-swapped otherwise (silent
-# write-loss window). New-stack services may not exist yet at this point
-# (pre-Phase-1) — stop/start tolerate that.
-#
-# After the swap, verify legacy archon runs clean on PG17 (plain JSONB,
-# expected fine) before standing up the new stack.
-#
-# Run with: just migrate-postgres-prod
-# Requires: PG16 already running, legacy archon running off it.
+# One-shot, run BEFORE the Phase-1 stand-up: with PG16 still on 5432, apt puts
+# PG17 on 5433 while DATABASE_URL silently targets 5432 (the legacy cluster).
 
 - name: "PG16 -> PG17 migration"
   hosts: archon
@@ -46,8 +25,7 @@
         msg: "Aborted by operator."
       when: confirm.user_input | default('') | lower != 'y'
 
-    # Legacy archon first — it is the active writer on the PG16 cluster.
-    # failed_when: false tolerates services that do not exist on this box yet
+    # failed_when: false tolerates services that don't exist on this box yet
     # (the new stack lands at Phase 1, after this migration).
     - name: Stop archon services (legacy + new stack)
       ansible.builtin.service:
@@ -73,10 +51,8 @@
       ansible.builtin.include_role:
         name: postgresql
 
-    # pg_conftool edits the named cluster's postgresql.conf directly — no
-    # socket connection that could silently land on the OTHER cluster (a bare
-    # postgresql_set here would connect to 5432 = the still-running PG16 and
-    # write the port into ITS config, breaking the documented rollback path).
+    # pg_conftool edits postgresql.conf directly, with no socket connection —
+    # a bare postgresql_set here would connect to 5432 (still PG16) instead.
     - name: Point target cluster at temporary port {{ target_port_tmp }}
       ansible.builtin.command: >
         pg_conftool {{ target_version }} main set port {{ target_port_tmp }}

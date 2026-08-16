@@ -2,15 +2,8 @@
   import { Trophy } from "@lucide/svelte";
   import * as m from "$lib/paraglide/messages.js";
 
-  // Renders a final-placement rank: a trophy for the winner (rank 1), a dimmed
-  // number + "Finalist" pill for the tied-for-2nd finalists (VEKN §3.7.5), and a
-  // plain number otherwise. Single-sources the "2,2,2,2" tie presentation so it
-  // reads as a deliberate band, not a glitch.
-  //
-  // `total` makes the cell a self-contained placement ("#1 / 43") for lists with no
-  // rank column to supply that meaning. It also forces the winner's NUMBER to render
-  // — the trophy alone would leave a denominator with no numerator — and carries the
-  // spoken sentence, since a rendered "/" does not read as "of".
+  // Single-sources the tied-for-2nd "Finalist" pill presentation (VEKN §3.7.5) so it reads as a
+  // deliberate band, not a glitch. `total` also forces the winner's NUMBER to render as "#1 / 43" — the trophy alone would leave a denominator with no numerator.
   let { rank, finalist = false, hash = false, total = undefined }: {
     rank: number;
     finalist?: boolean;

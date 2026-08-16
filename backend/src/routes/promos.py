@@ -158,10 +158,8 @@ async def delete_promo(
     return Response(status_code=204)
 
 
-# Promo ledger: append-mostly inventory movements (promo_ledger side table,
-# not synced — officials-only online-only back-office, the wiki/sync.md carve-out).
-# Remaining stock is recomputed server-side after every write and streamed via
-# the Promo/User objects, never derived client-side.
+# Ledger movements (promo_ledger, not synced) are officials-only back office.
+# Stock is recomputed server-side and streamed via Promo/User, never derived client-side.
 
 
 class LedgerEntryCreate(BaseModel):
@@ -185,9 +183,8 @@ async def create_ledger_entry(
     officials-only: NC for their own pool, IC for anyone."""
     if not user:
         raise HTTPException(401, "Authentication required")
-    # Membership floor: every real holder (official/organizer) has a VEKN ID —
-    # keeps drive-by accounts from writing rows. Movements stay auditable
-    # (created_by/from_uid) and correctable via compensating rows.
+    # Membership floor: every real holder has a VEKN ID — keeps drive-by accounts
+    # from writing rows (movements stay auditable, correctable via compensating rows).
     if not user.vekn_id:
         raise HTTPException(403, "VEKN membership required")
     from_uid = body.from_uid or user.uid
@@ -252,12 +249,9 @@ async def list_ledger_entries(user: OptionalUser = None) -> Response:
     )
 
 
-# Promo image: blob in the promo_images side table; the Promo object only
-# carries a versioned image_path so a re-upload propagates via SSE while each
-# version stays long-cacheable. Served UNAUTHENTICATED by design — the service
-# worker deliberately never caches JWT-bearing responses, and these images must
-# be cacheable for offline display (raffle winner, picker).
-MAX_PROMO_IMAGE_SIZE = 1024 * 1024  # 1MB
+# Served UNAUTHENTICATED by design: the service worker never caches JWT-bearing
+# responses, and these images must be cacheable for offline display.
+MAX_PROMO_IMAGE_SIZE = 1024 * 1024
 
 
 @router.post("/{uid}/image")

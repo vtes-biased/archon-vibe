@@ -1,17 +1,6 @@
-"""TWDA (Tournament Winning Deck Archive) GitHub integration.
-
-Auto-creates PRs to GiottoVerducci/TWD when a sanctioned tournament finishes
-and the winner's decklist is available.
-
-Uses a GitHub App installed on the TWD repo with permissions:
-- Contents: write (to create branches and commit files)
-- Pull requests: write (to open PRs)
-
-Configuration (env vars):
-- TWDA_GITHUB_CLIENT_ID: GitHub App client ID (used as the JWT iss)
-- TWDA_GITHUB_PRIVATE_KEY: PEM private key contents, or path to .pem file
-- TWDA_GITHUB_INSTALLATION_ID: Installation ID on the TWD repo (numeric)
-"""
+"""TWDA (Tournament Winning Deck Archive) GitHub integration — auto-creates PRs to
+GiottoVerducci/TWD when a sanctioned tournament finishes with a winner decklist.
+Config: TWDA_GITHUB_{CLIENT_ID,PRIVATE_KEY,INSTALLATION_ID}."""
 
 import base64
 import json

@@ -1,6 +1,5 @@
 use json::JsonValue;
 
-// Modules
 pub mod cards;
 pub mod deck;
 pub mod error;
@@ -13,7 +12,6 @@ pub mod tournament;
 
 pub use error::EngineError;
 
-// Re-export permissions module items
 pub use permissions::{
     can_change_country, can_change_role, can_delete_sanction, can_edit_league, can_issue_sanction,
     can_lift_sanction, can_link_tournament_to_league, can_take_tournament_offline, check,
@@ -21,10 +19,8 @@ pub use permissions::{
     PermissionResult, Request, Role, SanctionContext, UserContext,
 };
 
-// ============================================================================
-// Shared JSON→core→JSON functions (used by both WASM and PyO3 shims).
-// Appear unused when neither feature is enabled (test builds).
-// ============================================================================
+// Shared JSON→core→JSON functions used by both WASM and PyO3 shims; appear
+// unused when neither feature is enabled (test builds).
 #[allow(dead_code)]
 mod shared {
     use super::*;
@@ -42,13 +38,8 @@ mod shared {
         Ok(can_change_role(&actor, &target, role).to_json().dump())
     }
 
-    /// Evaluate one capability from the engine's permission table.
-    ///
     /// The single authorization entry point for both bindings. Request shape:
-    /// `{actor: {roles, country, vekn_id}, actor_uid, target_uid?,
-    /// target_country?, resource?: {country, organizers_uids}}` — supply only
-    /// the fields the capability's rule reads. Capability names are the `name`
-    /// column of `permissions::CAPABILITIES`.
+    /// `{actor, actor_uid, target_uid?, target_country?, resource?}` — supply only the fields the rule reads.
     pub fn check_permission_json(
         capability: &str,
         request_json: &str,
@@ -67,7 +58,6 @@ mod shared {
         Ok(check(capability, &request).to_json().dump())
     }
 
-    /// JSON array of the capabilities the actor holds unconditionally.
     pub fn unconditional_capabilities_json(actor_json: &str) -> Result<String, EngineError> {
         let actor = UserContext::from_json(&json::parse(actor_json)?)?;
         let names: Vec<JsonValue> = unconditional_capabilities(&actor)
@@ -77,7 +67,6 @@ mod shared {
         Ok(JsonValue::Array(names).dump())
     }
 
-    /// Identity, not authority — see `permissions::is_official`.
     pub fn is_official_json(actor_json: &str) -> Result<bool, EngineError> {
         Ok(is_official(&UserContext::from_json(&json::parse(
             actor_json,
@@ -265,10 +254,8 @@ mod shared {
         super::tournament::preview_scores_json(config_json)
     }
 
-    /// Reorder preliminary standings into final placement (winner first, other
+    /// Reorders preliminary standings into final placement (winner first, other
     /// finalists tied for 2nd, then non-finalists), tagging each with `rank`.
-    /// Input: `{ "standings": [...], "winner": "<uid>" }`. Used by the
-    /// post-finals results display.
     pub fn compute_final_standings_json(config_json: &str) -> Result<String, EngineError> {
         let config = json::parse(config_json)?;
         let winner = config["winner"].as_str().unwrap_or("");
@@ -276,10 +263,8 @@ mod shared {
         Ok(json::JsonValue::Array(ranked).dump())
     }
 
-    /// Validate a table's VPs in seating order. Returns `null` when the table
-    /// is scorable, else `{ code, seats }` so the UI can say *why* a table
-    /// will not close instead of leaving it silently unfinished.
-    /// Input: `{ "vps": [1.5, 0, 0.5, 0.5, 0.5] }`.
+    /// Returns `null` when the table is scorable, else `{ code, seats }` so the
+    /// UI can say *why* a table won't close instead of leaving it silently unfinished.
     pub fn check_table_vps_json(config_json: &str) -> Result<String, EngineError> {
         let config = json::parse(config_json)?;
         let vps: Vec<f64> = config["vps"]
@@ -311,9 +296,6 @@ mod shared {
     }
 }
 
-// ============================================================================
-// WASM bindings (frontend) — thin shims over shared functions
-// ============================================================================
 #[cfg(feature = "wasm")]
 mod wasm {
     use super::shared::*;
@@ -571,9 +553,6 @@ mod wasm {
     }
 }
 
-// ============================================================================
-// Python bindings (backend) — thin shims over shared functions
-// ============================================================================
 #[cfg(feature = "python")]
 mod python {
     use super::shared::*;
@@ -764,11 +743,8 @@ mod python {
             ))
         }
 
-        /// Recompute a tournament's standings from its rounds + current sanctions,
-        /// returning the updated tournament JSON. For sanction mutations (issuing,
-        /// lifting, or deleting a standings_adjustment), which are not
-        /// TournamentEvents and so can't refresh standings via
-        /// process_tournament_event.
+        /// Recomputes standings from rounds + sanctions, for sanction mutations
+        /// (issue/lift/delete) which aren't TournamentEvents and so bypass process_tournament_event.
         fn update_standings(
             &self,
             tournament_json: &str,
@@ -841,12 +817,10 @@ mod python {
             ))
         }
 
-        /// Check VP validity for a table. Returns error string or None if valid.
         fn check_table_vps(&self, vps: Vec<f64>) -> PyResult<Option<String>> {
             Ok(super::tournament::check_table_vps(&vps).map(|e| format!("{:?}", e)))
         }
 
-        /// Compute game wins for each player at a table.
         fn compute_gw(&self, vps: Vec<f64>, adjustments: Vec<f64>) -> Vec<f64> {
             super::tournament::compute_gw(&vps, &adjustments)
         }
@@ -864,7 +838,6 @@ mod python {
             super::tournament::compute_gw_finals(&vps, &adjustments, &uid_refs, &seed_order)
         }
 
-        /// Compute tournament points for each player at a table.
         fn compute_tp(&self, table_size: usize, vps: Vec<f64>, adjustments: Vec<f64>) -> Vec<f64> {
             super::tournament::compute_tp(table_size, &vps, &adjustments)
         }

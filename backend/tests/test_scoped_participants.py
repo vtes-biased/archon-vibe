@@ -1,9 +1,7 @@
-"""The bot's tournament-scoped catch-up seeds participant identities.
-
-Regression guard for seating announcements showing raw UUIDs: the scoped SSE
-stream otherwise carries no user objects, so the bot can't resolve a player's
-name. `_scoped_catchup_frames` must emit each participant's (players +
-organizers) member-level User object and seed `sent` for the live-refresh diff.
+"""Regression guard for seating announcements showing raw UUIDs: the bot's
+scoped SSE stream carries no user objects otherwise. `_scoped_catchup_frames`
+must emit each participant's User object and seed `sent` for the live-refresh
+diff.
 """
 
 from datetime import UTC, datetime

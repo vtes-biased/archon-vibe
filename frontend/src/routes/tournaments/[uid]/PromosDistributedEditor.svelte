@@ -54,9 +54,9 @@
     catalog.filter(p => p.active).length - eligible.length
   );
 
-  // One row per promo: a row's options exclude promos chosen in other rows but
-  // always include its own current pick (even retired or re-gated) so an
-  // existing report keeps rendering.
+  // A row's options exclude promos chosen in other rows but always include its
+  // own current pick (even retired or re-gated), so an existing report keeps
+  // rendering.
   function optionsFor(index: number): Promo[] {
     const chosen = new Set(rows.filter((_, i) => i !== index).map(r => r.promo_uid));
     const opts = eligible.filter(p => !chosen.has(p.uid));
@@ -72,9 +72,9 @@
   // suspended while any row is invalid — say so instead of silently no-oping.
   const hasInvalidRow = $derived(rows.some(r => !r.promo_uid || !(r.qty >= 1)));
 
-  // Own computed stock (server-written, streamed to own profile): warn — never
-  // block — when a reported promo's remaining has gone negative. Re-read on
-  // tournament change so the post-save recompute is picked up.
+  // Own computed stock (server-written, streamed to own profile): warn, never
+  // block, when a reported promo's remaining goes negative. Re-read on
+  // tournament change to pick up the post-save recompute.
   let ownStock = $state<Record<string, number>>({});
   $effect(() => {
     void tournament.modified;

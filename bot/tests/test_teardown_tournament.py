@@ -1,24 +1,6 @@
-"""`/teardown` must leave a guild with no leftover tournament channels.
-
-``teardown_tournament`` is the reliability backstop behind the ``/teardown``
-command: even when the bot has lost its in-memory channel map (restart) or a
-child got orphaned out of the category by an earlier partial teardown, a re-run
-must still remove everything. This pins that contract:
-  - every channel under the category is deleted (the restart-safe scan);
-  - explicitly-passed ids that drifted OUT of the category are also deleted, and
-    the category is deleted LAST and exactly once (even if passed among them);
-  - channels already gone (NotFound) are ignored, while real delete failures are
-    returned so the caller flags a partial teardown instead of lying success;
-  - on a partial failure the category is KEPT (not deleted), so a survivor whose
-    delete failed stays grouped under it rather than being un-parented to root;
-  - a failed channel listing still deletes the explicitly-known ids.
-
-Only the REST calls the function makes are faked; real ``hikari`` error types.
-
-Run from bot/:
-    DISCORD_BOT_TOKEN=x OAUTH_CLIENT_ID=x OAUTH_CLIENT_SECRET=x \
-        uv run --with pytest --with pytest-asyncio pytest -q
-"""
+"""Even when the bot has lost its in-memory channel map (restart) or a child
+got orphaned out of the category by an earlier partial teardown, a re-run
+must still remove everything."""
 
 from __future__ import annotations
 

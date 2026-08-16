@@ -1,5 +1,3 @@
-"""VEKN push sync — push tournaments and members to vekn.net."""
-
 import logging
 import os
 from collections.abc import AsyncIterator
@@ -34,11 +32,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def vekn_push_client() -> AsyncIterator[VEKNAPIClient | None]:
-    """Yield a VEKNAPIClient when VEKN_PUSH is enabled (else None); always closes it.
-
-    Folds the env-gate + construct + try/finally-close dance shared by every push
-    call site. Callers keep their own try/except for site-specific log messages.
-    """
+    """Yield a VEKNAPIClient when VEKN_PUSH is enabled (else None); always closes it."""
     if os.getenv("VEKN_PUSH", "").lower() != "true":
         yield None
         return
@@ -49,8 +43,8 @@ async def vekn_push_client() -> AsyncIterator[VEKNAPIClient | None]:
         await client.close()
 
 
-# Reverse map: (format, rank) → VEKN event type ID
-# We pick the most common type for each combination
+# Reverse of EVENT_TYPE_MAP — lossy: several VEKN types map to the same
+# (format, rank), so only the most common type per combination survives here.
 FORMAT_RANK_TO_VEKN_TYPE: dict[tuple[TournamentFormat, TournamentRank], int] = {
     (TournamentFormat.Standard, TournamentRank.BASIC): 2,  # Standard Constructed
     (TournamentFormat.Standard, TournamentRank.NC): 8,  # National Championship
@@ -76,55 +70,42 @@ def generate_archondata(
     users_by_uid: dict[str, User],
     sanctions: list | None = None,
 ) -> str:
-    """Generate VEKN archondata string from tournament standings.
-
-    Format: {nrounds}¤{rank}§{first}§{last}§{city}§{vekn}§{gw}§{vp}§{vpf}§{tp}§{toss}§{rtp}§...
-    """
     nrounds = len(tournament.rounds) + (1 if tournament.finals else 0)
 
-    # Pre-compute finals VP for finalists
     finals_vp: dict[str, float] = {}
     if tournament.finals:
         for seat in tournament.finals.seating:
             finals_vp[seat.player_uid] = seat.result.vp
 
-    # Sanctions feed the rating-point (rtp) calculation so the SA penalty is
-    # reflected in the pushed rating; the {vp} field below reads standing.vp,
-    # which the engine already SA-adjusts.
-    # Hoisted out of the loop: all four are user-independent, and encoding the whole
-    # tournament once per player is O(players) full-tournament encodes on events that
-    # can run to hundreds of seats.
+    # Hoisted out of the loop (avoids O(players) re-encodes); sanctions feed rtp so
+    # the SA penalty reaches the pushed rating (standing.vp is already SA-adjusted).
     t_json = msgspec.json.encode(tournament).decode()
     sanctions_json = msgspec.json.encode(sanctions or []).decode()
     player_count = _player_count(tournament)
     positions = _final_positions(tournament)
 
     parts: list[str] = []
-    # Guard: iterate standings (seating-derived), not tournament.players, so a
-    # registered no-show stays out and our pushed RTP field size matches vekn's.
+    # Iterate standings, not tournament.players — a registered no-show stays
+    # out, keeping the pushed RTP field count matched to vekn's.
     for rank_idx, standing in enumerate(tournament.standings, 1):
         user = users_by_uid.get(standing.user_uid)
         if not user:
             continue
-        # Proxy (non-competing official stood in): not a real competitor — never push
-        # to VEKN (the system of record). They sort last in standings, so skipping
+        # Proxies never push to VEKN; they sort last in standings so skipping
         # them doesn't disturb the leading competitors' rank_idx.
         if standing.non_competing:
             continue
 
-        # Split name into first/last
         name_parts = (user.name or "").split(maxsplit=1)
         first = name_parts[0] if name_parts else ""
         last = name_parts[1] if len(name_parts) > 1 else ""
         city = user.city or ""
         vekn_id = user.vekn_id or ""
 
-        # GW: standings are prelim-only (engine compute_standings sums rounds only)
         gw = standing.gw
 
         vpf = finals_vp.get(standing.user_uid, 0.0)
 
-        # Rating points
         entry = _compute_entry(
             tournament,
             t_json,
@@ -163,7 +144,6 @@ async def push_tournament_event(
     if tournament.open_rounds or tournament.self_organized_rounds:
         return None
 
-    # Validate requirements
     if not tournament.name or len(tournament.name) < 3:
         logger.warning(f"Tournament {tournament.uid}: name too short for VEKN")
         return None
@@ -171,13 +151,11 @@ async def push_tournament_event(
         logger.warning(f"Tournament {tournament.uid}: no organizers")
         return None
 
-    # Get organizer's VEKN ID for impersonation
     organizer = await get_user_by_uid(tournament.organizers_uids[0])
     if not organizer or not organizer.vekn_id:
         logger.warning(f"Tournament {tournament.uid}: organizer has no VEKN ID")
         return None
 
-    # Map to VEKN event type
     event_type = tournament_to_vekn_type(tournament.format, tournament.rank)
     if event_type is None:
         logger.warning(
@@ -186,14 +164,12 @@ async def push_tournament_event(
         )
         return None
 
-    # Determine rounds. Open rounds: max_rounds is a per-player cap, so the event can run
-    # more (or fewer) total rounds than it — report the actual rounds run, falling back to
-    # the cap before any round exists (calendar push at creation).
+    # max_rounds is a per-player cap under open rounds, not the actual count —
+    # report rounds run, falling back to the cap before any round exists.
     rounds = len(tournament.rounds) or tournament.max_rounds
     if rounds < 2:
         rounds = 2  # VEKN minimum
 
-    # Dates
     start_date = ""
     end_date = ""
     start_time = ""
@@ -217,19 +193,18 @@ async def push_tournament_event(
         logger.warning(f"Tournament {tournament.uid}: no start date")
         return None
     if not end_date:
-        end_date = start_date  # Same day
+        end_date = start_date
     if not end_time:
         end_time = start_time  # VEKN requires a non-empty endtime
 
-    # Base on an actual finals (max_rounds is a per-player cap now, not a finals signal).
+    # Derived from an actual finals object — max_rounds is a per-player cap,
+    # not a finals signal.
     has_finals = 1 if tournament.finals else 0
 
     try:
         event_id = await client.create_event(
             name=tournament.name[:120],
             event_type=event_type,
-            # VEKN wants date and time as separate fields (event.php requires all
-            # four; a combined "date time" reads as an empty starttime/endtime → 400).
             startdate=start_date,
             starttime=start_time,
             enddate=end_date,
@@ -253,9 +228,8 @@ async def push_tournament_event(
         logger.error(f"Failed to create VEKN event for {tournament.uid}: {e}")
         return None
 
-    # Store the VEKN event ID. Re-fetch under the row lock: batch_push loads rows up
-    # front but saves here minutes later — only the vekn fields are ours, so we write
-    # them onto the CURRENT locked snapshot so interim /action edits aren't clobbered.
+    # Re-fetch under the row lock — batch_push loads rows minutes before saving,
+    # so writing onto the CURRENT snapshot avoids clobbering interim /action edits.
     async with tournament_transaction(tournament.uid) as (fresh, tx_conn):
         fresh = fresh or tournament  # hard-deleted mid-push: fall back to re-create
         fresh.external_ids["vekn"] = event_id
@@ -275,7 +249,8 @@ async def push_tournament_results(
     """Upload archondata for a finished tournament. Returns True on success.
 
     raise_api_errors: see push_tournament_event — propagated to the nested
-    event-create too."""
+    event-create too.
+    """
     if not os.getenv("VEKN_PUSH", "").lower() == "true":
         return False
 
@@ -286,7 +261,6 @@ async def push_tournament_results(
         logger.warning(f"Tournament {tournament.uid}: no standings")
         return False
 
-    # Ensure all players have VEKN IDs
     users_by_uid: dict[str, User] = {}
     for standing in tournament.standings:
         user = await get_user_by_uid(standing.user_uid)
@@ -297,7 +271,6 @@ async def push_tournament_results(
             return False
         users_by_uid[standing.user_uid] = user
 
-    # Ensure VEKN event exists
     vekn_event_id = tournament.external_ids.get("vekn")
     if not vekn_event_id:
         vekn_event_id = await push_tournament_event(
@@ -307,7 +280,7 @@ async def push_tournament_results(
             logger.error(f"Tournament {tournament.uid}: cannot create VEKN event")
             return False
 
-    # Generate and upload archondata (sanctions feed the SA-adjusted rating points)
+    # sanctions feed the SA-adjusted rating points in the archondata
     sanctions = await get_sanctions_for_tournament(tournament.uid)
     archondata = generate_archondata(tournament, users_by_uid, sanctions)
 
@@ -321,10 +294,8 @@ async def push_tournament_results(
         logger.error(f"Failed to upload results for {tournament.uid}: {e}")
         return False
 
-    # Mark as pushed. Re-fetch under the row lock: the snapshot we computed
-    # archondata from may be minutes stale by now — write only the vekn fields onto
-    # the CURRENT locked row so concurrent edits aren't clobbered. push_tournament_event
-    # above may have already bumped external_ids.vekn; the locked read picks that up too.
+    # Re-fetch under the row lock — the archondata snapshot may be minutes
+    # stale; this also picks up external_ids.vekn if create_event just set it.
     async with tournament_transaction(tournament.uid) as (fresh, tx_conn):
         fresh = fresh or tournament  # hard-deleted mid-push: fall back to re-create
         fresh.vekn_pushed_at = datetime.now(UTC)
@@ -348,7 +319,6 @@ async def push_member(
     if not user.vekn_id:
         return False
 
-    # Split name into first/last
     name_parts = (user.name or "").split(maxsplit=1)
     firstname = name_parts[0] if name_parts else "Unknown"
     lastname = name_parts[1] if len(name_parts) > 1 else "Unknown"
@@ -372,9 +342,8 @@ async def push_member(
         logger.error(f"Failed to push member {user.vekn_id}: {e}")
         return False
 
-    # Re-fetch before save: batch_push may have loaded this user minutes
-    # ago — write only the vekn-sync flags onto a fresh snapshot so interim
-    # profile edits (name, city, roles) aren't clobbered.
+    # Re-fetch — batch_push may have loaded this user minutes ago; write only
+    # the vekn-sync flags so interim profile edits aren't clobbered.
     fresh = await get_user_by_uid(user.uid) or user
     fresh.vekn_synced = True
     fresh.vekn_synced_at = datetime.now(UTC)
@@ -388,8 +357,7 @@ async def push_member(
 async def push_member_background(user: User) -> None:
     """push_member with its own client and swallowed errors, for asyncio.create_task.
 
-    Failures are log-only by design: the user is saved with vekn_synced=false
-    before this runs, so the hourly batch_push retries until VEKN accepts.
+    Failures are log-only — vekn_synced stays false, so batch_push retries hourly.
     """
     try:
         async with vekn_push_client() as client:
@@ -399,17 +367,8 @@ async def push_member_background(user: User) -> None:
         logger.exception(f"Failed to push member {user.vekn_id} to VEKN")
 
 
-# batch_push step 2 selection: tournaments needing a vekn.net calendar event.
-# Planned drafts are included on purpose: create() pushes on creation regardless
-# of state (tournaments.py), and this batch retries any push that failed then, so
-# the calendar entry lands as soon as VEKN accepts it — not only once registration
-# opens. The vekn_pushed_at guard keeps imported history out — ETL-migrated finished
-# tournaments without a vekn id are stamped at import (no push owed) and must
-# not get calendar events created for them years after the fact.
-# Guard covered by test_vekn_push_batch.py.
-# open_rounds / self_organized_rounds events are the non-VEKN house format — never
-# create a vekn.net calendar entry for them (IS DISTINCT FROM keeps legacy rows that
-# predate the flag, where ->> is NULL, in the push set).
+# Planned drafts included on purpose (create() pushes regardless of state; this
+# retries failures). open_rounds/self_organized_rounds are non-VEKN — never pushed.
 UNCREATED_EVENTS_QUERY = """
     SELECT "full" FROM objects
     WHERE type = %s
@@ -422,11 +381,8 @@ UNCREATED_EVENTS_QUERY = """
       AND ("full"->>'self_organized_rounds') IS DISTINCT FROM 'true'
 """
 
-# batch_push step 3 selection. The rounds guard keeps tournaments whose results
-# did not originate here (VEKN imports, ETL-migrated history — standings but no
-# per-round play data) out of the push set even if their vekn_pushed_at was never
-# stamped: re-pushing the source of record is pointless and archondata needs the
-# round detail an import never had. Guard covered by test_vekn_push_batch.py.
+# The rounds guard excludes results that didn't originate here (VEKN imports, ETL
+# history — standings but no round data) even when vekn_pushed_at was never stamped.
 UNPUSHED_RESULTS_QUERY = """
     SELECT "full" FROM objects
     WHERE type = %s
@@ -442,13 +398,8 @@ UNPUSHED_RESULTS_QUERY = """
 
 async def batch_push(client: VEKNAPIClient) -> dict:
     """Push all unpushed tournaments and members. Returns stats dict.
-
-    Fail-fast: the first VEKNAPIConnectionError (transport down, timeout,
-    auth failure) aborts the whole batch rather than letting every remaining
-    item re-time-out serially (30-120s each) during an outage — it reruns next
-    cycle anyway. Per-item data errors (bad VEKN id, parse error) still skip just
-    that item and continue.
-    """
+    Fail-fast: the first VEKNAPIConnectionError aborts the whole batch rather than
+    re-timing-out every remaining item serially; per-item data errors just skip that item."""
     from .db import decode_json
 
     stats = {
@@ -520,13 +471,11 @@ async def batch_push(client: VEKNAPIClient) -> dict:
             try:
                 if await push_tournament_results(client, t):
                     stats["results_pushed"] += 1
-                    # First-push TWDA trigger: events finished offline (or whose
-                    # VEKN id only just got created above) never saw the
-                    # finish-time submission — retry now that external_ids.vekn
-                    # and results exist. Re-fetch: the push just rewrote the row.
-                    # Late import — routes.tournaments imports this module.
+                    # Retries the TWDA submission for events finished offline that
+                    # never saw it. Late import: routes.tournaments imports this module.
                     from .routes.tournaments import maybe_submit_twda
 
+                    # Re-fetch: the push just rewrote the row.
                     fresh = await get_tournament_by_uid(t.uid)
                     if fresh:
                         await maybe_submit_twda(fresh)

@@ -124,9 +124,8 @@ async def check(t: Tournament) -> list[str]:
         problems.append(f"state {t.state.value} cannot be finished")
     if not t.standings:
         problems.append("no standings — push_tournament_results would refuse")
-    # Sanctions shift finals scoring when rounds.len() changes
-    # (refresh_finals_scoring derives the finals round number from it), so a
-    # tournament carrying any is out of scope for this repair.
+    # Sanctions shift finals scoring when rounds.len() changes, so a tournament
+    # carrying any is out of scope for this repair.
     if await db.get_sanctions_for_tournament(t.uid):
         problems.append("tournament has sanctions — finals re-scoring is not in scope")
     missing = []

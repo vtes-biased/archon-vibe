@@ -35,7 +35,6 @@
 
   const isFinals = $derived(tournament?.finals != null && (tournament?.state === "Playing" || tournament?.state === "Finished"));
 
-  // Action bar derived values
   const registeredCount = $derived(tournament?.players?.length ?? 0);
   const checkedInCount = $derived(tournament?.players?.filter(p => p.state === "Checked-in").length ?? 0);
   const uncheckedCount = $derived(tournament?.players?.filter(p => p.state === "Registered").length ?? 0);
@@ -45,7 +44,6 @@
   const qrCheckin = $derived(!tournament?.online && !!tournament?.checkin_code);
   const hasFinalsCandidate = $derived(standings.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
   const finalsReady = $derived(hasFinalsCandidate && !top5HasTiesFn(standings));
-  // Find the single in-progress round (for action bar when not parallel)
   const activeRoundIdx = $derived.by(() => {
     if (!tournament?.rounds?.length) return -1;
     const idx = tournament.rounds.findIndex(r => r.some(t => t.state !== "Finished"));
@@ -87,9 +85,9 @@
   );
   const hasParallelRounds = $derived(inProgressRoundCount > 1);
   const playingCount = $derived(tournament?.players?.filter(p => p.state === "Playing").length ?? 0);
-  // Round-1 no-show notice (standard tournaments): who gets recorded as a
-  // no-show when the round starts. Non-blocking — drops are reinstatable
-  // (CheckIn between rounds, SeatPlayer mid-round), so it informs, no confirm.
+  // Round-1 no-show notice: who gets recorded as a no-show when the round
+  // starts. Non-blocking — drops are reinstatable (CheckIn, SeatPlayer), so it
+  // informs, no confirm.
   const prospectiveNoShows = $derived.by(() => {
     if (tournament?.state !== "Waiting" || tournament?.open_rounds) return [];
     const priorRealRounds = tournament?.rounds?.filter(r => r.some(t => t.state !== "Cancelled")).length ?? 0;
@@ -99,9 +97,9 @@
       .map(p => seatDisplay(p.user_uid!, playerInfo, tournament.online));
   });
 
-  // Present but not seated in any live round — a late arrival just checked in, or
-  // a rotation sit-out. Nothing in the data tells them apart, and both leave the
-  // organizer the same two choices, so one notice serves both.
+  // Present but not seated in any live round — a late arrival or a rotation
+  // sit-out; nothing in the data tells them apart, and both leave the organizer
+  // the same two choices, so one notice serves both.
   const unseatedCheckedIn = $derived.by(() => {
     if (tournament?.state !== "Playing") return [];
     const seated = new Set<string>();
@@ -144,7 +142,7 @@
   });
 
   // Compact progress for the sticky strip: digits only, so it needs no
-  // translation and stays legible at any width. The full sentence rides along
+  // translation and stays legible at any width; the full sentence rides along
   // as the accessible label.
   const stickyProgress = $derived(
     tournament.state === "Playing" && !isFinals && !hasParallelRounds && tablesFinishedCount.total > 0
@@ -170,13 +168,11 @@
   });
 </script>
 
-<!-- Action Bar — tournament-level, so it sits ABOVE the tab bar: it is the same
-     panel whichever tab is open, and nesting it inside the tab content made it
-     read as if it belonged to that tab. -->
+<!-- Sits above the tab bar, not inside tab content — it's the same panel
+     whichever tab is open. -->
 <div bind:this={barEl} class="border-b border-line px-3 sm:px-6 py-3 space-y-3">
-  <!-- Step indicator. Gone once the event is Finished: the rail answers "how
-       far along am I", and the guidance line below already answers it with
-       "Tournament complete." -->
+  <!-- Gone once Finished: the guidance line below already answers "how far
+       along" with "Tournament complete." -->
   {#if tournament.state !== "Finished"}
   <div class="flex items-center gap-1 sm:gap-2 text-xs overflow-x-auto">
     {#each ["Planned", "Registration", "Waiting", "Playing", "Finished"] as step, i}
@@ -195,7 +191,6 @@
   </div>
   {/if}
 
-  <!-- Guidance message -->
   <p class="text-sm text-ink-muted">
     {#if tournament.state === "Planned"}
       {m.action_bar_planned()}
@@ -224,7 +219,6 @@
     {/if}
   </p>
 
-  <!-- Actions: ONE primary CTA per state; secondaries collapse into a More overflow -->
   <div class="flex flex-wrap items-center gap-2">
     {#if primary}
       <Button variant="primary" size="lg" loading={actionLoading} disabled={primary.disabled} onclick={primary.onclick}>{primary.label}</Button>
@@ -283,8 +277,6 @@
     </InlineNotice>
   {/if}
 
-  <!-- Finished results: winner + share/export + reopen (re-homed from the former Overview tab).
-       Archon import only when there are no standings (an empty finished shell to migrate into). -->
   {#if tournament.state === "Finished"}
     <FinishedResults
       {tournament}
@@ -295,7 +287,6 @@
     />
   {/if}
 
-  <!-- Check-in hints (Waiting state) -->
   {#if tournament.state === "Waiting"}
     {#if checkedInCount < 4}
       <p class="text-sm text-ink-faint">{m.overview_start_round_hint({ count: String(checkedInCount) })}</p>
@@ -314,14 +305,13 @@
     {/if}
   {/if}
 
-  <!-- Checking someone in mid-round leaves them present but unseated, and that is
-       a decision the organizer has to make under time pressure. State it; the two
-       options are theirs to weigh, so the copy carries no default. -->
+  <!-- Checking someone in mid-round leaves them present but unseated — state it,
+       but the two options are the organizer's to weigh, so the copy carries no
+       default. -->
   {#if tournament.state === "Playing" && unseatedCheckedIn.length > 0}
     <InlineNotice>{m.action_bar_unseated_notice({ names: unseatedCheckedIn.join(", ") })}</InlineNotice>
   {/if}
 
-  <!-- QR Check-in display -->
   {#if showQrCode && (tournament.state === "Registration" || tournament.state === "Waiting") && qrCheckin && tournament.checkin_code}
     <div class="pt-3 border-t border-line">
       <QrCheckinDisplay code={tournament.checkin_code} tournamentUid={tournament.uid} tournamentName={tournament.name} />
@@ -329,11 +319,9 @@
   {/if}
 </div>
 
-<!-- Sticky CTA: the organizer works in the tables far below the bar, so the one
-     state action follows them down rather than making them scroll back up.
-     Sits flush on the mobile nav (bottom-navbar == the nav's total footprint,
-     touch row + bottom safe area) and clears the desktop side rail (sm:left-rail),
-     where it is itself the bottom-most element and absorbs the inset. -->
+<!-- Sits flush on the mobile nav (bottom-navbar, its total footprint) and
+     clears the desktop rail (sm:left-rail), where it is itself the bottom-most
+     element and absorbs the inset. -->
 {#if primary && !barOnScreen}
   <div
     class="fixed left-0 right-0 bottom-navbar sm:bottom-0 sm:left-rail z-30 sm:pb-safe-b pr-safe-r border-t border-line bg-surface-card/95 backdrop-blur-sm print:hidden"

@@ -1,9 +1,6 @@
 ---
-# Create the unprivileged runtime user/group + app dirs for the beta deploy.
 # Prod gets these from the `common` role at bootstrap; the beta box is
-# server-setup-provisioned (which doesn't know archon's app user), so the deploy
-# playbook owns them. The user name == the DB role so Postgres peer auth over the
-# unix socket works (DATABASE_URL's password is then vestigial).
+# server-setup-provisioned, so the deploy playbook owns them here instead.
 - name: Ensure runtime group exists
   ansible.builtin.group:
     name: "{{ archon_group }}"

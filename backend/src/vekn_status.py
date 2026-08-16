@@ -1,13 +1,4 @@
-"""In-process status tracking for VEKN sync/push jobs (observability).
-
-A days-long vekn.net outage is otherwise invisible except in logs. The scheduled
-jobs (member sync, tournament sync, hourly batch_push) record their last success
-and last error here; an IC-gated admin endpoint exposes the snapshot so admins
-can see at a glance whether sync/push is healthy.
-
-State is module-level and resets on restart — by design: "is it working right
-now" is the question, not a durable audit trail (logs remain the record).
-"""
+"""In-process status tracking for VEKN sync/push jobs; resets on restart by design."""
 
 from datetime import UTC, datetime
 
@@ -16,7 +7,6 @@ _status: dict[str, dict] = {}
 
 
 def record_success(job: str, detail: dict | None = None) -> None:
-    """Record that `job` just completed successfully."""
     entry = _status.setdefault(job, {})
     entry["last_success_at"] = datetime.now(UTC).isoformat()
     entry["last_status"] = "ok"
@@ -25,7 +15,7 @@ def record_success(job: str, detail: dict | None = None) -> None:
 
 
 def record_error(job: str, message: str) -> None:
-    """Record that `job` just failed (keeps last_success_at for contrast)."""
+    """Keeps last_success_at for contrast."""
     entry = _status.setdefault(job, {})
     entry["last_error_at"] = datetime.now(UTC).isoformat()
     entry["last_error"] = message
@@ -33,5 +23,4 @@ def record_error(job: str, message: str) -> None:
 
 
 def get_status() -> dict[str, dict]:
-    """Return the full status snapshot (per-job last success/error)."""
     return _status

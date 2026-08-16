@@ -30,7 +30,6 @@
     link.moderation?.status === "promoted" ? link.moderation.scope : null;
 </script>
 
-<!-- Language filter chips -->
 <div class="flex flex-wrap gap-2 mb-4 overflow-x-auto">
   <button
     onclick={() => onSelectLanguage("")}
@@ -46,7 +45,6 @@
   {/each}
 </div>
 
-<!-- Content list -->
 {#if items.length > 0}
   <div class="space-y-2">
     {#each items as { user, link }}

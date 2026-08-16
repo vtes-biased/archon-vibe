@@ -44,27 +44,19 @@ def _require_manager_for_user(manager: User, target: User) -> None:
 
 
 class ClaimRequest(BaseModel):
-    """Request to claim an unclaimed VEKN ID."""
-
     vekn_id: str
 
 
 class LinkRequest(BaseModel):
-    """Request to link a VEKN ID to a user (may displace current holder)."""
-
     vekn_id: str
     user_uid: str
 
 
 class SponsorRequest(BaseModel):
-    """Request to sponsor a new VEKN member."""
-
     user_uid: str
 
 
 class ForceAbandonRequest(BaseModel):
-    """Request to force-abandon a user's VEKN ID."""
-
     user_uid: str
 
 
@@ -73,29 +65,21 @@ async def claim_vekn_id(
     request: ClaimRequest,
     current_user: CurrentUser,
 ) -> Response:
-    """User claims an unclaimed VEKN ID.
+    """User claims an unclaimed VEKN ID, merging it into their own account."""
 
-    The VEKN ID must exist and not be claimed (no auth_methods).
-    The current user must not already have a VEKN ID.
-    On success, merges the VEKN user into the current user's account.
-    """
-
-    # Check current user doesn't already have a VEKN ID
     if current_user.vekn_id:
         raise HTTPException(status_code=400, detail="You already have a VEKN ID")
 
-    # Find the VEKN user
     vekn_user = await get_user_by_vekn_id(request.vekn_id)
     if not vekn_user:
         raise HTTPException(status_code=404, detail="VEKN ID not found")
 
-    # Check if it's claimed (has auth methods)
     if await is_vekn_id_claimed(request.vekn_id):
         raise HTTPException(
             status_code=400, detail="This VEKN ID is already claimed by another user"
         )
 
-    # Merge: keep the VEKN user_uid (stable reference), transfer auth from current
+    # merge_users keeps its first uid; the VEKN-record account survives.
     result = await merge_users(vekn_user.uid, current_user.uid)
     if not result:
         raise HTTPException(status_code=500, detail="Failed to merge accounts")
@@ -111,10 +95,8 @@ async def claim_vekn_id(
     # Update Discord Linked Roles (vekn_id changes org level)
     asyncio.create_task(sync_user_discord_roles(merged.uid))
 
-    # Issue new tokens for the VEKN user's uid (different from the old user).
-    # Consumed by the SPA (session rotation) AND the Discord bot, which fires
-    # one follow-up tournament action with this access_token after a bot-side
-    # claim tombstones its stored OAuth identity (bot commands/player.py).
+    # New tokens for the VEKN uid (different from the old one): consumed by the SPA
+    # AND the Discord bot, which fires a follow-up action after a claim tombstones its OAuth identity.
     access_token, expires_in = create_access_token(merged.uid)
     refresh_token = create_refresh_token(merged.uid)
 
@@ -136,19 +118,16 @@ async def claim_vekn_id(
 async def abandon_vekn_id(
     current_user: CurrentUser,
 ) -> Response:
-    """User voluntarily abandons their VEKN ID.
-
-    Splits the user: creates a new user with auth methods and personal data,
-    orphans the old VEKN record. Returns new tokens for the new user.
-    """
+    """User voluntarily abandons their VEKN ID, splitting off a fresh account
+    with their auth methods and personal data."""
 
     if not current_user.vekn_id:
         raise HTTPException(
             status_code=400, detail="You don't have a VEKN ID to abandon"
         )
 
-    # You can't abandon your way out of a suspension — the sanction stays with
-    # the VEKN record, so block the self-service detach while one is active.
+    # The sanction stays with the VEKN record — block self-service detach
+    # while one is active.
     if await user_has_active_suspension(current_user.uid):
         raise HTTPException(
             status_code=403,
@@ -171,7 +150,6 @@ async def abandon_vekn_id(
     # Update Discord Linked Roles (lost vekn_id)
     asyncio.create_task(sync_user_discord_roles(new_user.uid))
 
-    # Issue new tokens for the new user
     access_token, expires_in = create_access_token(new_user.uid)
     refresh_token = create_refresh_token(new_user.uid)
 
@@ -194,35 +172,24 @@ async def sponsor_new_member(
     request: SponsorRequest,
     manager: CurrentUser,
 ) -> Response:
-    """Sponsor a new VEKN member.
-
-    Allocates a new sequential VEKN ID to the target user.
-    Requires an official role (IC, NC, or Prince) — any country: a visiting
-    official can sponsor newcomers abroad (they won't be able to edit that
-    member's profile afterwards; profile edits stay country-scoped).
-    Target user must not already have a VEKN ID.
-    """
-
-    # Check manager has appropriate role
+    """Sponsor a new VEKN member: allocates a sequential VEKN ID to the target
+    user. A visiting official can sponsor abroad, but won't be able to edit
+    that member's profile afterwards — profile edits stay country-scoped."""
     if not permissions.can_sponsor_member(manager):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can sponsor new members"
         )
 
-    # Get target user
     target = await get_user_by_uid(request.user_uid)
     if not target:
         raise HTTPException(status_code=404, detail="Target user not found")
 
-    # Check target doesn't already have a VEKN ID
     if target.vekn_id:
         raise HTTPException(status_code=400, detail="User already has a VEKN ID")
 
-    # Allocate new VEKN ID
     new_vekn_id = await allocate_next_vekn_id()
     now = datetime.now(UTC)
 
-    # Update target user
     updated = msgspec.structs.replace(
         target,
         modified=now,
@@ -243,8 +210,7 @@ async def sponsor_new_member(
     # Update Discord Linked Roles (gained vekn_id)
     asyncio.create_task(sync_user_discord_roles(updated.uid))
 
-    # Push new member to VEKN registry. Background task — the response must not
-    # wait on vekn.net (30-120s timeouts when it is down); batch_push retries.
+    # Background task — the response must not wait on a vekn.net outage.
     from ..vekn_push import push_member_background
 
     asyncio.create_task(push_member_background(updated))
@@ -266,41 +232,29 @@ async def link_vekn_to_user(
     request: LinkRequest,
     manager: CurrentUser,
 ) -> Response:
-    """Link a VEKN ID to a user account.
-
-    If the VEKN ID is unclaimed, merges directly.
-    If claimed by another user, displaces them first (strips their account).
-    Requires IC, or NC/Prince for same country (both users must be same country).
-    """
-
-    # Get target user
+    """Link a VEKN ID to a user account: merges directly if unclaimed, else
+    displaces the current holder first."""
     target = await get_user_by_uid(request.user_uid)
     if not target:
         raise HTTPException(status_code=404, detail="Target user not found")
 
-    # Check manager can manage target's country
     _require_manager_for_user(manager, target)
 
-    # Check target doesn't already have a different VEKN ID
     if target.vekn_id and target.vekn_id != request.vekn_id:
         raise HTTPException(
             status_code=400, detail="User already has a different VEKN ID"
         )
 
-    # Find the VEKN user
     vekn_user = await get_user_by_vekn_id(request.vekn_id)
     if not vekn_user:
         raise HTTPException(status_code=404, detail="VEKN ID not found")
 
-    # Check manager can manage VEKN user's country too
     _require_manager_for_user(manager, vekn_user)
 
     displaced_user = None
     message = f"Linked VEKN ID {request.vekn_id}"
 
-    # Check if VEKN ID is currently claimed
     if await is_vekn_id_claimed(request.vekn_id):
-        # Need to displace the current holder
         result = await detach_user_from_vekn(vekn_user.uid)
         if result:
             displaced_user, _vekn_record, displace_bds = result
@@ -315,7 +269,6 @@ async def link_vekn_to_user(
                 f"Displaced user {vekn_user.uid} from VEKN ID {request.vekn_id}"
             )
 
-    # Merge: keep the VEKN user_uid, transfer auth from target
     result = await merge_users(vekn_user.uid, target.uid)
     if not result:
         raise HTTPException(status_code=500, detail="Failed to link accounts")
@@ -327,7 +280,6 @@ async def link_vekn_to_user(
         f"Linked VEKN ID {request.vekn_id} to user {merged.uid} by {manager.uid}"
     )
 
-    # Trigger resync for affected users
     await broadcast_resync(merged.uid)
     asyncio.create_task(sync_user_discord_roles(merged.uid))
     if displaced_user:
@@ -352,18 +304,11 @@ async def force_abandon_vekn_id(
     request: ForceAbandonRequest,
     manager: CurrentUser,
 ) -> Response:
-    """Force-abandon a user's VEKN ID.
-
-    Requires IC, or NC/Prince for same country.
-    Same effect as user abandoning themselves.
-    """
-
-    # Get target user
+    """Force-abandon a user's VEKN ID (same effect as self-abandon)."""
     target = await get_user_by_uid(request.user_uid)
     if not target:
         raise HTTPException(status_code=404, detail="Target user not found")
 
-    # Check manager can manage target's country
     _require_manager_for_user(manager, target)
 
     if not target.vekn_id:
@@ -380,8 +325,8 @@ async def force_abandon_vekn_id(
             detail="This VEKN ID is not claimed by anyone — no need to abandon",
         )
 
-    # Admin force-abandon is exempt from the active-suspension guard that blocks
-    # self-service /abandon — officials act deliberately.
+    # Exempt from the active-suspension guard that blocks self-service
+    # /abandon — officials act deliberately.
     result = await detach_user_from_vekn(target.uid)
     if not result:
         raise HTTPException(status_code=500, detail="Failed to abandon VEKN ID")

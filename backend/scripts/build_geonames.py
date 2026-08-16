@@ -25,13 +25,12 @@ def download_and_extract(url: str, output_dir: Path) -> Path:
     print(f"Downloading {filename}...")
     urlretrieve(url, zip_path)
 
-    # Extract if it's a zip file
     if filename.endswith(".zip"):
         print(f"Extracting {filename}...")
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             zip_ref.extractall(output_dir)
         txt_filename = filename.replace(".zip", ".txt")
-        zip_path.unlink()  # Remove zip after extraction
+        zip_path.unlink()
         return output_dir / txt_filename
 
     return zip_path
@@ -46,8 +45,8 @@ def build_countries_data(data_dir: Path, output_dir: Path) -> None:
         print("Downloading countryInfo.txt...")
         urlretrieve(url, country_file)
 
-    # Official UN/ISO 3166-1 country name overrides
-    # GeoNames uses informal names, but we need official ones for political sensitivity
+    # Official UN/ISO 3166-1 names — GeoNames uses informal ones, which are
+    # politically sensitive for a few (Taiwan, Korea, Macedonia...).
     name_overrides = {
         "BO": "Bolivia, Plurinational State of",
         "CZ": "Czech Republic",
@@ -71,7 +70,6 @@ def build_countries_data(data_dir: Path, output_dir: Path) -> None:
     print("Processing countries data...")
     with open(country_file, encoding="utf-8") as f:
         for line in f:
-            # Skip comments and empty lines
             if line.startswith("#") or not line.strip():
                 continue
 
@@ -85,7 +83,6 @@ def build_countries_data(data_dir: Path, output_dir: Path) -> None:
             capital = parts[5] if len(parts) > 5 else ""
             continent = parts[8] if len(parts) > 8 else ""
 
-            # Apply official name override if available
             if iso_code in name_overrides:
                 name = name_overrides[iso_code]
 
@@ -113,13 +110,11 @@ def load_admin_codes(data_dir: Path) -> tuple[dict[str, str], dict[str, str]]:
     admin1_file = data_dir / "admin1CodesASCII.txt"
     admin2_file = data_dir / "admin2Codes.txt"
 
-    # Download admin1 codes if not present
     if not admin1_file.exists():
         url = "http://download.geonames.org/export/dump/admin1CodesASCII.txt"
         print("Downloading admin1CodesASCII.txt...")
         urlretrieve(url, admin1_file)
 
-    # Download admin2 codes if not present
     if not admin2_file.exists():
         url = "http://download.geonames.org/export/dump/admin2Codes.txt"
         print("Downloading admin2Codes.txt...")
@@ -164,7 +159,6 @@ def build_cities_data(data_dir: Path, output_dir: Path) -> None:
         url = "http://download.geonames.org/export/dump/cities15000.zip"
         txt_file = download_and_extract(url, data_dir)
 
-    # Feature codes to exclude (city subdivisions and minor divisions)
     excluded_feature_codes = {
         "PPLX",  # Section of populated place (e.g., Paris arrondissements, Dubai Marina)
         "PPLA5",  # Fifth-order administrative division capital
@@ -173,10 +167,9 @@ def build_cities_data(data_dir: Path, output_dir: Path) -> None:
         "PPLH",  # Historical populated place
     }
 
-    # Load admin code mappings for human-readable names
     admin1_names, admin2_names = load_admin_codes(data_dir)
 
-    cities_by_country = {}  # Temporary dict for de-duplication
+    cities_by_country = {}
 
     print("Processing cities data...")
     with open(txt_file, encoding="utf-8") as f:
@@ -187,7 +180,6 @@ def build_cities_data(data_dir: Path, output_dir: Path) -> None:
 
             feature_code = parts[7]
 
-            # Skip city subdivisions and minor divisions
             if feature_code in excluded_feature_codes:
                 continue
 
@@ -217,15 +209,12 @@ def build_cities_data(data_dir: Path, output_dir: Path) -> None:
                 "population": population,
             }
 
-            # Group by country for de-duplication
             if country_code not in cities_by_country:
                 cities_by_country[country_code] = []
             cities_by_country[country_code].append(city_data)
 
-    # De-duplicate and disambiguate cities within each country
     cities = []
     for country_code, country_cities in cities_by_country.items():
-        # Group cities by name
         name_groups = {}
         for city in country_cities:
             name_key = city["ascii_name"].lower()
@@ -233,17 +222,14 @@ def build_cities_data(data_dir: Path, output_dir: Path) -> None:
                 name_groups[name_key] = []
             name_groups[name_key].append(city)
 
-        # Process each name group
         for group in name_groups.values():
             if len(group) == 1:
-                # No duplicates, keep as is
                 cities.append(group[0])
             else:
-                # Multiple cities with same name - disambiguate or deduplicate
-                # Sort by population to prioritize larger cities
+                # Sort by population descending: dedup-by-coordinate below keeps
+                # the first city seen at each spot, so the larger one survives.
                 group.sort(key=lambda x: x["population"], reverse=True)
 
-                # Check if they're truly different cities or just duplicate entries
                 seen_coords = set()
                 for city in group:
                     coord_key = (
@@ -251,51 +237,44 @@ def build_cities_data(data_dir: Path, output_dir: Path) -> None:
                         round(city["longitude"], 2),
                     )
 
-                    # Skip if we've seen a city at roughly the same location
                     if coord_key in seen_coords:
                         continue
                     seen_coords.add(coord_key)
 
-                    # Add admin zone disambiguation if there are multiple distinct cities
                     if len(group) > 1:
-                        # Prefer admin1 (state/region) as it's most meaningful
-                        # Fall back to more specific divisions if admin1 is same
+                        # Prefer admin1; fall back to admin2 when admin1 doesn't
+                        # disambiguate. admin3 has no standard name mapping.
                         admin_suffix = None
                         if city["admin1_code"]:
-                            # Check if other cities in group have same admin1
                             same_admin1 = [
                                 c
                                 for c in group
                                 if c["admin1_code"] == city["admin1_code"]
                             ]
                             if len(same_admin1) == 1:
-                                # Use human-readable admin1 name
                                 admin1_key = f"{country_code}.{city['admin1_code']}"
                                 admin_suffix = admin1_names.get(
                                     admin1_key, city["admin1_code"]
                                 )
                             elif city["admin2_code"]:
-                                # Use human-readable admin2 name
                                 admin2_key = f"{country_code}.{city['admin1_code']}.{city['admin2_code']}"
                                 admin_suffix = admin2_names.get(
                                     admin2_key, city["admin2_code"]
                                 )
-                            # Note: admin3 codes don't have a standard GeoNames mapping file,
-                            # so we skip them to avoid showing non-human-readable codes
 
                         if admin_suffix:
                             city["name"] = f"{city['name']} ({admin_suffix})"
 
                     cities.append(city)
 
-    # Remove admin code fields from output (info is in the name when needed)
+    # Admin codes are only needed to build the disambiguation suffix above; the
+    # info they'd carry is already folded into the name where needed.
     for city in cities:
         city.pop("admin1_code", None)
         city.pop("admin2_code", None)
         city.pop("admin3_code", None)
         city.pop("admin4_code", None)
 
-    # Sort by population descending (most important cities first)
     cities.sort(key=lambda x: x["population"], reverse=True)
 
     output_file = output_dir / "cities.json"
@@ -306,8 +285,6 @@ def build_cities_data(data_dir: Path, output_dir: Path) -> None:
 
 
 def main() -> None:
-    """Main entry point for the build script."""
-    # Setup directories
     backend_dir = Path(__file__).parent.parent
     data_dir = backend_dir / "data" / "geonames_raw"  # Raw downloads (not in package)
     output_dir = (
@@ -321,10 +298,7 @@ def main() -> None:
     print("Building GeoNames data files")
     print("=" * 60)
 
-    # Build countries data
     build_countries_data(data_dir, output_dir)
-
-    # Build cities data
     build_cities_data(data_dir, output_dir)
 
     print("=" * 60)

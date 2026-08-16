@@ -309,10 +309,8 @@ async def test_nested_uids_and_deck_attribution_remapped(test_client, test_db):
 
 @pytest.mark.asyncio
 async def test_duplicate_participant_rejected(test_client, test_db):
-    """An offline temp player that resolves (by VEKN ID) to someone
-    already in the tournament must NOT create a duplicate participant. The only
-    real participant-into-existing-VEKN case is this offline sync, and we handle
-    it per-tournament by failing early (409) rather than auto-merging players.
+    """An offline temp player that resolves (by VEKN ID) to someone already in
+    the tournament must NOT create a duplicate participant — 409, no auto-merge.
     """
     org = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Org")
     existing = User(

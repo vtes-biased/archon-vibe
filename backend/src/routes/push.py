@@ -1,11 +1,6 @@
-"""Web Push subscription endpoints (#314).
-
-The frontend fetches the per-env VAPID public key, then POSTs the browser's
-PushSubscription (authenticated, so it's tied to the current user). Unsubscribe and the
-lazy reconcile after ``pushsubscriptionchange`` both route through the authenticated
-subscribe/unsubscribe pair — there is deliberately no unauthenticated rotate endpoint
-(an endpoint-only rewrite would let a leaked endpoint hijack a user's notifications).
-Dead rows are pruned lazily on 404/410 at send time (see push_service).
+"""There is deliberately no unauthenticated rotate endpoint: an endpoint-only
+rewrite would let a leaked endpoint hijack a user's notifications. Dead rows
+are pruned lazily on 404/410 at send time, in push_service.
 """
 
 import logging
@@ -48,7 +43,6 @@ async def get_vapid_key() -> dict:
 async def subscribe(
     body: SubscribeRequest, request: Request, user: CurrentUser
 ) -> Response:
-    """Register (or refresh) the current user's subscription for this browser."""
     if not push_service.is_configured():
         raise HTTPException(status_code=503, detail="Push notifications not configured")
     await db.save_push_subscription(
@@ -64,6 +58,5 @@ async def subscribe(
 
 @router.post("/unsubscribe", status_code=204)
 async def unsubscribe(body: UnsubscribeRequest, user: CurrentUser) -> Response:
-    """Drop the current user's subscription for this browser (toggle off)."""
     await db.delete_push_subscription(body.endpoint, user_uid=user.uid)
     return Response(status_code=204)

@@ -51,7 +51,6 @@
 <div class="p-6 border-t border-line space-y-4">
   <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.profile_settings()}</h3>
 
-  <!-- Theme -->
   <div class="space-y-2">
     <span class="block text-sm text-ink-muted">{m.profile_theme_label()}</span>
     <div class="flex gap-2">
@@ -68,7 +67,6 @@
     </div>
   </div>
 
-  <!-- Language -->
   <div class="space-y-2">
     <span class="block text-sm text-ink-muted">{m.profile_language_label()}</span>
     <div class="flex gap-2 flex-wrap">
@@ -85,7 +83,6 @@
     </div>
   </div>
 
-  <!-- Notifications -->
   <div class="space-y-2">
     <span class="block text-sm text-ink-muted">{m.notifications_label()}</span>
     {#if !pushSupported()}

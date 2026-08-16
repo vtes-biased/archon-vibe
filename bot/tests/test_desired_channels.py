@@ -1,26 +1,5 @@
-"""Merge gate for the reconcile epic: the two PURE functions reconcile builds on.
-
-``desired_channels`` is the single source of truth for which round/finals voice
-channels must exist and who may connect; ``structure_signature`` is the cheap
-guard that decides whether a tournament update is even structurally relevant.
-Together they are the only unit-testable surface of the reconcile rewrite (the
-bot has no CI — #156), so this file pins their contracts:
-
-  - nothing is desired unless the tournament is ``Playing``;
-  - a Playing round yields ordered ``R{n} - Table {m}`` channels, each scoped to
-    its seated players ∪ the organizers;
-  - finals (seating present, no result) collapse to a single ``Finals`` channel
-    and SUPPRESS the prelim tables; a finished finals desires nothing;
-  - the signature is stable across non-structural churn (a reported score) but
-    flips on a SAME-SIZE seat swap (the principal-engineer amendment: a count-only
-    key would miss it), a new round, and an organizer change.
-
-Pure functions over plain dicts — no Discord, no REST, no fakes.
-
-Run from bot/:
-    DISCORD_BOT_TOKEN=x OAUTH_CLIENT_ID=x OAUTH_CLIENT_SECRET=x \
-        uv run --with pytest --with pytest-asyncio pytest -q
-"""
+"""``structure_signature`` must flip on a SAME-SIZE seat swap — a count-only
+key would miss it — as well as a new round or an organizer change."""
 
 from __future__ import annotations
 
@@ -55,9 +34,6 @@ def _playing(rounds: list[list[dict]], *, organizers=(ORG,), finals=None) -> dic
     return obj
 
 
-# ── desired_channels ────────────────────────────────────────────────────────
-
-
 def test_empty_unless_playing() -> None:
     for state in ("Planned", "Registration", "Waiting", "Finished"):
         obj = _playing([[_table("p1", "p2")]])
@@ -83,7 +59,6 @@ def test_no_rounds_yet_is_empty() -> None:
 
 
 def test_finals_single_channel_suppresses_prelim_tables() -> None:
-    # Prelim rounds still present in the object, but finals is seated → only Finals.
     obj = _playing(
         [[_table("p1", "p2"), _table("p3", "p4")]],
         finals={"seating": [{"player_uid": f} for f in ("p1", "p2", "p3")]},
@@ -110,9 +85,6 @@ def test_empty_seats_excluded_from_member_set() -> None:
     assert ch.member_uids == frozenset({"p1", ORG})
 
 
-# ── structure_signature ───────────────────────────────────────────────────────
-
-
 def test_signature_stable_across_score_report() -> None:
     """A reported score re-broadcasts the tournament but changes no structure:
     the signature must match so reconcile is skipped."""
@@ -135,9 +107,8 @@ def test_signature_stable_across_score_report() -> None:
 
 
 def test_signature_flips_on_same_size_seat_swap() -> None:
-    """The principal-engineer amendment: two tables before AND after (same count),
-    but a player swapped between them — a count-only key misses this; a
-    membership-keyed signature must flip."""
+    """Same table count before and after, but a player swapped between them —
+    a count-only key would miss this."""
     before = _playing([[_table("p1", "p2"), _table("p3", "p4")]])
     after = _playing([[_table("p1", "p4"), _table("p3", "p2")]])
     assert structure_signature(before) != structure_signature(after)

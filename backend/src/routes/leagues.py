@@ -60,7 +60,6 @@ async def create_league(
     if not permissions.can_manage_leagues(user):
         raise HTTPException(403, "Only NC and IC can create leagues")
 
-    # Validate parent for child leagues
     if body.parent_uid:
         parent = await get_league_by_uid(body.parent_uid)
         if not parent:
@@ -70,7 +69,6 @@ async def create_league(
         if parent.parent_uid:
             raise HTTPException(400, "Cannot nest more than 2 levels")
 
-    # Meta-leagues cannot have a parent
     if body.kind == LeagueKind.META and body.parent_uid:
         raise HTTPException(400, "Meta-League cannot have a parent")
 
@@ -117,7 +115,6 @@ async def update_league_endpoint(
     if not permissions.can_edit_league(user, league):
         raise HTTPException(403, "Not authorized to edit this league")
 
-    # Validate parent_uid if provided
     updates = body.model_dump(exclude_unset=True)
     if "parent_uid" in updates:
         new_parent = updates["parent_uid"]
@@ -134,7 +131,6 @@ async def update_league_endpoint(
             if parent.parent_uid:
                 raise HTTPException(400, "Cannot nest more than 2 levels")
 
-    # Apply updates
     for field, value in updates.items():
         setattr(league, field, value)
 
@@ -165,7 +161,6 @@ async def delete_league_endpoint(
     if not permissions.can_edit_league(user, league):
         raise HTTPException(403, "Not authorized to delete this league")
 
-    # Block deletion of meta-league with children
     if league.kind == LeagueKind.META:
         children = await get_child_leagues(uid)
         active_children = [c for c in children if not c.deleted_at]
@@ -191,7 +186,6 @@ async def add_organizer(
     body: OrganizerAction,
     user: OptionalUser = None,
 ) -> Response:
-    """Add an organizer to a league."""
     if not user:
         raise HTTPException(401, "Authentication required")
     league = await get_league_by_uid(uid)
@@ -223,7 +217,6 @@ async def remove_organizer(
     organizer_uid: str,
     user: OptionalUser = None,
 ) -> Response:
-    """Remove an organizer from a league."""
     if not user:
         raise HTTPException(401, "Authentication required")
     league = await get_league_by_uid(uid)

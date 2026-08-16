@@ -2,14 +2,8 @@
   import { MoreHorizontal } from "@lucide/svelte";
   import type { Component, Snippet } from "svelte";
 
-  // Overflow menu for secondary actions, so each state keeps ONE primary CTA.
-  // Menu items are raw rows (not <Button> — per wiki/design.md, dropdown options
-  // don't route through it). Closes on outside-click, Escape, or pick.
-  //
-  // `children` swaps the item list for arbitrary panel content (settings
-  // popovers). It shares this component rather than growing a second popover
-  // because the dismiss handling and the viewport clamp below are the fragile
-  // part, and a copy of them would drift.
+  // Menu items are raw rows, not <Button> — dropdown options don't route through it. `children`
+  // swaps the item list for arbitrary panel content, reusing this popover's dismiss/clamp handling rather than duplicating it (fragile, would drift).
   type Item = { label: string; icon?: Component<any>; onclick: () => void; disabled?: boolean };
   let {
     label,
@@ -36,11 +30,8 @@
   let triggerEl: HTMLButtonElement | undefined;
   let menuEl = $state<HTMLDivElement | null>(null);
 
-  // Anchored to the trigger, the panel can run off a narrow viewport — and an
-  // absolutely-positioned box still extends the document's scrollable area, so
-  // the whole page gains a horizontal scroll. Nudge it back inside after open
-  // (and on resize). Imperative on purpose: writing the offset to reactive
-  // state would re-trigger the measurement that produced it.
+  // An absolutely-positioned panel still extends the document's scrollable area on overflow; nudge it
+  // back on open/resize. Imperative on purpose — writing the offset to reactive state would re-trigger the measurement.
   const VIEWPORT_MARGIN = 8;
   function clampToViewport() {
     const el = menuEl;

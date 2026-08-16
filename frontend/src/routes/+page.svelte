@@ -3,7 +3,6 @@
   import { onMount } from 'svelte';
   import * as m from '$lib/paraglide/messages.js';
 
-  // Redirect to users page on mount
   onMount(() => {
     goto('/tournaments', { replaceState: true });
   });

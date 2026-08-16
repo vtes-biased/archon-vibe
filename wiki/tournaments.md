@@ -263,6 +263,11 @@ players between rounds is likewise not enforced.
 Whether such an event should then count toward rankings is the genuinely open
 question, and it is on the board with the Rules Director.
 
+The pre-finals panel deliberately carries no Start Finals button: the action bar
+owns every state transition and the toss-needed warning, and finishing without a
+final is a legitimate exit — a panel-level launch button would present the final
+as mandatory and bypass the toss warning.
+
 ## Engine event catalog
 
 Every business event goes through `POST /api/tournaments/{uid}/action` with body

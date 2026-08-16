@@ -1,10 +1,6 @@
-"""Rating aggregation logic.
-
-Recomputes player ratings when tournaments finish.
-Uses the Rust engine for per-tournament point calculation.
-
-New sync: ratings are embedded into User objects (no separate Rating table).
-"""
+"""Rating aggregation: recomputes player ratings when tournaments finish, using
+the Rust engine for per-tournament point calculation. Embedded into User objects,
+no separate Rating table."""
 
 import calendar
 import logging
@@ -50,12 +46,9 @@ def rating_category_for_tournament(t: Tournament) -> RatingCategory:
 
 
 def _players_with_rounds(t: Tournament) -> set[str]:
-    """Get user_uids of players who played at least 1 round.
-
-    Gates on `rounds`, not `finals`: a VEKN import has no per-round detail but DOES
-    carry a reconstructed finals object (a subset — the final table). Counting it
-    would undercount the field to ~5; the full field lives in standings instead.
-    """
+    """user_uids of players who played at least 1 round. Gates on `rounds`, not
+    `finals`: a VEKN import has no per-round detail but DOES carry a reconstructed
+    finals object (a subset), so counting it would undercount the field."""
     if t.rounds:
         played = set()
         for round_tables in t.rounds:
@@ -82,22 +75,14 @@ def _player_count(t: Tournament) -> int:
 
 
 def _final_positions(t: Tournament) -> dict[str, int]:
-    """{user_uid: final placement} for one finished tournament.
-
-    Placement comes from the engine's shared rule (winner 1, other finalists tied
-    for 2, non-finalists ranked from finalist_count+1) so the displayed position
-    matches the tournament page exactly. Computed once per tournament by the
-    caller, never per (user, tournament) — the map is user-independent.
-    """
+    """{user_uid: final placement} for one finished tournament, from the engine's
+    shared rule — computed once per tournament, never per (user, tournament)."""
     config = msgspec.json.encode(
         {"standings": t.standings, "winner": t.winner}
     ).decode()
     ranked = msgspec.json.decode(_engine.compute_final_standings(config))
-    # Drop the DQ'd/proxy tail the engine appends with ranks past the whole field.
-    # Callers skip those players anyway, but off a *different* signal (player state /
-    # active sanction, vs the stored standings flags read here) — so a stale
-    # standings flag would otherwise surface a rank past every real competitor.
-    # Absent from the map means position 0, i.e. no placement rendered.
+    # Drops the DQ'd/proxy tail (ranks past the whole field) using the stored
+    # standings flags, not the player-state signal callers use — absent = no placement.
     return {
         s["user_uid"]: s["rank"]
         for s in ranked
@@ -155,12 +140,7 @@ def _compute_entry(
     positions: dict[str, int],
 ) -> TournamentRatingEntry:
     """Core entry computation from pre-encoded JSON + precomputed player count.
-
-    VP/GW (including finals and the SA penalty) come from the Rust engine so the
-    standings-adjustment scoring rule lives in one place — not re-implemented here.
-    The daily recompute hoists the encode/count out of its per-user loop and calls
-    this directly; the single-tournament push path uses _compute_entry_sync below.
-    """
+    VP/GW come from the Rust engine, so the SA-penalty scoring rule lives once, not here."""
     engine = _engine
     vp, gw = engine.compute_rating_vp_gw(t_json, sanctions_json, user_uid)
     gw = int(gw)
@@ -183,10 +163,8 @@ def _compute_entry(
 def _compute_entry_sync(
     t: Tournament, user_uid: str, sanctions: list | None = None
 ) -> TournamentRatingEntry:
-    """Compute a TournamentRatingEntry without DB access (uses pre-loaded sanctions).
-
-    Convenience wrapper that encodes + counts on the spot; delegates to _compute_entry.
-    """
+    """Compute a TournamentRatingEntry without DB access (uses pre-loaded sanctions);
+    encodes + counts on the spot, delegating to _compute_entry."""
     return _compute_entry(
         t,
         msgspec.json.encode(t).decode(),
@@ -200,11 +178,8 @@ def _compute_entry_sync(
 async def recompute_ratings_for_players(
     player_uids: set[str], category: RatingCategory
 ) -> list[tuple[User, BroadcastData]]:
-    """Recompute ratings for an explicit set of players in a category.
-
-    Embeds rating data directly into User objects.
-    Returns (user, BroadcastData) tuples for broadcasting.
-    """
+    """Recompute ratings for an explicit set of players in a category, embedding
+    rating data directly into User objects. Returns (user, BroadcastData) tuples."""
     if not player_uids:
         return []
 
@@ -236,12 +211,8 @@ async def recompute_ratings_for_players(
             await get_finished_tournaments_for_category(fmt, online, cutoff_str)
         )
 
-    # Precompute per-tournament data once, not per (user, tournament): the played
-    # set, encoded JSON, and player count are user-independent. Avoids re-scanning
-    # rounds and re-encoding the full tournament O(players) times.
-    # The engine's ranking_eligibility gate (rules 3.1/3.1.6) drops open-rounds/
-    # self-organized house events AND events with < 8 players or no final — the
-    # same single-sourced predicate the frontend ranked/unranked badge displays.
+    # Precomputed once per tournament, not per (user, tournament) — avoids
+    # re-scanning rounds and re-encoding O(players) times.
     played_by_t: dict[str, set[str]] = {}
     json_by_t: dict[str, str] = {}
     count_by_t: dict[str, int] = {}
@@ -249,6 +220,7 @@ async def recompute_ratings_for_players(
     eligible: list[Tournament] = []
     for t in all_tournaments:
         t_json = msgspec.json.encode(t).decode()
+        # Same single-sourced predicate the frontend ranked/unranked badge displays.
         if _engine.ranking_eligibility(t_json) != "eligible":
             continue
         eligible.append(t)
@@ -303,13 +275,11 @@ async def recompute_ratings_for_players(
         cat_rating = CategoryRating(total=total, tournaments=entries)
         new_wins = sorted(wins_map.get(user_uid, []))
 
-        # No-change guard: skip the JSONB upsert + SSE delta when neither the
-        # category rating nor the wins moved. Keeps `modified` meaningful and
-        # avoids churning the whole rated corpus daily for unchanged data.
+        # No-change guard: skip the JSONB upsert + SSE delta when neither moved —
+        # keeps `modified` meaningful and avoids churning the corpus daily.
         if cat_rating == getattr(user, category.value) and new_wins == user.wins:
             continue
 
-        # Embed rating into user
         setattr(user, category.value, cat_rating)
         user.wins = new_wins
         user.modified = now
@@ -322,18 +292,9 @@ async def recompute_ratings_for_players(
 
 
 async def recompute_all_ratings() -> int:
-    """Full recomputation of all ratings and wins. Called daily for consistency.
-
-    Lightweight first pass collects player UIDs per category (streaming tournaments).
-    Then reuses recompute_ratings_for_players() per category.
-
-    Broadcasts each category's deltas as they are produced and returns only the
-    updated-user count: holding every (User, BroadcastData) until the end would peak
-    at three encoded JSON projections per rated user. The no-change guard keeps that
-    list tiny on an ordinary night, but any run that moves a field for the whole
-    corpus (a new entry field, a scoring change) would spike it on a box whose PG
-    pool is already sized down for memory.
-    """
+    """Full recomputation of all ratings and wins, called daily. Broadcasts each
+    category's deltas as produced and returns only the count: holding every
+    (User, BroadcastData) until the end would spike memory on a full-corpus run."""
     from .broadcast import broadcast_precomputed
 
     # Pass 1: stream tournaments to collect player sets per category

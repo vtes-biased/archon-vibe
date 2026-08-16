@@ -1,20 +1,4 @@
-"""Contract for the PURE scheduled-event spec logic (the bot has no integration CI).
-
-Pins the only unit-testable surface of the scheduled-event feature:
-  - ``_parse_start`` handles BOTH shapes the app may store — an absolute instant
-    (offset/``Z``) and a naive wall-clock localized via the tournament ``timezone``
-    — and normalizes to UTC (the regression that would silently shift event times);
-  - ``_build_spec`` requires online + a start and suppresses offline / finished /
-    soft-deleted tournaments (None ⇒ caller deletes any existing event);
-  - ``end`` falls back to start + DEFAULT_DURATION but honours a later ``finish``;
-  - ``event_signature`` flips on a cover (banner) change.
-
-Pure functions over plain dicts — no Discord, no REST, no fakes.
-
-Run from bot/:
-    DISCORD_BOT_TOKEN=x OAUTH_CLIENT_ID=x OAUTH_CLIENT_SECRET=x \
-        uv run --with pytest --with pytest-asyncio pytest -q
-"""
+"""A wrong ``_parse_start`` shape mix-up would silently shift event times."""
 
 from __future__ import annotations
 

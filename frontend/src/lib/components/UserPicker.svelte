@@ -17,10 +17,8 @@
     onselect: (user: User) => void;
     placeholder?: string;
     excludeUids?: string[];
-    // Default on: everything a user gets picked FOR here — organizing, holding
-    // promo stock — is member-only, so opting out is the deliberate act. The
-    // one exception is merging a duplicate account, which is usually the
-    // account that never got a VEKN id.
+    // Default on: everything a user gets picked FOR here — organizing, holding promo stock — is
+    // member-only, so opting out is the deliberate act (merging a duplicate account is the exception).
     membersOnly?: boolean;
     inputId?: string;
   } = $props();
@@ -30,9 +28,8 @@
   let searchTotal = $state(0);
   let selectedIndex = $state(-1);
   const SEARCH_LIMIT = 8;
-  // Keystrokes race: the first one pays for building the member index while
-  // later ones resolve straight from it, so without this the earliest (broadest)
-  // query can land last and overwrite the results for what was actually typed.
+  // Keystrokes race: the first one pays for building the member index while later ones resolve
+  // straight from it, so without this the earliest (broadest) query can land last and overwrite the results.
   let searchSeq = 0;
 
   onMount(() => { warmUserIndex(); });

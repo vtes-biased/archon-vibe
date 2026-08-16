@@ -12,11 +12,9 @@
   import * as m from '$lib/paraglide/messages.js';
 
   let leagues = $state<League[]>([]);
-  // Parent meta-league name, keyed by child league uid
   let metaLeagueNames = $state<Record<string, string>>({});
   let loaded = $state(false);
 
-  // Filters
   let searchQuery = $state("");
   let selectedCountry = $state<string>("all");
   let showPast = $state(false);
@@ -68,22 +66,17 @@
         if (!l.deleted_at && l.parent_uid && byUid.has(l.parent_uid)) metaMap[l.uid] = byUid.get(l.parent_uid)!;
       }
       metaLeagueNames = metaMap;
-      // Exclude soft-deleted
       all = all.filter(l => !l.deleted_at);
-      // Filter past — logged-out viewers always see active leagues only.
       if (!effectiveShowPast) {
         all = all.filter(l => isActive(l));
       }
-      // Filter by country
       if (selectedCountry !== "all") {
         all = all.filter(l => !l.country || l.country === selectedCountry);
       }
-      // Filter by search
       if (searchQuery.trim()) {
         const q = normalizeSearch(searchQuery.trim());
         all = all.filter(l => normalizeSearch(l.name).includes(q));
       }
-      // Sort: active first (by start desc), then finished (by finish desc)
       all.sort((a, b) => {
         const da = a.start || a.modified;
         const db_ = b.start || b.modified;
@@ -95,7 +88,6 @@
     }
   }
 
-  // Re-query when filters change
   $effect(() => {
     const _s = searchQuery;
     const _c = selectedCountry;
@@ -104,7 +96,6 @@
     untrack(() => loadLeagues());
   });
 
-  // SSE sync listener
   $effect(() => {
     const handleSyncEvent = (event: { type: string }) => {
       if (event.type === "league" || event.type === "sync_complete") {
@@ -122,7 +113,6 @@
 
 <div class="p-4 sm:p-8">
   <div class="max-w-6xl mx-auto">
-    <!-- Header -->
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-3xl font-semibold text-accent">{m.leagues_title()}</h1>
 
@@ -136,10 +126,8 @@
       {/if}
     </div>
 
-    <!-- Filters -->
     <div class="bg-surface-card rounded-lg shadow p-4 mb-6 border border-line">
       <div class="flex flex-wrap gap-4 items-end">
-        <!-- Search -->
         <div class="flex-1 min-w-[200px]">
           <label for="search" class="block text-sm font-medium text-ink-muted mb-1">{m.common_search()}</label>
           <input
@@ -151,7 +139,6 @@
           />
         </div>
 
-        <!-- Country -->
         <div class="min-w-[180px]">
           <label for="country-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.common_country()}</label>
           <select
@@ -166,7 +153,6 @@
           </select>
         </div>
 
-        <!-- Show past (signed-in only; logged-out sees active leagues only) -->
         {#if auth.isAuthenticated}
           <div class="flex items-center gap-3 pb-1">
             <label class="inline-flex items-center gap-2 cursor-pointer">
@@ -181,10 +167,8 @@
       </div>
     </div>
 
-    <!-- League List -->
     {#if leagues.length > 0}
       <div class="bg-surface-card rounded-lg shadow overflow-hidden border border-line">
-        <!-- Header (desktop) -->
         <div class="hidden sm:grid sm:grid-cols-12 gap-4 px-6 py-3 bg-surface-muted text-sm font-medium text-ink border-b border-line-strong">
           <div class="col-span-5">{m.common_name()}</div>
           <div class="col-span-3">{m.league_col_dates()}</div>
@@ -198,7 +182,6 @@
               href="/leagues/{league.uid}"
               class="block px-6 py-4 hover:bg-surface-muted/50 transition-colors"
             >
-              <!-- Mobile -->
               <div class="sm:hidden space-y-2">
                 <div class="flex items-start justify-between">
                   <div>
@@ -228,7 +211,6 @@
                 </div>
               </div>
 
-              <!-- Desktop -->
               <div class="hidden sm:grid sm:grid-cols-12 gap-4 items-center">
                 <div class="col-span-5">
                   <div class="font-semibold text-ink-strong">

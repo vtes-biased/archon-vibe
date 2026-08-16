@@ -1,5 +1,3 @@
-//! Tests for tournament engine.
-
 use super::*;
 use crate::error::EngineError;
 
@@ -42,7 +40,6 @@ fn no_decks() -> String {
     "[]".to_string()
 }
 
-/// Helper to run a tournament event with empty sanctions and no decks
 fn run_event(
     tournament: &JsonValue,
     event: &JsonValue,
@@ -59,7 +56,6 @@ fn run_event(
     Ok(parsed["tournament"].dump())
 }
 
-/// Helper to run a tournament event with existing decks metadata
 fn run_event_with_decks(
     tournament: &JsonValue,
     event: &JsonValue,
@@ -124,7 +120,6 @@ fn test_register_without_vekn_id_rejected() {
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("VEKN ID"));
 
-    // Also reject empty string
     let event2 = json::object! {
         type: "Register",
         user_uid: "player-1",
@@ -221,7 +216,6 @@ fn test_start_round_with_submitted_seating() {
         { user_uid: "p7", state: "Checked-in", payment_status: "Pending", toss: 0 },
     ];
 
-    // Use json::parse to build the event (same path as real JSON input)
     let event = json::parse(
         r#"{"type": "StartRound", "seating": [["p0","p1","p2","p3"],["p4","p5","p6","p7"]]}"#,
     )
@@ -244,9 +238,8 @@ fn test_start_round_with_submitted_seating() {
 
 #[test]
 fn test_start_round_computed_seating_is_deterministic() {
-    // No submitted seating => the engine computes it. The seed is derived from
-    // tournament uid + round, so running the same StartRound twice must yield
-    // byte-identical tables (WASM/PyO3/offline/bot agree).
+    // No submitted seating: the engine computes it from tournament uid + round,
+    // so two StartRound calls on the same input must be byte-identical.
     let mut tournament = make_tournament();
     tournament["state"] = "Waiting".into();
     let mut players = json::array![];
@@ -278,9 +271,8 @@ fn test_start_round_computed_seating_is_deterministic() {
 
 #[test]
 fn test_standings_tie_order_is_deterministic() {
-    // Four players finish fully tied (same gw/vp/tp/toss). Without the terminal
-    // user_uid tiebreak they come out in nondeterministic HashMap order; assert
-    // the order is stable across calls and sorted by user_uid ascending.
+    // Four players finish fully tied (same gw/vp/tp/toss); without the terminal
+    // user_uid tiebreak the order is HashMap-nondeterministic across calls.
     let mut tournament = make_tournament();
     tournament["rounds"] = json::array![json::array![json::object! {
         seating: [
@@ -326,10 +318,8 @@ fn test_start_round_drops_registered_players() {
     assert!(result.is_ok(), "StartRound failed: {:?}", result.err());
     let updated = json::parse(&result.unwrap()).unwrap();
 
-    // Checked-in players should now be Playing
     assert_eq!(updated["players"][0]["state"].as_str(), Some("Playing"));
     assert_eq!(updated["players"][3]["state"].as_str(), Some("Playing"));
-    // Registered players should be dropped to Finished
     assert_eq!(updated["players"][4]["state"].as_str(), Some("Finished"));
     assert_eq!(updated["players"][5]["state"].as_str(), Some("Finished"));
 }
@@ -391,9 +381,8 @@ fn test_seat_player_accepts_checked_in_late_arrival() {
 
 #[test]
 fn test_seat_player_reinstates_zero_round_no_show() {
-    // A recorded round-1 no-show (Finished, zero rounds played) who walks in
-    // mid-round is seated straight onto a live table; a Finished player who
-    // actually PLAYED stays ineligible.
+    // A round-1 no-show (Finished, zero rounds played) who walks in mid-round is
+    // seated straight onto a live table; one who actually PLAYED stays ineligible.
     let mut t = tournament_with_round();
     t["players"]
         .push(
@@ -416,10 +405,8 @@ fn test_seat_player_reinstates_zero_round_no_show() {
     assert!(result.unwrap_err().to_string().contains("Registered"));
 }
 
-// Self-organized rounds (#274): the player-authorized eligibility predicate. One test
-// over the whole invariant — registration is the gate, the initiator must be seated, the
-// abuse vectors (concurrent pod, non-participant, disabled) are rejected, and it works
-// offline / with no per-player cap (open-rounds is the only prerequisite).
+// Self-organized rounds: registration is the gate, the initiator must be seated,
+// abuse vectors (concurrent pod, non-participant, disabled) are rejected.
 #[test]
 fn test_self_organize_round_eligibility() {
     let mut t = make_tournament();
@@ -438,8 +425,6 @@ fn test_self_organize_round_eligibility() {
     let pod =
         json::parse(r#"{"type":"SelfOrganizeRound","player_uids":["p1","p2","p3","p4"]}"#).unwrap();
 
-    // Happy path: a registered initiator seats a 4-player pod. Engine assigns one table,
-    // stamps provenance, seats only the chosen players, and leaves p5 available.
     let out = json::parse(&run_event(&t, &pod, &p1).expect("self-organize")).unwrap();
     assert_eq!(out["rounds"].len(), 1);
     assert_eq!(out["rounds"][0].len(), 1, "exactly one table");
@@ -462,7 +447,6 @@ fn test_self_organize_round_eligibility() {
         "unselected player stays available"
     );
 
-    // Initiator must seat themselves.
     let no_self =
         json::parse(r#"{"type":"SelfOrganizeRound","player_uids":["p2","p3","p4","p5"]}"#).unwrap();
     assert!(matches!(
@@ -470,7 +454,6 @@ fn test_self_organize_round_eligibility() {
         Err(EngineError::SelfOrganizeNotSeated)
     ));
 
-    // Concurrent-pod guard: a Playing player can't be pulled into a second pod.
     let busy =
         json::parse(r#"{"type":"SelfOrganizeRound","player_uids":["p1","p2","p3","p6"]}"#).unwrap();
     assert!(matches!(
@@ -478,7 +461,6 @@ fn test_self_organize_round_eligibility() {
         Err(EngineError::SelfOrganizeIneligible { .. })
     ));
 
-    // Registration is the gate: a non-participant can't be seated.
     let ghost =
         json::parse(r#"{"type":"SelfOrganizeRound","player_uids":["p1","p2","p3","ghost"]}"#)
             .unwrap();
@@ -487,7 +469,6 @@ fn test_self_organize_round_eligibility() {
         Err(EngineError::NotRegistered)
     ));
 
-    // Disabled flag rejects the whole path.
     let mut off = t.clone();
     off["self_organized_rounds"] = false.into();
     assert!(matches!(
@@ -495,8 +476,6 @@ fn test_self_organize_round_eligibility() {
         Err(EngineError::SelfOrganizeDisabled)
     ));
 
-    // No online or per-player-cap prerequisite: an offline, uncapped tournament still
-    // seats a self-organized pod (open-rounds + the flag are the only requirements).
     let mut offline = t.clone();
     offline["online"] = false.into();
     offline["max_rounds"] = 0.into();
@@ -506,9 +485,8 @@ fn test_self_organize_round_eligibility() {
     );
 }
 
-// Cancelling a NON-last round (parallel rounds, #274) soft-cancels in place: the slot is
-// preserved (index-stable for deck.round / SA round_number), the round drops out of the cap
-// and standings, its players are released, and other in-progress rounds are untouched.
+// Cancelling a non-last round soft-cancels: the slot is preserved (index-stable
+// for deck.round / SA round_number), players are released, other rounds are untouched.
 #[test]
 fn test_cancel_round_soft_cancels_non_last() {
     let mut t = make_tournament();
@@ -525,8 +503,6 @@ fn test_cancel_round_soft_cancels_non_last() {
         { user_uid: "q3", state: "Playing", payment_status: "Pending", toss: 0 },
         { user_uid: "q4", state: "Playing", payment_status: "Pending", toss: 0 },
     ];
-    // Two parallel rounds: round 0 finished (p-pod, which capped them at max_rounds=1),
-    // round 1 still in progress (q-pod).
     t["rounds"] = json::array![
         [ { seating: [
             { player_uid: "p1", result: { gw: 0, vp: 1.0, tp: 0 } },
@@ -567,11 +543,8 @@ fn test_cancel_round_soft_cancels_non_last() {
             .unwrap()
             .to_string()
     };
-    // The cancelled round no longer counts toward the cap, so its capped players re-arm.
     assert_eq!(st(&out, "p1"), "Checked-in");
-    // The live round's players keep playing.
     assert_eq!(st(&out, "q1"), "Playing");
-    // A player seated only in the cancelled round drops out of standings entirely.
     assert!(
         !out["standings"]
             .members()
@@ -580,12 +553,8 @@ fn test_cancel_round_soft_cancels_non_last() {
     );
 }
 
-// RestoreRound un-voids a soft-cancelled non-last round (#295). The whole point of the
-// feature: a round cancelled by mistake must come back with its retained scores re-derived.
-// This is the inverse of test_cancel_round_soft_cancels_non_last — cancel round 0, then
-// restore it, and assert the engine flips the table back to Finished (the table was complete
-// + valid when cancelled), re-arms its capped players to Completed (round re-derived fully
-// Finished, players back at their cap), and leaves the still-live round 1 untouched.
+// RestoreRound un-voids a soft-cancelled non-last round: it must re-flip the table
+// back to Finished from retained scores, re-arm capped players, and leave the still-live round untouched.
 #[test]
 fn test_restore_round_rederives_finished_from_retained_scores() {
     let mut t = make_tournament();
@@ -602,8 +571,6 @@ fn test_restore_round_rederives_finished_from_retained_scores() {
         { user_uid: "q3", state: "Playing", payment_status: "Pending", toss: 0 },
         { user_uid: "q4", state: "Playing", payment_status: "Pending", toss: 0 },
     ];
-    // Same fixture as the cancel test: round 0 was a finished p-pod (single oust, sum == 4),
-    // round 1 a live q-pod. Engine-valid VP vectors.
     t["rounds"] = json::array![
         [ { seating: [
             { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 0 } },
@@ -619,8 +586,8 @@ fn test_restore_round_rederives_finished_from_retained_scores() {
         ], state: "In Progress" } ],
     ];
 
-    // Soft-cancel round 0 through the real engine, then restore it through the real engine —
-    // round-trip on the shipped artifact, not a hand-built Cancelled fixture.
+    // Cancel then restore through the real engine — round-trip on the shipped
+    // artifact, not a hand-built Cancelled fixture.
     let cancelled = json::parse(
         &run_event(
             &t,
@@ -646,7 +613,6 @@ fn test_restore_round_rederives_finished_from_retained_scores() {
     )
     .unwrap();
 
-    // The retained scores were a complete, valid finished table, so re-derivation -> Finished.
     assert_eq!(
         out["rounds"][0][0]["state"].as_str(),
         Some("Finished"),
@@ -668,13 +634,9 @@ fn test_restore_round_rederives_finished_from_retained_scores() {
             .unwrap()
             .to_string()
     };
-    // p-pod players: now back at their cap (max_rounds=1, this round counts again) on a fully-
-    // Finished round -> Completed, mirroring FinishRound. Cancel had released them to Checked-in.
     assert_eq!(st(&out, "p1"), "Completed");
     assert_eq!(st(&out, "p4"), "Completed");
-    // The live round's players are unaffected.
     assert_eq!(st(&out, "q1"), "Playing");
-    // And the restored round contributes standings again.
     assert!(
         out["standings"]
             .members()
@@ -683,19 +645,13 @@ fn test_restore_round_rederives_finished_from_retained_scores() {
     );
 }
 
-// All-or-nothing (#295): a round restores exactly as it was saved, or not at all. If a player
-// seated in the cancelled round can no longer be reinstated — dropped out (Finished) or
-// disqualified, or (open rounds) already at their round cap via OTHER rounds — RestoreRound
-// rejects the whole operation with a clear reason rather than silently leaving them out. (The
-// count-before-flip ordering for the cap case is exercised by the success test above, where the
-// restored round is itself what brings its players to cap; here a dropped player blocks restore.)
+// All-or-nothing: if a player seated in the cancelled round can no longer be
+// reinstated, RestoreRound rejects the whole operation rather than silently leaving them out.
 #[test]
 fn test_restore_round_rejects_non_reinstatable_player() {
     let mut t = make_tournament();
     t["state"] = "Playing".into();
     t["online"] = true.into();
-    // Two parallel rounds: round 0 cancelled (retained finished scores), round 1 live. One round-0
-    // player (p4) has since dropped out (state Finished) -> restore must be rejected, not partial.
     t["players"] = json::array![
         { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 0 },
         { user_uid: "p2", state: "Checked-in", payment_status: "Pending", toss: 0 },
@@ -748,8 +704,6 @@ fn test_non_organizer_cannot_open_registration() {
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("organizers"));
 }
-
-// --- Deck lifecycle tests ---
 
 fn tournament_with_player(state: &str) -> JsonValue {
     let mut t = make_tournament();
@@ -862,7 +816,6 @@ fn test_checkin_missing_decklist_warning() {
 
     let event = json::object! { type: "CheckIn", player_uid: "player-1" };
     let actor = make_organizer();
-    // No decks passed — should flag missing_decklist
     let (raw, _) = run_event_with_decks(&tournament, &event, &actor, "[]").unwrap();
     let updated = json::parse(&raw).unwrap();
     assert_eq!(updated["players"][0]["state"].as_str(), Some("Checked-in"));
@@ -886,8 +839,6 @@ fn test_checkin_with_decklist_no_warning() {
     assert_eq!(updated["players"][0]["state"].as_str(), Some("Checked-in"));
     assert!(updated["players"][0]["missing_decklist"].is_null());
 }
-
-// --- Payment tracking tests ---
 
 #[test]
 fn test_set_payment_status() {
@@ -966,36 +917,29 @@ fn test_non_organizer_cannot_set_payment() {
     assert!(result.unwrap_err().to_string().contains("organizers"));
 }
 
-// ================================================================
-// Sanctions tests
-// ================================================================
-
 #[test]
 fn test_gw_with_sa_adjustment() {
-    // Player with 2.5 VP normally gets GW, but with -1.0 SA adjustment (1.5 VP adjusted) loses it
     let vps = vec![2.5, 1.0, 0.5, 0.5, 0.5];
     let no_adj = vec![0.0; 5];
     let gw_normal = compute_gw(&vps, &no_adj);
-    assert_eq!(gw_normal[0], 1.0); // normally gets GW
+    assert_eq!(gw_normal[0], 1.0);
 
     let adj = vec![-1.0, 0.0, 0.0, 0.0, 0.0];
     let gw_adjusted = compute_gw(&vps, &adj);
-    assert_eq!(gw_adjusted[0], 0.0); // loses GW: adjusted VP 1.5 < 2.0
+    assert_eq!(gw_adjusted[0], 0.0);
 }
 
 #[test]
 fn test_gw_with_sa_still_above_threshold() {
-    // Player with 3.0 VP and -1.0 SA -> adjusted 2.0 VP, still >= 2.0 AND still highest -> keeps GW
     let vps = vec![3.0, 1.0, 0.5, 0.5, 0.0];
     let adj = vec![-1.0, 0.0, 0.0, 0.0, 0.0];
     let gw = compute_gw(&vps, &adj);
-    assert_eq!(gw[0], 1.0); // keeps GW: adjusted 2.0, still highest
+    assert_eq!(gw[0], 1.0);
 }
 
 #[test]
 fn test_tp_with_sa_reranks_table() {
-    // JG v2 1.1.3 Example 2: A sweeps a 5-player table (5VP); B/C/D/E at 0VP.
-    // E gets SA -> adjusted -1, dropping below the other 0VP players.
+    // JG v2 §1.1.3 Example 2: A sweeps (5VP); B/C/D/E at 0VP, E gets SA -> adjusted -1.
     // A=60 (1st), B/C/D tie 2nd-4th = (48+36+24)/3 = 36 each, E=12 (5th).
     let vps = vec![5.0, 0.0, 0.0, 0.0, 0.0];
     let adj = vec![0.0, 0.0, 0.0, 0.0, -1.0];
@@ -1009,9 +953,8 @@ fn test_tp_with_sa_reranks_table() {
 
 #[test]
 fn test_standings_vp_under_sa_goes_negative() {
-    // A 4-player table (VPs sum to 4). p1 has 2 raw VP, p2 has 0; both carry an SA
-    // on round 0. gw is 0 for everyone (p1's adjusted 1.0 < 2.0, so no GW — the
-    // engine would store exactly this). Standings VP: p1 -> 2-1 = 1.0, p2 -> 0-1 = -1.0.
+    // p1 has 2 raw VP, p2 has 0; both carry an SA on round 0, so gw is 0 for everyone
+    // (p1's adjusted 1.0 < 2.0). Standings VP: p1 -> 2-1 = 1.0, p2 -> 0-1 = -1.0.
     let mut tournament = make_tournament();
     tournament["rounds"] = json::array![json::array![json::object! {
         seating: [
@@ -1088,7 +1031,6 @@ fn test_dq_player_zeroed_and_sorted_last_opponents_unaffected() {
         "opponent keeps GW + VP earned vs the DQ'd seat"
     );
 
-    // Rating VP/GW: zero for the DQ'd player, unchanged for the opponent.
     assert_eq!(
         super::compute_rating_vp_gw(&tournament, &empty, "p2"),
         (0.0, 0.0)
@@ -1110,11 +1052,8 @@ fn test_dq_player_zeroed_and_sorted_last_opponents_unaffected() {
 
 #[test]
 fn test_proxy_kept_not_zeroed_sorted_last_opponents_and_rating_unaffected() {
-    // p2 is a proxy (non_competing: a non-competing official stood in). The KEY
-    // divergence from DQ: p2 keeps its own gw/vp/tp (NOT zeroed) yet sorts last
-    // and earns no rating. Opponents keep what they scored against the seat.
-    // Guards the shared DQ/proxy path against a refactor that starts zeroing the
-    // proxy score or stops excluding it from rank/rating.
+    // p2 is a proxy: unlike DQ, gw/vp/tp are NOT zeroed, yet it sorts last and earns
+    // no rating. Guards the shared DQ/proxy path from a refactor that conflates the two.
     let mut tournament = make_tournament();
     tournament["rounds"] = json::array![json::array![json::object! {
         seating: [
@@ -1152,7 +1091,6 @@ fn test_proxy_kept_not_zeroed_sorted_last_opponents_and_rating_unaffected() {
         "opponent keeps GW + VP earned vs the proxy seat"
     );
 
-    // Rating: proxy earns nothing; opponent unchanged.
     assert_eq!(
         super::compute_rating_vp_gw(&tournament, &empty, "p2"),
         (0.0, 0.0),
@@ -1166,9 +1104,8 @@ fn test_proxy_kept_not_zeroed_sorted_last_opponents_and_rating_unaffected() {
 
 #[test]
 fn test_rating_vp_gw_includes_finals_and_full_sa() {
-    // Rating recomputes prelim GW from raw VPs + sanctions and adds the stored
-    // finals GW. p1: round0 2.5VP (table-high -> GW), round1 0VP with an SA (-1, so
-    // no GW), finals 3VP/1GW (winner). VP = 2.5 + 0 + 3 - 1 = 4.5; GW = 1 + 0 + 1.
+    // p1: round0 2.5VP (table-high -> GW), round1 0VP with an SA (-1, so no GW),
+    // finals 3VP/1GW (winner). VP = 2.5 + 0 + 3 - 1 = 4.5; GW = 1 + 0 + 1.
     let mut tournament = make_tournament();
     tournament["rounds"] = json::array![
         json::array![json::object! {
@@ -1210,7 +1147,7 @@ fn test_rating_vp_gw_includes_finals_and_full_sa() {
 #[test]
 fn test_rating_vp_gw_reads_standings_when_no_rounds() {
     // VEKN-synced tournament: no rounds/finals -> read the player's standings row.
-    // An SA referencing a (nonexistent) round must not double-penalize the synced VP.
+    // An SA referencing a nonexistent round must not double-penalize the synced VP.
     let mut tournament = make_tournament();
     tournament["standings"] =
         json::array![json::object! { user_uid: "p1", gw: 1.0, vp: 4.0, tp: 120 },];
@@ -1224,13 +1161,8 @@ fn test_rating_vp_gw_reads_standings_when_no_rounds() {
 
 #[test]
 fn test_rating_vp_gw_credits_no_final_winner() {
-    // NO-final VEKN import: rounds AND finals both absent, but `winner` is set, so
-    // the tournament-win GW (+1) is credited from the winner field (no finals table
-    // recorded it). Matches vekn.net rtp (a no-final winner with prelim gw1 rates as
-    // gw2). A non-winner in the same import gets no bonus. The inert side
-    // (winner=="", native today) is pinned by the test above — keep this pair in
-    // sync. Guards the #340 rating gate: import totals must stay unchanged once the
-    // winner's +1 moved out of the folded standings and into this rule.
+    // No-final VEKN import: rounds/finals absent but `winner` is set, so the
+    // tournament-win GW (+1) is credited from the winner field, matching vekn.net.
     let mut tournament = make_tournament();
     tournament["winner"] = "p1".into();
     tournament["standings"] = json::array![
@@ -1252,10 +1184,8 @@ fn test_rating_vp_gw_credits_no_final_winner() {
 
 #[test]
 fn test_standings_vp_sa_ignores_lifted_redirects_unplayed_round() {
-    // A lifted SA must not penalize. An active SA whose stored round p1 never
-    // played (round 1 here — only round 0 exists) is NOT deferred (JG v2 §1.1.3:
-    // never a future round): it redirects to p1's most-recently-seated round
-    // (round 0) and applies. Net: -1 (the lifted one is ignored), so 1.5 -> 0.5.
+    // A lifted SA must not penalize. An active SA whose stored round p1 never played
+    // (round 1; only round 0 exists) redirects to round 0 (JG v2 §1.1.3: never a future round).
     let mut tournament = make_tournament();
     tournament["rounds"] = json::array![json::array![json::object! {
         seating: [
@@ -1287,12 +1217,8 @@ fn test_standings_vp_sa_ignores_lifted_redirects_unplayed_round() {
 
 #[test]
 fn test_standings_sa_redirects_to_most_recent_seated_round() {
-    // p1 plays round 0 only (not seated in round 1). An SA stored on round 1 — a
-    // round p1 never played — must redirect to p1's most-recently-seated round
-    // (round 0), and BOTH consumers must agree there. Round 0: p1's raw 2.5 VP
-    // would take the GW (>=2, strictly highest); the redirected -1 drops adjusted
-    // VP to 1.5, removing the GW. If the SA had instead deferred or landed on the
-    // unplayed round 1, p1 would keep 2.5 VP and the GW.
+    // p1 plays round 0 only. An SA stored on round 1 (never played) must redirect to
+    // round 0: raw 2.5 VP would take the GW, but the redirected -1 drops it to 1.5.
     let mut tournament = make_tournament();
     tournament["rounds"] = json::array![
         json::array![json::object! {
@@ -1334,11 +1260,8 @@ fn test_standings_sa_redirects_to_most_recent_seated_round() {
 
 #[test]
 fn test_rating_vp_gw_finals_sa_lands_on_finals() {
-    // A finals-round SA (stored round_number == rounds_len, the finals sentinel)
-    // sticks on the finals for a seated finalist: the prelim round is recomputed
-    // WITHOUT the penalty (p1 keeps that GW) and the -1 VP still hits the rating
-    // total (which includes finals VP). VP = prelim 2.0 + finals 3.0 - 1.0 SA =
-    // 4.0; GW = 1 (round 0: adjusted 2.0 holds) + 1 (finals, stored) = 2.0.
+    // A finals-round SA (round_number == rounds_len sentinel) sticks on the finals: prelim
+    // GW is kept (no penalty there) while -1 VP hits the rating total. VP = 2.0+3.0-1.0 = 4.0; GW = 1+1 = 2.0.
     let mut tournament = make_tournament();
     tournament["rounds"] = json::array![json::array![json::object! {
         seating: [
@@ -1371,12 +1294,8 @@ fn test_rating_vp_gw_finals_sa_lands_on_finals() {
 
 #[test]
 fn test_finals_sa_rescores_finals_and_rederives_winner() {
-    // Finals were scored BEFORE the SA: p1's top raw VP (2.5) holds the stored
-    // finals GW and FinishFinals crowned p1. An SA then lands on the finals
-    // (sentinel round 1): adjusted p1 1.5 < p2 2.0, so update_standings — the
-    // out-of-band sanction recompute path — must rewrite the stored finals GW
-    // and re-derive the winner, while prelim standings keep their VP (the
-    // penalty is finals-only).
+    // Finals scored BEFORE the SA crowned p1 on raw VP; an SA then lands on the finals
+    // sentinel round, dropping p1 below p2 — update_standings must rewrite the stored finals GW and re-derive the winner.
     let mut tournament = make_tournament();
     tournament["rounds"] = json::array![json::array![json::object! {
         seating: [
@@ -1438,10 +1357,8 @@ fn test_finals_sa_rescores_finals_and_rederives_winner() {
 
 #[test]
 fn test_standings_recompute_picks_up_late_sa() {
-    // The round was scored BEFORE the SA: p1's seat still stores the as-scored gw=1
-    // and tp=60. An SA is then issued on that round for p1, dropping adjusted VP to
-    // 1.5 (< 2.0). Standings must recompute from raw VP + the SA — p1 loses the GW
-    // and the table re-ranks TP — despite the stale stored seat values.
+    // The round was scored BEFORE the SA (stale seat still stores gw=1, tp=60). Standings
+    // must recompute from raw VP + the SA — p1 loses the GW and the table re-ranks TP.
     let mut tournament = make_tournament();
     tournament["rounds"] = json::array![json::array![json::object! {
         seating: [
@@ -1487,25 +1404,13 @@ fn test_standings_recompute_picks_up_late_sa() {
 }
 
 // An SA whose stored round gets soft-cancelled must penalize VP and the GW/TP cascade on the
-// SAME surviving round — never diverge. The bug (#472): `resolve_sa_effective_rounds` counted a
-// seat in a Cancelled table, so the SA parked on the cancelled round; `sa_vp_penalty` (applied
-// unconditionally) still took VP -1, but the GW/TP loop `continue`s past Cancelled tables, so the
-// cascade never got the -1 — VP was penalized while the game win was silently kept, corrupting the
-// standings/ratings pushed to VEKN. Fix: `seated_in` skips Cancelled, redirecting the SA to the
-// player's most-recent non-cancelled round (here round 1, the in-progress "current game" of JG v2
-// §1.1.3), so both consumers land there. Reach Cancelled through the real engine (CancelRound a
-// non-last round, which soft-cancels in place and keeps the round-0 seating that tagged the SA),
-// not a hand-built fixture. `gw` is the pre/post witness: pre-fix the SA sat on the cancelled
-// round 0, leaving round 1 unadjusted → p1's raw 2.5 keeps the GW (>= 2.0, JG threshold); post-fix
-// the -1 lands on round 1 → adjusted 1.5 (< 2.0) removes it. `vp` is 1.5 either way (documents the
-// VP side; it is `gw` that flips), so this asserts the two now AGREE on the surviving round.
+// SAME surviving round (`seated_in` skips Cancelled); `gw` is the witness, `vp` stays 1.5 either way.
 #[test]
 fn test_sa_on_soft_cancelled_round_penalizes_vp_and_gw_together() {
     let mut t = make_tournament();
     t["state"] = "Playing".into();
-    // Sequential rounds, same field: round 0 finished (later soft-cancelled), round 1 the live
-    // "current game". p1..p5 are seated in both, so the SA tagged on round 0 has a surviving
-    // non-cancelled round to redirect onto. Distinct toss for deterministic ranking.
+    // Round 0 finished (later soft-cancelled), round 1 live; p1..p5 seated in both so the
+    // SA tagged on round 0 has a surviving round to redirect onto. Distinct toss for deterministic ranking.
     t["players"] = json::array![
         { user_uid: "p1", state: "Playing", payment_status: "Pending", toss: 5 },
         { user_uid: "p2", state: "Playing", payment_status: "Pending", toss: 4 },
@@ -1722,9 +1627,8 @@ fn test_suspension_blocks_checkin() {
 
 #[test]
 fn test_expired_suspension_does_not_block_checkin() {
-    // The engine honors expires_at (via actor.now): a suspension expired at/before
-    // now is auto-lifted so CheckIn passes, while one expiring in the future still
-    // rejects. Guards the payload-builder → actor.now → has_active_suspension wiring.
+    // The engine honors expires_at (via actor.now): a suspension expired at/before now
+    // is auto-lifted so CheckIn passes, while one expiring in the future still rejects.
     let mut tournament = make_tournament();
     tournament["state"] = "Waiting".into();
     tournament["players"] = json::array![
@@ -1825,8 +1729,6 @@ fn test_reopen_tournament_preserves_dq() {
        // winner cleared to "" (not null): backend types it `str`, a null 500s the action
     assert_eq!(updated["winner"].as_str(), Some(""));
 }
-
-// --- AlterSeating tests ---
 
 /// Build a tournament in Playing state with one round of 2 tables of 4
 fn tournament_with_round() -> JsonValue {
@@ -2043,17 +1945,14 @@ fn test_check_in_reinstates_dropout_by_cap() {
     );
 }
 
-// #272 / open rounds: StartFinals selects the top-5 *eligible* players. A capped player
-// resting in `Completed` is still a finalist; a withdrawn player in `Finished` is excluded
-// from the cutoff and the next-ranked qualifier is promoted into the finals. Asserting the
-// wrong set here means the wrong person plays the final (a result pushed to VEKN/league).
+// StartFinals selects the top-5 *eligible* players: a capped player resting in `Completed`
+// is still a finalist; a withdrawn player in `Finished` is excluded and the next-ranked qualifier is promoted.
 #[test]
 fn test_start_finals_includes_completed_excludes_withdrawn() {
     let mut t = make_tournament();
     t["state"] = "Waiting".into();
-    // Two single-table rounds (>=2 rounds gate). Each table is [2,1,1,1,0] in seating
-    // (predator-prey) order — a valid oust sequence summing to the 5-seat table size.
-    // Distinct toss values keep the cutoff free of unbroken ties.
+    // Two single-table rounds (>=2 rounds gate); each table is [2,1,1,1,0], a valid oust
+    // sequence. Distinct toss values keep the cutoff free of unbroken ties.
     t["players"] = json::array![
         { user_uid: "p1", state: "Completed",  payment_status: "Pending", toss: 5 },
         { user_uid: "p2", state: "Playing",    payment_status: "Pending", toss: 4 },
@@ -2113,14 +2012,8 @@ fn test_start_finals_includes_completed_excludes_withdrawn() {
     assert_eq!(seated.len(), 5);
 }
 
-// #362: the finals/toss two-round minimum must count *played* rounds, not `rounds.len()`. A
-// fully soft-cancelled round did not happen, so one real round + one cancelled round must NOT
-// satisfy the minimum — otherwise an organizer starts (and VEKN/ratings silently receive) a
-// finals decided on a single round. Asserted at the StartFinals gate, the shared
-// `count_played_rounds` carrier: SetToss/RandomToss route through the same helper, so this one
-// test guards all three. Reach the state through the real engine (CancelRound a non-last round,
-// land in Waiting), not a hand-built Cancelled fixture. Pre-fix the gate tested rounds.len() (2)
-// and this returned Ok, illegitimately seating a 5-player final; post-fix it counts 1 and refuses.
+// The finals/toss two-round minimum must count *played* rounds via `count_played_rounds`, not
+// `rounds.len()` — a cancelled round must not satisfy it. SetToss/RandomToss share the same helper, so this one test guards all three.
 #[test]
 fn test_start_finals_rejects_when_only_one_round_survived_cancellation() {
     let mut t = make_tournament();
@@ -2178,9 +2071,8 @@ fn test_start_finals_rejects_when_only_one_round_survived_cancellation() {
     assert!(matches!(err, EngineError::FinalsMinRounds));
 }
 
-// Open rounds: CancelFinals reverts a seated finals back to Waiting so a no-show finalist can be
-// dropped and the field re-seated. Capped finalists must return to Completed (not Checked-in) so
-// they aren't re-armed for another preliminary round.
+// CancelFinals reverts a seated finals back to Waiting so a no-show finalist can be dropped and
+// the field re-seated. Capped finalists must return to Completed (not Checked-in), not re-armed.
 #[test]
 fn test_cancel_finals_reverts_finalists_by_cap() {
     let mut t = make_tournament();
@@ -2431,12 +2323,8 @@ fn test_alter_seating_invalid_state_fails() {
         .contains("Cannot alter seating"));
 }
 
-// SwapSeats is reachable in Finished state (require_state_or_finished), where no later
-// FinishRound/finals refreshes standings. Because it swaps player_uids but leaves each
-// seat's result in place, a swap silently *exchanges* two scored players' standings — and
-// those stored standings feed ratings, the vekn.net push, and exports. Regression guard for
-// #359: after the swap, the stored standings must credit each player with the score at the
-// seat they now occupy (gw + vp move with them), not the pre-swap arrangement.
+// SwapSeats swaps player_uids but leaves each seat's result in place, so in Finished state
+// (where no later FinishRound refreshes standings) the stored standings must follow the swap.
 #[test]
 fn test_swap_seats_in_finished_refreshes_standings() {
     let mut t = make_tournament();
@@ -2457,9 +2345,8 @@ fn test_swap_seats_in_finished_refreshes_standings() {
             { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
         ], state: "Finished", override: json::Null } ],
     ];
-    // Pre-swap standings, as they stood when the tournament finished. The bug is that these go
-    // *stale* on a swap (not that they go missing) — pre-seeding them makes the pre-fix path
-    // pass them through untouched, so the test pins staleness, not absence.
+    // Pre-swap standings, as they stood when the tournament finished — pre-seeding them pins
+    // staleness (values passed through untouched), not absence.
     t["standings"] = json::array![
         { user_uid: "p1", gw: 1.0, vp: 2.0, tp: 0.0, toss: 0, finalist: false, disqualified: false, non_competing: false },
         { user_uid: "p2", gw: 0.0, vp: 1.0, tp: 0.0, toss: 0, finalist: false, disqualified: false, non_competing: false },
@@ -2604,9 +2491,8 @@ fn test_update_config_v5_forbids_championship_rank() {
 
 #[test]
 fn test_update_config_finish_before_start() {
-    // A finish-only patch must be ordered against the STORED start, and the two
-    // sides carry different precisions (form posts minutes, store keeps seconds)
-    // — so equal wall-clock times stay legal and only a real inversion fails.
+    // A finish-only patch must be ordered against the STORED start, and the two sides carry
+    // different precisions (form posts minutes, store keeps seconds), so only a real inversion fails.
     let mut tournament = make_tournament();
     tournament["start"] = "2026-06-01T10:00:00".into();
     let actor = make_organizer();
@@ -2877,10 +2763,6 @@ fn test_checkin_refreshes_display_name_of_rostered_player() {
     );
 }
 
-// ================================================================
-// DeleteDeck tests
-// ================================================================
-
 #[test]
 fn test_delete_deck_success() {
     let tournament = tournament_with_player("Waiting");
@@ -2964,10 +2846,6 @@ fn test_delete_deck_organizer_always() {
     assert_eq!(deck_ops[0]["op"].as_str(), Some("delete"));
 }
 
-// ================================================================
-// Multideck tests
-// ================================================================
-
 fn multideck_tournament(state: &str, rounds_played: usize) -> JsonValue {
     let mut t = make_tournament();
     t["state"] = state.into();
@@ -2975,7 +2853,6 @@ fn multideck_tournament(state: &str, rounds_played: usize) -> JsonValue {
     t["players"] = json::array![
         { user_uid: "player-1", state: "Checked-in", payment_status: "Pending", toss: 0 },
     ];
-    // Add dummy rounds to simulate played rounds
     let mut rounds = json::JsonValue::new_array();
     for _ in 0..rounds_played {
         let table = json::object! {
@@ -3097,7 +2974,6 @@ fn test_multideck_delete_requires_index() {
 fn test_multideck_lifecycle() {
     // Upload deck at round 0, start round -> round 0 deck locked
     let mut tournament = multideck_tournament("Waiting", 0);
-    // Add enough players for StartRound
     tournament["players"] = json::array![
         { user_uid: "p0", state: "Checked-in", payment_status: "Pending", toss: 0 },
         { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 0 },
@@ -3105,7 +2981,6 @@ fn test_multideck_lifecycle() {
         { user_uid: "p3", state: "Checked-in", payment_status: "Pending", toss: 0 },
     ];
 
-    // Upload deck for p0 at round 0
     let event = json::object! {
         type: "UpsertDeck",
         player_uid: "p0",
@@ -3116,7 +2991,6 @@ fn test_multideck_lifecycle() {
     let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, "[]").unwrap();
     assert_eq!(deck_ops.len(), 1);
 
-    // Start round
     let start_event =
         json::parse(r#"{"type": "StartRound", "seating": [["p0","p1","p2","p3"]]}"#).unwrap();
     let org = make_organizer();
@@ -3125,7 +2999,6 @@ fn test_multideck_lifecycle() {
     assert_eq!(updated["state"].as_str(), Some("Playing"));
     assert_eq!(updated["rounds"].len(), 1);
 
-    // Now try to delete p0's round 0 deck -> should be locked
     let delete_event = json::object! {
         type: "DeleteDeck",
         player_uid: "p0",
@@ -3141,8 +3014,6 @@ fn test_multideck_lifecycle() {
         .to_string()
         .contains("already started"));
 }
-
-// --- Judge-locked score tests ---
 
 #[test]
 fn test_player_blocked_from_scoring_after_organizer_sets_score() {
@@ -3247,8 +3118,6 @@ fn test_late_arrival_checked_in_mid_round() {
     assert_eq!(added["state"].as_str(), Some("Checked-in"));
 }
 
-// --- Out-of-round score correction (organizer edits past round while Waiting) ---
-
 /// One finished round, tournament back to Waiting between rounds. Both tables carry
 /// a valid completed result (VPs ceil-sum to table size, valid oust order: p1/p5 win).
 fn waiting_after_round() -> JsonValue {
@@ -3315,12 +3184,8 @@ fn test_player_cannot_score_while_waiting() {
 
 #[test]
 fn test_preview_scores_match_setscore_including_sa_cascade() {
-    // The WASM `previewScores` binding (`preview_scores_json`) and the `SetScore`
-    // event are two separate copies of the GW/TP scoring cascade. The regression
-    // this pins: a UI preview silently diverging from the score actually persisted.
-    // We drive BOTH shipped entry points on the same table + candidate VPs and
-    // assert equality — with an active SA landing on the scored round so the SA
-    // cascade (resolve_sa_effective_rounds + table_sa_adjustments) is exercised.
+    // `preview_scores_json` and `SetScore` are two separate copies of the GW/TP cascade;
+    // drive both on the same table + VPs, with an active SA, and assert equality.
     let t = waiting_after_round();
     // Table 0 seat order is p1,p2,p3,p4; p2 sweeps to the table win (VPs [0,2,1,1]).
     let sanctions = json::array![
@@ -3382,9 +3247,8 @@ fn test_preview_scores_match_setscore_including_sa_cascade() {
     assert_eq!(preview_gw, stored_gw, "preview GW must match persisted GW");
     assert_eq!(preview_tp, stored_tp, "preview TP must match persisted TP");
 
-    // The SA must be load-bearing: it strips p2's would-be GW, so the equality
-    // above is exercising the cascade, not passing on a no-op. Same table with no
-    // SA leaves p2 (adjusted 2.0, table-high) the winner.
+    // The SA must be load-bearing: it strips p2's would-be GW, so the equality above
+    // exercises the cascade, not a no-op. No-SA control: p2 (adjusted 2.0) wins.
     assert_eq!(stored_gw[1], 0.0, "SA drops p2 below the 2VP GW threshold");
     let no_sa_cfg = json::object! {
         tournament: t.clone(),
@@ -3403,10 +3267,8 @@ fn test_preview_scores_match_setscore_including_sa_cascade() {
 
 #[test]
 fn test_organizer_corrects_earlier_round_during_parallel_round_refreshes_standings() {
-    // Online parallel rounds: round 0 finished, round 1 still in progress, tournament
-    // stays Playing. Correcting a VP in the already-finished round 0 must refresh stored
-    // standings — pre-fix, SetScore in Playing skipped update_standings, so a correction
-    // to a past round left ratings/VEKN-push reading stale totals.
+    // Online parallel rounds: round 0 finished, round 1 still in progress, tournament stays
+    // Playing. Correcting a VP in the finished round 0 must still refresh stored standings.
     let mut t = waiting_after_round();
     t["state"] = "Playing".into();
     t["online"] = true.into();
@@ -3452,8 +3314,6 @@ fn test_organizer_corrects_earlier_round_during_parallel_round_refreshes_standin
     assert_eq!(p2["vp"].as_f64(), Some(2.0));
 }
 
-// --- Raffle pool tests ---
-
 #[test]
 fn test_raffle_before_first_round_draws_checked_in_players() {
     // Pre-round-1 (Waiting / check-in): no rounds exist yet, but the raffle base
@@ -3485,9 +3345,8 @@ fn test_raffle_before_first_round_draws_checked_in_players() {
 
 #[test]
 fn test_raffle_pools_count_scores_from_round_in_progress() {
-    // Mid-round: table 0 scored (p1 has the GW, p1-p4 have VPs), table 1 unscored,
-    // and no stored standings (FinishRound never ran). Pools must be computed from
-    // the live round results, not the stale stored standings.
+    // Mid-round: table 0 scored, table 1 unscored, no stored standings (FinishRound
+    // never ran). Pools must be computed from the live round results.
     let t = tournament_with_round();
     let org = make_organizer();
 
@@ -3526,12 +3385,8 @@ fn test_raffle_pools_count_scores_from_round_in_progress() {
 
 #[test]
 fn test_report_promos_post_finish_replaces_whole_list() {
-    // ReportPromos is deliberately state-gate-free: the primary flow enters it from
-    // the Finished console (FinishedResults CTA), and re-submitting corrects an
-    // already-filed report by replacing the whole list — not merging. A future
-    // "fix" that adds a state gate or switches to append semantics would silently
-    // break both the corrections flow and the finish-flow CTA. This pins both, plus
-    // the submitter default for the stock source.
+    // ReportPromos is deliberately state-gate-free: re-submitting corrects an already-filed
+    // report by replacing the whole list — not merging — and this pins the submitter default for stock source too.
     let mut tournament = make_tournament();
     tournament["state"] = "Finished".into();
     // An already-filed report the organizer is now correcting.
@@ -3561,11 +3416,8 @@ fn test_report_promos_post_finish_replaces_whole_list() {
     );
 }
 
-/// A table where a card moved a VP (Life Boon merges two half-VPs into one
-/// integer) is complete, not half-entered — it used to read as "In Progress"
-/// and a round would simply never finish, which is how a sanctioned event ended
-/// up with a corrected score. It must say so instead. Validity itself is
-/// untouched: nothing here may make a new table Finished.
+/// A table where a card moved a VP (Life Boon merges two half-VPs into one integer)
+/// is complete, not half-entered — must read RedirectedVp, not IncompleteTotal.
 #[test]
 fn redirected_vp_reads_as_blocked_not_unfinished() {
     let plain = [1.5, 0.0, 0.5, 0.5, 0.5];

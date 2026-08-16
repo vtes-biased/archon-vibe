@@ -1,10 +1,6 @@
 ---
-# ----------------------------------------------------------------------------
-# Beta environment variables (non-secret).
 # Secrets live in vault.yml and are referenced via {{ vault_* }} below.
-# ----------------------------------------------------------------------------
 
-# --- identity -------------------------------------------------------------
 # Beta runs alongside the legacy `archon` on the server-setup frankfurt host, so
 # everything is namespaced `new_archon` to avoid collisions (user, paths, db,
 # services). service_name flows to the shared nginx_site role.
@@ -13,25 +9,20 @@ archon_user: new_archon          # unprivileged runtime user (== db role for PG 
 archon_group: new_archon
 contact_email: "lionel.panhaleux@gmail.com"
 
-# --- domains --------------------------------------------------------------
 domain_main: archon.krcg.org
 domain_bot: bot.archon.krcg.org
 site_url_base: "https://{{ domain_main }}"
 
-# --- legal page URLs ------------------------------------------------------
-# Canonical Terms / Privacy URLs. Set these in the Discord Developer Portal
-# (General Information -> Terms of Service URL + Privacy Policy URL); kept here
-# as the source of truth and for any future automation.
+# Canonical Terms/Privacy URLs, also set in the Discord Developer Portal
+# (General Information -> Terms of Service URL + Privacy Policy URL).
 legal_terms_url: "{{ site_url_base }}/legal/terms"
 legal_privacy_url: "{{ site_url_base }}/legal/privacy"
 
-# --- ports (localhost only, nginx proxies to them) ------------------------
 # 8007 is taken by the co-located legacy-archon beta's uvicorn on this box, so
 # beta uses the +8 pair (8008/9008); the whole 8xxx/9xxx band is otherwise free.
 backend_port: 8008
 bot_port: 9008                    # paired with backend_port at +8 for this env
 
-# --- filesystem paths -----------------------------------------------------
 opt_root: /opt/new_archon
 backend_site_root: "{{ opt_root }}/backend"
 bot_site_root: "{{ opt_root }}/bot"
@@ -40,24 +31,19 @@ bot_state_dir: /var/lib/new_archon-bot
 env_dir: /etc/new_archon
 app_lib_dir: /var/lib/new_archon          # backend snapshots etc. (created by tasks/app_user.yml)
 
-# --- service names --------------------------------------------------------
 backend_service: new-archon-backend
 bot_service: new-archon-bot
 
-# --- versions -------------------------------------------------------------
-# Python is managed by uv (downloaded from python-build-standalone) — same
-# exact version on both envs, independent of the distro. Change python_version
-# to roll forward. PostgreSQL comes from the server-setup foundation here
-# (distro major); archon's own postgresql role never runs on beta.
+# Python is managed by uv, same exact version on both envs, independent of the
+# distro. PostgreSQL comes from the server-setup foundation here (distro
+# major); archon's own postgresql role never runs on beta.
 python_version: "3.14"
 uv_python_install_dir: /opt/uv/python
 
-# --- database -------------------------------------------------------------
 db_name: new_archon
 db_user: new_archon
 db_password: "{{ vault_db_password }}"
 
-# --- backend env vars (non-secret) ----------------------------------------
 backend_env:
   PYTHONOPTIMIZE: 1
   ENVIRONMENT: beta
@@ -65,7 +51,6 @@ backend_env:
   FRONTEND_URL: "{{ site_url_base }}"
   API_BASE_URL: "{{ site_url_base }}"
   DATABASE_URL: "postgresql://{{ db_user }}:{{ db_password }}@/{{ db_name }}?host=/var/run/postgresql"
-  # --- mail ---------------------------------------------------------------
   MAIL_SERVER: smtp.gmail.com
   MAIL_PORT: 587
   MAIL_USE_TLS: "true"
@@ -73,52 +58,43 @@ backend_env:
   MAIL_FROM: codex.of.the.damned@gmail.com
   MAIL_FROM_NAME: "Archon Beta"
   MAIL_PASSWORD: "{{ vault_mail_password }}"
-  # --- auth ---------------------------------------------------------------
   JWT_SECRET: "{{ vault_jwt_secret }}"
-  # --- discord (note: backend uses CLIENTID/SECRET, not CLIENT_ID/CLIENT_SECRET)
+  # backend uses CLIENTID/SECRET, not CLIENT_ID/CLIENT_SECRET.
   DISCORD_CLIENTID: "{{ vault_discord_client_id }}"
   DISCORD_SECRET: "{{ vault_discord_client_secret }}"
   DISCORD_REDIRECT_URI: "{{ site_url_base }}/auth/discord/callback"
   DISCORD_BOT_TOKEN: "{{ vault_discord_bot_token }}"
   DISCORD_INSTALL_URL: ""
-  # --- passkeys / WebAuthn ------------------------------------------------
   WEBAUTHN_RP_ID: "{{ domain_main }}"
   WEBAUTHN_RP_NAME: "Archon Beta"
   WEBAUTHN_ORIGIN: "{{ site_url_base }}"
-  # --- VEKN sync + push ---------------------------------------------------
   VEKN_SYNC_ENABLED: "true"
   VEKN_SYNC_INTERVAL_HOURS: 24
   VEKN_API_BASE_URL: "https://www.vekn.net/api"
   VEKN_API_USERNAME: "{{ vault_vekn_username }}"
   VEKN_API_PASSWORD: "{{ vault_vekn_password }}"
   VEKN_PUSH: "false"           # beta does not push results back to VEKN
-  # --- Web Push / VAPID ---------------------------------------------------
-  # Per-env keypair (beta and prod must NOT share). Both keys live in vault so
-  # they rotate atomically; default('') keeps push a graceful no-op until set.
-  # Rotating the keypair invalidates every existing browser subscription.
+  # Per-env keypair (beta and prod must NOT share). Rotating it invalidates
+  # every existing browser subscription.
   VAPID_PUBLIC_KEY: "{{ vault_vapid_public_key | default('') }}"
   VAPID_PRIVATE_KEY: "{{ vault_vapid_private_key | default('') }}"
   VAPID_SUBJECT: "mailto:{{ contact_email }}"
-  # --- misc ---------------------------------------------------------------
   SNAPSHOT_DIR: "{{ app_lib_dir }}/snapshots"
   TWDA_GITHUB_CLIENT_ID: "{{ vault_twda_github_client_id | default('') }}"
   TWDA_GITHUB_INSTALLATION_ID: "{{ vault_twda_github_installation_id | default('') }}"
   # PRIVATE_KEY is the runtime PEM path — derived from env_dir so it always matches
-  # where the role copies the vault-delivered .pem (a hardcoded path drifts per-env).
+  # where the role copies the vault-delivered .pem.
   TWDA_GITHUB_PRIVATE_KEY: "{{ env_dir }}/twda_github_app.pem"
-  # In-app feedback -> GitHub issues. Dedicated GitHub App, Issues:write on this repo.
   FEEDBACK_GITHUB_CLIENT_ID: "{{ vault_feedback_github_client_id | default('') }}"
   FEEDBACK_GITHUB_INSTALLATION_ID: "{{ vault_feedback_github_installation_id | default('') }}"
   # PRIVATE_KEY: env_dir-derived PEM path (see TWDA note above).
   FEEDBACK_GITHUB_PRIVATE_KEY: "{{ env_dir }}/feedback_github_app.pem"
-  # User-facing GitHub OAuth App (profile account-linking). Distinct from the two
-  # GitHub Apps above: a client secret, no private key. Unset client id -> the
-  # "Link GitHub" button degrades to a not_configured toast.
+  # Distinct from the two GitHub Apps above: a client secret, no private key.
+  # Unset client id -> the "Link GitHub" button degrades to a not_configured toast.
   GITHUB_OAUTH_CLIENT_ID: "{{ vault_github_oauth_client_id | default('') }}"
   GITHUB_OAUTH_SECRET: "{{ vault_github_oauth_secret | default('') }}"
   GITHUB_OAUTH_REDIRECT_URI: "{{ site_url_base }}/auth/github/callback"
 
-# --- bot env vars (non-secret) --------------------------------------------
 bot_env:
   PYTHONOPTIMIZE: 1
   ARCHON_URL: "http://127.0.0.1:{{ backend_port }}"

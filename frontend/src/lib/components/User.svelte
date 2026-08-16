@@ -41,16 +41,15 @@
 
   const auth = $derived(getAuthState());
 
-  // Check if current user can change a specific role (using engine)
   function canChangeRole(role: Role): boolean {
     if (!auth.user) return false;
     if (mode === "create") {
-      // For create mode, assume user will have VEKN ID (auto-allocated by backend)
-      // Create a minimal user context for permission check
+      // Create mode has no real user yet, so vekn_id is a placeholder standing in for the
+      // auto-allocated one the backend will assign.
       const targetContext = {
         roles: [] as Role[],
         country: editCountry || null,
-        vekn_id: "pending",  // Will be auto-allocated
+        vekn_id: "pending",
       };
       try {
         return engineCanChangeRole(auth.user, targetContext as User, role).allowed;
@@ -58,20 +57,16 @@
         return false;
       }
     }
-    // For edit mode, use actual user data
     if (!user) return false;
     try {
       return engineCanChangeRole(auth.user, user, role).allowed;
     } catch {
-      // Engine not initialized yet
       return false;
     }
   }
 
-  // Avatar state
   let showAvatarCropper = $state(false);
 
-  // Check if current user can edit this user's avatar (only own avatar)
   const canEditAvatar = $derived.by(() => {
     if (!auth.user || !user) return false;
     return auth.user.uid === user.uid;
@@ -100,15 +95,13 @@
   let editRoles = $state<Role[]>([]);
   let saving = $state(false);
   let error = $state("");
-  // Track if we've initialized edit fields for current edit session
   let editInitialized = $state(false);
 
-  // Debounce timer for text fields
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   const DEBOUNCE_MS = 500;
 
-  // Initialize edit fields only once when first entering edit mode
-  // Don't react to user prop changes while editing (we're the source of truth)
+  // Initializes edit fields once on entering edit mode; doesn't re-sync from the user prop while
+  // editing — the local fields are the source of truth so live SSE updates don't clobber in-progress edits.
   $effect(() => {
     if (isEditing && !editInitialized && user) {
       editName = user.name || "";
@@ -119,12 +112,10 @@
       editRoles = [...user.roles];
       editInitialized = true;
     } else if (!isEditing) {
-      // Reset flag when exiting edit mode
       editInitialized = false;
     }
   });
 
-  // Auto-save function (for edit mode only, not create)
   async function autoSave() {
     if (mode === "create" || !user) return;
     if (!editName.trim() || !editCountry.trim()) {
@@ -153,7 +144,6 @@
     }
   }
 
-  // Debounced auto-save for text fields
   function debouncedAutoSave() {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
@@ -162,9 +152,8 @@
     }, DEBOUNCE_MS);
   }
 
-  // Flush a pending debounced save so closing the card (or unmounting) never
-  // drops the last keystrokes or saves them after the card is gone — the
-  // Close button must not lie (wiki/design.md auto-save pattern).
+  // Flushes a pending debounced save so closing the card (or unmounting) never drops the last
+  // keystrokes or saves them after the card is gone — the Close button must not lie.
   function flushPendingSave() {
     if (debounceTimer) {
       clearTimeout(debounceTimer);
@@ -175,16 +164,13 @@
 
   onDestroy(flushPendingSave);
 
-  // Immediate auto-save for select/role changes
   function immediateAutoSave() {
     if (debounceTimer) clearTimeout(debounceTimer);
     autoSave();
   }
 
-  // Changing an official's country changes the data-access scope their FULL
-  // projection is computed for, so it needs explicit confirmation — and the
-  // backend takes the authority that could change their highest role. Ask the
-  // engine for that instead of letting the select 403 after an optimistic save.
+  // Changing an official's country changes the data-access scope their FULL projection is computed
+  // for, so it needs explicit confirmation — ask the engine rather than letting the select 403 after an optimistic save.
   const isTargetOfficial = $derived(isOfficial(user ?? null));
   const countryChange = $derived.by(() => {
     if (mode === "create" || !auth.user || !user) return { allowed: true, reason: null };
@@ -192,8 +178,7 @@
   });
   let showCountryConfirm = $state(false);
 
-  // Called when the country select changes. Returns true if the change is being
-  // gated by the confirm dialog (so the caller skips the immediate save).
+  // Returns true when the change is gated by the confirm dialog, so the caller skips the immediate save.
   function handleCountryChange(): boolean {
     if (editCity) {
       editCity = "";
@@ -216,7 +201,6 @@
 
   function cancelCountryChange() {
     showCountryConfirm = false;
-    // Revert the select to the original country; nothing was saved.
     editCity = user?.city || "";
     editCityGeonameId = user?.city_geoname_id ?? null;
     editCountry = user?.country || "";
@@ -270,7 +254,6 @@
     } else {
       editRoles = [...editRoles, role];
     }
-    // Immediate save for role changes
     immediateAutoSave();
   }
 
@@ -320,7 +303,6 @@
 
 <div class={inline ? "p-4" : "bg-surface-card rounded-lg shadow p-4 hover:shadow-md transition-shadow border border-line"}>
   {#if isEditing}
-    <!-- Edit/Create Mode -->
     <div role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <form
         onsubmit={(e) => {
@@ -330,7 +312,6 @@
         class="space-y-4"
       >
       {#if mode !== "create"}
-        <!-- Close button + saving indicator for edit mode -->
         <div class="flex justify-end items-center gap-2 -mt-1 -mr-1">
           {#if saving}
             <span class="text-xs text-ink-muted flex items-center gap-1">
@@ -366,7 +347,6 @@
       </div>
 
       {#if mode === "create"}
-        <!-- Email field for create mode (optional, sends invite) -->
         <div>
           <label
             for="edit-email"
@@ -386,7 +366,6 @@
           </p>
         </div>
       {:else}
-        <!-- VEKN ID (read-only, managed via standalone VEKN Management section) -->
         <div>
           <span class="block text-sm font-medium text-ink-muted mb-1">{m.add_player_vekn_id_label()}</span>
           <span class="block px-3 py-2 text-ink">{user?.vekn_id || '—'}</span>
@@ -489,7 +468,6 @@
       {/if}
 
       {#if mode === "create"}
-        <!-- Create mode: show save/cancel buttons -->
         <div class="flex gap-2 pt-2">
           <Button
             type="submit"
@@ -513,9 +491,7 @@
     </form>
     </div>
   {:else if user}
-    <!-- View Mode -->
     <div class="flex items-start justify-between">
-      <!-- Avatar -->
       <div class="mr-4 flex-shrink-0">
         {#if canEditAvatar}
           <div class="flex flex-col items-center gap-1">
@@ -657,14 +633,12 @@
     </div>
 
   {:else}
-    <!-- Invalid state -->
     <div class="text-link">
       {m.user_invalid_state()}
     </div>
   {/if}
 </div>
 
-<!-- Avatar Cropper Modal -->
 {#if showAvatarCropper && user}
   <AvatarCropper
     onSave={handleAvatarSave}
@@ -672,7 +646,6 @@
   />
 {/if}
 
-<!-- Confirm changing an official's country (changes their data-access scope) -->
 {#if showCountryConfirm}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div

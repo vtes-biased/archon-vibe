@@ -1,8 +1,3 @@
-"""Archon Discord Bot — entry point.
-
-Manages online VTES tournaments inside Discord servers via the Archon webapp.
-"""
-
 import logging
 
 import hikari
@@ -39,14 +34,8 @@ logger = logging.getLogger(__name__)
 async def _auto_defer(
     _pipeline: lightbulb.ExecutionPipeline, ctx: lightbulb.Context
 ) -> None:
-    """Defer every command response ephemerally before invoke runs.
-
-    Commands do backend-API / Discord-REST I/O before their first response;
-    without a deferral that can blow Discord's 3s interaction window ("the
-    application did not respond"). Every command response is already ephemeral,
-    and none opens a modal as its first response (modals come from miru button
-    callbacks, separate interactions), so a blanket ephemeral defer is safe.
-    """
+    """Blanket ephemeral defer is safe only because no command opens a modal as
+    its first response — modals come from miru button callbacks instead."""
     await ctx.defer(ephemeral=True)
 
 
@@ -66,9 +55,8 @@ async def _on_unhandled_command_error(
     return True
 
 
-# Every slash command, in registration order. A tuple so the startup smoke test
-# (test_startup.py) can register the same set and assert each command's injected
-# dependencies resolve — the wiring regression #154 would have caught.
+# A tuple so test_startup.py can register the same set and assert each
+# command's injected dependencies resolve — the #154 wiring regression.
 COMMANDS = (
     SetupCommand,
     TeardownCommand,
@@ -88,11 +76,8 @@ def build_client(
     api: ArchonAPI,
     miru_client: miru.Client,
 ) -> lightbulb.Client:
-    """Wire the lightbulb client the way the running bot does: DI registry, the
-    auto-defer hook + error handler, and every command registered. Extracted from
-    ``main`` so a startup smoke test can exercise this wiring — and that each
-    command's injected deps resolve — without a live Discord connection.
-    """
+    """Extracted from ``main`` so a startup smoke test can exercise this wiring
+    without a live Discord connection."""
     client = lightbulb.client_from_app(bot, hooks=[_auto_defer])
     client.error_handler(_on_unhandled_command_error, priority=-10)
     bot.subscribe(hikari.StartingEvent, client.start)
@@ -136,12 +121,10 @@ def main() -> None:
         await api.init()
         set_context(bot, store, api)
 
-        # Start OAuth callback HTTP server
         callback_runner = await start_callback_server(
             config.CALLBACK_HOST, config.CALLBACK_PORT
         )
 
-        # Resume SSE listeners for all linked tournaments (reconnect after restart)
         all_tournaments = await store.get_all_guild_tournaments()
         for gt in all_tournaments:
             await start_sse(

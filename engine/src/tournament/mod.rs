@@ -1,8 +1,3 @@
-//! Tournament business logic engine.
-//!
-//! Processes tournament events and returns updated tournament state.
-//! Same code runs in WASM (frontend offline) and PyO3 (backend).
-
 use json::JsonValue;
 
 use crate::seating;
@@ -17,12 +12,10 @@ mod standings;
 mod tests;
 mod types;
 
-// Re-export items used by lib.rs
 pub use scoring::{check_table_vps, compute_gw, compute_gw_finals, compute_tp};
 pub use standings::{compute_final_standings, compute_rating_vp_gw};
 pub use types::{ActorContext, PlayerState, SeatScore, TournamentEvent, TournamentState, VpError};
 
-// Import everything needed for apply_event from submodules
 use crate::error::EngineError;
 use helpers::{
     all_rounds_finished, collect_previous_rounds, count_played_rounds, count_player_rounds_played,
@@ -34,11 +27,7 @@ use raffle::{compute_deck_public, get_raffle_pool};
 use sanctions::{has_active_suspension, has_dq_sanction, table_sa_adjustments};
 use standings::{compute_preliminary_standings, top5_has_ties, update_standings};
 
-// ============================================================================
-// TOURNAMENT ENGINE
-// ============================================================================
-
-/// Validate config fields shared between UpdateConfig and CreateTournament.
+/// Shared between `UpdateConfig` and `CreateTournament`.
 fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
     if let Some(f) = config["format"].as_str() {
         validate_enum(f, &["Standard", "V5", "Limited"], "format")?;
@@ -67,11 +56,8 @@ fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
             }
         }
     }
-    // Self-organized rounds are an open-rounds-only feature (no online or per-player-cap
-    // requirement). Rejects the nonsensical combo at config time when the fields arrive
-    // together (the usual case — the config form posts open_rounds alongside the flag).
-    // Single-sources the "self-organized implies open-rounds" invariant in the engine,
-    // not just the UI.
+    // self_organized_rounds implies open_rounds; reject the combo here so the
+    // invariant is enforced by the engine, not just the UI form.
     if config["self_organized_rounds"].as_bool() == Some(true)
         && config.has_key("open_rounds")
         && config["open_rounds"].as_bool() == Some(false)
@@ -81,10 +67,8 @@ fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
     Ok(())
 }
 
-/// Resolve the round a seat/unseat targets: None = last round (unchecked —
-/// the existing single-round flows). An explicit earlier round must be LIVE
-/// (some table still unfinished): substitutes may join a running pod in
-/// parallel/open-rounds play, but finished/cancelled rounds stay closed.
+/// None = last round (unchecked). An explicit earlier round must be LIVE — substitutes
+/// join a running open-rounds pod, but finished/cancelled rounds stay closed.
 fn resolve_live_round(rounds: &JsonValue, round: Option<usize>) -> Result<usize, EngineError> {
     let last = rounds.len() - 1;
     let target = round.unwrap_or(last);
@@ -102,14 +86,8 @@ fn resolve_live_round(rounds: &JsonValue, round: Option<usize>) -> Result<usize,
     Ok(target)
 }
 
-/// VEKN legality: ranked events (National/Continental championships) forbid
-/// proxies and multideck, and only Standard/Limited can be ranked at all —
-/// vekn.net has no V5 championship event type, so one could never be reported.
-/// Callers pass the MERGED view (config over current tournament) so setting
-/// either side of an illegal combo is rejected — create/config-edit/offline all
-/// share this gate. pub(crate): the PyO3 binding exposes it for the online
-/// create route, which builds the Tournament in Python without running engine
-/// create_tournament.
+/// Ranked events forbid proxies/multideck; only Standard/Limited can be ranked. Callers
+/// must pass the MERGED view (config over current tournament); pub(crate) for the online create route.
 pub(crate) fn validate_rank_legality(
     format: &str,
     rank: &str,
@@ -131,12 +109,8 @@ pub(crate) fn validate_rank_legality(
     Ok(())
 }
 
-/// Reject a finish that precedes its start. Both are naive wall-clock times in
-/// the tournament's single `timezone`, so comparing their shared fixed-width
-/// `YYYY-MM-DDTHH:MM` prefix orders them — the config form posts minute
-/// precision while the store keeps seconds, and a plain string compare would
-/// read `…T10:00` as earlier than `…T10:00:00`. Equal times stay legal:
-/// zero-length events are common in imported data.
+/// Naive wall-clock times share the tournament's single `timezone`, so comparing the
+/// fixed-width `YYYY-MM-DDTHH:MM` prefix orders them correctly despite minute-vs-second precision.
 pub(crate) fn validate_finish_after_start(start: &str, finish: &str) -> Result<(), EngineError> {
     if start.is_empty() || finish.is_empty() {
         return Ok(());
@@ -150,8 +124,6 @@ pub(crate) fn validate_finish_after_start(start: &str, finish: &str) -> Result<(
     Ok(())
 }
 
-/// Create a new tournament from config and actor context.
-/// Returns the tournament JSON string.
 pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, EngineError> {
     let config = json::parse(config_json)?;
     let actor = ActorContext::from_json(&json::parse(actor_json)?)?;
@@ -172,7 +144,6 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
         config["finish"].as_str().unwrap_or(""),
     )?;
 
-    // Name is required for creation
     let name = config["name"].as_str().ok_or("name is required")?;
     if name.trim().is_empty() {
         return Err(EngineError::NameRequired);
@@ -222,18 +193,6 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
     Ok(tournament.dump())
 }
 
-/// Process a tournament event and return updated tournament + deck side-effects.
-///
-/// # Arguments
-/// * `tournament_json` - Current tournament state as JSON
-/// * `event_json` - Event to process
-/// * `actor_json` - Actor performing the action
-/// * `sanctions_json` - Array of sanctions: [{user_uid, level, round_number, lifted_at, deleted_at}]
-/// * `decks_json` - Array of existing deck metadata: [{user_uid, round, uid}]
-///
-/// # Returns
-/// * JSON: `{"tournament": {...}, "deck_ops": [...]}`
-/// * Error message on failure
 pub fn process_tournament_event(
     tournament_json: &str,
     event_json: &str,
@@ -250,7 +209,6 @@ pub fn process_tournament_event(
     let event = TournamentEvent::from_json(&event_value)?;
     let actor = ActorContext::from_json(&actor_value)?;
 
-    // Process the event
     let mut deck_ops = JsonValue::new_array();
     apply_event(
         &mut tournament,
@@ -268,17 +226,8 @@ pub fn process_tournament_event(
     Ok(result.dump())
 }
 
-/// Recompute `standings` from the tournament's rounds + current `sanctions` and
-/// return the updated tournament JSON.
-///
-/// Issuing, lifting, or deleting a standings_adjustment is NOT a `TournamentEvent`
-/// (sanctions are their own object type), so those paths can't recompute standings
-/// through `process_tournament_event`. This is the recompute they call instead —
-/// the same `update_standings` that every event ends with — so the SA VP penalty,
-/// per-table GW/TP refresh, and the finals re-score + winner re-derivation (a
-/// finals-round SA can flip who won) apply live, not only on the next tournament
-/// action. No-op when rounds are empty (guarded in `update_standings` to preserve
-/// VEKN-synced standings). Returns the bare tournament object (no `deck_ops`).
+/// Sanction issue/lift/delete flows aren't `TournamentEvent`s, so they call this
+/// directly for the same recompute every event ends with. No-op on empty rounds.
 pub fn update_standings_json(
     tournament_json: &str,
     sanctions_json: &str,
@@ -289,13 +238,8 @@ pub fn update_standings_json(
     Ok(tournament.dump())
 }
 
-/// Preview GW/TP for one table exactly as `SetScore` computes them — the same
-/// SA cascade (`resolve_sa_effective_rounds` + `table_sa_adjustments`), so live
-/// UI previews can never drift from persisted results.
-///
-/// Config: `{ tournament, sanctions, round, table, vps }` where `round ==
-/// rounds.len()` is the finals sentinel (`table` ignored) and `vps` are the
-/// seat-ordered raw VPs. Returns `{ "gw": [...], "tp": [...] }`.
+/// Mirrors SetScore's SA cascade exactly, so live UI previews never drift from
+/// persisted results. `round == rounds.len()` is the finals sentinel (`table` ignored).
 pub fn preview_scores_json(config_json: &str) -> Result<String, EngineError> {
     let config = json::parse(config_json)?;
     let tournament = &config["tournament"];
@@ -381,7 +325,6 @@ fn apply_event(
             require_organizer(actor)?;
             require_state(state, TournamentState::Waiting)?;
             tournament["state"] = "Registration".into();
-            // Reset Checked-in players back to Registered
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 if players[i]["state"].as_str() == Some("Checked-in") {
@@ -395,13 +338,10 @@ fn apply_event(
             require_organizer(actor)?;
             require_state(state, TournamentState::Finished)?;
             tournament["state"] = "Waiting".into();
-            // Clear finals and winner so organizer can redo finals. winner is "" (not
-            // null): the backend Tournament model types it `str` (""=no winner), so a
-            // null fails msgspec validation and 500s the action.
+            // winner is "" (not null): the backend Tournament model types it `str`
+            // (""=no winner), so a null fails msgspec validation and 500s the action.
             tournament["finals"] = json::Null;
             tournament["winner"] = "".into();
-            // Reset Finished players back to Checked-in (DQ'd stay DQ'd)
-            // Also clear finalist flag so new finals can be started cleanly
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 if players[i]["state"].as_str() == Some("Finished") {
@@ -411,7 +351,6 @@ fn apply_event(
                 // Disqualified players stay Disqualified (no reset)
             }
             update_standings(tournament, sanctions);
-            // Reset all deck public flags since tournament is no longer finished
             for d in decks.members() {
                 let deck_uid = d["uid"].as_str().unwrap_or("");
                 if !deck_uid.is_empty() {
@@ -433,17 +372,14 @@ fn apply_event(
         } => {
             require_state(state, TournamentState::Registration)?;
 
-            // Require VEKN ID
             if vekn_id.as_ref().is_none_or(|v| v.is_empty()) {
                 return Err(EngineError::VeknIdRequired);
             }
 
-            // Check not already registered
             if player_exists(&tournament["players"], user_uid) {
                 return Err(EngineError::AlreadyRegistered);
             }
 
-            // Block players with DQ or suspension sanctions
             if has_dq_sanction(sanctions, user_uid) {
                 return Err(EngineError::PlayerDisqualified);
             }
@@ -451,7 +387,6 @@ fn apply_event(
                 return Err(EngineError::PlayerSuspended);
             }
 
-            // Add player
             let mut player = json::object! {
                 user_uid: user_uid.as_str(),
                 state: "Registered",
@@ -473,7 +408,6 @@ fn apply_event(
         TournamentEvent::Unregister { user_uid } => {
             require_state(state, TournamentState::Registration)?;
 
-            // Self-only: player can only unregister themselves
             if actor.uid != *user_uid {
                 return Err(EngineError::UnregisterOnlySelf);
             }
@@ -499,7 +433,6 @@ fn apply_event(
                 return Err(EngineError::CannotAddPlayers);
             }
 
-            // Require VEKN ID
             if vekn_id.as_ref().is_none_or(|v| v.is_empty()) {
                 return Err(EngineError::VeknIdRequired);
             }
@@ -508,7 +441,6 @@ fn apply_event(
                 return Err(EngineError::AlreadyRegistered);
             }
 
-            // Block players with DQ or suspension sanctions
             if has_dq_sanction(sanctions, user_uid) {
                 return Err(EngineError::PlayerDisqualified);
             }
@@ -516,7 +448,6 @@ fn apply_event(
                 return Err(EngineError::PlayerSuspended);
             }
 
-            // Auto check-in when adding during Waiting state
             let auto_checkin = state == TournamentState::Waiting;
             let player_state = if auto_checkin {
                 "Checked-in"
@@ -582,7 +513,6 @@ fn apply_event(
                 return Err(EngineError::PlayerAlreadyFinished);
             }
 
-            // Permission: self or organizer
             if !actor.is_organizer && actor.uid != *player_uid {
                 return Err(EngineError::DropOutForbidden);
             }
@@ -596,9 +526,8 @@ fn apply_event(
             vekn_id,
             display_name,
         } => {
-            // A round under way does not close the door. Late arrivals are routine:
-            // the organizer seats them now if a table is short, or next round if play
-            // has really begun. Drop-outs come back the same way.
+            // The door stays open mid-round — check-in never seats, that's a
+            // separate organizer action.
             if !matches!(
                 state,
                 TournamentState::Waiting | TournamentState::Playing | TournamentState::Finished
@@ -609,7 +538,6 @@ fn apply_event(
                 });
             }
 
-            // Permission: organizer or self (player checking themselves in)
             if !actor.is_organizer && actor.uid != *player_uid {
                 return Err(EngineError::CheckInForbidden);
             }
@@ -617,11 +545,9 @@ fn apply_event(
             let idx = match find_player_index(&tournament["players"], player_uid) {
                 Some(idx) => idx,
                 None => {
-                    // A walk-in nobody registered still gets in mid-round.
                     if state != TournamentState::Waiting && state != TournamentState::Playing {
                         return Err(EngineError::PlayerNotFound);
                     }
-                    // Require VEKN ID for auto-registration (same as Register)
                     if vekn_id.as_ref().is_none_or(|v| v.is_empty()) {
                         return Err(EngineError::VeknIdRequired);
                     }
@@ -650,12 +576,10 @@ fn apply_event(
                 }
             };
 
-            // Block disqualified players from checking in
             if tournament["players"][idx]["state"].as_str() == Some("Disqualified") {
                 return Err(EngineError::PlayerDisqualified);
             }
 
-            // Block players with DQ or suspension sanctions
             if has_dq_sanction(sanctions, player_uid) {
                 return Err(EngineError::PlayerDisqualified);
             }
@@ -663,10 +587,8 @@ fn apply_event(
                 return Err(EngineError::PlayerSuspended);
             }
 
-            // Refresh the guild-nickname snapshot: the bot resends it on every
-            // check-in, and a player already on the roster (the common case —
-            // the walk-in arm above only fires for someone nobody registered)
-            // would otherwise keep whatever name they registered under.
+            // The bot resends display_name on every check-in; refresh it here so a
+            // player already on the roster doesn't keep a stale registered name.
             if let Some(dn) = display_name {
                 if !dn.is_empty() {
                     tournament["players"][idx]["display_name"] = dn.as_str().into();
@@ -688,7 +610,6 @@ fn apply_event(
                 return Ok(());
             }
 
-            // Check for missing decklist when required (uses decks parameter)
             let missing_decklist = tournament["decklist_required"].as_bool().unwrap_or(false) && {
                 let pk = player_uid.as_str();
                 !decks.members().any(|d| d["user_uid"].as_str() == Some(pk))
@@ -740,9 +661,8 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Waiting)?;
 
-            // Open rounds: never re-arm a player who already reached their per-player cap
-            // (they normally rest in Completed, but Registered/Finished-at-cap can arise after
-            // a reopen or a post-cap drop-out). Compute the capped set before the mutable borrow.
+            // Never re-arm a player already at their per-player cap —
+            // Registered/Finished-at-cap can arise after a reopen or a post-cap drop-out.
             let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
             let capped: std::collections::HashSet<String> = if max_rounds > 0 {
                 tournament["players"]
@@ -815,11 +735,8 @@ fn apply_event(
             non_competing,
         } => {
             require_organizer(actor)?;
-            // Proxy (non-competing) status is settled once the event is decided:
-            // block after finals are seeded or the tournament is finished, so a
-            // proxied↔competing flip can't rewrite a concluded result. Standings are
-            // recomputed below, so toggling mid-prelim is safe — and is the use case
-            // (a no-show stood in for by an official partway through).
+            // Blocked after finals are seeded or the tournament is finished, so a
+            // proxied↔competing flip can't rewrite a concluded result; mid-prelim toggling is the use case.
             if !tournament["finals"].is_null() || state == TournamentState::Finished {
                 return Err(EngineError::CannotSetNonCompeting);
             }
@@ -861,18 +778,15 @@ fn apply_event(
                 require_state_or_finished(state, TournamentState::Waiting)?;
             }
 
-            // Cannot start prelim round after finals
             if !tournament["finals"].is_null() {
                 return Err(EngineError::PrelimAfterFinals);
             }
 
-            // Open rounds: max_rounds is a PER-PLAYER cap, not a tournament-wide total.
-            // The tournament may run more rounds than max_rounds (different player subsets each
-            // round); players who reached their cap are simply not seated again.
+            // max_rounds is a per-player cap, not tournament-wide — more rounds may
+            // run for players who haven't hit it yet.
             let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
 
-            // Get available players: Checked-in, plus Playing for online parallel rounds —
-            // excluding any who already reached their per-player round cap.
+            // Playing counts too, for online parallel rounds.
             let checked_in: Vec<String> = tournament["players"]
                 .members()
                 .filter(|p| {
@@ -890,17 +804,12 @@ fn apply_event(
                 return Err(EngineError::NotEnoughPlayers);
             }
 
-            // Previous rounds for seating optimization. Use the shared helper so
-            // Cancelled rounds are skipped — a soft-cancelled round did not really
-            // happen and must not constrain new-round pairings or sit-out selection.
             let previous_rounds = collect_previous_rounds(tournament);
 
-            // Select which players to seat (handles awkward counts like 6, 7, 11)
+            // Handles awkward counts (6, 7, 11) via staggered seating.
             let players_to_seat = seating::select_players_for_round(&checked_in, &previous_rounds);
 
-            // Use submitted seating if provided, otherwise compute
             let new_round: Vec<Vec<String>> = if let Some(submitted) = submitted_seating {
-                // Validate submitted seating against the selected subset
                 let seat_set: std::collections::HashSet<&str> =
                     players_to_seat.iter().map(|s| s.as_str()).collect();
                 let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
@@ -933,7 +842,6 @@ fn apply_event(
                 computed
             };
 
-            // Build tables JSON
             let tables: Vec<JsonValue> = new_round
                 .iter()
                 .map(|table| {
@@ -960,22 +868,13 @@ fn apply_event(
                 tournament["state"] = "Playing".into();
             }
 
-            // Build set of seated player UIDs
             let seated_uids: std::collections::HashSet<String> = new_round
                 .iter()
                 .flat_map(|table| table.iter().cloned())
                 .collect();
 
-            // Mark seated players as Playing. Checked-in players not seated
-            // (stagger sit-outs) stay Checked-in.
-            //
-            // No-shows: only ROUND 1 of a standard tournament withdraws
-            // registered-but-not-checked-in players (they never arrived;
-            // reinstatable via CheckIn / SeatPlayer while they have zero
-            // rounds played). Later rounds leave Registered untouched —
-            // it is a legitimate waiting state there (slow re-check-ins
-            // after ResetCheckIn, open-rounds pools); they just miss the
-            // round and resolve at FinishTournament as before.
+            // Only round 1 of a standard tournament withdraws no-show Registered players
+            // (reinstatable via CheckIn/SeatPlayer); later and open rounds leave them untouched.
             let prior_real_rounds = (0..tournament["rounds"].len().saturating_sub(1))
                 .filter(|&r| {
                     tournament["rounds"][r]
@@ -994,7 +893,6 @@ fn apply_event(
                             if seated_uids.contains(uid) {
                                 players[i]["state"] = "Playing".into();
                             }
-                            // else: sitting out, stay Checked-in
                         }
                     }
                     Some("Registered") if drop_no_shows => players[i]["state"] = "Finished".into(),
@@ -1006,12 +904,8 @@ fn apply_event(
         }
 
         TournamentEvent::SelfOrganizeRound { player_uids } => {
-            // Player-authorized (NOT organizer-gated): a registered player seats one pod
-            // when the organizer enabled self-organized rounds on an open-rounds tournament
-            // (no online or per-player-cap requirement). The integrity gate is REGISTRATION
-            // — you can only seat already-registered players; collusion / phantom-round risk
-            // is an accepted non-VEKN tradeoff, mitigated socially + by the organizer veto
-            // (FinishRound/CancelRound/Override). Players pick WHO; the engine assigns WHERE.
+            // NOT organizer-gated: integrity gate is registration only — collusion risk
+            // accepted, mitigated by organizer veto (FinishRound/CancelRound/Override).
             if !tournament["self_organized_rounds"]
                 .as_bool()
                 .unwrap_or(false)
@@ -1030,7 +924,6 @@ fn apply_event(
             if !tournament["finals"].is_null() {
                 return Err(EngineError::PrelimAfterFinals);
             }
-            // Exactly one legal table, distinct uids, initiator among the seated.
             if player_uids.len() < 4 || player_uids.len() > 5 {
                 return Err(EngineError::InvalidTableSize {
                     size: player_uids.len(),
@@ -1045,9 +938,8 @@ fn apply_event(
             if !player_uids.iter().any(|uid| uid == &actor.uid) {
                 return Err(EngineError::SelfOrganizeNotSeated);
             }
-            // Each selected player must be a registered, available participant:
-            // Registered or Checked-in only — reject Playing (already in a concurrent
-            // pod), Completed/Finished (done / withdrawn), Disqualified, and at-cap.
+            // Reject Playing (already in a concurrent pod), Completed/Finished,
+            // Disqualified, and at-cap players.
             for uid in player_uids {
                 let p = tournament["players"]
                     .members()
@@ -1066,7 +958,6 @@ fn apply_event(
                     return Err(EngineError::PlayerReachedMaxRounds);
                 }
             }
-            // Engine assigns seating for exactly this subset, honoring R1 best-effort.
             let previous_rounds = collect_previous_rounds(tournament);
             let seed = seating::seed_for_round(
                 tournament["uid"].as_str().unwrap_or(""),
@@ -1074,7 +965,7 @@ fn apply_event(
             );
             let (computed, _score) =
                 seating::compute_next_round(player_uids, &previous_rounds, seed)?;
-            // Single table; stamp `organized_by` for the audit trail.
+            // Stamp `organized_by` for the audit trail.
             let tables: Vec<JsonValue> = computed
                 .iter()
                 .map(|table| {
@@ -1129,7 +1020,6 @@ fn apply_event(
 
             let target_round = &rounds[target_round_idx];
 
-            // Check all tables are finished
             let unfinished: Vec<usize> = target_round
                 .members()
                 .enumerate()
@@ -1147,15 +1037,14 @@ fn apply_event(
                 });
             }
 
-            // Move players back — only if not in another active round
             let target_state = if state == TournamentState::Finished {
                 "Finished"
             } else {
                 "Checked-in"
             };
             let still_playing = players_in_other_active_rounds(tournament, target_round_idx);
-            // Open rounds: a player who just reached their per-player cap retires to Completed
-            // (done with prelims, still finals-eligible) instead of being re-armed as Checked-in.
+            // A player who just reached their per-player cap retires to Completed
+            // instead of being re-armed as Checked-in.
             let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
             let maxed: std::collections::HashSet<String> =
                 if max_rounds > 0 && state != TournamentState::Finished {
@@ -1186,7 +1075,6 @@ fn apply_event(
             if state != TournamentState::Finished && all_rounds_finished(tournament) {
                 tournament["state"] = "Waiting".into();
             }
-            // else: stay Playing (other rounds still in progress)
             update_standings(tournament, sanctions);
             Ok(())
         }
@@ -1208,28 +1096,24 @@ fn apply_event(
                 // Last round: hard-remove — no later round's index can shift.
                 tournament["rounds"].array_remove(len - 1);
             } else {
-                // Non-last round (parallel rounds): soft-cancel — mark its tables Cancelled
-                // and keep the slot. A mid-array removal would shift the round indices that
-                // deck.round and standings_adjustment.round_number are tagged by; the cap /
-                // standings / active-round helpers all skip Cancelled tables.
+                // Soft-cancel: mark tables Cancelled, keep the slot — a mid-array removal
+                // would shift deck.round / standings_adjustment.round_number, which are index-tagged.
                 let r = &mut tournament["rounds"][target_idx];
                 for i in 0..r.len() {
                     r[i]["state"] = "Cancelled".into();
                 }
             }
 
-            // Move playing players back — only if not in another active round. For the
-            // hard-removed last round, exclude_round=len-1 no longer exists in the array,
-            // so this checks ALL remaining rounds; for a soft-cancel it skips the now-
-            // Cancelled tables (treated as inactive by players_in_other_active_rounds).
+            // After a hard-remove, exclude_round=len-1 no longer exists, so this checks
+            // ALL remaining rounds; after a soft-cancel it skips the now-Cancelled tables.
             let target_state = if state == TournamentState::Finished {
                 "Finished"
             } else {
                 "Checked-in"
             };
             let still_playing = players_in_other_active_rounds(tournament, target_idx);
-            // Cancelling a round lowers per-player counts; re-arm any Completed (capped) player
-            // now back under their cap so they aren't stranded out of the remaining rounds.
+            // Cancelling a round lowers per-player counts; re-arm any Completed (capped)
+            // player now back under their cap so they aren't stranded.
             let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
             let rearm: std::collections::HashSet<String> =
                 if max_rounds > 0 && state != TournamentState::Finished {
@@ -1273,13 +1157,8 @@ fn apply_event(
 
         TournamentEvent::RestoreRound { round } => {
             require_organizer(actor)?;
-            // Restore un-voids a soft-cancelled round. It is a prelim-phase
-            // correction only: allowed while the tournament is still running
-            // (Playing/Waiting) and before finals are seeded. Once finals exist
-            // the prelim standings are frozen (finalists chosen), so un-voiding a
-            // round would silently invalidate the cut. NOTE the deliberate
-            // asymmetry: CancelRound also accepts Finished, but restore refuses it
-            // — cancel/restore is not a clean undo once the tournament is over.
+            // Prelim-phase correction only: allowed while Playing/Waiting and before
+            // finals are seeded — deliberate asymmetry: CancelRound also accepts Finished, restore refuses it.
             if state != TournamentState::Playing && state != TournamentState::Waiting {
                 return Err(EngineError::WrongState {
                     expected: TournamentState::Playing.as_str().to_string(),
@@ -1311,13 +1190,8 @@ fn apply_event(
                 .filter_map(|s| s["player_uid"].as_str().map(String::from))
                 .collect();
 
-            // All-or-nothing: a round restores exactly as it was saved, or not at
-            // all. If any seated player can no longer be reinstated — disqualified,
-            // dropped (Finished), or (open rounds) already at their round cap from
-            // OTHER rounds — reject the whole restore with a clear reason instead of
-            // silently dropping them. Runs BEFORE any mutation; the cap is measured
-            // with this round still Cancelled (excluded by count_player_rounds_played),
-            // i.e. "would re-adding this round push them over?".
+            // All-or-nothing: reject the whole restore if any seated player can no longer
+            // be reinstated. Runs before any mutation; the cap check sees this round still Cancelled.
             let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
             for uid in &seated {
                 let pstate = tournament["players"]
@@ -1332,10 +1206,8 @@ fn apply_event(
                 }
             }
 
-            // Re-derive each table's state from its retained scores (same path as
-            // Unoverride): an override forces Finished; otherwise check_table_vps
-            // maps complete+valid -> Finished, partial -> In Progress, invalid
-            // oust order -> Invalid. A round with any non-Finished table is "live".
+            // Same derivation path as Unoverride: override forces Finished, otherwise
+            // check_table_vps maps complete+valid -> Finished, partial -> In Progress, else Invalid.
             let mut round_is_live = false;
             {
                 let r = &mut tournament["rounds"][target_idx];
@@ -1360,9 +1232,8 @@ fn apply_event(
                 }
             }
 
-            // Post-restore cap membership (tables now flipped): a seated player at
-            // their cap on a round that re-derived to fully Finished retires to
-            // Completed, mirroring FinishRound.
+            // A seated player at cap on a round that re-derived to fully Finished
+            // retires to Completed, mirroring FinishRound.
             let capped: std::collections::HashSet<String> = if max_rounds > 0 {
                 seated
                     .iter()
@@ -1373,11 +1244,8 @@ fn apply_event(
                 std::collections::HashSet::new()
             };
 
-            // Re-arm seated players. Validation above guarantees every seat is
-            // reinstatable, so the only one left untouched is a player already
-            // Playing in another live round — don't demote them out of their game.
-            // Live round -> Playing; a round that re-derived to fully Finished
-            // mirrors FinishRound's post-state (capped -> Completed, else Checked-in).
+            // Validation above guarantees every seat is reinstatable; the only one left
+            // untouched is a player already Playing in another live round.
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 let uid = match players[i]["user_uid"].as_str() {
@@ -1405,7 +1273,6 @@ fn apply_event(
             } else if all_rounds_finished(tournament) {
                 tournament["state"] = "Waiting".into();
             }
-            // else: another round is still live — stay Playing.
             update_standings(tournament, sanctions);
             Ok(())
         }
@@ -1467,9 +1334,8 @@ fn apply_event(
                 round_tables[*table2]["seating"][*seat2]["player_uid"] = uid1.as_str().into();
             }
 
-            // Seats moved under standing results — recompute (no later FinishRound
-            // refreshes when this fires in Finished state). No-op for the finals
-            // branch: prelim standings read from rounds only.
+            // Recompute: no later FinishRound refreshes this in Finished state. No-op
+            // for the finals branch — prelim standings read from rounds only.
             update_standings(tournament, sanctions);
             Ok(())
         }
@@ -1486,7 +1352,6 @@ fn apply_event(
             let rounds_len = tournament["rounds"].len();
             let is_finals = *round == rounds_len && !tournament["finals"].is_null();
 
-            // Validate no duplicate players in new seating
             {
                 let all_uids: Vec<&String> = seating.iter().flat_map(|t| t.iter()).collect();
                 let unique: std::collections::HashSet<&String> = all_uids.iter().copied().collect();
@@ -1496,7 +1361,6 @@ fn apply_event(
             }
 
             if is_finals {
-                // Replace finals seating player UIDs
                 let finals = &mut tournament["finals"]["seating"];
                 if seating.len() != 1 {
                     return Err(EngineError::FinalsOneTable);
@@ -1505,7 +1369,6 @@ fn apply_event(
                 if new_players.len() != finals.len() {
                     return Err(EngineError::FinalsPlayerCount);
                 }
-                // Verify same set of players
                 let old_set: std::collections::HashSet<String> = (0..finals.len())
                     .map(|i| finals[i]["player_uid"].as_str().unwrap_or("").to_string())
                     .collect();
@@ -1519,16 +1382,13 @@ fn apply_event(
                     finals[i]["player_uid"] = uid.as_str().into();
                 }
             } else {
-                // Round seating
                 if *round >= rounds_len {
                     return Err(EngineError::InvalidRound);
                 }
 
-                // Validation phase (immutable borrows)
-                // The payload is positional: tables 0..table_count match the existing
-                // tables by index (results/overrides are preserved per index), extra
-                // tables are appended. Empty tables are draft workspaces, dropped after
-                // the rebuild; non-empty tables must seat 4 or 5 players.
+                // Positional: tables 0..table_count match existing by index (results
+                // preserved per index); extras appended; empty tables are draft
+                // workspaces, dropped after rebuild.
                 let table_count = tournament["rounds"][*round].len();
                 if seating.len() < table_count {
                     return Err(EngineError::TableCountMismatch);
@@ -1539,7 +1399,6 @@ fn apply_event(
                     }
                 }
 
-                // Build map: player_uid -> (old_table, old_result, judge_uid) from current state
                 let mut old_results: std::collections::HashMap<String, (usize, JsonValue, String)> =
                     std::collections::HashMap::new();
                 for t in 0..table_count {
@@ -1558,17 +1417,14 @@ fn apply_event(
                     }
                 }
 
-                // Validate new seating has exact same player set
                 let new_total: usize = seating.iter().map(|t| t.len()).sum();
                 if new_total != old_results.len() {
                     return Err(EngineError::PlayerCountMismatch);
                 }
 
-                // R1 check: reject predator-prey repeats
                 {
-                    // Reuse collect_previous_rounds (already Cancelled-filtered) and swap in
-                    // the proposed seating for the round being altered. *round < rounds_len
-                    // was validated above, so the index is in range.
+                    // Reject predator-prey repeats: reuse collect_previous_rounds
+                    // (Cancelled-filtered) with the proposed seating swapped in.
                     let mut check_rounds = collect_previous_rounds(tournament);
                     check_rounds[*round] = seating.clone();
                     let issues = seating::compute_player_issues(&check_rounds);
@@ -1577,10 +1433,8 @@ fn apply_event(
                     }
                 }
 
-                // Mutation phase (mutable borrow)
                 let round_data = &mut tournament["rounds"][*round];
 
-                // Rebuild each table's seating
                 for t in 0..seating.len() {
                     if t >= round_data.len() {
                         round_data.push(json::object! {
@@ -1598,7 +1452,6 @@ fn apply_event(
                                 .ok_or_else(|| EngineError::PlayerNotInRound {
                                     player: uid.to_string(),
                                 })?;
-                        // Preserve result and judge_uid if player stays in same table, reset otherwise
                         let (result, judge) = if *old_table == t {
                             (old_result.clone(), old_judge.as_str())
                         } else {
@@ -1612,7 +1465,6 @@ fn apply_event(
                     }
                     round_data[t]["seating"] = JsonValue::Array(new_seating);
 
-                    // Recompute table state: if all VPs are 0, it's "In Progress"
                     let vps: Vec<f64> = (0..round_data[t]["seating"].len())
                         .map(|s| {
                             round_data[t]["seating"][s]["result"]["vp"]
@@ -1625,11 +1477,9 @@ fn apply_event(
                         if all_zero {
                             round_data[t]["state"] = "In Progress".into();
                         }
-                        // If not all zero, keep existing state (scores were preserved for same-table)
                     }
                 }
 
-                // Drop empty tables (draft workspaces, or tables emptied by moves)
                 for t in (0..round_data.len()).rev() {
                     if round_data[t]["seating"].is_empty() {
                         round_data.array_remove(t);
@@ -1652,9 +1502,8 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
-            // Registered or Checked-in: both are present and unseated. Plus a
-            // Finished player with ZERO rounds played — a no-show who walks in
-            // is reinstated by seating them.
+            // Registered/Checked-in are unseated-and-present; a Finished player with
+            // ZERO rounds played is a no-show reinstated by seating them.
             let player_idx = find_player_index(&tournament["players"], player_uid)
                 .ok_or(EngineError::PlayerNotFound)?;
             let player_state = tournament["players"][player_idx]["state"]
@@ -1672,9 +1521,8 @@ fn apply_event(
                 });
             }
 
-            // Verify table exists in the target round (default: last). With
-            // parallel/open rounds an EARLIER round may take a substitute too,
-            // but only while it is live — finished/cancelled rounds stay closed.
+            // An earlier round may take a substitute too, but only while it is
+            // live (see resolve_live_round).
             let rounds = &mut tournament["rounds"];
             if rounds.is_empty() {
                 return Err(EngineError::NoRoundInProgress);
@@ -1684,7 +1532,6 @@ fn apply_event(
                 return Err(EngineError::InvalidTable);
             }
 
-            // Verify table is not already full (max 5 players)
             let seating = &mut rounds[last][*table]["seating"];
             let seating_len = seating.len();
             if seating_len >= 5 {
@@ -1702,7 +1549,6 @@ fn apply_event(
                 judge_uid: "",
             };
 
-            // Insert by rebuilding array
             let mut new_seating = Vec::new();
             for i in 0..seating_len {
                 if i == insert_pos {
@@ -1737,7 +1583,6 @@ fn apply_event(
             }
             let last = resolve_live_round(rounds, *round)?;
 
-            // Find and remove player from seating
             let mut found = false;
             for t in 0..rounds[last].len() {
                 let seating = &rounds[last][t]["seating"];
@@ -1818,17 +1663,13 @@ fn apply_event(
             table,
             scores,
         } => {
-            // Players score only mid-round; organizers may correct any round between
-            // rounds (Waiting) or after the tournament has finished.
             require_can_edit_results(actor, state)?;
 
-            // If round == rounds.len() and finals exists, target finals table
             let rounds_len = tournament["rounds"].len();
             let is_finals = *round == rounds_len && !tournament["finals"].is_null() && *table == 0;
 
-            // Resolve SA effective rounds from the whole tournament BEFORE taking the
-            // mutable borrow of `t` below (scores don't move seats, so resolving here
-            // is equivalent and avoids a borrow conflict).
+            // Resolved before the mutable borrow of `t` below: scores don't move
+            // seats, so this ordering is equivalent and avoids a borrow conflict.
             let effective_sas = sanctions::resolve_sa_effective_rounds(tournament, sanctions);
 
             let t = if is_finals {
@@ -1844,7 +1685,6 @@ fn apply_event(
                 &mut tournament["rounds"][*round][*table]
             };
 
-            // Check permission: organizer or player at this table
             let is_at_table = t["seating"]
                 .members()
                 .any(|s| s["player_uid"].as_str() == Some(&actor.uid));
@@ -1853,12 +1693,10 @@ fn apply_event(
                 return Err(EngineError::ScoreForbidden);
             }
 
-            // If table has override and actor is not organizer, deny
             if !t["override"].is_null() && !actor.is_organizer {
                 return Err(EngineError::ScoreLocked);
             }
 
-            // If any seat was scored by an organizer, non-organizers cannot change scores
             if !actor.is_organizer {
                 let has_judge_score = t["seating"]
                     .members()
@@ -1870,7 +1708,6 @@ fn apply_event(
 
             let table_size = t["seating"].len();
 
-            // Basic VP validation per seat
             for score in scores.iter() {
                 let vp = score.vp;
                 // Must be in [0, table_size] in 0.5 steps
@@ -1888,13 +1725,12 @@ fn apply_event(
                 }
             }
 
-            // Build a map from player_uid -> vp from the scores
             let vp_map: std::collections::HashMap<&str, f64> = scores
                 .iter()
                 .map(|s| (s.player_uid.as_str(), s.vp))
                 .collect();
 
-            // Gather VPs in seating order (predator-prey order)
+            // Gathered in seating order (predator-prey order), for oust-order validation.
             let mut vps: Vec<f64> = Vec::with_capacity(table_size);
             for i in 0..table_size {
                 let player_uid = t["seating"][i]["player_uid"].as_str().unwrap_or("");
@@ -1924,7 +1760,6 @@ fn apply_event(
             };
             let tps = compute_tp(table_size, &vps, &adjustments);
 
-            // Apply scores
             for i in 0..table_size {
                 let player_uid = t["seating"][i]["player_uid"]
                     .as_str()
@@ -1942,8 +1777,6 @@ fn apply_event(
                 }
             }
 
-            // Determine table state using oust-order validation
-            // Only recompute state if override is not set (override forces Finished)
             if t["override"].is_null() {
                 let vp_err = check_table_vps(&vps);
                 match vp_err {
@@ -1951,15 +1784,12 @@ fn apply_event(
                         t["state"] = "In Progress".into();
                     }
                     Some(VpError::RedirectedVp) => {
-                        // These numbers used to read as a half-filled table and
-                        // were accepted, so keep accepting them — but say what
-                        // they are, since only a judge can close this table.
+                        // Previously read as a half-filled table and accepted; keep
+                        // accepting, but flag what it is — only a judge can close it.
                         t["state"] = "Invalid".into();
                     }
                     Some(_) => {
-                        // Invalid oust order or other error
                         if !actor.is_organizer {
-                            // Non-organizer: reject impossible oust sequences
                             return Err(EngineError::InvalidScore);
                         }
                         t["state"] = "Invalid".into();
@@ -1970,10 +1800,8 @@ fn apply_event(
                 }
             }
 
-            // Keep stored standings in sync with the edited result. Required for
-            // out-of-round corrections (Waiting/Finished) and edits to an already-
-            // finished round while another is still Playing — FinishRound won't run
-            // again to refresh them, and ratings/VEKN-push/exports read them.
+            // Required for out-of-round corrections and edits to an already-finished round
+            // while another is still Playing — ratings/VEKN-push/exports read the stored standings.
             update_standings(tournament, sanctions);
 
             Ok(())
@@ -2006,7 +1834,6 @@ fn apply_event(
                 judge_uid: actor.uid.as_str(),
                 comment: comment.as_str(),
             };
-            // Override forces table to Finished
             t["state"] = "Finished".into();
 
             Ok(())
@@ -2033,7 +1860,6 @@ fn apply_event(
             };
             t["override"] = json::Null;
 
-            // Recompute table state from current VPs
             let table_size = t["seating"].len();
             let vps: Vec<f64> = (0..table_size)
                 .map(|i| t["seating"][i]["result"]["vp"].as_f64().unwrap_or(0.0))
@@ -2075,10 +1901,7 @@ fn apply_event(
 
             let standings = compute_preliminary_standings(tournament, sanctions);
 
-            // Find tied groups in top-5 cutoff zone that need toss
-            // Group players by (gw, vp, tp) where toss == 0
             let cutoff = standings.len().min(5);
-            // Include players beyond #5 that tie with #5
             let mut zone_end = cutoff;
             if cutoff > 0 && standings.len() > cutoff {
                 let fifth = &standings[cutoff - 1];
@@ -2092,10 +1915,8 @@ fn apply_event(
                 }
             }
 
-            // Find groups of tied players with toss == 0
             let mut i = 0;
             let mut toss_counter: u32 = 1;
-            // Simple deterministic shuffle using tournament uid as seed
             let seed: u64 = tournament["uid"]
                 .as_str()
                 .unwrap_or("")
@@ -2113,7 +1934,6 @@ fn apply_event(
                 }
                 // i..j is a group of players with same scores
                 if j - i > 1 {
-                    // Collect those with toss == 0
                     let mut needs_toss: Vec<usize> =
                         (i..j).filter(|&k| standings[k].toss == 0).collect();
                     if needs_toss.len() > 1 {
@@ -2126,7 +1946,6 @@ fn apply_event(
                             let swap_idx = (rng >> 33) as usize % (k + 1);
                             needs_toss.swap(k, swap_idx);
                         }
-                        // Assign sequential toss values
                         for &idx in &needs_toss {
                             let uid = &standings[idx].user_uid;
                             if let Some(pi) = find_player_index(&tournament["players"], uid) {
@@ -2154,9 +1973,8 @@ fn apply_event(
 
             let standings = compute_preliminary_standings(tournament, sanctions);
 
-            // Finals consideration excludes the disqualified and the withdrawn/dropped (Finished).
-            // Players who reached their per-player cap rest in Completed and stay eligible; a
-            // withdrawn finalist is dropped here so the next-ranked qualifier is promoted.
+            // Completed (capped) players stay eligible; Finished (withdrawn) are
+            // dropped so the next-ranked qualifier is promoted.
             let eligible: Vec<&standings::Standing> = standings
                 .iter()
                 .filter(|s| {
@@ -2164,10 +1982,8 @@ fn apply_event(
                         .members()
                         .find(|p| p["user_uid"].as_str() == Some(&s.user_uid));
                     let ps = player.and_then(|p| p["state"].as_str()).unwrap_or("");
-                    // `disqualified` carries the dual DQ signal (state OR active DQ
-                    // sanction) the standings already resolved — use it so finals
-                    // eligibility can't diverge from who got zeroed. Proxies
-                    // (non_competing) are non-competitors: never finals-eligible.
+                    // `disqualified` carries the dual DQ signal (state OR active sanction);
+                    // reuse it so eligibility can't diverge. Proxies are never finals-eligible.
                     !s.disqualified && !s.non_competing && ps != "Finished"
                 })
                 .collect();
@@ -2179,7 +1995,6 @@ fn apply_event(
                 return Err(EngineError::FinalsUnresolvedTies);
             }
 
-            // Top 5 eligible players form the finals table
             let top5: Vec<&standings::Standing> = eligible.into_iter().take(5).collect();
             let seed_order: Vec<JsonValue> =
                 top5.iter().map(|s| s.user_uid.as_str().into()).collect();
@@ -2201,7 +2016,6 @@ fn apply_event(
                 seed_order: JsonValue::Array(seed_order),
             };
 
-            // Mark top 5 players as Playing and finalist
             for s in &top5 {
                 if let Some(idx) = find_player_index(&tournament["players"], &s.user_uid) {
                     tournament["players"][idx]["state"] = "Playing".into();
@@ -2227,15 +2041,8 @@ fn apply_event(
                 return Err(EngineError::FinalsTableUnfinished);
             }
 
-            // Winner = the highest SA-adjusted finals VP, tiebroken by seed order.
-            // VEKN finals have no prelim-style 2VP threshold and always yield exactly
-            // one winner (even an all-timeout 0.5 table, or an unscored override table
-            // — then the top seed). compute_gw_finals is the single source of that
-            // rule — the same call SetScore uses to award the finals GW and
-            // update_standings uses to refresh a Finished finals after a sanction
-            // change — so the winner can never diverge from the scored GW, and a
-            // finals-round SA counts. With no finals SA it is the highest raw-VP
-            // seat, unchanged.
+            // compute_gw_finals is the single source of finals-winner derivation — the same
+            // call SetScore and update_standings use, so the winner can never diverge from the scored GW.
             let effective_sas = sanctions::resolve_sa_effective_rounds(tournament, sanctions);
             let finals_round = tournament["rounds"].len();
             let seating = &tournament["finals"]["seating"];
@@ -2264,7 +2071,6 @@ fn apply_event(
                 tournament["state"] = "Finished".into();
             }
 
-            // Mark all players as finished (except DQ'd)
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 if players[i]["state"].as_str() != Some("Disqualified") {
@@ -2272,24 +2078,21 @@ fn apply_event(
                 }
             }
 
-            // Recompute standings so finalist flags are up-to-date
             update_standings(tournament, sanctions);
 
             Ok(())
         }
 
         TournamentEvent::CancelFinals => {
-            // Revert a seated (not-yet-finalized) finals back to Waiting so the organizer can
-            // drop a no-show finalist and re-run StartFinals (which then promotes the next
-            // qualifier). Only valid while finals are in progress, not after FinishFinals.
+            // Revert a not-yet-finalized finals to Waiting so the organizer can drop a
+            // no-show and re-run StartFinals, which promotes the next qualifier.
             require_organizer(actor)?;
             require_state(state, TournamentState::Playing)?;
             if tournament["finals"].is_null() {
                 return Err(EngineError::NoFinalsInProgress);
             }
 
-            // Capped (open-rounds) finalists return to Completed; the rest to Checked-in. Compute
-            // the capped set before the mutable borrow.
+            // Capped (open-rounds) finalists return to Completed; the rest to Checked-in.
             let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
             let capped: std::collections::HashSet<String> = if max_rounds > 0 {
                 tournament["players"]
@@ -2332,7 +2135,6 @@ fn apply_event(
 
             tournament["state"] = "Finished".into();
 
-            // Mark all players as finished (except DQ'd)
             let players = &mut tournament["players"];
             for i in 0..players.len() {
                 if players[i]["state"].as_str() != Some("Disqualified") {
@@ -2342,7 +2144,6 @@ fn apply_event(
 
             update_standings(tournament, sanctions);
 
-            // Emit deck_ops to flip public on qualifying decks
             for d in decks.members() {
                 let user_uid = d["user_uid"].as_str().unwrap_or("");
                 if user_uid.is_empty() {
@@ -2366,18 +2167,15 @@ fn apply_event(
             deck,
             multideck,
         } => {
-            // Auth: organizer or self
             if !actor.is_organizer && actor.uid != *player_uid {
                 return Err(EngineError::DeckUploadForbidden);
             }
-            // Verify player is registered
             let is_registered = tournament["players"]
                 .members()
                 .any(|p| p["user_uid"].as_str() == Some(player_uid.as_str()));
             if !is_registered {
                 return Err(EngineError::NotRegistered);
             }
-            // Lifecycle: non-organizers restricted by tournament state
             if !actor.is_organizer {
                 let existing_count = decks
                     .members()
@@ -2386,8 +2184,6 @@ fn apply_event(
                 match state {
                     TournamentState::Playing => {
                         if *multideck {
-                            // Multideck: new deck goes at index == existing_count
-                            // Block if that round has already been played
                             if is_deck_locked(tournament, player_uid, existing_count) {
                                 return Err(EngineError::DeckLockedRound);
                             }
@@ -2401,12 +2197,9 @@ fn apply_event(
                     _ => {} // Planned, Registration, Waiting: always allowed
                 }
             }
-            // Compute public flag
             let is_public = compute_deck_public(tournament, player_uid);
-            // Build deck data with public flag
             let mut deck_data = deck.clone();
             deck_data["public"] = is_public.into();
-            // Emit deck_ops upsert (tournament unchanged for deck events)
             let op = json::object! {
                 "op" => "upsert",
                 "player_uid" => player_uid.as_str(),
@@ -2422,11 +2215,9 @@ fn apply_event(
             deck_index,
             multideck,
         } => {
-            // Auth: organizer or self
             if !actor.is_organizer && actor.uid != *player_uid {
                 return Err(EngineError::DeckDeleteForbidden);
             }
-            // Lifecycle: non-organizers restricted
             if !actor.is_organizer {
                 match state {
                     TournamentState::Playing => {
@@ -2450,7 +2241,6 @@ fn apply_event(
                     _ => {} // Planned, Registration, Waiting: always allowed
                 }
             }
-            // Emit deck_ops delete
             let op = json::object! {
                 "op" => "delete",
                 "player_uid" => player_uid.as_str(),
@@ -2483,7 +2273,7 @@ fn apply_event(
             if eligible.is_empty() {
                 return Err(EngineError::RaffleNoPlayers);
             }
-            // Fisher-Yates shuffle with caller-provided seed (same LCG as RandomToss)
+            // Fisher-Yates, same LCG as RandomToss.
             let mut rng = *seed;
             for k in (1..eligible.len()).rev() {
                 rng = rng
@@ -2546,13 +2336,10 @@ fn apply_event(
         TournamentEvent::UpdateConfig { config } => {
             require_organizer(actor)?;
 
-            // Validate shared config fields
             validate_config_fields(config)?;
 
-            // Identity freeze after VEKN publication: the calendar event is
-            // create-once and the results push write-once, so a post-push
-            // rank/format/start edit silently diverges from vekn.net with no
-            // API path to fix it. Venue/description/timers stay editable.
+            // rank/format/start freeze once VEKN-published: calendar create and results
+            // push are both write-once, so a later edit would silently diverge from vekn.net.
             let vekn_id = tournament["external_ids"]["vekn"].as_str().unwrap_or("");
             if !vekn_id.is_empty() {
                 for field in ["rank", "format", "start"] {
@@ -2568,11 +2355,8 @@ fn apply_event(
                 }
             }
 
-            // VEKN legality on the merged view: any side of the illegal combo
-            // (rank vs format/proxies/multideck) may be the incoming edit.
-            // Only when the edit touches one of the four keys — an already-
-            // illegal stored combo (legacy import) must not block unrelated
-            // edits like venue/description.
+            // Only when the edit touches one of the four keys, on the merged view — an
+            // already-illegal stored combo (legacy import) must not block unrelated edits.
             if config.has_key("rank")
                 || config.has_key("format")
                 || config.has_key("proxies")
@@ -2600,11 +2384,8 @@ fn apply_event(
                 )?;
             }
 
-            // Date ordering on the merged view: a partial update can carry
-            // `finish` while `start` still lives on the stored tournament, so a
-            // config-only check would see half the pair. Gated on the edit
-            // touching one of the two, like the rank-legality check above, so a
-            // legacy inverted row doesn't block unrelated venue/description edits.
+            // Date ordering on the merged view: a partial update can carry `finish` while
+            // `start` still lives on the stored tournament, so a config-only check would see half the pair.
             if config.has_key("start") || config.has_key("finish") {
                 let merged_date = |field: &str| -> String {
                     let src = if config.has_key(field) {
@@ -2644,7 +2425,6 @@ fn apply_event(
                 }
             }
 
-            // Check if decklists_mode is changing on a Finished tournament
             let decklists_mode_changing =
                 config.has_key("decklists_mode") && state == TournamentState::Finished;
 
@@ -2683,7 +2463,6 @@ fn apply_event(
                 }
             }
 
-            // Recompute deck public flags if decklists_mode changed on Finished tournament
             if decklists_mode_changing {
                 for d in decks.members() {
                     let user_uid = d["user_uid"].as_str().unwrap_or("");

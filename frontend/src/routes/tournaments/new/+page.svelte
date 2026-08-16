@@ -54,9 +54,9 @@
     ...(!values.online && !values.country ? [m.common_country()] : []),
   ]);
 
-  // Detect-and-adapt: when the device is offline, creation routes to the local
-  // WASM engine and the tournament is born locked to this device (pushed at
-  // go-online). No offline-while-online option — actual connectivity decides.
+  // Offline creation routes to the local WASM engine and the tournament is born
+  // locked to this device (pushed at go-online); actual connectivity decides,
+  // no manual offline toggle.
   let offline = $state(!isOnline());
   $effect(() => {
     const on = () => (offline = false);
@@ -167,7 +167,6 @@
           <TournamentFields bind:values disabled={isSubmitting} mode="create" />
         </div>
 
-        <!-- Actions -->
         <div class="flex flex-col items-end gap-1.5">
           {#if missingFields.length > 0}
             <p class="text-xs text-ink-faint">{m.tournament_new_missing_fields({ fields: missingFields.join(", ") })}</p>

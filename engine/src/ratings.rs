@@ -1,16 +1,5 @@
 /// Rating points computation shared between frontend (WASM) and backend (PyO3).
-///
-/// Formula per tournament: 5 + 4*VP + 8*GW + round(finalist_bonus * coef)
-/// - Finalist bonus: Winner=90, Runner-up=30
-/// - coef = log15(player_count²) - 1, with +0.25 for NC, +1.0 for CC
-/// - player_count = players with ≥1 round played
-///
-/// Compute per-tournament rating points.
-/// - `vp`: victory points (float, e.g. 3.5)
-/// - `gw`: game wins
-/// - `finalist_position`: 0=none, 1=winner, 2=runner-up
-/// - `player_count`: players with ≥1 round played
-/// - `rank`: "" (basic), "National Championship", "Continental Championship"
+/// `finalist_position`: 0=none, 1=winner, 2=runner-up; `rank` is "", "National Championship" or "Continental Championship".
 pub fn compute_rating_points(
     vp: f64,
     gw: i32,
@@ -42,11 +31,8 @@ pub fn compute_rating_points(
     base as i32 + (finalist_bonus * coef).round() as i32
 }
 
-/// Ranking-eligibility gate (VEKN rules 3.1/3.1.6): an event counts toward the
-/// international ranking only with >= 8 players who played AND a played final;
-/// open-rounds / self-organized events are the non-VEKN house format, never
-/// rated. Single source for backend ratings.py (inclusion filter) and the
-/// frontend ranked/unranked badge (display) — don't re-derive it there.
+/// Ranking-eligibility gate (VEKN 3.1/3.1.6): >= 8 played players AND a played final,
+/// never for open-rounds/self-organized. Single source — ratings.py and the frontend badge read this, don't re-derive.
 ///
 /// Returns "eligible" or the blocking reason, first match wins:
 /// "open_rounds" | "few_players" | "no_final".
@@ -67,9 +53,8 @@ pub fn ranking_eligibility(t: &json::JsonValue) -> &'static str {
     "eligible"
 }
 
-/// Players with >= 1 round played: distinct seats across rounds + finals when
-/// per-round detail exists; else (rounds-less VEKN import) standings rows
-/// carrying any score. Inclusive of DQ'd players (tournament-rules A.2).
+/// Players with >= 1 round played: distinct seats across rounds + finals, or
+/// (rounds-less VEKN import) standings rows carrying any score. DQ'd players count (A.2).
 fn players_with_rounds(t: &json::JsonValue) -> usize {
     let mut played = std::collections::HashSet::new();
     if !t["rounds"].is_empty() {
@@ -101,7 +86,6 @@ fn players_with_rounds(t: &json::JsonValue) -> usize {
         .count()
 }
 
-/// Map tournament format + online flag to a rating category string.
 /// Returns one of: "constructed_online", "constructed_offline", "limited_online", "limited_offline"
 pub fn rating_category(format: &str, online: bool) -> &'static str {
     let constructed = match format {
@@ -128,21 +112,14 @@ mod tests {
 
     #[test]
     fn test_winner_basic_tournament() {
-        // base = 5 + 4*6.0 + 8*3 = 5 + 24 + 24 = 53
-        // coef = log15(20²) - 1 = ln(400)/ln(15) - 1 ≈ 2.212 - 1 = 1.212
-        // finalist = round(90 * 1.212) = round(109.1) = 109
-        // total = 53 + 109 = 162
+        // base=5+4*6.0+8*3=53; coef=log15(20²)-1≈1.212; finalist=round(90*1.212)=109; total=162.
         let pts = compute_rating_points(6.0, 3, 1, 20, "");
         assert_eq!(pts, 162);
     }
 
     #[test]
     fn test_runner_up_nc() {
-        // base = 5 + 4*4.0 + 8*2 = 5 + 16 + 16 = 37
-        // coef = log15(30²) - 1 + 0.25 = ln(900)/ln(15) - 1 + 0.25
-        //      ≈ 6.802/2.708 - 1 + 0.25 ≈ 2.512 - 1 + 0.25 = 1.762
-        // finalist = round(30 * 1.762) = round(52.86) = 53
-        // total = 37 + 53 = 90
+        // base=5+4*4.0+8*2=37; coef=log15(30²)-1+0.25≈1.762; finalist=round(30*1.762)=53; total=90.
         let pts = compute_rating_points(4.0, 2, 2, 30, "National Championship");
         assert_eq!(pts, 90);
     }
@@ -181,8 +158,7 @@ mod tests {
         };
         assert_eq!(ranking_eligibility(&small), "few_players");
 
-        // Native no-final finish: no finals object, empty winner — the 8
-        // prelim players still count, the missing final is what blocks.
+        // Native no-final finish: the 8 prelim players still count, the missing final blocks.
         let mut no_final = eligible.clone();
         no_final["finals"] = json::JsonValue::Null;
         no_final["winner"] = "".into();

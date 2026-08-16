@@ -1,7 +1,3 @@
-/**
- * API client for backend communication.
- */
-
 import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, League, Promo, PromoKind, PromoLedgerEntry, PromoLedgerKind, TournamentRank } from '$lib/types';
 import { saveTournament, saveLeague } from './db';
 import { showToast } from '$lib/stores/toast.svelte';
@@ -11,11 +7,8 @@ import * as m from './paraglide/messages.js';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
-/**
- * API error class with message extraction.
- * `code`/`params` carry the engine's structured rejection when the 400 body
- * has them — `toUserMessage` maps the code to a localized message.
- */
+/** `code`/`params` carry the engine's structured rejection when the 400 body has them —
+ * `toUserMessage` maps the code to a localized message. */
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -29,22 +22,15 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * Make an authenticated API request.
- */
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
-  // apiRequest is the single toast authority for its own failures: it auto-toasts
-  // offline, transport (network), AND HTTP error responses. Callers that surface
-  // the error themselves (inline message or their own catch toast) pass this to
-  // avoid a duplicate toast.
+  // apiRequest is the single toast authority for its own failures: it auto-toasts offline, transport,
+  // and HTTP errors. Callers that surface the error themselves pass this to avoid a duplicate toast.
   { suppressErrorToast = false }: { suppressErrorToast?: boolean } = {}
 ): Promise<T> {
-  // Offline guard: every apiRequest is a mutation (reads are offline-first from
-  // IndexedDB), so there's no point attempting the fetch. Toast + throw an
-  // ApiError (status 0 = never left the device) so empty-catch callers aren't
-  // silent and inline callers can still distinguish it.
+  // Offline guard: every apiRequest is a mutation (reads are offline-first from IndexedDB), so there's
+  // no point attempting the fetch. Toast + throw (status 0 = never left the device) so callers can distinguish it.
   if (!isOnline()) {
     const message = m.error_action_requires_online();
     if (!suppressErrorToast) showToast({ type: 'error', message });
@@ -61,17 +47,15 @@ export async function apiRequest<T>(
 
   let response: Response;
   try {
-    // authorizedFetch attaches the bearer and retries once on 401 after a
-    // single-flighted refresh — the backstop for laptop-wake/suspended-tab
-    // mutations whose proactive refresh timer died with the tab.
+    // authorizedFetch attaches the bearer and retries once on 401 after a single-flighted refresh —
+    // the backstop for laptop-wake/suspended-tab mutations whose proactive refresh timer died with the tab.
     response = await authorizedFetch(`${API_URL}${path}`, {
       ...options,
       headers,
     });
   } catch (e) {
-    // fetch() rejects with a TypeError on a transport failure (dropped mid-flight,
-    // DNS, CORS, server down). This never reached the !response.ok block below, so
-    // it used to escape untoasted and get swallowed by empty catches — toast it.
+    // fetch() rejects with a TypeError on a transport failure (dropped mid-flight, DNS, CORS, server
+    // down). This never reaches the !response.ok block below, so it used to escape untoasted — toast it.
     if (!suppressErrorToast) showToast({ type: 'error', message: m.error_network_unreachable() });
     throw e instanceof Error ? e : new Error(m.error_network_unreachable());
   }
@@ -89,9 +73,7 @@ export async function apiRequest<T>(
         params = data.params ?? {};
       }
     } catch {
-      // Ignore JSON parse errors
     }
-    // Prefer the code-mapped localized message over the server's English detail
     const localized = code ? errorCodeToMessage(code, params) : undefined;
     const message = localized || detail || `Request failed: ${response.statusText}`;
     if (!suppressErrorToast) showToast({ type: 'error', message });
@@ -104,19 +86,12 @@ export async function apiRequest<T>(
   return response.json();
 }
 
-/**
- * Check if the app is online.
- */
 export function isOnline(): boolean {
   return navigator.onLine;
 }
 
-/**
- * Guard an online-only action: toasts + throws a localized error when offline.
- * Toasts so the many empty-catch callers (sanctions, VEKN, avatar — which relied
- * on apiRequest's toast but threw here, before it) aren't silent offline. Callers
- * that render the error themselves pass `suppressErrorToast`.
- */
+/** Toasts + throws when offline. Toasts so the many empty-catch callers (sanctions, VEKN, avatar)
+ * aren't silent offline. Callers that render the error themselves pass `suppressErrorToast`. */
 export function requireOnline({ suppressErrorToast = false }: { suppressErrorToast?: boolean } = {}): void {
   if (isOnline()) return;
   const message = m.error_action_requires_online();
@@ -124,17 +99,14 @@ export function requireOnline({ suppressErrorToast = false }: { suppressErrorToa
   throw new ApiError(message, 0);
 }
 
-// --- Web Push (#314) ---------------------------------------------------------
-
 /** Per-env VAPID public key (applicationServerKey) the browser subscribes with. */
 export async function getVapidPublicKey(): Promise<string> {
   const { key } = await apiRequest<{ key: string }>('/api/push/vapid-key', {}, { suppressErrorToast: true });
   return key;
 }
 
-/** Register (upsert) the browser's push subscription for the current user. The
- *  locale is stored per-subscription so notification bodies render in this device's
- *  language (a user may have a FR phone and an EN laptop). */
+/** Registers (upserts) the browser's push subscription. Locale is stored per-subscription so
+ * notification bodies render in this device's language (a user may have a FR phone and an EN laptop). */
 export async function registerPushSubscription(
   sub: PushSubscriptionJSON,
   locale: string
@@ -146,7 +118,6 @@ export async function registerPushSubscription(
   );
 }
 
-/** Drop the browser's push subscription server-side (toggle off). */
 export async function deletePushSubscription(endpoint: string): Promise<void> {
   await apiRequest<void>(
     '/api/push/unsubscribe',
@@ -154,8 +125,6 @@ export async function deletePushSubscription(endpoint: string): Promise<void> {
     { suppressErrorToast: true }
   );
 }
-
-// --- In-app feedback (#332) --------------------------------------------------
 
 export interface FeedbackSubmission {
   category: 'bug' | 'feature' | 'question';
@@ -188,7 +157,6 @@ export async function createUser(
   email?: string | null,
   roles?: string[],
   city_geoname_id?: number | null,
-  // Pass { suppressErrorToast: true } from callers that render the error inline.
   opts?: { suppressErrorToast?: boolean },
 ): Promise<User> {
   const body: Record<string, unknown> = { name, country };
@@ -209,7 +177,6 @@ export async function updateUser(
   nickname?: string | null,
   roles?: string[],
   city_geoname_id?: number | null,
-  // Pass { suppressErrorToast: true } from callers that render the error inline.
   opts?: { suppressErrorToast?: boolean },
 ): Promise<User> {
   // Omit a field to leave it unchanged; '' clears a string, [] clears roles.
@@ -236,8 +203,6 @@ export async function setMemberDeceased(uid: string, deceased: boolean): Promise
 export async function deleteMember(uid: string): Promise<User> {
   return apiRequest<User>(`/api/users/${uid}`, { method: 'DELETE' });
 }
-
-// VEKN ID Management API
 
 export interface VeknClaimResponse {
   user: User;
@@ -271,9 +236,6 @@ export interface VeknAbandonResponse {
   expires_in: number;
 }
 
-/**
- * Claim an unclaimed VEKN ID for the current user.
- */
 export async function claimVeknId(vekn_id: string): Promise<VeknClaimResponse> {
   return apiRequest<VeknClaimResponse>('/vekn/claim', {
     method: 'POST',
@@ -281,18 +243,13 @@ export async function claimVeknId(vekn_id: string): Promise<VeknClaimResponse> {
   });
 }
 
-/**
- * Abandon the current user's VEKN ID.
- */
 export async function abandonVeknId(): Promise<VeknAbandonResponse> {
   return apiRequest<VeknAbandonResponse>('/vekn/abandon', {
     method: 'POST',
   });
 }
 
-/**
- * Sponsor a new VEKN member (allocates new sequential VEKN ID).
- */
+/** Allocates a new sequential VEKN ID. */
 export async function sponsorVeknMember(user_uid: string): Promise<VeknSponsorResponse> {
   return apiRequest<VeknSponsorResponse>('/vekn/sponsor', {
     method: 'POST',
@@ -300,9 +257,7 @@ export async function sponsorVeknMember(user_uid: string): Promise<VeknSponsorRe
   });
 }
 
-/**
- * Link a VEKN ID to a user (may displace current holder).
- */
+/** May displace the current holder of that VEKN ID. */
 export async function linkVeknId(vekn_id: string, user_uid: string): Promise<VeknLinkResponse> {
   return apiRequest<VeknLinkResponse>('/vekn/link', {
     method: 'POST',
@@ -310,9 +265,7 @@ export async function linkVeknId(vekn_id: string, user_uid: string): Promise<Vek
   });
 }
 
-/**
- * Force-abandon a user's VEKN ID (gated by the `manage_vekn` capability).
- */
+/** Gated by the `manage_vekn` capability. */
 export async function forceAbandonVeknId(user_uid: string): Promise<VeknMessageResponse> {
   return apiRequest<VeknMessageResponse>('/vekn/force-abandon', {
     method: 'POST',
@@ -320,9 +273,7 @@ export async function forceAbandonVeknId(user_uid: string): Promise<VeknMessageR
   });
 }
 
-/**
- * Merge two user accounts (IC only — the merge unions both accounts' roles).
- */
+/** IC only. Unions both accounts' roles rather than picking one side. */
 export async function mergeUsers(keep_uid: string, delete_uid: string): Promise<{ user: User; message: string }> {
   return apiRequest<{ user: User; message: string }>('/admin/users/merge', {
     method: 'POST',
@@ -330,7 +281,6 @@ export async function mergeUsers(keep_uid: string, delete_uid: string): Promise<
   });
 }
 
-/** Result of an IC manual-sync trigger: a status plus a free-form stats map. */
 export interface AdminSyncResult {
   /** "started" / "already_running" for background-dispatched syncs. */
   status: string;
@@ -365,32 +315,23 @@ export interface VeknStatusResponse {
   jobs: Record<string, VeknJobStatus>;
 }
 
-/**
- * IC-only: last success/error of the scheduled VEKN jobs (member/tournament
- * sync, hourly push). In-process server state, not a synced object type — a
- * justified GET (like the sync triggers above, it can't come from IndexedDB).
- */
+/** In-process server state, not a synced object type — a justified GET (like the sync triggers
+ * above, it can't come from IndexedDB). */
 export async function getVeknStatus(): Promise<VeknStatusResponse> {
   return apiRequest<VeknStatusResponse>('/admin/vekn-status', { method: 'GET' }, { suppressErrorToast: true });
 }
 
-/**
- * Data export: download the sync snapshot for the caller's access level as a
- * zip-wrapped JSONL attachment. A browser download can't carry an Authorization
- * header, so the token rides the query string — same as the SSE/snapshot fetch.
- */
+/** A browser download can't carry an Authorization header, so the token rides the query string —
+ * same as the SSE/snapshot fetch. */
 export async function downloadDataExport(): Promise<void> {
-  // Thrown, not toasted: the caller is the confirm modal, which renders the
-  // failure in place (with a retry) instead of dismissing itself over a toast.
-  // Offline the navigation would land on the browser's error page, replacing the SPA.
+  // Thrown, not toasted: the caller (confirm modal) renders the failure in place with a retry. Offline,
+  // the navigation would otherwise land on the browser's error page, replacing the SPA.
   if (!isOnline()) throw new Error(m.error_action_requires_online());
   const t = await ensureSyncToken();
   if (t.kind !== 'token') throw new Error(m.auth_error_session_expired());
   // Content-Disposition makes this a download, not a navigation — the SPA stays put.
   window.location.href = `${API_URL}/snapshot?download=1&token=${encodeURIComponent(t.token)}`;
 }
-
-// Sanctions API
 
 export interface CreateSanctionData {
   user_uid: string;
@@ -403,9 +344,7 @@ export interface CreateSanctionData {
   tournament_uid?: string | null;
 }
 
-/**
- * Create a new sanction (IC/Ethics only for SUSPENSION/PROBATION).
- */
+/** IC/Ethics only for SUSPENSION/PROBATION. */
 export async function createSanction(data: CreateSanctionData): Promise<Sanction> {
   return apiRequest<Sanction>('/sanctions/', {
     method: 'POST',
@@ -423,9 +362,6 @@ export interface UpdateSanctionData {
   lifted?: boolean;
 }
 
-/**
- * Update a sanction (level, category, description, expiry, or lift it).
- */
 export async function updateSanction(uid: string, data: UpdateSanctionData): Promise<Sanction> {
   return apiRequest<Sanction>(`/sanctions/${uid}`, {
     method: 'PUT',
@@ -433,22 +369,13 @@ export async function updateSanction(uid: string, data: UpdateSanctionData): Pro
   });
 }
 
-/**
- * Soft delete a sanction.
- */
 export async function deleteSanctionApi(uid: string): Promise<{ message: string }> {
   return apiRequest<{ message: string }>(`/sanctions/${uid}`, {
     method: 'DELETE',
   });
 }
 
-// Avatar API
-
-/**
- * Upload user avatar.
- * @param userUid - The user's UID
- * @param blob - The image blob (should be webp, max 1MB)
- */
+/** Blob should be webp, max 1MB. */
 export async function uploadAvatar(userUid: string, blob: Blob): Promise<{ success: boolean }> {
   // apiRequest passes FormData through untouched (no JSON content-type) and
   // handles auth + error extraction; the browser sets the multipart boundary.
@@ -462,8 +389,6 @@ export async function uploadAvatar(userUid: string, blob: Blob): Promise<{ succe
   showToast({ type: 'success', message: m.profile_avatar_updated() });
   return result;
 }
-
-// Archon Import API
 
 export interface ArchonImportResult {
   success: boolean;
@@ -493,8 +418,6 @@ export async function importArchonFile(tournamentUid: string, file: File): Promi
   }
   return data;
 }
-
-// Tournament API
 
 export interface CreateTournamentData {
   name: string;
@@ -578,12 +501,12 @@ export async function deleteTournamentApi(uid: string, opts?: { suppressErrorToa
       method: 'DELETE',
     }, opts);
   } catch (e) {
-    // 404 = the server never knew this tournament (created offline, not yet
-    // pushed at go-online) — the local delete below IS the deletion.
+    // 404 = the server never knew this tournament (created offline, not yet pushed at go-online) —
+    // the local delete below IS the deletion.
     if (!(e instanceof ApiError && e.status === 404)) throw e;
     result = { message: 'Tournament deleted' };
   }
-  // Optimistic IDB delete so UI updates immediately instead of waiting for SSE
+  // Optimistic IDB delete so UI updates immediately instead of waiting for SSE.
   const { deleteTournament } = await import('./db');
   await deleteTournament(uid);
   // Drop any offline lock/metadata (no-op for ordinary online tournaments)
@@ -599,17 +522,13 @@ export async function syncTournamentVekn(uid: string, opts?: { suppressErrorToas
   }, opts);
 }
 
-/**
- * Self check-in via QR code (server-only, no optimistic path).
- */
+/** Server-only, no optimistic path. */
 export async function qrCheckin(tournamentUid: string, code: string): Promise<Tournament> {
   return apiRequest<Tournament>(`/api/tournaments/${tournamentUid}/qr-checkin`, {
     method: 'POST',
     body: JSON.stringify({ code }),
   });
 }
-
-// League API
 
 export interface CreateLeagueData {
   name: string;
@@ -677,8 +596,6 @@ export async function removeTournamentOrganizer(uid: string, organizerUid: strin
   });
 }
 
-// Timer API
-
 export async function timerStart(uid: string): Promise<void> {
   await apiRequest(`/api/tournaments/${uid}/timer/start`, { method: 'POST' });
 }
@@ -698,8 +615,6 @@ export async function timerAddTime(uid: string, table: string, seconds: number):
   });
 }
 
-// Announcement API
-
 export async function postAnnouncement(uid: string, body: string): Promise<void> {
   await apiRequest(`/api/tournaments/${uid}/announce`, {
     method: 'POST',
@@ -711,8 +626,6 @@ export async function deleteAnnouncement(uid: string, announcementId: string): P
   await apiRequest(`/api/tournaments/${uid}/announce/${announcementId}`, { method: 'DELETE' });
 }
 
-// Judge call API
-
 export async function callJudge(uid: string, table: number): Promise<void> {
   await apiRequest<void>(`/api/tournaments/${uid}/call-judge`, {
     method: 'POST',
@@ -720,11 +633,8 @@ export async function callJudge(uid: string, table: number): Promise<void> {
   });
 }
 
-/**
- * Upload a tournament banner (organizer only). The new versioned banner_path
- * arrives via SSE — no need to return it here.
- * @param blob - The cropped 1.91:1 image blob (webp, max 1MB)
- */
+/** The new versioned banner_path arrives via SSE — no need to return it here. Blob should be the
+ * cropped 1.91:1 image, webp, max 1MB. */
 export async function uploadTournamentBanner(
   tournamentUid: string,
   blob: Blob
@@ -751,9 +661,7 @@ export async function deleteTournamentBanner(
   return result;
 }
 
-// ============================================================================
-// Promos (catalog IC-only; ledger self-sourced — see wiki/sync.md carve-out)
-// ============================================================================
+// Promos: catalog is IC-only; the ledger read below is the app's one sanctioned online-only carve-out.
 
 export interface PromoPayload {
   name?: string;
@@ -814,8 +722,8 @@ export async function createPromoLedgerEntry(payload: LedgerEntryPayload): Promi
   });
 }
 
-/** Whole role-scoped ledger (officials: all rows; others: involved rows).
- * Online-only read — the sanctioned wiki/sync.md carve-out. */
+/** Whole role-scoped ledger (officials: all rows; others: involved rows) — the app's one sanctioned
+ * online-only-read carve-out. */
 export async function getPromoLedger(): Promise<PromoLedgerEntry[]> {
   return apiRequest<PromoLedgerEntry[]>('/api/promos/ledger', { method: 'GET' });
 }

@@ -1,11 +1,8 @@
 """Token-optional SSE endpoints must reject a supplied-but-invalid credential
-(401) instead of silently serving the public projection.
-
-The credential arrives two ways: the browser EventSource can't set headers so it
-passes a `token=` query param; the Discord bot sends an `Authorization: Bearer`
-header. Both must resolve a viewer, and a present-but-invalid credential of
-either form must 401 (so the client refreshes) rather than fall through to the
-public projection. Only a wholly absent credential is anonymous → public.
+(401) instead of silently serving the public projection — whether it arrives as
+a `token=` query param (browser EventSource can't set headers) or an
+`Authorization: Bearer` header (the bot). Only a wholly absent credential is
+anonymous → public.
 """
 
 import pytest

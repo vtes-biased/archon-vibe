@@ -56,10 +56,8 @@ UIDS_QUERY = """
     ORDER BY type, uid
 """
 
-# Re-read under the same row lock the app's writers take (db.tournament_transaction),
-# so a payload edited between the sweep's start and this row's turn is not clobbered
-# by a stale snapshot. "full" is already the full projection for both types, so
-# re-saving what we just read cannot alter stored data.
+# Re-read under the same row lock the app's writers take, so a payload edited
+# between the sweep's start and this row's turn is not clobbered by a stale read.
 LOCK_ROW_QUERY = 'SELECT "full", deleted_at FROM objects WHERE uid = %s FOR UPDATE'
 
 
@@ -79,11 +77,9 @@ async def run(args: argparse.Namespace) -> int:
                 counts[obj_type] += 1
                 if not args.apply:
                     continue
-                # One transaction PER ROW, deliberately: a single wrapping
-                # transaction would hold every row lock at once, and would stamp
-                # every row with the same transaction-start CURRENT_TIMESTAMP —
-                # catch-up filters on a strict `modified_at > since`, so a tie run
-                # split across a client's cursor would be skipped for good.
+                # One transaction PER ROW: a single wrapping transaction would stamp
+                # every row with the same CURRENT_TIMESTAMP, and catch-up's strict
+                # `modified_at > since` would skip a run split across a cursor.
                 async with conn.transaction():
                     row = await (await conn.execute(LOCK_ROW_QUERY, (uid,))).fetchone()
                     if row is None:

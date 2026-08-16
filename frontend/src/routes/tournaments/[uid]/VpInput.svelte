@@ -29,7 +29,6 @@
   const hasHalf = $derived(value % 1 !== 0);
   const halfAvailable = $derived(options.includes(whole + 0.5));
 
-  // Flash a brief "saved" check when an in-flight save for this seat completes.
   let justSaved = $state(false);
   // Intentionally a plain (non-reactive) local: it only carries the previous
   // `saving` across effect runs. Making it $state would re-trigger this effect.

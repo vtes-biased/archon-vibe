@@ -172,3 +172,8 @@ inclusive. Cancel a **non-last** round to obtain a `Cancelled` table.
 **The bot is the one place validated fakes are legitimate** — there is no real
 backend or Discord to talk to. Pair them with a guard test proving the fake, and
 don't generalize the exemption.
+
+**The bot startup smoke test earns its keep** (`bot/tests/test_startup.py`): the
+lightbulb v2→v3 `.d`/`.di` migration crash-looped 69 times in production while CI
+stayed green, because CI has no Discord gateway to fail against. The test pins the
+import-and-wire path that incident exposed.

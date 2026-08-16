@@ -1,4 +1,3 @@
-// Display helpers for the promo catalog (gallery, inventory, modals).
 import type { Promo, PromoKind } from '$lib/types';
 import * as m from '$lib/paraglide/messages.js';
 

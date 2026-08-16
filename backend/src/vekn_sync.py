@@ -1,5 +1,3 @@
-"""VEKN member synchronization service."""
-
 import json
 import logging
 import os
@@ -25,17 +23,8 @@ from .vekn_api import VEKNAPIClient, VEKNAPIError
 logger = logging.getLogger(__name__)
 
 
-# NC/Prince contact emails scraped from the vekn.net official lists
-# (national-coordinators + prince-list), keyed by vekn_id. The member API does
-# not expose these (cloaked on the site), so we inject them during sync.
-#
-# This is personal data, so it is NOT bundled in the repo/wheel. It is delivered
-# out of band: at deploy time ansible decrypts an ansible-vault file and points
-# OFFICIALS_CONTACTS_FILE at it (the role sets this to
-# `{env_dir}/officials_contacts.json`). In dev, with the env var unset, it falls
-# back to an untracked file next to this package. A missing/unreadable file means
-# no injection (and never wipes already-stored emails — see _update_user).
-# See the ansible fastapi_backend role for how the file is delivered.
+# Personal data, delivered out of band (ansible-vault at deploy, untracked dev
+# copy otherwise); a missing/unreadable file skips injection silently.
 def _officials_contacts_path() -> Path:
     env = os.environ.get("OFFICIALS_CONTACTS_FILE")
     if env:
@@ -50,8 +39,7 @@ def _load_officials_emails() -> dict[str, str]:
         logger.info("officials contacts file not present; skipping email injection")
         return {}
     except (OSError, ValueError) as e:
-        # Present but unreadable/corrupt (partial deploy, bad JSON). Runs at
-        # import, so log and skip rather than crash backend startup.
+        # Runs at import — log and skip rather than crash backend startup.
         logger.warning("officials contacts file unreadable (%s); skipping", e)
         return {}
     return {
@@ -63,12 +51,7 @@ OFFICIALS_EMAILS: dict[str, str] = _load_officials_emails()
 
 
 def _derive_role_seeds(vekn_player: dict[str, Any]) -> list[Role]:
-    """Initial roles for a member this sync is about to CREATE.
-
-    Seed-only: roles are written on first import and app-managed thereafter
-    (_update_user never touches them) — the same contract as the legacy-archon
-    ETL/merge seed, for environments where this sync is the first importer.
-    """
+    """Roles to seed on first import only; never called again for this user."""
     roles: list[Role] = []
     if vekn_player.get("princeid"):
         roles.append(Role.PRINCE)
@@ -534,31 +517,16 @@ FIX_CITIES: dict[str, dict[str, str]] = {
 
 
 class VEKNSyncService:
-    """Service for syncing VEKN members with local database."""
-
     def __init__(self) -> None:
-        """Initialize sync service."""
         self.client = VEKNAPIClient()
 
     async def close(self) -> None:
-        """Close the VEKN API client."""
         await self.client.close()
 
     def _map_vekn_to_user(self, vekn_player: dict[str, Any]) -> dict[str, Any]:
-        """
-        Map VEKN API player data to User model fields.
-
-        Args:
-            vekn_player: Player data from VEKN API
-
-        Returns:
-            Dictionary of User fields
-        """
-        # Combine first and last name
         name = f"{vekn_player.get('firstname', '')} {vekn_player.get('lastname', '')}".strip()
         vekn_id = str(vekn_player.get("veknid", ""))
 
-        # Fix city name and validate against geonames
         city = vekn_player.get("city") or None
         country_name = vekn_player.get("countryname") or ""
         country_code = vekn_player.get("countrycode") or ""
@@ -573,13 +541,7 @@ class VEKNSyncService:
             else:
                 city = None
 
-        # No roles here: they are seeded on first import only — by the
-        # legacy-archon ETL/merge, or by _derive_role_seeds when this sync
-        # creates the user (see sync_player) — and app-managed thereafter; no
-        # sync ever updates them. princeid/coordinatorid still feed
-        # vekn_prefix below (used by the coopted_by inference), just not roles.
-
-        # Extract vekn_prefix for Prince/NC users
+        # Roles seeded once by _derive_role_seeds on create, never touched here.
         vekn_prefix = None
         if vekn_player.get("princeid"):
             vekn_prefix = str(vekn_player.get("princeid"))
@@ -595,28 +557,17 @@ class VEKNSyncService:
             "state": vekn_player.get("statename") or None,
             "vekn_prefix": vekn_prefix,
         }
-        # Officials' contact email comes from the scraped vekn.net lists, not the
-        # member API. Only set when present so non-officials' emails (and any
-        # self-edited address, guarded by local_modifications) are left alone.
+        # Set only when present in the scraped list, so non-officials' emails and
+        # any self-edited address (guarded by local_modifications) stay untouched.
         official_email = OFFICIALS_EMAILS.get(vekn_id)
         if official_email:
             fields["contact_email"] = official_email
         return fields
 
     async def _get_user_by_vekn_id(self, vekn_id: str) -> User | None:
-        """
-        Get user by VEKN ID.
-
-        Args:
-            vekn_id: VEKN ID to search for
-
-        Returns:
-            User if found, None otherwise
-        """
         async with get_connection() as conn:
-            # Live users only: the legacy-archon merge tombstones vekn-created
-            # duplicates; matching one here would update a dead copy instead of
-            # the surviving user.
+            # Live rows only: the archon merge tombstones vekn-created duplicates,
+            # so matching a dead one here would update a dead copy, not the survivor.
             result = await conn.execute(
                 """
                 SELECT "full"
@@ -634,15 +585,6 @@ class VEKNSyncService:
             return decode_json(row[0], User)
 
     async def _create_user(self, vekn_data: dict[str, Any]) -> User:
-        """
-        Create new user from VEKN data.
-
-        Args:
-            vekn_data: Mapped VEKN player data
-
-        Returns:
-            Created User
-        """
         now = datetime.now(UTC)
         user = User(
             uid=str(uuid7()),
@@ -659,26 +601,13 @@ class VEKNSyncService:
     async def _update_user(
         self, existing_user: User, vekn_data: dict[str, Any]
     ) -> tuple[User, bool]:
-        """
-        Update existing user with VEKN data, preserving local modifications.
-
-        Only updates the database if actual data changed, to avoid triggering
-        the modified timestamp update and unnecessary frontend sync.
-
-        Args:
-            existing_user: Existing user
-            vekn_data: Mapped VEKN player data
-
-        Returns:
-            Tuple of (User, changed) where changed indicates if data was modified
-        """
-        # Build update dict, excluding locally modified fields
+        """Applies only actually-changed fields, skipping the write (and its SSE
+        broadcast) when nothing changed."""
         update_fields = {}
         for field, value in vekn_data.items():
             if field not in existing_user.local_modifications:
                 update_fields[field] = value
 
-        # Check if any data actually changed
         new_name = update_fields.get("name", existing_user.name)
         new_country = update_fields.get("country", existing_user.country)
         new_city = update_fields.get("city", existing_user.city)
@@ -701,13 +630,9 @@ class VEKNSyncService:
             or new_contact_email != existing_user.contact_email
         )
 
-        # Skip DB update if no changes (preserves original modified timestamp)
         if not has_changes:
             return existing_user, False
 
-        # Apply changes to existing user, preserving all non-sync fields.
-        # Roles are deliberately absent: seeded on create only (sync_player),
-        # app-managed thereafter — never sync-updated.
         now = datetime.now(UTC)
         existing_user.name = new_name
         existing_user.country = new_country
@@ -726,53 +651,30 @@ class VEKNSyncService:
         return existing_user, True
 
     async def sync_player(self, vekn_player: dict[str, Any]) -> tuple[User, str]:
-        """
-        Sync a single player from VEKN API.
-
-        Args:
-            vekn_player: Player data from VEKN API
-
-        Returns:
-            Tuple of (User, action) where action is "created", "updated", or "unchanged"
-        """
+        """Returns (User, action) where action is "created", "updated" or "unchanged"."""
         vekn_data = self._map_vekn_to_user(vekn_player)
         vekn_id = vekn_data.get("vekn_id")
 
         if not vekn_id:
             raise ValueError("VEKN player data missing veknid")
 
-        # Check if user exists
         existing_user = await self._get_user_by_vekn_id(vekn_id)
 
         if existing_user:
             user, changed = await self._update_user(existing_user, vekn_data)
             return user, "updated" if changed else "unchanged"
         else:
-            # First import of this member: seed roles (Prince/NC inference +
-            # static roster). Create path only — _update_user never touches
-            # roles (app-managed after the seed, same contract as the
-            # legacy-archon ETL/merge seed). This is what gives officials
-            # their roles in environments populated by this sync alone
-            # (dev resets, rebuilds without the legacy DB).
             vekn_data["roles"] = _derive_role_seeds(vekn_player)
             return await self._create_user(vekn_data), "created"
 
     async def sync_all_members(self) -> dict[str, int]:
-        """
-        Sync all VEKN members.
-
-        Returns:
-            Dictionary with sync statistics
-        """
         logger.info("Starting VEKN member sync")
         stats = {"created": 0, "updated": 0, "unchanged": 0, "errors": 0, "total": 0}
 
         try:
-            # Fetch all members from VEKN API
             players = await self.client.fetch_all_members()
             stats["total"] = len(players)
 
-            # Sync each player
             for player in players:
                 try:
                     _, action = await self.sync_player(player)
@@ -787,7 +689,6 @@ class VEKNSyncService:
                 f"{stats['errors']} errors, {stats['total']} total"
             )
 
-            # Infer coopted_by relationships
             inferred_prefix = await self._infer_coopted_by()
             inferred_city = await self._infer_coopted_by_city()
             logger.info(
@@ -801,13 +702,8 @@ class VEKNSyncService:
         return stats
 
     async def _infer_coopted_by(self) -> int:
-        """Infer coopted_by relationships from VEKN ID prefix matching.
-
-        For each Prince/NC with a vekn_prefix, find users whose VEKN ID
-        starts with that prefix and set coopted_by if not already set.
-
-        Returns the number of users updated.
-        """
+        """Prefix-matches VEKN IDs against a Prince/NC's vekn_prefix; sets
+        coopted_by only when unset."""
         sponsors = await get_users_with_vekn_prefix()
         if not sponsors:
             return 0
@@ -819,18 +715,15 @@ class VEKNSyncService:
             if not sponsor.vekn_prefix:
                 continue
 
-            # Find users whose VEKN ID starts with this sponsor's prefix
             sponsored_users = await get_users_by_vekn_prefix(sponsor.vekn_prefix)
 
             for user in sponsored_users:
-                # Skip if user is the sponsor themselves
                 if user.uid == sponsor.uid:
                     continue
-                # Skip if coopted_by already set
                 if user.coopted_by:
                     continue
 
-                # In place — a from-scratch User(...) drops every non-sync field.
+                # Mutate in place — a from-scratch User(...) would drop new fields.
                 user.coopted_by = sponsor.uid
                 user.coopted_at = None
                 user.modified = now
@@ -841,20 +734,13 @@ class VEKNSyncService:
         return count
 
     async def _infer_coopted_by_city(self) -> int:
-        """Infer coopted_by from city (Prince) then country (NC) fallback.
-
-        Phase 1: Match users to Princes in the same city.
-        Phase 2: Match remaining users to NCs in the same country.
-        Skips ambiguous cases (multiple Princes in same city, multiple NCs in same country).
-
-        Returns the number of users updated.
-        """
+        """Two-phase fallback: city-level Prince match, then country-level NC
+        match. Skips ambiguous cases (multiple candidates for one city/country)."""
         sponsors = await get_users_with_vekn_prefix()
         orphans = await get_users_without_coopted_by()
         if not sponsors or not orphans:
             return 0
 
-        # Build lookups
         prince_by_city: dict[tuple[str, str], str] = {}  # (country, city) -> uid
         ambiguous_cities: set[tuple[str, str]] = set()
         nc_by_country: dict[str, str] = {}  # country -> uid
@@ -884,7 +770,6 @@ class VEKNSyncService:
         now = datetime.now(UTC)
         still_orphan: list[User] = []
 
-        # Phase 1: Prince by city
         for user in orphans:
             if user.city and user.country:
                 sponsor_uid = prince_by_city.get((user.country, user.city))
@@ -897,7 +782,6 @@ class VEKNSyncService:
                     continue
             still_orphan.append(user)
 
-        # Phase 2: NC by country
         for user in still_orphan:
             if user.country:
                 sponsor_uid = nc_by_country.get(user.country)

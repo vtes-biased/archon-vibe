@@ -5,10 +5,8 @@
   import { TriangleAlert } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  // Pre-finish confirmation: FinishTournament computes the winner, writes
-  // ratings, publishes decklists and triggers the write-once VEKN results
-  // push — summarize that and surface client-side warnings. Warnings never
-  // block: running the event wins over reporting.
+  // FinishTournament computes the winner, writes ratings, publishes decklists
+  // and triggers the write-once VEKN push; warnings here never block finishing.
   let {
     tournament,
     standings,

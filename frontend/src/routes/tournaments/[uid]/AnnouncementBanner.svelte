@@ -42,9 +42,8 @@
     persist(dismissed);
   }
 
-  // Evict dismissals whose announcement no longer exists (pruned past the cap or
-  // deleted server-side). Keeps this key bounded by the live list (≤ server cap)
-  // instead of growing with every announcement ever posted in this tournament.
+  // Evict dismissals whose announcement no longer exists (pruned past cap or
+  // deleted), keeping this key bounded by the live list instead of growing forever.
   $effect(() => {
     const live = new Set(announcements.map((a) => a.id));
     if ([...dismissed].some((id) => !live.has(id))) {
@@ -59,9 +58,8 @@
   const active = $derived(sorted.filter((a) => !dismissed.has(a.id)));
   const history = $derived(sorted.filter((a) => dismissed.has(a.id)));
 
-  // Post-event, announcements are archival, not live ops: surface only the most
-  // recent (e.g. the wrap-up / results-up note) as a calm, non-dismissible banner;
-  // everything else drops into history, and no arrival toast fires.
+  // Post-event, announcements are archival: only the most recent shows as a calm,
+  // non-dismissible banner, the rest drop into history, and no arrival toast fires.
   const finished = $derived(tournamentState === "Finished");
   const shown = $derived(finished ? sorted.slice(0, 1) : active);
   const rest = $derived(finished ? sorted.slice(1) : history);

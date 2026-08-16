@@ -34,51 +34,30 @@ router = APIRouter()
 encoder = msgspec.json.Encoder()
 ph = PasswordHasher()
 
-# Magic link settings
 MAGIC_LINK_EXPIRE_MINUTES = 15
 SET_PASSWORD_EXPIRE_MINUTES = 10
 
 
 class MagicLinkRequest(BaseModel):
-    """Magic link request payload."""
-
     email: EmailStr
     purpose: str = "signup"  # "signup" or "reset"
 
 
 class MagicLinkVerifyRequest(BaseModel):
-    """Magic link verification request payload."""
-
     token: str
 
 
 class SetPasswordRequest(BaseModel):
-    """Set password request payload (after magic link verification)."""
-
     token: str
     password: str
 
 
 def _get_frontend_url() -> str:
-    """Get frontend URL from environment."""
     return os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 
 async def send_invite_email(email: str, user_uid: str, user_name: str) -> bool:
-    """Send an invite email to a newly created user.
-
-    Creates a magic link that allows the user to set their password
-    and activate their account.
-
-    Args:
-        email: Recipient email address
-        user_uid: The UID of the user to link to
-        user_name: The user's name for the email
-
-    Returns:
-        True if email was sent successfully
-    """
-    # Generate token
+    """Send an invite email letting a newly created user set their password."""
     token = secrets.token_urlsafe(32)
     expires_at = datetime.now(UTC) + timedelta(minutes=MAGIC_LINK_EXPIRE_MINUTES)
     await store_transient_token(
@@ -91,11 +70,9 @@ async def send_invite_email(email: str, user_uid: str, user_name: str) -> bool:
         expires_at,
     )
 
-    # Build magic link URL
     frontend_url = _get_frontend_url()
     magic_link = f"{frontend_url}/verify-email?token={token}"
 
-    # Send email
     sent = await send_magic_link_email(email, magic_link, purpose="invite")
     if not sent:
         await delete_transient_token(f"magic:{token}")
@@ -109,22 +86,14 @@ async def request_magic_link(
     request: MagicLinkRequest,
     authorization: str | None = Header(default=None),
 ) -> Response:
-    """Request a magic link email for signup or password reset.
-
-    Purpose:
-    - "signup": Create new account or link email to existing account
-    - "reset": Reset password (fails if email not registered)
-
-    If Authorization header is provided with a valid Bearer token,
-    the email will be linked to the authenticated user's account.
-    """
+    """Purpose "signup" creates or links an account; "reset" requires an
+    existing one. An authenticated Bearer token links the email to that user."""
     email = request.email.lower()
     purpose = request.purpose
 
     if purpose not in ("signup", "reset"):
         raise HTTPException(status_code=400, detail="Invalid purpose")
 
-    # If authenticated, extract user_uid for account linking
     link_user_uid = None
     if authorization and authorization.startswith("Bearer "):
         try:
@@ -132,10 +101,8 @@ async def request_magic_link(
         except Exception:
             pass  # Invalid token is fine -- treat as unauthenticated
 
-    # Check if EMAIL auth already exists
     existing_email_auth = await get_auth_method_by_identifier("email", email)
 
-    # Check if there's a Discord user with this contact_email (for merging)
     discord_user = await get_user_by_contact_email(email)
     discord_user_uid = discord_user.uid if discord_user else None
 
@@ -152,7 +119,6 @@ async def request_magic_link(
                 detail="No account found with this email.",
             )
 
-    # Generate token
     token = secrets.token_urlsafe(32)
     expires_at = datetime.now(UTC) + timedelta(minutes=MAGIC_LINK_EXPIRE_MINUTES)
     await store_transient_token(
@@ -166,11 +132,9 @@ async def request_magic_link(
         expires_at,
     )
 
-    # Build magic link URL
     frontend_url = _get_frontend_url()
     magic_link = f"{frontend_url}/verify-email?token={token}"
 
-    # Send email with appropriate subject
     sent = await send_magic_link_email(email, magic_link, purpose=purpose)
     if not sent:
         await delete_transient_token(f"magic:{token}")
@@ -190,16 +154,11 @@ async def request_magic_link(
 
 @router.post("/email/verify")
 async def verify_magic_link(request: MagicLinkVerifyRequest) -> Response:
-    """Verify a magic link token.
-
-    Returns a short-lived set-password token that allows the user to set their password.
-    Does NOT log in directly - user must set password first.
-    """
+    """Returns a short-lived set-password token; does not log in directly."""
     stored = await get_transient_token(f"magic:{request.token}")
     if not stored:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
-    # Generate a set-password token (magic token stays valid until password is set)
     set_password_token = secrets.token_urlsafe(32)
     expires_at = datetime.now(UTC) + timedelta(minutes=SET_PASSWORD_EXPIRE_MINUTES)
     await store_transient_token(
@@ -208,8 +167,8 @@ async def verify_magic_link(request: MagicLinkVerifyRequest) -> Response:
             "email": stored["email"],
             "purpose": stored["purpose"],
             "discord_user_uid": stored.get("discord_user_uid"),
-            "user_uid": stored.get("user_uid"),  # For invite flow
-            "magic_token": request.token,  # To clean up when password is set
+            "user_uid": stored.get("user_uid"),
+            "magic_token": request.token,
         },
         expires_at,
     )
@@ -229,16 +188,12 @@ async def verify_magic_link(request: MagicLinkVerifyRequest) -> Response:
 
 @router.post("/email/set-password")
 async def set_password(request: SetPasswordRequest) -> Response:
-    """Set password after magic link verification.
-
-    Creates user/auth method if signup, updates password if reset.
-    Returns authentication tokens on success.
-    """
+    """Creates or updates the EMAIL auth method depending on purpose
+    (signup/reset/invite) and returns authentication tokens."""
     stored = await get_transient_token(f"setpwd:{request.token}")
     if not stored:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
-    # Clean up both tokens (single use)
     await delete_transient_token(f"setpwd:{request.token}")
     if magic_token := stored.get("magic_token"):
         await delete_transient_token(f"magic:{magic_token}")
@@ -248,26 +203,21 @@ async def set_password(request: SetPasswordRequest) -> Response:
     discord_user_uid = stored.get("discord_user_uid")
     now = datetime.now(UTC)
 
-    # Hash the password
     password_hash = ph.hash(request.password)
 
-    # Check existing auth
     existing_email_auth = await get_auth_method_by_identifier("email", email)
 
     if purpose == "signup":
         if existing_email_auth:
-            # Race condition: email was registered while user was setting password
+            # Race condition: email was registered while user was setting password.
             raise HTTPException(status_code=409, detail="Email already registered")
 
         link_user_uid = stored.get("user_uid")
         if link_user_uid:
-            # Authenticated user linking email to their existing account
             user_uid = link_user_uid
         elif discord_user_uid:
-            # Merge into Discord user: add EMAIL auth to existing user
             user_uid = discord_user_uid
         else:
-            # Create new user
             user = User(
                 uid=str(uuid7()),
                 modified=now,
@@ -277,7 +227,6 @@ async def set_password(request: SetPasswordRequest) -> Response:
             await save_user(user)
             user_uid = user.uid
 
-        # Create EMAIL auth method with password
         auth_method = AuthMethod(
             uid=str(uuid7()),
             modified=now,
@@ -293,7 +242,6 @@ async def set_password(request: SetPasswordRequest) -> Response:
 
     elif purpose == "reset":
         if existing_email_auth:
-            # Update existing EMAIL auth with new password
             user_uid = existing_email_auth.user_uid
             updated_auth = AuthMethod(
                 uid=existing_email_auth.uid,
@@ -309,7 +257,6 @@ async def set_password(request: SetPasswordRequest) -> Response:
             await update_auth_method(updated_auth)
 
         elif discord_user_uid:
-            # Discord user resetting: create EMAIL auth for them
             user_uid = discord_user_uid
             auth_method = AuthMethod(
                 uid=str(uuid7()),
@@ -328,18 +275,15 @@ async def set_password(request: SetPasswordRequest) -> Response:
             raise HTTPException(status_code=404, detail="Account not found")
 
     elif purpose == "invite":
-        # Invited user setting password for first time
         invite_user_uid = stored.get("user_uid")
         if not invite_user_uid:
             raise HTTPException(status_code=400, detail="Invalid invite token")
 
         if existing_email_auth:
-            # Email already registered to another account
             raise HTTPException(status_code=409, detail="Email already registered")
 
         user_uid = invite_user_uid
 
-        # Create EMAIL auth method linked to the existing user
         auth_method = AuthMethod(
             uid=str(uuid7()),
             modified=now,
@@ -360,7 +304,6 @@ async def set_password(request: SetPasswordRequest) -> Response:
     # for it (a fresh signup resolves to a new, live uid and passes).
     await assert_account_active(user_uid)
 
-    # Generate authentication tokens
     access_token, expires_in = create_access_token(user_uid)
     refresh_token = create_refresh_token(user_uid)
 

@@ -41,14 +41,12 @@
   let error = $state<string | null>(null);
   let warnings = $state<string[]>([]);
   let success = $state(false);
-  // Format validation results (count/banned/group/V5), shown right here at the
-  // upload moment — a 90-card paste must not read as a green success. null =
-  // validation unavailable (engine/card DB not ready).
+  // Format validation results, shown right here at the upload moment — a 90-card paste must not read
+  // as a green success. null = validation unavailable (engine/card DB not ready).
   let validationErrors = $state<ValidationError[] | null>([]);
 
-  // URL/QR import fetch through the backend proxy, so gate them on connectivity;
-  // text import stays local. `navigator.onLine` isn't reactive — mirror it (same
-  // pattern as +layout / FeedbackModal) and fall back to text if we drop offline.
+  // URL/QR import fetch through the backend proxy, so gate them on connectivity; text import stays
+  // local. `navigator.onLine` isn't reactive — mirror it and fall back to text if we drop offline.
   let online = $state(navigator.onLine);
   $effect(() => {
     const on = () => (online = true);
@@ -104,7 +102,6 @@
     }
   }
 
-  // QR scanner
   let videoEl = $state<HTMLVideoElement | null>(null);
   let scanner: any = null;
   let qrScanning = $state(false);
@@ -142,7 +139,6 @@
     qrScanning = false;
   }
 
-  // Start scanner when QR mode is selected
   $effect(() => {
     if (mode === 'qr' && videoEl) {
       startQrScanner();
@@ -165,7 +161,6 @@
       const { fetchDeckFromUrl, parseDeckText } = await import('$lib/deck-fetch');
       const { getCards } = await import('$lib/cards');
 
-      // Parse deck (URL fetch or text parse via WASM)
       let deck: { name: string; author: string; comments: string; cards: Record<string, number>; warnings?: string[] };
       if (mode === 'text') {
         deck = await parseDeckText(deckText);
@@ -173,10 +168,8 @@
         deck = await fetchDeckFromUrl(deckUrl);
       }
 
-      // Collect parse warnings (unrecognized lines from text parsing)
       const uploadWarnings: string[] = [...(deck.warnings ?? [])];
 
-      // Check for unknown card IDs against local card database
       try {
         const cardsDb = await getCards();
         if (cardsDb.size > 0) {
@@ -190,10 +183,8 @@
         }
       } catch { /* card DB unavailable — skip check */ }
 
-      // Override name if provided
       if (deckName) deck.name = deckName;
 
-      // Build attribution
       let attrValue: string | null | undefined = undefined;
       let authorValue = deck.author;
       if (attribution === 'anonymous') {
@@ -219,7 +210,6 @@
       if (round !== undefined) deckData.round = round;
       if (attrValue !== undefined) deckData.attribution = attrValue;
 
-      // Route through engine action
       const targetUid = playerUid || (await import('$lib/stores/auth.svelte')).getAuthState().user?.uid;
       await tournamentAction(tournamentUid, 'UpsertDeck', {
         player_uid: targetUid,
@@ -310,7 +300,6 @@
       <p class="text-xs text-ink-faint">{m.deck_upload_supported_sites()}</p>
     {/if}
 
-    <!-- Attribution -->
     <div class="flex items-center gap-3 text-sm flex-wrap">
       <span class="text-ink-muted">{m.deck_upload_attribution()}:</span>
       <label class="flex items-center gap-1 text-ink-bright">

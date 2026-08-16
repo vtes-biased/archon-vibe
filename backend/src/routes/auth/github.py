@@ -1,19 +1,7 @@
-"""GitHub OAuth account-linking endpoints.
+"""GitHub OAuth account-linking endpoints — link-only, no login.
 
-Link-only: GitHub is NOT a login method here. We capture the member's GitHub
-login (+ stable numeric id) so in-app feedback issues can @-mention them instead
-of showing only a VEKN id (see routes/feedback.py). No AuthMethod is created;
-the fields live on the User (full projection only) and unlink clears them.
-
-This is a user-facing GitHub *OAuth App* (client id + secret), distinct from the
-GitHub *Apps* in github_app.py (TWDA / feedback) which mint installation tokens.
-
-Configuration (env vars):
-- GITHUB_OAUTH_CLIENT_ID / GITHUB_OAUTH_SECRET: the OAuth App credentials.
-- GITHUB_OAUTH_REDIRECT_URI: must match the App's callback (default localhost).
-  Unset client id -> /authorize redirects back with ?github_error=not_configured
-  (graceful: a toast on the profile page, not a raw error, since /authorize is a
-  full-page navigation).
+Distinct from the GitHub *Apps* in github_app.py (TWDA / feedback), which mint
+installation tokens; this is a user-facing OAuth App (client id + secret).
 """
 
 import logging
@@ -63,7 +51,6 @@ async def github_authorize(
     ),
     authorization: str | None = Header(default=None),
 ) -> RedirectResponse:
-    """Initiate GitHub OAuth to link the caller's GitHub account (auth required)."""
     client_id, _secret, redirect_uri, frontend_url = _get_github_config()
     if not client_id:
         # Toast, not a 500: /authorize is a top-level navigation.
@@ -104,7 +91,6 @@ async def github_callback(
     code: str = Query(..., description="Authorization code from GitHub"),
     state: str = Query(..., description="CSRF state token"),
 ) -> RedirectResponse:
-    """Exchange the code, fetch the GitHub login + id, store them on the user."""
     client_id, client_secret, redirect_uri, frontend_url = _get_github_config()
 
     stored = await get_transient_token(f"github:{state}")
@@ -112,7 +98,7 @@ async def github_callback(
         return RedirectResponse(
             url=f"{frontend_url}/profile?github_error=invalid_state", status_code=302
         )
-    await delete_transient_token(f"github:{state}")  # single use
+    await delete_transient_token(f"github:{state}")
 
     user_uid = stored.get("user_uid")
     redirect_path = stored.get("redirect", "/profile")
@@ -190,7 +176,6 @@ async def github_callback(
 
 @router.post("/github/unlink")
 async def github_unlink(current_user: CurrentUser) -> Response:
-    """Clear the caller's linked GitHub account."""
     user = current_user
     if user.github_id or user.github_login:
         user.github_id = None

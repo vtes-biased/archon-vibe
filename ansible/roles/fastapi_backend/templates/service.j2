@@ -14,19 +14,13 @@ Restart=always
 RestartSec=3
 TimeoutStartSec=30
 # Daily restart: primarily to re-fetch upstream assets loaded at startup
-# (krcg-static card data etc.) so upstream updates arrive without a redeploy;
-# also a low-key memory-leak defense. Relative to start, so the restart hour
-# drifts with deploys — accepted over a fixed-hour timer to keep one mechanism.
+# (krcg-static card data) without a redeploy; also a low-key memory-leak defense.
 RuntimeMaxSec=1d
-# Restart/stop speed: the app sets _shutdown_event on SIGTERM so the SSE streams
-# self-close in ~1s; --timeout-graceful-shutdown caps the drain at 5s, and these
-# bound the worst case if a connection ignores both (was a ~90s hang via the
-# default 90s TimeoutStopSec). KillMode=mixed: SIGTERM the main proc, SIGKILL the
-# cgroup if it overruns.
+# Bounds the worst case if a connection ignores both SIGTERM and the 5s
+# graceful-shutdown drain (was a ~90s hang via the default 90s TimeoutStopSec).
 TimeoutStopSec=15
 KillMode=mixed
 
-# hardening
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true

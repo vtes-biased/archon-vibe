@@ -1,5 +1,3 @@
-//! Helper functions for tournament event processing.
-
 use json::JsonValue;
 
 use super::types::{ActorContext, TournamentState};
@@ -61,10 +59,7 @@ pub(super) fn require_state_or_finished(
     Ok(())
 }
 
-/// Gate for result-correction events (SetScore/Override/Unoverride). A player may
-/// only score while a round is live (`Playing`); an organizer may also correct any
-/// round between rounds (`Waiting`) or after the tournament has finished
-/// (`Finished`) — they must be able to fix a result at any time, not just mid-round.
+/// Organizers can correct results anytime rounds exist, not just mid-round.
 pub(super) fn require_can_edit_results(
     actor: &ActorContext,
     current: TournamentState,
@@ -119,9 +114,8 @@ pub(super) fn all_rounds_finished(tournament: &JsonValue) -> bool {
         })
 }
 
-/// Previous rounds as nested player-UID lists for seating optimization. Skips
-/// `Cancelled` tables — a soft-cancelled round did not really happen, so it must
-/// not constrain R1 (predator/prey) for future seatings.
+/// Skips `Cancelled` tables — a soft-cancelled round did not really happen, so it
+/// must not constrain future seatings (predator/prey).
 pub(super) fn collect_previous_rounds(tournament: &JsonValue) -> Vec<Vec<Vec<String>>> {
     tournament["rounds"]
         .members()
@@ -140,10 +134,8 @@ pub(super) fn collect_previous_rounds(tournament: &JsonValue) -> Vec<Vec<Vec<Str
         .collect()
 }
 
-/// Rounds that actually happened, for the finals/toss two-round minimum. A round
-/// counts only while it still has a non-`Cancelled` table — a fully soft-cancelled
-/// round did not really happen. Mirrors the `Cancelled` filter in
-/// [`collect_previous_rounds`], so `rounds.len()` can't be gamed by a voided round.
+/// A round counts only while it has a non-`Cancelled` table. Mirrors the filter in
+/// `collect_previous_rounds`, so `rounds.len()` can't be gamed by a voided round.
 pub(super) fn count_played_rounds(tournament: &JsonValue) -> usize {
     tournament["rounds"]
         .members()
@@ -155,7 +147,6 @@ pub(super) fn count_played_rounds(tournament: &JsonValue) -> usize {
         .count()
 }
 
-/// Collect user UIDs of players still playing in rounds other than `exclude_round`.
 pub(super) fn players_in_other_active_rounds(
     tournament: &JsonValue,
     exclude_round: usize,

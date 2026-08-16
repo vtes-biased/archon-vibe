@@ -1,33 +1,20 @@
-//! Scoring functions: VP validation, GW/TP computation.
-
 use super::types::VpError;
 
-/// Check VP validity on a table, replicating archon's oust-order validation.
-/// VPs are in seating (predator-prey) order around the table.
-/// Returns None if valid, Some(error) if invalid.
+/// VPs must be in seating (predator-prey) order around the table.
 pub fn check_table_vps(vps: &[f64]) -> Option<VpError> {
     let n = vps.len();
     if !(4..=5).contains(&n) {
         return Some(VpError::InvalidTableSize);
     }
-    // Seats accounted for: scoring each seat as ousts made plus half a VP for
-    // surviving makes this sum exactly the table size. Do NOT loosen this into a
-    // raw-total check — the oust-order pass below is only sound because it never
-    // sees a table with seats missing, and would accept [0.0, 0.0, 0.0, 0.0, 4.0]
-    // (four seats at zero is four ousts, so the survivor swept for 5, not 4).
+    // Do NOT loosen to a raw total: the oust-order pass below assumes no seat is
+    // missing, so a raw total would wrongly accept e.g. [0,0,0,0,4] as a sweep.
     let accounted: i64 = vps.iter().map(|&v| v.ceil() as i64).sum();
     if accounted > n as i64 {
         return Some(VpError::ExcessiveTotal);
     }
     if accounted < n as i64 {
-        // Short of a full account — but of what? A complete table's raw total is
-        // always a half-step in [T/2, T]: each oust awards 1, each survivor 0.5,
-        // a sweep the extra game win. Landing there means the numbers are all in
-        // and one of them was redirected (Life Boon merges two halves into a
-        // single integer, costing exactly one unit above), which the oust order
-        // cannot represent — a judge call. Anywhere else the seats simply aren't
-        // filled in yet. Same VPs, opposite meanings: one needs a ruling, the
-        // other needs the rest of the scores.
+        // A half-step-consistent total exactly one entry short means a Life Boon
+        // merged two halves into one integer (RedirectedVp), not unfilled seats.
         let size = n as f64;
         let total: f64 = vps.iter().sum();
         let halves = total * 2.0;
@@ -41,9 +28,7 @@ pub fn check_table_vps(vps: &[f64]) -> Option<VpError> {
             VpError::IncompleteTotal
         });
     }
-    // Oust-order simulation: work with (original_index, accounted_vp) pairs
     let mut seats: Vec<(usize, f64)> = vps.iter().enumerate().map(|(i, &v)| (i, v)).collect();
-    // Repeatedly find ousted players (vp <= 0) and transfer to predator
     loop {
         if seats.is_empty() {
             break;
@@ -52,11 +37,9 @@ pub fn check_table_vps(vps: &[f64]) -> Option<VpError> {
         for j in 0..seats.len() {
             let (idx, vp_count) = seats[j];
             if vp_count <= 0.0 {
-                // A negative count with fractional part means impossible sequence
                 if vp_count.fract().abs() > 1e-9 && (vp_count.fract().abs() - 1.0).abs() > 1e-9 {
                     return Some(VpError::MissingVp(idx));
                 }
-                // Transfer: predator (previous seat) gets vp_count - 1
                 let pred = if j == 0 { seats.len() - 1 } else { j - 1 };
                 seats[pred].1 += vp_count - 1.0;
                 seats.remove(j);
@@ -65,21 +48,17 @@ pub fn check_table_vps(vps: &[f64]) -> Option<VpError> {
             }
         }
         if !found_oust {
-            // All remaining scores are positive
-            // If everyone is at 0.5, it's a timeout (valid if more than 1)
             if seats.iter().all(|(_, vp)| (*vp - 0.5).abs() < 1e-9) {
                 if seats.len() == 1 {
                     return Some(VpError::MissingHalfVp(vec![seats[0].0]));
                 }
-                break; // valid timeout
+                break;
             }
-            // Remove 0.5s (withdrawals)
             let remaining: Vec<(usize, f64)> = seats
                 .iter()
                 .filter(|(_, vp)| (*vp - 0.5).abs() > 1e-9)
                 .cloned()
                 .collect();
-            // At most 1 can remain (the last survivor with 1.0 VP)
             if remaining.len() > 1 {
                 return Some(VpError::MissingHalfVp(
                     remaining.iter().map(|(i, _)| *i).collect(),
@@ -116,8 +95,8 @@ pub fn compute_gw(vps: &[f64], adjustments: &[f64]) -> Vec<f64> {
         .collect()
 }
 
-/// Compute GW for finals: always awards 1 GW to the winner (highest adjusted VP,
-/// tiebroken by seed order). No 2VP threshold -- finals always produce a winner.
+/// Finals GW always awards the winner (highest adjusted VP, tiebroken by seed
+/// order) — no 2VP threshold, unlike prelim GW.
 pub fn compute_gw_finals(
     vps: &[f64],
     adjustments: &[f64],
@@ -155,10 +134,8 @@ pub fn compute_gw_finals(
     gws
 }
 
-/// Compute TP based on adjusted-VP rank within the table. Ties average their
-/// positions. `adjustments` is same length as `vps` with negative values for SA
-/// penalties — TP ranks on `vp + adjustment`, so an SA can re-rank and re-average
-/// the table (JG v2 1.1.3, Example 2). Per-seat `result.vp` stays raw for display.
+/// TP ranks on `vp + adjustment`, so an SA can re-rank and re-average the table
+/// (JG v2 §1.1.3, Example 2); ties average TP. Per-seat `result.vp` stays raw.
 pub fn compute_tp(table_size: usize, vps: &[f64], adjustments: &[f64]) -> Vec<f64> {
     let base: &[f64] = match table_size {
         5 => &[60.0, 48.0, 36.0, 24.0, 12.0],
@@ -174,7 +151,6 @@ pub fn compute_tp(table_size: usize, vps: &[f64], adjustments: &[f64]) -> Vec<f6
         .map(|(v, a)| v + a)
         .collect();
 
-    // Create indices sorted by adjusted VP descending
     let mut indices: Vec<usize> = (0..vps.len()).collect();
     indices.sort_by(|&a, &b| {
         adjusted[b]
@@ -185,12 +161,10 @@ pub fn compute_tp(table_size: usize, vps: &[f64], adjustments: &[f64]) -> Vec<f6
     let mut result = vec![0.0; vps.len()];
     let mut i = 0;
     while i < indices.len() {
-        // Find group of tied players
         let mut j = i + 1;
         while j < indices.len() && adjusted[indices[j]] == adjusted[indices[i]] {
             j += 1;
         }
-        // Average TP for positions i..j
         let tp_sum: f64 = (i..j).map(|pos| base[pos]).sum();
         let tp_avg = tp_sum / (j - i) as f64;
         for k in i..j {

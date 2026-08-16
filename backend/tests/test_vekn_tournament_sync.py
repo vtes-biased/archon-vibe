@@ -1,13 +1,7 @@
-"""Tests for VEKN tournament import → prelim-only standings + finals + push guard.
-
-The import honors the project contract: `standings` are **preliminary-only**, a
-final lives in a reconstructed `finals` object, and rating/league scoring add it
-on top. Imported VEKN-origin results must also never be re-uploaded by batch_push:
-the importer stamps `vekn_pushed_at` on finished imports (here), and batch_push
-also requires `rounds` non-empty (see test_vekn_push_batch.py). Either alone keeps
-imports out of the push set; both together is belt-and-suspenders.
-
-`_map_vekn_to_tournament` is a pure function — no DB, no mocks.
+"""VEKN tournament import: standings are preliminary-only (a final lives in a
+reconstructed `finals` object); imports are excluded from batch_push both by
+the `vekn_pushed_at` stamp set here and by batch_push's own rounds-non-empty
+guard — belt-and-suspenders. `_map_vekn_to_tournament` is pure, no DB/mocks.
 """
 
 from datetime import UTC, datetime
@@ -72,10 +66,10 @@ def test_import_populates_round_count():
 
 
 def test_import_stores_naive_wall_clock_paired_with_timezone():
-    # start/finish are stored NAIVE, paired with `timezone` — readers anchor them
-    # in that zone (calendar._as_utc, frontend utils.zonedDate). Converting VEKN's
-    # venue wall clock to UTC here made those readers shift it a second time, so a
-    # 09:00 Madrid event read back as 07:00.
+    # start/finish are stored NAIVE, paired with `timezone` — readers
+    # (calendar._as_utc, frontend zonedDate) anchor them in that zone.
+    # Converting VEKN's venue wall clock to UTC here shifted it twice (09:00
+    # Madrid read back as 07:00).
     event = _planned_event() | {"venue_country": "ES", "event_starttime": "09:00:00"}
     t = _map_vekn_to_tournament(event, {})
     assert t is not None
@@ -85,11 +79,9 @@ def test_import_stores_naive_wall_clock_paired_with_timezone():
 
 
 def test_import_carries_proxies_allowed_unless_rank_forbids_it():
-    # VEKN's 'proxies_allowed' flag drives deck legality in the UI — dropping it
-    # showed every import as "proxies not allowed" (over half of vekn.net events
-    # allow them). Championship ranks forbid proxies (engine legality), and a few
-    # vekn.net championships do carry the flag set: rank wins there, otherwise the
-    # imported row can't pass validate_rank_legality on any later config edit.
+    # VEKN's 'proxies_allowed' flag drives deck legality in the UI (over half
+    # of vekn.net events allow them). Championship ranks forbid proxies
+    # (engine legality); a few championships do carry the flag — rank wins.
     event = _planned_event() | {"proxies_allowed": "1"}
     assert _map_vekn_to_tournament(event, {}).proxies is True
 
@@ -126,9 +118,9 @@ def _final_event() -> dict:
 
 
 def test_import_standings_prelim_only_and_reconstructs_finals():
-    # The #340 contract: standings carry PRELIM-only scores (winner's +1 finals GW
-    # and everyone's vpf excluded); the final lives in a reconstructed finals object
-    # with the winner's +1 GW and each seat's vp = their vpf.
+    # The #340 contract: standings carry PRELIM-only scores (winner's +1 finals
+    # GW and everyone's vpf excluded); the final lives in a reconstructed
+    # finals object with winner +1 GW and each seat's vp = vpf.
     users = {str(i): _user(f"u{i}", str(i)) for i in range(1, 7)}
     t = _map_vekn_to_tournament(_final_event(), users)
     assert t is not None

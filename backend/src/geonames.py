@@ -1,7 +1,4 @@
-"""GeoNames data utilities.
-
-Provides access to countries and cities data from GeoNames.
-"""
+"""GeoNames data utilities."""
 
 import json
 import re
@@ -13,8 +10,6 @@ from typing import TypedDict
 
 
 class Continent(StrEnum):
-    """Continent codes from GeoNames."""
-
     AF = "AF"  # Africa
     AN = "AN"  # Antarctica
     AS = "AS"  # Asia
@@ -25,8 +20,6 @@ class Continent(StrEnum):
 
 
 class Country(TypedDict):
-    """Country information from GeoNames."""
-
     iso_code: str  # ISO-3166 2-letter code
     iso3: str  # ISO-3166 3-letter code
     name: str
@@ -35,8 +28,6 @@ class Country(TypedDict):
 
 
 class City(TypedDict):
-    """City information from GeoNames."""
-
     geoname_id: int
     name: str
     ascii_name: str
@@ -48,38 +39,20 @@ class City(TypedDict):
 
 @lru_cache(maxsize=1)
 def load_countries() -> dict[str, Country]:
-    """Load countries data from JSON file.
-
-    Returns:
-        Dictionary mapping ISO codes to Country objects
-    """
-    # Anchor on this module's own package so it resolves both in dev (`src`) and in
-    # the wheel (also `src` — pyproject packages = ["backend/src"]); a hardcoded
-    # "backend.src..." has no `backend` top-level once installed as a wheel.
+    # files(__package__) resolves both in dev and in the wheel; a hardcoded
+    # "backend.src..." path breaks post-install.
     data_file = files(__package__).joinpath("data", "geonames", "countries.json")
     return json.loads(data_file.read_text(encoding="utf-8"))
 
 
 @lru_cache(maxsize=1)
 def load_cities() -> list[City]:
-    """Load cities data from JSON file.
-
-    Returns:
-        List of City objects sorted by population (descending)
-    """
+    """Cities are sorted by population descending."""
     data_file = files(__package__).joinpath("data", "geonames", "cities.json")
     return json.loads(data_file.read_text(encoding="utf-8"))
 
 
 def get_country(iso_code: str) -> Country | None:
-    """Get a country by its ISO code.
-
-    Args:
-        iso_code: ISO-3166 2-letter country code
-
-    Returns:
-        Country object or None if not found
-    """
     countries = load_countries()
     return countries.get(iso_code.upper())
 
@@ -129,13 +102,11 @@ def country_key(value: str) -> str:
 
 
 def get_continent(country_code: str) -> str | None:
-    """Get the continent code for a country."""
     country = get_country(country_code)
     return country["continent"] if country else None
 
 
 def get_countries_on_continent(country_code: str) -> list[str]:
-    """Get all country ISO codes on the same continent as given country."""
     continent = get_continent(country_code)
     if not continent:
         return []
@@ -186,15 +157,9 @@ def _build_city_index() -> tuple[
     dict[tuple[str, str], City],
     dict[tuple[str, str], City],
 ]:
-    """Build lookup dicts for city matching.
-
-    Returns (by_name, by_ascii, by_base) where:
-    - by_name: (CC, name.lower()) -> City
-    - by_ascii: (CC, ascii_name.lower()) -> City
-    - by_base: (CC, base_name.lower()) -> City  (name with parenthetical stripped)
-
-    Cities are sorted by population desc, so setdefault keeps the largest city.
-    """
+    """Build (by_name, by_ascii, by_base) lookup dicts keyed by (country_code,
+    name.lower()). Cities are sorted by population desc, so setdefault keeps
+    the largest city per key."""
     by_name: dict[tuple[str, str], City] = {}
     by_ascii: dict[tuple[str, str], City] = {}
     by_base: dict[tuple[str, str], City] = {}
@@ -207,7 +172,6 @@ def _build_city_index() -> tuple[
         by_name.setdefault((cc, name_lower), city)
         by_ascii.setdefault((cc, ascii_lower), city)
 
-        # Base name: strip parenthetical suffix
         base = _PAREN_RE.sub("", city["name"]).strip()
         if base != city["name"]:
             by_base.setdefault((cc, base.lower()), city)
@@ -216,29 +180,22 @@ def _build_city_index() -> tuple[
 
 
 def match_city(name: str, country_code: str) -> City | None:
-    """Match a city name against the geonames database.
-
-    Tries exact name, ASCII name, ASCII-folded, and base name (no parens).
-    Returns the City dict or None if no match found.
-    """
+    """Tries exact name, ASCII name, ASCII-folded, then base name (no parens),
+    in that order."""
     name = name.strip()
     if not name:
         return None
     cc = country_code.upper()
     by_name, by_ascii, by_base = _build_city_index()
 
-    # 1. Exact name match
     if city := by_name.get((cc, name.lower())):
         return city
-    # 2. ASCII name match
     if city := by_ascii.get((cc, name.lower())):
         return city
-    # 3. Fold the input to ASCII, try ASCII
     stripped = fold_ascii(name)
     if stripped != name:
         if city := by_ascii.get((cc, stripped.lower())):
             return city
-    # 4. Base name match (handles "Washington" matching "Washington (DC)")
     if city := by_base.get((cc, name.lower())):
         return city
     return None

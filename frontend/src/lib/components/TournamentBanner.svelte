@@ -11,10 +11,8 @@
     bannerPath?: string | null;
     /** Organizer view: show add/change/remove affordances. */
     canManage: boolean;
-    /**
-     * Empty-state dropzone. The console turns it off and calls openCropper()
-     * from Tools instead, rather than park a dashed box atop every event.
-     */
+    /** Empty-state dropzone. The console turns it off and calls openCropper() from Tools instead,
+     * rather than park a dashed box atop every event. */
     showEmpty?: boolean;
   }
   let { tournamentUid, bannerPath, canManage, showEmpty: allowEmpty = true }: Props = $props();

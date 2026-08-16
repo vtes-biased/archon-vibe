@@ -1,31 +1,22 @@
 ---
-# ----------------------------------------------------------------------------
-# Production environment variables (non-secret).
 # Secrets live in vault.yml and are referenced via {{ vault_* }} below.
-# ----------------------------------------------------------------------------
 
-# --- identity -------------------------------------------------------------
 archon_user: archon
 archon_group: archon
 contact_email: "lionel.panhaleux@gmail.com"
 
-# --- domains --------------------------------------------------------------
 domain_main: archon.vekn.net
 domain_bot: bot.archon.vekn.net
 site_url_base: "https://{{ domain_main }}"
 
-# --- legal page URLs ------------------------------------------------------
-# Canonical Terms / Privacy URLs. Set these in the Discord Developer Portal
-# (General Information -> Terms of Service URL + Privacy Policy URL); kept here
-# as the source of truth and for any future automation.
+# Canonical Terms/Privacy URLs, also set in the Discord Developer Portal
+# (General Information -> Terms of Service URL + Privacy Policy URL).
 legal_terms_url: "{{ site_url_base }}/legal/terms"
 legal_privacy_url: "{{ site_url_base }}/legal/privacy"
 
-# --- ports ----------------------------------------------------------------
 backend_port: 8007
 bot_port: 9007
 
-# --- filesystem paths -----------------------------------------------------
 opt_root: /opt/archon
 backend_site_root: "{{ opt_root }}/backend"
 bot_site_root: "{{ opt_root }}/bot"
@@ -33,75 +24,56 @@ frontend_site_root: /var/www/archon
 bot_state_dir: /var/lib/archon-bot
 env_dir: /etc/archon
 
-# --- service names --------------------------------------------------------
 backend_service: archon-backend
 bot_service: archon-bot
 # Legacy archon stack sharing the vekn.net VPS during the parallel run; it
-# writes to the same PG cluster, so migrate_postgres.yml must stop/start it
-# around the dump + port swap. Decommissioned at Phase 4.
+# writes to the same PG cluster, so migrate_postgres.yml must stop/start it.
 legacy_web_service: archon_web
 
-# --- versions -------------------------------------------------------------
-# PostgreSQL pinned via PGDG repo. Python is managed by uv (downloaded from
-# python-build-standalone) — identical on prod and beta.
+# PostgreSQL pinned via PGDG repo. Python is managed by uv, identical on prod and beta.
 postgresql_version: 17
 python_version: "3.14"
 uv_python_install_dir: /opt/uv/python
 
-# --- host resources -------------------------------------------------------
-# Tiny VPS (~945MB RAM, 1 vCPU) → codify a swap safety-net so it survives a
-# reprovision. No-op against the swap already added by hand (won't reformat or
-# resize a live swapfile); mainly ensures the fstab entry + swappiness.
+# Tiny VPS (~945MB RAM, 1 vCPU): codifies a swap safety-net so it survives a
+# reprovision. No-op against a swap already added by hand.
 swapfile_enabled: true
 
-# --- database -------------------------------------------------------------
 # Distinct role from legacy archon's `archon` PG role: both stacks share one
 # PG17 cluster during the parallel run, and reusing `archon` would reset its
-# password and lock legacy out. db_name `archon` (≠ legacy `archondb`) is safe.
+# password and lock legacy out.
 db_name: archon
 db_user: archonvibe
 db_password: "{{ vault_db_password }}"
 
-# PG footprint trimmed for the tiny VPS (~945MB RAM, 1 vCPU) shared by both
-# stacks during the parallel run: free RAM for the two Python apps, cap live
-# backends. Small DB → OS page cache covers what shared_buffers gives up.
-# shared_buffers + max_connections take effect on the next PG restart (the
-# role's Restart handler; a one-time blip). effective_cache_size is a planner
-# hint only. max_connections covers new(≤20) + legacy(≤20) + merge + reserved.
+# PG footprint trimmed for the tiny VPS shared by both stacks during the
+# parallel run. shared_buffers + max_connections need a PG restart to take
+# effect; max_connections covers new(<=20) + legacy(<=20) + merge + reserved.
 postgresql_shared_buffers: 96MB
 postgresql_max_connections: 60
 postgresql_effective_cache_size: 384MB
 
-# --- legacy-archon merge (parallel run; remove at Phase-4 decommission) ----
-# Reads legacy `archondb` (role `archon`) over the socket via peer auth (the unit
-# runs as OS user `archon`) and merges rich data into the vekn-seeded copies. No
-# legacy password needed; the new-db write uses the archonvibe scram cred.
+# Legacy-archon merge (parallel run; remove at Phase-4 decommission).
+# Reads legacy `archondb` over the socket via peer auth (the unit runs as OS
+# user `archon`); the new-db write uses the archonvibe scram cred.
 legacy_sync_enabled: false
 legacy_db_user: archon
 legacy_db_name: archondb
 merge_backup_dir: /var/lib/archon/merge-backups
 legacy_sync_oncalendar: "*-*-* 04:00:00"
 
-# --- database backups -------------------------------------------------------
-# Daily cluster-wide pg_dump (covers `archon` AND legacy `archondb` while the
-# parallel run lasts; decommission needs no config change) + weekly
-# restore-verify, mirroring server-setup's mechanism on frankfurt. 03:00 lands
-# a restore point right before the 04:00 legacy merge — the riskiest daily
-# write — with no contention on the 1-vCPU box.
+# Daily cluster-wide pg_dump (covers `archon` AND legacy `archondb`) + weekly
+# restore-verify. 03:00 lands a restore point right before the 04:00 legacy
+# merge, the riskiest daily write, with no contention on the 1-vCPU box.
 db_backup_enabled: true
 db_backup_dir: /var/backups/postgres
 db_backup_retention_days: 7
 db_backup_oncalendar: "*-*-* 03:00:00"
 db_backup_check_oncalendar: "Wed *-*-* 06:00:00"
-# Failure alerting (dead-man's switch): set vault_db_backup_healthcheck_url +
-# vault_db_backup_check_healthcheck_url in vault.yml (ping UUIDs are
-# capability URLs; the repo is public) to healthchecks.io-style check URLs —
-# success pings GET them, failures GET <url>/fail, and a backup that silently
-# stops running alerts by ABSENCE of pings. Empty = no pings (journald only).
-# Off-box push via restic -> S3 (frankfurt parity; local-only until the bucket
-# exists). To flip on: create the Scaleway bucket + an API key scoped to it,
-# add vault_remote_backup_{access_key,secret_key,restic_password} to vault.yml,
-# then set true — the deploy asserts the secrets when enabled.
+# Dead-man's switch: set vault_db_backup_healthcheck_url + ..._check_healthcheck_url
+# to healthchecks.io-style URLs; empty = no pings (journald only).
+# Off-box push via restic -> S3, local-only until the bucket exists; flip on by
+# adding vault_remote_backup_{access_key,secret_key,restic_password} to vault.yml.
 db_backup_remote_enabled: true
 db_backup_remote_bucket: "archon-db-backups"
 db_backup_remote_endpoint: "https://s3.fr-par.scw.cloud"
@@ -109,7 +81,6 @@ db_backup_remote_keep_daily: 7
 db_backup_remote_keep_weekly: 4
 db_backup_remote_keep_monthly: 12
 
-# --- backend env vars -----------------------------------------------------
 backend_env:
   PYTHONOPTIMIZE: 1
   ENVIRONMENT: production
@@ -117,10 +88,9 @@ backend_env:
   FRONTEND_URL: "{{ site_url_base }}"
   API_BASE_URL: "{{ site_url_base }}"
   DATABASE_URL: "postgresql://{{ db_user }}:{{ db_password }}@/{{ db_name }}?host=/var/run/postgresql"
-  # One async worker; 8 PG backends is ample for the officials load and keeps
-  # the pool's memory bounded on the tiny shared box (default is 20).
+  # One async worker; 8 PG backends keeps the pool's memory bounded on the tiny
+  # shared box (default is 20).
   DB_POOL_MAX_SIZE: 8
-  # --- mail ---------------------------------------------------------------
   MAIL_SERVER: smtp.gmail.com
   MAIL_PORT: 587
   MAIL_USE_TLS: "true"
@@ -128,19 +98,16 @@ backend_env:
   MAIL_FROM: codex.of.the.damned@gmail.com
   MAIL_FROM_NAME: "Archon"
   MAIL_PASSWORD: "{{ vault_mail_password }}"
-  # --- auth ---------------------------------------------------------------
   JWT_SECRET: "{{ vault_jwt_secret }}"
-  # --- discord (note: backend uses CLIENTID/SECRET, not CLIENT_ID/CLIENT_SECRET)
+  # backend uses CLIENTID/SECRET, not CLIENT_ID/CLIENT_SECRET.
   DISCORD_CLIENTID: "{{ vault_discord_client_id }}"
   DISCORD_SECRET: "{{ vault_discord_client_secret }}"
   DISCORD_REDIRECT_URI: "{{ site_url_base }}/auth/discord/callback"
   DISCORD_BOT_TOKEN: "{{ vault_discord_bot_token }}"
   DISCORD_INSTALL_URL: "https://discord.com/oauth2/authorize?client_id=1495034668469194864"
-  # --- passkeys / WebAuthn ------------------------------------------------
   WEBAUTHN_RP_ID: "{{ domain_main }}"
   WEBAUTHN_RP_NAME: "Archon"
   WEBAUTHN_ORIGIN: "{{ site_url_base }}"
-  # --- VEKN sync + push ---------------------------------------------------
   VEKN_SYNC_ENABLED: "true"
   VEKN_SYNC_INTERVAL_HOURS: 24
   VEKN_API_BASE_URL: "https://www.vekn.net/api"
@@ -148,33 +115,27 @@ backend_env:
   VEKN_API_PASSWORD: "{{ vault_vekn_password }}"
   VEKN_PUSH: "{{ vekn_push_enabled | default('true') }}"   # prod-final on; phase-1 override gates it off
   VEKN_PUSH_INTERVAL_HOURS: 1
-  # --- Web Push / VAPID ---------------------------------------------------
-  # Per-env keypair (beta and prod must NOT share). Both keys live in vault so
-  # they rotate atomically; default('') keeps push a graceful no-op until set.
-  # Rotating the keypair invalidates every existing browser subscription.
+  # Per-env keypair (beta and prod must NOT share). Rotating it invalidates
+  # every existing browser subscription.
   VAPID_PUBLIC_KEY: "{{ vault_vapid_public_key | default('') }}"
   VAPID_PRIVATE_KEY: "{{ vault_vapid_private_key | default('') }}"
   VAPID_SUBJECT: "mailto:{{ contact_email }}"
-  # --- misc ---------------------------------------------------------------
   SNAPSHOT_DIR: /var/lib/archon/snapshots
   TWDA_GITHUB_CLIENT_ID: "{{ vault_twda_github_client_id | default('') }}"
   TWDA_GITHUB_INSTALLATION_ID: "{{ vault_twda_github_installation_id | default('') }}"
   # PRIVATE_KEY is the runtime PEM path — derived from env_dir so it always matches
-  # where the role copies the vault-delivered .pem (a hardcoded path drifts per-env).
+  # where the role copies the vault-delivered .pem.
   TWDA_GITHUB_PRIVATE_KEY: "{{ env_dir }}/twda_github_app.pem"
-  # In-app feedback -> GitHub issues. Dedicated GitHub App, Issues:write on this repo.
   FEEDBACK_GITHUB_CLIENT_ID: "{{ vault_feedback_github_client_id | default('') }}"
   FEEDBACK_GITHUB_INSTALLATION_ID: "{{ vault_feedback_github_installation_id | default('') }}"
   # PRIVATE_KEY: env_dir-derived PEM path (see TWDA note above).
   FEEDBACK_GITHUB_PRIVATE_KEY: "{{ env_dir }}/feedback_github_app.pem"
-  # User-facing GitHub OAuth App (profile account-linking). Distinct from the two
-  # GitHub Apps above: a client secret, no private key. Unset client id -> the
-  # "Link GitHub" button degrades to a not_configured toast.
+  # Distinct from the two GitHub Apps above: a client secret, no private key.
+  # Unset client id -> the "Link GitHub" button degrades to a not_configured toast.
   GITHUB_OAUTH_CLIENT_ID: "{{ vault_github_oauth_client_id | default('') }}"
   GITHUB_OAUTH_SECRET: "{{ vault_github_oauth_secret | default('') }}"
   GITHUB_OAUTH_REDIRECT_URI: "{{ site_url_base }}/auth/github/callback"
 
-# --- bot env vars ---------------------------------------------------------
 bot_env:
   PYTHONOPTIMIZE: 1
   ARCHON_URL: "http://127.0.0.1:{{ backend_port }}"

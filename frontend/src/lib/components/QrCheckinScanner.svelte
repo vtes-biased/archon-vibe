@@ -26,7 +26,6 @@
     const QrScanner = (await import('qr-scanner')).default;
     scanner = new QrScanner(videoEl, async (result: { data: string }) => {
       let code = result.data;
-      // Parse URL format: extract checkin param from our app URLs
       if (code.startsWith('http')) {
         try {
           const url = new URL(code);

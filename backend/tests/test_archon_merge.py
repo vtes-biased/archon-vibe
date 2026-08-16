@@ -351,11 +351,8 @@ async def test_member_merge_respects_field_ownership(test_db):
 
 @pytest.mark.asyncio
 async def test_claimed_account_not_detached_by_merge(test_db):
-    """regression: a user claimed a VEKN-sync copy (uuid7 ≠ old-archon uid),
-    so the old-archon member arrives under a different uid. The merge must match
-    on the vekn id and merge INTO the claimed account — never tombstone it or
-    null its vekn_id (the old bug wiped the claimed identity + its community
-    links)."""
+    """regression: the old bug matched on old-archon uid and tombstoned a claimed
+    account (uuid7 ≠ old-archon uid), wiping its identity and community links."""
     from src.models import CommunityLink, CommunityLinkType
 
     await db.save_user(
@@ -443,12 +440,9 @@ async def test_member_refs_remapped_and_vekn_less_seeded(test_db):
 async def test_veknless_played_throwaway_collapses_onto_real_noshow(
     test_db, monkeypatch
 ):
-    """#216 core case: a player registered under their real VEKN account (a
-    0-round no-show) yet PLAYED under a VEKN-less throwaway in the SAME event. The
-    throwaway's refs remap onto the real account, the real account's redundant
-    no-show registration is scoped-dropped, and a separate phantom registration is
-    dropped wholesale — leaving ONE real-account entry carrying the played result
-    (no duplicate)."""
+    """#216 core case: a played VEKN-less throwaway remaps onto the real account,
+    collapsing its redundant no-show registration and a separate phantom into
+    one real-account entry carrying the played result."""
     tuid, throwaway, real, phantom = "t-216", "throw-216", "real-216", "phan-216"
     monkeypatch.setattr(mig, "KNOWN_DROP", frozenset({phantom}))
     monkeypatch.setattr(mig, "KNOWN_DROP_IN_TOURNAMENT", frozenset({(tuid, real)}))
@@ -506,12 +500,10 @@ async def test_veknless_played_throwaway_collapses_onto_real_noshow(
 
 @pytest.mark.asyncio
 async def test_known_remap_resolves_to_live_account_by_vekn_id(test_db):
-    """#216: resolve_known_remaps must rewrite the KNOWN_REMAP source uid to the
-    LIVE uid of the account holding the target VEKN id — even when that account was
-    claimed (live uid is a uuid7 ≠ the source uid). This is what makes the played
-    throwaway's tournament refs attribute to the real player; a regression here
-    silently leaves the source pointing at its own (unseeded) uid → orphan refs.
-    Uses the shipped KNOWN_REMAP entry and the real by-vekn lookup, not a copy."""
+    """resolve_known_remaps must rewrite the KNOWN_REMAP source uid to the live
+    uid holding the target VEKN id, even claimed (uuid7 ≠ source uid) — else the
+    source points at its own unseeded uid and refs orphan. Uses the shipped
+    KNOWN_REMAP entry, not a copy."""
     source_uid, target_vekn = next(iter(KNOWN_REMAP.items()))
     # The real account that holds the remap target VEKN, under a claimed uuid7.
     await db.save_user(
@@ -537,10 +529,8 @@ async def test_known_remap_resolves_to_live_account_by_vekn_id(test_db):
 
 @pytest.mark.asyncio
 async def test_veknless_participant_allocated_idempotent_and_resurrects_shell(test_db):
-    """#216: a genuinely VEKN-less legacy participant is allocated a real VEKN id
-    and becomes a LIVE, push-eligible member; a re-run never re-allocates; and a
-    leftover #169 soft-deleted shell under the uid is resurrected into the live
-    row (the prod-cutover state)."""
+    """#216: a genuinely VEKN-less participant is allocated a real, push-eligible
+    VEKN id; a re-run never re-allocates; a leftover #169 shell is resurrected."""
     # A Phase-1 (#169) run already shelled this participant.
     await db.save_user(
         User(

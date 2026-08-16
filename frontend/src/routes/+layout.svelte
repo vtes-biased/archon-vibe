@@ -1,7 +1,6 @@
 <script lang="ts">
   import '../app.css';
   import { page } from '$app/stores';
-  // A plain click on a nav item reopens that list where the viewer left it.
   import { openLastView } from '$lib/last-view';
   import { syncManager } from '$lib/sync';
   import { initAuth } from '$lib/stores/auth.svelte';
@@ -19,13 +18,11 @@
 
   let { children } = $props();
 
-  // Connection status
   let isOnline = $state(navigator.onLine);
   let isSyncing = $state(true);
   let syncError = $state(false);
-  // SW update banner is suppressed while a tournament is offline-locked on
-  // this device (a mid-event refresh is the wrong nudge); resumes after
-  // go-online. Refreshed on sync events since the getter isn't reactive.
+  // Suppressed while offline-locked (mid-event refresh is the wrong nudge);
+  // tracked in state and refreshed on sync events since the getter isn't reactive.
   let hasOfflineLocked = $state(false);
 
   // Manual recovery from a terminal sync failure (the auto-retry gives up after a
@@ -36,7 +33,6 @@
     syncManager.connect();
   }
 
-  // Navigation items - fixed 6 items, no conditional developer
   const navItems = [
     { href: '/tournaments', labelFn: () => m.nav_tournaments(), icon: 'trophy' },
     { href: '/leagues', labelFn: () => m.nav_leagues(), icon: 'chart' },
@@ -51,22 +47,15 @@
     return currentPath.startsWith(href);
   }
 
-  // Keep <html lang> in sync with locale
   $effect(() => {
     document.documentElement.lang = getLocale();
   });
 
   onMount(() => {
-    // Initialize theme (sync .light class with preference)
     initTheme();
-
-    // Initialize service worker for offline asset caching
     initServiceWorker();
-
-    // Initialize engine (WASM) for permission checks
     initEngine().catch(err => console.error('Failed to initialize engine:', err));
 
-    // Initialize auth state, then connect SSE with valid token
     initAuth().then(() => {
       syncManager.connect();
       // Lazy-reconcile the push subscription once authed (#314): re-register a
@@ -74,12 +63,10 @@
       reconcilePush();
     });
 
-    // Restore offline tournament state from IndexedDB
     initOfflineState()
       .then(() => { hasOfflineLocked = getOfflineTournamentUids().size > 0; })
       .catch(err => console.error('Failed to init offline state:', err));
 
-    // Listen for sync events
     const handleSyncEvent = (event: { type: string; error?: string }) => {
       hasOfflineLocked = getOfflineTournamentUids().size > 0;
       if (event.type === 'syncing') {
@@ -102,9 +89,8 @@
 
     syncManager.addEventListener(handleSyncEvent);
 
-    // Debounced banner clear: flapping venue wifi strobes online/offline —
-    // going offline shows immediately, but the banner only clears after a few
-    // seconds of stable connectivity. Reconnection itself is NOT delayed.
+    // Debounced clear only: flapping venue wifi strobes online/offline, so offline
+    // shows immediately but the banner clears after a few stable seconds.
     let onlineStableTimer: ReturnType<typeof setTimeout> | undefined;
     const handleOnline = () => {
       syncManager.connect();
@@ -147,23 +133,16 @@
   {/if}
 {/snippet}
 
-<!-- dvh, not vh: on iOS `100vh` is the LARGE viewport (URL bar hidden), so with the
-     bar showing the shell is taller than the visible area and leaves dead scroll
-     under the fixed nav. Does not address the iOS 26 fixed-element repaint bug —
-     see the nav ticket.
-     pt-safe-t keeps the first content clear of the status bar under
-     viewport-fit=cover; the strip it reserves paints bg-surface. -->
+<!-- dvh, not vh: on iOS 100vh is the LARGE viewport (bar hidden), so the shell
+     overflows and leaves dead scroll under the fixed nav. -->
 <div class="min-h-dvh bg-surface pt-safe-t pb-navbar sm:pb-safe-b">
-  <!-- Status/update banners: a normal-flow sticky stack so they push content
-       down instead of overlaying the page header; multiple banners stack as
-       block siblings (no hard-coded per-banner top offsets).
-       Sticks at safe-t, not 0, to match the shell's padding — otherwise a stuck
-       banner slides under the status bar in the installed PWA. -->
+  <!-- Sticky stack, not overlay, so banners push content down and stack as block
+       siblings; sticks at safe-t, not 0, or a stuck banner slides under the
+       status bar in the installed PWA. -->
   {#if engineLoadFailed() || !isOnline || syncError || (getUpdateAvailable() && !hasOfflineLocked)}
     <div class="sticky top-safe-t z-50">
-      <!-- A WASM engine load failure degrades the app (permission checks,
-           optimistic writes and standings stop working): a durable banner, not
-           a transient toast, since the state persists until reload. -->
+      <!-- Durable banner, not a toast: engine failure degrades permission checks,
+           optimistic writes and standings, and persists until reload. -->
       {#if engineLoadFailed()}
         <div role="alert" class="px-4 py-2 text-center text-sm bg-accent-strong text-white">
           <span class="inline-flex items-center gap-2 flex-wrap justify-center">
@@ -201,22 +180,16 @@
     </div>
   {/if}
 
-  <!-- Main content. pr-safe-r clears the notch when a phone is held with the
-       camera on the right; the left side is already cleared by the rail's width. -->
+  <!-- pr-safe-r clears the notch when the phone is held camera-right; the left
+       side is already cleared by the rail's width. -->
   <main class="sm:ml-rail pr-safe-r">
     {@render children()}
   </main>
 
-  <!-- Bottom navigation (mobile) — icon-only: visible labels truncated to
-       ambiguity in longer locales (es/pt), so the destination name lives in
-       aria-label/title (announced by AT, shown on hover) instead. -->
-  <!-- h-navbar is declared, not emergent: letting the height fall out of the
-       icons' padding left a strip of page showing between the CTA and the nav.
-       pb-safe-b keeps the icons in the touch row while the background bleeds
-       behind the home indicator.
-       transform-gpu is a compositing win for momentum scroll, NOT a fix for the
-       iOS 26 misplacement (WebKit 297779 is a viewport-offset bug, not a skipped
-       repaint) — don't re-derive a theory from this class. -->
+  <!-- Icon-only: labels truncate to ambiguity in longer locales (es/pt), so the
+       destination name lives in aria-label/title instead. -->
+  <!-- h-navbar is declared, not emergent, or a gap shows between the CTA and the
+       nav; transform-gpu is a scroll-compositing win only, not a WebKit 297779 fix. -->
   <nav class="fixed bottom-0 left-0 right-0 z-40 h-navbar pb-safe-b transform-gpu bg-surface-card border-t border-line sm:hidden">
     <div class="flex h-full justify-around">
       {#each navItems as item}
@@ -235,14 +208,10 @@
     </div>
   </nav>
 
-  <!-- Side navigation (desktop) -->
-  <!-- The rail spans every viewport edge it can, so under viewport-fit=cover it
-       absorbs three insets: py-4 grows by the top/bottom ones (iPad standalone —
-       logo under the status bar, sync indicator under the home indicator), and
-       w-rail + pl-safe-l keeps the icons out of the notch on a landscape phone,
-       which is >=640px wide and therefore gets the rail, not the bottom nav. -->
+  <!-- The rail absorbs three insets under viewport-fit=cover: py-4 grows for
+       top/bottom (iPad standalone), w-rail+pl-safe-l keeps icons off the notch
+       on landscape phones (>=640px, so rail not bottom nav). -->
   <nav class="hidden sm:flex fixed left-0 top-0 bottom-0 w-rail pl-safe-l bg-surface-card border-r border-line flex-col items-center pt-[calc(1rem+var(--spacing-safe-t))] pb-[calc(1rem+var(--spacing-safe-b))] z-40">
-    <!-- Logo -->
     <a href="/tournaments" onclick={(e) => openLastView(e, '/tournaments')} class="mb-6 text-link hover:text-link-soft" title={m.nav_home()}>
       <img src="/favicon.svg" alt="Archon" class="w-16 h-16" />
     </a>
@@ -262,7 +231,6 @@
       {/each}
     </div>
 
-    <!-- Connection status indicator -->
     <div class="mt-auto pt-4">
       <!-- data-sync-state is a stable, color-independent hook for E2E (the visual
            cue is icon + semantic color, which a design refactor can freely change). -->
@@ -282,18 +250,10 @@
     </div>
   </nav>
 
-  <!-- Status-bar scrim. pt-safe-t only reserves space in the document — once
-       scrolled, live page content slides up through the strip under the clock.
-       This paints bg-surface over it.
-       z-45 is deliberate: above the page and its sticky top-* surfaces, but
-       BELOW anything that owns the whole screen (modals at z-50, lightbox at
-       z-60) — those paint their own colour up there, and an opaque page-coloured
-       band across a full-screen sheet reads as a rendering fault.
-       sm:left-rail for the same reason: the rail is bg-surface-card with a right
-       border, so scrimming its top would notch its silhouette. It reaches the
-       status bar itself and paints its own. Zero-height off iOS. -->
+  <!-- Paints bg-surface over the strip pt-safe-t only reserves (content scrolls
+       through it otherwise). z-45: above the page's sticky surfaces, below modals
+       (z-50) and the lightbox (z-60), which paint their own colour. -->
   <div aria-hidden="true" class="fixed top-0 left-0 right-0 sm:left-rail h-safe-t z-[45] bg-surface pointer-events-none"></div>
 
-  <!-- Global toast notifications -->
   <Toast />
 </div>

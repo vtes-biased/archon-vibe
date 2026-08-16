@@ -1,9 +1,5 @@
-//! VEKN Judges Guide v2 penalty reference — the single source of truth for the
-//! category/subcategory taxonomy, English labels, baseline penalties and the
-//! repeat-offence escalation ladder. The backend (PyO3) and frontend (WASM)
-//! read `sanction_reference_json`; the Discord bot fetches it from the
-//! backend's public `/sanctions/reference` endpoint. A Judges-Guide revision
-//! is applied HERE and propagates everywhere.
+//! VEKN Judges Guide v2 penalty reference — the single source of truth; a
+//! revision applied here propagates to the backend, frontend and Discord bot.
 
 /// (key, English label, baseline level).
 pub type SubcategoryDef = (&'static str, &'static str, &'static str);
@@ -133,9 +129,8 @@ pub const ESCALATION: &[&str] = &[
     "disqualification",
 ];
 
-/// The full reference as wire JSON:
-/// `{"categories": [{"key", "label", "subcategories": [{"key", "label", "baseline"}]}],
-///   "levels": [{"key", "label"}], "escalation": [level, ...]}`
+/// The full reference as wire JSON: categories (each with subcategories and a
+/// baseline), levels, and the escalation ladder.
 pub fn sanction_reference_json() -> String {
     let mut categories = json::JsonValue::new_array();
     for (key, label, subs) in CATEGORIES {

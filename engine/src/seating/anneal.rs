@@ -1,5 +1,4 @@
-//! Simulated-annealing optimization: a multi-restart driver around a single
-//! index-based annealing engine.
+//! Multi-restart driver around a single index-based annealing engine.
 
 use super::measure::{
     add_table_to_measure_idx, build_mapping, build_round_idx, clear_table_from_measure_idx,
@@ -7,7 +6,6 @@ use super::measure::{
 };
 use super::score::{compute_score, fast_lex_score, SeatingScore};
 
-/// Multi-restart simulated annealing optimization
 pub(crate) fn optimize_sa_multi(
     rounds: &mut [Vec<Vec<String>>],
     iterations_per_run: u32,
@@ -22,7 +20,6 @@ pub(crate) fn optimize_sa_multi(
     // WASM/PyO3/offline/bot all reproduce the same seating for the same input.
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
 
-    // Keep original state for restarts
     let original_rounds = rounds.to_vec();
 
     let mut best_rounds = rounds.to_vec();
@@ -56,7 +53,6 @@ pub(crate) fn optimize_sa_multi(
         }
     }
 
-    // Copy best back
     for (i, r) in best_rounds.into_iter().enumerate() {
         rounds[i] = r;
     }
@@ -64,7 +60,7 @@ pub(crate) fn optimize_sa_multi(
     best_score
 }
 
-/// Simulated annealing optimization (index-based for performance)
+/// Index-based (rather than string-keyed) for fast swapping.
 pub(crate) fn optimize_sa(
     rounds: &mut [Vec<Vec<String>>],
     iterations: u32,
@@ -86,7 +82,6 @@ pub(crate) fn optimize_sa(
         return compute_score(&total_measure, rounds_count);
     }
 
-    // Build mapping and reverse mapping
     let mapping = build_mapping(rounds);
     let n = mapping.len();
     let mut reverse_mapping: Vec<String> = vec![String::new(); n];
@@ -96,7 +91,6 @@ pub(crate) fn optimize_sa(
 
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
 
-    // Convert rounds to index-based representation for fast swapping
     let mut idx_rounds: Vec<Vec<Vec<usize>>> = rounds
         .iter()
         .map(|r| {
@@ -106,14 +100,12 @@ pub(crate) fn optimize_sa(
         })
         .collect();
 
-    // Shuffle non-fixed rounds
     for round in idx_rounds.iter_mut().skip(fixed_rounds) {
         let mut players: Vec<usize> = round.iter().flatten().copied().collect();
         players.shuffle(&mut rng);
         *round = build_round_idx(&players, n);
     }
 
-    // Compute total measure
     let mut total_measure = Measure::new(n);
     for r in idx_rounds.iter() {
         total_measure.add(&measure_round_idx(r, n));
@@ -123,12 +115,10 @@ pub(crate) fn optimize_sa(
     let mut current_score = best_score.clone();
     let mut best_state: Vec<Vec<Vec<usize>>> = idx_rounds.clone();
 
-    // Annealing parameters
     let temp_max = 1e6_f64;
     let temp_min = 0.001;
     let temp_factor = -(temp_max / temp_min).ln();
 
-    // Build position lookup: round -> [(table_idx, seat_idx), ...]
     let round_positions: Vec<Vec<(usize, usize)>> = idx_rounds
         .iter()
         .map(|r| {
@@ -145,7 +135,6 @@ pub(crate) fn optimize_sa(
         let progress = step as f64 / iterations as f64;
         let base_temperature = temp_max * (temp_factor * progress).exp();
 
-        // Pick random non-fixed round
         let round_idx = rng.gen_range(fixed_rounds..rounds_count);
         let positions = &round_positions[round_idx];
         let player_count = positions.len();
@@ -154,7 +143,6 @@ pub(crate) fn optimize_sa(
             continue;
         }
 
-        // Pick two random positions for swap
         let pos1 = rng.gen_range(0..player_count);
         let pos2 = rng.gen_range(0..player_count);
         if pos1 == pos2 {
@@ -164,20 +152,17 @@ pub(crate) fn optimize_sa(
         let (t1, s1) = positions[pos1];
         let (t2, s2) = positions[pos2];
 
-        // Clear old contribution (1 or 2 tables)
         let round = &idx_rounds[round_idx];
         clear_table_from_measure_idx(&mut total_measure, &round[t1], n);
         if t1 != t2 {
             clear_table_from_measure_idx(&mut total_measure, &round[t2], n);
         }
 
-        // Swap players
         let round = &mut idx_rounds[round_idx];
         let tmp = round[t1][s1];
         round[t1][s1] = round[t2][s2];
         round[t2][s2] = tmp;
 
-        // Add new contribution
         add_table_to_measure_idx(&mut total_measure, &round[t1], n);
         if t1 != t2 {
             add_table_to_measure_idx(&mut total_measure, &round[t2], n);
@@ -185,7 +170,6 @@ pub(crate) fn optimize_sa(
 
         let new_score = fast_lex_score(&total_measure, rounds_count);
 
-        // Accept or reject
         let accept = match new_score.cmp(&current_score) {
             std::cmp::Ordering::Less => true,
             std::cmp::Ordering::Equal => true,
@@ -207,7 +191,7 @@ pub(crate) fn optimize_sa(
             }
             current_score = new_score;
         } else {
-            // Revert: remove NEW, re-swap, add OLD back
+            // Revert: undo the swap before re-adding, or the measure double-counts.
             let round = &idx_rounds[round_idx];
             clear_table_from_measure_idx(&mut total_measure, &round[t1], n);
             if t1 != t2 {
@@ -225,7 +209,6 @@ pub(crate) fn optimize_sa(
             }
         }
 
-        // Checkpoint
         if step > 0 && step % checkpoint == 0 {
             idx_rounds = best_state.clone();
             total_measure = Measure::new(n);
@@ -240,7 +223,6 @@ pub(crate) fn optimize_sa(
         }
     }
 
-    // Convert best state back to strings
     for (r_idx, r) in best_state.iter().enumerate() {
         for (t_idx, t) in r.iter().enumerate() {
             for (s_idx, &p_idx) in t.iter().enumerate() {
@@ -252,7 +234,6 @@ pub(crate) fn optimize_sa(
     compute_score(&total_measure, rounds_count)
 }
 
-/// Get SA parameters (iterations, restarts) based on player count
 pub(crate) fn get_sa_params(n: usize) -> (u32, u32) {
     if n <= 15 {
         (80_000, 5)

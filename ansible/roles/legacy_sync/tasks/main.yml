@@ -1,9 +1,6 @@
 ---
-# Deploys the legacy-archon -> archon-vibe daily merge on the shared prod box:
-# ships the merge script (NOT in the wheel — keeps the app package free of
-# legacy-schema code), renders its env, and installs a oneshot service + daily
-# timer that runs it with the already-deployed venv. Prod-only, parallel-run;
-# remove at Phase-4 decommission. See ../wiki/vekn.md
+# Prod-only, temporary: remove this role at Phase-4 decommission. The merge
+# script ships separately (not in the wheel) to keep it free of legacy-schema code.
 - name: Assert required inputs
   ansible.builtin.assert:
     that:
@@ -70,11 +67,8 @@
     group: root
     mode: "0644"
 
-# Enable the daily timer. The first (C-3) merge is run by hand —
-# `systemctl start {{ r.service_name }}.service` — and watched before the 04:00
-# timer first fires; the pre-run pg_dump + idempotent upserts + phase-1 push-off
-# make either path safe (the ~18k vekn-account check is a manual pre-flight, not
-# enforced in the script).
+# The first merge is run by hand and watched before the 04:00 timer first fires;
+# the pre-run pg_dump + idempotent upserts make either path safe.
 - name: Enable + start the daily timer
   ansible.builtin.systemd:
     name: "{{ r.service_name }}.timer"

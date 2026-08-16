@@ -13,7 +13,6 @@
   let verifyResult = $state<VerifyMagicLinkResult | null>(null);
   let error = $state<string | null>(null);
 
-  // Password form
   let password = $state("");
   let passwordError = $state<string | null>(null);
 
@@ -42,7 +41,6 @@
   async function handleSetPassword() {
     passwordError = null;
 
-    // Validate
     if (password.length < 8) {
       passwordError = m.auth_verify_error_password_length();
       return;
@@ -80,7 +78,6 @@
 
     <div class="bg-surface-card rounded-lg shadow-lg p-8 border border-line">
       {#if verifying}
-        <!-- VERIFYING TOKEN -->
         <div class="space-y-4 text-center">
           <div class="w-16 h-16 mx-auto flex items-center justify-center">
             <Loader2 class="w-10 h-10 animate-spin text-accent" />
@@ -90,7 +87,6 @@
         </div>
 
       {:else if error}
-        <!-- ERROR -->
         <div class="space-y-4 text-center">
           <div class="w-16 h-16 mx-auto banner-error border rounded-full flex items-center justify-center">
             <X class="w-8 h-8" />
@@ -109,7 +105,6 @@
         </div>
 
       {:else if verifyResult}
-        <!-- PASSWORD FORM -->
         <div class="space-y-4">
           <h2 class="text-lg font-medium text-ink-strong text-center">{heading}</h2>
             {#if passwordError}

@@ -34,12 +34,8 @@ BASE = "https://archon.example"
 
 
 def _pub(**overrides) -> dict:
-    """Public projection of a Tournament with the given field overrides.
-
-    Built via the same model→builtins→projection path as the write path in
-    db.save_object (msgspec.to_builtins + compute_*), so the test rides the real
-    field contract rather than an invented dict.
-    """
+    """Public projection of a Tournament with the given field overrides, built
+    via the same model→builtins→projection path as the real write path."""
     fields = {"name": "Paris Open", "country": "France", **overrides}
     t = Tournament(uid="t-uid", modified=datetime.now(UTC), **fields)
     return compute_tournament_public(msgspec.to_builtins(t))

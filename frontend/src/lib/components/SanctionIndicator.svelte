@@ -4,7 +4,6 @@
 
   let { sanctions, onclick }: { sanctions: Sanction[]; onclick?: () => void } = $props();
 
-  // Only show active (non-lifted, non-deleted) sanctions
   const activeSanctions = $derived(
     sanctions.filter(s => !s.lifted_at && !s.deleted_at)
   );
@@ -19,7 +18,6 @@
     probation: "dot-danger",
   };
 
-  // Highest severity sanction determines dot color
   const SEVERITY_ORDER: SanctionLevel[] = [
     "disqualification", "suspension", "probation",
     "standings_adjustment", "warning", "caution",

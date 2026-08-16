@@ -1,28 +1,14 @@
-//! Scoring layer: the lexicographic rule score, the detailed/issue views, and
-//! the unavoidable-minimum lower bounds.
-//!
-//! Rule order (strict lexicographic priority, R1 is highest priority):
-//! - R1: predator-prey repeat (hard)
-//! - R2: opponent on all rounds (hard)
-//! - R3: VP distribution (stddev)
-//! - R4: opponent twice
-//! - R5: fifth seat twice
-//! - R6: same relative position
-//! - R7: same seat position
-//! - R8: transfers distribution (stddev)
-//! - R9: same position group
+//! The lexicographic rule score (9 counts in strict priority order), the
+//! detailed/issue views, and the unavoidable-minimum lower bounds.
 
 use super::measure::{build_mapping, measure_round, Measure};
 use crate::error::EngineError;
 
-/// Lexicographic score - array of 9 rule violation counts
-/// Compare using `cmp_lex` for strict priority ordering
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct LexScore(pub [f64; 9]);
 
 impl LexScore {
-    /// Compare two scores lexicographically
-    /// Returns Ordering::Less if self is better (lower violations)
+    /// `Ordering::Less` means self is better (lower violations).
     #[allow(clippy::should_implement_trait)]
     pub fn cmp(&self, other: &LexScore) -> std::cmp::Ordering {
         for i in 0..9 {
@@ -36,12 +22,11 @@ impl LexScore {
         std::cmp::Ordering::Equal
     }
 
-    /// Check if self is strictly better than other
     pub fn is_better(&self, other: &LexScore) -> bool {
         self.cmp(other) == std::cmp::Ordering::Less
     }
 
-    /// Get the first rule where scores differ (for temperature-based acceptance)
+    /// First rule where scores differ; feeds the annealing acceptance temperature.
     pub fn first_diff_rule(&self, other: &LexScore) -> Option<(usize, f64)> {
         for i in 0..9 {
             let diff = self.0[i] - other.0[i];
@@ -52,13 +37,11 @@ impl LexScore {
         None
     }
 
-    /// Check if all rules are zero (perfect score)
     pub fn is_perfect(&self) -> bool {
         self.0.iter().all(|&x| x < 1e-10)
     }
 }
 
-/// Scoring result with detailed rule violations
 #[derive(Clone, Debug)]
 pub struct SeatingScore {
     pub rules: [f64; 9],
@@ -75,7 +58,6 @@ impl SeatingScore {
         }
     }
 
-    /// Check if self is strictly better than other (lexicographically)
     pub fn is_better(&self, other: &SeatingScore) -> bool {
         for i in 0..9 {
             if self.rules[i] < other.rules[i] {
@@ -88,17 +70,13 @@ impl SeatingScore {
         false
     }
 
-    /// Check if all rules are zero (perfect score)
     pub fn is_perfect(&self) -> bool {
         self.rules.iter().all(|&x| x < 1e-10)
     }
 }
 
-/// Core scorer shared by [`fast_lex_score`] and [`compute_score`].
-///
-/// Returns the 9 rule-violation counts plus the mean VPs / transfers. When no
-/// player has played, every count and mean is 0 (the diagonal and off-diagonal
-/// reads are all zero), so callers needn't special-case the empty matrix.
+/// Shared by `fast_lex_score` and `compute_score`. Returns 0 for every count
+/// and mean when no player has played — callers needn't special-case that.
 fn score_measure(measure: &Measure, rounds_count: usize) -> ([f64; 9], f64, f64) {
     let n = measure.n();
     let mut playing_count = 0;
@@ -107,7 +85,6 @@ fn score_measure(measure: &Measure, rounds_count: usize) -> ([f64; 9], f64, f64)
     let mut vps_list = Vec::with_capacity(n);
     let mut transfers_list = Vec::with_capacity(n);
 
-    // Collect position data from diagonal
     for i in 0..n {
         let played = measure.get(i, i, 0);
         if played > 0 {
@@ -138,7 +115,6 @@ fn score_measure(measure: &Measure, rounds_count: usize) -> ([f64; 9], f64, f64)
         (0.0, 0.0, 0.0, 0.0)
     };
 
-    // Count violations from position data
     let mut r5 = 0.0; // Fifth seat twice
     let mut r7 = 0.0; // Same seat twice
     for i in 0..n {
@@ -153,7 +129,6 @@ fn score_measure(measure: &Measure, rounds_count: usize) -> ([f64; 9], f64, f64)
         }
     }
 
-    // Count violations from opponent relationships
     let mut r1 = 0.0; // Predator-prey repeat
     let mut r2 = 0.0; // Opponent all rounds
     let mut r4 = 0.0; // Opponent twice
@@ -196,12 +171,11 @@ fn score_measure(measure: &Measure, rounds_count: usize) -> ([f64; 9], f64, f64)
     )
 }
 
-/// Compute lexicographic score for optimization (hot path)
+/// Hot-path score for optimization — bare rule counts, no means.
 pub(crate) fn fast_lex_score(measure: &Measure, rounds_count: usize) -> LexScore {
     LexScore(score_measure(measure, rounds_count).0)
 }
 
-/// Compute detailed score (rule counts + means)
 pub(crate) fn compute_score(measure: &Measure, rounds_count: usize) -> SeatingScore {
     let (rules, mean_vps, mean_transfers) = score_measure(measure, rounds_count);
     SeatingScore {
@@ -211,7 +185,6 @@ pub(crate) fn compute_score(measure: &Measure, rounds_count: usize) -> SeatingSc
     }
 }
 
-/// Total-measure a full set of rounds and score it.
 pub(crate) fn score_total(rounds: &[Vec<Vec<String>>]) -> SeatingScore {
     let mapping = build_mapping(rounds);
     let total = rounds
@@ -223,11 +196,10 @@ pub(crate) fn score_total(rounds: &[Vec<Vec<String>>]) -> SeatingScore {
     compute_score(&total, rounds.len())
 }
 
-/// Per-player seating issue
 #[derive(Debug, Clone)]
 pub struct SeatingIssue {
-    pub rule: usize,          // 0-8 (R1-R9)
-    pub players: Vec<String>, // involved player UIDs
+    pub rule: usize, // 0-8 (R1-R9)
+    pub players: Vec<String>,
 }
 
 impl SeatingIssue {
@@ -240,8 +212,6 @@ impl SeatingIssue {
 }
 
 #[allow(clippy::needless_range_loop)] // `i`/`j` index both matrix and `reverse` vec
-/// Compute per-player seating issues (which players violate which rules).
-/// Returns a list of SeatingIssue, each identifying a rule and the involved player UIDs.
 /// Ported from legacy Evaluator.issues().
 pub fn compute_player_issues(rounds: &[Vec<Vec<String>>]) -> Vec<SeatingIssue> {
     if rounds.is_empty() {
@@ -252,12 +222,10 @@ pub fn compute_player_issues(rounds: &[Vec<Vec<String>>]) -> Vec<SeatingIssue> {
     if n == 0 {
         return vec![];
     }
-    // Build reverse mapping
     let mut reverse: Vec<String> = vec![String::new(); n];
     for (name, &idx) in &mapping {
         reverse[idx] = name.clone();
     }
-    // Compute total measure
     let total = rounds.iter().fold(Measure::new(n), |mut acc, r| {
         acc.add(&measure_round(&mapping, r));
         acc
@@ -266,7 +234,6 @@ pub fn compute_player_issues(rounds: &[Vec<Vec<String>>]) -> Vec<SeatingIssue> {
 
     let mut issues = Vec::new();
 
-    // Compute global values
     let mut mean_vps = 0.0_f64;
     let mut mean_trs = 0.0_f64;
     let mut playing = 0_usize;
@@ -285,7 +252,6 @@ pub fn compute_player_issues(rounds: &[Vec<Vec<String>>]) -> Vec<SeatingIssue> {
     mean_vps /= playing as f64;
     mean_trs /= playing as f64;
 
-    // Diagonal checks (per-player)
     for i in 0..n {
         let rounds_played = total.get(i, i, 0);
         if rounds_played == 0 {
@@ -325,7 +291,6 @@ pub fn compute_player_issues(rounds: &[Vec<Vec<String>>]) -> Vec<SeatingIssue> {
         }
     }
 
-    // Off-diagonal checks (pair-wise)
     for i in 0..n {
         for j in 0..i {
             let opponent_count = total.get(i, j, 0);
@@ -344,7 +309,6 @@ pub fn compute_player_issues(rounds: &[Vec<Vec<String>>]) -> Vec<SeatingIssue> {
                         players: vec![reverse[i].clone(), reverse[j].clone()],
                     });
                 }
-                // Check specific relationships
                 for k in 1..6 {
                     if total.get(i, j, k) > 1 {
                         // R6: Same position
@@ -379,11 +343,8 @@ pub fn compute_player_issues(rounds: &[Vec<Vec<String>>]) -> Vec<SeatingIssue> {
     issues
 }
 
-/// Compute lower-bound minimum violations for a given round structure.
-///
-/// These represent violations that are mathematically unavoidable given the
-/// number of players, rounds, and table sizes. Violations at or below these
-/// minimums are expected; violations above indicate suboptimal seating.
+/// Mathematically-unavoidable lower bounds given the player/round/table-size
+/// counts. Violations at or below these are expected; above is suboptimal.
 pub fn compute_minimum_violations(rounds: &[Vec<Vec<String>>]) -> [f64; 9] {
     let r = rounds.len();
     if r == 0 {
@@ -396,8 +357,7 @@ pub fn compute_minimum_violations(rounds: &[Vec<Vec<String>>]) -> [f64; 9] {
         return [0.0; 9];
     }
 
-    // --- R4 minimum (opponent twice): pigeonhole on pair-slots ---
-    // Total opponent-pair-slots across all rounds
+    // R4 minimum: pigeonhole bound on pair-slots vs. available unique pairs.
     let total_pair_slots: usize = rounds
         .iter()
         .map(|round| {
@@ -407,7 +367,6 @@ pub fn compute_minimum_violations(rounds: &[Vec<Vec<String>>]) -> [f64; 9] {
                 .sum::<usize>()
         })
         .sum();
-    // Available unique pairs (all players that ever participated)
     let available_pairs = n * (n - 1) / 2;
     let r4_min = if total_pair_slots > available_pairs && r > 1 {
         let excess = total_pair_slots - available_pairs;
@@ -416,13 +375,10 @@ pub fn compute_minimum_violations(rounds: &[Vec<Vec<String>>]) -> [f64; 9] {
         0.0
     };
 
-    // --- R2 minimum (opponent all rounds) ---
-    // If every round has exactly 1 table (≤5 players per round), all pairs that
-    // co-participate in all rounds must meet in every round.
-    // For multi-table rounds, pairs CAN theoretically be separated → min 0.
+    // R2 minimum: with one table per round, any pair playing every round must
+    // meet every round; multi-table rounds can always separate such a pair.
     let all_single_table = rounds.iter().all(|round| round.len() == 1);
     let r2_min = if all_single_table && r >= 2 {
-        // Find players who participate in ALL rounds
         let mut play_counts = vec![0usize; n];
         for round in rounds {
             for table in round {
@@ -432,18 +388,13 @@ pub fn compute_minimum_violations(rounds: &[Vec<Vec<String>>]) -> [f64; 9] {
             }
         }
         let all_round_players = play_counts.iter().filter(|&&c| c >= r).count();
-        // C(all_round_players, 2)
         (all_round_players * all_round_players.saturating_sub(1) / 2) as f64
     } else {
         0.0
     };
 
-    // --- R7 minimum (same seat position twice) ---
-    // A player at 4-player tables has 4 possible seats; at 5-player, 5 seats.
-    // If they play more rounds than available seats, seat repeats are forced.
-    // With mixed table sizes, available distinct seats = up to 4+5=9.
-    // Conservatively: if a player plays r rounds at only 4-player tables, repeats
-    // after 4 rounds. We compute per-player.
+    // R7 minimum: pigeonhole on seat slots — 4 seats at 4-tables, 5 at
+    // 5-tables, 9 if a player sees both; more rounds than that forces a repeat.
     let mut r7_min = 0.0;
     let mut player_table_sizes: Vec<Vec<usize>> = vec![vec![]; n];
     for round in rounds {
@@ -470,8 +421,7 @@ pub fn compute_minimum_violations(rounds: &[Vec<Vec<String>>]) -> [f64; 9] {
         }
     }
 
-    // --- R5 minimum (fifth seat twice) ---
-    // Only relevant if a player plays at 5-player tables more than 5 times
+    // R5 minimum: only forced past 5 rounds at 5-player tables.
     let mut r5_min = 0.0;
     for sizes in &player_table_sizes {
         let five_table_rounds = sizes.iter().filter(|&&s| s == 5).count();
@@ -480,22 +430,16 @@ pub fn compute_minimum_violations(rounds: &[Vec<Vec<String>>]) -> [f64; 9] {
         }
     }
 
-    // --- R3 minimum (VP stddev) ---
-    // If all tables across all rounds are the same size, min = 0.
-    // If mixed (4 and 5), some minimum variance is unavoidable.
-    // R3 minimum: with mixed table sizes (4 and 5), some VP variance is unavoidable
-    // due to integer assignment constraints. Exact computation requires solving an
-    // assignment problem; use 0 as conservative lower bound for now.
+    // R3 minimum: exact value needs solving an assignment problem; 0 is a
+    // conservative placeholder (mixed table sizes make some variance unavoidable).
     let r3_min = 0.0;
 
-    // R1 (predator-prey repeat): always 0 minimum (hard constraint, must never happen)
-    // R6 (same relative position): 0 (complex, conservative)
-    // R8 (transfer stddev): same logic as R3, use 0 for now
-    // R9 (same position group): 0 (complex, conservative)
+    // R1/R6/R8/R9 stay 0: R1 is a hard constraint (never violated), the rest
+    // are conservative placeholders like R3 (exact bounds are complex to derive).
     [0.0, r2_min, r3_min, r4_min, r5_min, 0.0, r7_min, 0.0, 0.0]
 }
 
-/// Score an existing seating arrangement without optimization.
+/// Scores an existing seating arrangement without optimizing it.
 pub fn score_rounds(rounds: &[Vec<Vec<String>>]) -> Result<SeatingScore, EngineError> {
     if rounds.is_empty() {
         return Err(EngineError::internal("No rounds to score"));

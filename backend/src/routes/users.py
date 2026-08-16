@@ -1,5 +1,3 @@
-"""User API endpoints."""
-
 import logging
 from datetime import UTC, datetime
 from uuid import uuid7
@@ -27,7 +25,6 @@ from .auth import send_invite_email
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 logger = logging.getLogger(__name__)
-# Encoder with decimal_format to handle all types properly
 encoder = msgspec.json.Encoder()
 
 
@@ -60,33 +57,27 @@ class UpdateUserRequest(BaseModel):
 async def create_user(
     body: CreateUserRequest, current_user: OptionalUser = None
 ) -> Response:
-    """Create a new user.
-
-    Auto-allocates a VEKN ID for the new user.
-    If email is provided, sends an invite email so they can log in.
-    """
+    """Auto-allocates a VEKN ID. If email is provided, sends an invite email so
+    the new member can log in."""
     name = body.name
     # Normalize country casing: storage + the same-country overlay match
     # (broadcast.py) compare exact, so a raw lower-case payload would corrupt it.
     country = body.country.upper() if body.country else body.country
     city, city_geoname_id = body.city, body.city_geoname_id
     state, nickname, email, roles = body.state, body.nickname, body.email, body.roles
-    # Authenticate current user
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    # Only IC, NC, or Prince can create users
     if not permissions.can_sponsor_member(current_user):
         raise HTTPException(
             status_code=403,
             detail="Only IC, NC, or Prince can create users",
         )
 
-    # Validate and convert roles if provided
     validated_roles: list[Role] = []
     if roles is not None:
         for role_str in roles:
-            if not role_str:  # Skip empty strings
+            if not role_str:
                 continue
             try:
                 validated_roles.append(Role(role_str))
@@ -96,11 +87,8 @@ async def create_user(
                     detail=f"Invalid role: {role_str}. Valid roles: {[r.value for r in Role]}",
                 ) from err
 
-    # Door-dedup: an email already on a live member means this person almost
-    # certainly already has an account. Don't mint a duplicate — 409 with the
-    # matched uid so the caller pivots to sponsor+register that account instead.
-    # The client resolves name/vekn from its local member projection (which
-    # carries every user), so only the uid is needed on the wire.
+    # Door-dedup: an existing email match 409s with the matched uid instead of
+    # minting a duplicate, so the caller pivots to sponsor+register that account.
     if email:
         existing = await get_user_by_contact_email(email)
         if existing:
@@ -113,7 +101,6 @@ async def create_user(
                 },
             )
 
-    # Auto-allocate VEKN ID
     vekn_id = await allocate_next_vekn_id()
 
     user = User(
@@ -132,7 +119,6 @@ async def create_user(
         coopted_at=datetime.now(UTC),
     )
 
-    # Check role permissions if assigning roles
     for role in validated_roles:
         if not permissions.can_change_role(current_user, user, role):
             raise HTTPException(
@@ -142,7 +128,6 @@ async def create_user(
 
     bd = await db_save_user(user)
 
-    # Send invite email if provided
     if email:
         try:
             await send_invite_email(email.lower(), user.uid, user.name)
@@ -151,14 +136,13 @@ async def create_user(
             logger.error(f"Failed to send invite email to {email}: {e}")
             # Don't fail the request, user is already created
 
-    # Push new member to VEKN (fire-and-forget, batch_push catches failures)
+    # Fire-and-forget; batch_push catches failures.
     import asyncio
 
     from ..vekn_push import push_member_background
 
     asyncio.create_task(push_member_background(user))
 
-    # Broadcast to SSE clients
     broadcast_precomputed(bd)
 
     return Response(
@@ -172,26 +156,21 @@ async def create_user(
 async def update_user(
     uid: str, body: UpdateUserRequest, current_user: OptionalUser = None
 ) -> Response:
-    """Update an existing user."""
     name = body.name
     # Normalize country casing: storage + the same-country overlay match
     # (broadcast.py) compare exact, so a raw lower-case payload would corrupt it.
     country = body.country.upper() if body.country else body.country
     city, city_geoname_id = body.city, body.city_geoname_id
     state, nickname, roles = body.state, body.nickname, body.roles
-    # Authenticate current user
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    # Fetch existing user
     user = await get_user_by_uid(uid)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Two independent gates over one endpoint: profile fields take edit
-    # authority, roles take the appointment matrix. A Rulemonger or PTC holds
-    # the second without the first, so a roles-only request must not be turned
-    # away here — but any profile field they send still is.
+    # Profile fields and roles are gated separately: a Rulemonger/PTC-only roles
+    # request must pass even without edit authority, but any profile field turns it away.
     edits_profile = any(
         field is not None
         for field in (name, country, city, city_geoname_id, state, nickname)
@@ -206,9 +185,8 @@ async def update_user(
     old_roles = set(user.roles)
     old_country = user.country
 
-    # Country scopes an official's FULL-data overlay, so changing an official's
-    # country takes the authority that could change their official role. Gated on
-    # the target's current roles (what they are), not any roles in this request.
+    # Changing country moves an official's FULL-data overlay scope, so it needs the
+    # authority that could change their role — gated on the target's CURRENT roles.
     if (
         country is not None
         and country != old_country
@@ -219,16 +197,14 @@ async def update_user(
             detail="You don't have permission to change this official's country",
         )
 
-    # Track which fields are being modified locally
     local_mods = set(user.local_modifications)
 
-    # Validate and convert roles if provided
     validated_roles: list[Role] | None = None
     if roles is not None:
         validated_roles = []
-        # Filter out empty strings (used to signal "clear all roles")
+        # An empty string in the list signals "clear all roles".
         for role_str in roles:
-            if not role_str:  # Skip empty strings
+            if not role_str:
                 continue
             try:
                 validated_roles.append(Role(role_str))
@@ -238,7 +214,6 @@ async def update_user(
                     detail=f"Invalid role: {role_str}. Valid roles: {[r.value for r in Role]}",
                 ) from err
 
-        # Check permission for each role change
         old_roles = set(user.roles)
         new_roles = set(validated_roles)
         added_roles = new_roles - old_roles
@@ -251,7 +226,6 @@ async def update_user(
                     detail=f"You don't have permission to change the {role.value} role",
                 )
 
-        # Ensure target has VEKN ID if any roles are being set
         if validated_roles and not user.vekn_id:
             raise HTTPException(
                 status_code=400,
@@ -260,7 +234,6 @@ async def update_user(
 
         local_mods.add("roles")
 
-    # Update fields - only if at least one field is being updated
     if (
         name is not None
         or country is not None
@@ -270,7 +243,6 @@ async def update_user(
         or nickname is not None
         or validated_roles is not None
     ):
-        # Track which fields are modified
         if name is not None:
             local_mods.add("name")
         if country is not None:
@@ -281,9 +253,8 @@ async def update_user(
             local_mods.add("city_geoname_id")
         if state is not None:
             local_mods.add("state")
-        # nickname is in the legacy merge's ARCHON_USER_FIELDS, so an untracked
-        # official-set nickname is reverted at the next nightly merge (the twin
-        # PATCH /auth/me tracks it for the same reason).
+        # nickname is in the legacy merge's ARCHON_USER_FIELDS; untracked, it
+        # reverts at the next nightly merge (mirrors PATCH /auth/me).
         if nickname is not None:
             local_mods.add("nickname")
 
@@ -302,19 +273,10 @@ async def update_user(
             local_modifications=local_mods,
         )
 
-    # Save to database
     bd = await db_save_user(user)
 
-    # Resync when the user's VIEWER entitlement changes: the overlay roles they
-    # hold (NC/IC), or — for an NC — their country, which scopes their FULL-level
-    # overlay (IC sees full everywhere, so an IC country change is
-    # overlay-neutral). Must stay in lockstep with db._OVERLAY_ROLES and
-    # broadcast.entitled_level. Other roles change no projection they can see, so
-    # resyncing on them just empties caches for ~10s for nothing — a Prince's own
-    # projection does change (they enter the public officials directory), but
-    # that reaches every viewer through broadcast_precomputed below, not through
-    # their own resync. Offline clients self-heal via the access-version
-    # fingerprint at connect; this is the online nudge.
+    # Only NC/IC role changes or an NC's country change move the access-version
+    # fingerprint — must stay in lockstep with db._OVERLAY_ROLES and broadcast.entitled_level.
     new_roles = set(user.roles)
     access_roles = {Role.NC, Role.IC}
     roles_access_changed = (old_roles & access_roles) != (new_roles & access_roles)
@@ -324,14 +286,13 @@ async def update_user(
     if roles_access_changed or country_overlay_changed:
         await broadcast_resync(user.uid)
     if new_roles != old_roles:
-        # Update Discord Linked Roles metadata (any role change, access-affecting or not)
+        # Any role delta, not just access-affecting ones.
         import asyncio
 
         from ..roles_hook import sync_user_discord_roles
 
         asyncio.create_task(sync_user_discord_roles(user.uid))
 
-    # Broadcast to SSE clients
     broadcast_precomputed(bd)
 
     return Response(
@@ -340,8 +301,7 @@ async def update_user(
     )
 
 
-# Avatar endpoints
-MAX_AVATAR_SIZE = 1024 * 1024  # 1MB
+MAX_AVATAR_SIZE = 1024 * 1024
 
 
 @router.post("/{uid}/avatar")
@@ -350,26 +310,18 @@ async def upload_avatar(
     file: UploadFile,
     current_user: OptionalUser = None,
 ) -> Response:
-    """Upload or update user avatar.
-
-    Expects a webp image, max 1MB. Client should resize/crop before upload.
-    """
-    # Authenticate
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    # Users can only upload their own avatar
     if current_user.uid != uid:
         raise HTTPException(status_code=403, detail="Can only upload your own avatar")
 
-    # Validate content type
     if file.content_type not in ("image/webp", "image/png", "image/jpeg"):
         raise HTTPException(
             status_code=400,
             detail="Avatar must be webp, png, or jpeg",
         )
 
-    # Read and validate size
     data = await file.read()
     if len(data) > MAX_AVATAR_SIZE:
         raise HTTPException(
@@ -377,12 +329,10 @@ async def upload_avatar(
             detail=f"Avatar too large. Max size: {MAX_AVATAR_SIZE // 1024}KB",
         )
 
-    # Store in database
     await db_upsert_avatar(uid, data, file.content_type or "image/webp")
 
-    # Update user's avatar_path with a versioned URL: a re-upload yields a new
-    # URL, so SSE propagates the change and every client refetches at once,
-    # while each version stays long-cacheable (see get_avatar cache headers).
+    # Versioned avatar_path: a re-upload gets a new URL so SSE propagates the change
+    # and clients refetch, while each version stays long-cacheable (see get_avatar).
     user = await get_user_by_uid(uid)
     if user:
         now = datetime.now(UTC)
@@ -394,7 +344,6 @@ async def upload_avatar(
         )
         bd = await db_save_user(updated_user)
 
-        # Broadcast user update via SSE
         broadcast_precomputed(bd)
 
     return Response(
@@ -405,11 +354,8 @@ async def upload_avatar(
 
 @router.get("/{uid}/avatar")
 async def get_avatar(uid: str, request: Request) -> Response:
-    """Get user avatar image.
-
-    A versioned (?v=) URL is immutable content, so it can be cached for a year;
-    a legacy unversioned request gets a short TTL and revalidates hourly.
-    """
+    """A versioned (?v=) URL is immutable content, cached for a year; a legacy
+    unversioned request gets a short TTL and revalidates hourly."""
     result = await db_get_avatar(uid)
     if not result:
         raise HTTPException(status_code=404, detail="Avatar not found")
@@ -432,21 +378,16 @@ async def delete_avatar(
     uid: str,
     current_user: OptionalUser = None,
 ) -> Response:
-    """Delete user avatar."""
-    # Authenticate
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    # Users can only delete their own avatar
     if current_user.uid != uid:
         raise HTTPException(status_code=403, detail="Can only delete your own avatar")
 
-    # Delete from database
     deleted = await db_delete_avatar(uid)
     if not deleted:
         raise HTTPException(status_code=404, detail="Avatar not found")
 
-    # Update user's avatar_path to None
     user = await get_user_by_uid(uid)
     if user:
         updated_user = msgspec.structs.replace(
@@ -456,7 +397,6 @@ async def delete_avatar(
         )
         bd = await db_save_user(updated_user)
 
-        # Broadcast user update via SSE
         broadcast_precomputed(bd)
 
     return Response(
@@ -466,7 +406,7 @@ async def delete_avatar(
 
 
 class LinkModerationRequest(BaseModel):
-    url: str  # link URL to moderate
+    url: str
     action: str  # "hide" | "promote_national" | "promote_global" | "clear"
 
 
@@ -476,14 +416,8 @@ async def moderate_community_link(
     request: LinkModerationRequest,
     current_user: CurrentUser,
 ) -> Response:
-    """Moderate a community link on a target user.
-
-    Hide/clear: IC anywhere, NC in the same country as the target.
-    promote_national: same, but never delegated further down.
-    promote_global: IC only.
-    Self-moderation is allowed: officials pin their own links this way.
-    """
-    # Get target user
+    """Moderate a community link on a target user. Self-moderation is allowed:
+    officials pin their own links through the same grant."""
     target = await get_user_by_uid(user_uid)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
@@ -533,7 +467,6 @@ async def moderate_community_link(
                 " 'promote_global', or 'clear'",
             )
 
-    # Find and update the link
     updated_links = []
     found = False
     for link in target.community_links:
@@ -564,11 +497,8 @@ class DeceasedRequest(BaseModel):
 async def set_deceased(
     uid: str, body: DeceasedRequest, current_user: CurrentUser
 ) -> Response:
-    """Mark or clear a member's deceased status.
-
-    IC anywhere, NC in the same country as the target (Prince excluded).
-    Not a soft-delete: history and ratings are preserved. Reversible.
-    """
+    """Mark or clear a member's deceased status. Not a soft-delete: history
+    and ratings are preserved. Reversible."""
     if current_user.uid == uid:
         raise HTTPException(
             status_code=403, detail="You cannot change your own deceased status"
@@ -584,9 +514,8 @@ async def set_deceased(
             detail="Only IC, or the member's national coordinator, can change deceased status",
         )
 
-    # Symmetric with delete: deceased is for VEKN members (real people); a
-    # VEKN-less member is local junk, removed via delete instead. Block only
-    # SETTING — clearing a legacy mis-mark stays allowed so it can't get stuck.
+    # Block only SETTING on a VEKN-less member (delete instead) — clearing a
+    # legacy mis-mark stays allowed so it can't get stuck.
     if body.deceased and not target.vekn_id:
         raise HTTPException(
             status_code=400,
@@ -612,14 +541,8 @@ async def set_deceased(
 
 @router.delete("/{uid}")
 async def delete_member(uid: str, current_user: CurrentUser) -> Response:
-    """Soft-delete a VEKN-less member (IC only).
-
-    Soft, never hard: historical tournament references must still resolve, so
-    the row stays cached and is only filtered out of listings. The inverse of
-    marking deceased — VEKN-bearing members are upstream-authoritative (the next
-    VEKN sync would recreate a tombstoned one), so they're refused here and
-    handled via deceased status instead.
-    """
+    """Soft-delete a VEKN-less member (IC only). A VEKN-bearing member is
+    refused: the next VEKN sync would just recreate a tombstoned one."""
     if current_user.uid == uid:
         raise HTTPException(
             status_code=403, detail="You cannot delete your own account"

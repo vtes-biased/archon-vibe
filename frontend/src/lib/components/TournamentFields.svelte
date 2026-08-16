@@ -55,12 +55,8 @@
     disabled?: boolean;
     disabledFields?: Set<string>;
     idPrefix?: string;
-    /**
-     * Same sections either way — only what starts open differs, because the two
-     * jobs differ. Creating means filling the required path, so it opens.
-     * Editing is targeted: you came to change one thing, and a closed list of
-     * peers is the index that gets you there.
-     */
+    /** Same sections either way — only what starts open differs. Creating opens the required path;
+     * editing is targeted, so peers stay a closed index to navigate from. */
     mode?: "create" | "edit";
     /** Rendered at the foot of the Venue section (the table-rooms editor). */
     venueExtra?: Snippet;
@@ -80,8 +76,7 @@
     });
   });
 
-  // Leagues the user may attach tournaments to (selectable): league editors,
-  // or a same-country Prince when the league is open to them.
+  // Leagues the user may attach to (selectable): league editors, or a same-country Prince when open to them.
   const myLeagues = $derived(
     allActiveLeagues.filter(l => canLinkTournamentToLeague(auth.user, l))
   );
@@ -104,7 +99,6 @@
   let visibilityOpen = $state(false);
   let descriptionOpen = $state(false);
 
-  // What-players-see helpers: name when the reveal happens, per selected mode.
   function standingsHelp(mode: string): string {
     switch (mode) {
       case "Private": return m.tfield_standings_help_private();
@@ -155,13 +149,10 @@
   }
 </script>
 
-<!-- Sections are peers, named for what they configure. There is deliberately no
-     "Advanced": that names a frequency, not a topic, so it becomes the bucket
-     everything unplaced falls into — which is how round count and timer, both
-     core to running an event, ended up two folds deep. -->
+<!-- Sections are peers, named for what they configure — deliberately no "Advanced", which names a
+     frequency not a topic and becomes a dumping ground. -->
 
 <FoldableSection title={m.tfield_section_basics()} bind:open={basicsOpen}>
-  <!-- Name -->
   <div>
     <label class="block text-sm text-ink-muted mb-1" for={id("name")}>{m.tfield_name_label()} <span class="text-link text-xs">({m.common_required()})</span></label>
     <input
@@ -176,7 +167,6 @@
     />
   </div>
 
-  <!-- Format & Rank -->
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
     <div>
       <label class="block text-sm text-ink-muted mb-1" for={id("format")}>{m.tfield_format()}</label>
@@ -209,11 +199,8 @@
         disabled={disabled || disabledFields.has("rank") || values.format === "V5"}
         onchange={(e) => {
           const rank = (e.target as HTMLSelectElement).value;
-          // Championships forbid proxies/multideck (engine-enforced): clear the
-          // local values only — persistence is owned by the parent (the config
-          // form bundles rank+proxies+multideck into one save; the create form
-          // posts the whole values object). Emitting per-field clears here would
-          // double-save.
+          // Championships forbid proxies/multideck (engine-enforced): clear the local values only —
+          // persistence is the parent's (bundled into one save), so emitting per-field clears here would double-save.
           if (rank) {
             values.proxies = false;
             values.multideck = false;
@@ -234,7 +221,6 @@
     </div>
   </div>
 
-  <!-- League -->
   {#if allActiveLeagues.length > 0}
     <div>
       <label class="block text-sm text-ink-muted mb-1" for={id("league")}>{m.tfield_league()}</label>
@@ -261,7 +247,6 @@
     </div>
   {/if}
 
-  <!-- Dates & Timezone -->
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
     <div>
       <label class="block text-sm text-ink-muted mb-1" for={id("start")}>{m.tfield_start()} <span class="text-link text-xs">({m.common_required()})</span></label>
@@ -353,7 +338,6 @@
 </FoldableSection>
 
 <FoldableSection title={m.tfield_section_location()} bind:open={locationOpen}>
-  <!-- Online toggle -->
   <label class="flex items-center gap-3 cursor-pointer">
     <input
       type="checkbox"
@@ -375,7 +359,6 @@
     <span class="text-sm text-ink-bright">{m.tfield_online()}</span>
   </label>
 
-  <!-- Location fields (hidden when online) -->
   {#if !values.online}
     <div>
       <label class="block text-sm text-ink-muted mb-1" for={id("country")}>{m.common_country()} <span class="text-link text-xs">({m.common_required()})</span></label>
@@ -395,7 +378,6 @@
     </div>
   {/if}
 
-  <!-- Venue (always shown) -->
   <div>
     <label class="block text-sm text-ink-muted mb-1" for={id("venue")}>{m.tfield_venue()}</label>
     <VenueAutocomplete
@@ -409,7 +391,6 @@
     />
   </div>
 
-  <!-- Venue URL (always shown) -->
   <div>
     <label class="block text-sm text-ink-muted mb-1" for={id("venue-url")}>{m.tfield_venue_url()}</label>
     <input
@@ -424,7 +405,6 @@
   </div>
 
   {#if !values.online}
-    <!-- Address -->
     <div>
       <label class="block text-sm text-ink-muted mb-1" for={id("address")}>{m.tfield_address()}</label>
       <input
@@ -438,7 +418,6 @@
       />
     </div>
 
-    <!-- Map URL -->
     <div>
       <label class="block text-sm text-ink-muted mb-1" for={id("map-url")}>{m.tfield_map_url()}</label>
       <input
@@ -529,9 +508,8 @@
       <p class="text-xs text-ink-faint mt-1">{m.tfield_max_players_desc()}</p>
     </div>
 
-    <!-- Self-organized rounds: an open-rounds opt-in with no further prerequisite
-         (works offline and with or without a per-player cap) — lets present players
-         seat their own pod without an organizer. -->
+    <!-- Self-organized rounds: an open-rounds opt-in with no further prerequisite (works offline, with
+         or without a per-player cap) — lets present players seat their own pod without an organizer. -->
     {#if values.open_rounds}
       <div>
         <label class="flex items-center gap-3 cursor-pointer">

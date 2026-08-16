@@ -47,25 +47,20 @@ class BroadcastData:
     # The tournament a sanction/deck belongs to (None for tournaments/users/
     # leagues). Lets a tournament-scoped SSE connection match related objects.
     tournament_uid: str | None = None
-    # Authoritative modified_at (DB clock) of the written row. Emitted in the
-    # live SSE envelope as `ts` so clients advance their sync cursor in the same
-    # value space the `since` catch-up filter uses (not the payload's `modified`,
-    # which is an independent app-clock value in a different format).
+    # DB-clock modified_at, emitted as the SSE envelope `ts` for cursor advance —
+    # not the payload's app-clock `modified`, a different format and value space.
     modified_at: str | None = None
 
 
-# Database connection string from environment
 DB_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://archon:archon_dev_password@localhost:5433/archon",
 )
 
-# Pool ceiling. One async uvicorn worker, so this bounds the backend's PG
-# backends (~5-10MB RSS each). Lowered via env on the memory-constrained prod
-# box that shares one cluster with legacy archon; beta/dev keep the default.
+# Bounds PG backend RSS (~5-10MB each, one async worker). Lowered via env on
+# the memory-constrained prod box sharing a cluster with legacy archon.
 POOL_MAX_SIZE = int(os.getenv("DB_POOL_MAX_SIZE", "20"))
 
-# Global connection pool
 _pool: AsyncConnectionPool | None = None
 
 
@@ -76,30 +71,14 @@ class _ActiveTx(NamedTuple):
     task: "asyncio.Task | None"
 
 
-# Ambient transaction connection. `tournament_transaction` sets this to its
-# locked connection for the duration of the `async with` block; while it is set,
-# `get_connection()` (and therefore every DB helper that calls it) transparently
-# runs on that one connection instead of checking out a fresh one. This keeps a
-# single in-flight action to ONE pooled connection — it cannot starve the pool by
-# acquiring more while holding the FOR UPDATE lock — and makes every nested
-# read/write part of the same transaction. See `get_connection`.
-#
-# INVARIANT: never start a DB-touching `asyncio.create_task`/`gather` inside a
-# transaction. A child task inherits this ContextVar (and the connection) and
-# would interleave operations on it with the parent and/or outlive the `with`
-# block. We do NOT rely on discipline alone: `get_connection` records the owner
-# task and raises if the ambient connection is reached from any other task, so
-# such misuse fails loudly instead of corrupting the wire protocol. (Today all
-# spawned DB tasks — Discord role sync, VEKN sync — fire post-commit, outside any
-# transaction, so the var is unset when their context is copied.)
+# Ambient transaction connection; see `_acquire`/`get_connection`. Never start a
+# DB-touching task while set — `_acquire` raises if reached from another task.
 _tx_conn: ContextVar["_ActiveTx | None"] = ContextVar("_tx_conn", default=None)
 
 
 async def init_db() -> None:
-    """Initialize database connection pool and schema."""
     global _pool
 
-    # Create connection pool with autocommit enabled
     _pool = AsyncConnectionPool(
         conninfo=DB_URL,
         min_size=2,
@@ -119,7 +98,6 @@ async def init_db() -> None:
 
 
 async def close_db() -> None:
-    """Close database connection pool."""
     global _pool
     if _pool:
         await _pool.close()
@@ -128,13 +106,11 @@ async def close_db() -> None:
 
 @asynccontextmanager
 async def get_connection() -> AsyncIterator[psycopg.AsyncConnection]:
-    """Check a connection out of the pool (the raw pool primitive).
+    """Check a connection out of the pool — always pools, not ambient-aware.
 
-    This always pools — it is intentionally NOT ambient-aware, so writers that
-    must commit independently of an open `tournament_transaction` (e.g. the
-    go-online VEKN-ID allocation loop, where each new user must be committed and
-    visible before the next `allocate_next_vekn_id`) keep their own connection.
-    Reads that should join an open transaction go through `_acquire`.
+    Writers that must commit independently of an open transaction (e.g.
+    go-online's per-user VEKN allocation loop) use this directly; reads that
+    should join an open transaction go through `_acquire`.
     """
     if not _pool:
         raise RuntimeError("Database not initialized")
@@ -146,12 +122,11 @@ async def get_connection() -> AsyncIterator[psycopg.AsyncConnection]:
 async def batch_read_connection(
     statement_timeout_ms: int = 120_000,
 ) -> AsyncIterator[psycopg.AsyncConnection]:
-    """Pooled connection with a relaxed statement_timeout for internal batch jobs
-    (snapshot gen, VEKN push) whose full-corpus reads outlast the 30s user-request
-    guard when this shared VPS's disk is latency-bound.
+    """Pooled connection with a relaxed statement_timeout for full-corpus batch
+    jobs (snapshot gen, VEKN push) that outlast the 30s request guard.
 
-    Autocommit pool has no reset hook, so RESET on release stops the relaxed
-    timeout leaking to the next borrower. int() interpolation: SET can't bind-param.
+    Autocommit pool has no reset hook, so the caller must RESET on release;
+    `SET` can't bind-param, hence the `int()` interpolation.
     """
     async with get_connection() as conn:
         await conn.execute(f"SET statement_timeout = {int(statement_timeout_ms)}")
@@ -170,21 +145,16 @@ async def batch_read_connection(
 async def _acquire(
     conn: psycopg.AsyncConnection | None = None,
 ) -> AsyncIterator[psycopg.AsyncConnection]:
-    """Resolve a connection for a READ by precedence: explicit ``conn`` → ambient
-    transaction connection → pool.
+    """Resolve a connection for a READ: explicit `conn` → ambient transaction
+    connection → pool. Reusing the ambient connection means one action never
+    checks out a second connection while holding its FOR UPDATE lock.
 
-    An explicit ``conn`` pins the read to a connection the caller already holds.
-    With none, if a `tournament_transaction` is open on THIS task its connection
-    is reused (so the action never checks out a second connection while holding
-    its FOR UPDATE lock, and the read sees the transaction's snapshot); otherwise
-    a pooled connection is used. Reaching the ambient connection from a *different*
-    task raises — that only happens if DB work was spawned inside a transaction
-    (`create_task`/`gather`), which would interleave operations on the shared
-    connection or outlive it. See `_tx_conn`.
+    Reached from a different task, it raises — DB work spawned inside a
+    transaction (`create_task`/`gather`) would race the shared connection.
 
-    For WRITES inside a transaction, pass `conn=tx_conn` explicitly to join it, or
-    use `get_connection` to commit independently — never rely on the ambient path
-    for a write, so the read/write transaction boundary stays obvious at the call.
+    For WRITES inside a transaction, pass `conn=tx_conn` explicitly to join it;
+    never rely on this ambient path for a write, so the transaction boundary
+    stays visible at the call site.
     """
     if conn is not None:
         yield conn
@@ -207,16 +177,11 @@ async def _acquire(
 async def tournament_transaction(
     uid: str,
 ) -> AsyncIterator[tuple[Tournament | None, psycopg.AsyncConnection]]:
-    """Lock a tournament row for update within a transaction.
+    """Lock a tournament row FOR UPDATE within a transaction; yields
+    (tournament, connection). Commits on normal exit, rolls back on exception.
 
-    Uses SELECT ... FOR UPDATE to serialize concurrent writes to the same
-    tournament. Yields (tournament, connection). The caller must use the
-    yielded connection for any UPDATE within the same transaction.
-    Commits on normal exit, rolls back on exception.
-
-    While this block is open, `_tx_conn` is set so every DB helper called on this
-    task transparently runs on `conn` (one pooled connection per action, all reads
-    and writes inside the one transaction) — see `get_connection`.
+    While open, `_tx_conn` is set so every DB helper called on this task
+    transparently shares `conn` — see `get_connection`.
     """
     if not _pool:
         raise RuntimeError("Database not initialized")
@@ -241,15 +206,8 @@ async def tournament_transaction(
 _encoder = msgspec.json.Encoder()
 
 
-# ---------------------------------------------------------------------------
-# Access-version fingerprint (SSE connect handshake) — see wiki/sync.md
-# ---------------------------------------------------------------------------
-
-# Global wire-shape lever: bump on any change to the projected JSON shape that does
-# NOT also ride a frontend DB_VERSION bump (a field rename/remove in models.py, an
-# access_levels projection-policy change, a nested engine-struct change). One bump
-# flips every client's fingerprint → exactly one resync. The narrow backstop, not
-# the primary mechanism (a DB_VERSION bump self-heals client-side).
+# Bump on a wire-shape change that does NOT ride a frontend DB_VERSION bump —
+# flips every client's access-version fingerprint into exactly one resync.
 DATA_SCHEMA_VERSION = 1
 
 # Roles that branch in base_data_level / entitled_level / access_levels — the only
@@ -278,8 +236,7 @@ async def organizer_tournament_uids(user_uid: str) -> list[str]:
         rows = await (
             await conn.execute(
                 # Literal type (not a %s param) so the planner can prove the partial
-                # index's `WHERE type = 'tournament'` predicate; @> (not ?) so its
-                # jsonb_path_ops opclass applies. See idx_objects_tournament_organizers.
+                # index's WHERE predicate; @> (not ?) so its jsonb_path_ops opclass applies.
                 "SELECT uid FROM objects WHERE type = 'tournament' "
                 "AND (\"full\"->'organizers_uids') @> %s::jsonb AND deleted_at IS NULL",
                 (_encoder.encode([user_uid]).decode(),),
@@ -291,12 +248,9 @@ async def organizer_tournament_uids(user_uid: str) -> list[str]:
 async def compute_access_version(viewer: User | None) -> str:
     """Opaque per-user entitlement fingerprint for the SSE connect handshake.
 
-    Hashes everything that changes WHICH objects (or which projection of them) a
-    viewer is entitled to: the wire-shape version, base level, overlay-granting
-    roles, the country that scopes an NC's overlay, and the tournaments they
-    organize. A mismatch at connect ⇒ the cached corpus predates an entitlement
-    change a since-delta can't repair ⇒ resync. Backend-only + opaque: the client
-    stores + echoes it, never parses it, so the inputs stay server-evolvable.
+    Hashes the wire-shape version, base level, overlay-granting roles, an NC's
+    country, and organized-tournament uids. Backend-only and opaque — the client
+    stores and echoes it without parsing, so the inputs stay server-evolvable.
     """
     level = base_data_level(viewer)
     roles = sorted(r.value for r in _OVERLAY_ROLES if viewer and r in viewer.roles)
@@ -322,22 +276,15 @@ def _decoder_for(type_: type) -> msgspec.json.Decoder:
 
 
 def encode_json(obj: msgspec.Struct) -> str:
-    """Encode a msgspec Struct to JSON string."""
     return _encoder.encode(obj).decode("utf-8")
 
 
 def decode_json[T](data: str | dict, type_: type[T]) -> T:
-    """Decode JSON string or dict to a msgspec Struct."""
     decoder = _decoder_for(type_)
     if isinstance(data, dict):
-        # Convert dict back to JSON string for msgspec
         data = _encoder.encode(data).decode("utf-8")
     return decoder.decode(data)
 
-
-# ---------------------------------------------------------------------------
-# Unified objects table operations
-# ---------------------------------------------------------------------------
 
 from .access_levels import compute_full, compute_member, compute_public  # noqa: E402
 
@@ -363,27 +310,19 @@ async def save_object(
     conn: psycopg.AsyncConnection | None = None,
     deleted_at: str | None = None,
 ) -> BroadcastData:
-    """Save an object to the unified objects table.
-
-    Computes public/member/full projections and upserts.
-    Returns BroadcastData for broadcasting without DB re-read.
+    """Save an object to the unified objects table, computing and upserting all
+    three access-level projections.
     """
     pub = compute_public(obj_type, full_data)
     mem = compute_member(obj_type, full_data)
     full = compute_full(obj_type, full_data)
 
-    # Serialize to JSON strings for JSONB columns
     pub_json = _encoder.encode(pub).decode("utf-8") if pub is not None else None
     mem_json = _encoder.encode(mem).decode("utf-8") if mem is not None else None
     full_json = _encoder.encode(full).decode("utf-8")
 
-    # calendar_token is the only field persisted outside the JSONB projections
-    # (it must never be broadcast over SSE — see the objects table DDL). The
-    # token rarely travels in full_data (reads strip it), so the upsert below
-    # COALESCEs it: a NULL write PRESERVES the stored token. This makes every
-    # write path (profile edits, role changes, the nightly VEKN sync, …) safe
-    # without each loader having to re-read the secret. The two paths that must
-    # actually drop a token (strip/split VEKN) call clear_calendar_token().
+    # calendar_token lives outside the JSONB projections and must never be
+    # broadcast. A NULL write here COALESCEs — only clear_calendar_token() drops it.
     cal_token = full_data.get("calendar_token") if obj_type == ObjectType.USER else None
 
     query = """
@@ -432,7 +371,6 @@ async def save_object_from_model(
     """Save a msgspec model to the objects table."""
     full_data = msgspec.to_builtins(obj)
     deleted_at = full_data.get("deleted_at")
-    # Convert deleted_at to string if it's not None
     if deleted_at is not None and not isinstance(deleted_at, str):
         deleted_at = (
             deleted_at.isoformat()
@@ -449,17 +387,14 @@ async def delete_object(
 ) -> None:
     """Hard delete an object and any side-table binary asset keyed by its uid.
 
-    Avatars (user_uid) and banners (tournament_uid) live in separate tables with
-    no FK cascade, so a bare `DELETE FROM objects` would orphan their image bytes.
-    A uid is a v7 UUID — it matches at most one of the two side tables, so both
-    cleanup deletes are cheap PK lookups that no-op for objects without an asset.
+    Avatars/banners have no FK cascade, so a bare DELETE would orphan bytes.
+    A uid matches at most one side table (v7 UUID), so both deletes are
+    cheap no-ops when the object has no asset.
     """
 
     async def _run(c: psycopg.AsyncConnection) -> None:
-        # Atomic across the three tables: the pool is autocommit, so without an
-        # explicit transaction a crash between deletes would orphan asset bytes
-        # permanently (no future purge can re-find them). Nests as a savepoint if
-        # `c` is already in a caller transaction.
+        # Explicit transaction: autocommit pool, so a crash mid-delete would
+        # permanently orphan asset bytes. Nests as a savepoint if already in one.
         async with c.transaction():
             await c.execute("DELETE FROM objects WHERE uid = %s", (uid,))
             await c.execute("DELETE FROM avatars WHERE user_uid = %s", (uid,))
@@ -478,17 +413,14 @@ async def delete_object(
 def _level_col(level: str) -> str:
     """Map access level name to quoted SQL column name.
 
-    Fail-closed: an unknown level raises KeyError rather than silently serving
-    the "full" projection — a mistyped level must never leak fields. Every caller
-    passes a DataLevel value (public/member/full), so this never fires in practice.
+    Fail-closed: an unknown level raises KeyError instead of silently serving
+    the "full" projection — a mistyped level must never leak fields.
     """
     return {"public": '"public"', "member": '"member"', "full": '"full"'}[level]
 
 
-# Model class -> stored `type` string. Lets get_object_full constrain its read to
-# the type it will decode into, so a uid of the wrong type reads as absent instead
-# of decoding a foreign row (msgspec fills the defaults) and being written back
-# under EXCLUDED.type — silently transmuting e.g. a User row into a Tournament.
+# Constrains get_object_full's read to the stored type — else a uid of the
+# wrong type could decode as this type and get written back, silently transmuting it.
 _OBJECT_TYPES: dict[type, ObjectType] = {
     User: ObjectType.USER,
     Sanction: ObjectType.SANCTION,
@@ -521,22 +453,15 @@ async def stream_objects_new(
     since: str | None = None,
     batch_size: int = 1000,
 ) -> AsyncIterator[tuple[list[str], str]]:
-    """Stream pre-serialized JSON in keyset-paginated batches — the monotonic,
-    `since`-ordered path for SSE catch-up and the full-corpus rating recompute.
+    """Stream pre-serialized JSON in keyset-paginated batches for SSE catch-up
+    and the full-corpus rating recompute.
 
-    Each batch acquires a pooled connection, fetches up to `batch_size` rows ordered
-    by (modified_at, uid), then RELEASES the connection BEFORE yielding — so a slow
-    SSE client never pins a pool slot across its catch-up, and app heap holds at most
-    one batch (not the whole resultset). This bounds the full-corpus reads a single
-    fetchall would otherwise materialize per connection: a no-`since` rating recompute,
-    or a large catch-up delta. Keyset continuation on (modified_at, uid) is tie-safe
-    across batch boundaries (a same-timestamp run split by the LIMIT is neither skipped
-    nor duplicated) and rides the idx_objects_type_modified (type, modified_at, uid) index.
+    Releases the pooled connection before each yield, so a slow client never
+    pins a pool slot and the app heap holds at most one batch. `ORDER BY
+    (modified_at, uid)` is load-bearing — the `since` cursor must advance
+    monotonically; keyset continuation stays tie-safe across batch seams.
 
-    The ORDER BY is load-bearing here (the `since` high-water mark must advance
-    monotonically); a full snapshot needs no order and takes the cheaper unordered
-    sequential scan instead — see stream_objects_snapshot. Yields
-    (batch_of_raw_json_strings, max_modified_at_in_batch) per non-empty batch.
+    Yields (batch_of_raw_json_strings, max_modified_at_in_batch) per batch.
     """
     if not _pool:
         raise RuntimeError("Database not initialized")
@@ -579,35 +504,16 @@ async def stream_objects_snapshot(
     conn: psycopg.AsyncConnection,
     batch_size: int = 150,
 ) -> AsyncIterator[list[tuple[str, str | None, str | None, str | None]]]:
-    """Stream the WHOLE live corpus once — every type, all three levels per row.
+    """Stream the whole live corpus once, unordered — every type, all three
+    access levels per row.
 
-    ONE unordered sequential scan feeds all three snapshot files. The previous shape
-    (one query per type per level) issued len(ObjectType) x 3 = 18 queries, each of
-    which the planner answers with a full heap scan for the big types: ~477MB of heap
-    reads per cycle to emit ~20MB of gzip, every 15 minutes, on a latency-bound disk.
-    Selecting the three level columns of the same row together drops that to 1x heap +
-    1x toast for the same detoast volume.
+    `conn` is caller-owned; drive this under `contextlib.aclosing` (or fully
+    drain it), or an early exit leaves the cursor/transaction open until GC
+    re-lends the connection. Plan checks must EXPLAIN the DECLARE, not the
+    bare SELECT — cursor_tuple_fraction costs it differently.
 
-    No ORDER BY: a full snapshot needs no row order, and dropping it frees the planner
-    to choose a seq/bitmap heap scan (physical page order = sequential I/O) over an
-    index scan (index-order heap access = random I/O). Note the plan is costed with
-    cursor_tuple_fraction (a named cursor is a DECLARE), so verify with EXPLAIN of the
-    DECLARE, not of the bare SELECT.
-
-    Consistency comes free: a DECLAREd cursor holds ONE MVCC snapshot for its whole
-    lifetime even under READ COMMITTED, so all three files describe the same instant
-    without needing REPEATABLE READ. The cursor bounds app heap to one fetch; it is
-    DECLAREd inside an explicit transaction (autocommit forbids a bare DECLARE CURSOR)
-    spanning the iteration — the gaps between FETCHes are just gzip writes (ms).
-    `batch_size` is deliberately far below the ordered streamer's 1000: rows now carry
-    three projections of the same object, and a tournament averages ~8KB per level.
-
-    The transaction/cursor live inside this generator but the `conn` is caller-owned, so
-    the caller MUST drive it under contextlib.aclosing (or fully drain it) — an early
-    break/exception then unwinds the cursor+ROLLBACK deterministically before the conn
-    is released, instead of at GC on a connection the pool may have already re-lent.
-    Yields batches of (type, public, member, full); a level is None where that
-    projection doesn't exist for the row, and the caller omits it from that file.
+    Yields batches of (type, public, member, full); a None level means the
+    row has no such projection.
     """
     sql = (
         'SELECT type, "public"::text, "member"::text, "full"::text '
@@ -628,10 +534,8 @@ async def purge_deleted_objects(days: int = 30) -> int:
     if not _pool:
         raise RuntimeError("Database not initialized")
     async with _pool.connection() as conn:
-        # One transaction (pool is autocommit): the object purge and its
-        # side-table asset cleanup commit together, so a crash can't leave bytes
-        # orphaned with their owning row already gone (unrecoverable — no future
-        # purge can re-find them).
+        # Explicit transaction (autocommit pool): purge and asset cleanup commit
+        # together, so a crash can't orphan bytes whose owning row is already gone.
         async with conn.transaction():
             result = await conn.execute(
                 "DELETE FROM objects WHERE deleted_at < NOW() - make_interval(days => %s) "
@@ -653,13 +557,7 @@ async def purge_deleted_objects(days: int = 30) -> int:
         return len(purged)
 
 
-# ---------------------------------------------------------------------------
-# User CRUD (thin wrappers around objects table)
-# ---------------------------------------------------------------------------
-
-
 async def save_user(user: User) -> BroadcastData:
-    """Upsert a user into the objects table."""
     return await save_object_from_model(ObjectType.USER, user)
 
 
@@ -677,11 +575,9 @@ async def get_user_by_uid(
 
 
 async def get_users_by_uids(uids: set[str]) -> dict[str, User]:
-    """Batch-fetch users by uid, keyed by uid (full projection, same as
-    get_user_by_uid). One query instead of N round-trips — the post-finish rating
-    recompute would otherwise do one get_user_by_uid per player (400 sequential
-    round-trips at a big-event finish). Missing/null-full uids are absent from the
-    map, so the caller skips them exactly as the per-uid loop did."""
+    """Batch-fetch users by uid (full projection). One query avoids N round-trips
+    — up to 400 sequential ones in the post-finish rating recompute at a big
+    event. Missing/null-full uids are simply absent from the map."""
     if not uids:
         return {}
     async with get_connection() as conn:
@@ -708,11 +604,9 @@ async def soft_delete_user(uid: str) -> tuple[User, BroadcastData] | None:
 
 async def get_user_by_contact_email(email: str) -> User | None:
     """Find a live user by contact_email (account-merge + door-dedup lookup).
-
     Skips soft-deleted rows — a merged/tombstoned duplicate must neither block a
-    fresh create nor be a merge target. ORDER BY uid + LIMIT 1 is a stable pick
-    across the legacy dup emails (#368-class data) both callers can encounter.
-    """
+    fresh create nor be a merge target. ORDER BY uid + LIMIT 1 gives a stable pick
+    across legacy duplicate emails."""
     async with get_connection() as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
@@ -778,7 +672,6 @@ async def clear_calendar_token(uid: str) -> None:
 async def get_user_by_vekn_id(
     vekn_id: str, conn: psycopg.AsyncConnection | None = None
 ) -> User | None:
-    """Get a user by VEKN ID."""
     async with _acquire(conn) as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
@@ -801,7 +694,6 @@ async def is_vekn_id_claimed(vekn_id: str) -> bool:
 
 
 async def get_users_by_vekn_prefix(prefix: str) -> list[User]:
-    """Get users whose VEKN ID starts with a given prefix."""
     async with get_connection() as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
@@ -827,7 +719,6 @@ async def get_users_with_vekn_prefix() -> list[User]:
 
 
 async def get_users_without_coopted_by() -> list[User]:
-    """Get users with vekn_id but no coopted_by."""
     async with get_connection() as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
@@ -841,20 +732,16 @@ async def get_users_without_coopted_by() -> list[User]:
 
 
 async def allocate_next_vekn_id() -> str:
-    """Atomically allocate the next available VEKN ID.
-
-    Finds the first gap in existing VEKN IDs starting from 1000000.
-    Uses advisory lock to ensure atomic allocation across concurrent requests.
-    Returns the allocated VEKN ID as a string (7 digits).
+    """Atomically allocate the next available VEKN ID: first gap starting at
+    1000000, guarded by an advisory lock against concurrent requests.
     """
-    # Minimum VEKN ID to avoid leading zeros (7 digits)
+    # Avoid leading zeros: VEKN IDs are 7 digits.
     min_vekn_id = 1000000
 
     if not _pool:
         raise RuntimeError("Database not initialized")
     async with _pool.connection() as conn:
         async with conn.transaction():
-            # Advisory lock to prevent concurrent allocations
             await conn.execute("SELECT pg_advisory_xact_lock(1)")
 
             result = await conn.execute(
@@ -880,9 +767,7 @@ async def allocate_next_vekn_id() -> str:
             return str(row[0]) if row and row[0] is not None else str(min_vekn_id)
 
 
-# Auth methods CRUD
 async def insert_auth_method(auth_method: AuthMethod) -> None:
-    """Insert a new auth method into the database."""
     async with get_connection() as conn:
         await conn.execute(
             "INSERT INTO auth_methods (uid, data) VALUES (%s, %s)",
@@ -891,7 +776,6 @@ async def insert_auth_method(auth_method: AuthMethod) -> None:
 
 
 async def update_auth_method(auth_method: AuthMethod) -> None:
-    """Update an existing auth method in the database."""
     async with get_connection() as conn:
         await conn.execute(
             "UPDATE auth_methods SET data = %s WHERE uid = %s",
@@ -904,7 +788,6 @@ async def get_auth_method_by_identifier(
     identifier: str,
     conn: psycopg.AsyncConnection | None = None,
 ) -> AuthMethod | None:
-    """Find an auth method by type and identifier (e.g., email address)."""
     async with _acquire(conn) as conn:
         result = await conn.execute(
             """
@@ -920,7 +803,6 @@ async def get_auth_method_by_identifier(
 
 
 async def get_auth_methods_for_user(user_uid: str) -> list[AuthMethod]:
-    """Get all auth methods for a user."""
     async with get_connection() as conn:
         result = await conn.execute(
             "SELECT data FROM auth_methods WHERE data->>'user_uid' = %s",
@@ -931,30 +813,21 @@ async def get_auth_methods_for_user(user_uid: str) -> list[AuthMethod]:
 
 
 async def delete_auth_method(uid: str) -> None:
-    """Delete an auth method from the database."""
     async with get_connection() as conn:
         await conn.execute("DELETE FROM auth_methods WHERE uid = %s", (uid,))
 
 
-# ---------------------------------------------------------------------------
-# Sanction CRUD (thin wrappers around objects table)
-# ---------------------------------------------------------------------------
-
-
 async def save_sanction(sanction: Sanction) -> BroadcastData:
-    """Upsert a sanction into the objects table."""
     return await save_object_from_model(ObjectType.SANCTION, sanction)
 
 
 async def get_sanction_by_uid(uid: str) -> Sanction | None:
-    """Get a sanction by UID."""
     return await get_object_full(uid, Sanction)
 
 
 async def get_sanctions_for_user(
     user_uid: str, conn: psycopg.AsyncConnection | None = None
 ) -> list[Sanction]:
-    """Get all sanctions for a user."""
     async with _acquire(conn) as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
@@ -971,8 +844,8 @@ async def get_sanctions_for_users(
 ) -> list[Sanction]:
     """Get all sanctions for a set of users in a single query.
 
-    Batched replacement for a per-user fan-out loop — one round-trip instead of
-    one per player, which matters when called while holding a row lock.
+    Batched replacement for a per-user fan-out loop, which matters when
+    called while holding a row lock.
     """
     if not user_uids:
         return []
@@ -1035,30 +908,22 @@ async def get_sanctions_for_cleanup(days: int = 30) -> list[Sanction]:
 
 
 async def delete_sanction_hard(uid: str) -> None:
-    """Hard delete a sanction from the database."""
     await delete_object(uid)
-
-
-# ---------------------------------------------------------------------------
-# Tournament CRUD (thin wrappers around objects table)
-# ---------------------------------------------------------------------------
 
 
 async def save_tournament(
     tournament: Tournament, *, conn: psycopg.AsyncConnection
 ) -> BroadcastData:
-    """Upsert a tournament. `conn` is REQUIRED: every whole-row tournament write
-    must run on a caller-supplied connection — inside tournament_transaction(uid)
-    for an existing row (so a concurrent /action commit can't be lost to a stale
-    read-modify-write), or a plain get_connection() for a fresh uuid7 (creation)
-    or bulk seed. Non-optional so an unlocked tournament write can no longer be typed."""
+    """Upsert a tournament. `conn` is REQUIRED — inside `tournament_transaction(uid)`
+    for an existing row, so a concurrent `/action` commit can't be lost to a stale
+    read-modify-write; or a plain `get_connection()` for a fresh create/bulk seed.
+    """
     return await save_object_from_model(ObjectType.TOURNAMENT, tournament, conn=conn)
 
 
 async def get_tournament_by_uid(
     uid: str, conn: psycopg.AsyncConnection | None = None
 ) -> Tournament | None:
-    """Get a tournament by UID."""
     return await get_object_full(uid, Tournament, conn=conn)
 
 
@@ -1107,13 +972,11 @@ async def get_league_public_projection(uid: str) -> tuple[dict, int] | None:
 async def soft_delete_tournament(
     uid: str,
 ) -> tuple[Tournament, list[BroadcastData]] | None:
-    """Soft-delete a tournament and cascade to its decks and sanctions.
+    """Soft-delete a tournament and cascade the tombstone to its decks and sanctions.
 
-    Returns (tournament, [tournament_bd, *deck_bds, *sanction_bds]) so the caller
-    broadcasts a tombstone for the tournament AND each dependent object — otherwise
-    they linger, live and orphaned (a deck pointing at a gone event, a DQ/SA still
-    on the player's record), in every client's IndexedDB. All writes share the
-    tournament's row-lock transaction, so the cascade is atomic.
+    Returns bd for the tournament plus each dependent object, or they'd linger
+    live and orphaned in every client's IndexedDB. All writes share the
+    tournament's row-lock transaction.
     """
     async with tournament_transaction(uid) as (tournament, tx_conn):
         if not tournament:
@@ -1143,9 +1006,9 @@ async def get_tournament_by_external_id(
 ) -> Tournament | None:
     """Get a LIVE tournament by external ID (e.g., platform='vekn', ext_id='123').
 
-    Soft-deleted holders are skipped: the legacy-archon merge tombstones
-    round-less duplicates of an event id — matching one here (VEKN tournament
-    sync) would refresh a dead copy instead of the surviving tournament.
+    Skips soft-deleted holders: the legacy-archon merge tombstones round-less
+    duplicates of an event id, so matching one here would refresh the dead
+    copy instead of the surviving tournament.
     """
     async with get_connection() as conn:
         result = await conn.execute(
@@ -1160,22 +1023,8 @@ async def get_tournament_by_external_id(
         return None
 
 
-# Same-event matcher for the two import paths that create tournaments without a
-# shared key: the VEKN tournament sync (keyed on external_ids.vekn) and the
-# legacy-archon merge (keyed on the old uid / external_ids.archon / the old
-# extra.vekn_id). A legacy event that never carried a vekn id is invisible to both
-# keys, so each path used to insert its own copy of the one real event.
-#
-# Name is compared case- and whitespace-insensitively; start within 24h rather
-# than on the calendar date because the two paths derive the instant differently
-# (the sync applies a guessed venue timezone, the ETL takes old archon's stored
-# value) — the observed skew reaches 9h and can straddle midnight UTC.
-#
-# Name+day is NOT an identity key on its own: legacy imports share placeholder
-# names ("Imported VTES Event" covers hundreds of distinct 2005 events, dozens on
-# one Saturday), and one convention runs several same-named events in a day. It is
-# only evidence of identity when unambiguous — callers must apply the guards in
-# their own docstrings, never merge on a bare hit.
+# Same-event matcher for two import paths with no shared key. Name+day is NOT
+# an identity key alone — legacy placeholder names collide, so a hit is candidate evidence only.
 SAME_EVENT_QUERY = """
     SELECT "full" FROM objects
     WHERE type = 'tournament'
@@ -1214,17 +1063,8 @@ async def find_same_event_tournaments(
     return found
 
 
-# The #520 class: several live copies of ONE event where at least one copy holds a
-# vekn id and at least one holds none. Grouping by external_ids.vekn (the
-# one-live-per-vekn-id invariant check) cannot see it — the extra copies have no
-# vekn id at all.
-#
-# The mixed-vekn clause is load-bearing, not a refinement: without it this reports
-# every same-name/same-day cluster, and legacy placeholder names make that
-# hundreds of DISTINCT events (each with its own vekn id) rather than duplicates.
-# Copies that ALL hold vekn ids are a different class — one event entered twice on
-# vekn.net — resolvable locally only once one of the ids is deleted there (see
-# BOTH_VEKN_GROUPS_QUERY below).
+# Live copies of one event where only SOME hold a vekn id. The mixed-vekn filter
+# is load-bearing — without it, legacy placeholder names flood every result.
 DUPLICATE_GROUPS_QUERY = """
     WITH t AS (
         SELECT uid,
@@ -1256,10 +1096,8 @@ async def find_duplicate_tournament_groups() -> list[dict]:
         ]
 
 
-# Same-name/same-day groups where EVERY copy holds a (different) vekn id. Most are
-# DISTINCT events sharing a legacy placeholder name, not duplicates — only a VEKN
-# API probe can tell (one id confirmed deleted marks a resolvable double-entry), so
-# this feeds the operator dedup script only, never the sync's end-of-run logging.
+# Same-name/same-day groups where EVERY copy holds a different vekn id — usually
+# distinct events sharing a placeholder name; feeds the dedup script, never the sync's logging.
 BOTH_VEKN_GROUPS_QUERY = """
     WITH t AS (
         SELECT uid,
@@ -1292,10 +1130,7 @@ async def find_both_vekn_tournament_groups() -> list[dict]:
 
 
 async def get_tournament_wins_for_users(user_uids: set[str]) -> dict[str, list[str]]:
-    """Get all-time IRL tournament win UIDs for multiple users at once.
-
-    Returns: {user_uid: [tournament_uid, ...]}
-    """
+    """Get all-time IRL tournament win UIDs for multiple users at once."""
     if not user_uids:
         return {}
     async with get_connection() as conn:
@@ -1327,11 +1162,10 @@ async def get_finished_tournaments_for_category(
 ) -> list[Tournament]:
     """Get all live FINISHED tournaments matching format/online within date window."""
     async with get_connection() as conn:
-        # finish is optional (the engine never stamps it on FinishTournament /
-        # FinishFinals) — fall back to start then modified, mirroring the date
-        # used for the rating entry itself (ratings.py).
-        # deleted_at IS NULL: a soft-deleted tournament keeps state='Finished', so
-        # without this it would still feed ratings (and never drop out on delete).
+        # finish is optional (the engine never stamps it on FinishTournament/
+        # FinishFinals) — fall back to start then modified, mirroring ratings.py.
+        # deleted_at IS NULL: a soft-deleted tournament keeps state='Finished' and
+        # would otherwise still feed ratings.
         result = await conn.execute(
             """SELECT "full" FROM objects
             WHERE type = 'tournament'
@@ -1347,23 +1181,15 @@ async def get_finished_tournaments_for_category(
         return [decode_json(row[0], Tournament) for row in rows]
 
 
-# ---------------------------------------------------------------------------
-# League CRUD (thin wrappers around objects table)
-# ---------------------------------------------------------------------------
-
-
 async def save_league(league: League) -> BroadcastData:
-    """Upsert a league into the objects table."""
     return await save_object_from_model(ObjectType.LEAGUE, league)
 
 
 async def save_promo(promo: Promo) -> BroadcastData:
-    """Upsert a promo into the objects table."""
     return await save_object_from_model(ObjectType.PROMO, promo)
 
 
 async def get_promo_by_uid(uid: str) -> Promo | None:
-    """Get a promo by UID."""
     return await get_object_full(uid, Promo)
 
 
@@ -1408,7 +1234,6 @@ async def count_promo_references(uid: str) -> int:
 async def get_all_leagues(
     conn: psycopg.AsyncConnection | None = None,
 ) -> list[League]:
-    """Get all leagues."""
     async with _acquire(conn) as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
@@ -1419,12 +1244,10 @@ async def get_all_leagues(
 
 
 async def get_league_by_uid(uid: str) -> League | None:
-    """Get a league by UID."""
     return await get_object_full(uid, League)
 
 
 async def get_child_leagues(parent_uid: str) -> list[League]:
-    """Get child leagues for a meta-league."""
     async with get_connection() as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
@@ -1435,15 +1258,9 @@ async def get_child_leagues(parent_uid: str) -> list[League]:
         return [decode_json(row[0], League) for row in rows]
 
 
-# ---------------------------------------------------------------------------
-# Avatar CRUD (stays on avatars table, not a synced object)
-# ---------------------------------------------------------------------------
-
-
 async def upsert_avatar(
     user_uid: str, data: bytes, content_type: str = "image/webp"
 ) -> None:
-    """Insert or update an avatar for a user."""
     async with get_connection() as conn:
         await conn.execute(
             """
@@ -1459,7 +1276,6 @@ async def upsert_avatar(
 
 
 async def get_avatar(user_uid: str) -> tuple[bytes, str] | None:
-    """Get avatar data and content type for a user. Returns (data, content_type) or None."""
     async with get_connection() as conn:
         result = await conn.execute(
             "SELECT data, content_type FROM avatars WHERE user_uid = %s",
@@ -1472,7 +1288,6 @@ async def get_avatar(user_uid: str) -> tuple[bytes, str] | None:
 
 
 async def delete_avatar(user_uid: str) -> bool:
-    """Delete avatar for a user. Returns True if deleted, False if not found."""
     async with get_connection() as conn:
         result = await conn.execute(
             "DELETE FROM avatars WHERE user_uid = %s RETURNING user_uid",
@@ -1482,15 +1297,9 @@ async def delete_avatar(user_uid: str) -> bool:
         return row is not None
 
 
-# ---------------------------------------------------------------------------
-# Banner CRUD (per-tournament hero / social image; banners table, not synced)
-# ---------------------------------------------------------------------------
-
-
 async def upsert_banner(
     tournament_uid: str, data: bytes, content_type: str = "image/webp"
 ) -> None:
-    """Insert or update the banner for a tournament."""
     async with get_connection() as conn:
         await conn.execute(
             """
@@ -1506,7 +1315,6 @@ async def upsert_banner(
 
 
 async def get_banner(tournament_uid: str) -> tuple[bytes, str] | None:
-    """Get banner data and content type. Returns (data, content_type) or None."""
     async with get_connection() as conn:
         result = await conn.execute(
             "SELECT data, content_type FROM banners WHERE tournament_uid = %s",
@@ -1519,7 +1327,6 @@ async def get_banner(tournament_uid: str) -> tuple[bytes, str] | None:
 
 
 async def delete_banner(tournament_uid: str) -> bool:
-    """Delete the banner for a tournament. Returns True if deleted, else False."""
     async with get_connection() as conn:
         result = await conn.execute(
             "DELETE FROM banners WHERE tournament_uid = %s RETURNING tournament_uid",
@@ -1532,7 +1339,6 @@ async def delete_banner(tournament_uid: str) -> bool:
 async def upsert_promo_image(
     promo_uid: str, data: bytes, content_type: str = "image/webp"
 ) -> None:
-    """Insert or update the image for a promo."""
     async with get_connection() as conn:
         await conn.execute(
             """
@@ -1548,7 +1354,6 @@ async def upsert_promo_image(
 
 
 async def get_promo_image(promo_uid: str) -> tuple[bytes, str] | None:
-    """Get promo image data and content type, or None."""
     async with get_connection() as conn:
         result = await conn.execute(
             "SELECT data, content_type FROM promo_images WHERE promo_uid = %s",
@@ -1561,7 +1366,6 @@ async def get_promo_image(promo_uid: str) -> tuple[bytes, str] | None:
 
 
 async def delete_promo_image(promo_uid: str) -> bool:
-    """Delete the image for a promo. Returns True if deleted, else False."""
     async with get_connection() as conn:
         result = await conn.execute(
             "DELETE FROM promo_images WHERE promo_uid = %s RETURNING promo_uid",
@@ -1570,10 +1374,6 @@ async def delete_promo_image(promo_uid: str) -> bool:
         row = await result.fetchone()
         return row is not None
 
-
-# ---------------------------------------------------------------------------
-# Promo ledger (side table, not synced — see the wiki/sync.md carve-out)
-# ---------------------------------------------------------------------------
 
 _LEDGER_COLS = (
     "uid, kind, promo_uid, qty, from_uid, to_uid, note, happened_at, "
@@ -1706,13 +1506,7 @@ async def get_users_with_promo_stock_keys(promo_uids: list[str]) -> list[str]:
         return [r[0] for r in rows]
 
 
-# ---------------------------------------------------------------------------
-# Transient Token CRUD (auth challenges, magic links, discord state, etc.)
-# ---------------------------------------------------------------------------
-
-
 async def store_transient_token(key: str, data: dict, expires_at) -> None:
-    """Store a transient token with expiry."""
     async with get_connection() as conn:
         await conn.execute(
             """
@@ -1725,7 +1519,7 @@ async def store_transient_token(key: str, data: dict, expires_at) -> None:
 
 
 async def get_transient_token(key: str) -> dict | None:
-    """Get a transient token if not expired. Returns None if missing or expired."""
+    """Get a transient token if not expired (None if missing or expired)."""
     async with get_connection() as conn:
         result = await conn.execute(
             "SELECT data FROM transient_tokens WHERE key = %s AND expires_at > NOW()",
@@ -1742,24 +1536,17 @@ async def get_transient_token(key: str) -> dict | None:
 
 
 async def delete_transient_token(key: str) -> None:
-    """Delete a transient token."""
     async with get_connection() as conn:
         await conn.execute("DELETE FROM transient_tokens WHERE key = %s", (key,))
 
 
 async def cleanup_expired_tokens() -> int:
-    """Delete all expired transient tokens. Returns count deleted."""
     async with get_connection() as conn:
         result = await conn.execute(
             "DELETE FROM transient_tokens WHERE expires_at < NOW() RETURNING key"
         )
         rows = await result.fetchall()
         return len(rows)
-
-
-# ---------------------------------------------------------------------------
-# Web Push subscriptions (#314): server-side send credentials, never synced.
-# ---------------------------------------------------------------------------
 
 
 async def save_push_subscription(

@@ -1,11 +1,3 @@
-"""Pure message rendering for the Discord SSE listener.
-
-Data -> string. No I/O, no bot/store handles, no module state: the listener owns
-*when* and *where* to post (and the state-transition detection that decides it);
-this module owns *how* each announcement reads. Keeping the text here makes the
-wording reviewable in one place and unit-testable without a live stream.
-"""
-
 _SANCTION_LEVEL_LABELS = {
     "caution": "Caution",
     "warning": "Warning",
@@ -14,10 +6,10 @@ _SANCTION_LEVEL_LABELS = {
 }
 
 _SANCTION_LEVEL_EMOJI = {
-    "caution": "\u26a0\ufe0f",  # ⚠️
-    "warning": "\U0001f7e0",  # 🟠
-    "standings_adjustment": "\U0001f7e3",  # 🟣
-    "disqualification": "\U0001f534",  # 🔴
+    "caution": "\u26a0\ufe0f",
+    "warning": "\U0001f7e0",
+    "standings_adjustment": "\U0001f7e3",
+    "disqualification": "\U0001f534",
 }
 
 
@@ -29,18 +21,6 @@ def player_display(
     user_names: dict | None = None,
     mention: bool = False,
 ) -> str:
-    """Resolve a player UID to a display string.
-
-    Priority: Discord ``@mention`` (when linked and ``mention``) → per-tournament
-    Discord nickname (``display_name``) → cached user nickname → user name → uid
-    prefix. ``mention`` is set only where a ping is wanted (seating/finals — "go
-    to your table"); standings/warnings leave it off so the per-round post reads
-    as plain names and doesn't notify every listed player.
-
-    ``user_names`` maps uid → ``{"name", "nickname"}`` (seeded from the scoped
-    stream's participant identities) and is what lets non-Discord players —
-    webapp/VEKN-added — resolve to a real name instead of a raw uid.
-    """
     if mention and discord_id_map and puid in discord_id_map:
         return f"<@{discord_id_map[puid]}>"
     p = next((p for p in players if p.get("user_uid") == puid), None)
@@ -59,13 +39,6 @@ def format_standings(
     *,
     user_names: dict | None = None,
 ) -> str:
-    """Format standings respecting the tournament's standings_mode setting.
-
-    - Private: no standings shown
-    - Cutoff: only the 5th-place score threshold (no names)
-    - Top 10: top 10 players with scores
-    - Public: all players with scores
-    """
     if standings_mode == "Private" or not standings:
         return ""
 
@@ -100,11 +73,6 @@ def format_round_seating(
     discord_id_map: dict | None = None,
     user_names: dict | None = None,
 ) -> str:
-    """Render the new-round seating announcement (prey → predator per table).
-
-    Mentions linked players (pings them to join their table); falls back to
-    nickname/name for everyone else.
-    """
     lines = [f"**Round {round_count} — Seating**\n"]
     for ti, player_uids in enumerate(tables_player_uids):
         seat_names = [
@@ -133,11 +101,6 @@ def format_finals(
     discord_id_map: dict | None = None,
     user_names: dict | None = None,
 ) -> str:
-    """Render the finals seating announcement (prey → predator, with seeds).
-
-    Mentions linked finalists (pings them to join the finals voice channel);
-    falls back to nickname/name otherwise.
-    """
     lines = [f"**Finals — {name}**\n", "Seating order (prey → predator):"]
     for i, s in enumerate(seating):
         uid = s.get("player_uid", "")
@@ -169,13 +132,6 @@ def format_table_result(
     is_finals: bool = False,
     user_names: dict | None = None,
 ) -> str:
-    """Render a table's current reported VPs for its voice channel.
-
-    Posted on every score change so everyone seated sees what was entered —
-    open reporting deters mis-reporting. No pings (players are already here), so
-    names resolve without a mention (nickname/name fallback, not @handle).
-    The footer reflects the engine-computed table ``state``.
-    """
     label = "Finals" if is_finals else f"Table {table_index + 1}"
     lines = [f"**Results reported — {label}**"]
     for s in table.get("seating", []):
@@ -198,12 +154,6 @@ def format_table_result(
 
 
 def format_timer_reminder(table_label: str, threshold_seconds: int) -> str:
-    """Render a round-timer reminder for a table's voice text chat.
-
-    ``threshold_seconds`` is how much time remains at the moment it fires: a
-    positive value is a "N minutes left" warning, 0 (or less) is the time-up post.
-    Plain English — the bot has no i18n.
-    """
     if threshold_seconds <= 0:
         return (
             f"⏰ **Time!** {table_label} — the round clock has run out. "
@@ -215,11 +165,6 @@ def format_timer_reminder(table_label: str, threshold_seconds: int) -> str:
 
 
 def format_announcement(text: str) -> str:
-    """Render an organizer's in-app broadcast for the Discord announcement channel.
-
-    The text is authored by the organizer (already localized by them); we only
-    frame it. Plain English framing, no i18n.
-    """
     return f"📣 **Announcement**\n{text}"
 
 
@@ -231,10 +176,7 @@ def format_sanction(
     round_number: int | None,
     player_mention: str,
 ) -> tuple[str, str]:
-    """Render the (judges, player) sanction announcement pair.
-
-    ``category`` is expected already space-normalized; ``subcategory`` raw.
-    """
+    """``category`` is expected already space-normalized; ``subcategory`` raw."""
     level_label = _SANCTION_LEVEL_LABELS.get(level, level)
     level_emoji = _SANCTION_LEVEL_EMOJI.get(level, "")
     round_info = f" (Round {round_number + 1})" if round_number is not None else ""

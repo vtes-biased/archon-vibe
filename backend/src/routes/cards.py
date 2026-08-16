@@ -12,7 +12,6 @@ _cards_etag: str | None = None
 
 
 def _load_cards():
-    """Return (bytes, etag) for cards.json, or (None, None) if unavailable."""
     global _cards_etag
     data = cards_json_bytes()
     if data is None:
@@ -24,12 +23,10 @@ def _load_cards():
 
 @router.get("/cards")
 async def get_cards(request: Request) -> Response:
-    """Serve cards.json with ETag caching."""
     data, etag = _load_cards()
     if data is None:
         return Response(status_code=503, content="Cards data not available")
 
-    # Check If-None-Match for caching
     if_none_match = request.headers.get("if-none-match")
     if if_none_match and if_none_match.strip('"') == etag:
         return Response(status_code=304)

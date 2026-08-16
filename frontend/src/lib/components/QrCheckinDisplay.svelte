@@ -15,7 +15,6 @@
 
   let canvasEl = $state<HTMLCanvasElement | null>(null);
 
-  // Encode a URL so phone camera scanning opens the tournament page
   const qrUrl = $derived(
     `${typeof window !== 'undefined' ? window.location.origin : ''}/tournaments/${tournamentUid}?checkin=${code}`
   );

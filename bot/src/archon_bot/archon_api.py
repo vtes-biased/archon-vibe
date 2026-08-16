@@ -1,5 +1,3 @@
-"""Archon API client for the Discord bot."""
-
 from __future__ import annotations
 
 import asyncio
@@ -17,8 +15,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ApiResult:
-    """Result of an API call — either data or an error message."""
-
     data: dict | None = None
     error: str | None = None
 
@@ -36,24 +32,16 @@ class ApiResult:
 
 
 class ArchonAPI:
-    """HTTP client for Archon backend. Uses OAuth tokens for all requests."""
-
     def __init__(self, store: TokenStore):
         self._store = store
         self._session: aiohttp.ClientSession | None = None
-        # Single-flight refresh: one lock per discord_id so concurrent refreshers
-        # (SSE loop + a slash command both hitting 401 at once) serialize instead
-        # of both replaying the same stored refresh token. Replaying a rotated-out
-        # token trips the backend's reuse-detection, which revokes the whole token
-        # chain and logs the organizer out. The map is unbounded but keyed by the
-        # small, bounded set of linked organizers — negligible. (#11)
+        # One refresh lock per discord_id: replaying a rotated-out refresh token
+        # trips the backend's reuse-detection and revokes the whole chain. (#11)
         self._refresh_locks: dict[str, asyncio.Lock] = {}
 
     async def init(self) -> None:
-        # total=30 bounds every backend call (aiohttp defaults to 300s): a hung
-        # backend must surface as an error, not wedge callers — the SSE loop's
-        # pre-connect refresh in particular runs outside its dispatch-timeout
-        # guard. (The SSE stream itself uses its own unbounded session.)
+        # total=30 (aiohttp defaults to 300s): a hung backend must surface as an
+        # error, not wedge callers. The SSE stream uses its own unbounded session.
         self._session = aiohttp.ClientSession(
             base_url=config.ARCHON_URL, timeout=aiohttp.ClientTimeout(total=30)
         )
@@ -61,8 +49,6 @@ class ArchonAPI:
     async def close(self) -> None:
         if self._session:
             await self._session.close()
-
-    # --- Token refresh ---
 
     def _refresh_lock_for(self, discord_id: str) -> asyncio.Lock:
         """Get-or-create the per-organizer refresh lock (atomic under asyncio)."""
@@ -75,7 +61,6 @@ class ArchonAPI:
     async def refresh_tokens(
         self, discord_id: str, *, stale_access_token: str | None = None
     ) -> dict | None:
-        """Public wrapper to refresh tokens (for SSE listener reconnect)."""
         return await self._refresh_tokens(
             discord_id, stale_access_token=stale_access_token
         )
@@ -83,14 +68,8 @@ class ArchonAPI:
     async def _refresh_tokens(
         self, discord_id: str, *, stale_access_token: str | None = None
     ) -> dict | None:
-        """Refresh expired access token using refresh token.
-
-        Single-flight per ``discord_id``. ``stale_access_token`` is the access
-        token whose request 401'd; if another caller already refreshed while we
-        waited for the lock, the stored access token will differ from it and we
-        return the fresh tokens instead of replaying our now-rotated-out refresh
-        token (which would trip backend reuse-detection). (#11)
-        """
+        """Single-flight per ``discord_id``; if the stored access token no longer
+        matches ``stale_access_token``, another caller already refreshed. (#11)"""
         async with self._refresh_lock_for(discord_id):
             tokens = await self._store.get_tokens(discord_id)
             if not tokens:
@@ -120,9 +99,8 @@ class ArchonAPI:
                 },
             ) as resp:
                 if resp.status in (400, 401):
-                    # The backend signals invalid-grant exclusively via 400
-                    # (oauth._handle_refresh_token; 401 = bad client creds) —
-                    # only then is the stored pair genuinely dead.
+                    # Invalid-grant is signaled via 400 only (401 = bad client
+                    # creds); only then is the stored pair genuinely dead.
                     logger.warning(
                         "Refresh token rejected (%s) for discord_id=%s",
                         resp.status,
@@ -170,7 +148,6 @@ class ArchonAPI:
 
     @staticmethod
     def _extract_error(status: int, text: str) -> str:
-        """Extract a human-readable error from an API response."""
         try:
             body = json.loads(text)
             detail = body.get("detail", "")
@@ -196,7 +173,6 @@ class ArchonAPI:
         discord_id: str,
         json_body: dict | None = None,
     ) -> ApiResult:
-        """Make an authenticated request, auto-refreshing on 401."""
         token = await self._get_stored_token(discord_id)
         if not token:
             return ApiResult.fail(
@@ -235,16 +211,12 @@ class ArchonAPI:
                 return ApiResult.fail(self._extract_error(resp.status, text))
             return ApiResult.success(await resp.json())
 
-    # --- Public API methods ---
-
     async def get_userinfo(self, discord_id: str) -> ApiResult:
-        """Get user profile via /oauth/userinfo."""
         return await self._request("GET", "/oauth/userinfo", discord_id)
 
     async def get_sanction_reference(self) -> dict:
-        """Judges-Guide penalty reference (public endpoint, no auth) —
-        engine-owned tables the /sanction UI is built from. Raises on failure;
-        callers surface the error and retry on the next command."""
+        """Public, no-auth, engine-owned. Raises on failure; callers surface the
+        error and retry on the next command."""
         assert self._session
         async with self._session.get("/sanctions/reference") as resp:
             resp.raise_for_status()
@@ -253,7 +225,6 @@ class ArchonAPI:
     async def tournament_action(
         self, discord_id: str, tournament_uid: str, action: str, **kwargs: object
     ) -> ApiResult:
-        """Send a tournament action via POST /{uid}/action."""
         payload = {"type": action, **kwargs}
         return await self._request(
             "POST",
@@ -263,7 +234,6 @@ class ArchonAPI:
         )
 
     async def claim_vekn_id(self, discord_id: str, vekn_id: str) -> ApiResult:
-        """Claim a VEKN ID via POST /vekn/claim."""
         return await self._request(
             "POST", "/vekn/claim", discord_id, json_body={"vekn_id": vekn_id}
         )
@@ -271,13 +241,8 @@ class ArchonAPI:
     async def tournament_action_with_token(
         self, access_token: str, tournament_uid: str, action: str, **kwargs: object
     ) -> ApiResult:
-        """Send a tournament action with an explicit bearer (no store, no refresh).
-
-        One-shot escape hatch for the post-claim window: /vekn/claim merges the
-        bot-linked account away (tombstoning the uid the stored OAuth tokens
-        authenticate), and its response's fresh first-party access token is the
-        only credential that can act for the merged user in this interaction.
-        """
+        """One-shot escape hatch: after ``/vekn/claim`` tombstones the linked
+        account, only its response's fresh access token can act for the user."""
         assert self._session
         payload = {"type": action, **kwargs}
         async with self._session.post(
@@ -302,7 +267,6 @@ class ArchonAPI:
         subcategory: str | None = None,
         round_number: int | None = None,
     ) -> ApiResult:
-        """Create a sanction via POST /sanctions/."""
         payload: dict = {
             "user_uid": user_uid,
             "tournament_uid": tournament_uid,
@@ -317,7 +281,6 @@ class ArchonAPI:
         return await self._request("POST", "/sanctions/", discord_id, json_body=payload)
 
     async def exchange_code(self, code: str, code_verifier: str) -> dict | None:
-        """Exchange authorization code for tokens."""
         assert self._session
         async with self._session.post(
             "/oauth/token",

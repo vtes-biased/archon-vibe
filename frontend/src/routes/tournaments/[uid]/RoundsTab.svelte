@@ -41,12 +41,9 @@
     scoreSavingSeat: string | null;
   } = $props();
 
-  // Sanction modal state
   let sanctionTarget = $state<{ uid: string; name: string; round: number } | null>(null);
-  // Sanction list modal state (view + cancel issued sanctions)
   let sanctionListTarget = $state<{ uid: string; name: string } | null>(null);
 
-  // Build a map of player uid → their sanctions
   const playerSanctionsMap = $derived.by(() => {
     const map: Record<string, Sanction[]> = {};
     for (const s of tournamentSanctions ?? []) {
@@ -61,13 +58,11 @@
   );
 
   let error = $state<string | null>(null);
-  // Which round index is pending cancel confirmation (null = none). The engine now
-  // soft-cancels any non-last round and hard-removes the last, so any round can be cancelled.
+  // Pending cancel confirmation (null = none). The engine soft-cancels any
+  // non-last round and hard-removes the last, so any round can be cancelled.
   let cancelConfirmRound = $state<number | null>(null);
-  // Which fully-cancelled round is pending restore confirmation (null = none).
   let restoreConfirmRound = $state<number | null>(null);
 
-  // Alter seating mode
   let alterMode = $state(false);
   let alterTables = $state<string[][]>([]);
   let alterRoundIdx = $state(-1);
@@ -76,8 +71,8 @@
   let overrideTable_ = $state<number | null>(null);
   let overrideComment = $state("");
   let overrideSaving = $state(false);
-  // "round:table" key — the pool can now open on any live round, so a bare
-  // table index would collide across expanded rounds.
+  // "round:table" key: a bare table index would collide across expanded rounds
+  // since the pool can open on any live round.
   let seatTargetTable = $state<string | null>(null);
   let expandedRounds = $state<Set<number>>(new Set());
 
@@ -110,9 +105,8 @@
     expandedRounds = next;
   }
 
-  // One-table-at-a-time scoring: only the expanded table shows its VP chip grid;
-  // others stay compact (read-only scores). You never score two tables at once,
-  // so this is an accordion — opening one collapses the rest. Keyed "round:table".
+  // One-table-at-a-time scoring: only the expanded table shows its VP chip grid,
+  // others stay read-only, so this is an accordion keyed "round:table".
   let scoringTable = $state<string | null>(null);
   function toggleScoring(r: number, i: number) {
     const key = `${r}:${i}`;
@@ -138,10 +132,9 @@
     const round = tournament.rounds![idx];
     return round ? round.length > 0 && round.every(t => t.state === "Finished") : false;
   }
-  // A round still needs ending while it holds a seated player who is Playing and hasn't
-  // moved on to a later round — i.e. FinishRound would actually release someone. Players
-  // re-seated into a later parallel round are excluded so an already-superseded round stops
-  // offering an End button; ended rounds (players no longer Playing) drop out too.
+  // A round still needs ending while it holds a Playing player not yet re-seated
+  // into a later round — i.e. FinishRound would actually release someone;
+  // superseded and already-ended rounds drop the End button.
   function isRoundEndable(idx: number): boolean {
     if (tournament.state !== "Playing" || tournament.finals) return false;
     const round = tournament.rounds![idx];
@@ -152,7 +145,6 @@
       for (const t of tournament.rounds![i]!) for (const s of t.seating) laterSeated.add(s.player_uid);
     return round.some(t => t.seating.some(s => playing.has(s.player_uid) && !laterSeated.has(s.player_uid)));
   }
-  // Seating score
   let seatingScore = $state<{ rules: number[]; minimums: number[]; mean_vps: number; mean_transfers: number } | null>(null);
 
   function computeSeatingScore() {
@@ -194,7 +186,6 @@
     }).length;
   }
 
-  // Organizer can swap/seat on last round in Playing or Finished
   const hasR1Issue = $derived(
     Array.from(playerIssues.values()).some(i => i.level === 0)
   );
@@ -339,20 +330,17 @@
     doAction("CancelRound", { round: roundIdx });
   }
 
-  // A round is cancellable while the tournament is Playing (no finals) and the round
-  // isn't already fully cancelled. Any round qualifies — the engine soft-cancels
-  // non-last rounds and hard-removes the last.
+  // Cancellable while Playing (no finals) and not already fully cancelled; the
+  // engine soft-cancels non-last rounds and hard-removes the last.
   function isRoundCancellable(roundIdx: number): boolean {
     if (tournament.state !== "Playing" || tournament.finals) return false;
     const round = tournament.rounds?.[roundIdx];
     return !!round && round.some(t => t.state !== "Cancelled");
   }
 
-  // Players seated in the round who can't be reinstated, by display name. Mirrors
-  // the engine's all-or-nothing rule (dropped/Finished, disqualified, or — open
-  // rounds — already at cap via OTHER rounds; the still-Cancelled target round is
-  // naturally excluded from the count). The engine re-checks authoritatively; this
-  // only names them up front so the toast can guide the organizer.
+  // Mirrors the engine's all-or-nothing restore rule (dropped/Finished,
+  // disqualified, or already at cap via other rounds); the engine re-checks
+  // authoritatively, this only names blockers up front for the toast.
   function restoreBlockers(roundIdx: number): string[] {
     const round = tournament.rounds?.[roundIdx];
     if (!round) return [];
@@ -380,9 +368,8 @@
     doAction("RestoreRound", { round: roundIdx });
   }
 
-  // A fully-cancelled (soft-voided) round shows a Cancelled badge and a Restore
-  // affordance. The last round is hard-removed on cancel, so a fully-Cancelled
-  // round is always a restorable non-last soft-cancel.
+  // The last round is hard-removed on cancel, so a fully-Cancelled round is
+  // always a restorable non-last soft-cancel.
   function isRoundFullyCancelled(roundIdx: number): boolean {
     const round = tournament.rounds?.[roundIdx];
     return !!round && round.length > 0 && round.every(t => t.state === "Cancelled");
@@ -401,7 +388,7 @@
 
   function printSeatHtml(uid: string): string {
     // Nicknames are an online-event privacy device; an IRL seating sheet prints
-    // the real name. This used to ignore that and print the nickname either way.
+    // the real name.
     const { primary, detail } = seatDisplayParts(uid, playerInfo, tournament.online);
     const base = detail
       ? `${esc(primary)} <span style="color:#888;font-size:10pt">(${esc(detail)})</span>`
@@ -480,7 +467,6 @@
     </div>
   {/if}
 
-  <!-- Global Timer (hidden with parallel rounds) -->
   {#if !hasParallelRounds && (tournament.round_time ?? 0) > 0 && tournament.state === "Playing"}
     <div class="bg-surface-muted/50 rounded-lg p-4 flex justify-center">
       <TimerDisplay {tournament} {isOrganizer} />
@@ -489,13 +475,12 @@
 
   {#if tournament.rounds!.length === 0}
     <!-- VEKN-synced tournaments carry standings but no round details (engine
-         preserves them: standings.rs update_standings guard). Distinguish those
-         from a not-yet-played event, which has neither. -->
+         preserves them: standings.rs update_standings guard) — distinct from a
+         not-yet-played event, which has neither. -->
     <p class="text-ink-muted">
       {(tournament.standings?.length ?? 0) > 0 ? m.rounds_no_rounds_recorded() : m.rounds_no_rounds()}
     </p>
   {:else}
-    <!-- Current round controls -->
     {#if isOrganizer && currentRoundIdx >= 0 && !hasParallelRounds}
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div class="flex items-center gap-3">
@@ -525,7 +510,6 @@
         </div>
       </div>
 
-      <!-- Score details panel -->
       {#if showScoreDetails && seatingScore}
         <div class="bg-surface-muted/50 rounded-lg p-4 text-sm space-y-1">
           {#each RULE_LABELS as label, i}
@@ -563,14 +547,12 @@
         </div>
       {/if}
 
-      <!-- Cancel round confirmation -->
       {#if cancelConfirmRound === currentRoundIdx}
         {@render cancelConfirmBox(currentRoundIdx)}
       {/if}
 
     {/if}
 
-    <!-- Not seated players (alter mode, visible in Playing and Finished) -->
     {#if unseatedPlayers.length > 0}
       <div class="banner-warn border rounded-lg p-3">
         <p class="text-xs mb-2">{m.rounds_not_seated()}</p>
@@ -584,7 +566,6 @@
         </div>
       </div>
     {/if}
-    <!-- Sitting out players (stagger rounds, hidden with parallel rounds) -->
     {#if !hasParallelRounds && sittingOutPlayers.length > 0}
       <div class="banner-info border rounded-lg p-3">
         <p class="text-xs mb-2">{m.rounds_sitting_out()}</p>
@@ -642,7 +623,6 @@
         {#if isExpanded}
           <div class="px-4 pb-4 space-y-3">
             {#if alterMode && r === alterRoundIdx}
-              <!-- In-place alter seating mode -->
               <p class="text-sm text-ink">{m.rounds_alter_hint()}</p>
               {#if seatablePlayers.length > 0}
                 <!-- Cross-link: adding a pool player is a separate engine event
@@ -763,7 +743,9 @@
                     {/if}
                   </div>
                 </div>
-                <!-- Per-table timer + extension controls (unfold-only: the unfold is this table's org-action surface; the folded list stays compact, and the global round timer above keeps time visible at all times) -->
+                <!-- Unfold-only: the unfold is this table's org-action surface, the
+                     folded list stays compact, and the global round timer above
+                     keeps time visible. -->
                 {#if isScoring && !hasParallelRounds && (tournament.round_time ?? 0) > 0 && tournament.state === "Playing" && r === tournament.rounds!.length - 1}
                   <div class="mb-2">
                     <TimerDisplay {tournament} {isOrganizer} tableIndex={i} showAdvisory={false} />
@@ -834,9 +816,9 @@
                     </div>
                   {/each}
                 </div>
-                <!-- Why the table won't close, then the way past it. Without the
-                     reason an impossible table and a half-typed one look identical:
-                     no error, just a round that never finishes. -->
+                <!-- Why the table won't close, then the way past it — without the
+                     reason, an impossible table and a half-typed one look
+                     identical: no error, just a round that never finishes. -->
                 {#if isScoring && (table.state === 'Invalid' || table.state === 'In Progress')}
                   {@const vpIssue = checkTableVpsSync(table.seating.map(s => s.result.vp))}
                   {@const blocked = !!vpIssue && vpIssue.code !== 'incomplete'}
@@ -942,7 +924,6 @@
   {/if}
 </div>
 
-<!-- Tournament Sanction Modal -->
 {#if sanctionTarget && isOrganizer}
   <TournamentSanctionModal
     {tournament}
@@ -953,7 +934,6 @@
   />
 {/if}
 
-<!-- Sanction List Modal -->
 {#if sanctionListTarget}
   <SanctionListModal
     playerName={sanctionListTarget.name}

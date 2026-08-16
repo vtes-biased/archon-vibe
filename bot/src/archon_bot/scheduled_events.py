@@ -1,12 +1,3 @@
-"""Discord Guild Scheduled Event lifecycle for online tournaments.
-
-One EXTERNAL scheduled event per linked *online* tournament, so server members
-see it on the events list and get reminders. ``ensure_scheduled_event`` is the
-single idempotent authority, keyed on the ``scheduled_event_id`` persisted in the
-bot's ``guild_tournaments`` row — driven entirely off the tournament SSE snapshot
-(no setup-time create path), so a bot restart never double-creates.
-"""
-
 import asyncio
 import io
 import logging
@@ -36,8 +27,6 @@ _perm_warned: set[str] = set()
 
 @dataclass(frozen=True)
 class EventSpec:
-    """The scheduled event a tournament state requires."""
-
     name: str
     description: str
     location: str
@@ -47,12 +36,8 @@ class EventSpec:
 
 
 def _parse_start(obj: dict) -> datetime | None:
-    """Parse the tournament ``start`` into a tz-aware UTC datetime, defensively.
-
-    The app's ``start`` may be an absolute instant (offset/``Z``) or a naive
-    wall-clock time in ``timezone``; handle both — localize a naive value with the
-    tournament's IANA zone, then normalize to UTC. Returns None if unset/unparseable.
-    """
+    """A naive wall-clock ``start`` is localized with the tournament's IANA
+    ``timezone`` before normalizing to UTC; an absolute instant passes through."""
     raw = obj.get("start")
     if not raw:
         return None
@@ -69,7 +54,6 @@ def _parse_start(obj: dict) -> datetime | None:
 
 
 def _parse_end(obj: dict, start: datetime) -> datetime:
-    """Event end: the tournament ``finish`` if set and after start, else a default."""
     raw = obj.get("finish")
     if raw:
         try:
@@ -88,11 +72,6 @@ def _parse_end(obj: dict, start: datetime) -> datetime:
 
 
 def _build_spec(obj: dict, tournament_uid: str) -> EventSpec | None:
-    """The event a tournament requires, or None if it should have none.
-
-    None when: not online, finished, soft-deleted, or no parseable start — the
-    caller deletes any existing event in that case.
-    """
     if not obj.get("online"):
         return None
     if obj.get("state") == "Finished" or obj.get("deleted_at"):
@@ -121,9 +100,8 @@ def _build_spec(obj: dict, tournament_uid: str) -> EventSpec | None:
 
 
 def event_signature(obj: dict) -> tuple:
-    """Cheap digest of the fields that affect the scheduled event — the change guard.
-
-    Equal between two snapshots ⇒ no ensure needed (skips score/seating churn)."""
+    """Equal between two snapshots means no ensure is needed — skips score and
+    seating churn that don't touch the scheduled event."""
     return (
         bool(obj.get("online")),
         obj.get("name"),
@@ -150,10 +128,7 @@ def _to_png(data: bytes) -> bytes:
 
 
 async def _fetch_cover(banner_path: str | None) -> hikari.Bytes | None:
-    """Fetch the tournament banner and transcode it to a PNG event cover.
-
-    Returns None (no cover) on any failure — the event is still created/edited.
-    """
+    """Returns None (no cover) on any failure — the event is still created/edited."""
     if not banner_path:
         return None
     url = f"{config.ARCHON_URL}{banner_path}"
@@ -183,19 +158,9 @@ async def ensure_scheduled_event(
     obj: dict,
     prev_obj: dict | None = None,
 ) -> None:
-    """Idempotently drive Discord to the scheduled event ``obj`` requires.
-
-    Create/edit/delete keyed on the stored ``scheduled_event_id``. Safe to call
-    repeatedly (catch-up reconcile + live updates); failures are logged, never raised
-    — a missing event is repaired on the next call. Caller should hold the structural
-    lock so concurrent runs for one tournament don't race the stored id.
-
-    ``prev_obj`` (the previous snapshot, when known) lets the banner be re-fetched
-    only on an actual cover change instead of on every edit.
-
-    Always attempted for online tournaments — a guild that didn't grant the bot
-    MANAGE_EVENTS just makes the create ``ForbiddenError`` (logged, skipped).
-    """
+    """Caller must hold the structural lock so concurrent runs for one tournament
+    don't race the stored ``scheduled_event_id``. Failures are logged, never
+    raised — a missing event is repaired on the next call."""
     link = await store.get_tournament_link(guild_id, tournament_uid)
     if not link:
         return
@@ -203,7 +168,6 @@ async def ensure_scheduled_event(
     spec = _build_spec(obj, tournament_uid)
     gid = int(guild_id)
 
-    # No event wanted (offline / finished / deleted / no start): remove any existing.
     if spec is None:
         if event_id:
             await _delete(bot, gid, event_id)
@@ -211,8 +175,7 @@ async def ensure_scheduled_event(
         return
 
     now = datetime.now(UTC)
-    # Only (re)fetch + transcode the banner when it could actually have changed — a
-    # fresh create, a reconcile with no prior snapshot, or a banner edit. A
+    # Re-fetch/transcode the banner only on an actual cover change — a
     # name/description-only edit keeps the event's existing Discord cover.
     cover_changed = (
         event_id is None
@@ -221,7 +184,6 @@ async def ensure_scheduled_event(
     )
     image = await _fetch_cover(spec.banner_path) if cover_changed else None
 
-    # Edit the existing event when we still track one.
     if event_id:
         kwargs: dict = {
             "name": spec.name,
@@ -261,7 +223,7 @@ async def ensure_scheduled_event(
         )
         await store.set_scheduled_event_id(guild_id, tournament_uid, str(ev.id))
         logger.info("Created scheduled event %s for %s", ev.id, tournament_uid)
-        _perm_warned.discard(f"{guild_id}:{tournament_uid}")  # reset on success
+        _perm_warned.discard(f"{guild_id}:{tournament_uid}")
     except hikari.ForbiddenError:
         logger.warning(
             "Missing MANAGE_EVENTS — can't create scheduled event for %s",
@@ -273,10 +235,8 @@ async def ensure_scheduled_event(
 
 
 async def _warn_missing_events_permission(bot, link: dict, key: str) -> None:
-    """Post short, one-time guidance to #judges when the event couldn't be created.
-
-    Deduped per (guild, tournament) per process so the repeated ensure calls don't
-    spam; cleared on a later successful create (``ensure_scheduled_event``)."""
+    """Deduped per (guild, tournament) per process; cleared on the next
+    successful create."""
     if key in _perm_warned:
         return
     _perm_warned.add(key)
@@ -295,7 +255,6 @@ async def _warn_missing_events_permission(bot, link: dict, key: str) -> None:
 
 
 async def _delete(bot, guild_id: int, event_id: str) -> None:
-    """Delete a scheduled event, ignoring one already gone."""
     try:
         await bot.rest.delete_scheduled_event(guild_id, int(event_id))
         logger.info("Deleted scheduled event %s", event_id)
@@ -308,7 +267,6 @@ async def _delete(bot, guild_id: int, event_id: str) -> None:
 async def delete_scheduled_event(
     bot, store, guild_id: str, tournament_uid: str
 ) -> None:
-    """Remove a tournament's scheduled event and clear the stored id (for /teardown)."""
     link = await store.get_tournament_link(guild_id, tournament_uid)
     if not link:
         return

@@ -1,17 +1,9 @@
 """Guardrail: no frontend SPA page route may be shadowed by a backend-proxied
-nginx prefix.
-
-Frontend and backend share one origin behind nginx, split by path prefix: a
-fixed set of prefixes proxies to the backend, everything else falls through to
-the SPA shell. A frontend *page* placed under a backend prefix is therefore
-sent to the API and 404s instead of booting the client router — this bit us
-twice (/oauth/consent, /auth/email/verify, since relocated to /consent and
-/verify-email).
-
-This test reads the proxied-prefix list straight from the `static_site` role
-default (the same source nginx renders from), so the guardrail and the deployed
-config can't drift, and scans the real SvelteKit route tree. One invariant:
-every page route lives outside every backend prefix.
+nginx prefix — a page under a backend prefix 404s against the API instead of
+booting the SPA (bit us twice: /oauth/consent, /auth/email/verify, since
+relocated). Reads the proxied-prefix list from the `static_site` role default,
+the same source nginx renders from, so the check can't drift from the deployed
+config.
 """
 
 from pathlib import Path

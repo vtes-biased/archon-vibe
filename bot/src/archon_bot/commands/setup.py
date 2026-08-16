@@ -1,5 +1,3 @@
-"""Organizer commands: /setup, /teardown, /announce."""
-
 import logging
 import secrets
 
@@ -27,15 +25,12 @@ logger = logging.getLogger(__name__)
 
 
 def _may_set_up(info_data: dict) -> bool:
-    """Whether the backend says this user may set a tournament up.
-
-    Absent capabilities (an older backend) means no — the API is authoritative
-    and would refuse anyway; better a missing button than a broken one."""
+    """Absent capabilities (an older backend) means no — better a missing
+    button than a broken one."""
     return config.SETUP_CAPABILITY in info_data.get("capabilities", [])
 
 
 def extract_tournament_uid(url: str) -> str | None:
-    """Extract tournament UID from Archon URL like /tournaments/<uid>."""
     parts = url.rstrip("/").split("/")
     for i, part in enumerate(parts):
         if part == "tournaments" and i + 1 < len(parts):
@@ -75,7 +70,6 @@ class SetupCommand(
 
         discord_id = str(ctx.user.id)
 
-        # Check if user has tokens
         tokens = await store.get_tokens(discord_id)
         if not tokens:
             state = secrets.token_urlsafe(32)
@@ -93,7 +87,6 @@ class SetupCommand(
             )
             return
 
-        # Check user has NC/Prince/IC role
         info = await fetch_userinfo(api, ctx, discord_id, account="Archon account")
         if info is None:
             return
@@ -105,7 +98,6 @@ class SetupCommand(
             )
             return
 
-        # Check if already linked
         existing = await store.get_tournament_link(str(ctx.guild_id), tournament_uid)
         if existing:
             await ctx.respond(
@@ -115,8 +107,7 @@ class SetupCommand(
             return
 
         # Probe BEFORE any side effect: a typo'd or inaccessible uid must not
-        # leave a dead category plus a listener reconnecting forever. Also the
-        # only way the bot learns the tournament's real name and state.
+        # leave a dead category plus a listener reconnecting forever.
         tournament = await probe_tournament(api, store, discord_id, tournament_uid)
         if tournament is None:
             await ctx.respond(
@@ -136,7 +127,6 @@ class SetupCommand(
             "Setting up tournament channels...", flags=hikari.MessageFlag.EPHEMERAL
         )
 
-        # Create channels
         try:
             channels = await create_tournament_channels(
                 ctx.client.app,
@@ -150,7 +140,6 @@ class SetupCommand(
             )
             return
 
-        # Store link
         await store.link_tournament(
             guild_id=str(ctx.guild_id),
             tournament_uid=tournament_uid,
@@ -158,7 +147,6 @@ class SetupCommand(
             **channels,
         )
 
-        # Start SSE listener
         await start_sse(
             ctx.client.app,
             api,
@@ -168,7 +156,6 @@ class SetupCommand(
             discord_id,
         )
 
-        # Post welcome messages
         webapp_url = f"{config.ARCHON_FRONTEND_URL}/tournaments/{tournament_uid}"
         ann_id = int(channels["announcement_channel_id"])
         lobby_id = int(channels["lobby_channel_id"])
@@ -233,7 +220,6 @@ class TeardownCommand(
             )
             return
 
-        # Verify the user has organizer rights
         is_archon_organizer = False
         info = await api.get_userinfo(discord_id)
         if info.ok:
@@ -297,9 +283,8 @@ class TeardownCommand(
         try:
             await ctx.respond(msg, flags=hikari.MessageFlag.EPHEMERAL)
         except (hikari.NotFoundError, hikari.BadRequestError):
-            # /teardown is usually run from a channel inside the category it just
-            # deleted, so this follow-up targets a gone channel (10003 Unknown
-            # Channel). The teardown already completed — nothing left to report.
+            # The invoking channel is usually inside the category just deleted
+            # (10003 Unknown Channel) — teardown already completed regardless.
             logger.info("Teardown done; status reply skipped (invoking channel gone)")
 
 
@@ -332,7 +317,6 @@ class AnnounceCommand(
             )
             return
 
-        # Verify organizer permissions
         is_organizer = link["organizer_discord_id"] == discord_id
         if not is_organizer:
             info = await api.get_userinfo(discord_id)

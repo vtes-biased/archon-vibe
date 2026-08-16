@@ -1,14 +1,5 @@
-/**
- * Offline-aware sanction actions for the tournament context.
- *
- * Online: plain API calls (server applies DQ state + standings recompute).
- * Offline (device-locked tournament): Sanction objects are written straight
- * to IndexedDB and tagged for go-online reconciliation, then the client
- * mirrors the server's side effects — DQ player-state flips and a WASM
- * standings recompute over the tournament's IDB sanctions. Scope is
- * event-level sanctions of the locked tournament only; VEKN-wide
- * suspension/probation stay online-only (IC/Ethics surfaces).
- */
+// Online: plain API calls (server applies DQ state + standings recompute). Offline (device-locked):
+// Sanction objects write straight to IndexedDB and the client mirrors the server's DQ/standings side effects; VEKN-wide suspension/probation stay online-only.
 
 import type { Sanction, Tournament } from './types';
 import {
@@ -86,11 +77,8 @@ export async function removeTournamentSanction(tournamentUid: string, sanctionUi
   await applyOfflineSanctionEffects(tournamentUid);
 }
 
-/**
- * Mirror the server's sanction side effects on the device-locked tournament:
- * DQ state flips (backend _set_player_dq_state / _dq_restore_state) and ONE
- * standings recompute via the shared Rust engine.
- */
+/** Mirrors the server's sanction side effects on the device-locked tournament: DQ state flips
+ * (backend _set_player_dq_state/_dq_restore_state) and ONE standings recompute via the shared Rust engine. */
 async function applyOfflineSanctionEffects(tournamentUid: string): Promise<void> {
   const tournament = await getTournament(tournamentUid);
   if (!tournament) return;
@@ -116,9 +104,8 @@ async function applyOfflineSanctionEffects(tournamentUid: string): Promise<void>
   syncManager.notifyLocalMutation('tournament');
 }
 
-/** Playable state after a DQ is removed — mirror of backend _dq_restore_state:
- * Playing while seated at a live table (prelim or finals), Finished on a
- * finished tournament, Checked-in otherwise. */
+/** Playable state after a DQ is removed — mirror of backend _dq_restore_state: Playing while seated
+ * at a live table, Finished on a finished tournament, Checked-in otherwise. */
 function restoredState(t: Tournament, userUid: string): 'Playing' | 'Finished' | 'Checked-in' {
   if (t.state === 'Finished') return 'Finished';
   const liveTables = (t.rounds ?? [])

@@ -1,5 +1,3 @@
-"""HTTP server for OAuth redirect callback."""
-
 import logging
 
 from aiohttp import web
@@ -24,7 +22,6 @@ def set_context(bot, store: TokenStore, api: ArchonAPI) -> None:
 
 
 async def handle_callback(request: web.Request) -> web.Response:
-    """Handle OAuth redirect from Archon."""
     assert _store and _api and _bot
 
     code = request.query.get("code")
@@ -40,19 +37,16 @@ async def handle_callback(request: web.Request) -> web.Response:
     if not code or not state:
         return web.Response(text="Missing code or state.", status=400)
 
-    # Look up pending OAuth flow
     pending = await _store.get_pending_oauth(state)
     if not pending:
         return web.Response(text="Unknown or expired OAuth state.", status=400)
 
     await _store.remove_pending_oauth(state)
 
-    # Exchange code for tokens
     token_data = await _api.exchange_code(code, pending["code_verifier"])
     if not token_data:
         return web.Response(text="Token exchange failed. Please try again.", status=500)
 
-    # Get user info to find archon_uid using the shared API session
     async with _api._session.get(
         "/oauth/userinfo",
         headers={"Authorization": f"Bearer {token_data['access_token']}"},
@@ -64,7 +58,6 @@ async def handle_callback(request: web.Request) -> web.Response:
     archon_uid = userinfo["sub"]
     discord_id = pending["discord_id"]
 
-    # Store tokens
     await _store.store_tokens(
         discord_id=discord_id,
         archon_uid=archon_uid,
@@ -72,16 +65,14 @@ async def handle_callback(request: web.Request) -> web.Response:
         refresh_token=token_data["refresh_token"],
     )
 
-    # Respawn SSE listeners for this organizer's links whose tasks died —
-    # genuine token death stops a listener permanently, and this fresh grant is
-    # the self-service recovery (start_sse no-ops for listeners still alive).
+    # Self-service recovery: a dead-token listener stays dead until this fresh
+    # grant respawns it (start_sse no-ops for listeners still alive).
     for gt in await _store.get_all_guild_tournaments():
         if gt["organizer_discord_id"] == discord_id:
             await start_sse(
                 _bot, _api, _store, gt["guild_id"], gt["tournament_uid"], discord_id
             )
 
-    # Notify the user in Discord that auth succeeded
     try:
         user = await _bot.rest.fetch_user(int(discord_id))
         await user.send(
@@ -99,7 +90,6 @@ async def handle_callback(request: web.Request) -> web.Response:
 
 
 async def start_callback_server(host: str, port: int) -> web.AppRunner:
-    """Start the OAuth callback HTTP server."""
     app = web.Application()
     app.router.add_get("/oauth/callback", handle_callback)
 

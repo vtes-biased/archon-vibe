@@ -87,7 +87,7 @@
   {#if rooms.length > 0}
     <div class="space-y-2 mb-3">
       {#each rooms as room, i}
-        <!-- Side-by-side 44px reorder + remove targets (wiki/design.md touch floor) -->
+        <!-- Side-by-side 44px reorder + remove targets (mobile touch-target floor). -->
         <div class="flex items-center gap-1">
           <button
             onclick={() => moveUp(i)}

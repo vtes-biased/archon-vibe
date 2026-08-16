@@ -33,17 +33,15 @@ sw.addEventListener('fetch', (event) => {
 
   if (url.origin === location.origin) {
     // Promo images: unauthenticated by design, versioned/immutable URLs —
-    // cache-first so they display during offline tournaments (raffle winner,
-    // promo picker). Populated by the catalog-sync prefetch (sync.ts).
+    // cache-first so they display during offline tournaments. Populated by
+    // the catalog-sync prefetch (sync.ts).
     if (url.pathname.startsWith('/api/promos/') && url.pathname.endsWith('/image')) {
       event.respondWith(cacheFirst(event.request));
       return;
     }
-    // Same-origin allow-list: only precached assets (cache-first) and SPA
-    // navigations (200.html fallback) are served from Cache Storage. Every
-    // other same-origin GET — /api, /stream, /snapshot?token=JWT, /auth,
-    // /oauth, /vekn, /sanctions, /admin — passes through untouched so
-    // JWT-bearing / authenticated responses never land in the cache.
+    // Allow-list: only precached assets and SPA navigations use Cache Storage;
+    // every other same-origin GET passes through untouched, so authenticated
+    // responses never get cached.
     if (ASSETS.includes(url.pathname) || event.request.mode === 'navigate') {
       event.respondWith(respondFromCache(event.request, url));
     }
@@ -68,19 +66,16 @@ async function cacheFirst(request: Request): Promise<Response> {
 async function respondFromCache(request: Request, url: URL): Promise<Response> {
   const cache = await caches.open(CACHE);
 
-  // Precached assets: serve from cache (cache-first)
   if (ASSETS.includes(url.pathname)) {
     const cached = await cache.match(url.pathname);
     if (cached) return cached;
   }
 
-  // Navigation requests: serve SPA fallback (200.html) from cache
   if (request.mode === 'navigate') {
     const fallback = await cache.match('/200.html');
     if (fallback) return fallback;
   }
 
-  // Precached asset / shell missing from cache: fall back to the network.
   return networkFirst(request);
 }
 
@@ -99,16 +94,14 @@ async function networkFirst(request: Request): Promise<Response> {
   }
 }
 
-// Listen for skip-waiting message from the app
 sw.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     sw.skipWaiting();
   }
 });
 
-// --- Web Push (#314) ---------------------------------------------------------
 // Backend payload: { title, body, url, tag }. iOS revokes permission if a push
-// doesn't show a notification, so this ALWAYS calls showNotification.
+// doesn't show a notification, so this always calls showNotification.
 sw.addEventListener('push', (event) => {
   let data: { title?: string; body?: string; url?: string; tag?: string; renotify?: boolean } = {};
   try {
@@ -150,9 +143,9 @@ sw.addEventListener('notificationclick', (event) => {
   );
 });
 
-// Browser rotated the subscription. Re-subscribe locally with the same server key so
-// pushManager.getSubscription() is valid again; the app re-POSTs it on next open (lazy
-// reconcile) and the stale endpoint is pruned server-side on its next 404/410.
+// Browser rotated the subscription: re-subscribe locally with the same server
+// key so pushManager.getSubscription() is valid again; the app re-POSTs it on
+// next open (lazy reconcile).
 sw.addEventListener('pushsubscriptionchange', (event) => {
   const e = event as Event & {
     oldSubscription?: PushSubscription;

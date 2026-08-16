@@ -1,11 +1,5 @@
-/**
- * Client-side deck fetching and parsing.
- *
- * URL fetching: routed through the backend `/fetch-deck` proxy — only the backend
- * (via krcg) can map provider-native card ids to VEKN ids (notably Amaranth's), so
- * every url/QR import goes server-side. Needs a connection; callers gate it offline.
- * Text parsing: uses the WASM engine's parse_deck — local, works offline.
- */
+// URL fetching routes through the backend `/fetch-deck` proxy — only the backend (via krcg) can map
+// provider-native card ids to VEKN ids (notably Amaranth's), so every url/QR import goes server-side and needs a connection. Text parsing uses the WASM engine locally, offline-capable.
 
 import { callEngine, initEngine } from './engine';
 
@@ -17,15 +11,10 @@ export interface ParsedDeck {
   warnings?: string[];
 }
 
-/** URL import failed (bad link, unsupported provider, provider error). The
- * server detail is developer English — callers show one friendly localized
- * message instead and nudge toward Paste, which always works. */
+/** URL import failed (bad link, unsupported provider, provider error). The server detail is developer
+ * English — callers show one friendly localized message instead and nudge toward Paste, which always works. */
 export class DeckFetchError extends Error {}
 
-/**
- * Fetch a deck from a supported URL (VDB, VTESDecks, Amaranth) via the backend
- * proxy, which resolves all card ids to VEKN ids. Requires network.
- */
 export async function fetchDeckFromUrl(url: string): Promise<ParsedDeck> {
   const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
   const { getAccessToken } = await import('./stores/auth.svelte');
@@ -43,9 +32,6 @@ export async function fetchDeckFromUrl(url: string): Promise<ParsedDeck> {
   return resp.json();
 }
 
-/**
- * Parse deck text using the WASM engine (local, offline-capable).
- */
 export async function parseDeckText(text: string): Promise<ParsedDeck> {
   const engine = await initEngine();
   const { getCardsJson } = await import('./cards');

@@ -6,14 +6,8 @@ Focuses on:
 
 from src.routes.tournaments import _remap_uids_in_tournament
 
-# ============================================================================
-# _remap_uids_in_tournament tests
-# ============================================================================
-
 
 class TestRemapUids:
-    """Test the UID remapping used during go-online reconciliation."""
-
     def test_basic_remap(self):
         data = {
             "uid": "t1",
@@ -47,13 +41,11 @@ class TestRemapUids:
         assert result["winner"] == "real-111"
 
     def test_empty_uid_map(self):
-        """No remapping needed -- data should be unchanged."""
         data = {"uid": "t1", "players": [{"user_uid": "existing-user"}]}
         result = _remap_uids_in_tournament(data, {})
         assert result == data
 
     def test_uid_not_present_in_data(self):
-        """UID in map but not in data -- should be harmless."""
         data = {"uid": "t1", "players": []}
         result = _remap_uids_in_tournament(data, {"temp-xxx": "real-yyy"})
         assert result == data

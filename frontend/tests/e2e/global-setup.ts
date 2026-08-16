@@ -13,13 +13,10 @@ const STATE_FILE = path.join(__dirname, '.e2e-state.json');
 const API_URL = process.env.VITE_API_URL || 'http://localhost:8000';
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
 
-// In Docker, populate-db writes seed data to this file via a shared volume.
-// Locally, run the seed script with --output to produce it.
 const SEED_FILE = process.env.E2E_SEED_FILE
   || path.join(__dirname, '..', '..', '..', 'e2e-seed.json');
 
 async function globalSetup() {
-  // 1. Health-check backend
   for (let i = 0; i < 10; i++) {
     try {
       const res = await fetch(`${API_URL}/`);
@@ -30,7 +27,6 @@ async function globalSetup() {
     }
   }
 
-  // 2. Read seed data (written by populate-db container or manual script run)
   if (!fs.existsSync(SEED_FILE)) {
     throw new Error(
       `Seed file not found at ${SEED_FILE}. ` +
@@ -40,7 +36,6 @@ async function globalSetup() {
   }
   const seedData = JSON.parse(fs.readFileSync(SEED_FILE, 'utf-8'));
 
-  // 3. Login organizer via real /auth/login
   const loginRes = await fetch(`${API_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -54,7 +49,6 @@ async function globalSetup() {
   }
   const tokens = await loginRes.json();
 
-  // 4. Store state for tests
   const state = {
     ...seedData,
     access_token: tokens.access_token,
@@ -62,13 +56,9 @@ async function globalSetup() {
   };
   fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
 
-  // 5. Warm up Vite dev server — visit the app so Vite pre-compiles all
-  //    JS bundles before parallel test workers hit it simultaneously.
-  //    Retry rather than settle for one attempt: nothing upstream waits for Vite
-  //    (in Docker BASE_URL is set, which disables Playwright's own webServer
-  //    readiness check), so a single early attempt can land before the server
-  //    serves anything and leave the first tests racing dep optimization — they
-  //    assert on a bare page.goto with no wait helper and fail on a cold start.
+  // Warm up Vite: pre-compile bundles before parallel workers hit it. Retry
+  // instead of one attempt — BASE_URL disables Playwright's readiness check,
+  // so an early attempt can race dep optimization and fail cold-start tests.
   const { chromium } = await import('@playwright/test');
   const browser = await chromium.launch();
   const page = await browser.newPage();

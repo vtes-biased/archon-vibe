@@ -1,14 +1,7 @@
-"""Tests for batch_push's selection queries (the import guards).
-
-batch_push retries any finished tournament that has no `vekn_pushed_at`. The
-rounds guard excludes tournaments whose results did NOT originate in-app — VEKN
-imports / ETL-migrated history have populated `standings` but no `rounds`.
-Re-pushing those would send finals-folded numbers to the public VEKN registry
-(see test_vekn_tournament_sync.py for the other half of the invariant).
-
-The calendar-event query's vekn_pushed_at guard excludes ETL-imported finished
-tournaments that never had a vekn id (old in-app events): without it, the first
-push run would create vekn.net calendar events for years-old history.
+"""batch_push retries any finished tournament with no `vekn_pushed_at`; the
+rounds guard excludes VEKN imports (standings but no rounds) from re-push, and
+the calendar-event query's vekn_pushed_at guard excludes ETL-imported
+tournaments that never had a vekn id.
 """
 
 from datetime import UTC, datetime
@@ -86,11 +79,9 @@ async def test_results_query_selects_in_app_excludes_imports(test_db):
             await conn.execute("DELETE FROM objects WHERE type = 'tournament'")
 
 
-# ---------------------------------------------------------------------------
-# Fail-fast circuit: a connection/auth failure aborts the whole batch
-# (it reruns next cycle) instead of re-timing-out every pending item serially;
-# a per-item data error skips only that item and the batch continues.
-# ---------------------------------------------------------------------------
+# A connection/auth failure aborts the whole batch (reruns next cycle) instead
+# of re-timing-out every pending item; a per-item data error skips just that
+# item and the batch continues.
 
 
 def _member(uid: str, vekn_id: str) -> User:
@@ -153,14 +144,9 @@ async def test_batch_push_skips_data_error_and_continues(test_db, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_push_queries_exclude_open_and_self_organized_rounds(test_db):
-    """House open-rounds / self-organized events are never pushed to VEKN.
-
-    Both batch_push selection queries must exclude them: an open_rounds=true
-    (or self_organized_rounds=true) tournament is byte-identical to a standard
-    VEKN event except for the flag, so without the guard its results would be
-    sent to the public VEKN registry. Asserts the invariant against the shipped
-    queries; a standard event with the same shape stays selected.
-    """
+    """House open-rounds / self-organized events are never pushed to VEKN: both
+    batch_push selection queries must exclude them, since such a tournament is
+    otherwise byte-identical to a standard VEKN event except for the flag."""
     try:
         # Standard pushable event (rounds + vekn id, unpushed) → stays selected.
         await seed_tournament(_tournament("standard", with_rounds=True))

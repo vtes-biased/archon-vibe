@@ -1,14 +1,5 @@
-/**
- * Contact-field de-obfuscation.
- *
- * Anonymous viewers receive officials' contact_email / contact_phone cloaked as
- * base64 in the public projection (see backend access_levels.py) so the
- * plaintext never appears in /sync/snapshot?level=public — deterring naive bulk
- * harvesters. Authenticated viewers (member/full) get plaintext. This decoder
- * handles both: cloaked values are decoded, plaintext passes through unchanged.
- *
- * Keep the prefix and scheme in sync with access_levels.py.
- */
+/** Officials' contact_email/contact_phone are cloaked as base64 in the public projection
+ * (backend access_levels.py) as a harvester speed-bump; member/full get plaintext. Keep the prefix and scheme in sync with access_levels.py. */
 const OBFUSCATED_PREFIX = "#b64#";
 
 export function deobfuscateContact(value: string | null | undefined): string {

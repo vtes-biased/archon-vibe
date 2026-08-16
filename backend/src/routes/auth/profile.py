@@ -23,8 +23,6 @@ encoder = msgspec.json.Encoder()
 
 
 class CommunityLinkInput(BaseModel):
-    """Community link input for profile update."""
-
     type: str
     url: str
     label: str = ""
@@ -32,8 +30,6 @@ class CommunityLinkInput(BaseModel):
 
 
 class ProfileUpdateRequest(BaseModel):
-    """Profile update request payload."""
-
     name: str | None = None
     nickname: str | None = None
     country: str | None = None
@@ -47,13 +43,11 @@ class ProfileUpdateRequest(BaseModel):
 
 @router.get("/me")
 async def get_me(current_user: CurrentUser) -> Response:
-    """Get the current authenticated user."""
     user = current_user
 
     # Surface the owner's calendar feed token (kept out of all projections).
     user.calendar_token = await get_calendar_token(user.uid)
 
-    # Get auth methods for this user (without credential hashes)
     auth_methods = await get_auth_methods_for_user(user.uid)
     methods_info = [
         {
@@ -79,19 +73,12 @@ async def update_current_user(
     request: ProfileUpdateRequest,
     current_user: CurrentUser,
 ) -> Response:
-    """Update the current authenticated user's profile.
-
-    Only updates fields that are provided (non-None).
-    """
     user = current_user
 
-    # Track locally modified fields so VEKN sync won't overwrite them
+    # Self-edits must land in local_modifications, or the VEKN sync and the
+    # legacy-archon merge — both skip locally-modified fields — silently revert them.
     local_mods = set(user.local_modifications)
 
-    # Update only provided fields. Contact fields and nickname are recorded in
-    # local_modifications too: the VEKN sync (officials' contact_email
-    # injection) and the legacy-archon merge both skip locally-modified fields,
-    # so self-edits here must not be silently reverted by either.
     if request.name is not None:
         user.name = request.name
         local_mods.add("name")
@@ -100,10 +87,8 @@ async def update_current_user(
         local_mods.add("nickname")
     if request.country is not None:
         new_country = request.country.upper() if request.country else None
-        # An NC/Prince may not change their OWN country — it scopes their
-        # FULL-data overlay, so a self-service change is an unauthorized
-        # data-scope change. can_change_country(self, self) blocks them; IC
-        # (overlay-neutral) and regular members pass.
+        # An NC/Prince can't change their own country: it scopes their FULL-data
+        # overlay, so a self-edit would be an unauthorized scope change.
         if new_country != user.country and not permissions.can_change_country(
             user, user
         ):
@@ -148,7 +133,6 @@ async def update_current_user(
                 detail=f"Maximum {max_links} community links allowed",
             )
         links = []
-        # Build map of existing moderation states (keyed by url)
         existing_mod: dict[str, object] = {}
         for existing in user.community_links:
             if existing.moderation:
@@ -162,8 +146,7 @@ async def update_current_user(
                 ) from None
             if not link.url.startswith(("http://", "https://")):
                 raise HTTPException(status_code=422, detail=f"Invalid URL: {link.url}")
-            # Shape-only language validation — the selectable list is owned by
-            # the frontend (lib/data/languages.ts), the single point of truth.
+            # Shape-only validation; the curated language list lives in the frontend.
             if len(link.languages) > 5:
                 raise HTTPException(
                     status_code=422, detail="Maximum 5 languages per link"
@@ -173,7 +156,6 @@ async def update_current_user(
                     raise HTTPException(
                         status_code=422, detail=f"Invalid language code: {lang}"
                     )
-            # Preserve moderation state from existing link with same URL
             mod = existing_mod.get(link.url)
             links.append(
                 CommunityLink(
@@ -186,7 +168,6 @@ async def update_current_user(
             )
         user.community_links = links
 
-    # Update modified timestamp and local modifications
     user.modified = datetime.now(UTC)
     user.local_modifications = local_mods
 
@@ -196,7 +177,6 @@ async def update_current_user(
     # Surface the owner's calendar feed token (preserved by COALESCE, not in "full").
     user.calendar_token = await get_calendar_token(user.uid)
 
-    # Return updated user with auth methods
     auth_methods = await get_auth_methods_for_user(user.uid)
     methods_info = [
         {
@@ -219,10 +199,8 @@ async def update_current_user(
 
 @router.post("/me/calendar-token")
 async def generate_calendar_token(current_user: CurrentUser) -> Response:
-    """Generate or regenerate a calendar subscription token."""
     user = current_user
 
-    # Generate new token
     cal_token = secrets.token_urlsafe(32)
     user.calendar_token = cal_token
     user.modified = datetime.now(UTC)

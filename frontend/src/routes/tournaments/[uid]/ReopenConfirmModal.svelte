@@ -5,8 +5,6 @@
   import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  // Split out of FinishedResults when Reopen moved into the Tools sheet: the
-  // trigger and the confirmation now live together, wherever the trigger is.
   let {
     tournament,
     actionLoading = false,

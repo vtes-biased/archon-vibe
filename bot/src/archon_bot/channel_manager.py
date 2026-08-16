@@ -1,5 +1,3 @@
-"""Discord channel creation and permission management."""
-
 import logging
 import re
 from collections.abc import Iterable
@@ -10,28 +8,22 @@ import hikari
 logger = logging.getLogger(__name__)
 
 PLAYER_ALLOW = hikari.Permissions.CONNECT | hikari.Permissions.SPEAK
-# The bot's own allow on a table/finals voice channel, OVER the @everyone CONNECT
-# deny it writes there. A channel overwrite overrides the bot's server-level grant,
-# so without this the bot denies ITSELF CONNECT — and Discord requires CONNECT to
-# DELETE a voice channel, so /teardown 403s (50001) on its own tables. SEND_MESSAGES
-# lets the bot post in the voice channel's text chat.
+# A channel overwrite overrides the bot's server-level grant, so without its own
+# CONNECT allow here the bot denies itself CONNECT — and Discord requires CONNECT
+# to DELETE a voice channel, so /teardown 403s (50001) on its own tables.
 BOT_ALLOW = hikari.Permissions.CONNECT | hikari.Permissions.SEND_MESSAGES
 
-# #judges is private: sanction details (member-level data in the app) post there,
-# so @everyone must neither see nor join it. Organizers win VIEW+CONNECT back;
-# SPEAK isn't denied, so it inherits for anyone who can connect.
+# @everyone must neither see nor join #judges; organizers win VIEW+CONNECT back.
 JUDGE_DENY = hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.CONNECT
 JUDGE_ALLOW = hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.CONNECT
 JUDGES_BOT_ALLOW = JUDGE_ALLOW | hikari.Permissions.SEND_MESSAGES
 
-# Table voice-channel name: round-prefixed "R{n} - Table {m}". The optional
-# legacy "Table {m}" form (no prefix) is still matched so tournaments mid-flight
-# when this shipped are discovered/cleaned correctly.
+# The legacy unprefixed "Table {m}" form is still matched so tournaments
+# mid-flight when the round prefix shipped are discovered/cleaned correctly.
 _TABLE_NAME_RE = re.compile(r"^(?:R\d+ - )?Table (\d+)$")
 
 
 def _table_channel_name(table_num: int, round_number: int | None) -> str:
-    """Voice-channel name for a prelim table — round-prefixed when known."""
     if round_number is not None:
         return f"R{round_number} - Table {table_num}"
     return f"Table {table_num}"
@@ -39,11 +31,8 @@ def _table_channel_name(table_num: int, round_number: int | None) -> str:
 
 @dataclass(frozen=True)
 class DesiredChannel:
-    """A voice channel the tournament state requires, matched/diffed by ``name``.
-
-    ``member_uids`` (seated players ∪ organizers) is the CONNECT+SPEAK allow-set
-    over the constant ``@everyone DENY CONNECT`` baseline.
-    """
+    """Matched/diffed by ``name``. ``member_uids`` is the CONNECT+SPEAK allow-set
+    over the constant ``@everyone DENY CONNECT`` baseline."""
 
     name: str
     member_uids: frozenset[str]
@@ -54,13 +43,8 @@ def _seat_uids(seating: Iterable[dict]) -> frozenset[str]:
 
 
 def desired_channels(obj: dict) -> list[DesiredChannel]:
-    """The target round/finals voice-channel set for a state — reconcile's goal.
-
-    Empty unless ``Playing``. With finals seated and no result yet: a single
-    ``Finals`` for all finalists ∪ organizers (a finished finals → nothing, so the
-    channel is torn down). Otherwise the current round: one ``R{n} - Table {m}`` per
-    table, scoped to that table's seated players ∪ organizers.
-    """
+    """Reconcile's goal set. An empty return (finals finished, or not ``Playing``)
+    means every matching Discord channel gets torn down."""
     if obj.get("state") != "Playing":
         return []
     organizer_uids = frozenset(obj.get("organizers_uids", []))
@@ -84,14 +68,9 @@ def desired_channels(obj: dict) -> list[DesiredChannel]:
 
 
 def structure_signature(obj: dict) -> tuple:
-    """Hashable digest of the structure-affecting fields — the cheap reconcile guard.
-
-    Keyed on each desired channel's name and full member set (per-table membership,
-    organizers, finals/prelim mode), NOT on table count: a same-size seat swap must
-    still flip it. Also keyed on the organizer set directly: the judges channel's
-    membership follows it in EVERY state, not just Playing. Equal between two
-    snapshots ⇒ no reconcile needed.
-    """
+    """Keyed on full member sets, NOT table count — a same-size seat swap must
+    still flip it. Also keyed on the organizer set directly: #judges tracks it
+    in every state, not just Playing."""
     return (
         frozenset(obj.get("organizers_uids", [])),
         tuple((dc.name, dc.member_uids) for dc in desired_channels(obj)),
@@ -104,24 +83,18 @@ async def create_tournament_channels(
     tournament_name: str,
     organizer_discord_id: int,
 ) -> dict:
-    """Create tournament channels (category, announcement, lobby, judges).
-
-    ``organizer_discord_id`` (the /setup runner) is granted on the private
-    #judges channel; the other organizers are synced from the tournament
-    object on every reconcile. Returns dict with channel IDs.
-    """
+    """``organizer_discord_id`` (the /setup runner) is granted on the private
+    #judges channel; other organizers sync in on every reconcile."""
     logger.info("Creating tournament channels in guild=%s", guild_id)
     guild = await bot.rest.fetch_guild(guild_id)
     me = guild.get_my_member() or await bot.rest.fetch_my_member(guild_id)
 
-    # Create category
     category = await bot.rest.create_guild_category(
         guild_id,
         name=f"Tournament: {tournament_name[:50]}",
     )
     logger.info("✓ created tournament category id=%s", category.id)
 
-    # #announcement — read-only for @everyone
     announcement = await bot.rest.create_guild_text_channel(
         guild_id,
         name="announcement",
@@ -140,14 +113,12 @@ async def create_tournament_channels(
         ],
     )
 
-    # #lobby — writable by everyone
     lobby = await bot.rest.create_guild_text_channel(
         guild_id,
         name="lobby",
         category=category.id,
     )
 
-    # #judges — private voice channel for judges/organizers
     judges = await bot.rest.create_guild_voice_channel(
         guild_id,
         name="judges",
@@ -180,12 +151,6 @@ async def create_tournament_channels(
 
 
 def member_override_ids(channel: object) -> set[int]:
-    """Member ids holding an override on an already-fetched channel payload.
-
-    Lets reconcile pass current members to ``sync_table_permissions`` off the
-    ``fetch_guild_channels`` payload instead of re-fetching per channel. Role
-    overrides (@everyone) are skipped.
-    """
     overrides = getattr(channel, "permission_overwrites", None) or {}
     return {
         int(ov.id)
@@ -203,17 +168,6 @@ async def sync_table_permissions(
     discord_id_map: dict[str, int],
     current_member_ids: set[int] | None = None,
 ) -> None:
-    """Idempotently sync voice channel permissions for a table.
-
-    Sets CONNECT+SPEAK for each player and organizer found in discord_id_map.
-    Removes stale member overrides for users no longer at this table.
-    Leaves @everyone DENY CONNECT untouched.
-
-    Args:
-        current_member_ids: If provided, skip the fetch_channel call (e.g., when
-            called right after channel creation with known-empty overrides, or with
-            the overwrites already on a ``fetch_guild_channels`` payload).
-    """
     allowed_uids = player_uids | organizer_uids
     desired_discord_ids: set[int] = set()
     for uid in allowed_uids:
@@ -237,9 +191,8 @@ async def sync_member_overrides(
     current_member_ids: set[int],
     allow: hikari.Permissions,
 ) -> None:
-    """Add-missing/remove-stale MEMBER overrides on a channel, at ``allow``."""
-    # Remove stale overrides — but never the bot's own self-allow: its CONNECT is
-    # what lets teardown delete the voice channel, so reconcile must not reap it.
+    # Never remove the bot's own self-allow: its CONNECT is what lets teardown
+    # delete the voice channel, so reconcile must not reap it.
     stale = current_member_ids - desired_discord_ids
     me = bot.get_me()
     if me is not None:
@@ -263,7 +216,6 @@ async def sync_member_overrides(
                 "Failed to remove override for %s on %s: %s", did, channel_id, e
             )
 
-    # Add missing overrides
     missing = desired_discord_ids - current_member_ids
     for did in missing:
         try:
@@ -285,13 +237,8 @@ async def sync_judges_channel(
     channel: object,
     desired_discord_ids: set[int],
 ) -> None:
-    """Idempotently enforce the judges channel's privacy and membership.
-
-    Ensures the ``@everyone`` VIEW+CONNECT deny and the bot's own allow — which
-    also retrofits pre-privacy judges channels on their next reconcile — then
-    add-missing/remove-stale member overrides at ``JUDGE_ALLOW``. Works off the
-    already-fetched channel payload (no per-channel fetch).
-    """
+    """Also retrofits pre-privacy judges channels missing the deny/allow
+    overrides, on their next reconcile."""
     channel_id = int(channel.id)  # type: ignore[attr-defined]
     overrides = getattr(channel, "permission_overwrites", None) or {}
 
@@ -340,8 +287,6 @@ async def create_round_voice_channel(
     member_uids: frozenset[str] | set[str],
     discord_id_map: dict[str, int],
 ) -> int:
-    """Create one table/finals voice channel (``@everyone DENY CONNECT`` baseline)
-    and grant CONNECT+SPEAK to its members. Returns the new channel id."""
     logger.info("→ create_guild_voice_channel '%s' guild=%s", name, guild_id)
     overwrites = [
         hikari.PermissionOverwrite(
@@ -385,13 +330,8 @@ async def create_round_voice_channel(
 def round_channels_by_name(
     channels: Iterable[object], category_id: int
 ) -> dict[str, object]:
-    """The volatile round/finals VOICE channels under ``category_id``, keyed by name
-    — exactly what reconcile owns (``R{n} - Table {m}``, legacy ``Table {m}``,
-    ``Finals``); #judges, text, and foreign-category channels are excluded.
-
-    Takes an already-fetched list so reconcile reads each survivor's
-    ``permission_overwrites`` off the same payload it diffs.
-    """
+    """Takes an already-fetched list so reconcile reads each survivor's
+    ``permission_overwrites`` off the same payload it diffs."""
     out: dict[str, object] = {}
     for ch in channels:
         if getattr(ch, "parent_id", None) != category_id:
@@ -408,7 +348,6 @@ async def delete_channels(
     bot: hikari.GatewayBot,
     channel_ids: list[int],
 ) -> None:
-    """Delete a list of channels, ignoring already-deleted ones."""
     if channel_ids:
         logger.info("→ deleting %d channel(s): %s", len(channel_ids), channel_ids)
     for cid in channel_ids:
@@ -426,28 +365,9 @@ async def teardown_tournament(
     category_id: int,
     extra_channel_ids: Iterable[int] = (),
 ) -> list[int]:
-    """Delete a tournament's channels reliably, then the category itself.
-
-    Deletes (by explicit id, deduped) the union of:
-      - every channel currently under ``category_id`` — the restart-safe catch-all
-        that finds table/finals channels we may have lost track of in memory; and
-      - ``extra_channel_ids`` — channels we know belong to this tournament but that
-        may have drifted *out* of the category and so are invisible to the scan.
-        A child whose delete failed during an earlier teardown is left top-level
-        when the category is then removed (Discord un-parents children rather than
-        deleting them); the scan, keyed on the now-gone category, can never see it
-        again. The caller passes the link's announcement/lobby/judges plus any
-        tracked table/finals ids so a re-run still cleans those orphans up.
-
-    The category is deleted LAST, and only once every child is gone: deleting it
-    while a child delete is still failing would un-parent that survivor to the
-    guild root (Discord moves children up rather than deleting them), scattering
-    exactly the channels we couldn't remove. On a partial failure we keep the
-    category as the survivors' anchor so they stay grouped (and re-discoverable by
-    the scan) instead of loose at root. Returns the channel ids that could not be
-    deleted (excluding ones already gone) so the caller can flag a partial teardown
-    for manual cleanup instead of falsely reporting success.
-    """
+    """The category is deleted only once every child is gone: Discord un-parents
+    a survivor to guild root rather than deleting it, so deleting the category
+    early would scatter exactly the channels we couldn't remove."""
     under_category: list[int] = []
     try:
         channels = await bot.rest.fetch_guild_channels(guild_id)

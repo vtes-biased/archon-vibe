@@ -9,7 +9,6 @@ export function renderMarkdown(src: string): string {
   return DOMPurify.sanitize(raw, { ADD_ATTR: ["target", "rel"] });
 }
 
-/** Slugify a heading text into a URL-friendly id */
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -20,21 +19,12 @@ function slugify(text: string): string {
     .trim();
 }
 
-/**
- * Pre-process markdown source to clean up patterns from upstream documents:
- * - Strip {#anchor-id} suffixes from headings (Pandoc-style anchors)
- * - Strip leading TOC sections (blocks of [text](#anchor) lines)
- */
 function preprocessDocument(src: string): string {
-  // Strip {#anchor-id} from headings
   let cleaned = src.replace(/^(#{1,6}\s+.*?)\s*\{#[^}]+\}\s*$/gm, "$1");
 
-  // Promote standalone bold-paragraph titles to h5 headings so they get anchor IDs
-  // e.g. **Play Area** (alone on a line) → ##### **Play Area**
+  // Promotes standalone bold-paragraph titles to h5 so they get anchor IDs.
   cleaned = cleaned.replace(/^(\*\*[^*]+\*\*)\s*$/gm, "##### $1");
 
-  // Strip leading TOC: detect a block of lines that are all [text](#anchor)
-  // preceded by a "Table of Contents" header
   const lines = cleaned.split("\n");
   let tocStart = -1;
   let tocEnd = -1;
@@ -45,7 +35,6 @@ function preprocessDocument(src: string): string {
     }
   }
   if (tocStart >= 0) {
-    // Find the end of the TOC block: consecutive lines that are blank or [text](#...)
     for (let i = tocStart + 1; i < lines.length; i++) {
       const line = lines[i]!.trim();
       if (line === "" || /^\[.*\]\(#/.test(line)) {
@@ -60,11 +49,8 @@ function preprocessDocument(src: string): string {
     }
   }
 
-  // Strip empty headings (e.g. bare "# " lines)
   cleaned = cleaned.replace(/^#{1,6}\s*$/gm, "");
 
-  // Auto-link plain-text cross-references like (see Section Name)
-  // Build index: heading text → slug (from markdown headings and bold-paragraph titles)
   const headingIndex = new Map<string, string>();
   function indexTitle(raw: string) {
     const title = raw.replace(/\*\*/g, "").replace(/\\/g, "").trim();
@@ -77,30 +63,23 @@ function preprocessDocument(src: string): string {
     }
   }
   for (const line of cleaned.split("\n")) {
-    // Markdown headings: # **Title** or ## Title
     const hMatch = line.match(/^#{1,6}\s+\**(.+?)\**\s*$/);
     if (hMatch) { indexTitle(hMatch[1]!); continue; }
-    // Bold paragraph titles: **Title** (alone on a line, not part of a sentence)
     const bMatch = line.match(/^\*\*([^*]+)\*\*\s*$/);
     if (bMatch) { indexTitle(bMatch[1]!); }
   }
-  // Replace (see Title) and (see Title, p. N) with linked versions.
-  // "véase" is the Spanish docs' equivalent, and both languages prefix the title
-  // with a section word ("see section 1.4.2", "véase el apartado 1.2.4.") that
-  // has to come off before the lookup but stay in the visible link text.
+  // Replace (see Title)/(véase Title) cross-references with linked versions. Both languages prefix the
+  // title with a section word that must come off before the lookup but stay in the visible link text.
   cleaned = cleaned.replace(
     /\((see|véase) ((?:(?:el|la)\s+)?(?:section|secci[óo]n|apartado)\s+)?([^)[\]]+?)(?:,\s*p\.\s*\d+)?\)/gi,
     (_full, verb: string, prefix: string | undefined, ref: string) => {
       const lead = `${verb} ${prefix ?? ""}`;
-      // ref may be a comma-separated list: "Game Setup, Drawing cards and Influence Phase"
-      // Try the full ref first, then individual parts
       const text = ref.trim();
       const refLower = text.replace(/\*\*/g, "").toLowerCase();
       const slug = headingIndex.get(refLower);
       if (slug) {
         return `(${lead}[${text}](#${slug}))`;
       }
-      // Try splitting on comma and linking each part
       const parts = text.split(",").map(p => p.trim());
       if (parts.length > 1) {
         const linked = parts.map(part => {
@@ -109,36 +88,27 @@ function preprocessDocument(src: string): string {
         });
         return `(${lead}${linked.join(", ")})`;
       }
-      return _full; // no match, leave as-is
+      return _full;
     }
   );
 
   return cleaned;
 }
 
-/**
- * Render a long-form document with heading anchors, callout blockquotes,
- * and constrained images. Used for help/documentation pages.
- */
 export function renderDocument(src: string): string {
   const preprocessed = preprocessDocument(src);
   const renderer = new marked.Renderer();
 
-  // Collect all generated heading IDs + aliases for post-processing broken links
   const idSet = new Set<string>();
   const aliasMap = new Map<string, string>(); // broken slug → actual id
 
-  // Heading anchors: generate id and anchor link
   renderer.heading = ({ tokens, depth }: Tokens.Heading) => {
     const text = tokens.map(t => ('text' in t ? (t as any).text : t.raw)).join("");
     const id = slugify(text);
     idSet.add(id);
-    // Register aliases: strip number prefix ("2-master-phase" → "master-phase")
     const stripped = id.replace(/^\d+-/, "");
     if (stripped !== id) aliasMap.set(stripped, id);
-    // Also alias lowercase normalization for ALL CAPS headings with word differences
     const inner = marked.parser([{ type: "heading", depth, raw: "", text: "", tokens }] as any, { async: false }) as string;
-    // Extract inner HTML from the default heading tag
     const match = inner.match(/<h\d[^>]*>([\s\S]*?)<\/h\d>/);
     const content = match ? match[1] : text;
     return `<h${depth} id="${id}" class="heading-anchor">` +
@@ -146,36 +116,30 @@ export function renderDocument(src: string): string {
       `</h${depth}>\n`;
   };
 
-  // Callout blockquotes: detect blockquotes starting with **ALL CAPS TITLE**
   renderer.blockquote = ({ tokens }: Tokens.Blockquote) => {
     const html = marked.parser(tokens as any, { async: false }) as string;
-    // Check if content starts with a bold ALL CAPS phrase
     const calloutMatch = html.match(/^<p>\s*<strong>([A-Z][A-Z\s&:,\-]+)<\/strong>/);
     if (calloutMatch) {
       let title = calloutMatch[1]!.trim();
       let body = html.replace(calloutMatch[0], "<p>");
       // Strip leading <br> tags from body (from > \ blank lines in source)
       body = body.replace(/^(<p>)\s*(?:<br\s*\/?>[\s\n]*)*/i, "$1");
-      // Merge subtitle: if body starts with <strong>Subtitle</strong>, append to title
       const subMatch = body.match(/^<p>\s*<strong>([^<]+)<\/strong>/);
       if (subMatch) {
         title += ` — ${subMatch[1]!.trim()}`;
         body = body.replace(subMatch[0], "<p>");
-        // Strip <br> again after subtitle extraction
         body = body.replace(/^(<p>)\s*(?:<br\s*\/?>[\s\n]*)*/i, "$1");
       }
       const calloutId = slugify(title);
       idSet.add(calloutId);
-      // The subtitle was folded into the callout title, so its own slug now
-      // matches no element — but that is the name cross-references use
-      // ("(see Sequencing)"), so keep it reachable.
+      // The subtitle was folded into the callout title, so its own slug now matches no element — but
+      // that's the name cross-references use ("(see Sequencing)"), so keep it reachable.
       if (subMatch) aliasMap.set(slugify(subMatch[1]!.trim()), calloutId);
       return `<div class="callout" id="${calloutId}"><div class="callout-title">${title} <a href="#${calloutId}" class="anchor-link" aria-label="Link to this section">#</a></div>${body}</div>\n`;
     }
     return `<blockquote>${html}</blockquote>\n`;
   };
 
-  // Image sizing: add doc-img class
   renderer.image = ({ href, title, text }: Tokens.Image) => {
     const titleAttr = title ? ` title="${title}"` : "";
     return `<img src="${href}" alt="${text}" class="doc-img"${titleAttr} />`;
@@ -183,8 +147,8 @@ export function renderDocument(src: string): string {
 
   let html = marked.parse(preprocessed, { renderer, async: false }) as string;
 
-  // Post-process: add anchor IDs to bold definitions (<strong>Term</strong> or
-  // <strong>Term:</strong>) that are targets of cross-reference links but have no heading
+  // Adds anchor IDs to bold <strong>Term</strong> definitions that cross-reference links target but
+  // have no heading of their own.
   html = html.replace(
     /<strong>([^<]+?)(:|\\)?<\/strong>/g,
     (_m, term: string, suffix: string) => {
@@ -197,7 +161,6 @@ export function renderDocument(src: string): string {
     }
   );
 
-  // Post-process: fix broken internal links by remapping to alias targets or fuzzy match
   html = html.replace(
     /href="#([a-zA-Z][a-zA-Z0-9-]*)"/g,
     (_m, target: string) => {
@@ -222,10 +185,7 @@ export function renderDocument(src: string): string {
   });
 }
 
-/**
- * Render a markdown section for interactive guides.
- * Lighter than renderDocument: heading anchors + callouts, no preprocessing.
- */
+/** Lighter than renderDocument: heading anchors + callouts, no preprocessing. */
 export function renderGuideSection(src: string): string {
   const renderer = new marked.Renderer();
   renderer.heading = ({ tokens, depth }: Tokens.Heading) => {
@@ -271,12 +231,8 @@ export function stripLeadingTitle(description: string, name: string): string {
   return description;
 }
 
-/**
- * Plain-text teaser for a markdown description, derived from the source
- * (clamping rendered HTML breaks: -webkit-line-clamp needs inline content).
- * Skips a leading heading, takes the first paragraph, caps at maxChars on
- * a word boundary. `truncated` is true only if something was actually hidden.
- */
+/** Plain-text teaser for a markdown description, derived from the source (rendered HTML breaks
+ * -webkit-line-clamp, which needs inline content). Skips a leading heading; `truncated` is true only if something was actually hidden. */
 export function descriptionExcerpt(md: string, maxChars = 140): { text: string; truncated: boolean } {
   const lines = md.replace(/\r\n/g, '\n').split('\n');
   let i = 0;

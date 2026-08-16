@@ -1,27 +1,6 @@
-"""Idempotency hinge for channel reconciliation (regression: SSE wedge fix).
-
-``round_channels_by_name`` is the sole gate that lets reconcile tell which
-volatile round voice channels already exist on Discord, keyed by the
-deterministic name it diffs ``desired_channels`` against. If it miscounts the
-set — admitting a #judges/text channel, a foreign-category channel, or missing a
-legacy ``Table N`` — reconcile either re-creates duplicates or deletes a channel
-it doesn't own.
-
-This pins its contract:
-  - only GUILD_VOICE channels under the given category are returned;
-  - ``R{n} - Table {m}``, the legacy ``Table {m}``, and ``Finals`` are all
-    recognized and keyed by their name;
-  - the per-tournament ``judges`` voice channel, text channels, and any channel
-    under a different category are excluded.
-
-Real ``hikari.ChannelType`` enum members are used (the function compares against
-them); the only fake is a duck-typed channel object exposing the same four
-attributes the function reads off a real hikari channel.
-
-Run from bot/:
-    DISCORD_BOT_TOKEN=x OAUTH_CLIENT_ID=x OAUTH_CLIENT_SECRET=x \
-        uv run --with pytest --with pytest-asyncio pytest -q
-"""
+"""If ``round_channels_by_name`` miscounts — admitting a #judges/text channel, a
+foreign-category channel, or missing a legacy ``Table N`` — reconcile either
+re-creates duplicates or deletes a channel it doesn't own."""
 
 from __future__ import annotations
 

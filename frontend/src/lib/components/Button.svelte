@@ -2,10 +2,8 @@
   import { Loader2 } from "@lucide/svelte";
   import type { Snippet } from 'svelte';
 
-  // One action button for the whole app. variant = colour/intent, size = density.
-  // Owns disabled + loading so call-sites never hand-roll those states (the old
-  // three-tier disabled rule collapses into the single `disabled:` block below).
-  // Focus comes from the global :focus-visible ring — never add a bespoke outline.
+  // Owns disabled + loading so call-sites never hand-roll those states. Focus comes from the global
+  // :focus-visible ring — never add a bespoke outline.
   let {
     variant = 'secondary',
     size = 'md',
@@ -28,15 +26,8 @@
     [key: string]: unknown;
   } = $props();
 
-  // Crimson is the brand colour AND the single positive-CTA colour: every
-  // affirmative action (lifecycle CTA + form/auth submit) is `primary`.
-  // Danger is a distinct VIOLET, never red — red and crimson are the same hue
-  // family and collapse together (even under colourblindness), so destructive
-  // actions get their own hue plus an icon/verb at the call-site. The accent and
-  // neutral variants use role tokens (accent/surface/ink/line — each carries both
-  // theme values via light-dark()); btn-danger is its own light-dark() class
-  // (violet is off-palette) with an inert :disabled (a tier below the enabled bg,
-  // so disabled never reads as active).
+  // btn-danger is its own light-dark() class (violet is off-palette) with an inert :disabled — a tier
+  // below the enabled bg, so disabled never reads as active.
   const VARIANT: Record<string, string> = {
     primary:   'bg-accent-strong enabled:hover:bg-accent-strong-hover text-white disabled:bg-surface-muted disabled:text-ink-faint',
     danger:    'btn-danger',

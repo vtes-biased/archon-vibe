@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 def _get_mail_config() -> tuple[str, int, str, str, str, bool]:
-    """Get mail configuration from environment."""
     return (
         os.getenv("MAIL_SERVER", "localhost"),
         int(os.getenv("MAIL_PORT", "587")),
@@ -25,19 +24,8 @@ def _get_mail_config() -> tuple[str, int, str, str, str, bool]:
 async def send_magic_link_email(
     to_email: str, magic_link: str, purpose: str = "signup"
 ) -> bool:
-    """Send a magic link email for signup or password reset.
-
-    Args:
-        to_email: Recipient email address
-        magic_link: Full URL for the magic link
-        purpose: "signup" for new accounts, "reset" for password reset
-
-    Returns:
-        True if email was sent successfully, False otherwise
-    """
     server, port, username, password, from_addr, use_tls = _get_mail_config()
 
-    # Content based on purpose
     if purpose == "reset":
         subject = "Reset your Archon password"
         heading = "Reset your password"
@@ -54,13 +42,11 @@ async def send_magic_link_email(
         description = "Click the button below to set your password and complete your account setup."
         button_text = "Set Password"
 
-    # Create message
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = from_addr
     msg["To"] = to_email
 
-    # Plain text version
     text_content = f"""
 {heading}
 
@@ -73,7 +59,6 @@ This link will expire in 15 minutes.
 If you didn't request this email, you can safely ignore it.
 """
 
-    # HTML version
     html_content = f"""
 <!DOCTYPE html>
 <html>
@@ -107,7 +92,6 @@ If you didn't request this email, you can safely ignore it.
 
     try:
         if username and password:
-            # Authenticated SMTP
             await aiosmtplib.send(
                 msg,
                 hostname=server,
@@ -117,7 +101,6 @@ If you didn't request this email, you can safely ignore it.
                 start_tls=use_tls,
             )
         else:
-            # Local/dev SMTP (no auth)
             await aiosmtplib.send(
                 msg,
                 hostname=server,

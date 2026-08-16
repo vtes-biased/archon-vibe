@@ -34,14 +34,12 @@
   // Identity, not authority: it only decides which contact-visibility note to show.
   const isOfficial = $derived(engineIsOfficial(user ?? null));
 
-  // An official may not move their own country — it would move the scope their
-  // FULL projection is computed for, so it takes the authority that could change
-  // their highest role, which self-service never has.
+  // An official can't move their own country: that would shift the scope their
+  // FULL projection is computed for, an authority self-service never has.
   const isCountryLocked = $derived(!!user && !canChangeCountry(user, user).allowed);
 
   // svelte-ignore state_referenced_locally
   const initial = { ...user };
-  // Editable field values — initialized from user
   let editName = $state(initial.name || "");
   let editNickname = $state(initial.nickname || "");
   let editCountry = $state(initial.country || "");
@@ -78,7 +76,6 @@
     { value: "other", label: "Other" },
   ];
 
-  // Track last-saved values to avoid redundant saves
   let lastSaved: Record<string, unknown> = {
     name: initial.name || "",
     nickname: initial.nickname || "",
@@ -103,7 +100,6 @@
   }
 
   async function saveFields(data: Record<string, unknown>) {
-    // Check if anything changed
     const changed: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(data)) {
       const cmp = k === "community_links" ? JSON.stringify(v) : v;
@@ -167,7 +163,6 @@
   const inputClass = "w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent";
 </script>
 
-<!-- Header -->
 <div class="p-6 border-b border-line">
   <div class="flex items-center gap-4">
     <div class="flex flex-col items-center gap-1">
@@ -218,7 +213,6 @@
   </div>
 </div>
 
-<!-- Details -->
 <div class="p-6 space-y-4">
   {#if user.vekn_id}
     <div class="flex justify-between items-center">
@@ -285,7 +279,6 @@
   {/if}
 </div>
 
-<!-- Contact Info -->
 <div class="p-6 border-t border-line space-y-4">
   <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.profile_contact_info()}</h3>
 
@@ -321,7 +314,6 @@
   </div>
 </div>
 
-<!-- Community Links -->
 {#if user.vekn_id}
   <div class="p-6 border-t border-line">
     <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide mb-4">{m.profile_community_links()}</h3>

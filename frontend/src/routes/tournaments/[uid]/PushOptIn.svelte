@@ -1,9 +1,6 @@
-<!--
-  Per-tournament Web Push opt-in (#314). Primary discovery surface: shown to a checked-in
-  participant of a live tournament. The Enable tap is the user gesture iOS requires. On
-  iOS in a browser tab (not installed) push is impossible, so the tap surfaces an
-  Add-to-Home-Screen nudge instead. Dismissal is remembered per tournament (≤1 prompt).
--->
+<!-- Per-tournament push opt-in (#314): the Enable tap is the iOS user gesture;
+     in an uninstalled iOS tab push is impossible, so it nudges Add-to-Home-Screen
+     instead. Dismissal is remembered per tournament. -->
 <script lang="ts">
   import { onMount } from "svelte";
   import { Bell, Share } from "@lucide/svelte";
@@ -37,9 +34,8 @@
     refreshPushState();
   });
 
-  // On an iOS browser tab PushManager/Notification don't exist, so pushSupported()
-  // is false — yet this is exactly the user who must be nudged to install. Show the
-  // card when push is usable OR when installing on iOS would make it usable.
+  // pushSupported() is false on an iOS tab (no PushManager/Notification) — exactly
+  // who needs the install nudge, so show when push works OR installing would make it.
   const iosNeedsInstall = $derived(isIOS() && !isStandalone());
   const visible = $derived(
     eligible &&

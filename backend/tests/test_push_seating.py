@@ -1,15 +1,7 @@
 """Seating-push mapping (#314): a wrong table/seat/round number sends a player to
-the wrong table at a live event.
-
-`build_seating_specs` is pure (no DB/engine/network) and is the contract
-`send_to_users` consumes; `render_payload` localizes a spec into the wire body. The
-regressions worth guarding are the index math and the round-scoping, not the copy:
-  - 0-indexed table/seat/round → 1-based human numbering (four `+1` sites);
-  - StartRound/SelfOrganizeRound enumerate ONLY the newly-appended round
-    (`rounds[-1]`), so a self-organized single pod pushes one pod, not the field;
-  - StartFinals reads `finals.seating` (not a preliminary round);
-  - render_payload formats those numbers into the body and falls back to `en`.
-Asserts the structured routing/numbers; deliberately does not snapshot wording.
+the wrong table at a live event. Guards the index math and round-scoping in
+`build_seating_specs`/`render_payload`, not the copy — asserts structured
+routing/numbers, deliberately does not snapshot wording.
 """
 
 from datetime import UTC, datetime
@@ -33,8 +25,6 @@ def _t(**kw) -> Tournament:
 
 
 def test_start_round_numbers_each_seat_by_table_and_seat() -> None:
-    # Two tables of 5 in the newly-started round; numbering must be per-table,
-    # 1-based, and the round number = len(rounds).
     t = _t(
         rounds=[
             [
@@ -45,7 +35,7 @@ def test_start_round_numbers_each_seat_by_table_and_seat() -> None:
     )
     specs = dict(build_seating_specs(t, "StartRound"))
 
-    assert len(specs) == 10  # every seated player, once
+    assert len(specs) == 10
     # Table 1 seat 1 and table 2 seat 3 pin the per-table 1-based numbering.
     assert specs["a0"]["url"] == "/tournaments/trn-1"
     assert (specs["a0"]["round"], specs["a0"]["table"], specs["a0"]["seat"]) == (
@@ -56,11 +46,9 @@ def test_start_round_numbers_each_seat_by_table_and_seat() -> None:
     assert (specs["b2"]["table"], specs["b2"]["seat"]) == (2, 3)
     # tag is per-round so a re-seated round replaces, not stacks.
     assert specs["a0"]["tag"] == "seating-trn-1-1"
-    # render formats those numbers into the body.
     body = render_payload(specs["b2"], "en")["body"]
     assert "Round 1" in body and "Table 2" in body and "seat 3" in body
 
-    # A second round bumps the round number and the tag.
     t2 = _t(rounds=[*t.rounds, [Table(seating=[Seat(player_uid="c0")])]])
     s2 = dict(build_seating_specs(t2, "StartRound"))
     assert s2["c0"]["round"] == 2
@@ -68,9 +56,8 @@ def test_start_round_numbers_each_seat_by_table_and_seat() -> None:
 
 
 def test_self_organize_round_pushes_only_the_new_pod() -> None:
-    # Two parallel pods exist, but only rounds[-1] is the just-seated one: a
-    # player in an earlier round must NOT be paged. Enumerating all rounds
-    # (instead of rounds[-1]) would page the whole field.
+    # Only rounds[-1] is the just-seated pod; a player in an earlier round must
+    # NOT be paged, or enumerating all rounds would page the whole field.
     t = _t(
         rounds=[
             [Table(seating=[Seat(player_uid="old1"), Seat(player_uid="old2")])],
@@ -114,9 +101,8 @@ def _round() -> list[Table]:
 
 
 def test_reseat_pushes_only_moved_players_on_live_tables() -> None:
-    # A substitute replaces a1 on the live table; b0/b1 swap on a FINISHED table
-    # (score correction). Only the substitute is paged — unmoved players and
-    # finished-table corrections are not. The unseated a1 gets nothing.
+    # A substitute replaces a1 (live table, gets paged); b0/b1 swap on a
+    # FINISHED table (score correction, not paged).
     old = _t(state=TournamentState.PLAYING, rounds=[_round()])
     new = _t(state=TournamentState.PLAYING, rounds=[_round()])
     new.rounds[0][0].seating[1] = Seat(player_uid="sub")

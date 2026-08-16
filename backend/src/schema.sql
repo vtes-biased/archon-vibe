@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS banners (
 -- Promo ledger - inventory movements for promotional material. Source of truth
 -- for the server-computed stock aggregates (Promo.holdings / User.promo_stock);
 -- deliberately NOT a synced object type: officials-only, online-only back-office
--- read via REST (see the wiki/sync.md offline-first carve-out). Rows are
+-- read via REST (the sanctioned offline-first carve-out). Rows are
 -- append-mostly; corrections are compensating rows (negative qty), never edits.
 CREATE TABLE IF NOT EXISTS promo_ledger (
     uid TEXT PRIMARY KEY,

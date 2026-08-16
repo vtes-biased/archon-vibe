@@ -1,14 +1,8 @@
-/**
- * IndexedDB setup for offline-first storage.
- * Stores objects with uid and modified fields for sync.
- */
-
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, type StoreNames } from 'idb';
 import type { User, Role, Sanction, Tournament, DeckObject, League, Promo, VtesCard, OfflinePlayer } from '$lib/types';
 import { expandRolesForFilter } from './roles';
 import { normalizeSearch, searchTokens } from './utils';
 
-// Device ID: persistent random UUID identifying this browser/device
 export function getDeviceId(): string {
   let id = localStorage.getItem('archon_device_id');
   if (!id) {
@@ -20,23 +14,23 @@ export function getDeviceId(): string {
 
 interface ArchonDB extends DBSchema {
   users: {
-    key: string;  // uid
+    key: string;
     value: User;
     indexes: {
       'by-name': string;
-      'by-country-name': [string, string];  // Compound index for country+name
+      'by-country-name': [string, string];
     };
   };
   sanctions: {
-    key: string;  // uid
+    key: string;
     value: Sanction;
     indexes: {
-      'by-user': string;  // user_uid index for efficient lookups
-      'by-tournament': string;  // tournament_uid index
+      'by-user': string;
+      'by-tournament': string;
     };
   };
   tournaments: {
-    key: string;  // uid
+    key: string;
     value: Tournament;
     indexes: {
       'by-state': string;
@@ -46,7 +40,7 @@ interface ArchonDB extends DBSchema {
     };
   };
   decks: {
-    key: string;  // uid
+    key: string;
     value: DeckObject;
     indexes: {
       'by-tournament': string;
@@ -54,7 +48,7 @@ interface ArchonDB extends DBSchema {
     };
   };
   leagues: {
-    key: string;  // uid
+    key: string;
     value: League;
     indexes: {
       'by-country': string;
@@ -62,11 +56,11 @@ interface ArchonDB extends DBSchema {
     };
   };
   promos: {
-    key: string;  // uid
+    key: string;
     value: Promo;
   };
   cards: {
-    key: number; // card id
+    key: number;
     value: VtesCard;
   };
   metadata: {
@@ -77,19 +71,12 @@ interface ArchonDB extends DBSchema {
 
 let dbPromise: Promise<IDBPDatabase<ArchonDB>> | null = null;
 
-// Version 16: add promos store
 const DB_VERSION = 16;
 
 type UpgradeTx = IDBPTransaction<ArchonDB, ArrayLike<StoreNames<ArchonDB>>, 'versionchange'>;
 
-/**
- * Unsynced offline-tournament data lifted out of the old stores so it survives
- * the destructive version upgrade below. Synced data is re-fetched from SSE, but
- * an offline tournament is locked to this device and may hold changes not yet
- * pushed to the server — dropping it loses real work. The `offline_*`
- * metadata keys are the manifest of what is unsynced; the referenced rows live
- * in the tournaments / users / sanctions / decks stores.
- */
+/** Unsynced offline-tournament data lifted out of the old stores before the destructive version
+ * upgrade drops them — synced data re-fetches from SSE, but an offline tournament is locked to this device and would lose real work. */
 interface RescuedOfflineData {
   metadata: [string, string][];
   tournaments: Tournament[];
@@ -109,13 +96,8 @@ function safeParseArray(value: string): unknown[] {
   }
 }
 
-/**
- * Read unsynced offline-tournament data out of the existing stores before they
- * are dropped. Runs inside the versionchange transaction and awaits ONLY IDB
- * operations (never a non-IDB promise) so the transaction stays alive. Uses the
- * raw upgrade transaction, NOT the getDB() helpers (which would recurse).
- * Returns empty on a fresh DB or a pre-metadata schema.
- */
+/** Runs inside the versionchange transaction and awaits ONLY IDB operations so the transaction
+ * stays alive; uses the raw upgrade tx, NOT the getDB() helpers (which would recurse). */
 async function rescueOfflineData(db: IDBPDatabase<ArchonDB>, tx: UpgradeTx): Promise<RescuedOfflineData> {
   if (!db.objectStoreNames.contains('metadata')) return EMPTY_RESCUE;
 
@@ -150,10 +132,8 @@ async function rescueOfflineData(db: IDBPDatabase<ArchonDB>, tx: UpgradeTx): Pro
   // No offline tournaments → nothing to keep (drop any stray offline_* metadata).
   if (tournamentUids.size === 0) return EMPTY_RESCUE;
 
-  // Issue every row read in one synchronous burst, then await once. A sequential
-  // await-per-row loop can let the versionchange transaction go inactive between
-  // awaits (idb's documented "transaction lifetime" hazard); a single batched
-  // await keeps it alive.
+  // Issue every row read in one synchronous burst, then await once: a sequential await-per-row loop
+  // can let the versionchange transaction go inactive between awaits (idb's documented hazard).
   const tournamentReads = db.objectStoreNames.contains('tournaments')
     ? [...tournamentUids].map((uid) => tx.objectStore('tournaments').get(uid)) : [];
   const userReads = db.objectStoreNames.contains('users')
@@ -178,7 +158,6 @@ async function rescueOfflineData(db: IDBPDatabase<ArchonDB>, tx: UpgradeTx): Pro
   };
 }
 
-/** Write rescued offline data back into the freshly recreated stores. */
 function restoreOfflineData(tx: UpgradeTx, rescued: RescuedOfflineData): void {
   const meta = tx.objectStore('metadata');
   for (const [key, value] of rescued.metadata) meta.put(value, key);
@@ -207,55 +186,39 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
       dbPromise = null;
     },
     async upgrade(db, _oldVersion, _newVersion, transaction) {
-
-      // Rescue unsynced offline-tournament data before the destructive rebuild
-      // Read everything first, then drop/recreate stores, then write
-      // it back — all in this versionchange transaction, awaiting only IDB ops.
       const rescued = await rescueOfflineData(db, transaction);
 
-      // On ANY version upgrade: delete all existing stores and recreate fresh.
-      // This triggers a full resync from SSE on next connect.
+      // Deleting and recreating every store triggers a full resync from SSE on next connect.
       for (const name of [...db.objectStoreNames]) {
         db.deleteObjectStore(name);
       }
 
-      // Users store
       const userStore = db.createObjectStore('users', { keyPath: 'uid' });
       userStore.createIndex('by-name', 'name');
       userStore.createIndex('by-country-name', ['country', 'name']);
 
-      // Sanctions store
       const sanctionStore = db.createObjectStore('sanctions', { keyPath: 'uid' });
       sanctionStore.createIndex('by-user', 'user_uid');
       sanctionStore.createIndex('by-tournament', 'tournament_uid');
 
-      // Tournaments store (single store, all data levels)
       const tournamentStore = db.createObjectStore('tournaments', { keyPath: 'uid' });
       tournamentStore.createIndex('by-state', 'state');
       tournamentStore.createIndex('by-start', 'start');
       tournamentStore.createIndex('by-country', 'country');
       tournamentStore.createIndex('by-format', 'format');
 
-      // Decks store (standalone deck objects, extracted from tournaments)
       const deckStore = db.createObjectStore('decks', { keyPath: 'uid' });
       deckStore.createIndex('by-tournament', 'tournament_uid');
       deckStore.createIndex('by-user', 'user_uid');
 
-      // Leagues store
       const leagueStore = db.createObjectStore('leagues', { keyPath: 'uid' });
       leagueStore.createIndex('by-country', 'country');
       leagueStore.createIndex('by-start', 'start');
 
-      // Promos store (small catalog — no indexes)
       db.createObjectStore('promos', { keyPath: 'uid' });
-
-      // Cards store (VTES card database, keyed by card ID)
       db.createObjectStore('cards', { keyPath: 'id' });
-
-      // Metadata store for sync state
       db.createObjectStore('metadata');
 
-      // Restore the rescued offline data into the fresh stores.
       restoreOfflineData(transaction, rescued);
       if (rescued.tournaments.length > 0) {
         console.info(`[IDB] Preserved ${rescued.tournaments.length} offline tournament(s) across upgrade.`);
@@ -267,7 +230,6 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
   return dbPromise;
 }
 
-// User operations
 export async function getUser(uid: string): Promise<User | undefined> {
   const db = await getDB();
   return db.get('users', uid);
@@ -275,8 +237,7 @@ export async function getUser(uid: string): Promise<User | undefined> {
 
 export async function getAllUsers(): Promise<User[]> {
   const db = await getDB();
-  // Use the name index to get pre-sorted results. Tombstones now hard-delete the
-  // row (sync.ts), so this !deleted_at filter is defensive: it hides any
+  // Tombstones now hard-delete the row (sync.ts); this !deleted_at filter is defensive, hiding any
   // pre-change soft-deleted row a client still holds until its next full resync.
   const users = await db.getAllFromIndex('users', 'by-name');
   return users.filter(u => !u.deleted_at);
@@ -309,21 +270,8 @@ export async function deleteUser(uid: string): Promise<void> {
   dropFromUserIndex(uid);
 }
 
-/**
- * In-memory member search index.
- *
- * The member typeahead runs per keystroke over the whole ~10k-member corpus, and
- * a `getAll` of the users store cannot sit on that path: User rows embed four
- * CategoryRating objects each carrying a full per-tournament history, so the
- * corpus is tens of MB and materializing it costs ~100ms before IDB's own
- * deserialization overhead — hence the >300ms completions organizers reported.
- * So it is read once and patched on write, the same trick cards.ts uses. Tokens
- * are precomputed for the same reason: NFD-normalizing every row per keystroke
- * is the next cost down.
- *
- * All user writes funnel through saveUser/saveUsersBatch/deleteUser/clearAllUsers
- * above, so keeping those four in step keeps the index authoritative.
- */
+/** getAll() over the ~10k-member corpus costs ~100ms+ (each User embeds 4 CategoryRating
+ * histories), so this index is read once and patched on write; saveUser/saveUsersBatch/deleteUser/clearAllUsers must all patch it or it goes stale. */
 interface UserIndexEntry {
   user: User;
   /** Word-prefix haystack: name, nickname, email and Discord handle tokens. */
@@ -340,9 +288,8 @@ let userIndexPromise: Promise<Map<string, UserIndexEntry>> | null = null;
 function buildEntry(user: User): UserIndexEntry {
   return {
     user,
-    // Contact fields exist only in the full projection (an official's entitled
-    // members — see backend access_levels.py), so email/Discord search is
-    // implicitly scoped to those.
+    // Contact fields exist only in the full projection (an official's entitled members, see backend
+    // access_levels.py), so email/Discord search is implicitly scoped to those.
     tokens: [
       ...searchTokens(user.name),
       ...(user.nickname ? searchTokens(user.nickname) : []),
@@ -366,18 +313,14 @@ async function getUserIndex(): Promise<Map<string, UserIndexEntry>> {
   return userIndexPromise;
 }
 
-/**
- * Build the index ahead of the first keystroke — components about to show a
- * member search box call this on mount, so the one-off read isn't billed to the
- * user's first character.
- */
+/** Components about to show a member search box call this on mount, so the index build
+ * isn't billed to the user's first keystroke. */
 export async function warmUserIndex(): Promise<void> {
   await getUserIndex();
 }
 
-// Writes chain onto the build promise rather than a materialized map, so a write
-// landing mid-build still applies. The IDB write has already committed by the
-// time these run, so re-indexing the newer value is always correct.
+// Chains onto the build promise rather than a materialized map, so a write landing mid-build still
+// applies; the IDB write has already committed by the time this runs, so re-indexing is always correct.
 function patchUserIndex(user: User): void {
   if (userIndexPromise) void userIndexPromise.then(idx => idx.set(user.uid, buildEntry(user)));
 }
@@ -386,11 +329,8 @@ function dropFromUserIndex(uid: string): void {
   if (userIndexPromise) void userIndexPromise.then(idx => idx.delete(uid));
 }
 
-/**
- * Rank name-leading matches above incidental word hits, then alphabetically.
- * Callers truncate to the top 8/10, so without this a surname query would order
- * by *first* name and which few you saw would be arbitrary.
- */
+/** Ranks name-leading matches above incidental word hits, then alphabetically — callers truncate to
+ * the top 8/10, so without this a surname query would order by first name arbitrarily. */
 function sortSearchResults(entries: UserIndexEntry[], terms: string[]): User[] {
   const lead = terms[0];
   if (lead) {
@@ -405,22 +345,13 @@ function sortSearchResults(entries: UserIndexEntry[], terms: string[]): User[] {
   return entries.map(e => e.user);
 }
 
-/**
- * Filter members by country, roles and/or a search query.
- *
- * Search is uniformly word-prefix: every typed term must open a name, nickname,
- * email or Discord-handle token, or prefix the VEKN/Discord id. All terms have to
- * hit, so "vin rip" finds Vincent Ripoll. Mid-word matches are deliberately
- * excluded — they read as a bug, and matching an address as one substring used to
- * re-admit them through the back door, since emails embed names ("inc" hitting
- * vincent.ripoll@…, and only ever for officials, who alone see contact fields).
- */
+/** Search is uniformly word-prefix; every term must open a name/nickname/email/Discord token or
+ * prefix an id. Mid-word matches are deliberately excluded — they read as a bug (e.g. "inc" hitting an email address). */
 export async function getFilteredUsers(
   country?: string,
   roles?: Role[],
   nameSearch?: string
 ): Promise<User[]> {
-  // Convert Svelte proxy to plain array and expand roles (e.g., Judge includes Judgekin)
   const plainRoles = roles && roles.length > 0 ? [...roles] : undefined;
   const expandedRoles = plainRoles ? expandRolesForFilter(plainRoles) : undefined;
   const terms = nameSearch?.trim() ? searchTokens(nameSearch) : [];
@@ -451,7 +382,6 @@ export async function clearAllUsers(): Promise<void> {
   userIndexPromise = null;
 }
 
-// Metadata operations
 export async function getLastSyncTimestamp(): Promise<string | null> {
   const db = await getDB();
   const value = await db.get('metadata', 'last_sync_timestamp');
@@ -468,9 +398,8 @@ export async function clearLastSyncTimestamp(): Promise<void> {
   await db.delete('metadata', 'last_sync_timestamp');
 }
 
-// Snapshot generation instant (DB clock), echoed on /stream as a freshness signal so the
-// server's staleness guard measures real client-away time rather than the data's
-// last-modified time. Separate from last_sync_timestamp, which is the data cursor (since).
+// DB-clock instant of snapshot generation, echoed on /stream as a freshness signal so the server's
+// staleness guard measures real client-away time. Separate from last_sync_timestamp (the data cursor).
 export async function getLastSyncGeneratedAt(): Promise<string | null> {
   const db = await getDB();
   const value = await db.get('metadata', 'last_sync_generated_at');
@@ -487,10 +416,8 @@ export async function clearLastSyncGeneratedAt(): Promise<void> {
   await db.delete('metadata', 'last_sync_generated_at');
 }
 
-// Opaque access-version fingerprint: seeded from the /snapshot X-Access-Version header,
-// echoed on /stream as ?av=, and refreshed by targeted-push frames. The client never
-// parses it — a mismatch at connect tells the server the cached corpus predates an
-// entitlement change and triggers one resync.
+// Opaque access-version fingerprint: seeded from /snapshot's X-Access-Version header, echoed on
+// /stream as ?av=. The client never parses it — a mismatch at connect triggers one resync.
 export async function getLastSyncAccessVersion(): Promise<string | null> {
   const db = await getDB();
   const value = await db.get('metadata', 'last_sync_access_version');
@@ -507,12 +434,8 @@ export async function clearLastSyncAccessVersion(): Promise<void> {
   await db.delete('metadata', 'last_sync_access_version');
 }
 
-// Set while a snapshot is being streamed into the stores, cleared only when the file's
-// eof line lands. The snapshot used to be parsed whole before anything was written, so a
-// truncated file left IndexedDB untouched; streaming ingest writes as it reads and gives
-// that up. A marker surviving into the next boot therefore means "these stores are a
-// partial snapshot" — indistinguishable from a good load without it, since the rows that
-// DID arrive look perfectly valid. connect() treats it as no snapshot and refetches.
+// Set while a snapshot streams into the stores, cleared only when eof lands. Streaming ingest writes
+// as it reads, so a marker surviving into the next boot means a partial snapshot; connect() refetches.
 export async function getSnapshotIngesting(): Promise<boolean> {
   const db = await getDB();
   return (await db.get('metadata', 'snapshot_ingest_in_progress')) === '1';
@@ -528,7 +451,6 @@ export async function clearSnapshotIngesting(): Promise<void> {
   await db.delete('metadata', 'snapshot_ingest_in_progress');
 }
 
-// Sanction operations
 export async function getSanction(uid: string): Promise<Sanction | undefined> {
   const db = await getDB();
   return db.get('sanctions', uid);
@@ -562,17 +484,11 @@ export async function clearAllSanctions(): Promise<void> {
   await db.clear('sanctions');
 }
 
-/**
- * Get all sanctions for a tournament.
- */
 export async function getSanctionsForTournament(tournamentUid: string): Promise<Sanction[]> {
   const db = await getDB();
   return db.getAllFromIndex('sanctions', 'by-tournament', tournamentUid);
 }
 
-/**
- * Get sanctions for a specific player in a specific tournament.
- */
 export async function getPlayerSanctionsInTournament(
   userUid: string,
   tournamentUid: string
@@ -581,12 +497,8 @@ export async function getPlayerSanctionsInTournament(
   return sanctions.filter(s => s.user_uid === userUid && !s.deleted_at);
 }
 
-/**
- * Sanctions visible in a tournament's context: all of the tournament's own
- * sanctions, plus the given players' sanctions from OTHER tournaments within
- * the last 18 months (VEKN cross-event visibility). Only cautions stay
- * private to the event where they were issued. Single scan of the store.
- */
+/** Sanctions visible in a tournament's context: its own sanctions, plus the given players'
+ * sanctions from OTHER tournaments within the last 18 months (VEKN cross-event visibility) — cautions stay private to their own event. */
 export async function getTournamentContextSanctions(
   tournamentUid: string,
   playerUids: string[]
@@ -606,30 +518,22 @@ export async function getTournamentContextSanctions(
   });
 }
 
-/**
- * Get active (non-deleted) sanctions for a user within the last 18 months.
- */
 export async function getActiveSanctionsForUser(userUid: string): Promise<Sanction[]> {
   const sanctions = await getSanctionsForUser(userUid);
   const eighteenMonthsAgo = new Date();
   eighteenMonthsAgo.setMonth(eighteenMonthsAgo.getMonth() - 18);
 
   return sanctions.filter(s => {
-    // Exclude soft-deleted sanctions
     if (s.deleted_at) return false;
 
-    // Include if within last 18 months OR if it's a permanent ban (no expires_at on suspension)
     const issuedAt = new Date(s.issued_at);
     const isPermanentBan = s.level === 'suspension' && !s.expires_at;
     return isPermanentBan || issuedAt >= eighteenMonthsAgo;
   });
 }
 
-/**
- * Does this one sanction currently bar its holder? Shared by the single-user and
- * bulk checks below so the two can never drift — note it is NOT the same rule as
- * getSuspendedUserUids, which is suspension-only for the rankings board.
- */
+/** Does this sanction currently bar registration? Shared by the single-user and bulk checks below
+ * so they can't drift — NOT the same rule as getSuspendedUserUids, which is suspension-only for the rankings board. */
 function barsRegistration(s: Sanction, now: Date, cutoff: Date): boolean {
   if (s.deleted_at) return false;
   if (s.level !== 'suspension' && s.level !== 'probation') return false;
@@ -647,21 +551,14 @@ function sanctionWindow(): { now: Date; cutoff: Date } {
   return { now: new Date(), cutoff };
 }
 
-/**
- * Check if user currently has an active ban/suspension/probation.
- * Returns true if there's an active sanction that hasn't been lifted and hasn't expired.
- */
 export async function isUserCurrentlySanctioned(userUid: string): Promise<boolean> {
   const sanctions = await getSanctionsForUser(userUid);
   const { now, cutoff } = sanctionWindow();
   return sanctions.some(s => barsRegistration(s, now, cutoff));
 }
 
-/**
- * UIDs currently barred from registering, in one pass over the sanctions store.
- * The member pickers need this for a whole page of results at once; asking
- * per-row cost one IDB transaction each, on the path to first paint.
- */
+/** One pass over the sanctions store: the member pickers need this for a whole page of results at
+ * once, and asking per-row cost one IDB transaction each on the path to first paint. */
 export async function getRegistrationBarredUids(): Promise<Set<string>> {
   const db = await getDB();
   const all = await db.getAll('sanctions');
@@ -671,10 +568,7 @@ export async function getRegistrationBarredUids(): Promise<Set<string>> {
   return barred;
 }
 
-/**
- * Get the set of user UIDs that are currently suspended.
- * Single scan of sanctions store — efficient for bulk filtering (e.g., rankings).
- */
+/** Single scan of the sanctions store, for bulk filtering (e.g. rankings). */
 export async function getSuspendedUserUids(): Promise<Set<string>> {
   const db = await getDB();
   const allSanctions = await db.getAll('sanctions');
@@ -692,9 +586,6 @@ export async function getSuspendedUserUids(): Promise<Set<string>> {
   return suspended;
 }
 
-/**
- * Check if user has any past sanctions (including lifted/expired).
- */
 export async function userHasPastSanctions(userUid: string): Promise<boolean> {
   const sanctions = await getSanctionsForUser(userUid);
   // Cautions stay private to their tournament — they don't count as a member-
@@ -702,7 +593,6 @@ export async function userHasPastSanctions(userUid: string): Promise<boolean> {
   return sanctions.some(s => !s.deleted_at && s.level !== 'caution');
 }
 
-// Tournament operations (single store, all data levels)
 export async function getTournament(uid: string): Promise<Tournament | undefined> {
   const db = await getDB();
   return db.get('tournaments', uid);
@@ -736,7 +626,6 @@ export async function clearAllTournaments(): Promise<void> {
   await db.clear('tournaments');
 }
 
-// Filtered tournament queries using indexes
 export interface FilteredTournamentsResult {
   items: Tournament[];
   total: number;
@@ -746,7 +635,6 @@ export interface FilteredTournamentsResult {
 
 const ONGOING_STATES: Set<string> = new Set(['Registration', 'Waiting', 'Playing']);
 
-/** Which slice of the calendar a list shows. */
 export type TournamentStateFilter = 'all' | 'upcoming' | 'ongoing' | 'finished';
 
 /** Naive local wall-clock "today", same format as Tournament.start. */
@@ -783,13 +671,8 @@ function matchesState(t: Tournament, state: TournamentStateFilter, cutoff: strin
   }
 }
 
-/**
- * Sort in place: upcoming/current events ascending (soonest first), then past
- * events descending (most recent first). Returns the upcoming cluster size so
- * callers can render an Upcoming/Past divider. Filtering to Finished therefore
- * needs no separate sort flip: with no upcoming events left, the whole list is
- * the past cluster, most recent first.
- */
+/** Sorts upcoming/current ascending then past descending, returning the upcoming cluster size for an
+ * Upcoming/Past divider. Filtering to Finished needs no separate sort flip — with no upcoming events left, the whole list is the past cluster already in recency order. */
 export function sortUpcomingFirst(items: Tournament[]): number {
   const cutoff = todayCutoff();
   const date = tournamentDate;
@@ -822,7 +705,6 @@ export async function getFilteredTournaments(
   const db = await getDB();
   let items: Tournament[];
 
-  // Pick best index for initial query
   if (filters.country && filters.country !== 'all') {
     items = await db.getAllFromIndex('tournaments', 'by-country', filters.country);
   } else if (filters.format && filters.format !== 'all') {
@@ -831,7 +713,6 @@ export async function getFilteredTournaments(
     items = await db.getAll('tournaments');
   }
 
-  // Apply filters in JS
   if (filters.state && filters.state !== 'all') {
     const cutoff = todayCutoff();
     items = items.filter(t => matchesState(t, filters.state!, cutoff));
@@ -861,15 +742,8 @@ export async function getFilteredTournaments(
   return { items: items.slice(start, start + pageSize), total, upcomingCount };
 }
 
-/**
- * Get tournaments matching the user's personal agenda.
- * A tournament matches if ANY of these are true:
- * 1. Same country (non-finished)
- * 2. Online (if includeOnline, non-finished)
- * 3. NC/CC on same continent (non-finished)
- * 4. User organizes it (any state)
- * 5. User participates (any state)
- */
+/** Matches if the user organizes or participates in it (any state), or — for non-finished events —
+ * it's in their country, online (if included), or an NC/CC championship on their continent. */
 export async function getAgendaTournaments(
   userUid: string,
   userCountry: string,
@@ -883,24 +757,17 @@ export async function getAgendaTournaments(
   const continentSet = new Set(continentCountries);
 
   let items = allItems.filter(t => {
-    // User organizes (any state)
     if (t.organizers_uids?.includes(userUid)) return true;
-    // User participates (any state)
     if (t.players?.some(p => p.user_uid === userUid)) return true;
-    // Non-finished only for geographic matches
     if (t.state === 'Finished') return false;
-    // Same country
     if (t.country === userCountry) return true;
-    // Online
     if (filters.includeOnline && t.online) return true;
-    // NC/CC on same continent
     if (t.country && continentSet.has(t.country)) {
       if (t.rank === 'National Championship' || t.rank === 'Continental Championship') return true;
     }
     return false;
   });
 
-  // Apply additional filters
   if (filters.state && filters.state !== 'all') {
     const cutoff = todayCutoff();
     items = items.filter(t => matchesState(t, filters.state!, cutoff));
@@ -920,7 +787,6 @@ export async function getAgendaTournaments(
   return { items: items.slice(start, start + pageSize), total, upcomingCount };
 }
 
-// Deck operations (standalone DeckObject, extracted from tournaments)
 export async function getDeck(uid: string): Promise<DeckObject | undefined> {
   const db = await getDB();
   return db.get('decks', uid);
@@ -929,13 +795,12 @@ export async function getDeck(uid: string): Promise<DeckObject | undefined> {
 export async function getDecksByTournament(tournamentUid: string): Promise<DeckObject[]> {
   const db = await getDB();
   const decks = await db.getAllFromIndex('decks', 'by-tournament', tournamentUid);
-  // Offline-deleted decks are kept as local tombstones until go-online pushes
-  // them (getDeck stays unfiltered — the push payload needs them); hide them
-  // from every UI/engine read.
+  // Offline-deleted decks stay as local tombstones until go-online pushes them (getDeck stays
+  // unfiltered — the push payload needs them); hide them from every UI/engine read here.
   return decks.filter(d => !d.deleted_at);
 }
 
-/** Get decks for a tournament, grouped by user_uid (same shape as old tournament.decks). */
+/** Same shape as the old embedded tournament.decks, for callers that still expect it. */
 export async function getDecksByTournamentGrouped(tournamentUid: string): Promise<Record<string, DeckObject[]>> {
   const decks = await getDecksByTournament(tournamentUid);
   const grouped: Record<string, DeckObject[]> = {};
@@ -952,10 +817,8 @@ export async function getDecksByTournamentGrouped(tournamentUid: string): Promis
 export async function saveDeck(deck: DeckObject): Promise<void> {
   const db = await getDB();
   const tx = db.transaction('decks', 'readwrite');
-  // Deduplicate: remove any deck with same (tournament_uid, user_uid, round) but different uid
-  // This cleans up optimistic decks when authoritative SSE arrives. Spare offline
-  // tombstones (deleted_at): they must survive until go-online pushes them —
-  // authoritative deletions arrive as del-frames by uid, never through here.
+  // Removes any other deck with the same (tournament_uid, user_uid, round) but a different uid — this
+  // cleans up optimistic decks once authoritative SSE arrives. Spares offline tombstones (deleted_at): they must survive until go-online pushes them.
   const existing = await tx.store.index('by-tournament').getAll(deck.tournament_uid);
   for (const d of existing) {
     if (d.uid !== deck.uid && d.user_uid === deck.user_uid && d.round === deck.round && !d.deleted_at) {
@@ -984,7 +847,6 @@ export async function clearAllDecks(): Promise<void> {
   await db.clear('decks');
 }
 
-// League operations
 export async function getLeague(uid: string): Promise<League | undefined> {
   const db = await getDB();
   return db.get('leagues', uid);
@@ -1018,7 +880,6 @@ export async function clearAllLeagues(): Promise<void> {
   await db.clear('leagues');
 }
 
-// Promo operations
 export async function getPromo(uid: string): Promise<Promo | undefined> {
   const db = await getDB();
   return db.get('promos', uid);
@@ -1052,8 +913,6 @@ export async function clearAllPromos(): Promise<void> {
   await db.clear('promos');
 }
 
-// Metadata helpers for offline tournament state
-
 export async function getMetadata(key: string): Promise<string | undefined> {
   const db = await getDB();
   return db.get('metadata', key);
@@ -1069,7 +928,6 @@ export async function deleteMetadata(key: string): Promise<void> {
   await db.delete('metadata', key);
 }
 
-/** Get all metadata keys matching a prefix. */
 export async function getMetadataByPrefix(prefix: string): Promise<Map<string, string>> {
   const db = await getDB();
   const tx = db.transaction('metadata', 'readonly');
@@ -1084,8 +942,6 @@ export async function getMetadataByPrefix(prefix: string): Promise<Map<string, s
   await tx.done;
   return result;
 }
-
-// Offline players registry (stored as JSON in metadata store)
 
 export async function getOfflinePlayers(tournamentUid: string): Promise<OfflinePlayer[]> {
   const raw = await getMetadata(`offline_players:${tournamentUid}`);
@@ -1102,8 +958,6 @@ export async function addOfflinePlayer(tournamentUid: string, player: OfflinePla
   players.push(player);
   await setOfflinePlayers(tournamentUid, players);
 }
-
-// Offline sanctions registry (list of sanction UIDs created offline for a tournament)
 
 export async function getOfflineSanctionUids(tournamentUid: string): Promise<string[]> {
   const raw = await getMetadata(`offline_sanctions:${tournamentUid}`);
@@ -1129,8 +983,6 @@ export async function addOfflineDeckUid(tournamentUid: string, deckUid: string):
   await setMetadata(`offline_decks:${tournamentUid}`, JSON.stringify(uids));
 }
 
-// Venue autocomplete from tournament history
-
 export interface VenueInfo {
   venue: string;
   venue_url: string;
@@ -1143,14 +995,11 @@ export async function getVenuesByCountry(country: string): Promise<VenueInfo[]> 
   const db = await getDB();
   const tournaments = await db.getAllFromIndex('tournaments', 'by-country', country);
 
-  // Only consider tournaments from the last 3 years
   const cutoff = new Date(Date.now() - 3 * 365.25 * 24 * 3600 * 1000).toISOString();
 
-  // Keep most recent tournament's data per venue name
   const venueMap = new Map<string, { info: VenueInfo; modified: string }>();
   for (const t of tournaments) {
     if (t.deleted_at || !t.venue?.trim() || t.modified < cutoff) continue;
-    // Strip diacritics, punctuation, and whitespace for matching
     const key = normalizeSearch(t.venue).replace(/[^\w]/g, '');
     const existing = venueMap.get(key);
     if (!existing || t.modified > existing.modified) {

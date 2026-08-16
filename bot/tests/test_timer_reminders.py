@@ -1,24 +1,5 @@
-"""Round-timer reminder scheduling math (post warnings to table voice chats).
-
-``compute_timer_reminders`` is the pure half of the timer feature: given a
-tournament snapshot, the live table channels, and ``now`` (UTC epoch), it returns
-the per-table reminders to schedule with their wall-clock delays. The listener
-only sleeps and posts; if this math drifts, players get a "5 minutes left" that
-isn't, a missed time-up, or a reminder on every table on every push. This pins
-the contract that mirrors the frontend countdown (TimerDisplay.svelte):
-
-  remaining = total - (elapsed_before_pause + (now - started_at)) + table_extra
-  total     = (finals_time or round_time) for finals, else round_time
-
-A reminder's ``delay`` is when the table hits that threshold relative to ``now``;
-negative means already passed (the listener suppresses those without posting).
-
-Pure function, no bot/REST — only env vars to satisfy the config import.
-
-Run from bot/:
-    DISCORD_BOT_TOKEN=x OAUTH_CLIENT_ID=x OAUTH_CLIENT_SECRET=x \
-        uv run --with pytest --with pytest-asyncio pytest -q
-"""
+"""If this math drifts, players get a "5 minutes left" that isn't, a missed
+time-up, or a reminder on every table on every push."""
 
 from __future__ import annotations
 
@@ -145,8 +126,8 @@ def test_only_pending_tables_get_reminders() -> None:
     ov["rounds"][-1][0]["override"] = {"judge_uid": "j"}
     assert compute_timer_reminders(ov, [111], EPOCH) == []
 
-    # A finished finals (seating still populated, tournament not yet finalized) must
-    # not keep a stale "Time!" scheduled — the over-trigger the reviewer flagged.
+    # A finished finals (seating still populated, tournament not yet finalized)
+    # must not keep a stale "Time!" scheduled.
     fin = _tourney(finals=True, finals_time=600)
     fin["finals"]["state"] = "Finished"
     assert compute_timer_reminders(fin, [999], EPOCH) == []

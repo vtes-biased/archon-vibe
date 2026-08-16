@@ -28,8 +28,6 @@ async def _mk_user(country: str, roles: list[Role], vekn: str | None = None) -> 
 
 @pytest.mark.asyncio
 async def test_create_user(test_client: AsyncClient, populated_db):
-    """Test creating a new user (requires IC/NC/Prince auth)."""
-    # Find a user with NC or Prince role to act as creator
     admin = next(
         u for u in populated_db if Role.NC in u.roles or Role.PRINCE in u.roles
     )
@@ -84,13 +82,11 @@ async def test_create_user_dedup_email_conflict(test_db, test_client: AsyncClien
 
 @pytest.mark.asyncio
 async def test_update_user(test_client: AsyncClient, populated_db):
-    """Test updating a user's information (requires auth)."""
     # IC can edit any user in any country (mock targets have random countries).
     admin = next(u for u in populated_db if Role.IC in u.roles)
     target = next(u for u in populated_db if u.uid != admin.uid)
     headers = make_auth_header(admin.uid)
 
-    # Update the user
     response = await test_client.put(
         f"/api/users/{target.uid}",
         json={
@@ -134,17 +130,8 @@ async def test_update_user_tracks_nickname_local_modification(
 async def test_role_change_resyncs_only_for_access_roles(
     test_client: AsyncClient, populated_db
 ):
-    """Only NC/IC role changes nudge a resync; other roles must not.
-
-    Resync clears every client's IndexedDB and forces a snapshot re-fetch (~10s
-    blank community page), so it is reserved for a change to what the user can
-    SEE — the overlay roles. Prince sits on the other side of that line: gaining
-    it changes the user's own projection (they enter the public officials
-    directory), but that reaches other viewers as an ordinary object update, and
-    it grants the Prince no wider view of their own. The online nudge is
-    broadcast_resync (asserted here via the user's SSE connection); the offline
-    path is the access-version fp (test_access_version).
-    """
+    """Only NC/IC role changes trigger a resync (they widen what a client can
+    see); Prince changes the user's own projection but grants no wider view."""
     import json
 
     from src import db
@@ -203,7 +190,6 @@ async def test_role_change_resyncs_only_for_access_roles(
 
 @pytest.mark.asyncio
 async def test_create_user_requires_auth(test_client: AsyncClient, populated_db):
-    """Test that creating a user without auth returns 401."""
     response = await test_client.post(
         "/api/users/",
         json={"name": "Test", "country": "US"},
@@ -213,7 +199,6 @@ async def test_create_user_requires_auth(test_client: AsyncClient, populated_db)
 
 @pytest.mark.asyncio
 async def test_update_user_requires_auth(test_client: AsyncClient, populated_db):
-    """Test that updating a user without auth returns 401."""
     response = await test_client.put(
         f"/api/users/{populated_db[0].uid}",
         json={"name": "Nope"},
@@ -223,12 +208,8 @@ async def test_update_user_requires_auth(test_client: AsyncClient, populated_db)
 
 @pytest.mark.asyncio
 async def test_update_user_requires_edit_authority(test_db, test_client: AsyncClient):
-    """A member with no official role cannot edit another user's profile.
-
-    Closes the gap where PUT /api/users/{uid} had no edit-authority gate at all —
-    any authenticated user could change any user's name/country. Now gated by
-    can_edit_user (self / IC / NC-Prince same-country).
-    """
+    """A member with no official role cannot edit another user's profile —
+    closes the gap where PUT had no edit-authority gate at all."""
     actor = await _mk_user("FR", [], vekn="2000001")
     target = await _mk_user("FR", [], vekn="2000002")
     resp = await test_client.put(
@@ -243,13 +224,8 @@ async def test_update_user_requires_edit_authority(test_db, test_client: AsyncCl
 async def test_role_only_edit_without_profile_authority(
     test_db, test_client: AsyncClient
 ):
-    """A Rulemonger appoints Judges anywhere without holding profile authority.
-
-    Profile fields and roles are two independent gates over one endpoint: the
-    baseline can_edit_user check used to run first, so the appointment matrix's
-    grants to a bare Rulemonger/PTC were unreachable unless they also held
-    IC/NC. A roles-only request now passes; a profile field still does not.
-    """
+    """A Rulemonger appoints Judges anywhere without profile authority: profile
+    fields and roles are independent gates over one endpoint."""
     actor = await _mk_user("FR", [Role.RULEMONGER], vekn="2000001")
     target = await _mk_user("US", [], vekn="2000002")
 
@@ -343,12 +319,9 @@ async def test_get_users_by_uids_batch_matches_per_uid(populated_db):
 
 @pytest.mark.asyncio
 async def test_delete_member(test_db, test_client: AsyncClient):
-    """IC soft-deletes a VEKN-less member; every other case is refused.
-
-    These guards are route-only — the engine permission knows just "IC-only".
-    The VEKN-bearing 400 is load-bearing: a soft-deleted VEKN member would be
-    resurrected as a tombstone by the next VEKN member sync, so it must stay.
-    """
+    """IC soft-deletes a VEKN-less member; every other case is refused. The
+    VEKN-bearing 400 is load-bearing — a soft-deleted VEKN member would be
+    resurrected as a tombstone by the next VEKN member sync."""
     ic = await _mk_user("US", [Role.IC], vekn="4000001")
     junk = await _mk_user("FR", [])  # VEKN-less ETL residue
     member = await _mk_user("FR", [], vekn="4000002")  # real VEKN member

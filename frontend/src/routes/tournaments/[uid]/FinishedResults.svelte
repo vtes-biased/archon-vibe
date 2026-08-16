@@ -8,7 +8,6 @@
   import * as m from '$lib/paraglide/messages.js';
 
   // Organizer-only Finished-state panel: winner, deck nudge, sync/TWDA outcome.
-  // Every action it used to carry now lives in the Tools sheet.
   let {
     tournament,
     playerInfo,
@@ -46,7 +45,6 @@
 </script>
 
 <div class="space-y-3">
-  <!-- Winner -->
   {#if tournament.winner}
     <div class="banner-highlight border rounded-lg p-4">
       <div class="text-ink-faint text-sm">{m.tournament_winner()}</div>
@@ -54,12 +52,9 @@
     </div>
   {/if}
 
-  <!-- Every line below is one InlineNotice: same class of information, one
-       shape. Tone splits them by what the organizer must do — warn for the
-       things still owed (a missing deck, a failed sync), info for the things
-       that merely happened. -->
+  <!-- Every line below is one InlineNotice: tone splits by what's owed (warn)
+       vs what merely happened (info). -->
 
-  <!-- Winner deck nudge (no deck on file) -->
   {#if tournament.winner && !winnerHasDeck}
     <InlineNotice tone="warn" icon={TriangleAlert}>
       {m.decks_winner_nudge_organizer({ name: seatDisplay(tournament.winner) })}
@@ -94,10 +89,9 @@
     {/if}
   {/if}
 
-  <!-- This panel STATES the result; it no longer offers a toolbar. Copy results,
-       the event-file download, promo distribution and Reopen all live in the
-       Tools sheet's Wrap up group. The one exception is an empty finished shell
-       with nothing to state — there, importing is the only thing to do. -->
+  <!-- This panel states the result; other actions (copy, export, promos, reopen)
+       live in the Tools sheet. Import is the exception, shown only when there's
+       nothing yet to state. -->
   {#if !hasStandings}
     <div>
       <Button variant="secondary" size="md" onclick={() => onImportArchon?.()}>

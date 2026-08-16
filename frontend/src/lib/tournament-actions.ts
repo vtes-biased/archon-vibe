@@ -1,12 +1,5 @@
-/**
- * Optimistic tournament-action engine.
- *
- * The mutation half of the client: applies a tournament event through the WASM
- * engine locally (optimistic IndexedDB write), then posts it to the server,
- * serialized per tournament and rolled back on rejection. Reads stay offline-first
- * (no GET); see rollbackTournamentAction. Pure HTTP transport lives in api.ts,
- * which this module builds on (one-way import — api.ts never imports back).
- */
+/** Optimistic mutation: applies a tournament event through WASM locally, then posts to the server
+ * (serialized per tournament) and rolls back on rejection. Pure HTTP transport lives in api.ts, which this module builds on one-way. */
 
 import * as m from '$lib/paraglide/messages.js';
 import type { Tournament, DeckObject } from '$lib/types';
@@ -34,10 +27,7 @@ import { isOffline, scheduleSyncOffline } from '$lib/stores/offline.svelte';
 import { apiRequest, ApiError, requireOnline, isOnline } from './api';
 import { EngineError } from './error-codes';
 
-/**
- * Per-tournament action queue to serialize server POSTs.
- * Prevents concurrent requests from racing on the same tournament.
- */
+/** Serializes server POSTs per tournament so concurrent requests can't race. */
 const actionQueues = new Map<string, Promise<void>>();
 
 function enqueueServerAction(uid: string, fn: () => Promise<void>): void {
@@ -51,10 +41,8 @@ function enqueueServerAction(uid: string, fn: () => Promise<void>): void {
   });
 }
 
-/**
- * Pre-check: block barred players (suspension, league-wide DQ) before WASM optimistic path.
- * Mirrors backend _check_player_barred() logic.
- */
+/** Blocks barred players (suspension, league-wide DQ) before the WASM optimistic path.
+ * Mirrors backend _check_player_barred(). */
 async function checkPlayerBarred(playerUid: string, tournament: Tournament): Promise<void> {
   const sanctions = await getSanctionsForUser(playerUid);
   const now = new Date();
@@ -97,11 +85,9 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
     }
   }
 
-  // Try optimistic update via WASM engine
   const current = await getTournament(uid);
   if (current) {
     try {
-      // Pre-check: block barred players before WASM optimistic path
       if (action === 'CheckIn' && data?.player_uid) {
         await checkPlayerBarred(data.player_uid as string, current);
       } else if ((action === 'Register' || action === 'AddPlayer') && data?.user_uid) {
@@ -127,10 +113,8 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
       const result = await processTournamentEvent(current, event, actor, sanctions, decks);
       await saveTournament(result.tournament);
 
-      // Handle deck side-effects in IDB
       const affectedDeckUids = await applyDeckOps(result.deckOps, uid, decks);
 
-      // If tournament is in offline mode, track deck UIDs and skip server POST
       if (isOffline(uid)) {
         for (const deckUid of affectedDeckUids) {
           await addOfflineDeckUid(uid, deckUid);
@@ -139,10 +123,8 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
         return result.tournament;
       }
 
-      // For StartRound: forward WASM-computed seating so the server uses the
-      // same tables. Seating is now deterministic (seeded from tournament_uid +
-      // round), so the server would compute the same result — forwarding is a
-      // safety net guaranteeing agreement even if engine builds drift.
+      // For StartRound: forward WASM-computed seating so the server uses the same tables. Seating is
+      // deterministic (seeded from tournament_uid+round) so this is a safety net, not strictly required.
       let serverEvent: TournamentEvent = event;
       if (action === 'StartRound' && result.tournament.rounds &&
           result.tournament.rounds.length > (current.rounds?.length ?? 0)) {
@@ -150,11 +132,9 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
         serverEvent = { ...event, seating: newRound.map(t => t.seating.map(s => s.player_uid)) };
       }
 
-      // Queue server POST (serialized per tournament, prevents concurrent races)
       const hadDeckOps = (result.deckOps?.length ?? 0) > 0;
-      // Snapshot our optimistic 'modified' stamps so rollback can tell our own
-      // write apart from a foreign SSE update (co-judge action, server job) that
-      // landed between the optimistic write and the rejection.
+      // Snapshot our optimistic 'modified' stamps so rollback can tell our own write apart from a
+      // foreign SSE update (co-judge action, server job) landed between the optimistic write and the rejection.
       const optimisticModified = result.tournament.modified;
       const optimisticDeckMods = hadDeckOps
         ? new Map((await getDecksByTournament(uid)).map((d) => [d.uid, d.modified]))
@@ -183,10 +163,8 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
 
       return result.tournament;
     } catch (e) {
-      // WASM rejected. When this tournament is offline (or the device is), there's
-      // no server to defer to — surface the engine's actual reason (a typed
-      // EngineError) instead of a misleading "requires online".
-      // Otherwise fall through to server-only (covers genuine unknown-action drift).
+      // WASM rejected. When this tournament (or the device) is offline, there's no server to defer to —
+      // surface the engine's actual reason. Otherwise fall through to server-only (covers unknown-action drift).
       if (isOffline(uid) || !isOnline()) throw e;
     }
   }
@@ -200,11 +178,8 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
   }, { suppressErrorToast: true });
 }
 
-/**
- * Apply deck operations from engine result to IndexedDB.
- * In online mode, SSE will deliver authoritative state and overwrite.
- * Returns UIDs of affected decks (for offline tracking).
- */
+/** In online mode, SSE delivers authoritative state and overwrites. Returns affected deck UIDs for
+ * offline tracking. */
 async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, existingDecks: DeckObject[]): Promise<string[]> {
   const affectedUids: string[] = [];
   for (const op of deckOps) {
@@ -235,9 +210,8 @@ async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, existingDe
         // Mirror the backend: a multideck delete tombstones only the matching round-deck
         if (op.multideck && op.deck_index != null && d.round !== op.deck_index) continue;
         if (offline) {
-          // Soft-delete: go-online pushes offline_decks as upserts only, so the
-          // deletion must travel as a tombstoned row — a local hard delete would
-          // leave the server copy live and the deck would resurrect on resync.
+          // Soft-delete: go-online pushes offline_decks as upserts only, so the deletion must travel as a
+          // tombstoned row — a local hard delete would leave the server copy live and resurrect the deck on resync.
           d.deleted_at = new Date().toISOString();
           d.modified = new Date().toISOString();
           await saveDeck(d);
@@ -259,21 +233,8 @@ async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, existingDe
   return affectedUids;
 }
 
-/**
- * Roll back an optimistic tournament action that the server rejected.
- *
- * A rejected action emits no SSE event, so the optimistic mutations written to
- * IndexedDB would otherwise persist forever. We do NOT GET authoritative state
- * from the server — reads are offline-first (IndexedDB only). Server actions are
- * transactional (all-or-nothing), so on rejection the authoritative state equals
- * the pre-action state we already held in memory: restore it locally.
- *
- * Guard against clobbering a newer foreign write: a co-judge action or server
- * job whose SSE landed between our optimistic write and the rejection already
- * replaced our stored state (and its cursor advanced, so it won't be redelivered).
- * Since our rejected action emits no SSE, any change to the stored `modified`
- * means that foreign update is the correct post-rejection state — skip the restore.
- */
+/** A rejected action emits no SSE event, so optimistic IDB writes would persist forever; server actions
+ * are transactional, so the pre-action state IS the post-rejection state — restore it, unless a foreign SSE write (co-judge, server job) already replaced our stored `modified` first. */
 async function rollbackTournamentAction(
   uid: string,
   preActionTournament: Tournament,

@@ -8,9 +8,6 @@ import { expect, type Page } from '@playwright/test';
 
 const DEFAULT_SYNC_TIMEOUT = 8_000;
 
-/**
- * Wait for SSE sync to complete (synced state on the sidebar indicator).
- */
 export async function waitForSync(page: Page, timeout = DEFAULT_SYNC_TIMEOUT) {
   await expect(
     page.locator('[data-sync-state="synced"]').first(),
@@ -18,13 +15,10 @@ export async function waitForSync(page: Page, timeout = DEFAULT_SYNC_TIMEOUT) {
 }
 
 /**
- * Navigate to the Members tab and wait for user rows to load.
- * The Community page defaults to the "Community" tab; the user list
- * is on the "Members" tab.
+ * Navigate to Members — the Community page defaults to the Community tab.
  */
 export async function waitForUsers(page: Page) {
   await waitForSync(page);
-  // Switch to Members tab (user list)
   await page.getByRole('button', { name: 'Members' }).click();
   await expect(
     page.locator('.user-row').first(),

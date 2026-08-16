@@ -31,23 +31,19 @@
 
   const auth = getAuthState();
 
-  // Sponsor modal state
   let sponsorLoading = $state(false);
-  // Minting a member and issuing a VEKN ID to an accountless one are one
-  // authority: officials-only (IC/NC/Prince) and deliberately cross-country, so
-  // any official present at the event qualifies — the copy says so rather than
-  // hiding the option, since an organizer who can't act needs to know who can.
+  // Minting a member and issuing a VEKN ID are one authority: officials-only,
+  // deliberately cross-country — the copy states the rule rather than hiding
+  // the option, so an organizer who can't act knows who can.
   const canSponsor = $derived(canSponsorMember(auth.user).allowed);
   // checkPermission fails closed before WASM loads; don't tell an official they
   // aren't one in that window — show the form (its confirm stays disabled).
   const eligibilityKnown = $derived(engineReady());
-  // The device lock, not browser connectivity: this must be the same fact that
-  // decides whether doAction skips the server POST (tournament-actions.ts), or a
-  // disconnected device on an online tournament mints a temp player and a user
-  // stub that no go-online push will ever reconcile away.
+  // The device lock, not browser connectivity — must match the fact doAction
+  // uses to skip the server POST (tournament-actions.ts), or a disconnected
+  // device mints a temp player/user stub go-online will never reconcile.
   const offlineCreate = $derived(isOffline(tournament.uid));
 
-  // Create-and-register modal state
   let createName = $state('');
   let createEmail = $state('');
   // Offline only: a player who knows their VEKN ID gives go-online an exact
@@ -100,8 +96,8 @@
   }
 
   // Picking a surfaced duplicate pivots into the normal add path (register, or
-  // sponsor+register for a no-VEKN member) — no new member is minted. Suspended
-  // rows are non-interactive; deceased ones route through the confirm.
+  // sponsor+register) — no new member is minted. Suspended rows are
+  // non-interactive; deceased ones route through the confirm.
   function chooseCandidate(user: User) {
     resetCreateModal();
     if (user.deceased_at) { pendingDeceased = user; return; }
@@ -121,11 +117,10 @@
     // creates during the await, and the review button never sticks.
     createLoading = true;
     try {
-      // A typed VEKN ID that already belongs to someone means this was never a
-      // create. Check it here because go-online matches on vekn_id FIRST and
-      // never re-checks the name (_resolve_or_create_offline_player), so one
-      // transposed digit would silently bind the seat — and the event's results
-      // and ratings — to a different real member.
+      // A typed VEKN ID that already belongs to someone was never a create:
+      // go-online matches on vekn_id first and never re-checks the name
+      // (_resolve_or_create_offline_player), so a transposed digit would
+      // silently bind the seat, results and ratings to a different member.
       const typedVekn = createVeknId.trim();
       if (typedVekn) {
         const holder = (await getFilteredUsers(undefined, undefined, typedVekn))
@@ -133,25 +128,19 @@
         if (holder) { chooseCandidate(holder); return; }
       }
 
-      // Dedup gate: surface same-country name look-alikes (incl. accountless
-      // VEKN-synced members — the member projection carries them all) before
-      // minting. Email dedup is the server's job (create_user 409, cross-country
-      // authoritative). Skip once the review has been shown and dismissed.
-      //
-      // Runs offline too: the local member list is stale but complete, which is
-      // ample to surface a look-alike, and this keyboard moment is the only one
-      // where a human can review candidates — go-online is batch and matches on
-      // email alone, so an unreviewed offline create mints a second account for
-      // a member who already has one.
+      // Dedup gate: surface same-country look-alikes before minting (email
+      // dedup is the server's job). Runs offline too — go-online matches on
+      // email alone in batch, so an unreviewed offline create can mint a
+      // duplicate account.
       if (createCandidates.length === 0) {
         const country = createCountry || tournament.country || '';
         const registered = new Set(tournament.players?.map(p => p.user_uid) ?? []);
         const search = async (c: string | undefined) =>
           (await getFilteredUsers(c, undefined, createName.trim())).filter(u => !registered.has(u.uid));
         let matches = await search(country || undefined);
-        // Offline there is no server-side email 409 behind this, so a
+        // Offline there's no server-side email 409 behind this, so a
         // cross-country duplicate would go uncaught — and a visiting player is
-        // exactly who an offline event collects. Widen rather than miss them.
+        // exactly who an offline event collects; widen rather than miss them.
         if (matches.length === 0 && offlineCreate && country) matches = await search(undefined);
         matches = matches.slice(0, 8);
         if (matches.length > 0) {
@@ -206,7 +195,6 @@
   }
 </script>
 
-<!-- Sponsor & Register Modal -->
 {#if sponsorTarget}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
@@ -257,7 +245,6 @@
   </div>
 {/if}
 
-<!-- Create & Register Modal -->
 {#if showCreateModal}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
@@ -288,7 +275,6 @@
           <Button variant="primary" size="lg" onclick={resetCreateModal}>{m.common_close()}</Button>
         </div>
       {:else if createCandidates.length > 0}
-        <!-- Dedup review: pick an existing member instead of minting a duplicate -->
         <h3 id="create-modal-title" bind:this={dedupHeading} tabindex="-1" class="text-lg font-medium text-ink-strong outline-none">{m.create_dedup_title()}</h3>
         <p class="text-sm text-ink">{m.create_dedup_message()}</p>
         <div class="border border-line-strong rounded-lg divide-y divide-line max-h-56 overflow-y-auto">
@@ -380,7 +366,6 @@
   </div>
 {/if}
 
-<!-- Deceased-member add confirmation (dedup pick / email pivot) -->
 {#if pendingDeceased}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div

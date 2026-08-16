@@ -7,9 +7,8 @@
   vars_files:
     - ../vars/release_artifacts.yml
 
-  # Quick lane: `--tags app` (QUICK=1 in the justfile) ships artifacts only —
-  # the [app] roles below run whole, untagged provisioning roles are skipped.
-  # Any nginx/TLS/db/unit change needs the full (default, untagged) deploy.
+  # Quick lane (`--tags app` / QUICK=1): untagged provisioning roles are
+  # skipped, so any nginx/TLS/db/unit change needs the full deploy instead.
   pre_tasks:
     - name: Fetch release artifacts (shared)
       ansible.builtin.import_tasks: ../tasks/fetch_release.yml
@@ -77,9 +76,8 @@
         env: "{{ bot_env }}"
         env_dir: "{{ env_dir }}"
 
-    # 5. Legacy-archon -> archon-vibe daily merge (parallel run, prod-only).
-    # Gated by legacy_sync_enabled; runs the merge script with the deployed venv.
-    # Remove at Phase-4 decommission.
+    # 5. Legacy-archon -> archon-vibe daily merge, prod-only, gated by
+    # legacy_sync_enabled. Remove at Phase-4 decommission.
     - role: legacy_sync
       when: legacy_sync_enabled | default(false) | bool
       r:
@@ -97,9 +95,8 @@
         merge_backup_dir: "{{ merge_backup_dir | default('/var/lib/archon/merge-backups') }}"
         oncalendar: "{{ legacy_sync_oncalendar | default('*-*-* 04:00:00') }}"
 
-    # 6. Daily cluster-wide DB backup (pg_dump of every DB — new `archon` AND
-    # legacy `archondb` while the parallel run lasts) + weekly restore-verify.
-    # Optional off-box push via restic -> S3. Gated by db_backup_enabled.
+    # 6. Daily cluster-wide DB backup + weekly restore-verify, gated by
+    # db_backup_enabled. Optional off-box push via restic -> S3.
     - role: db_backup
       when: db_backup_enabled | default(false) | bool
       r:

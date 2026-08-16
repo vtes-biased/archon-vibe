@@ -4,9 +4,8 @@
     name: "postgresql@{{ postgresql_version }}-main"
     state: reloaded
 
-# Fires only when shared_buffers/max_connections actually change (alter_system
-# reports changed on diff), so it's a one-time blip on first apply, not every
-# deploy — legacy archon_web reconnects. Run in a low-traffic window.
+# Fires only when shared_buffers/max_connections actually change — a one-time
+# blip on first apply, not every deploy. Run in a low-traffic window.
 - name: Restart postgresql
   ansible.builtin.service:
     name: "postgresql@{{ postgresql_version }}-main"

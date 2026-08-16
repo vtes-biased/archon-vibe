@@ -1,20 +1,5 @@
 #!/usr/bin/env python3
-"""Build engine/data/cards.json from krcg's canonical card data.
-
-Sources the VTES card database through krcg (the owner-maintained canonical
-library) so the generated cards.json carries krcg's three name forms and its
-computed name_variants — the data half of correct card-name resolution shared by
-the Rust engine (offline text import) and the frontend:
-
-- ``printed_name`` — bare name, for display (group/advanced shown as separate badges)
-- ``unique_name``  — minimal disambiguator (most vampires bare; later groups /
-  advanced get the suffix), for text decklist output
-- ``full_name``    — always group/advanced suffixed
-- ``name_variants``— accents, player-shorthand aliases and ordinals, all as parse keys
-
-All three names plus the variants are lookup keys for the parser; the parser folds
-accents so an ASCII-only spelling still resolves.
-"""
+"""Build engine/data/cards.json from krcg's canonical card data."""
 
 import asyncio
 import json
@@ -31,11 +16,8 @@ OUTPUT = Path(
     or Path(__file__).resolve().parent.parent / "engine" / "data" / "cards.json"
 )
 
-# VEKN "V5" constructed format (Tournament Rules §6.4) — a fixed product allowlist,
-# NOT a company/date cutoff: V5A/V5C/EoG are Paradox-published yet OUT, so matching on
-# a "Fifth Edition" name substring is wrong. A card is V5-legal if any legal print is
-# in a listed set (reprints included) OR it's one of the 19 individually-whitelisted
-# promos krcg flags with Format.V5 (PP3/PP4 — unrecoverable from set membership).
+# Fixed VEKN V5 allowlist, not a company/date cutoff: V5A/V5C/EoG are Paradox-published
+# yet excluded. PP3/PP4 promos aren't recoverable from set membership; krcg flags them via Format.V5.
 V5_LEGAL_SETS = {"V5", "NB", "NB2", "NB3", "FoL", "SoB", "30th", "SV5"}
 
 
@@ -74,7 +56,6 @@ def _sets(card: Card, cards: CardDict) -> list[str]:
 
 
 def transform(card: Card, cards: CardDict) -> dict:
-    """Project a krcg card to the engine's cards.json entry."""
     crypt = card.kind == Card.Kind.CRYPT
     return {
         "id": card.id,

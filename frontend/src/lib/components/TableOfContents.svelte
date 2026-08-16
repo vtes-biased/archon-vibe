@@ -23,10 +23,9 @@
   }
 </script>
 
-<!-- Desktop: sticky sidebar -->
 <aside class="hidden lg:block w-64 shrink-0">
-  <!-- sticky resolves against the scrollport, not the shell's padding box, so
-       the inset has to be carried here (iPad standalone). -->
+  <!-- sticky resolves against the scrollport, not the shell's padding box, so the inset has to be
+       carried here (iPad standalone). -->
   <div class="sticky top-[calc(1rem+var(--spacing-safe-t))] max-h-[calc(100dvh-2rem-var(--spacing-safe-t))] overflow-y-auto">
     <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide mb-3">{m.help_toc_title()}</h3>
     <nav class="space-y-0.5">
@@ -44,11 +43,9 @@
   </div>
 </aside>
 
-<!-- Mobile: floating button + drawer -->
 <div class="lg:hidden">
-  <!-- Floating TOC button. This block is lg:hidden but the bottom nav is
-       sm:hidden, so between the two breakpoints the rail is showing and there
-       is no nav to clear — hence the sm: arm. -->
+  <!-- This block is lg:hidden but the bottom nav is sm:hidden, so between the two breakpoints the
+       rail is showing and there is no nav to clear — hence the sm: arm. -->
   <button
     onclick={() => (mobileOpen = true)}
     class="fixed bottom-navbar mb-6 sm:bottom-6 sm:mb-0 right-4 mr-safe-r z-30 w-12 h-12 rounded-full bg-accent-strong text-white shadow-lg flex items-center justify-center hover:bg-accent-strong-hover transition-colors"
@@ -57,7 +54,6 @@
     <List class="w-5 h-5" />
   </button>
 
-  <!-- Drawer backdrop -->
   {#if mobileOpen}
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div

@@ -5,16 +5,12 @@ import os
 import sys
 from pathlib import Path
 
-# Add backend to path for local development
-# This ensures backend/src and backend/tests are importable
 backend_dir = Path(__file__).parent.parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
 import random
 from datetime import UTC, datetime, timedelta
-
-# Import uuid7 for generating IDs
 from uuid import uuid7
 
 from src import db
@@ -144,7 +140,6 @@ def generate_mock_users(count: int = 300) -> list[User]:
 
 
 async def main():
-    """Populate database with mock users."""
     db_url = os.getenv(
         "DATABASE_URL",
         "postgresql://archon:archon_dev_password@localhost:5433/archon",
@@ -154,11 +149,9 @@ async def main():
 
     await db.init_db()
 
-    # Clean existing users
     async with db.get_connection() as conn:
         await conn.execute("DELETE FROM objects WHERE type = 'user'")
 
-    # Generate and insert mock users
     users = generate_mock_users(300)
     for user in users:
         await db.save_user(user)

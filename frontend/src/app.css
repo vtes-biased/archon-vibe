@@ -2,79 +2,54 @@
 @plugin "@tailwindcss/typography";
 
 @theme {
-    /*
-     * VTES Gothic ROLE TOKENS — see wiki/design.md.
-     * Each role is defined ONCE via light-dark(LIGHT, DARK): the value is picked
-     * from the element's color-scheme (dark on :root, light on html.light). No
-     * parallel html.light override block, no numeric scale-inversion to maintain —
-     * a new shade is a new role here, not a hand-inverted ramp entry. The hex
-     * values are exactly the old crimson/bone/dusk/ash scale's resolved colours,
-     * so both themes render identically to the pre-migration numeric scales.
-     *   light-dark(LIGHT, DARK): first arg = light theme, second = dark (default).
-     */
+    --color-surface:        light-dark(#F5F0E6, #2A2520);
+    --color-surface-card:   light-dark(#FFFFFF, #1C1A1E);
+    --color-surface-muted:  light-dark(#E8E6E4, #3D3A37);
+    --color-surface-hover:  light-dark(#D4D0CC, #4A4642);
+    --color-surface-active: light-dark(#B8B2AC, #5A5550);
 
-    /* Surfaces (bg) — page → card → muted/overlay → hover → solid control */
-    --color-surface:        light-dark(#F5F0E6, #2A2520);  /* page background  (was bone-950) */
-    --color-surface-card:   light-dark(#FFFFFF, #1C1A1E);  /* cards / panels   (was dusk-950) */
-    --color-surface-muted:  light-dark(#E8E6E4, #3D3A37);  /* subtle row/overlay (was ash-900, dusk-900/800) */
-    --color-surface-hover:  light-dark(#D4D0CC, #4A4642);  /* interactive hover (was ash-800) */
-    --color-surface-active: light-dark(#B8B2AC, #5A5550);  /* solid neutral control (was ash-700) */
+    --color-ink-strong:     light-dark(#5E5444, #FAF8F4);
+    --color-ink-bright:     light-dark(#4A4642, #D4D0CC);
+    --color-ink:            light-dark(#5A5550, #B8B2AC);
+    --color-ink-muted:      light-dark(#6B6560, #9A938C);
+    --color-ink-faint:      light-dark(#7D756E, #7D756E);
 
-    /* Ink (text/fill/stroke) — strong → bright → body → muted → faint */
-    --color-ink-strong:     light-dark(#5E5444, #FAF8F4);  /* headings/emphasis (was bone-100) */
-    --color-ink-bright:     light-dark(#4A4642, #D4D0CC);  /* bright body/labels (was ash-200) */
-    --color-ink:            light-dark(#5A5550, #B8B2AC);  /* default body (was ash-300) */
-    --color-ink-muted:      light-dark(#6B6560, #9A938C);  /* secondary (was ash-400) */
-    --color-ink-faint:      light-dark(#7D756E, #7D756E);  /* tertiary/disabled (was ash-500/600, mist) */
+    --color-line:           light-dark(#D4D0CC, #4A4642);
+    --color-line-strong:    light-dark(#B8B2AC, #5A5550);
 
-    /* Borders (border/ring/divide) — same hue as the matching surface, distinct role */
-    --color-line:           light-dark(#D4D0CC, #4A4642);  /* default border (was ash-800) */
-    --color-line-strong:    light-dark(#B8B2AC, #5A5550);  /* stronger border (was ash-700/600/500) */
+    --color-accent:              light-dark(#A40F2D, #DC143C);
+    --color-accent-strong:       light-dark(#880C26, #A40F2D);
+    --color-accent-strong-hover: light-dark(#960D29, #C41235);
+    --color-accent-soft:         light-dark(#FCE4E8, #6E0A1F);
+    --color-accent-soft-border:  light-dark(#F9CCD4, #880C26);
+    --color-link:                light-dark(#DC143C, #EC6B84);
+    --color-link-soft:           light-dark(#C41235, #F4A3B3);
 
-    /* Accent (crimson) — brand → CTA → tint, plus accent text (link) */
-    --color-accent:              light-dark(#A40F2D, #DC143C);  /* brand accent: bg/border/ring + strong text (was crimson-500) */
-    --color-accent-strong:       light-dark(#880C26, #A40F2D);  /* CTA solid (was crimson-700) */
-    --color-accent-strong-hover: light-dark(#960D29, #C41235);  /* CTA hover (was crimson-600) */
-    --color-accent-soft:         light-dark(#FCE4E8, #6E0A1F);  /* accent tint bg (was crimson-900) */
-    --color-accent-soft-border:  light-dark(#F9CCD4, #880C26);  /* accent tint border (was crimson-800) */
-    --color-link:                light-dark(#DC143C, #EC6B84);  /* accent text / links (was crimson-400) */
-    --color-link-soft:           light-dark(#C41235, #F4A3B3);  /* light accent text on tint (was crimson-300) */
+    --color-info:      light-dark(#1e40af, #60a5fa);
+    --color-warn:      light-dark(#6b21a8, #c084fc);
+    --color-highlight: light-dark(#86198f, #e879f9);
 
-    /* Status text/icon (gothic-jewel; pair with icon+text, never colour alone — see #225) */
-    --color-info:      light-dark(#1e40af, #60a5fa);  /* azure — info / positive (✓, online) */
-    --color-warn:      light-dark(#6b21a8, #c084fc);  /* amethyst — pending / warning (matches .dot-pending) */
-    --color-highlight: light-dark(#86198f, #e879f9);  /* fuchsia — highlight / mid severity (matches .dot-highlight) */
+    --color-select:        light-dark(#1e40af, #60a5fa);
+    --color-select-border: light-dark(#bfdbfe, #1e3a8a);
+    --color-select-soft:   light-dark(#eff6ff, #1e3a8a);
 
-    /* Selection (azure) — tap-to-swap seating affordance; a purpose, NOT a status meaning */
-    --color-select:        light-dark(#1e40af, #60a5fa);  /* select text/icon/ring */
-    --color-select-border: light-dark(#bfdbfe, #1e3a8a);  /* select border */
-    --color-select-soft:   light-dark(#eff6ff, #1e3a8a);  /* select tint bg (pair with opacity) */
-
-    /*
-     * Safe areas — contract in wiki/design.md → Mobile first. The 0px fallbacks are
-     * load-bearing: without one, a UA lacking env() makes calc() invalid at
-     * computed-value time and --spacing-navbar collapses the nav to height:auto.
-     */
+    /* 0px fallbacks are load-bearing: without one, calc() is invalid on a UA
+       lacking env(), and --spacing-navbar collapses the nav to height:auto. */
     --spacing-safe-t: env(safe-area-inset-top, 0px);
-    --spacing-safe-b: 0px;  /* claimed only in standalone — see below */
+    --spacing-safe-b: 0px;  /* claimed only in standalone; see @media below */
     --spacing-safe-l: env(safe-area-inset-left, 0px);
     --spacing-safe-r: env(safe-area-inset-right, 0px);
-    /* Bottom nav's total footprint: touch row + whatever inset it bleeds into. */
     --spacing-navbar: calc(3.5rem + var(--spacing-safe-b));
     --spacing-rail: calc(5rem + var(--spacing-safe-l));
 }
 
-/*
- * Only the installed app claims the bottom inset. In an iOS Safari tab the
- * toolbar already occupies that space AND the inset flips between 0 and the
- * home-indicator value as the toolbar collapses on scroll, which would resize
- * the nav mid-scroll. Top/left/right need no gate — stable in both modes.
- */
+/* Bottom inset only in standalone: an iOS Safari tab's toolbar occupies it and
+   the value flips as the toolbar collapses on scroll, which would resize the
+   nav mid-scroll. */
 @media (display-mode: standalone) {
     :root { --spacing-safe-b: env(safe-area-inset-bottom, 0px); }
 }
 
-/* VTES icon fonts from krcg-static */
 @font-face {
     font-family: "Ankha VTES";
     src: url("/fonts/ankha2.otf") format("opentype");
@@ -87,7 +62,6 @@
 }
 
 @layer base {
-    /* Default to dark mode - gothic aesthetic */
     :root {
         color-scheme: dark;
     }
@@ -97,69 +71,35 @@
     }
 
     button, [role="button"], summary, select { cursor: pointer; }
-    /* Checkbox/radio/file inputs (and the labels that toggle them) read as inert
-       without this — Tailwind v4 preflight leaves them unstyled and native
-       checkboxes default to the arrow, so toggle switches and option rows showed
-       no hand. Keeps cursor affordance consistent with the button rule above. */
+    /* Tailwind v4 preflight leaves these unstyled (native checkbox/radio default
+       to the arrow cursor) without this rule. */
     input:where([type="checkbox"], [type="radio"], [type="file"]),
     label:has(> input:where([type="checkbox"], [type="radio"], [type="file"])) { cursor: pointer; }
     button:disabled, select:disabled, input:disabled,
     label:has(> input:disabled) { cursor: not-allowed; }
 
-    /*
-     * Global keyboard-focus ring (WCAG 2.4.7). Crimson, matching the design
-     * language. :focus-visible shows only for keyboard / programmatic focus,
-     * never on mouse click. Lives in @layer base so it's the floor: controls
-     * that manage their own focus (form inputs using focus:outline-none + a
-     * crimson border/ring) override it via Tailwind's later utilities layer.
-     *
-     * The hard outline carries 1.4.11/2.4.7 compliance on its own; the soft
-     * crimson box-shadow is the gothic glow (cf. .callout / .doc-img) that makes
-     * focus read as designed. color-mix derives it from the accent role token so
-     * it follows the theme automatically. The glow may be clipped by an
-     * overflow:hidden ancestor — harmless, the outline is never clipped.
-     */
+    /* In @layer base so per-input focus:outline-none + custom ring overrides it
+       via Tailwind's later utility layer; the glow may be clipped by an
+       overflow:hidden ancestor, but the hard outline never is. */
     :focus-visible {
         outline: 2px solid var(--color-accent);
         outline-offset: 2px;
         box-shadow: 0 0 8px color-mix(in srgb, var(--color-accent) 45%, transparent);
     }
 
-    /*
-     * Toggle switches hide their checkbox as .sr-only.peer and render a styled
-     * sibling track div, so the ring above lands on the 1px checkbox. Project it
-     * onto the visible track instead (outline follows the track's pill radius).
-     */
+    /* Checkbox is .sr-only.peer with a styled sibling track div; project the
+       ring onto the visible track, not the hidden 1px input. */
     .sr-only.peer:focus-visible + div {
         outline: 2px solid var(--color-accent);
         outline-offset: 2px;
         box-shadow: 0 0 8px color-mix(in srgb, var(--color-accent) 45%, transparent);
     }
 
-    /*
-     * Light theme — role tokens resolve via light-dark() (see @theme above), so
-     * the only thing the light theme needs is to flip color-scheme. No per-shade
-     * override block: each role carries both theme values at its definition.
-     */
     html.light {
         color-scheme: light;
     }
 }
 
-/*
- * Semantic component colors — badges, buttons, banners, toasts, status, dots.
- * Each class is defined ONCE; light-dark() picks the theme value from the
- * element's color-scheme (dark on :root, light on html.light). No parallel
- * light-mode override block — the single source of truth the old scheme lacked.
- * light-dark(LIGHT, DARK): first arg = light theme, second = dark (the default).
- *
- * Two layers share these gothic-jewel hues (no green/amber/teal — off-palette):
- *   status (meaning):  success/info = blue · pending = amethyst · danger = crimson · highlight = fuchsia
- *   categorical (id):  badge-blue / -amethyst / -fuchsia / -crimson / -slate
- * Violet stays danger-button-only (btn-danger). All combos verified WCAG AA in both themes.
- */
-
-/* ── Badges (status pills, role tags) ── */
 .badge-success, .badge-info, .badge-blue {
     background: light-dark(#eff6ff, rgb(30 58 138 / 0.6));
     color: light-dark(#1e40af, #bfdbfe);
@@ -181,13 +121,10 @@
     color: light-dark(#334155, #e2e8f0);
 }
 
-/* ── Buttons (solid status chips; action buttons go through <Button>) ── */
 .btn-success                        { background-color: light-dark(#1e40af, #1d4ed8); color: #fff; }
 .btn-success:hover:not(:disabled)   { background-color: light-dark(#1d4ed8, #2563eb); }
 .btn-pending                        { background-color: light-dark(#6b21a8, #7e22ce); color: #fff; }
 .btn-pending:hover:not(:disabled)   { background-color: light-dark(#7e22ce, #9333ea); }
-/* danger = violet (NOT crimson): keeps destructive distinct from crimson primary,
-   incl. under colourblindness. Always paired with an icon + verb at the call-site. */
 .btn-danger                         { background-color: light-dark(#5B21B6, #6D28D9); color: #fff; }
 .btn-danger:hover:not(:disabled)    { background-color: light-dark(#6D28D9, #7C3AED); }
 .btn-success:disabled,
@@ -198,7 +135,7 @@
     cursor: not-allowed;
 }
 
-/* ── Banners (alert/info boxes; add border rounded-lg p-3 at the call-site) ── */
+/* Add border rounded-lg p-3 at the call site — these classes don't include them. */
 .banner-info {
     background: light-dark(#eff6ff, rgb(30 58 138 / 0.2));
     border-color: light-dark(#bfdbfe, #1e3a8a);
@@ -220,36 +157,24 @@
     color: light-dark(#86198f, #f5d0fe);
 }
 
-/* ── Toasts ── */
 .toast-success { background: light-dark(#eff6ff, rgb(30 58 138 / 0.9)); border-color: light-dark(#bfdbfe, #1d4ed8); color: light-dark(#1e40af, #dbeafe); }
 .toast-warn    { background: light-dark(#faf5ff, rgb(88 28 135 / 0.9)); border-color: light-dark(#e9d5ff, #7e22ce); color: light-dark(#6b21a8, #f3e8ff); }
 
-/* ── Status bars ── */
-.status-offline { background: light-dark(#6b21a8, rgb(88 28 135 / 0.9)); color: light-dark(#fff, #f3e8ff); }  /* amethyst = offline/attention */
-.status-update  { background: light-dark(#1e40af, rgb(30 58 138 / 0.9)); color: light-dark(#fff, #dbeafe); }  /* blue = info */
+.status-offline { background: light-dark(#6b21a8, rgb(88 28 135 / 0.9)); color: light-dark(#fff, #f3e8ff); }
+.status-update  { background: light-dark(#1e40af, rgb(30 58 138 / 0.9)); color: light-dark(#fff, #dbeafe); }
 
-/*
- * Full-height centring INSIDE the app shell. `min-h-screen` is 100vh — on iOS
- * the large viewport, insets included — while the shell's content box is
- * dvh minus the safe-area top and the bottom nav, so a vh-sized child overflows
- * it and centres its content off-screen-low. Anything that wants "fill what the
- * shell actually gives me" uses this.
- */
+/* min-h-screen is iOS's LARGE viewport (100vh, insets included); the shell's
+   dvh-based content box is smaller, so a vh-sized child overflows it and
+   centres its content off-screen-low. */
 .min-h-shell { min-height: calc(100dvh - var(--spacing-safe-t) - var(--spacing-navbar)); }
 @media (min-width: 40rem) { /* sm: the rail replaces the bottom nav */
     .min-h-shell { min-height: calc(100dvh - var(--spacing-safe-t) - var(--spacing-safe-b)); }
 }
 
-/* ── Severity dots (SanctionIndicator) — ordinal amethyst → fuchsia → crimson ── */
 .dot-pending   { background-color: light-dark(#9333ea, #c084fc); }
 .dot-highlight { background-color: light-dark(#a21caf, #e879f9); }
 .dot-danger    { background-color: var(--color-accent); }
 
-/* Light theme is handled per-class above via light-dark() — no override block. */
-
-/* ── Help/Documentation ── */
-
-/* Callout boxes for rulebook inserts */
 .callout {
     border-left: 4px solid var(--color-accent);
     background: color-mix(in srgb, var(--color-accent) 8%, transparent);
@@ -269,7 +194,6 @@
     margin-top: 0;
 }
 
-/* Mathematical formulas */
 .formula {
     text-align: center;
     font-family: 'Georgia', 'Times New Roman', serif;
@@ -281,7 +205,6 @@
     color: var(--color-ink-strong);
 }
 
-/* Document prose — uses palette variables so it works in both themes */
 .doc-prose {
     --tw-prose-body: var(--color-ink);
     --tw-prose-headings: var(--color-ink-strong);
@@ -308,7 +231,6 @@
     text-decoration: underline;
 }
 
-/* Heading anchor links — hover-reveal on desktop, always visible on touch */
 .heading-anchor { position: relative; }
 .heading-anchor .anchor-link, .callout-title .anchor-link { opacity: 0; transition: opacity 0.15s; margin-left: 0.25rem; font-size: 0.8em; text-decoration: none; color: var(--color-ink-faint); }
 @media (hover: hover) {
@@ -319,18 +241,12 @@
     .heading-anchor .anchor-link, .callout-title .anchor-link { opacity: 0.4; }
 }
 
-/* Document images: constrained, not full-width; max-height prevents tall images from dominating */
 .doc-img { max-width: min(100%, 32rem); max-height: 26rem; height: auto; filter: drop-shadow(0 0 1px white) drop-shadow(0 0 1px white); }
-/* Wide/large images (panoramic or full-page diagrams): allow more room */
 .doc-img-wide { max-width: 100%; max-height: 48rem; }
-/* Square-ish photos (game pieces, tokens): moderate size */
 .doc-img-medium { max-width: 16rem; max-height: 16rem; }
-/* Small icons (game symbols): keep tiny */
 .doc-img-icon { max-width: 4rem; max-height: 4rem; }
-/* Images inside callouts are always small icons */
 .callout img { max-width: 4rem; max-height: 4rem; height: auto; }
 
-/* VTES reference icon grid */
 .vtes-icon-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
@@ -348,13 +264,13 @@
     white-space: nowrap;
 }
 .inline-icon { height: 1.25em; vertical-align: middle; }
-.vtes-d { /* discipline/symbol icon (Ankha VTES font) */
+.vtes-d {
     font-family: "Ankha VTES";
     font-size: 1.25em;
     vertical-align: middle;
     line-height: 1;
 }
-.vtes-c { /* clan/creed icon (VTES Clans font) */
+.vtes-c {
     font-family: "VTES Clans";
     font-size: 1.25em;
     vertical-align: middle;

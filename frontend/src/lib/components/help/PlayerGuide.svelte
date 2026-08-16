@@ -562,11 +562,8 @@
 
 {@html renderGuideSection(m.pg_standings())}
 
-<!-- pg_standings ends by introducing Offline Mode and pointing at this banner
-     ("you'll see a banner at the top of the tournament page:"), so nothing may
-     be rendered between the two. This is the LOCKED-BY-ANOTHER-DEVICE banner —
-     the loud "OFFLINE MODE" one is gated on this device holding the offline
-     lock, so only the organizer's device ever shows it. -->
+<!-- pg_standings ends by pointing at "a banner at the top of the tournament page" — this must stay
+     immediately after it. This is the LOCKED-BY-ANOTHER-DEVICE banner; the loud OFFLINE MODE one only shows on the organizer's own device. -->
 <ExampleBox>
   <div class="bg-surface-muted/50 border border-line-strong rounded-lg p-4 max-w-sm">
     <div class="flex items-center gap-2">

@@ -30,7 +30,6 @@ def _rating_vp_gw(t: Tournament, user_uid: str, sanctions: list | None = None):
 
 
 def _make_tournament(**overrides) -> Tournament:
-    """Minimal Tournament with sensible defaults."""
     defaults = {
         "uid": "t-001",
         "modified": "2026-01-01T00:00:00",
@@ -50,11 +49,6 @@ def _make_tournament(**overrides) -> Tournament:
 
 def _seat(uid: str, vp: float = 0.0, gw: int = 0) -> dict:
     return {"player_uid": uid, "result": {"vp": vp, "gw": gw, "tp": 0}}
-
-
-# ---------------------------------------------------------------------------
-# compute_rating_vp_gw (single-source Rust rating stat)
-# ---------------------------------------------------------------------------
 
 
 class TestRatingVpGw:
@@ -188,11 +182,6 @@ class TestRatingVpGw:
         assert gw == 1
 
 
-# ---------------------------------------------------------------------------
-# Disqualified player earns no RTP (the backend guard, not just engine zeroing)
-# ---------------------------------------------------------------------------
-
-
 def _sanction(user_uid: str, **overrides) -> Sanction:
     d = {
         "uid": "s-001",
@@ -209,10 +198,9 @@ def _sanction(user_uid: str, **overrides) -> Sanction:
 
 
 def test_ranking_eligibility_gate():
-    """Rules 3.1/3.1.6: only >=8 players AND a played final counts toward the
-    international ranking; house formats never do. This PyO3 predicate is what
-    ratings.py inclusion-filters on (and the frontend badge displays) — a
-    regression here silently re-credits sub-threshold events."""
+    """Rules 3.1/3.1.6: >=8 players AND a played final for international ranking;
+    house formats never qualify. This PyO3 predicate gates ratings.py inclusion
+    and the frontend badge."""
 
     def verdict(t: Tournament) -> str:
         return _engine.ranking_eligibility(msgspec.json.encode(t).decode())
@@ -284,11 +272,9 @@ def test_ranking_eligibility_gate():
 
 
 def test_dq_player_earns_no_rating_entry_co_player_unaffected_count_inclusive():
-    """A DQ'd player who played earns NO rating points — not even the 5-point
-    participation base (spec #284). The engine zeroes their VP/GW to (0,0), so an
-    entry would still score base=5; the backend guard that prevents any entry is
-    `_is_disqualified`. This pins that guard (both DQ signals), proves the co-player
-    is untouched, and that `_player_count` stays inclusive of the DQ'd head."""
+    """DQ'd players earn NO rating points, not even the 5-pt participation base
+    (spec #284) — the engine zeroes VP/GW, but `_is_disqualified` must block the
+    entry entirely."""
     t = _make_tournament(
         players=[
             {"user_uid": "dq_state", "state": "Disqualified"},
@@ -314,14 +300,10 @@ def test_dq_player_earns_no_rating_entry_co_player_unaffected_count_inclusive():
     assert _is_disqualified(t, sanctions, "dq_sanction")
     assert not _is_disqualified(t, sanctions, "clean")
 
-    # Were a DQ'd player NOT skipped, their entry would still bank the 5-pt base
-    # (VP/GW zeroed by the engine, not the points) — which is exactly the RTP the
-    # spec forbids, and why the guard must skip the entry entirely.
     dq_entry = _compute_entry_sync(t, "dq_state", sanctions)
     assert (dq_entry.vp, dq_entry.gw) == (0.0, 0)
     assert dq_entry.points == 5
 
-    # The co-player's entry is unaffected.
     clean_entry = _compute_entry_sync(t, "clean", sanctions)
     assert clean_entry.vp == 2.0 and clean_entry.gw == 1
 
@@ -330,13 +312,9 @@ def test_dq_player_earns_no_rating_entry_co_player_unaffected_count_inclusive():
 
 
 def test_final_positions_excludes_dq_and_proxy_rows():
-    """DQ'd/proxy players must be absent from the placement map.
-
-    The engine appends them after the whole field with ranks past every real
-    competitor. Callers skip them off a different signal (player state / active
-    sanction) than the stored standings flags read here, so a flag that outlived its
-    sanction would otherwise show a rating row placed behind the entire field.
-    Absent -> position 0 -> no placement rendered.
+    """DQ'd/proxy players must be absent from the placement map (absent →
+    position 0 → no placement rendered). Standings flags here can outlive the
+    sanction, so a stale flag could otherwise place them behind the whole field.
     """
     t = _make_tournament(
         winner="w",
@@ -355,11 +333,6 @@ def test_final_positions_excludes_dq_and_proxy_rows():
         ],
     )
     assert _final_positions(t) == {"w": 1, "f": 2, "p": 3}
-
-
-# ---------------------------------------------------------------------------
-# _finalist_position
-# ---------------------------------------------------------------------------
 
 
 class TestFinalistPosition:
@@ -414,11 +387,6 @@ class TestFinalistPosition:
             ],
         )
         assert _finalist_position(t, "p3") == 0
-
-
-# ---------------------------------------------------------------------------
-# Hall of Fame win counting (get_tournament_wins_for_users)
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio

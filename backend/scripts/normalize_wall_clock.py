@@ -1,10 +1,9 @@
 """Rewrite tz-aware tournament start/finish as the naive wall clock they should be.
 
-`Tournament.start`/`finish` are stored NAIVE and paired with `Tournament.timezone`
-(wiki/architecture.md, "API conventions"): readers anchor the wall clock in that
-zone (`routes/calendar._as_utc`, frontend `utils.zonedDate`), so a stored instant
-gets shifted by the venue's offset a second time — a 09:00 Madrid event reads back
-as 07:00.
+`Tournament.start`/`finish` are stored NAIVE and paired with `Tournament.timezone`:
+readers anchor the wall clock in that zone (`routes/calendar._as_utc`, frontend
+`utils.zonedDate`), so a stored instant gets shifted by the venue's offset a
+second time — a 09:00 Madrid event reads back as 07:00.
 
 Three writers used to store instants: the VEKN import (venue wall clock → UTC), the
 Finished hook (`finish = now(UTC)`), and the legacy merge (UTC forced onto old

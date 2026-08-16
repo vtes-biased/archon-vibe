@@ -1,10 +1,6 @@
 """Shared GitHub App authentication: App JWT -> short-lived installation token.
-
-Two GitHub Apps use this: the TWDA importer (twda.py, installed on the community
-TWD archive) and the in-app feedback endpoint (routes/feedback.py, installed on
-this repo). Each passes its own App ID / private key / installation id, so the
-fragile JWT-signing + token-exchange dance lives here once.
-"""
+Two Apps use this (twda.py, routes/feedback.py), each passing its own
+App ID/private key/installation id."""
 
 import logging
 import os

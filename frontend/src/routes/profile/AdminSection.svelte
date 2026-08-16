@@ -44,9 +44,8 @@
     if (expanded && status === null && !statusLoading) loadStatus();
   }
 
-  // Short-month localized form (e.g. "Jun 10, 2026, 9:04 AM") — avoids the
-  // ambiguous all-numeric "6/11/2026". Matches SanctionBadge/SanctionsManager,
-  // with time added since sync timestamps need hour/minute.
+  // Short-month form avoids the ambiguous all-numeric date; matches
+  // SanctionBadge/SanctionsManager's format, plus time for sync timestamps.
   const fmt = (iso?: string) =>
     iso
       ? new Date(iso).toLocaleString(undefined, {
@@ -101,7 +100,6 @@
   </button>
   {#if expanded}
     <div class="mt-4 space-y-3">
-      <!-- Sync-job health -->
       <div class="bg-surface-muted rounded-lg border border-line-strong p-4">
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0">

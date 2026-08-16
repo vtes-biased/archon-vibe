@@ -1,17 +1,9 @@
-/**
- * Passkey (WebAuthn) authentication functions.
- *
- * Extracted from auth store — handles passkey registration, login,
- * and conditional UI (autofill) via the WebAuthn API.
- */
-
 import * as m from '$lib/paraglide/messages.js';
 import { toUserMessage } from '$lib/errors';
 import { getAccessToken, getAuthState, setAuthState, storeTokens, fetchCurrentUser } from './auth.svelte';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
-// Helper functions for base64url encoding/decoding
 function base64urlToBuffer(base64url: string): ArrayBuffer {
   const padding = "=".repeat((4 - (base64url.length % 4)) % 4);
   const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/") + padding;
@@ -32,9 +24,6 @@ function bufferToBase64url(buffer: ArrayBuffer): string {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
-/**
- * Check if WebAuthn/Passkeys are supported in this browser.
- */
 export function isPasskeySupported(): boolean {
   return (
     typeof window !== "undefined" &&
@@ -43,10 +32,6 @@ export function isPasskeySupported(): boolean {
   );
 }
 
-/**
- * Register a passkey for the current authenticated user.
- * User must already be logged in.
- */
 export async function registerPasskey(): Promise<boolean> {
   const authState = getAuthState();
   if (!authState.isAuthenticated) {
@@ -66,7 +51,6 @@ export async function registerPasskey(): Promise<boolean> {
   }
 
   try {
-    // Get registration options from server
     const optionsResponse = await fetch(`${API_BASE}/auth/passkey/register/options`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
@@ -80,7 +64,6 @@ export async function registerPasskey(): Promise<boolean> {
 
     const options = await optionsResponse.json();
 
-    // Convert base64url to ArrayBuffer for WebAuthn API
     options.challenge = base64urlToBuffer(options.challenge);
     options.user.id = base64urlToBuffer(options.user.id);
     if (options.excludeCredentials) {
@@ -92,7 +75,6 @@ export async function registerPasskey(): Promise<boolean> {
       );
     }
 
-    // Create credential
     const credential = (await navigator.credentials.create({
       publicKey: options,
     })) as PublicKeyCredential | null;
@@ -102,7 +84,6 @@ export async function registerPasskey(): Promise<boolean> {
       return false;
     }
 
-    // Send credential to server for verification
     const attestationResponse = credential.response as AuthenticatorAttestationResponse;
     const credentialData = {
       id: credential.id,
@@ -138,9 +119,6 @@ export async function registerPasskey(): Promise<boolean> {
   }
 }
 
-/**
- * Create a new account with a passkey.
- */
 export async function createAccountWithPasskey(): Promise<boolean> {
   if (!isPasskeySupported()) {
     setAuthState({ error: m.passkey_error_not_supported() });
@@ -150,7 +128,6 @@ export async function createAccountWithPasskey(): Promise<boolean> {
   setAuthState({ isLoading: true, error: null });
 
   try {
-    // Get registration options from server
     const optionsResponse = await fetch(`${API_BASE}/auth/passkey/create/options`, {
       method: "POST",
     });
@@ -163,11 +140,9 @@ export async function createAccountWithPasskey(): Promise<boolean> {
 
     const options = await optionsResponse.json();
 
-    // Convert base64url to ArrayBuffer for WebAuthn API
     options.challenge = base64urlToBuffer(options.challenge);
     options.user.id = base64urlToBuffer(options.user.id);
 
-    // Create credential
     const credential = (await navigator.credentials.create({
       publicKey: options,
     })) as PublicKeyCredential | null;
@@ -177,7 +152,6 @@ export async function createAccountWithPasskey(): Promise<boolean> {
       return false;
     }
 
-    // Send credential to server for verification
     const attestationResponse = credential.response as AuthenticatorAttestationResponse;
     const credentialData = {
       id: credential.id,
@@ -204,7 +178,6 @@ export async function createAccountWithPasskey(): Promise<boolean> {
     const tokens = await verifyResponse.json();
     storeTokens(tokens);
 
-    // Fetch user data
     const result = await fetchCurrentUser();
     if (result) {
       setAuthState({ user: result.user, authMethods: result.auth_methods, isAuthenticated: true, isLoading: false, error: null });
@@ -222,9 +195,6 @@ export async function createAccountWithPasskey(): Promise<boolean> {
   }
 }
 
-/**
- * Check if conditional UI (passkey autofill) is supported.
- */
 export async function isConditionalUISupported(): Promise<boolean> {
   if (!isPasskeySupported()) return false;
   try {
@@ -237,11 +207,6 @@ export async function isConditionalUISupported(): Promise<boolean> {
 // Track if conditional UI is active to prevent duplicate calls
 let conditionalUIAbortController: AbortController | null = null;
 
-/**
- * Start conditional UI (passkey autofill). Call this on page load.
- * When user selects a passkey from autofill, it authenticates automatically.
- * Returns a cleanup function to abort the conditional UI.
- */
 export async function startConditionalUI(
   onSuccess: () => void
 ): Promise<(() => void) | null> {
@@ -249,12 +214,10 @@ export async function startConditionalUI(
     return null;
   }
 
-  // Abort any existing conditional UI
   conditionalUIAbortController?.abort();
   conditionalUIAbortController = new AbortController();
 
   try {
-    // Get authentication options from server
     const optionsResponse = await fetch(`${API_BASE}/auth/passkey/login/options`, {
       method: "POST",
     });
@@ -265,7 +228,6 @@ export async function startConditionalUI(
 
     const options = await optionsResponse.json();
 
-    // Convert base64url to ArrayBuffer for WebAuthn API
     options.challenge = base64urlToBuffer(options.challenge);
     if (options.allowCredentials) {
       options.allowCredentials = options.allowCredentials.map(
@@ -276,7 +238,6 @@ export async function startConditionalUI(
       );
     }
 
-    // Start conditional UI - this waits for user to select from autofill
     const credential = (await navigator.credentials.get({
       publicKey: options,
       mediation: "conditional",
@@ -287,7 +248,6 @@ export async function startConditionalUI(
       return null;
     }
 
-    // User selected a passkey - authenticate
     setAuthState({ isLoading: true, error: null });
 
     const assertionResponse = credential.response as AuthenticatorAssertionResponse;
@@ -335,17 +295,11 @@ export async function startConditionalUI(
   }
 }
 
-/**
- * Stop conditional UI if it's running.
- */
 export function stopConditionalUI(): void {
   conditionalUIAbortController?.abort();
   conditionalUIAbortController = null;
 }
 
-/**
- * Login with a passkey (explicit login, shows browser dialog).
- */
 export async function loginWithPasskey(): Promise<boolean> {
   if (!isPasskeySupported()) {
     setAuthState({ error: m.passkey_error_not_supported() });
@@ -355,7 +309,6 @@ export async function loginWithPasskey(): Promise<boolean> {
   setAuthState({ isLoading: true, error: null });
 
   try {
-    // Get authentication options from server
     const optionsResponse = await fetch(`${API_BASE}/auth/passkey/login/options`, {
       method: "POST",
     });
@@ -368,7 +321,6 @@ export async function loginWithPasskey(): Promise<boolean> {
 
     const options = await optionsResponse.json();
 
-    // Convert base64url to ArrayBuffer for WebAuthn API
     options.challenge = base64urlToBuffer(options.challenge);
     if (options.allowCredentials) {
       options.allowCredentials = options.allowCredentials.map(
@@ -379,7 +331,6 @@ export async function loginWithPasskey(): Promise<boolean> {
       );
     }
 
-    // Get credential
     const credential = (await navigator.credentials.get({
       publicKey: options,
     })) as PublicKeyCredential | null;
@@ -389,7 +340,6 @@ export async function loginWithPasskey(): Promise<boolean> {
       return false;
     }
 
-    // Send credential to server for verification
     const assertionResponse = credential.response as AuthenticatorAssertionResponse;
     const credentialData = {
       id: credential.id,
@@ -420,7 +370,6 @@ export async function loginWithPasskey(): Promise<boolean> {
     const tokens = await verifyResponse.json();
     storeTokens(tokens);
 
-    // Fetch user data
     const result = await fetchCurrentUser();
     if (result) {
       setAuthState({ user: result.user, authMethods: result.auth_methods, isAuthenticated: true, isLoading: false, error: null });

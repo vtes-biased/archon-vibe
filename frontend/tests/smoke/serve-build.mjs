@@ -1,7 +1,6 @@
-// Mirrors prod nginx (ansible static_site https.conf.j2) except a missing /_app/* asset returns
-// 404 instead of the `try_files .. /200.html` SPA fallback: nginx masks a missing
-// chunk as 200.html (HTML, 200), which is how asset-path regressions ship green.
-// The 404 is what lets the smoke catch them.
+// Mirrors prod nginx, except a missing /_app/* asset 404s instead of falling
+// back to 200.html — nginx masks that as a 200 HTML page, which is how
+// asset-path regressions ship green; the 404 here is what catches them.
 import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { join, extname, normalize } from 'node:path';

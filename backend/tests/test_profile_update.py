@@ -12,7 +12,6 @@ from tests.conftest import make_auth_header
 
 
 async def _insert_user(roles: list[Role], **kwargs) -> User:
-    """Insert a user with given roles and return it."""
     uid = str(uuid7())
     user = User(
         uid=uid,
@@ -98,10 +97,8 @@ async def test_community_links_bad_url_rejected(test_client: AsyncClient, test_d
 async def test_self_edited_contact_fields_flagged_local(
     test_client: AsyncClient, test_db
 ):
-    """A self-edit of contact fields and nickname records them in
-    local_modifications, so neither the VEKN sync (officials' email injection)
-    nor the legacy-archon merge silently reverts the user's own value. Without
-    this flag a daily sync would overwrite self-edited contact data."""
+    """Self-edited contact fields and nickname must land in local_modifications
+    so neither sync (VEKN or legacy-archon) silently reverts them."""
     user = await _insert_user(roles=[], vekn_id="1000004")
     response = await test_client.patch(
         "/auth/me",

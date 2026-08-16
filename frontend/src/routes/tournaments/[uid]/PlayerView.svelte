@@ -74,7 +74,6 @@
   let judgeCallCooldown = $state(false);
   let userSuspended = $state(false);
 
-  // Check if current user is suspended
   $effect(() => {
     if (userUid) {
       isUserCurrentlySanctioned(userUid).then(v => { userSuspended = v; });
@@ -97,9 +96,9 @@
       ? m.tournament_status_finished()
       : m.tournament_status_dropped();
   });
-  // Open rounds: this player has reached their per-player round cap. Gate self-check-in on the
-  // rounds-played count (not the player state), so a capped player can't self-check-in regardless
-  // of whether they rest in Completed, Finished, or Registered.
+  // Open rounds: gate self-check-in on rounds-played (not player state), so a
+  // capped player can't self-check-in regardless of whether they rest in
+  // Completed, Finished, or Registered.
   const atCap = $derived(
     (tournament.max_rounds ?? 0) > 0 && roundsPlayed(tournament, userUid) >= (tournament.max_rounds ?? 0),
   );
@@ -110,10 +109,9 @@
     (tournament.players?.length ?? 0) >= (tournament.max_players ?? 0),
   );
 
-  // Self-organized rounds (open-rounds): a registered participant can seat their own
-  // 4-5 pod without an organizer — no online or per-player-cap requirement. Mirrors the
-  // engine's eligibility gate (error.rs); the engine re-validates server-side, the UI
-  // just avoids showing an impossible action.
+  // A registered participant can seat their own 4-5 pod without an organizer.
+  // Mirrors the engine's eligibility gate (error.rs); the engine re-validates
+  // server-side, the UI just avoids showing an impossible action.
   let showSelfOrganize = $state(false);
   function isSelfOrganizeEligible(p: Player): boolean {
     const uid = p.user_uid;
@@ -145,9 +143,9 @@
     if (!selfOrganizeError) showSelfOrganize = false;
   }
 
-  // Deck check-in CTA: distinguish "no deck" from "deck present but invalid",
-  // and surface the blocking validation errors inline so the player can act
-  // at the door instead of hunting for the deck section.
+  // Distinguish "no deck" from "deck present but invalid", and surface blocking
+  // validation errors inline so the player can act at the door instead of
+  // hunting for the deck section.
   const hasDeck = $derived(!!decksByUser?.[userUid]?.[0]);
   const deckErrorMessages = $derived((myDeckErrors ?? []).filter(e => e.severity === 'error').map(e => e.message));
   // A registered (or reinstatable Finished) player who still needs to check in during
@@ -158,22 +156,18 @@
     tournament.state === "Waiting" &&
     !atCap
   );
-  // Missing/invalid decklist is a warning beside the check-in CTA, NOT a gate: the
+  // Missing/invalid decklist is a warning beside check-in, NOT a gate: the
   // engine allows deck-less check-in (mod.rs CheckIn just stamps missing_decklist).
-  // Only surfaced when a decklist is required (playerHasValidDeck is always true otherwise).
   const showDeckWarn = $derived(notCheckedIn && tournament.decklist_required && !playerHasValidDeck);
-  // Active rounds where the player is seated (for parallel round support)
   const myActiveRounds = $derived.by(() => {
     if (!tournament.rounds || tournament.state !== "Playing" || isFinals) return [];
     const lastRoundIdx = tournament.rounds.length - 1;
     return tournament.rounds
       .map((round, r) => ({ round, r }))
-      // Players may keep revising their table until the round is actually closed —
-      // i.e. until the organizer advances (a later round exists) or finals/finish.
-      // The current (last) round stays editable even once every table reads
-      // Finished; earlier rounds stay editable only while a table is unfinished
-      // (parallel-round safety). The engine permits this: a player-scored table
-      // carries no judge_uid, so SetScore is allowed while the tournament Plays.
+      // Editable until the round closes (a later round exists, or finals/finish)
+      // — not until every table reads Finished. The engine permits this: a
+      // player-scored table carries no judge_uid, so SetScore is allowed while
+      // Playing.
       .filter(({ round, r }) => r === lastRoundIdx || round.some(t => t.state !== "Finished"))
       .map(({ round, r }) => {
         const tIdx = round.findIndex(t => t.seating.some(s => s.player_uid === userUid));
@@ -186,9 +180,9 @@
     tournament.rounds?.filter(r => r.some(t => t.state !== "Finished")).length ?? 0
   ) > 1);
 
-  // History is whatever isn't live. Deferring to myActiveRounds is what keeps the
-  // current round out of it: that list owns the last round even once every table
-  // reads Finished, and testing table state here instead showed it in both.
+  // History is whatever isn't live: deferring to myActiveRounds keeps the
+  // current round out, since that list owns the last round even once every
+  // table reads Finished.
   const previousRounds = $derived.by(() => {
     if (!tournament.rounds?.length) return [];
     const active = new Set(myActiveRounds.map(a => a.roundIdx));
@@ -237,10 +231,9 @@
   const showRating = $derived(isFinished && getAuthState().isAuthenticated);
 </script>
 
-<!-- Missing/invalid decklist no longer hides the check-in button (engine treats it
-     as non-blocking). Surface it as a warning BESIDE the check-in CTA — penalty
-     framing + specific errors. No jump-to-deck button: the deck upload section is
-     right below, and the button read as a spurious 'upload' action (it only scrolled). -->
+<!-- Warning beside the check-in CTA, not a gate (engine treats missing/invalid
+     decklist as non-blocking). No jump-to-deck button: the section is right
+     below, and a button here would read as a spurious "upload" action. -->
 {#snippet deckWarn()}
   <div class="banner-warn border rounded-lg p-3">
     <div class="flex items-start gap-2 text-sm">
@@ -257,10 +250,9 @@
   </div>
 {/snippet}
 
-<!-- Online events have no on-site QR to scan: check-in happens in the server
-     (self-serve via the Discord bot, or organizer-driven). Point the player at
-     the join link instead of a dead camera scanner. Button has no href, so this
-     mirrors its primary/lg/block styling on an <a>. -->
+<!-- Online has no on-site QR: check-in happens server-side (Discord bot
+     self-serve or organizer). Point at the join link instead; mirrors Button's
+     primary/lg/block styling since this is an <a>, not a button. -->
 {#snippet onlineJoin()}
   {#if tournament.venue_url}
     <a href={tournament.venue_url} target="_blank" rel="noopener"
@@ -271,7 +263,6 @@
   {/if}
 {/snippet}
 
-<!-- Player interaction section -->
 <div class="bg-surface-card rounded-lg shadow border border-line mb-6 p-6 space-y-4">
   {#if tournament.state === "Registration" && !currentPlayerEntry}
     {#if userSuspended}
@@ -386,9 +377,8 @@
           {m.checkin_qr_scan_btn()}
         </Button>
       {:else if currentPlayerEntry.state === "Finished" && (tournament.state === "Waiting" || tournament.state === "Playing")}
-        <!-- Dropping out is undone here rather than guarded by a confirm. No QR:
-             a drop-out never left the venue, and the engine takes a self check-in
-             (at cap it reinstates to Completed, mid-round back to their seat). -->
+        <!-- Reversible, not confirmed: a drop-out never left the venue, so a self
+             check-in (at cap: to Completed, mid-round: back to their seat) is enough. -->
         <Button
           variant="ghost"
           onclick={() => doAction("CheckIn", { player_uid: userUid })}
@@ -420,7 +410,6 @@
     {#if showDeckWarn}
       <div class="mb-3">{@render deckWarn()}</div>
     {/if}
-    <!-- Self-organize a round (open-rounds, online): seat your own 4-5 pod without an organizer -->
     {#if canSelfOrganize}
       <div class="border-t border-line pt-4 space-y-2">
         <div class="flex items-start gap-2">
@@ -540,7 +529,6 @@
                 {m.override_overridden({ comment: myTable.override.comment })}
               </p>
             {/if}
-            <!-- Timer for player's table (hidden in offline tournaments and parallel rounds) -->
             {#if !hasParallelRounds && !tournament.offline_mode && (tournament.round_time ?? 0) > 0}
               <div class="mb-2">
                 <TimerDisplay {tournament} tableIndex={myTableIdx} />
@@ -584,7 +572,6 @@
                 </div>
               {/each}
             </div>
-            <!-- Call Judge: prominent emergency action for the player at this table -->
             {#if !tournament.offline_mode && isOnline()}
               <Button
                 variant="primary"
@@ -609,7 +596,6 @@
         <span class="text-ink font-medium">{formatScore(cutoffScore.gw, cutoffScore.vp, cutoffScore.tp)}</span>
       </p>
     {/if}
-    <!-- Standings for players -->
     {#if tournament.state !== "Finished" && playerStandings.length > 0}
       <div class="border-t border-line pt-4">
         <h3 class="text-sm font-medium text-ink-strong mb-2">
@@ -646,7 +632,6 @@
         </table>
       </div>
     {/if}
-    <!-- Previous rounds history -->
     {#if previousRounds.length > 0}
       <div>
         <button
@@ -692,12 +677,10 @@
     <p class="text-ink-muted text-sm">{m.tournament_registration_not_open()}</p>
   {/if}
 
-  <!-- QR Check-in scanner -->
   {#if showQrScanner}
     <QrCheckinScanner tournamentUid={tournament.uid} onclose={() => showQrScanner = false} />
   {/if}
 
-  <!-- Self-organize round picker -->
   {#if showSelfOrganize}
     <SelfOrganizeDialog
       selfName={seatDisplay(userUid)}
@@ -709,7 +692,6 @@
     />
   {/if}
 
-  <!-- Registered players list (player view, Planned/Registration) -->
   {#if (tournament.state === "Planned" || tournament.state === "Registration") && (tournament.players?.length ?? 0) > 0}
     {@const registered = tournament.players!.filter(p => p.state === "Registered")}
     {#if registered.length > 0}
@@ -735,7 +717,6 @@
     {/if}
   {/if}
 
-  <!-- Player deck section -->
   {#if currentPlayerEntry || (tournament.state === 'Finished' && tournament.decklists_mode)}
     <div id="player-deck-section" class="mt-4 scroll-mt-4">
       <PlayerDecksSection
@@ -747,7 +728,6 @@
   {/if}
 </div>
 
-<!-- Raffle results (visible to all players) -->
 {#if (tournament.state === "Waiting" || tournament.state === "Playing" || tournament.state === "Finished") && (tournament.raffles?.length ?? 0) > 0}
   <div class="bg-surface-card rounded-lg shadow border border-line mb-6 p-6">
     <h3 class="text-sm font-medium text-ink mb-3">{m.raffle_title()}</h3>

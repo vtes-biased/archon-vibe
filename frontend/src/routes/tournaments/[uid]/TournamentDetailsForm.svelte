@@ -1,7 +1,4 @@
 <script lang="ts">
-  // The tournament settings form. Organizers, table rooms and promo
-  // distribution used to be foldable siblings here; they are now their own rows
-  // in the Tools sheet, reachable in one tap instead of three.
   import { toUserMessage } from '$lib/errors';
   import type { Tournament } from "$lib/types";
   import { tournamentAction } from "$lib/tournament-actions";
@@ -20,9 +17,8 @@
   }: {
     tournament: Tournament;
     isOrganizer: boolean;
-    // Set when the form renders inside a scrolling sheet panel rather than the
-    // page: the sheet already covers the bottom nav, so the save chip must not
-    // reserve clearance for it (see the chip below).
+    // Set when rendered inside a scrolling sheet: the sheet already covers the
+    // bottom nav, so the save chip must not reserve clearance for it.
     inSheet?: boolean;
   } = $props();
 
@@ -42,7 +38,6 @@
   let stashedPhysical = $state<{ country: string; venue: string; venue_url: string; address: string; map_url: string } | null>(null);
   let stashedOnline = $state<{ venue: string; venue_url: string } | null>(null);
 
-  // Derive field values from tournament for the shared component
   let fieldValues = $state<TournamentFieldValues>({
     name: tournament.name,
     format: tournament.format,
@@ -141,22 +136,19 @@
   const disabledFields = $derived.by(() => {
     const s = new Set<string>();
     if (started || pushedToVekn) { s.add("open_rounds"); s.add("max_rounds"); }
-    // VEKN identity freeze: calendar create is write-once — post-push edits
-    // to these silently diverge from vekn.net (engine rejects them too).
-    // `proxies` joins them because the sync reads it back from vekn.net, so a
-    // local change would revert on the next cycle rather than just diverge.
+    // VEKN identity freeze: post-push edits to these silently diverge from
+    // vekn.net (engine rejects them too); proxies joins them because the sync
+    // reads it back, so a local change would revert rather than diverge.
     if (pushedToVekn) { s.add("rank"); s.add("format"); s.add("start"); s.add("proxies"); }
     return s;
   });
 
-  // Debounced save for text inputs
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   function debouncedSave(field: string, value: any) {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => save(field, value), 500);
   }
 
-  // Text fields that need debouncing
   const debouncedFields = new Set(["name", "venue", "venue_url", "address", "map_url", "description"]);
 
   function handleFieldChange(field: string, value: any) {
@@ -175,13 +167,12 @@
       return;
     }
     if (field === "rank" && value) {
-      // Selecting a championship rank also clears proxies/multideck (see
-      // TournamentFields rank onchange) — persist together, or the rank-only
-      // save would hit the engine's rank-legality gate against the old flags.
+      // Selecting a rank also clears proxies/multideck (see TournamentFields
+      // rank onchange) — persist together, or the rank-only save hits the
+      // engine's rank-legality gate against stale flags.
       saveMultiple({ rank: value, proxies: false, multideck: false });
       return;
     }
-    // Normalize empty strings to null for nullable fields
     const saveValue = (field === "country" || field === "start" || field === "finish" || field === "league_uid")
       ? (value || null)
       : value;
@@ -194,7 +185,6 @@
 
   async function handleToggleOnline(checked: boolean) {
     if (checked) {
-      // Stash physical-location fields, restore any stashed online fields
       stashedPhysical = {
         country: tournament.country ?? "",
         venue: tournament.venue ?? "",
@@ -213,7 +203,6 @@
         venue_url: restored.venue_url,
       });
     } else {
-      // Stash online venue fields, restore any stashed physical fields
       stashedOnline = {
         venue: tournament.venue ?? "",
         venue_url: tournament.venue_url ?? "",
@@ -252,7 +241,6 @@
   {#if !isOrganizer}
     <p class="text-ink-muted">{m.config_no_permission()}</p>
   {:else}
-    <!-- Tournament settings -->
     <div class="space-y-4">
       <TournamentFields
         bind:values={fieldValues}
@@ -264,13 +252,10 @@
       />
     </div>
 
-    <!-- Sticky save chip: visible wherever the edited field is, not only at the
-         form bottom; confirms success (auto-save has no submit moment).
-         Sticky resolves against the scrollport, NOT the shell's padding box, so
-         on the page it has to clear the bottom nav itself or the z-40 nav paints
-         over the only save feedback there is. In a sheet the scrollport is the
-         panel, which already covers the nav — clearing it there would strand the
-         chip ~70px up, eating visible panel height. -->
+    <!-- Sticky resolves against the scrollport, not the shell's padding box: on
+         the page it must clear the bottom nav itself (z-40) or the nav paints
+         over it; in a sheet the scrollport already covers the nav, so clearing
+         there would strand the chip. -->
     {#if saving || savedFlash}
       <div class="sticky {inSheet ? 'bottom-4' : 'bottom-[calc(1rem+var(--spacing-navbar))] sm:bottom-[calc(1rem+var(--spacing-safe-b))]'} flex justify-end pointer-events-none">
         <div class="bg-surface-card border border-line rounded-full shadow px-3 py-1.5 text-xs text-ink-muted flex items-center gap-1.5">

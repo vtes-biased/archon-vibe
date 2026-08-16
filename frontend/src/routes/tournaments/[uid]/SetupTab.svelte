@@ -1,13 +1,4 @@
 <script lang="ts">
-  // The pre-event workspace. Organizers and table rooms use the same section
-  // shell as the settings form's own sections, so all eight read as peers —
-  // that shared shell is the whole point, since without it they drift back into
-  // separate tiers. Everything here is also listed in the Tools sheet, which
-  // stays the durable index; the tab is the current moment's promotion of it.
-  //
-  // An "add co-organizer" chip used to live in the masthead purely because this
-  // section was buried; with organizers on screen where the work happens, the
-  // chip had no job left.
   import type { Tournament } from "$lib/types";
   import { addTournamentOrganizer, removeTournamentOrganizer } from "$lib/api";
   import TournamentDetailsForm from "./TournamentDetailsForm.svelte";

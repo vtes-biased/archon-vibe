@@ -1,5 +1,3 @@
-"""Tournament API endpoints."""
-
 import asyncio
 import json
 import logging
@@ -76,15 +74,8 @@ router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 
-# Post-finish actions that CANNOT change ranking points, so they must not trigger
-# the (expensive: full window recompute + a broadcast per player) rating pass on
-# an already-finished tournament. Conservative denylist — everything else still
-# recomputes, because a stale rating is worse than a redundant pass. These are the
-# edits that realistically happen after a tournament finishes: the winner's TWDA
-# writeup, closing-ceremony raffles, payment reconciliation, late check-in fixes.
-# Wire types are the RAW request.type, unnormalized — so list every deck-upsert
-# alias the engine accepts (parsing.rs: UpsertDeck|UploadDeck|UpdateDeck); the
-# frontend actually sends UpsertDeck, so omitting it defeated the headline case.
+# Wire types are raw and unnormalized: list every deck-upsert alias the engine
+# accepts (UpsertDeck/UploadDeck/UpdateDeck) or omitting one skips the recompute.
 _RATING_IRRELEVANT_ACTIONS = frozenset(
     {
         "UpsertDeck",
@@ -93,8 +84,8 @@ _RATING_IRRELEVANT_ACTIONS = frozenset(
         "DeleteDeck",
         "SetPaymentStatus",
         "MarkAllPaid",
-        # Proxy toggle: rating is recomputed only from FINISHED tournaments, and the
-        # engine blocks the toggle once finished — so it never changes a live rating.
+        # Rating recompute only reads FINISHED tournaments, and the engine
+        # blocks this toggle once finished, so it never changes a live rating.
         "SetNonCompeting",
         "RaffleDraw",
         "RaffleUndo",
@@ -111,17 +102,14 @@ _engine = PyEngine()
 
 
 def _promo_recompute_diff(old: Tournament | None, new: Tournament | None) -> None:
-    """Re-derive promo stock aggregates for promos whose distribution rows may
-    have changed — union of both sides, so removed rows recompute too. Fires on
-    every path that can alter promos_distributed: the ReportPromos action, the
-    offline snapshot/go-online pushes, and tournament soft-delete."""
+    """Re-derive promo stock for promos whose distribution may have changed —
+    the union of old and new so a removed row recomputes too."""
     affected = {r.promo_uid for t in (old, new) if t for r in t.promos_distributed}
     if affected:
         schedule_recompute(list(affected))
 
 
 async def _build_decks_json(tournament_uid: str, conn=None) -> str:
-    """Build deck metadata JSON for the engine's decks parameter."""
     decks = await get_decks_for_tournament(tournament_uid, conn=conn)
     return msgspec.json.encode(
         [{"user_uid": d.user_uid, "round": d.round, "uid": d.uid} for d in decks]
@@ -134,7 +122,6 @@ async def _process_deck_ops(
     existing_decks: list[DeckObject] | None = None,
     org_uids: list[str] | None = None,
 ) -> list[BroadcastData]:
-    """Process deck_ops from engine result. Returns BroadcastData for each affected deck."""
     if not deck_ops:
         return []
     if existing_decks is None:
@@ -148,7 +135,6 @@ async def _process_deck_ops(
             deck_data = op["deck"]
             player_uid = op["player_uid"]
             round_val = deck_data.get("round")
-            # Find existing deck for this (tournament, player, round)
             existing = next(
                 (
                     d
@@ -208,7 +194,6 @@ async def _process_deck_ops(
 
 
 async def _maybe_push_vekn(tournament: Tournament) -> None:
-    """Push tournament results to VEKN if VEKN_PUSH is enabled."""
     try:
         from ..vekn_push import push_tournament_results, vekn_push_client
 
@@ -220,7 +205,6 @@ async def _maybe_push_vekn(tournament: Tournament) -> None:
 
 
 async def _maybe_push_seating(tournament: Tournament, event_type: str) -> None:
-    """Web Push each seated player their table/seat for a just-started round (#314)."""
     try:
         from .. import push_service
 
@@ -231,7 +215,6 @@ async def _maybe_push_seating(tournament: Tournament, event_type: str) -> None:
 
 
 async def _maybe_push_reseat(old: Tournament, new: Tournament) -> None:
-    """Web Push a fresh table/seat to players actually moved by a re-seat action."""
     try:
         from .. import push_service
 
@@ -244,10 +227,6 @@ async def _maybe_push_reseat(old: Tournament, new: Tournament) -> None:
 async def _maybe_push_announcement(
     tournament: Tournament, body: str, exclude_uid: str
 ) -> None:
-    """Web Push an organizer announcement to the players it can still concern:
-    once rounds exist, checked-in/playing participants (dropped players are
-    done with the event); before round 1, registered players too — check-in-
-    window announcements must reach the not-yet-checked-in."""
     try:
         from .. import push_service
 
@@ -272,8 +251,8 @@ async def _maybe_push_judge_call(
     player_name: str,
     exclude_uid: str,
 ) -> None:
-    """Web Push a judge call to the on-premises organizers (#323) — same audience as
-    the ephemeral judge_call SSE, for a judge who's away from the screen."""
+    """Same organizer audience as the ephemeral judge_call SSE — keep both in
+    sync if the target set ever changes."""
     try:
         from .. import push_service
 
@@ -291,7 +270,6 @@ async def _maybe_push_judge_call(
 
 
 async def _maybe_push_vekn_event(tournament: Tournament) -> None:
-    """Create VEKN calendar event if VEKN_PUSH is enabled."""
     try:
         from ..vekn_push import push_tournament_event, vekn_push_client
 
@@ -303,13 +281,12 @@ async def _maybe_push_vekn_event(tournament: Tournament) -> None:
 
 
 async def _winner_deck_twda(tournament: Tournament) -> str | None:
-    """TWDA-formatted winner decklist — self-contained (event header + deck in TWD
-    layout), ready to paste into the TWDA. None if the winner has no stored deck.
-    Shared by the auto-TWDA PR (maybe_submit_twda) and the text report download."""
+    """TWDA-formatted winner decklist (event header + deck), or None if the
+    winner has no stored deck. Shared by maybe_submit_twda and the text report
+    download."""
     if not tournament.winner:
         return None
 
-    # Find winner's deck from DeckObject store
     decks = await get_decks_for_tournament(tournament.uid)
     winner_deck = next((d for d in decks if d.user_uid == tournament.winner), None)
     if not winner_deck:
@@ -318,13 +295,6 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
     player_user = await get_user_by_uid(tournament.winner)
     player_name = player_user.name if player_user else "Unknown"
 
-    # Resolve the TWDA "Created by:" designer credit from the deck's attribution
-    # (the "designed by" reference), not the raw author text.
-    #   None              -> anonymous (null) or unset/self: omit the credit
-    #                        (never leak a stored author the designer hid)
-    #   "twda"            -> historical import; author already holds the name
-    #   player's own id   -> self: omit (redundant with the header player line)
-    #   other vekn / name -> credit that member; resolve a vekn -> display name
     attribution = winner_deck.attribution
     self_ids = {i for i in (getattr(player_user, "vekn_id", ""), player_name) if i}
     if attribution == "twda":
@@ -360,17 +330,15 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
     )
 
 
-# TWDA eligibility floor: the winner's deck is archived only for events with
-# enough players who ACTUALLY played (seated in >=1 round, not merely registered).
-# Smaller sanctioned events are valid but their winner's deck isn't TWDA-worthy.
+# TWDA-eligible only with >=10 players who actually played (seated, not
+# merely registered) — smaller sanctioned events don't qualify.
 TWDA_MIN_PLAYERS = 10
 
 
 def _played_player_count(tournament: Tournament) -> int:
-    """Distinct real competitors who actually played — seated in >=1 prelim round
-    or the finals, minus non-competing proxies (officials who stood in, excluded
-    from rank/RTP; matches generate_archondata's competitor definition). Registered
-    no-shows (never seated) don't count either."""
+    """TWDA-gate count: seated players only, no standings fallback (0 for a
+    rounds-less import), proxies subtracted. Deliberately distinct from other
+    player-count implementations elsewhere in the app."""
     proxies = {p.user_uid for p in tournament.players if p.non_competing}
     seated: set[str] = set()
     for rnd in tournament.rounds:
@@ -384,11 +352,8 @@ def _played_player_count(tournament: Tournament) -> int:
 async def _record_twda_status(
     uid: str, outcome: TwdaOutcome, reason: str = "", pr_url: str = ""
 ) -> None:
-    """Persist the last TWDA outcome onto the (already-committed) tournament.
-
-    Locked fetch-modify-save, same as vekn_push's bookkeeping write: only the
-    twda_status field lands on the CURRENT row so concurrent edits aren't
-    clobbered. Unchanged outcome → no write (no pointless SSE churn)."""
+    """Locked fetch-modify-save so only twda_status lands on the CURRENT row,
+    never clobbering concurrent edits; an unchanged outcome skips the write."""
     async with tournament_transaction(uid) as (fresh, tx_conn):
         if not fresh:
             return
@@ -408,15 +373,9 @@ async def _record_twda_status(
 
 
 async def maybe_submit_twda(tournament: Tournament) -> None:
-    """Submit winner's deck to TWDA if conditions are met, and record the
-    outcome — submitted (PR URL) / skipped (reason) / failed — on the
-    tournament for organizer transparency. Self-contains its errors.
-
-    Conditions: finished, constructed (not Limited), >=10 players who actually
-    played, ranking-eligible (the engine predicate behind the ranked badge —
-    NOT rank, which is the Basic/NC/CC championship axis), a winner with a
-    stored deck, and a VEKN event ID.
-    """
+    """Self-contains its errors, recording outcome/reason on the tournament
+    either way. `ranking_eligibility` (the ranked-badge predicate) is distinct
+    from `rank` (the Basic/NC/CC championship axis) — don't conflate them."""
     from ..twda import is_configured, submit_twda_pr
 
     if tournament.state != TournamentState.FINISHED:
@@ -464,7 +423,6 @@ async def maybe_submit_twda(tournament: Tournament) -> None:
 def _build_actor_context(
     user, tournament: Tournament, can_organize_league_uids: list[str] | None = None
 ) -> dict:
-    """Build actor context dict for the Rust engine."""
     return {
         "uid": user.uid,
         "roles": [r.value if hasattr(r, "value") else str(r) for r in user.roles],
@@ -476,9 +434,8 @@ def _build_actor_context(
 
 
 async def _get_user_organizable_league_uids(user, conn=None) -> list[str]:
-    """Get league UIDs the user can link tournaments to (feeds the engine's
-    UpdateConfig league gate): league editors, plus same-country Princes when
-    the league is open to them."""
+    """League uids the user may attach tournaments to, feeding the engine's
+    UpdateConfig league gate."""
     # Not a gate — it mirrors the engine's own contract: an empty list means
     # "unrestricted", which is what IC already is, so skip the full scan.
     if Role.IC in user.roles:
@@ -492,13 +449,8 @@ async def _get_user_organizable_league_uids(user, conn=None) -> list[str]:
 async def _check_player_barred(
     player_uid: str, tournament_uid: str, tournament: Tournament, conn=None
 ) -> None:
-    """Check if a player is barred from participating (cross-tournament sanctions).
-
-    Raises EngineRejection (-> 400 with engine error code) if:
-    - Player has an active suspension
-    - Player is DQ'd in a sibling league tournament (league-wide DQ)
-    """
-    # Check active suspensions
+    """Raises EngineRejection if the player is suspended, or DQ'd in a
+    sibling league tournament (league-wide DQ)."""
     user_sanctions = await get_sanctions_for_user(player_uid, conn=conn)
     now = datetime.now(UTC)
     for s in user_sanctions:
@@ -511,13 +463,11 @@ async def _check_player_barred(
                     code="tournament.player_suspended",
                 )
 
-    # Check league-wide DQ (only if tournament is in a league)
     if tournament.league_uid:
         for s in user_sanctions:
             if s.deleted_at or s.lifted_at:
                 continue
             if s.level == SanctionLevel.DISQUALIFICATION and s.tournament_uid:
-                # Check if the DQ sanction's tournament is in the same league
                 dq_tournament = await get_tournament_by_uid(s.tournament_uid, conn=conn)
                 if dq_tournament and dq_tournament.league_uid == tournament.league_uid:
                     raise EngineRejection(
@@ -533,15 +483,9 @@ class OrganizerAction(BaseModel):
 async def _invalidate_organizer_view(
     tournament: Tournament, user_uid: str, modified_at: str | None
 ) -> None:
-    """Targeted SSE invalidation for the user whose organizer status just changed.
-
-    Pushes the tournament + each of its decks to that one user at their NEWLY-entitled
-    projection — full on add (the organizer upgrade), member-or-tombstone on remove (a
-    private deck whose member projection is null is tombstoned, evicting the leaked full
-    copy from their IDB) — each frame carrying the recomputed access-version so the client
-    refreshes its fingerprint without a full resync. broadcast_precomputed already
-    propagated the org-set change to everyone else; this is the per-user overlay delta.
-    """
+    """Push the tournament + its decks to one user at their newly-entitled
+    projection — broadcast_precomputed already handled everyone else and never
+    delivers decks."""
     user = await get_user_by_uid(user_uid)
     if not user:
         return
@@ -576,7 +520,6 @@ async def add_organizer(
     body: OrganizerAction,
     current_user: OptionalUser = None,
 ) -> Response:
-    """Add an organizer to a tournament."""
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -602,8 +545,8 @@ async def add_organizer(
 
     if bd is not None:
         broadcast_precomputed(bd)
-        # Grant access: push the tournament + its (private) decks at full to the new
-        # organizer — broadcast_precomputed delivers the tournament but never the decks.
+        # broadcast_precomputed never delivers decks — grant the new organizer
+        # full access to the tournament's private decks separately.
         await _invalidate_organizer_view(tournament, body.user_uid, bd.modified_at)
 
     return Response(
@@ -617,12 +560,9 @@ async def push_vekn(
     uid: str,
     current_user: OptionalUser = None,
 ) -> Response:
-    """Publish a tournament to VEKN on demand (organizer action).
-
-    Registers the calendar event if needed; for a FINISHED event it also uploads
-    results (once) and submits the winner's deck to the TWDA. Lets an organizer
-    publish immediately instead of waiting for the next hourly batch_push.
-    """
+    """Registers the calendar event if missing; for a FINISHED tournament also
+    pushes results (once) and submits the TWDA deck, mirroring the hourly
+    batch_push immediately."""
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -650,7 +590,6 @@ async def push_vekn(
         async with vekn_push_client() as client:
             if client is None:
                 raise HTTPException(status_code=400, detail="VEKN sync is not enabled")
-            # 1. Register the calendar event if it isn't on VEKN yet.
             if not tournament.external_ids.get("vekn"):
                 # push_tournament_event saves external_ids.vekn + broadcasts on success.
                 event_id = await push_tournament_event(
@@ -665,9 +604,6 @@ async def push_vekn(
                         ),
                     )
                 tournament = await get_tournament_by_uid(uid) or tournament
-            # 2. A finished event also uploads results (once) + the winner's TWDA
-            #    deck, so publishing a same-session event doesn't wait for (or get
-            #    missed by) the hourly batch_push.
             if tournament.state == TournamentState.FINISHED:
                 if not tournament.vekn_pushed_at:
                     # A manual publish must report a real outcome — don't swallow a
@@ -689,9 +625,8 @@ async def push_vekn(
         raise HTTPException(
             status_code=502, detail="VEKN API is unavailable, try again later"
         ) from e
-    # Order matters: VEKNAPIConnectionError subclasses VEKNAPIError. A data error
-    # carries VEKN's actual reason ('event already exists for this date', 'not a
-    # prince', ...) — show it to the organizer instead of a guessed hint.
+    # Order matters: VEKNAPIConnectionError subclasses VEKNAPIError. A data
+    # error carries VEKN's actual reason — show it instead of guessing.
     except VEKNAPIError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -705,7 +640,6 @@ async def remove_organizer(
     organizer_uid: str,
     current_user: OptionalUser = None,
 ) -> Response:
-    """Remove an organizer from a tournament."""
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -724,15 +658,14 @@ async def remove_organizer(
                 )
             tournament.organizers_uids.remove(organizer_uid)
             tournament.modified = datetime.now(UTC)
-            # save_tournament advances modified_at, so the member-level tournament self-heals
-            # via the since-catch-up too (checkin_code/vekn_pushed_at drop) — the targeted push
-            # below additionally tombstones the now-invisible private decks (the leak fix).
+            # modified_at self-heals the member projection via since-catch-up; the
+            # targeted push below additionally tombstones now-invisible private decks.
             bd = await save_tournament(tournament, conn=tx_conn)
 
     if bd is not None:
         broadcast_precomputed(bd)
-        # Revoke access without a full resync: downgrade the tournament + tombstone the
-        # private decks for just this user (offline removal is caught by the fp at connect).
+        # Offline organizer removal is caught by the access-version fingerprint
+        # at the next connect; this handles the online case without a full resync.
         await _invalidate_organizer_view(tournament, organizer_uid, bd.modified_at)
 
     return Response(
@@ -741,11 +674,7 @@ async def remove_organizer(
     )
 
 
-# Banner endpoints — per-tournament hero / social-share image.
-# Bytes live in the banners table (not the synced objects row); the Tournament
-# only carries a versioned banner_path so a re-upload propagates via SSE while
-# each version stays long-cacheable. Organizer-gated, mirrors the avatar flow.
-MAX_BANNER_SIZE = 1024 * 1024  # 1MB
+MAX_BANNER_SIZE = 1024 * 1024
 
 
 @router.post("/{uid}/banner")
@@ -754,10 +683,7 @@ async def upload_banner(
     file: UploadFile,
     current_user: OptionalUser = None,
 ) -> Response:
-    """Upload or replace a tournament banner (organizer only).
-
-    Expects a 1.91:1 (1200×630) image, max 1MB. Client crops before upload.
-    """
+    """Expects a 1.91:1 (1200×630) image, max 1MB; client crops before upload."""
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -768,9 +694,8 @@ async def upload_banner(
             raise HTTPException(
                 status_code=403, detail="Only organizers can set the banner"
             )
-        # Mirror every other tournament mutation: refuse server-side writes while the
-        # tournament is offline-locked, so banner_path can't diverge during the
-        # offline window and get clobbered by the go-online snapshot overwrite.
+        # Refuse writes while offline-locked, or banner_path diverges during
+        # the offline window and gets clobbered by the go-online snapshot overwrite.
         if tournament.offline_mode:
             raise HTTPException(status_code=423, detail="Tournament is in offline mode")
 
@@ -824,7 +749,6 @@ async def delete_banner_image(
     uid: str,
     current_user: OptionalUser = None,
 ) -> Response:
-    """Delete a tournament banner (organizer only)."""
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -895,28 +819,21 @@ def _zone(tz_name: str) -> ZoneInfo:
 
 
 def _wall_clock_now(tz_name: str) -> datetime:
-    """Now as NAIVE wall clock in `tz_name` — the storage shape of start/finish
-    (paired with Tournament.timezone, never tz-aware)."""
+    """Naive wall clock in `tz_name` — the stored shape of start/finish."""
     return datetime.now(_zone(tz_name)).replace(tzinfo=None)
 
 
 def _wall_clock(dt: datetime | None, tz_name: str) -> datetime | None:
-    """Coerce a client-supplied start/finish to the stored shape: naive wall clock
-    in `tz_name`. An offset is CONVERTED, not truncated — truncating would move the
-    event by the difference between the sender's zone and the venue's."""
+    """Coerce to the stored shape: naive wall clock in `tz_name`. An offset is
+    CONVERTED, not truncated — truncating would shift the event by the zone delta."""
     if dt is None or dt.tzinfo is None:
         return dt
     return dt.astimezone(_zone(tz_name)).replace(tzinfo=None)
 
 
 def _normalize_wall_clock(t: Tournament) -> None:
-    """Apply `_wall_clock` to a tournament decoded from a client payload.
-
-    Nothing the frontend sends carries an offset today — the config form posts the
-    naive text of a `datetime-local` input — but these payloads are whole objects
-    off the wire, and one tz-aware value would read back shifted by the venue's
-    offset everywhere (see wiki/architecture.md, "API conventions").
-    """
+    """Apply `_wall_clock` to a client tournament payload — a tz-aware value
+    here would read back shifted by the venue's offset everywhere it's stored."""
     t.start = _wall_clock(t.start, t.timezone)
     t.finish = _wall_clock(t.finish, t.timezone)
 
@@ -926,7 +843,6 @@ async def create_tournament(
     request: CreateTournamentRequest,
     current_user: OptionalUser = None,
 ) -> Response:
-    """Create a new tournament."""
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -981,10 +897,8 @@ async def create_tournament(
                 detail="You don't have permission to attach tournaments to this league",
             )
 
-    # VEKN legality (championships forbid proxies/multideck, and only
-    # Standard/Limited may be ranked at all) — single-sourced in the engine;
-    # this route builds the Tournament in Python rather than through engine
-    # create_tournament, so call the gate explicitly.
+    # This route builds the Tournament in Python with no engine call — call
+    # the create-time legality gates explicitly or they're skipped for online creates.
     try:
         _engine.validate_rank_legality(
             fmt.value, rank, request.proxies, request.multideck
@@ -1043,7 +957,7 @@ async def create_tournament(
     )
 
 
-# --- Static routes (must be before /{uid} to avoid path parameter capture) ---
+# Must precede /{uid}: route match order, or the path param captures these.
 
 
 @router.get("/archon-template")
@@ -1065,12 +979,8 @@ async def fetch_deck_proxy(
     url: str,
     current_user: OptionalUser = None,
 ) -> Response:
-    """Proxy to fetch deck data from external URLs (VDB, VTESDecks, Amaranth).
-
-    Read-only — no mutation. Works around CORS restrictions on external APIs and
-    maps provider-native card ids (notably Amaranth's) to VEKN ids via krcg.
-    Returns parsed deck: {name, author, comments, cards}.
-    """
+    """Proxies deck fetch from VDB/VTESDecks/Amaranth — works around CORS and
+    maps provider-native card ids to VEKN ids via krcg."""
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -1090,15 +1000,11 @@ async def fetch_deck_proxy(
     )
 
 
-# --- Dynamic routes ---
-
-
 @router.delete("/{uid}")
 async def delete_tournament_endpoint(
     uid: str,
     current_user: OptionalUser = None,
 ) -> Response:
-    """Delete a tournament (organizers only, before it has reached VEKN)."""
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -1119,9 +1025,8 @@ async def delete_tournament_endpoint(
             detail="Cannot delete a tournament locked for offline use; unlock it first",
         )
 
-    # Deletable at any state until it has a VEKN footprint: once a calendar event
-    # exists (external_ids.vekn) or results were pushed (vekn_pushed_at), deleting
-    # here would orphan the vekn.net record — that's the system of record, so block it.
+    # Deletable until it has a VEKN footprint (external_ids.vekn or
+    # vekn_pushed_at) — past that, deleting here orphans the vekn.net record.
     if tournament.external_ids.get("vekn") or tournament.vekn_pushed_at is not None:
         raise HTTPException(
             status_code=400,
@@ -1169,7 +1074,6 @@ async def archon_import(
     file: UploadFile,
     current_user: OptionalUser = None,
 ) -> Response:
-    """Import a filled-in Archon v1.5l spreadsheet into an existing tournament."""
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -1183,7 +1087,6 @@ async def archon_import(
             detail="Only organizers can import",
         )
 
-    # File validation
     if not file.filename or not file.filename.endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="File must be an .xlsx spreadsheet")
 
@@ -1197,7 +1100,6 @@ async def archon_import(
         validate_archon_import,
     )
 
-    # Parse
     try:
         data = parse_archon_file(file_bytes)
     except Exception as e:
@@ -1205,7 +1107,6 @@ async def archon_import(
             status_code=400, detail=f"Failed to parse spreadsheet: {e}"
         ) from e
 
-    # Validate
     engine = _engine
     errors = validate_archon_import(data, engine)
     if errors:
@@ -1224,7 +1125,6 @@ async def archon_import(
             status_code=400,
         )
 
-    # Apply
     result = await apply_archon_import(
         tournament_uid=uid,
         data=data,
@@ -1269,16 +1169,8 @@ async def bulk_register(
     request: BulkRegisterRequest,
     current_user: OptionalUser = None,
 ) -> Response:
-    """Bulk-register externally-ticketed players (big events sell tickets on
-    third-party platforms; the organizer imports the resulting list instead of
-    hand-adding a hundred players at the desk).
-
-    Rows match existing members by VEKN ID first, then email. Matches are
-    registered through the engine (AddPlayer) and get their payment status set
-    (default Paid — they paid at the ticketing source). Unmatched rows are
-    RETURNED for manual resolution through the normal officials-only
-    sponsor/create path — never silently created.
-    """
+    """Bulk-register externally-ticketed players by VEKN ID then email match.
+    Unmatched rows are RETURNED for manual resolution — never silently created."""
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
     if len(request.rows) > 500:
@@ -1339,7 +1231,6 @@ async def bulk_register(
         actor_json = msgspec.json.encode(
             _build_actor_context(current_user, tournament)
         ).decode("utf-8")
-        # Suspension/DQ context for the users being added (engine barrier)
         sanctions_data = [
             {
                 "user_uid": s.user_uid,
@@ -1424,21 +1315,12 @@ async def bulk_register(
     )
 
 
-# --- Tournament Action Endpoint (Rust Engine) ---
-
-
 class TournamentActionRequest(BaseModel):
-    """Request body for tournament actions processed by Rust engine."""
-
     type: str  # Event type: OpenRegistration, Register, CheckIn, StartRound, etc.
     user_uid: str | None = None  # For Register, AddPlayer, RemovePlayer
     player_uid: str | None = None  # For CheckIn
-    # Register/AddPlayer/CheckIn: the Discord guild nickname, snapshotted by the
-    # bot. Display only — it overrides the profile nickname on online events so
-    # the roster reads the way the guild does. Never an identity input: the
-    # vekn_id below it comes from the resolved user precisely so it can't be.
-    # 32 is Discord's own ceiling for every value the bot can put here —
-    # nicknames are 1-32, usernames 2-32 — so anything longer isn't from Discord.
+    # Discord guild nickname, display-only, never identity — vekn_id comes only
+    # from the resolved user. max_length=32 mirrors Discord's own ceiling.
     display_name: str | None = Field(default=None, max_length=32)
     round: int | None = None  # For SetScore, SwapSeats
     table: int | None = None  # For SetScore
@@ -1455,10 +1337,8 @@ class TournamentActionRequest(BaseModel):
     seating: list[list[str]] | None = None  # For AlterSeating
     player_uids: list[str] | None = None  # For SelfOrganizeRound: the chosen pod
     config: dict | None = None  # For UpdateConfig: partial config fields
-    # Deck
     deck: dict | None = None
     multideck: bool | None = None
-    # Raffle
     label: str | None = None
     pool: str | None = None
     exclude_drawn: bool | None = None
@@ -1472,18 +1352,9 @@ async def tournament_action(
     request: TournamentActionRequest,
     current_user: OptionalUser = None,
 ) -> Response:
-    """Process a tournament event via the Rust engine.
-
-    All tournament state mutations go through this endpoint, which delegates
-    to the Rust engine for consistent behavior in online/offline modes.
-
-    Uses SELECT ... FOR UPDATE to serialize concurrent writes per tournament,
-    preventing lost updates when multiple actions arrive simultaneously.
-    """
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    # Build event data outside the transaction (no DB needed)
     event_data = {"type": request.type}
     if request.user_uid:
         event_data["user_uid"] = request.user_uid
@@ -1554,9 +1425,8 @@ async def tournament_action(
                         detail="max_rounds cannot be changed after tournament is pushed to VEKN",
                     )
             vekn_push = os.getenv("VEKN_PUSH", "").lower() == "true"
-            # Open-rounds events are non-VEKN: max_rounds is a free per-player cap, so
-            # the 2-4 rule applies only to standard tournaments (effective open_rounds =
-            # this request's value if present, else the stored one).
+            # 2-4 max_rounds applies only to standard (non-open-rounds) tournaments;
+            # open_rounds is the request's value if present, else the stored one.
             open_rounds = request.config.get("open_rounds", tournament.open_rounds)
             if (
                 vekn_push
@@ -1570,18 +1440,14 @@ async def tournament_action(
                         detail="max_rounds must be 2, 3, or 4 when VEKN push is enabled",
                     )
 
-        # Reject actions on offline-locked tournaments
         if tournament.offline_mode:
             raise HTTPException(
                 status_code=423,
                 detail="Tournament is in offline mode on another device",
             )
 
-        # Reads below run on tx_conn (the locked transaction connection) rather
-        # than acquiring extra pooled connections while holding FOR UPDATE — a
-        # single in-flight action consumes one pooled connection, so concurrent
-        # actions can't starve the small pool (see db._acquire).
-        # Build actor context for Rust engine
+        # Reads below reuse tx_conn instead of a fresh pooled connection while
+        # holding FOR UPDATE, so one action never pins more than one pool slot.
         can_organize = None
         if request.type == "UpdateConfig" and request.config:
             can_organize = await _get_user_organizable_league_uids(
@@ -1589,8 +1455,8 @@ async def tournament_action(
             )
         actor_data = _build_actor_context(current_user, tournament, can_organize)
 
-        # Fetch sanctions for this tournament + user-level suspension/DQ
-        # sanctions for all tournament players (needed for CheckInAll etc.)
+        # Tournament sanctions plus user-level suspension/DQ for all players
+        # (needed for CheckInAll etc.)
         tournament_sanctions = await get_sanctions_for_tournament(uid, conn=tx_conn)
         seen_uids = {s.uid for s in tournament_sanctions}
         player_uids = {p.user_uid for p in tournament.players if p.user_uid}
@@ -1618,14 +1484,8 @@ async def tournament_action(
             for s in tournament_sanctions
         ]
 
-        # The vekn_id for Register/AddPlayer/CheckIn comes from the resolved user
-        # and nowhere else — TournamentActionRequest deliberately has no vekn_id
-        # field, and must never gain one: a client-supplied id would let an
-        # organizer register a VEKN-less member under a fabricated one, bypassing
-        # sponsorship. An unresolvable target is a 404 rather than a fall-through,
-        # which would otherwise store a Player row pointing at no user. Offline
-        # play never reaches here (tournament-actions.ts returns after the local
-        # apply), so a TEMP- id is never a legitimate caller.
+        # vekn_id comes only from the resolved user — the request model has no
+        # vekn_id field, so a fabricated id can never reach the engine.
         target_uid = None
         if request.type in ("Register", "AddPlayer"):
             target_uid = request.user_uid
@@ -1639,20 +1499,17 @@ async def tournament_action(
             # ignores it for one already on the roster.
             event_data["vekn_id"] = target_user.vekn_id or ""
 
-        # Serialize tournament to JSON for engine
         tournament_json = encoder.encode(tournament).decode("utf-8")
         event_json = msgspec.json.encode(event_data).decode("utf-8")
         actor_json = msgspec.json.encode(actor_data).decode("utf-8")
         sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
         decks_json = await _build_decks_json(uid, conn=tx_conn)
 
-        # Backend pre-checks for cross-tournament sanctions
         if request.type in ("CheckIn", "Register", "AddPlayer"):
             player_uid = request.player_uid or request.user_uid
             if player_uid:
                 await _check_player_barred(player_uid, uid, tournament, conn=tx_conn)
 
-        # Call Rust engine
         engine = _engine
         try:
             result_json = engine.process_tournament_event(
@@ -1671,16 +1528,13 @@ async def tournament_action(
             v = t_data.get(dt_field)
             if isinstance(v, str) and len(v) == 16:  # "YYYY-MM-DDTHH:MM"
                 t_data[dt_field] = v + ":00"
-        # Build the model straight from the engine's dict: msgspec.convert applies
-        # the same coercion (incl. RFC3339 str→datetime) as a JSON decode but skips
-        # the redundant whole-object encode→decode round-trip — meaningful event-loop
-        # CPU on a 400-player object during a large scoring burst.
+        # msgspec.convert applies the same coercion as JSON decode without the
+        # redundant encode→decode round-trip — meaningful CPU on a large scoring burst.
         updated = msgspec.convert(t_data, Tournament)
         updated.modified = datetime.now(UTC)
         _normalize_wall_clock(updated)
-        # Stamp the actual end time when entering Finished without an explicit
-        # finish date — the engine never sets finish, and ratings/VEKN push
-        # rely on it (server-side hook, same as modified and the timer below)
+        # Stamp finish when entering Finished with none set — the engine never
+        # writes it, and ratings/VEKN push depend on it.
         if (
             updated.state == TournamentState.FINISHED
             and tournament.state != TournamentState.FINISHED
@@ -1689,17 +1543,8 @@ async def tournament_action(
             updated.finish = _wall_clock_now(updated.timezone)
         deck_ops = result.get("deck_ops", [])
 
-        # Timer lifecycle hooks (online-only, not handled by Rust engine).
-        # Dumb rule: any round/finals lifecycle transition resets the clock to a
-        # fresh full PAUSED timer (TimerState() == started_at None, elapsed 0,
-        # paused). Starting a round NEVER launches the clock — players need time to
-        # get seated, so the organizer starts it explicitly via /timer/start; a
-        # fresh paused timer and a cleared-on-end timer are the same state, so one
-        # reset covers both. The global timer is meaningless with parallel rounds
-        # (self-organized pods each push their own round); the UI and bot deactivate
-        # it when more than one round is live, so clobbering here is harmless.
-        # AddTable stays OUT of this list so a mid-round table add never resets a
-        # running clock.
+        # Timer lifecycle is backend-only: every round/finals transition resets to
+        # a fresh paused timer and clears extra time. AddTable is excluded (no reset).
         TIMER_EVENTS = (
             "StartRound",
             "SelfOrganizeRound",
@@ -1715,11 +1560,8 @@ async def tournament_action(
             updated.timer = TimerState()
             updated.table_extra_time = {}
 
-        # Once results are on vekn.net (write-once push), any change to the
-        # result-bearing content diverges from vekn.net permanently. Detect by
-        # content, not event type: reopen clears winner/finalist data, score
-        # edits touch rounds/finals — while post-push config typo fixes stay
-        # clean. Sticky, so the compare runs at most once per pushed tournament.
+        # Detected by CONTENT diff, not event type, so any edit touching those
+        # fields after a VEKN push is caught; sticky, so this runs at most once.
         if updated.vekn_pushed_at and not updated.vekn_results_stale:
             if (
                 tournament.winner != updated.winner
@@ -1730,7 +1572,6 @@ async def tournament_action(
             ):
                 updated.vekn_results_stale = True
 
-        # Save within the same transaction (row is still locked)
         tournament_bd = await save_object(
             ObjectType.TOURNAMENT,
             updated.uid,
@@ -1739,10 +1580,9 @@ async def tournament_action(
         )
         pre_state = tournament.state
 
-    # --- Transaction committed, row lock released ---
+    # Below runs unlocked — the tournament row's FOR UPDATE lock was released.
     logger.info(f"Tournament {uid} action {request.type} by {current_user.uid}")
 
-    # Process deck side-effects (outside transaction)
     deck_bds = await _process_deck_ops(deck_ops, uid, org_uids=updated.organizers_uids)
     for bd in deck_bds:
         broadcast_precomputed(bd)
@@ -1752,22 +1592,17 @@ async def tournament_action(
     if request.type == "ReportPromos":
         _promo_recompute_diff(tournament, updated)
 
-    # Web Push seating notification (#314): on a just-started round/finals, push each
-    # seated player their table+seat. Fire-and-forget, post-commit (a DB-touching task
-    # must not run inside tournament_transaction). RestoreRound re-seats no one → excluded.
+    # Fire-and-forget, post-commit (a DB-touching task must not run inside
+    # tournament_transaction). RestoreRound re-seats no one, so it's excluded.
     if request.type in ("StartRound", "SelfOrganizeRound", "StartFinals"):
         asyncio.create_task(_maybe_push_seating(updated, request.type))
     elif request.type in ("AlterSeating", "SwapSeats", "SeatPlayer", "UnseatPlayer"):
-        # Re-seat mid-round: only players whose table/seat actually changed are
-        # pushed — the stale seating notification they may act on gets replaced.
+        # Only players whose table/seat actually changed are pushed — the
+        # stale seating notification they may act on gets replaced.
         asyncio.create_task(_maybe_push_reseat(tournament, updated))
 
-    # Recompute ratings when the tournament enters/leaves Finished (state change),
-    # or when a result-affecting action lands on an already-finished tournament
-    # (e.g. SetScore/Override correction). Skip the recompute for finished-state
-    # edits that can't move ranking points (deck/payment/raffle/check-in) — they
-    # otherwise trigger a full window recompute + a broadcast per player on EVERY
-    # such post-finish action.
+    # Recompute on entering/leaving Finished, or on a result-affecting action on
+    # an already-finished tournament (see _RATING_IRRELEVANT_ACTIONS for the skip list).
     was_finished = pre_state == TournamentState.FINISHED
     is_finished = updated.state == TournamentState.FINISHED
     state_changed = was_finished != is_finished
@@ -1795,9 +1630,8 @@ async def tournament_action(
         except Exception as e:
             logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
 
-    # TWDA auto-PR + VEKN push: trigger when tournament finishes. VEKN push runs
-    # in the background — the response must not wait on vekn.net (30-120s
-    # timeouts when it is down); batch_push retries.
+    # VEKN push backgrounds (vekn.net can take 30-120s or be down; batch_push
+    # retries) — TWDA submission runs inline since it's local/fast.
     if is_finished and not was_finished:
         await maybe_submit_twda(updated)
         asyncio.create_task(_maybe_push_vekn(updated))
@@ -1809,22 +1643,14 @@ async def tournament_action(
             for op in deck_ops
         )
     ):
-        # Winner's deck was edited on an already-finished tournament (organizers
-        # only — players are deck-locked post-finish). Re-submit so the
-        # idempotent TWDA PR (branch/file keyed on the vekn event id) picks up
-        # the change, e.g. an added strategy writeup. Background: the deck save
-        # already committed and maybe_submit_twda self-contains its errors.
+        # Re-submit on a post-finish winner-deck edit (organizers only — players
+        # are deck-locked); the TWDA PR is idempotent, keyed on the vekn event id.
         asyncio.create_task(maybe_submit_twda(updated))
 
     return Response(
         content=encoder.encode(updated),
         media_type="application/json",
     )
-
-
-# ============================================================================
-# QR check-in (server-only, validates checkin_code before delegating)
-# ============================================================================
 
 
 class QrCheckinRequest(BaseModel):
@@ -1844,8 +1670,7 @@ async def qr_checkin(
     if not tournament:
         raise HTTPException(status_code=404, detail="Tournament not found")
     # Defense-in-depth: an empty stored code must never authorize check-in (a
-    # migrated/legacy event that slipped through with checkin_code='' would let
-    # request.code='' pass). Real codes are always non-empty.
+    # legacy event with checkin_code='' would otherwise accept code='').
     if not tournament.checkin_code or request.code != tournament.checkin_code:
         raise HTTPException(status_code=403, detail="Invalid check-in code")
     return await tournament_action(
@@ -1853,11 +1678,6 @@ async def qr_checkin(
         TournamentActionRequest(type="CheckIn", player_uid=current_user.uid),
         current_user,
     )
-
-
-# ============================================================================
-# Deck endpoints
-# ============================================================================
 
 
 def _load_cards_json() -> str:
@@ -1896,9 +1716,9 @@ def _seat_display(
     display_names: dict[str, str | None],
     online: bool,
 ) -> str:
-    """Backend mirror of frontend seatDisplay (tournament-utils.ts). Online events
-    show the nickname (real name abbreviated, in parens) for privacy; IRL events show
-    the real name + VEKN only and never the nickname."""
+    """Backend mirror of frontend seatDisplay (tournament-utils.ts) — keep them
+    in sync. Online shows nickname+abbreviated name; IRL shows real name+VEKN,
+    never the nickname."""
     user = users_by_uid.get(uid)
     name = (user.name if user else "") or uid
     vekn = user.vekn_id if user else None
@@ -1965,9 +1785,8 @@ async def tournament_report(
     fmt: str = Query("json", pattern="^(json|text)$"),
     user: OptionalUser = None,
 ) -> Response:
-    """Download a tournament report. `fmt=json` (default) returns structured
-    standings/results; `fmt=text` returns a readable standings list plus the
-    winner's decklist in TWDA format. Organizer-only, finished tournaments only."""
+    """fmt=json (default) returns structured data; fmt=text returns a readable
+    standings list plus the winner's TWDA decklist."""
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -2027,14 +1846,6 @@ async def tournament_report(
     )
 
 
-# ============================================================================
-# Timer endpoints (online-only, not processed by Rust engine)
-# ============================================================================
-
-
-# _check_organizer removed — auth now via OptionalUser dependency
-
-
 def _validate_timer_tournament(user, tournament: Tournament | None):
     """Validate tournament state for timer operations (inside transaction)."""
     if not tournament:
@@ -2063,7 +1874,6 @@ async def timer_start(
     uid: str,
     user: OptionalUser = None,
 ) -> Response:
-    """Start or resume the global timer."""
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     async with tournament_transaction(uid) as (tournament, tx_conn):
@@ -2086,7 +1896,6 @@ async def timer_pause(
     uid: str,
     user: OptionalUser = None,
 ) -> Response:
-    """Pause the global timer."""
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     async with tournament_transaction(uid) as (tournament, tx_conn):
@@ -2155,12 +1964,8 @@ async def timer_add_time(
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
-# ============================================================================
-# Announcement endpoints (online-only, not processed by Rust engine)
-# ============================================================================
-
-MAX_ANNOUNCEMENTS = 20  # keep the most recent N; bounds the member-projection payload
-MAX_ANNOUNCEMENT_LEN = 280  # one notice-sized message
+MAX_ANNOUNCEMENTS = 20  # bounds the member-projection payload
+MAX_ANNOUNCEMENT_LEN = 280
 
 
 def _validate_announce_tournament(user, tournament: Tournament | None):
@@ -2215,8 +2020,8 @@ async def post_announcement(
             conn=tx_conn,
         )
     broadcast_precomputed(bd)
-    # Web Push announcement (#314): fire-and-forget to every participant except the
-    # posting organizer (who has the composer open). Post-commit, like seating above.
+    # Fire-and-forget to every participant except the posting organizer (who has
+    # the composer open already). Post-commit, like seating above.
     asyncio.create_task(_maybe_push_announcement(tournament, body, user.uid))
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
@@ -2248,11 +2053,6 @@ async def delete_announcement(
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
-# ============================================================================
-# Judge call endpoint (online-only)
-# ============================================================================
-
-
 class JudgeCallRequest(BaseModel):
     table: int
 
@@ -2273,7 +2073,6 @@ async def call_judge(
         raise HTTPException(status_code=400, detail="Tournament is not playing")
     if tournament.offline_mode:
         raise HTTPException(status_code=423, detail="Tournament is in offline mode")
-    # Verify player is seated at the specified table in current round
     if not tournament.rounds:
         raise HTTPException(status_code=400, detail="No active round")
     current_round = tournament.rounds[-1]
@@ -2282,10 +2081,9 @@ async def call_judge(
     table = current_round[request.table]
     if not any(s.player_uid == user.uid for s in table.seating):
         raise HTTPException(status_code=403, detail="You are not seated at this table")
-    # Build table label
     table_label = resolveTableLabelPy(tournament.table_rooms, request.table)
-    # Broadcast to organizers (live, in-app), and Web Push the same audience so a
-    # judge away from the screen is alerted (#323). Fire-and-forget, exclude caller.
+    # Web Push the same organizer audience as the SSE broadcast, so one away from
+    # the screen is alerted too. Fire-and-forget, exclude caller.
     await broadcast_judge_call(
         tournament_uid=tournament.uid,
         table=request.table,
@@ -2312,11 +2110,6 @@ def resolveTableLabelPy(rooms: list, table_idx: int) -> str:
             return f"{room.name} T{local}"
         offset += room.count
     return f"Table {table_idx + 1}"
-
-
-# ============================================================================
-# Offline tournament mode endpoints
-# ============================================================================
 
 
 class GoOfflineRequest(BaseModel):
@@ -2399,19 +2192,16 @@ async def _resolve_or_create_offline_player(
     Returns (temp_uid, real_user, created) — created=True only for a brand-new
     account (the go-online outcome summary tells the organizer how many real
     members were minted at the venue)."""
-    # 1. Match by vekn_id (skip temp IDs)
     if player_data.vekn_id and not player_data.vekn_id.startswith("TEMP-"):
         user = await get_user_by_vekn_id(player_data.vekn_id)
         if user:
             return player_data.temp_uid, user, False
 
-    # 2. Match by email
     if player_data.email:
         auth_method = await get_auth_method_by_identifier("email", player_data.email)
         if auth_method:
             user = await get_user_by_uid(auth_method.user_uid)
             if user:
-                # If matched user lacks VEKN ID, allocate one
                 if not user.vekn_id:
                     user.vekn_id = await allocate_next_vekn_id()
                     user.coopted_by = organizer_uid
@@ -2421,7 +2211,6 @@ async def _resolve_or_create_offline_player(
                     broadcast_precomputed(bd)
                 return player_data.temp_uid, user, False
 
-    # 3. Create new user with VEKN ID
     now = datetime.now(UTC)
     vekn_id = await allocate_next_vekn_id()
     new_user = User(
@@ -2440,7 +2229,6 @@ async def _resolve_or_create_offline_player(
 
     broadcast_precomputed(bd)
 
-    # Send invite email if provided
     if player_data.email:
         try:
             await send_invite_email(
@@ -2453,15 +2241,8 @@ async def _resolve_or_create_offline_player(
 
 
 def _remap_uids_in_tournament(tournament_data: dict, uid_map: dict[str, str]) -> dict:
-    """Replace all temp_uid references with real UIDs throughout tournament data.
-
-    A whole-JSON byte replace, intentionally: temp UIDs are full 36-char UUIDs,
-    so substring collisions are not a practical concern, and this covers every
-    UID-bearing field (players, seating, standings, finals seed_order, raffles,
-    winner) without having to enumerate — and miss — them. Decks and sanctions are
-    flat single objects, so `go_online` repoints their one UID field directly; a
-    deck's `attribution` (a vekn, not a UID) is repointed there too.
-    """
+    """Whole-JSON byte replace of every temp_uid with its real UID — safe only
+    because temp uids are full 36-char UUIDs, limiting substring collisions."""
     raw = msgspec.json.encode(tournament_data)
     for temp_uid, real_uid in uid_map.items():
         raw = raw.replace(temp_uid.encode(), real_uid.encode())
@@ -2471,12 +2252,8 @@ def _remap_uids_in_tournament(tournament_data: dict, uid_map: dict[str, str]) ->
 async def _gate_offline_created_insert(
     current_user: User, tournament_data: dict
 ) -> None:
-    """Authorize inserting a tournament the server has never seen (created
-    offline): mirror create_tournament's gates — the WASM engine enforced them
-    client-side, but the payload is client-supplied. Shared by go_online and
-    sync_offline; whichever inserts first is the creation, and the other then
-    takes its existing-row path.
-    """
+    """Mirrors create_tournament's gates for a tournament the server is inserting
+    for the first time (created offline); shared by go_online and sync_offline."""
     if not permissions.can_create_tournament(current_user):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can create tournaments"
@@ -2508,16 +2285,13 @@ async def go_online(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    # Validate tournament UID matches URL (cheap, request-only — before any side effects)
+    # Cheap, request-only check before any side effects.
     if request.tournament.get("uid") and request.tournament["uid"] != uid:
         raise HTTPException(status_code=400, detail="Tournament UID mismatch")
-    request.tournament["uid"] = uid  # Force correct UID
+    request.tournament["uid"] = uid
 
-    # Pre-lock gate: authorize and pre-check the device lock against current server
-    # state BEFORE creating any users, so player resolution (save_user /
-    # allocate_next_vekn_id / invite emails) never runs for an unauthorized or
-    # wrong-device request. Re-checked authoritatively under the lock below; this
-    # unlocked read only fails fast and gates side effects.
+    # Pre-lock gate: authorize before creating any users (save_user/allocate_next_vekn_id).
+    # Re-checked authoritatively under the lock below; this unlocked read only fails fast.
     existing = await get_tournament_by_uid(uid)
     if existing:
         if not permissions.is_organizer(current_user, existing):
@@ -2547,13 +2321,8 @@ async def go_online(
         # this insert is a creation.
         await _gate_offline_created_insert(current_user, request.tournament)
 
-    # Resolve offline players → real user accounts. Done OUTSIDE the lock: each
-    # resolution may create a user and allocate a VEKN ID (its own advisory-locked
-    # transaction), so holding the FOR UPDATE lock here would check out extra
-    # pooled connections per player.
-    # Benign race: if the caller's organizer rights are revoked between the
-    # pre-check and the lock, the authoritative re-check below 403s after these
-    # users were created — leaving orphaned (real, coopted) accounts. Acceptable.
+    # Resolved OUTSIDE the lock: each resolution may allocate a VEKN ID via its
+    # own transaction. A rights-revoke race here only orphans an account (harmless).
     uid_map: dict[str, str] = {}  # temp player UID → resolved user UID
     vekn_remap: dict[
         str, str
@@ -2568,10 +2337,8 @@ async def go_online(
         if (player_data.vekn_id or "").startswith("TEMP-") and real_user.vekn_id:
             vekn_remap[player_data.vekn_id] = real_user.vekn_id
 
-    # If a temp player resolves (by VEKN ID) to someone already in the tournament,
-    # or two temps resolve to the same person, the remap below would create a
-    # duplicate participant. We deliberately do NOT auto-merge tournament players
-    # — fail early so the organizer removes the duplicate registration.
+    # Two temps (or a temp + existing player) resolving to the same person would
+    # duplicate a participant — fail early rather than auto-merge them.
     final_player_uids = [
         uid_map.get(p.get("user_uid"), p.get("user_uid"))
         for p in request.tournament.get("players", [])
@@ -2587,21 +2354,16 @@ async def go_online(
             ),
         )
 
-    # SELECT FOR UPDATE: serialize the device-lock check with the save (TOCTOU) so
-    # two devices can't both reconcile. A missing row yields None and the upsert
-    # below inserts it within the same tx. Holds only tx_conn — no per-player work.
+    # SELECT FOR UPDATE serializes the device-lock check with the save; a missing
+    # row upserts within the same tx. Holds only tx_conn — no per-player work.
     async with tournament_transaction(uid) as (tournament, tx_conn):
         # Re-verify authorization + device lock authoritatively under the lock.
         if tournament and not permissions.is_organizer(current_user, tournament):
             raise HTTPException(
                 status_code=403, detail="Only organizers can bring a tournament online"
             )
-        # The server is no longer in offline mode (an IC force-unlocked it, or it
-        # was already brought online). Refuse to blind-overwrite the authoritative
-        # state with this device's stale offline snapshot — without this guard the
-        # device-lock check below is skipped and the upsert clobbers. 410 Gone
-        # distinguishes "offline session ended, discard + resync" from the
-        # device-mismatch 409 (which offers a force override).
+        # No longer offline (force-unlocked, or already online elsewhere): refuse
+        # to overwrite. 410 = discard+resync; 409 device-mismatch offers a force override.
         if tournament and not tournament.offline_mode:
             raise HTTPException(
                 status_code=410,
@@ -2625,12 +2387,8 @@ async def go_online(
             merged = list(dict.fromkeys(original_organizers + client_organizers))
             request.tournament["organizers_uids"] = merged
 
-            # Server-managed side-channel fields the offline WASM engine never
-            # touches: re-pull them from the locked server row so a value that
-            # changed server-side during the offline window (VEKN sync writes
-            # external_ids/vekn_pushed_at; a re-uploaded banner_path) isn't
-            # reverted by this device's stale snapshot. "Server wins" for
-            # non-engine fields, same as organizers_uids above.
+            # Server-managed fields the offline engine never touches: re-pull from the
+            # locked row so a server-side change isn't reverted by this stale snapshot.
             request.tournament["banner_path"] = tournament.banner_path
             request.tournament["external_ids"] = tournament.external_ids
             request.tournament["checkin_code"] = tournament.checkin_code
@@ -2646,25 +2404,21 @@ async def go_online(
                 else None
             )
 
-        # Remap temp UIDs → real user UIDs throughout tournament data
         tournament_data = request.tournament
         if uid_map:
             tournament_data = _remap_uids_in_tournament(tournament_data, uid_map)
 
-        # Clear offline fields
         tournament_data["offline_mode"] = False
         tournament_data["offline_device_id"] = ""
         tournament_data["offline_user_uid"] = ""
         tournament_data["offline_since"] = None
         tournament_data["modified"] = datetime.now(UTC).isoformat()
 
-        # Save tournament within the locked transaction (upsert handles insert)
         updated = msgspec.convert(tournament_data, Tournament)
         updated.modified = datetime.now(UTC)
         _normalize_wall_clock(updated)
-        # Offline-issued DQs: assert the player state server-side too. The
-        # offline client mirrors the flip, but state gates check-in/StartFinals
-        # — belt and braces before the authoritative save.
+        # Offline-issued DQs: assert player state server-side too (belt and braces)
+        # — the offline client mirrors the flip, but state gates check-in/StartFinals.
         active_dq_uids = {
             uid_map.get(s.get("user_uid"), s.get("user_uid"))
             for s in request.offline_sanctions
@@ -2680,10 +2434,8 @@ async def go_online(
         # engine never stamps it) — use the sync time as the actual end time
         if updated.state == TournamentState.FINISHED and updated.finish is None:
             updated.finish = _wall_clock_now(updated.timezone)
-        # Offline edits to already-pushed results diverge from vekn.net just
-        # like online ones — same compare as the /action endpoint, against the
-        # locked server pre-image (the restore above only carries the flag over;
-        # it can't see what the offline session changed).
+        # Same vekn_results_stale compare as /action, against the locked pre-image —
+        # the restore above only carries the flag over, not what the offline session changed.
         if (
             tournament
             and tournament.vekn_pushed_at
@@ -2704,11 +2456,8 @@ async def go_online(
             conn=tx_conn,
         )
 
-        # 5+6. Save offline sanctions and decks INSIDE the same transaction as
-        # the snapshot: a connection drop mid-push (flaky venue wifi is WHY the
-        # event was offline) must leave the tournament still offline and the
-        # whole push retryable — never a committed online row with the offline
-        # decks/sanctions silently lost. Broadcasts fire after commit.
+        # Saved INSIDE the same transaction as the snapshot: a mid-push connection
+        # drop must leave it still offline and retryable, never partially committed.
         pending_bds: list = []
         for sanction_data in request.offline_sanctions:
             sanction = msgspec.convert(sanction_data, Sanction)
@@ -2718,9 +2467,8 @@ async def go_online(
                     ObjectType.SANCTION, sanction, conn=tx_conn
                 )
             )
-        # Deck attribution is a vekn (the "designed by" credit), so a temp
-        # player's own-deck attribution is their offline TEMP- vekn; repoint it
-        # to their resolved real vekn (or drop it if unresolved).
+        # Attribution is a vekn: a temp player's own-deck attribution is their
+        # offline TEMP- vekn; repoint to the resolved real vekn, or drop if unresolved.
         for deck_data in request.offline_decks:
             deck_obj = msgspec.convert(deck_data, DeckObject)
             deck_obj.tournament_uid = uid
@@ -2740,34 +2488,25 @@ async def go_online(
         broadcast_precomputed(bd)
 
     if request.offline_sanctions:
-        # ONE authoritative standings recompute over the now-saved sanctions
-        # (the offline client already recomputed via WASM; this re-derives
-        # server-side under the row lock and broadcasts the result).
+        # One authoritative recompute over the now-saved sanctions, server-side
+        # under the row lock (the offline client already recomputed via WASM).
         from .sanctions import _apply_sanction_to_tournament
 
         await _apply_sanction_to_tournament(uid)
-        # The recompute rewrote the row — return the FRESH tournament. The
-        # HTTP response is the initiating device's sole authority (its own
-        # SSE frames are suppressed during go-online), so a stale body would
-        # silently lag the server if sanctions were also issued online during
-        # the offline window.
+        # Return the FRESH row: the HTTP response is the initiating device's sole
+        # authority (its own SSE frames are suppressed during go-online).
         refreshed = await get_tournament_by_uid(uid)
         if refreshed is not None:
             updated = refreshed
 
-    # 7. Broadcast updated tournament — but NOT back to the initiating device:
-    # it gets the authoritative reconciled tournament in this endpoint's HTTP
-    # response (saveTournament), and its own offline_mode=false echo would race
-    # ahead of that response and trip the client's lost-lock warning. Only the
-    # tournament frame self-excludes; the resolved users / decks / sanctions /
-    # ratings broadcasts above intentionally reach the device (it lacks them).
+    # Excludes the initiating device: it gets the reconciled tournament in the HTTP
+    # response, and an echoed offline_mode=false would race ahead and trip its lost-lock warning.
     broadcast_precomputed(tournament_bd, exclude_device_id=request.device_id)
 
     _promo_recompute_diff(tournament, updated)
 
-    # An event run+finished offline would otherwise get its rating points only on
-    # the next daily recompute (~24h late). Mirror the action route and recompute
-    # immediately on go-online so players' ratings reflect the result right away.
+    # Otherwise an event finished offline waits for the next daily recompute
+    # (~24h late) — mirror the action route and recompute immediately.
     if updated.state == TournamentState.FINISHED:
         try:
             from ..ratings import (
@@ -2782,9 +2521,8 @@ async def go_online(
                 broadcast_precomputed(bd)
         except Exception as e:
             logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
-        # Mirror the finish action for an event finished offline: attempt/record
-        # the TWDA submission. Usually skips on no_vekn_event here; batch_push
-        # retries after it creates the event and pushes results.
+        # Mirrors the finish action's TWDA attempt; usually skips on no_vekn_event
+        # here, and batch_push retries after it creates the event.
         asyncio.create_task(maybe_submit_twda(updated))
 
     # Outcome summary closes the loop the go-offline modal opens: each created
@@ -2878,8 +2616,7 @@ async def sync_offline(
                 )
 
             # offline_device_id is member-visible, so the device-lock check alone
-            # lets any member overwrite the snapshot — gate on organizer like the
-            # go_offline/go_online/force_takeover siblings.
+            # would let any member overwrite the snapshot — gate on organizer too.
             if not permissions.is_organizer(current_user, tournament):
                 raise HTTPException(
                     status_code=403,
@@ -2891,11 +2628,8 @@ async def sync_offline(
                     status_code=409, detail="Device does not hold the offline lock"
                 )
         else:
-            # Offline-CREATED tournament: the backup snapshot is exactly the
-            # crash insurance that motivates offline creation, so insert rather
-            # than 404 — gated like the go-online insert (the later go-online
-            # then finds the row and takes its existing-row path, so these
-            # gates MUST run here).
+            # Offline-CREATED tournament: insert rather than 404 — this backup
+            # snapshot IS the crash insurance offline creation exists for.
             await _gate_offline_created_insert(current_user, request.tournament)
 
         # Pin the write to the locked row: the FOR UPDATE lock and device-lock
@@ -2904,7 +2638,6 @@ async def sync_offline(
             raise HTTPException(status_code=400, detail="Tournament UID mismatch")
         request.tournament["uid"] = uid
 
-        # Save tournament snapshot (keep offline_mode=True)
         tournament_data = request.tournament
         tournament_data["offline_mode"] = True
         if tournament:
@@ -2959,10 +2692,8 @@ async def force_unlock(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    # Break-glass: first-party IC sessions only. An OAuth token (even
-    # user:impersonate) must not be able to discard another organizer's offline
-    # work — get_current_user stamps oauth_client_id on the request for any
-    # OAuth token, so its presence flags a delegated credential.
+    # First-party IC sessions only — an OAuth token must not discard another
+    # organizer's offline work; get_current_user stamps oauth_client_id to detect one.
     if getattr(request.state, "oauth_client_id", None):
         raise HTTPException(
             status_code=403, detail="OAuth tokens cannot force-unlock tournaments"

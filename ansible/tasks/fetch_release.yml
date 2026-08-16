@@ -1,17 +1,13 @@
 ---
-# Download CI-built artifacts straight from the GitHub Release onto the control
-# node (the roles then copy them to the hosts). Self-contained: no make, no gh
-# CLI — so the deploy playbooks run identically from a laptop or a CI runner.
-# Skipped for artifact_source=local (deploy a local `just build-all`). Shared by
-# playbooks/deploy.yml (prod) and playbooks/deploy-beta.yml.
+# Self-contained: no make, no gh CLI, so the deploy playbooks run identically
+# from a laptop or a CI runner. Skipped for artifact_source=local.
 - name: Fetch release artifacts
   when: artifact_source == 'release'
   delegate_to: localhost
   become: false
   run_once: true
-  # Run for real even under --check: everything here is localhost-only (fills
-  # build/), and skipping it would starve the wheel-glob assert below — making
-  # dry runs impossible without pre-populated artifacts.
+  # Run for real even under --check: skipping it would starve the assert below,
+  # making dry runs impossible without pre-populated artifacts.
   check_mode: false
   block:
     - name: Reset local artifact dir
@@ -67,9 +63,8 @@
         mode: "0755"
 
     - name: Unpack frontend dist
-      # Use tar directly rather than ansible.builtin.unarchive: the control node
-      # may be macOS (laptop deploys), where unarchive can't find GNU tar and
-      # falls through to unzip on a .tar.gz. bsdtar and GNU tar both take -xzf.
+      # tar directly, not ansible.builtin.unarchive: on macOS (laptop deploys)
+      # unarchive can't find GNU tar and falls through to unzip on a .tar.gz.
       ansible.builtin.command:  # noqa: command-instead-of-module
         cmd: tar -xzf {{ build_dir }}/frontend-dist.tar.gz -C {{ frontend_dist_dir }}
       changed_when: true

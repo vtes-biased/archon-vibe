@@ -25,7 +25,6 @@
   let archonResult = $state<ArchonImportResult | null>(null);
   let archonConfirmOverwrite = $state(false);
 
-  // Reset transient state whenever the modal closes.
   $effect(() => {
     if (!show) {
       archonFile = null;
@@ -36,7 +35,6 @@
 
   async function handleArchonImport() {
     if (!archonFile) return;
-    // Confirm overwrite if tournament already has rounds
     if (hasRounds && !archonConfirmOverwrite) {
       archonConfirmOverwrite = true;
       return;

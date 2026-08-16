@@ -29,7 +29,6 @@
   const auth = $derived(getAuthState());
   const myUid = $derived(auth.user?.uid ?? '');
 
-  // Use parent-provided decksByUser if available, otherwise load locally
   let localDecks = $state<Record<string, DeckObject[]>>({});
 
   $effect(() => {
@@ -50,7 +49,6 @@
   // Per-player rounds played (open rounds: each player progresses through the pool independently).
   const myRoundsPlayed = $derived(roundsPlayed(tournament, myUid));
 
-  // For multideck: how many slots to show (this player's rounds played + 1 upcoming, capped by max_rounds)
   const deckSlotCount = $derived.by(() => {
     if (!isMultideck) return 1;
     const slots = myRoundsPlayed + 1;
@@ -82,7 +80,6 @@
 
   function onUploaded() {
     uploadingFor = null;
-    // Reload local decks from IDB after upload (when not using parent prop)
     if (!decksByUserProp) {
       getDecksByTournamentGrouped(tournament.uid).then(grouped => {
         localDecks = grouped;
@@ -101,11 +98,9 @@
     if (s === 'Playing') {
       return isMultideck ? !isDeckLocked(index) : false;
     }
-    // Planned, Registration, Waiting: always allowed
     return s === 'Planned' || s === 'Registration' || s === 'Waiting';
   }
 
-  // Can the player upload (single-deck mode or first deck)
   const canPlayerUpload = $derived.by(() => {
     const s = tournament.state;
     if (s === 'Planned' || s === 'Registration' || s === 'Waiting') return true;
@@ -114,14 +109,12 @@
     return false;
   });
 
-  // Can the player delete (single-deck mode)
   const canPlayerDelete = $derived.by(() => {
     const s = tournament.state;
     if (s === 'Planned' || s === 'Registration' || s === 'Waiting') return true;
     return false;
   });
 
-  // Single-deck: player can edit before they've played any round or after the tournament ends
   const singleDeckEditable = $derived(myRoundsPlayed === 0 || tournament.state === 'Finished');
 
   async function deleteDeck(playerUid: string, deckIndex?: number) {
@@ -132,23 +125,22 @@
         multideck: isMultideck,
       });
     } catch (e) {
-      // Surface to the user (not console-only): tournamentAction's server-only
-      // fallback no longer toasts, so this is the delete's error surface.
+      // Surface to the user: tournamentAction's server-only fallback doesn't
+      // toast, so this is the delete's error surface.
       console.error('Delete deck error:', e);
       showToast({ type: 'error', message: toUserMessage(e, m.tournament_error_action()) });
     }
   }
 
-  // Winner info for nudges
   const winnerUid = $derived(tournament.winner ?? '');
   const winnerHasDeck = $derived(
     !!winnerUid && !!(decksByUser[winnerUid]?.length)
   );
   const isWinner = $derived(myUid === winnerUid);
 
-  // Determine which decks are visible
-  // IDB already has role-appropriate data (organizers see all, members see public+own).
-  // Only client filter needed: decklists_mode for "visible decks" section post-tournament.
+  // IDB already has role-appropriate data (organizers see all, members see
+  // public+own); only decklists_mode needs a client filter, for the
+  // post-tournament visible-decks section.
   const visibleDecks = $derived.by(() => {
     if (Object.keys(decksByUser).length === 0) return {};
     if (tournament.state !== 'Finished') return {};
@@ -166,13 +158,11 @@
     return result;
   });
 
-  // Visible decks: entries for other players + total count (used in template)
   const deckEntries = $derived(Object.entries(visibleDecks).filter(([uid]) => uid !== myUid));
   const totalVisibleDecks = $derived(deckEntries.reduce((n, [, d]) => n + d.filter(Boolean).length, 0));
 </script>
 
 <div class="space-y-6">
-  <!-- Decklist required reminder -->
   {#if tournament.decklist_required && tournament.state === 'Registration'}
     <div class="banner-warn border rounded-lg p-3 text-sm">
       {#if isPlayer && myDecks.length === 0}
@@ -184,9 +174,9 @@
       {/if}
     </div>
   {:else if tournament.decklist_required && tournament.state === 'Waiting'}
-    <!-- Check-in window: the loud message is "check in" (PlayerView banner). A
-         present deck is the happy path → quiet note, not an amber warning. The
-         no-deck penalty warning lives beside the check-in CTA in PlayerView. -->
+    <!-- The loud message here is check-in (PlayerView banner); a deck present is
+         the happy path, so this stays a quiet note. The no-deck penalty warning
+         lives beside the check-in CTA in PlayerView. -->
     {#if isPlayer && myDecks.length > 0}
       <p class="text-xs text-ink-muted">{m.decks_submitted_note()}</p>
     {:else if !isPlayer}
@@ -194,7 +184,6 @@
     {/if}
   {/if}
 
-  <!-- Winner's deck nudge (post-tournament) -->
   {#if tournament.state === 'Finished' && winnerUid && !winnerHasDeck}
     {#if isWinner}
       <div class="bg-accent-soft/30 border border-accent-strong/50 rounded-lg p-3 text-sm text-link-soft">
@@ -203,10 +192,8 @@
     {/if}
   {/if}
 
-  <!-- Player's own deck(s) -->
   {#if isPlayer}
     {#if isMultideck}
-      <!-- Multideck: per-round slots (accordion) -->
       <div class="bg-surface-muted/50 rounded-lg p-3 sm:p-4 space-y-2">
         <h3 class="text-sm font-semibold text-ink-strong">{m.decks_my_decks()}</h3>
         {#each Array(deckSlotCount) as _, slotIdx}
@@ -275,13 +262,11 @@
         {/each}
       </div>
     {:else}
-      <!-- Single-deck -->
       <div class="bg-surface-muted/50 rounded-lg">
         {#if myDecks.length > 0 && myDecks[0]}
-          <!-- Folded by default and never auto-expanded: keeps a nearby opponent
-               from inadvertently glancing at the player's own decklist. The
-               check-in "Fix your deck" CTA scrolls here but deliberately leaves
-               it collapsed. -->
+          <!-- Folded by default, never auto-expanded: keeps a nearby opponent
+               from glancing at the decklist. The check-in "Fix your deck" CTA
+               scrolls here but leaves it collapsed. -->
           <button
             class="w-full flex items-center gap-3 p-3 sm:p-4 text-left min-h-[44px]"
             onclick={() => { const next = new Set(expandedDecks); if (next.has('my')) next.delete('my'); else next.add('my'); expandedDecks = next; }}
@@ -340,7 +325,6 @@
     {/if}
   {/if}
 
-  <!-- Visible decks (post-tournament, collapsible) -->
   {#if deckEntries.length > 0}
     <div class="space-y-2">
       <div class="flex items-center justify-between">

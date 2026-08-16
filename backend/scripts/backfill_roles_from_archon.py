@@ -1,87 +1,24 @@
 """Restore app roles the legacy-archon migration dropped (report, then `--apply`).
 
-The ETL seeds `roles` only on the INSERT path (`migrate_from_archon.build_user`);
-merge mode deliberately never writes them ("roles are app-managed post-seed"). So
-for every member the VEKN member sync had ALREADY created before the ETL ran, the
-legacy role list was silently discarded and the account kept only what
-`vekn_sync._derive_role_seeds` could reconstruct: Prince from `princeid`, NC from
-`coordinatorid`, IC from the hardcoded ADMINS set, and at most one judge rank from
-the ~44-entry JUDGES dict in `backend/src/data/vekn_roster.py` (that dict has since
-been removed — the app is the system of record for judge ranks). Everything else
-legacy recorded was lost — which is how Portuguese judges came to be missing their
-rank in the new app.
+UNION ONLY, never replace — roles are app-managed since the migration, so a
+replace would drop grants made in the new app.
 
-UNION ONLY. Roles have been app-managed since the migration, so a replace would
-drop grants made in the new app. This script only ever ADDS.
+Default scope is Judge/Judgekin only. Measured on prod 2026-08-09, the new DB
+is a strict subset of legacy for those two (pure migration loss, safe to
+union); Prince/NC/Ethics diverge in BOTH directions (real in-app churn since
+cutover — legacy only ever mirrored vekn.net's princeid/coordinatorid for
+Prince/NC), and Prince/NC also confer a data-access projection that a stale
+grant would leak publicly. Widening `--roles` to them needs a reviewed call.
 
-Scope — why only judge ranks by default (measured on prod 2026-08-09):
+A user whose `local_modifications` carries "roles" is reported and SKIPPED —
+their roles were edited in the app since cutover, so a union could resurrect a
+deliberately revoked grant.
 
-    role         legacy  new   only-legacy  only-new
-    Prince          465  472            27        34
-    NC               42   42             2         2
-    Judge            35   20            15         0
-    Judgekin         70   21            49         0
-    Rulemonger        5    5             0         0
-    Ethics            1    7             0         6
-    IC                6    6             0         0
-
-Two rules decide the scope, and NEITHER is "the sync will fix it" — no sync ever
-updates roles (`vekn_sync.py`:578-582), so the new DB's Prince/NC state is itself
-just a per-account creation-time snapshot.
-
-  * DIRECTIONALITY. `only-new = 0` for Judge/Judgekin: the new DB is a strict
-    SUBSET of legacy, the signature of pure migration loss — nobody has gained a
-    judge rank in the new app, so every gap is something we dropped. Prince, NC
-    and Ethics diverge in BOTH directions, the signature of two snapshots of a
-    moving target plus real in-app management (Ethics 1→7 is entirely
-    post-cutover grants). A union can only ADD, so backfilling a bidirectionally
-    divergent role monotonically inflates the officials list with people VEKN has
-    since replaced.
-  * ACCESS. Restore only roles that confer no data-access projection. Judge and
-    Judgekin appear in no branch of `access_levels.py` and are absent from
-    `routes/users.py`'s `access_roles = {NC, IC}` — a stale judge rank leaks
-    nothing. Prince and NC both hit `access_levels.py`:102, which puts them in
-    the PUBLIC officials directory with their contact fields (obfuscated to
-    anonymous viewers, plain to members): restoring 27 stale Princes would
-    publish 27 people's contact details on the strength of an office they no
-    longer hold. NC additionally carries FULL country-scoped access and implicit
-    organizer rights over every tournament in-country — and the two candidates
-    are in Canada and the US, which already have a different, current NC.
-    Widening `--roles` to NC manufactures duplicate national coordinators; don't.
-
-Legacy archon was never authoritative for these: Princes are appointed by their NC
-(or IC) and NCs by the IC (wiki/access.md), vekn.net's `princeid`/`coordinatorid`
-IS the register of those appointments, and legacy held a mirror of it. A mirror
-never outranks the register.
-
-Rulemonger and IC match exactly, so no other role has anything to restore.
-
-Judge rank decays on an activity requirement (`reference/judges-guide.md`:579-580
-— Judges yearly, Judgekins six-monthly), so some restored ranks will be stale.
-Pruning those is a Rulemonger exercise afterwards, not a reason to withhold a
-member's rank now.
-
-A user whose `local_modifications` carries "roles" has had their roles edited in
-the app since the cutover (`routes/users.py` stamps the marker on every role
-write), so a union could resurrect a role someone deliberately revoked. Those
-users are reported and SKIPPED, never written. The backfill does
-NOT stamp the marker itself: no sync writes roles, so it would have no protective
-effect, and keeping it to mean "a human changed this in the app" is what makes it
-a trustworthy exclusion signal for any future re-run.
-
-Idempotent: a second run finds no gaps. Writes go through `db.save_user`, so the
-public/member/full projections are recomputed byte-identically to runtime. Like
-the ETL, writes here are NOT broadcast over SSE (broadcast is in-process in the
-backend); clients pick them up on their next catch-up sync — and since the SSE
-stream has no lifetime cap, "next" for an always-connected client means the next
-backend restart, so prefer running this adjacent to a deploy. No access-version
-nudge is owed: that fingerprint covers only `db._OVERLAY_ROLES` (IC/NC), which a
-judge rank does not touch.
-
-Two side effects worth knowing. `db.init_db()` executes `schema.sql` against the
-target — idempotent DDL, but it takes locks and WILL fail with `LockNotAvailable`
-if the backend is mid-write; just re-run. And `--apply` re-pushes Discord Linked
-Roles metadata for everyone it writes (see `push_discord`).
+Idempotent; writes are NOT broadcast over SSE (clients pick them up on their
+next catch-up sync, so prefer running this adjacent to a deploy). `db.init_db()`
+takes DDL locks and WILL fail with `LockNotAvailable` if the backend is
+mid-write — just re-run. `--apply` also re-pushes Discord Linked Roles metadata
+for everyone it writes.
 
     # report only (default)
     OLD_DATABASE_URL=... NEW_DATABASE_URL=... \\
@@ -130,10 +67,8 @@ if not _have_backend:
 from backend.src import db  # noqa: E402
 from backend.src.models import Role  # noqa: E402
 
-# Must match migrate_from_archon.ROLE_MAP. Inlined rather than imported: legacy
-# archon is read-only and being decommissioned, so this mapping is frozen and
-# cannot drift — not worth importing a 1700-line module (and its whole vekn_sync
-# graph) for nine constant pairs.
+# Must match migrate_from_archon.ROLE_MAP. Inlined rather than imported — legacy
+# archon is frozen (read-only, decommissioning); not worth the import for nine pairs.
 ROLE_MAP: dict[str, Role] = {
     "Admin": Role.IC,
     "Playtester": Role.PT,
@@ -197,9 +132,8 @@ async def load_legacy(
             else:
                 unmapped.add(r)
         if mapped:
-            # Legacy `members` has no unique index on vekn (the new DB does), so
-            # union rather than assign — a second row for the same id must not
-            # silently drop the first one's roles.
+            # Legacy `members` has no unique index on vekn — union rather than
+            # assign, so a second row for the same id can't drop the first's roles.
             roles.setdefault(vekn, set()).update(mapped)
             names.setdefault(vekn, name)
     return roles, names, unmapped
@@ -249,14 +183,7 @@ def print_census(legacy: dict[str, set[Role]], new: dict[str, dict]) -> None:
 async def push_discord(uids: list[str]) -> None:
     """Re-push Discord Linked Roles metadata for users whose roles just changed.
 
-    Judge/Judgekin are the only inputs to Discord's `judge` field
-    (`roles_hook._JUDGE_LEVELS`), and `routes/users.py` is the only thing that
-    normally pushes on a role change — nothing reconciles periodically. Without
-    this, a restored judge reads `judge: 0` in Discord until they re-link or a
-    Rulemonger re-edits them: the same gap this script exists to close, one
-    system over. Sequential and awaited, not create_task — close_db() would kill
-    in-flight work. Each call no-ops without a stored token and swallows its own
-    errors, so most of these cost one lookup.
+    Sequential and awaited, not create_task — close_db() would kill in-flight work.
     """
     if not uids:
         return
@@ -421,8 +348,6 @@ def parse_args() -> argparse.Namespace:
         p.error(f"{err} — valid roles: {[r.value for r in Role]}")
     if not args.roles:
         p.error("--roles is empty")
-    # The docstring explains at length why widening to an access-bearing role is
-    # a bad idea; say it again to whoever skipped the docstring.
     risky = {Role.PRINCE, Role.NC, Role.IC} & set(args.roles)
     if risky:
         print(

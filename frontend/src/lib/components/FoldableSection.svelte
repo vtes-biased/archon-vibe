@@ -2,15 +2,8 @@
   import { ChevronDown, ChevronRight } from "@lucide/svelte";
   import type { Snippet } from "svelte";
 
-  // One shell for every configuration section, so the setup surfaces read as
-  // peers instead of the three tiers they grew into (always-visible headings,
-  // disclosures, and headings nested inside disclosures).
-  //
-  // Sections open independently and stay open: this is a workspace, not a
-  // directory. You compare across sections while configuring — round count
-  // against timer length, rank against the rules it disables — and the form
-  // auto-saves, so its "Saved" chip is the only confirmation there is; closing
-  // a section on you would hide it.
+  // Sections open independently and stay open: this is a workspace, not a directory. The form
+  // auto-saves with no Cancel, so closing a section on you would hide its only confirmation.
   let {
     title,
     open = $bindable(false),

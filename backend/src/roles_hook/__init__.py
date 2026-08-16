@@ -36,14 +36,12 @@ METADATA = [
     },
 ]
 
-# Role to integer level mappings
 _ORG_LEVELS = {Role.PRINCE: 2, Role.NC: 3, Role.IC: 4}
 _JUDGE_LEVELS = {Role.JUDGEKIN: 1, Role.JUDGE: 2, Role.RULEMONGER: 3}
 _PT_LEVELS = {Role.PT: 1, Role.PTC: 2}
 
 
 def build_metadata(user) -> dict[str, int]:
-    """Convert User roles to integer metadata levels."""
     roles = set(user.roles)
     org = max((_ORG_LEVELS.get(r, 0) for r in roles), default=0)
     if org == 0 and getattr(user, "vekn_id", None):
@@ -54,7 +52,6 @@ def build_metadata(user) -> dict[str, int]:
 
 
 def build_platform_info(user) -> tuple[str, str]:
-    """Return (platform_name, platform_username) for Discord profile display."""
     username = user.vekn_id if getattr(user, "vekn_id", None) else (user.name or "")
     return ("Archon", username)
 
@@ -84,7 +81,6 @@ async def register_metadata() -> None:
 
 
 async def push_role_metadata(user, access_token: str) -> bool:
-    """Push role metadata to Discord for a user using their OAuth access token."""
     client_id = os.getenv("DISCORD_CLIENTID", "")
     if not client_id:
         return False
@@ -116,7 +112,6 @@ async def push_role_metadata(user, access_token: str) -> bool:
 
 
 async def refresh_discord_token(refresh_token: str) -> dict | None:
-    """Refresh an expired Discord OAuth token. Returns new token dict or None."""
     client_id = os.getenv("DISCORD_CLIENTID", "")
     client_secret = os.getenv("DISCORD_SECRET", "")
     if not client_id or not client_secret:
@@ -145,7 +140,7 @@ async def sync_user_discord_roles(user_uid: str) -> None:
 
         stored = await get_transient_token(f"discord_rc:{user_uid}")
         if not stored:
-            return  # User has no stored Discord token
+            return
 
         user = await get_user_by_uid(user_uid)
         if not user:
@@ -154,12 +149,10 @@ async def sync_user_discord_roles(user_uid: str) -> None:
         access_token = stored.get("access_token", "")
         rt = stored.get("refresh_token", "")
 
-        # Try push with current token
         ok = await push_role_metadata(user, access_token)
         if ok:
             return
 
-        # Token likely expired — refresh
         if not rt:
             await delete_transient_token(f"discord_rc:{user_uid}")
             return
@@ -169,7 +162,6 @@ async def sync_user_discord_roles(user_uid: str) -> None:
             await delete_transient_token(f"discord_rc:{user_uid}")
             return
 
-        # Store refreshed tokens
         from datetime import UTC, datetime, timedelta
 
         await store_transient_token(

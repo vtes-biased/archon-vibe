@@ -1,23 +1,10 @@
-//! Structured engine errors: the single greppable taxonomy.
-//!
-//! Every fallible core function returns `Result<T, EngineError>`. The enum is the
-//! contract with the frontend: `code()` strings map 1:1 to paraglide `err_*` keys
-//! (dots → underscores), `params()` feed `{param}` interpolation, and `Display`
-//! renders the canonical English — kept byte-identical to `frontend/messages/en.json`
-//! so the Discord bot, server logs, and any non-i18n client read the same text.
-//!
-//! Domain rejections (a user can act on them) get their own variant. Anything the
-//! user can't act on — JSON parse/serialize failures, event-schema violations,
-//! enum drift between stacks — collapses to `Internal { detail }`: the frontend
-//! shows a generic message and logs the detail. Validation of *already-parsed*
-//! JSON must construct an explicit variant; the `From` impls below exist only for
-//! genuine deserialization failures and `?`-converted internal notes.
+//! Structured engine errors: the single greppable taxonomy for every engine
+//! rejection.
 
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum EngineError {
-    // Authorization
     NotOrganizer,
     CreateForbidden,
     UnregisterOnlySelf,
@@ -29,7 +16,6 @@ pub enum EngineError {
     ScoreLocked,
     ScoreSetByOrganizer,
     LeagueLinkForbidden,
-    // Registration / eligibility
     VeknIdRequired,
     AlreadyRegistered,
     NotRegistered,
@@ -39,7 +25,6 @@ pub enum EngineError {
     PlayerNotCheckedIn,
     PlayerAlreadyFinished,
     PlayerWrongState { current: String },
-    // State machine
     WrongState { expected: String, current: String },
     CannotAddPlayers,
     CannotRemovePlayers,
@@ -48,7 +33,6 @@ pub enum EngineError {
     CannotFinish,
     CannotAlterSeating,
     CannotSetNonCompeting,
-    // Rounds / seating
     NoRoundInProgress,
     NoRoundToFinish,
     NoRoundToCancel,
@@ -75,7 +59,6 @@ pub enum EngineError {
     TableFull,
     TableNotEmpty,
     RoundNotLive,
-    // Scoring / finals / toss
     InvalidScore,
     FinalsMinRounds,
     FinalsAlreadyStarted,
@@ -84,7 +67,6 @@ pub enum EngineError {
     NoFinalsInProgress,
     FinalsTableUnfinished,
     TossMinRounds,
-    // Decks / raffle / config
     DeckLockedFinished,
     DeckLockedPlaying,
     DeckLockedRound,
@@ -103,12 +85,10 @@ pub enum EngineError {
     DeckNoCards,
     SeatingMinPlayers,
     SeatingMinRounds,
-    // Self-organized rounds (player-initiated open-rounds pods)
     SelfOrganizeDisabled,
     SelfOrganizeNotOpenRounds,
     SelfOrganizeNotSeated,
     SelfOrganizeIneligible { player: String },
-    // Not user-actionable
     Internal { detail: String },
 }
 

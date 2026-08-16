@@ -1,18 +1,5 @@
-/**
- * Engine error contract: typed errors carrying the engine's stable
- * `{ code, params }` so the UI can render localized messages.
- *
- * The Rust engine serializes rejections as `{"code","params","message"}` JSON:
- * thrown as a JS string over WASM, carried as top-level `code`/`params` next to
- * `detail` in the backend's 400 body. `ENGINE_MESSAGES` maps each public code to
- * its paraglide `err_*` key (code dots → underscores); the catalog lives in
- * engine/src/error.rs and messages/en.json mirrors its English byte-for-byte.
- *
- * Lookup is `ENGINE_MESSAGES[code]?.(params)` — a missing key (e.g. a future
- * code from a newer backend under version skew) falls through to the caller's
- * English fallback, never throws. `internal` maps to a generic localized
- * message: parse/invariant noise is logged, not shown.
- */
+// ENGINE_MESSAGES maps each engine/src/error.rs code (dots → underscores) to a paraglide err_* key;
+// messages/en.json mirrors the Rust Display byte-for-byte. A missing key falls through to the caller's English fallback, never throws.
 import * as m from './paraglide/messages.js';
 
 /** A structured engine rejection, re-thrown from WASM calls and JS pre-checks. */
@@ -27,10 +14,8 @@ export class EngineError extends Error {
   }
 }
 
-/**
- * Parse a thrown value as the engine's wire JSON; returns null when it isn't
- * one (legacy free-text string throws keep the passthrough path).
- */
+/** Parses a thrown value as the engine's wire JSON; returns null when it isn't one (legacy
+ * free-text string throws keep the passthrough path). */
 export function engineErrorFromThrown(e: unknown): EngineError | null {
   if (typeof e !== 'string' || !e.startsWith('{')) return null;
   try {

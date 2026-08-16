@@ -19,11 +19,8 @@
     /** Runs the operation; may resolve with a stats map (or { stats }) to display. */
     action: () => Promise<unknown>;
     onClose: () => void;
-    /**
-     * Keep the modal open on success to show stats — right for the admin syncs,
-     * wrong for a plain confirm, where the screen changing IS the confirmation
-     * and a second dismissal is one click of nothing. Errors always stay.
-     */
+    /** Keep the modal open on success to show stats — right for the admin syncs, wrong for a plain
+     * confirm, where the screen changing IS the confirmation. Errors always stay. */
     reportResult?: boolean;
   } = $props();
 
@@ -43,9 +40,8 @@
     started = false;
     try {
       const result = await action();
-      // Background-dispatched jobs (the admin syncs) return
-      // {status:'started'|'already_running'} with no stats — the outcome shows
-      // up in the status panel, not here.
+      // Background-dispatched jobs (the admin syncs) return {status:'started'|'already_running'}
+      // with no stats — the outcome shows up in the status panel, not here.
       if (!reportResult) {
         onClose();
         return;

@@ -1,16 +1,5 @@
-// Server-clock offset correction (mini-NTP over /api/time).
-//
-// The round timer subtracts a SERVER-stamped `started_at` from the CLIENT's
-// Date.now(); a mis-set device clock therefore renders phantom elapsed time
-// (a device 4m fast shows a fresh 120:00 round as 115:32).
-//
-// We keep Date.now() as the timebase — it survives sleep/hibernate (the OS
-// restores the wall clock on wake, so the countdown accounts for the sleep) —
-// and correct only its OFFSET against OUR server, the same clock that stamps
-// started_at. Every viewer then references one reference clock and converges to
-// sub-second (no "5 devices, 5 timers"). A monotonic performance.now() timebase
-// would fix skew but regress on sleep (it pauses during suspend), so it is used
-// only as a divergence watchdog, never as the clock.
+// Server-clock offset correction (mini-NTP over /api/time). Timebase is Date.now() (survives sleep,
+// unlike performance.now()), corrected only by its OFFSET against our server, so every viewer converges on one reference clock instead of 5 devices/5 timers.
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -90,12 +79,8 @@ async function syncClock(): Promise<void> {
   }
 }
 
-// Each tick: compare Δwall (Date.now) vs Δmono (performance.now). Normal ticks —
-// including a throttled hidden tab — advance both together. A sleep pauses mono
-// but not wall, and a wall-clock step (NTP jump, manual set) moves wall but not
-// mono; either diverges the deltas and invalidates the offset ⇒ re-sync. One
-// check covers both. A step fires the divergence exactly once (next tick both
-// deltas are normal again), so a failed re-sync can't loop.
+// Compares Δwall vs Δmono each tick: a sleep pauses mono but not wall, and a wall-clock step (NTP
+// jump, manual set) moves wall but not mono — either diverges the deltas and triggers one re-sync (self-resolves next tick, so a failed re-sync can't loop).
 function tick(): void {
   const wall = Date.now();
   const mono = performance.now();
@@ -115,9 +100,8 @@ function start(): void {
   lastMono = performance.now();
   void syncClock();
   watchdog = setInterval(tick, WATCHDOG_INTERVAL_MS);
-  // Resume (tab foreground / device wake) and SSE-reconnect proxy (online) both
-  // re-align the offset. The SyncManager 'connected' event isn't wired here to
-  // keep the store decoupled; 'online' covers the reconnect case in practice.
+  // Resume (tab foreground / device wake) and the 'online' event both re-align the offset. SyncManager's
+  // 'connected' event isn't wired here to keep this store decoupled; 'online' covers the reconnect case in practice.
   document.addEventListener("visibilitychange", onVisible);
   window.addEventListener("online", syncClock);
   cleanup = () => {
@@ -129,11 +113,8 @@ function start(): void {
   };
 }
 
-/**
- * Ref-counted activation: a TimerDisplay calls this on mount and invokes the
- * returned disposer on unmount. The probe/watchdog run only while a timer is on
- * screen (many timers share one clock). Not reactive — call from an $effect.
- */
+/** Ref-counted activation: a TimerDisplay calls this on mount and invokes the returned disposer on
+ * unmount — the probe/watchdog run only while a timer is on screen. Not reactive — call from an $effect. */
 export function activateClock(): () => void {
   consumers++;
   if (consumers === 1) start();
@@ -148,11 +129,8 @@ export function getClockOffset(): number {
   return offset;
 }
 
-/**
- * Signed raw system-clock skew (ms) when it exceeds the advisory threshold, else
- * null. Positive = device clock ahead of the server. The offset CORRECTS the
- * skew, so raw skew = −offset. Reactive; null until a sync lands.
- */
+/** Signed raw system-clock skew (ms) past the advisory threshold, else null. Positive = device ahead
+ * of server; the offset CORRECTS the skew, so raw skew = −offset. Reactive; null until a sync lands. */
 export function getClockSkewAdvisory(): number | null {
   if (!synced) return null;
   const skew = -offset;

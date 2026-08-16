@@ -1,6 +1,5 @@
-// Country code → default UI/content language. Reference data shared by the
-// community and profile views (best-effort default; the user can always pick
-// another language). Not exhaustive — unlisted countries fall back at the call site.
+// Country code → default UI/content language (best-effort default; the user can always pick another).
+// Not exhaustive — unlisted countries fall back at the call site.
 export const COUNTRY_LANGUAGE: Record<string, string> = {
   US: 'en', GB: 'en', AU: 'en', CA: 'en', NZ: 'en', IE: 'en', ZA: 'en',
   FR: 'fr', BE: 'fr', CH: 'fr', MC: 'fr',

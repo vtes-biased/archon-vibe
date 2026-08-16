@@ -13,7 +13,6 @@ function apply(p: ThemePref) {
     ?.setAttribute('content', isLight ? '#A40F2D' : '#DC143C');
 }
 
-// Listen for OS theme changes when pref is 'system'
 if (typeof window !== 'undefined') {
   matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
     if (pref === 'system') apply('system');

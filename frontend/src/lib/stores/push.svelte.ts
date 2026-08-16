@@ -1,16 +1,5 @@
-/**
- * Web Push subscription lifecycle (#314).
- *
- * The browser's `pushManager.getSubscription()` is the source of truth for whether this
- * device is subscribed; this store mirrors it reactively for the UI and drives the
- * subscribe/unsubscribe gestures. Subscribing must happen from a user gesture (iOS), and
- * on iOS only works for an installed (standalone) PWA — see `isIOS`/`isStandalone`.
- *
- * Lazy reconcile: after a `pushsubscriptionchange` the service worker re-subscribes
- * locally (it has no auth); `reconcilePush()` (called on app open while logged in)
- * re-POSTs the current subscription so the backend learns the new endpoint, and the
- * stale one is pruned server-side on its next 404/410.
- */
+// pushManager.getSubscription() is the source of truth for subscription state; this store mirrors
+// it reactively. Subscribing must happen from a user gesture and, on iOS, only works for an installed PWA.
 import {
   deletePushSubscription,
   getVapidPublicKey,
@@ -35,7 +24,6 @@ export function isPushBusy(): boolean {
   return busy;
 }
 
-/** True when this browser can do Web Push at all. */
 export function pushSupported(): boolean {
   return (
     typeof window !== 'undefined' &&
@@ -65,12 +53,8 @@ export function isIOS(): boolean {
   );
 }
 
-/**
- * True only for real iOS Safari — the ONLY iOS browser that can install a
- * push-capable PWA. Chrome (CriOS), Firefox (FxiOS), Edge (EdgiOS) and in-app
- * webviews (which lack the "Safari" token) can't Add-to-Home-Screen into a
- * standalone app, so those users must be told to open the page in Safari first.
- */
+/** True only for real iOS Safari — the only iOS browser that can install a push-capable PWA; Chrome
+ * (CriOS)/Firefox (FxiOS)/Edge (EdgiOS)/in-app webviews can't A2HS into standalone, so those users must be told to open in Safari first. */
 export function isIOSSafari(): boolean {
   if (!isIOS() || typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent;
@@ -99,11 +83,7 @@ export async function refreshPushState(): Promise<void> {
   subscribed = !!(await currentSubscription());
 }
 
-/**
- * Subscribe this browser (MUST be called from a user gesture). Requests permission,
- * subscribes via pushManager, and registers the subscription with the backend.
- * Returns true on success, false if denied/unsupported/failed.
- */
+/** MUST be called from a user gesture (iOS). Returns true on success, false if denied/unsupported/failed. */
 export async function enablePush(): Promise<boolean> {
   if (!pushSupported() || busy) return false;
   busy = true;
@@ -152,11 +132,8 @@ export async function disablePush(): Promise<void> {
   }
 }
 
-/**
- * Lazy reconcile after a key rotation or SW re-subscribe. Re-POSTs the current
- * subscription so the backend has the live endpoint. No-op when unsupported, offline,
- * permission not granted, or not subscribed. Call on app open while authenticated.
- */
+/** Lazy reconcile after a key rotation or SW re-subscribe: re-POSTs the current subscription so the
+ * backend has the live endpoint. No-op when unsupported, offline, permission not granted, or not subscribed. */
 export async function reconcilePush(): Promise<void> {
   if (!pushSupported() || !isOnline()) return;
   permission = Notification.permission;

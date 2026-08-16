@@ -1,17 +1,6 @@
-"""Sanction → table-channel routing.
-
-``sanction_table_channel`` decides whether a sanction posts into a table voice
-channel or falls back to the lobby. ``_table_channels`` always maps the LIVE
-context's channels, so a past-round back-correction (only standings adjustments
-carry ``round_number``) must NOT resolve its table index against the live round
-— a round-1 adjustment issued during round 3 would land among strangers.
-
-Pure function, no bot/REST — only env vars to satisfy the config import.
-
-Run from bot/:
-    DISCORD_BOT_TOKEN=x OAUTH_CLIENT_ID=x OAUTH_CLIENT_SECRET=x \
-        uv run --with pytest pytest -q
-"""
+"""A past-round back-correction must NOT resolve its table index against the
+live round — a round-1 adjustment issued during round 3 would land among
+strangers."""
 
 from __future__ import annotations
 

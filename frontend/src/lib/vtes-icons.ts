@@ -1,12 +1,4 @@
-/**
- * VTES icon font mappings (from krcg-static ankha2.otf and vtes-clans.otf).
- *
- * Discipline trigrams (lowercase = inferior, uppercase = superior) → font character.
- * Card type names → font character.
- * Clan names → font character.
- */
-
-/** Discipline trigram → Ankha VTES font character */
+// VTES icon font mappings (krcg-static ankha2.otf / vtes-clans.otf).
 export const DISCIPLINE_ICONS: Record<string, string> = {
   // Inferior (lowercase trigrams)
   aus: 'a', obe: 'b', cel: 'c', dom: 'd', dem: 'e', for: 'f',
@@ -27,7 +19,6 @@ export const DISCIPLINE_ICONS: Record<string, string> = {
   viz: ')',
 };
 
-/** Card type → Ankha VTES font character */
 export const TYPE_ICONS: Record<string, string> = {
   'Action': '0',
   'Action Modifier': '1',
@@ -47,17 +38,10 @@ export const TYPE_ICONS: Record<string, string> = {
 };
 
 
-/**
- * Get the font character for a discipline trigram.
- * Input can be "for", "FOR", "Fortitude", etc.
- */
 export function disciplineIcon(trigram: string): string | undefined {
   return DISCIPLINE_ICONS[trigram];
 }
 
-/**
- * Get the font character for a card type.
- */
 export function typeIcon(type: string): string | undefined {
   return TYPE_ICONS[type];
 }

@@ -1,7 +1,6 @@
 <script lang="ts">
-  // Promos tab orchestrator. Progressive disclosure: anyone sees the gallery
-  // (public, offline-capable), signed-in holders see their own stock, officials
-  // get the inventory panel, IC additionally mints/edits catalog entries.
+  // Progressive disclosure: anyone sees the gallery (public, offline-capable), signed-in holders see
+  // their own stock, officials get the inventory panel, IC additionally mints/edits catalog entries.
   import type { Promo } from "$lib/types";
   import { getAllPromos, getUser } from "$lib/db";
   import { syncManager } from "$lib/sync";

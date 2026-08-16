@@ -1,20 +1,6 @@
-"""Two behavioural invariants of ``reconcile_channels`` that hold regardless of the
-exact REST calls it makes (so they're worth pinning even against a fake bot, which
-can't validate the calls themselves — the bot has no Discord integration test):
-
-  - IDEMPOTENT CONVERGENCE: a second reconcile of an already-matching Discord state
-    creates and deletes nothing. This is what makes a reconnect / repeated /sync
-    safe, and it's the property the whole "make state match, don't replay actions"
-    design rests on.
-  - NO PER-CHANNEL FETCH (principal-engineer HARD requirement): a survivor's
-    permissions are reconciled from the overrides already on the
-    ``fetch_guild_channels`` payload, never a per-channel ``fetch_channel`` — here
-    the fake's ``fetch_channel`` RAISES, so any regression to re-fetching fails loud.
-
-Run from bot/:
-    DISCORD_BOT_TOKEN=x OAUTH_CLIENT_ID=x OAUTH_CLIENT_SECRET=x \
-        uv run --with pytest --with pytest-asyncio pytest -q
-"""
+"""A survivor's permissions are reconciled from the overrides already on the
+``fetch_guild_channels`` payload, never a per-channel ``fetch_channel`` — here
+the fake's ``fetch_channel`` RAISES, so any regression to re-fetching fails loud."""
 
 from __future__ import annotations
 
@@ -214,10 +200,8 @@ async def test_in_sync_survivor_uses_payload_overwrites_never_refetches() -> Non
 
 @pytest.mark.asyncio
 async def test_reconcile_preserves_the_bots_own_overwrite() -> None:
-    # The bot grants itself an overwrite on every table voice channel so it can
-    # later DELETE it (Discord needs CONNECT to delete a voice channel). The bot is
-    # never a seated player, so a naive stale-diff would reap that overwrite —
-    # leaving teardown unable to remove the channel. Reconcile must keep it.
+    # The bot is never a seated player, so a naive stale-diff would reap its
+    # self-granted overwrite — leaving teardown unable to delete the channel.
     ch = FakeChannel(
         201,
         "R1 - Table 1",
@@ -237,9 +221,7 @@ async def test_reconcile_preserves_the_bots_own_overwrite() -> None:
 @pytest.mark.asyncio
 async def test_judges_channel_privacy_and_membership_sync() -> None:
     # A pre-privacy judges channel (world-visible, a stale member override):
-    # reconcile must retrofit the @everyone VIEW+CONNECT deny and the bot's own
-    # allow, grant the organizers + setup runner, and reap the stale member —
-    # sanction details (member-level data) post here.
+    # reconcile must retrofit the deny/allow overrides and reap the stale member.
     judges = FakeChannel(
         JUDGES_ID,
         "judges",

@@ -89,10 +89,8 @@
               <tbody>
                 {#each sorted as entry}
                   {@const isTop8 = topUids.has(entry.tournament_uid)}
-                  <!-- Rows written before `position` existed fall back to
-                       finalist_position, which IS the placement for a winner (1) or
-                       finalist (2); non-finalists stay bare until the nightly
-                       recompute backfills them. -->
+                  <!-- Rows written before `position` existed fall back to finalist_position (the
+                       placement for a winner/finalist); non-finalists stay bare until the nightly recompute backfills them. -->
                   {@const place = entry.position || entry.finalist_position}
                   <tr class="{isTop8 ? 'text-ink-bright' : 'text-ink-faint'}">
                     <td class="py-1">

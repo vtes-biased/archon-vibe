@@ -19,7 +19,6 @@
     inline?: boolean;
   } = $props();
 
-  // Sanctions state
   let userSanctions = $state<Sanction[]>([]);
   let showSanctionModal = $state(false);
   let sanctionTargetUser = $state<User | null>(null);
@@ -29,7 +28,6 @@
   let sanctionExpiresAt = $state("");
   let creatingSanction = $state(false);
 
-  // Edit sanction modal
   let showEditSanctionModal = $state(false);
   let editingSanction = $state<Sanction | null>(null);
   let editSanctionLevel = $state<SanctionLevel>("warning");
@@ -39,7 +37,6 @@
   let processingSanctionAction = $state(false);
   let savingSanction = $state(false);
 
-  // Load sanctions when user changes
   $effect(() => {
     getActiveSanctionsForUser(user.uid).then((sanctions) => {
       userSanctions = sanctions;
@@ -122,9 +119,8 @@
     }
   }
 
-  // No-save principle: each field commits on change (selects/date on change,
-  // description on blur). Optimistic — the server result replaces the local copy;
-  // a rejection reverts the form to the stored sanction.
+  // No-save principle: each field commits on change (selects/date on change, description on blur).
+  // Optimistic — the server result replaces the local copy; a rejection reverts to the stored sanction.
   async function saveSanctionField(
     patch: { level?: SanctionLevel; category?: SanctionCategory; description?: string; expires_at?: string },
   ) {
@@ -202,7 +198,6 @@
 </script>
 
 {#if inline}
-  <!-- Inline mode: just badges in a row (for User.svelte view mode) -->
   {#if shownSanctions.length > 0}
     <div class="flex items-start gap-2">
       <span class="font-medium">{m.sanction_mgr_title()}:</span>
@@ -214,7 +209,6 @@
     </div>
   {/if}
 {:else}
-  <!-- Standalone section card -->
   {#if canIssueSanctions || shownSanctions.length > 0}
     <div class="mt-6">
       <h2 class="text-lg font-semibold text-ink-bright mb-3">{m.sanction_mgr_title()}</h2>
@@ -273,7 +267,6 @@
   {/if}
 {/if}
 
-<!-- Issue Sanction Modal -->
 {#if showSanctionModal && sanctionTargetUser}
   <div
     role="presentation"
@@ -394,7 +387,6 @@
   </div>
 {/if}
 
-<!-- Edit Sanction Modal -->
 {#if showEditSanctionModal && editingSanction}
   <div
     role="presentation"

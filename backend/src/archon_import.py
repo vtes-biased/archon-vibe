@@ -1,7 +1,5 @@
-"""Archon Excel spreadsheet import.
-
-Parses filled-in 'The Archon v1.5l' spreadsheets and imports tournament results
-into an existing tournament, replacing NC approval with automated validation.
+"""Archon Excel spreadsheet import: parses filled-in 'The Archon v1.5l' sheets
+and imports results into an existing tournament, in place of NC approval.
 """
 
 import io
@@ -33,11 +31,6 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Data structures
-# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -75,13 +68,7 @@ class ImportResult:
     has_finals: bool = False
 
 
-# ---------------------------------------------------------------------------
-# Parsing
-# ---------------------------------------------------------------------------
-
-
 def _cell_float(val) -> float:
-    """Convert cell value to float, defaulting to 0.0."""
     if val is None:
         return 0.0
     try:
@@ -91,7 +78,6 @@ def _cell_float(val) -> float:
 
 
 def _cell_int(val) -> int:
-    """Convert cell value to int, defaulting to 0."""
     if val is None:
         return 0
     try:
@@ -101,32 +87,21 @@ def _cell_int(val) -> int:
 
 
 def _cell_str(val) -> str:
-    """Convert cell value to string, defaulting to ''."""
     if val is None:
         return ""
     return str(val).strip()
 
 
 def parse_archon_file(file_bytes: bytes) -> ArchonData:
-    """Parse a filled-in Archon v1.5l spreadsheet.
-
-    Expected sheet layout (0-indexed):
-      0: Instructions
-      1: Tournament Info
-      2: Methuselahs (player list)
-      3: (unused)
-      4-6: Round 1/2/3
-      7: Final Round
-    """
+    """Parse a filled-in Archon v1.5l spreadsheet. Sheet layout (0-indexed):
+    1 tournament info, 2 methuselahs (players), 4-6 rounds 1-3, 7 final round."""
     wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
     sheets = wb.sheetnames
 
-    # --- Tournament Info (sheet index 1) ---
     ws_info = wb[sheets[1]]
     event_name = _cell_str(ws_info.cell(row=3, column=2).value) or "Imported Tournament"
     num_rounds = _cell_int(ws_info.cell(row=11, column=2).value) or 3
 
-    # --- Methuselahs (sheet index 2), rows 7+ ---
     ws_players = wb[sheets[2]]
     players: list[ArchonPlayer] = []
     row = 7
@@ -152,7 +127,6 @@ def parse_archon_file(file_bytes: bytes) -> ArchonData:
         )
         row += 1
 
-    # --- Rounds (sheet indices 4-6) ---
     rounds: list[list[ArchonRoundTable]] = []
     for round_idx in range(num_rounds):
         sheet_idx = 4 + round_idx
@@ -174,7 +148,6 @@ def parse_archon_file(file_bytes: bytes) -> ArchonData:
             vp = _cell_float(ws_round.cell(row=row, column=5).value)
 
             if current_table_num is not None and table_num != current_table_num:
-                # New table; save previous
                 tables.append(ArchonRoundTable(seats=current_seats))
                 current_seats = []
 
@@ -188,7 +161,6 @@ def parse_archon_file(file_bytes: bytes) -> ArchonData:
         if tables:
             rounds.append(tables)
 
-    # --- Finals (sheet index 7) ---
     finals: ArchonRoundTable | None = None
     if len(sheets) > 7:
         ws_finals = wb[sheets[7]]
@@ -216,27 +188,19 @@ def parse_archon_file(file_bytes: bytes) -> ArchonData:
     )
 
 
-# ---------------------------------------------------------------------------
-# Validation
-# ---------------------------------------------------------------------------
-
-
 def validate_archon_import(data: ArchonData, engine) -> list[str]:
     """Validate parsed archon data. Returns list of error strings (empty = valid)."""
     errors: list[str] = []
 
-    # 1. Minimum players with VEKN IDs
     players_with_vekn = [p for p in data.players if p.vekn_id]
     if len(players_with_vekn) < 4:
         errors.append(
             f"At least 4 players with VEKN IDs required, found {len(players_with_vekn)}"
         )
 
-    # 2. At least 1 round
     if not data.rounds:
         errors.append("At least 1 round with data is required")
 
-    # 3. Check for duplicate VEKN IDs
     vekn_ids = [p.vekn_id for p in data.players if p.vekn_id]
     seen: set[str] = set()
     for vid in vekn_ids:
@@ -244,13 +208,11 @@ def validate_archon_import(data: ArchonData, engine) -> list[str]:
             errors.append(f"Duplicate VEKN ID: {vid}")
         seen.add(vid)
 
-    # 4. Validate each round
     for r_idx, tables in enumerate(data.rounds):
         for t_idx, table in enumerate(tables):
             table_size = len(table.seats)
             vps = [s[1] for s in table.seats]
 
-            # Table size must be 4 or 5
             if table_size not in (4, 5):
                 errors.append(
                     f"Round {r_idx + 1}, Table {t_idx + 1}: "
@@ -258,7 +220,6 @@ def validate_archon_import(data: ArchonData, engine) -> list[str]:
                 )
                 continue
 
-            # VP values in 0.5 increments, 0 to table_size
             for s_idx, vp in enumerate(vps):
                 if vp < 0 or vp > table_size:
                     errors.append(
@@ -271,7 +232,6 @@ def validate_archon_import(data: ArchonData, engine) -> list[str]:
                         f"VP {vp} not in 0.5 increments"
                     )
 
-            # Engine VP check
             vp_error = engine.check_table_vps(vps)
             if vp_error:
                 errors.append(
@@ -279,7 +239,6 @@ def validate_archon_import(data: ArchonData, engine) -> list[str]:
                     f"invalid VP distribution: {vp_error}"
                 )
 
-    # 5. Finals validation
     if data.finals:
         fsize = len(data.finals.seats)
         if fsize not in (4, 5):
@@ -291,11 +250,6 @@ def validate_archon_import(data: ArchonData, engine) -> list[str]:
                 errors.append(f"Finals: invalid VP distribution: {vp_error}")
 
     return errors
-
-
-# ---------------------------------------------------------------------------
-# Import
-# ---------------------------------------------------------------------------
 
 
 async def apply_archon_import(
@@ -311,7 +265,6 @@ async def apply_archon_import(
     Builds tournament state directly (like vekn_tournament_sync.py) rather
     than replaying events.
     """
-    # 1. Resolve all players by VEKN ID
     user_by_number: dict[int, User] = {}
     unmatched: list[str] = []
 
@@ -331,17 +284,13 @@ async def apply_archon_import(
             errors=[f"Unmatched players: {', '.join(unmatched)}"],
         )
 
-    # Map player_number → user_uid for quick lookup
     uid_by_number: dict[int, str] = {num: u.uid for num, u in user_by_number.items()}
 
-    # 2. Build round data
     built_rounds: list[list[Table]] = []
-    # Accumulate per-player scores: `player_scores` is the full prelim+finals
-    # aggregate (for Player.result); `player_prelim` is prelim-only and feeds the
-    # standings. Engine standings are prelim-only and league scoring adds finals
-    # on top (league.rs), so finals must NOT be folded into the standings.
-    player_scores: dict[str, dict] = {}  # user_uid → {gw, vp, tp} (prelim+finals)
-    player_prelim: dict[str, dict] = {}  # user_uid → {gw, vp, tp} (prelim only)
+    # player_scores is prelim+finals (feeds Player.result); player_prelim is
+    # prelim-only (feeds standings) — finals must never fold into it.
+    player_scores: dict[str, dict] = {}
+    player_prelim: dict[str, dict] = {}
     for user_uid in uid_by_number.values():
         player_scores[user_uid] = {"gw": 0.0, "vp": 0.0, "tp": 0}
         player_prelim[user_uid] = {"gw": 0.0, "vp": 0.0, "tp": 0}
@@ -381,17 +330,14 @@ async def apply_archon_import(
             )
         built_rounds.append(round_tables)
 
-    # 3. Build finals
     built_finals: FinalsTable | None = None
     finals_winner_uid = ""
     if data.finals:
         fvps = [s[1] for s in data.finals.seats]
         fsize = len(fvps)
         f_adjustments = [0.0] * fsize
-        # Finals rule, not the prelim compute_gw (no 2-VP threshold, exactly one
-        # winner): the engine's finals refresh rewrites these seats with
-        # compute_gw_finals on any standings recompute, so the import must store
-        # the same values or the GW would silently drift later.
+        # Must use compute_gw_finals (not prelim compute_gw): the engine's finals
+        # refresh recomputes with this rule, so a mismatch would silently drift the GW.
         f_uids = [uid_by_number[pn] for pn, _ in data.finals.seats]
         f_gws = engine.compute_gw_finals(fvps, f_adjustments, f_uids, f_uids)
         f_tps = engine.compute_tp(fsize, fvps, f_adjustments)
@@ -409,7 +355,6 @@ async def apply_archon_import(
                 )
             )
             seed_order.append(user_uid)
-            # Finals GW/VP adds to player total
             player_scores[user_uid]["gw"] += gw
             player_scores[user_uid]["vp"] += vp
             player_scores[user_uid]["tp"] += tp
@@ -422,7 +367,6 @@ async def apply_archon_import(
             state=TableState.FINISHED,
         )
 
-    # 4. Build player list and standings
     finalist_uids = set()
     if data.finals:
         finalist_uids = {uid_by_number[s[0]] for s in data.finals.seats}
@@ -458,20 +402,16 @@ async def apply_archon_import(
             )
         )
 
-    # Sort standings: GW desc, VP desc, TP desc, toss desc
     standings_list.sort(key=lambda s: (-s.gw, -s.vp, -s.tp, -s.toss))
 
-    # Winner: finalist with highest VP in finals, or top standings if no finals
     winner_uid = finals_winner_uid
     if not winner_uid and standings_list:
         winner_uid = standings_list[0].user_uid
 
-    # 5. Atomic update within transaction
     async with tournament_transaction(tournament_uid) as (tournament, tx_conn):
         if not tournament:
             return ImportResult(success=False, errors=["Tournament not found"])
 
-        # Update tournament fields
         tournament.state = TournamentState.FINISHED
         tournament.players = players_list
         tournament.rounds = built_rounds
@@ -487,7 +427,8 @@ async def apply_archon_import(
             conn=tx_conn,
         )
 
-    # 6. Post-effects (outside transaction)
+    # Post-effects run outside the transaction — must not hold the row locked
+    # while pushing to VEKN or recomputing ratings.
     logger.info(
         f"Archon import completed for tournament {tournament_uid}: "
         f"{len(players_list)} players, {len(built_rounds)} rounds, "
@@ -497,7 +438,6 @@ async def apply_archon_import(
     if broadcast_tournament_event:
         broadcast_tournament_event(tournament_bd)
 
-    # Ratings recompute
     try:
         from .ratings import (
             rating_category_for_tournament,
@@ -513,7 +453,6 @@ async def apply_archon_import(
     except Exception:
         logger.exception(f"Error recomputing ratings for {tournament_uid}")
 
-    # TWDA + VEKN push
     try:
         from .routes.tournaments import _maybe_push_vekn, maybe_submit_twda
 

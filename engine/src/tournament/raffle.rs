@@ -4,11 +4,8 @@ use super::standings::compute_preliminary_standings;
 use crate::error::EngineError;
 use json::JsonValue;
 
-/// Players eligible for a raffle: anyone seated in a round so far, plus anyone
-/// currently present (state Checked-in or Playing) who hasn't been seated yet — so
-/// a raffle held at check-in, before the first round exists, still draws from the
-/// checked-in players (and a checked-in player sitting out a round stays raffleable).
-/// Sorted for determinism.
+/// Raffle-eligible: seated so far, plus checked-in/playing players not yet seated —
+/// so a pre-round-1 raffle still draws from check-in. Sorted for determinism.
 fn get_raffle_base_uids(tournament: &JsonValue) -> Vec<String> {
     let mut base = std::collections::HashSet::new();
     for round in tournament["rounds"].members() {
@@ -37,8 +34,8 @@ fn get_raffle_base_uids(tournament: &JsonValue) -> Vec<String> {
     result
 }
 
-/// Filter raffle pool based on pool type and exclude_drawn flag.
-/// NOTE: Pool filtering logic duplicated in frontend RaffleSection.svelte eligibleForPool()
+/// NOTE: pool filtering is duplicated in frontend `RaffleSection.svelte`
+/// `eligibleForPool()` — keep both in sync.
 pub(super) fn get_raffle_pool(
     tournament: &JsonValue,
     sanctions: &JsonValue,
@@ -50,16 +47,14 @@ pub(super) fn get_raffle_pool(
         return Err(EngineError::RaffleNonePlayed);
     }
 
-    // Build standings map: uid -> (gw, vp). Computed live from round results —
-    // the stored tournament["standings"] only refreshes on FinishRound and would
-    // miss GW/VP earned in the round in progress (scored via SetScore).
+    // Computed live, not from tournament["standings"]: that only refreshes on
+    // FinishRound and would miss VP/GW from an in-progress round's SetScore.
     let standings_map: std::collections::HashMap<String, (f64, f64)> =
         compute_preliminary_standings(tournament, sanctions)
             .into_iter()
             .map(|s| (s.user_uid, (s.gw, s.vp)))
             .collect();
 
-    // Finalists set
     let finalists: std::collections::HashSet<String> = if !tournament["finals"].is_null() {
         tournament["finals"]["seating"]
             .members()
@@ -106,7 +101,6 @@ pub(super) fn get_raffle_pool(
     Ok(eligible)
 }
 
-/// Compute whether a deck should be public based on tournament state and decklists_mode.
 pub(super) fn compute_deck_public(tournament: &JsonValue, player_uid: &str) -> bool {
     let state = tournament["state"].as_str().unwrap_or("");
     if state != "Finished" {
@@ -116,7 +110,6 @@ pub(super) fn compute_deck_public(tournament: &JsonValue, player_uid: &str) -> b
     match mode {
         "All" => true,
         "Finalists" => {
-            // Check if player is a finalist or winner
             tournament["winner"].as_str() == Some(player_uid)
                 || tournament["players"].members().any(|p| {
                     p["user_uid"].as_str() == Some(player_uid)

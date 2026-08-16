@@ -1,33 +1,18 @@
-# Archon ansible deploy — remote provision/deploy entrypoints.
-# Run from this directory: `just deploy-beta`, `just bootstrap-prod`, … (dev tasks
-# live in the repo-root justfile).
-#
-# Deployed artifacts are built by GitHub Actions and attached to the published
-# Release; the deploy playbook fetches them itself, so the servers never run
-# cargo/maturin/npm/uv. `just deploy-*` is a friendly wrapper over ansible-playbook;
-# the build-* recipes are for local dev / `SOURCE=local` deploys.
-#
-# Env-var overrides (prefix the command): RELEASE_TAG=vX.Y.Z, SOURCE=local,
-# FULL=1, REBOOT=1, QUICK=1 (deploys: artifacts only via --tags app — skips the
-# provisioning roles; use a full deploy for any nginx/TLS/db/unit change).
+# Run from this directory: `just deploy-beta`, `just bootstrap-prod`, … (dev
+# tasks live in the repo-root justfile). Deployed artifacts are built by GitHub
+# Actions and attached to the published Release, so servers never run
+# cargo/maturin/npm/uv.
 
 repo_root := parent_directory(justfile_directory())
 build_dir := justfile_directory() / "build"
 manylinux := "quay.io/pypa/manylinux_2_28_x86_64"
 
-# Deploy/provision recipes default ANSIBLE_VAULT_PASSWORD_FILE to the env's
-# ansible/.<env>.vault_pass when you haven't set it yourself (an already-set value —
-# your global, or CI's — is respected). Locally: decrypt secrets/<env>.vault-pass.age
-# into it first (see README "Vault passwords"); CI writes its own file from the GitHub
-# Environment secret. lint/build recipes are left out so they run with no password.
+# Deploy/provision recipes default ANSIBLE_VAULT_PASSWORD_FILE to these when
+# not already set. lint/build recipes are left out so they run with no password.
 vault_pass_beta := justfile_directory() / ".beta.vault_pass"
 vault_pass_prod := justfile_directory() / ".prod.vault_pass"
 
-# Phase-1 parallel run: serve prod at new.archon.vekn.net with push off (extra-vars
-# beat group_vars, so prod's vars.yml stays prod-final). Blank this line at the
-# Phase-2 flip to revert to archon.vekn.net + push on. The file lives OUTSIDE
-# inventories/prod/ on purpose — a vars file inside the `-i` dir gets mis-parsed
-# as an inventory source.
+# Blank this at the Phase-2 flip to revert to archon.vekn.net + push on.
 phase1_override := ""
 
 default:
@@ -54,9 +39,8 @@ build-engine-wheel:
     set -euo pipefail
     mkdir -p {{build_dir}}
     cd {{repo_root}} && python scripts/update_cards.py
-    # manylinux_2_28 ships pythons at /opt/python/cp3XX-cp3XX/bin/python3.XX (not on
-    # PATH), so we pass the full path — derived from .python-version so it can't drift
-    # from the servers' python_version or CI's `-i python3.XX`.
+    # manylinux_2_28 ships pythons at /opt/python/cp3XX-cp3XX/bin/python3.XX,
+    # not on PATH — derived from .python-version so it can't drift from servers.
     pyver="$(cut -d. -f1,2 {{repo_root}}/.python-version)"   # e.g. 3.14
     cptag="cp${pyver//./}"                                    # e.g. cp314
     interp="/opt/python/${cptag}-${cptag}/bin/python${pyver}"
@@ -104,9 +88,8 @@ build-all: build-engine-wheel build-backend build-bot build-frontend
 # Beta has no bootstrap: server-setup owns the frankfurt foundation, and
 # `just deploy-beta` is the only beta entrypoint.
 
-# On the shared legacy VPS the bring-up MUST be sequenced foundation-prod ->
-# migrate-postgres-prod -> database-prod -> deploy-prod, or site.yml's database
-# step runs before the PG16->17 migration and hits the two-cluster trap.
+# On the shared legacy VPS, sequence foundation-prod -> migrate-postgres-prod
+# -> database-prod -> deploy-prod, or site.yml hits the two-cluster trap.
 # Prod foundation only (common role: packages+psycopg2, archon user, dirs, uv, nginx, ufw)
 foundation-prod: galaxy
     ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/bootstrap.yml
@@ -129,9 +112,8 @@ deploy-beta:
     #!/usr/bin/env bash
     set -euo pipefail
     export ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_beta}}}"
-    # Refresh galaxy collections (incl. the git-sourced foundation) as the sibling
-    # provision/lint recipes do — a full deploy runs collection-backed roles. Skip on
-    # QUICK=1: the artifact-only lane (--tags app) touches no such roles.
+    # A full deploy runs collection-backed roles; QUICK=1's artifact-only
+    # lane (--tags app) touches none, so it skips this.
     if [ -z "${QUICK:-}" ]; then just galaxy; fi
     extra=""
     if [ -n "${RELEASE_TAG:-}" ]; then extra="-e release_tag=${RELEASE_TAG}"; fi
@@ -144,9 +126,8 @@ deploy-prod:
     #!/usr/bin/env bash
     set -euo pipefail
     export ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}"
-    # Refresh galaxy collections (incl. the git-sourced foundation) as the sibling
-    # provision/lint recipes do — a full deploy runs collection-backed roles. Skip on
-    # QUICK=1: the artifact-only lane (--tags app) touches no such roles.
+    # A full deploy runs collection-backed roles; QUICK=1's artifact-only
+    # lane (--tags app) touches none, so it skips this.
     if [ -z "${QUICK:-}" ]; then just galaxy; fi
     extra=""
     if [ -n "${RELEASE_TAG:-}" ]; then extra="-e release_tag=${RELEASE_TAG}"; fi

@@ -1,5 +1,3 @@
-"""VEKN tournament synchronization service."""
-
 import logging
 import re
 from datetime import UTC, datetime
@@ -70,7 +68,6 @@ def _guess_timezone(
     if not country:
         return "UTC"
     country = country.upper()
-    # Check city overrides for multi-timezone countries
     location = f"{venue_city} {address}".lower()
     for cc, city, tz in CITY_TZ_OVERRIDES:
         if cc == country and city.lower() in location:
@@ -79,29 +76,15 @@ def _guess_timezone(
 
 
 def _parse_rounds(raw: Any) -> int:
-    """VEKN event 'rounds' field → preliminary round count (the app's "number of
-    rounds").
-
-    VEKN encodes it as a string like "3R+F" — the leading integer is the number
-    of preliminary rounds; the trailing "+F" just marks that a final is played
-    (the app tracks finals separately, so it isn't counted here). A plain int
-    or junk both degrade to the leading-digits read (→ 0 when absent).
-    """
+    """VEKN's "rounds" field is like "3R+F" — leading integer is the prelim
+    round count; "+F" ignored (finals tracked separately). Non-numeric -> 0."""
     m = re.match(r"\s*(\d+)", str(raw))
     return int(m.group(1)) if m else 0
 
 
 def _parse_date(date_str: str | None, time_str: str | None = None) -> datetime | None:
-    """Parse VEKN date/time strings into a NAIVE wall-clock datetime.
-
-    date_str: "YYYY-MM-DD", time_str: "HH:MM:SS" or "HH:MM"
-
-    VEKN event times are wall clock at the venue, which is exactly how
-    Tournament.start/finish are stored: naive, paired with Tournament.timezone
-    (see calendar._as_utc, frontend utils.zonedDate). Converting to UTC here
-    stored the instant twice over — readers that anchor the naive value in the
-    tournament timezone then shifted it by the venue's offset.
-    """
+    """Returns a NAIVE wall-clock datetime — do not convert to UTC, or
+    paired-timezone readers will double-shift it."""
     if not date_str:
         return None
     try:
@@ -120,23 +103,13 @@ def _map_vekn_to_tournament(
     users_by_vekn_id: dict[str, User],
     venue_data: dict[str, str] | None = None,
 ) -> Tournament | None:
-    """Map VEKN event data to a Tournament object.
-
-    VEKN event fields:
-      event_id, event_name, event_startdate, event_starttime,
-      event_enddate, event_endtime, event_isonline, eventtype_id, rounds,
-      venue_name, venue_city, venue_country, venue_id,
-      players[{pos, veknid, gw, vp, tp, tie, vpf, ...}]
-    venue_data (from separate /venue/<id> call):
-      name, address, city, country, website, zip, phone, email, lat, lng
-    """
+    """Map a VEKN event (+ optional venue_data from /venue/<id>) to a Tournament."""
     event_id = data.get("event_id")
     if not event_id:
         return None
 
     venue_data = venue_data or {}
 
-    # Event type mapping
     event_type = int(data.get("eventtype_id", 0) or 0)
     fmt, rank = EVENT_TYPE_MAP.get(
         event_type, (TournamentFormat.Standard, TournamentRank.BASIC)
@@ -145,33 +118,22 @@ def _map_vekn_to_tournament(
     name = data.get("event_name") or f"VEKN Event {event_id}"
     country = data.get("venue_country") or None
 
-    # Online detection
     online = str(data.get("event_isonline", "0")) == "1"
 
-    # VEKN 'proxies_allowed' is "0"/"1". Championship ranks forbid proxies by rule
-    # (engine validate_rank_legality), so rank wins over a mis-set calendar flag —
-    # a few NC events on vekn.net do carry proxies_allowed=1, and importing that
-    # combo would leave the tournament unable to save any config edit.
+    # Championship ranks forbid proxies by rule; wins over a mis-set proxies_allowed=1.
     proxies = (
         str(data.get("proxies_allowed", "0")) == "1" and rank == TournamentRank.BASIC
     )
 
-    # Venue info: name from event, address/website from venue details
     venue = data.get("venue_name") or ""
     address = venue_data.get("address") or ""
 
-    # Guess the venue timezone the wall-clock times belong to (online events have
-    # no venue — their times ride the UTC default).
     venue_city = venue_data.get("city") or data.get("venue_city") or ""
     tz_name = "UTC" if online else _guess_timezone(country, venue_city, address)
     start = _parse_date(data.get("event_startdate"), data.get("event_starttime"))
     finish = _parse_date(data.get("event_enddate"), data.get("event_endtime"))
-    # VEKN writes event_endtime "00:00:00" for an unset end time, and a handful of
-    # events are simply inverted upstream (11025: 10:00 -> 08:30 same day). Either
-    # way a finish before its start is not a finish — keep it unknown instead of
-    # importing a negative duration. Events that genuinely ran past midnight carry
-    # the next day in event_enddate (11096: 13th 22:00 -> 14th 06:00), so they
-    # never reach this and need no date arithmetic from us.
+    # VEKN sometimes writes an unset end time as "00:00:00" or inverts start/end;
+    # treat finish < start as unknown, not a negative duration.
     if finish and start and finish < start:
         finish = None
     if address and venue_data.get("city"):
@@ -180,7 +142,6 @@ def _map_vekn_to_tournament(
         address = data.get("venue_city") or ""
     venue_url = venue_data.get("website") or ""
 
-    # Build map URL: prefer coordinates from VEKN venue data, fall back to text search
     map_url = ""
     if not online:
         lat = venue_data.get("lat")
@@ -197,26 +158,21 @@ def _map_vekn_to_tournament(
             parts = [p for p in [venue, address, country] if p]
             map_url = f"https://www.google.com/maps/search/?api=1&query={quote(' '.join(parts))}"
 
-    # Organizer
     organizer_vekn = str(data.get("organizer_veknid") or "")
     organizer_user = users_by_vekn_id.get(organizer_vekn)
     organizers_uids = [organizer_user.uid] if organizer_user else []
 
-    # Number of preliminary rounds (the app's "round count" field).
     max_rounds = _parse_rounds(data.get("rounds"))
 
-    # Players
     vekn_players = data.get("players", [])
     now = datetime.now(UTC)
 
     if vekn_players:
-        # Finished tournament with results
         state = TournamentState.FINISHED
         players: list[Player] = []
         standings: list[Standing] = []
         winner_uid = ""
-        # Finalists for a reconstructed finals object: (user_uid, pos, vpf).
-        finalists: list[tuple[str, int, float]] = []
+        finalists: list[tuple[str, int, float]] = []  # (user_uid, pos, vpf)
 
         for vp_data in vekn_players:
             vekn_id = str(vp_data.get("veknid") or "")
@@ -224,8 +180,7 @@ def _map_vekn_to_tournament(
             if not user:
                 continue
 
-            # VEKN reports prelim GW/VP, separate finals VP (vpf), and a final
-            # placement (pos 1..5); pos==1 is the tournament winner.
+            # pos 1..5 is final placement; pos == "1" is the tournament winner.
             prelim_gw = int(vp_data.get("gw", 0) or 0)
             pos = str(vp_data.get("pos") or "")
             is_finalist = pos in ("1", "2", "3", "4", "5")
@@ -238,9 +193,8 @@ def _map_vekn_to_tournament(
             if is_finalist:
                 finalists.append((user.uid, int(pos), vp_finals))
 
-            # Player.result is the full aggregate (prelim + finals win), like every
-            # other importer. Standings stay PRELIM-ONLY (the contract): finals live
-            # in the reconstructed finals object below; rating/league add them on top.
+            # result aggregates prelim+finals; standings stay prelim-only (the
+            # finals object below carries the rest).
             players.append(
                 Player(
                     user_uid=user.uid,
@@ -269,12 +223,8 @@ def _map_vekn_to_tournament(
         if not players:
             return None  # All players unknown
 
-        # Reconstruct a finals object iff a final was actually played (some vpf > 0).
-        # VEKN gives no finals seating, so seats are ordered by final placement
-        # (synthetic seed_order, display/record only — nothing computes off it; the
-        # winner + per-seat vpf are known). Winner gets the +1 GW, vp = their vpf,
-        # tp = 0 (no seat order to derive a real table-point from; keeps the league
-        # RTP/GP displayed TP at prelim levels, unchanged from before this fix).
+        # Reconstructed only when vpf>0 (final played). No VEKN seating exists:
+        # seed_order is synthetic/display-only, tp=0 so league RTP/GP stays at prelim.
         finals: FinalsTable | None = None
         if sum(vpf for _, _, vpf in finalists) > 0:
             finalists.sort(key=lambda f: f[1])  # by final placement (pos 1..5)
@@ -290,10 +240,8 @@ def _map_vekn_to_tournament(
                 state=TableState.FINISHED,
             )
 
-        # Sort standings: GW desc, VP desc, TP desc, toss desc, then user_uid asc as
-        # a total-order tiebreak. Without it, tied rows keep VEKN's API order, which
-        # can differ across syncs → the standings-equality check below (self-heal)
-        # would see a spurious diff and re-import/re-broadcast on every run.
+        # Total-order tiebreak (user_uid) — without it, tied rows keep VEKN's API
+        # order, which can vary across syncs and spuriously trip the equality check below.
         standings.sort(key=lambda s: (-s.gw, -s.vp, -s.tp, -s.toss, s.user_uid))
 
         return Tournament(
@@ -320,13 +268,10 @@ def _map_vekn_to_tournament(
             winner=winner_uid,
             standings=standings,
             finals=finals,
-            # Results came FROM vekn.net — stamp so batch_push never re-uploads them
-            # (round-tripping our own import back to the source of record is pointless
-            # and the synthetic finals seating carries no info VEKN didn't already have).
+            # From vekn.net already — stamped so the push batch never re-uploads it.
             vekn_pushed_at=now,
         )
     else:
-        # Future planned tournament (no players yet)
         return Tournament(
             uid=str(uuid7()),
             modified=now,
@@ -351,7 +296,6 @@ def _map_vekn_to_tournament(
 
 
 async def _build_users_by_vekn_id() -> dict[str, User]:
-    """Build a lookup dict of User by VEKN ID from the database."""
     result_map: dict[str, User] = {}
     async with get_connection() as conn:
         cursor = await conn.execute(
@@ -368,19 +312,8 @@ async def _build_users_by_vekn_id() -> dict[str, User]:
 
 
 async def _adopt_same_event(tournament: Tournament, event_id: Any) -> Tournament | None:
-    """Link a vekn-less local copy of this event to `event_id`, or return None.
-
-    Without this, an event whose only local copy came in through the legacy-archon
-    merge without a vekn id gets a SECOND copy created here — the #520 duplicate
-    class, and (because the orphaned copy keeps retrying an event-create that
-    vekn.net rejects as already existing) the standing hourly push error.
-
-    Refuses to guess. Name+start-day is only evidence of identity where it is
-    UNIQUE in the corpus, so any other same-name/same-day copy already carrying a
-    vekn id proves the key doesn't discriminate here (legacy placeholder names
-    like "Imported VTES Event" cover dozens of distinct events per day) and the
-    match is abandoned. What remains must be a single vekn-less candidate.
-    """
+    """Adopts a vekn-less local copy instead of creating a duplicate. Matches
+    only when name+start-day is unique in the corpus; ambiguous cases return None."""
     if tournament.start is None:
         return None
     candidates = await find_same_event_tournaments(
@@ -404,10 +337,6 @@ async def _adopt_same_event(tournament: Tournament, event_id: Any) -> Tournament
         return None
 
     adopted = candidates[0]
-    # Adopting hands the row to the caller's existing-row paths, and the round-less
-    # one treats vekn.net as authoritative for players/standings. Safe when the copy
-    # has rounds (rich-guard → metadata only) or no players (nothing to lose); a
-    # registration list with no rounds yet would be overwritten, so leave it alone.
     if adopted.players and not adopted.rounds:
         logger.warning(
             f"VEKN event {event_id} '{tournament.name}': same-day copy {adopted.uid} "
@@ -428,10 +357,7 @@ async def _adopt_same_event(tournament: Tournament, event_id: Any) -> Tournament
 
 
 async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
-    """Sync all VEKN tournaments.
-
-    Returns stats: {created, adopted, updated, unchanged, errors, skipped, total}.
-    """
+    """Returns stats: {created, adopted, updated, unchanged, errors, skipped, total}."""
     logger.info("Starting VEKN tournament sync")
     stats = {
         "created": 0,
@@ -446,7 +372,6 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
     users_by_vekn_id = await _build_users_by_vekn_id()
     logger.info(f"Loaded {len(users_by_vekn_id)} users by VEKN ID")
 
-    # Cache venue data to avoid repeated API calls for the same venue
     venue_cache: dict[str, dict[str, str]] = {}
 
     async for event_data in client.fetch_all_events():
@@ -454,7 +379,6 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
         event_id = event_data.get("event_id", "?")
 
         try:
-            # Fetch full venue details (cached per venue_id)
             venue_id = str(event_data.get("venue_id") or "")
             if venue_id and venue_id not in venue_cache:
                 venue_cache[venue_id] = await client.fetch_venue(venue_id)
@@ -467,7 +391,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                 stats["skipped"] += 1
                 continue
 
-            # Check if already exists (unlocked lookup by external id → uid)
+            # Unlocked lookup — re-verified under the transaction below.
             existing_ref = await get_tournament_by_external_id("vekn", str(event_id))
             if existing_ref is None:
                 existing_ref = await _adopt_same_event(tournament, event_id)
@@ -475,10 +399,8 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                     stats["adopted"] += 1
             if existing_ref:
                 bd = None
-                # Re-read the row under a FOR UPDATE lock so this wholesale overwrite
-                # serializes against any concurrent /action commit rather than
-                # clobbering it (the meta path replaces onto the LOCKED row, so live
-                # play data added mid-sync survives).
+                # Locked re-read serializes this overwrite against a concurrent
+                # /action commit, so live play data added mid-sync survives.
                 async with tournament_transaction(existing_ref.uid) as (
                     existing,
                     tx_conn,
@@ -490,26 +412,8 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                         )
                     )
                     if existing.rounds or not tournament.players:
-                        # Tournament was run in-app (it has per-round play data). VEKN.net
-                        # is NOT authoritative for its rounds/finals/standings/players/
-                        # winner/state — only for descriptive event metadata. Refresh
-                        # metadata only and NEVER overwrite the play data (doing so would
-                        # silently wipe rounds and corrupt standings/ratings). Gate on
-                        # `rounds` only: a re-imported VEKN event now carries a
-                        # reconstructed finals object, but VEKN stays authoritative for
-                        # it (a final implies prelim rounds, so this never misses in-app).
-                        #
-                        # Round-less events take this path too when VEKN reports NO
-                        # players: authority follows content, and an empty calendar entry
-                        # has nothing to be authoritative about. Without this, the branch
-                        # below rebuilt the row from that empty entry — resetting an
-                        # in-app event still taking registrations to Planned and
-                        # discarding everyone registered so far, every sync, until its
-                        # first round started.
-                        # `proxies` refreshes here like the rest of the descriptive
-                        # metadata: the calendar entry is write-once (no update
-                        # endpoint), so vekn.net is where the flag is changed and the
-                        # app config field is frozen once an event has a vekn id.
+                        # Authority follows content: metadata-only refresh once local
+                        # rounds exist, or the incoming event has no players to speak for.
                         meta_changed = (
                             existing.name != tournament.name
                             or existing.format != tournament.format
@@ -550,8 +454,8 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                         else:
                             stats["unchanged"] += 1
                     else:
-                        # vekn-origin import (no play data): VEKN.net is authoritative for
-                        # everything, including players/standings/winner.
+                        # No local play data: VEKN is authoritative for everything,
+                        # including players/standings/winner.
                         changed = (
                             existing.state != tournament.state
                             or existing.name != tournament.name
@@ -569,12 +473,8 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                             or existing.map_url != tournament.map_url
                             or existing.proxies != tournament.proxies
                             or len(existing.players) != len(tournament.players)
-                            # Compare the authoritative play data so a VEKN-side score
-                            # correction is picked up — and so legacy folded imports (old
-                            # standings = prelim+finals, finals=None) self-heal to the
-                            # prelim-only + reconstructed-finals shape on the next sync.
-                            # Deterministic mapping ⇒ a migrated import compares equal and
-                            # won't thrash.
+                            # Also compares play data, so a VEKN-side score correction
+                            # is picked up and legacy folded imports self-heal.
                             or existing.standings != tournament.standings
                             or existing.finals != tournament.finals
                         )
@@ -604,15 +504,12 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                                 standings=tournament.standings,
                                 finals=tournament.finals,
                                 vekn_pushed_at=tournament.vekn_pushed_at,
-                                # Preserve the stored code — the freshly-built
-                                # `tournament` carries a new default_factory random
-                                # value that would break an already-printed QR.
+                                # A fresh Tournament's default_factory code would
+                                # break an already-printed QR.
                                 checkin_code=existing.checkin_code,
-                                # Local-only bookkeeping: not derivable from VEKN
-                                twda_status=existing.twda_status,
-                                # League membership is archon-only knowledge —
-                                # dropping it here nulled the league link on
-                                # every rebuild of a round-less event.
+                                twda_status=existing.twda_status,  # not derivable from VEKN
+                                # archon-only knowledge — dropping it nulls the league
+                                # link on every rebuild of a round-less event.
                                 league_uid=existing.league_uid,
                             )
                             bd = await save_tournament(tournament, conn=tx_conn)
@@ -622,7 +519,6 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                 if bd is not None:
                     broadcast_precomputed(bd)
             else:
-                # Fresh vekn-origin import: no existing row to lock.
                 async with get_connection() as conn:
                     bd = await save_tournament(tournament, conn=conn)
                 broadcast_precomputed(bd)
@@ -632,7 +528,6 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
             logger.error(f"Error syncing VEKN event {event_id}: {e}")
             stats["errors"] += 1
 
-        # Progress log every 100 events
         total = (
             stats["created"]
             + stats["updated"]
@@ -654,9 +549,8 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
         f"{stats['errors']} errors, {stats['total']} total"
     )
 
-    # One grouped query, after the fact: the adoption guards above decline every
-    # ambiguous case, so duplicates still accumulate silently otherwise. Stays loud
-    # until an operator resolves them (scripts/dedup_tournaments.py).
+    # Reported, not repaired — the adoption guards above decline ambiguous cases,
+    # so duplicates still accumulate; resolve with scripts/dedup_tournaments.py.
     for group in await find_duplicate_tournament_groups():
         logger.warning(
             f"Duplicate live tournaments: '{group['name']}' on {group['day']} — "

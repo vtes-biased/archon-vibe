@@ -1,8 +1,5 @@
-"""Tests for table-label resolution and judge-call routing.
-
-Covers:
-- resolveTableLabelPy (room label resolution)
-- broadcast_judge_call targeting (only explicit organizers receive)
+"""Table-label resolution (resolveTableLabelPy) and judge-call routing
+(broadcast_judge_call, only explicit organizers receive).
 """
 
 from datetime import UTC, datetime
@@ -35,11 +32,6 @@ def _make_user(
     )
 
 
-# ============================================================================
-# resolveTableLabelPy
-# ============================================================================
-
-
 class TestResolveTableLabel:
     def test_no_rooms(self):
         assert resolveTableLabelPy([], 0) == "Table 1"
@@ -64,11 +56,6 @@ class TestResolveTableLabel:
         assert resolveTableLabelPy(rooms, 5) == "Table 6"
 
 
-# ============================================================================
-# broadcast_judge_call targeting
-# ============================================================================
-
-
 import pytest
 
 
@@ -77,13 +64,11 @@ async def test_judge_call_only_sent_to_explicit_organizers():
     """Judge call SSE events must only reach explicit organizers of that tournament."""
     from src.main import _sse_connections
 
-    # Create mock SSE connections
     organizer = SSEConnection(user=_make_user(uid="org1", roles=[]))
     ic_user = SSEConnection(user=_make_user(uid="ic1", roles=[Role.IC]))
     random_member = SSEConnection(user=_make_user(uid="random", roles=[]))
     no_user = SSEConnection(user=None)
 
-    # Register connections
     _sse_connections.clear()
     _sse_connections.update({organizer, ic_user, random_member, no_user})
 
@@ -96,13 +81,9 @@ async def test_judge_call_only_sent_to_explicit_organizers():
             organizer_uids=["org1"],
         )
 
-        # Organizer should have received it
         assert not organizer.queue.empty()
-        # IC should NOT (not on premises)
-        assert ic_user.queue.empty()
-        # Random member should NOT
+        assert ic_user.queue.empty()  # IC not paged unless an explicit organizer
         assert random_member.queue.empty()
-        # No user connection should NOT
         assert no_user.queue.empty()
     finally:
         _sse_connections.clear()
@@ -124,7 +105,7 @@ async def test_judge_call_not_sent_to_other_tournament_organizer():
             table=0,
             table_label="Table 1",
             player_name="Bob",
-            organizer_uids=["org1"],  # org-other is NOT in this list
+            organizer_uids=["org1"],
         )
 
         assert other_org.queue.empty()

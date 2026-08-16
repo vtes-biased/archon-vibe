@@ -1,10 +1,4 @@
-"""Tests for calendar feed logic.
-
-Focuses on:
-- _matches_agenda: personal agenda filtering (organizer, participant, geography)
-- _escape_ical / _format_dt: iCal formatting edge cases
-- _tournament_to_vevent: event generation
-"""
+"""Tests for calendar feed logic."""
 
 from datetime import UTC, datetime, timedelta
 from uuid import uuid7
@@ -63,14 +57,7 @@ def _make_tournament(
     )
 
 
-# ============================================================================
-# _matches_agenda tests
-# ============================================================================
-
-
 class TestMatchesAgenda:
-    """Test personal agenda filtering logic."""
-
     def test_organizer_always_matches(self):
         t = _make_tournament(organizers_uids=["user1"], state=TournamentState.FINISHED)
         assert _matches_agenda(t, "user1", "US", [], True) is True
@@ -100,7 +87,6 @@ class TestMatchesAgenda:
         assert _matches_agenda(t, "user1", "FR", [], True) is False
 
     def test_nc_same_continent(self):
-        """National Championship on same continent should match."""
         t = _make_tournament(country="DE", rank=TournamentRank.NC)
         assert _matches_agenda(t, "user1", "FR", ["FR", "DE", "ES"], True) is True
 
@@ -109,12 +95,10 @@ class TestMatchesAgenda:
         assert _matches_agenda(t, "user1", "FR", ["FR", "DE"], True) is True
 
     def test_basic_different_country_no_match(self):
-        """Basic tournament in another country, not organizer/participant."""
         t = _make_tournament(country="US")
         assert _matches_agenda(t, "user1", "FR", ["FR", "DE"], True) is False
 
     def test_nc_different_continent_no_match(self):
-        """NC tournament on different continent should not match."""
         t = _make_tournament(country="US", rank=TournamentRank.NC)
         assert _matches_agenda(t, "user1", "FR", ["FR", "DE"], True) is False
 
@@ -129,11 +113,6 @@ class TestMatchesAgenda:
         assert _matches_agenda(t, "user1", "FR", [], False) is False
         own = _make_tournament(online=True, players=[Player(user_uid="user1")])
         assert _matches_agenda(own, "user1", "FR", [], False) is True
-
-
-# ============================================================================
-# iCal formatting tests
-# ============================================================================
 
 
 class TestEscapeIcal:
@@ -160,7 +139,7 @@ class TestFormatDt:
 
     def test_naive_anchored_in_tournament_timezone(self):
         """Naive wall-clock must be anchored in the event tz, not stamped UTC."""
-        naive = datetime(2025, 6, 15, 14, 0, 0)  # 14:00 CEST = 12:00 UTC
+        naive = datetime(2025, 6, 15, 14, 0, 0)  # CEST
         assert _format_dt(naive, "Europe/Paris") == "20250615T120000Z"
 
     def test_unknown_timezone_falls_back_to_utc(self):
@@ -223,10 +202,8 @@ class TestTournamentToVevent:
         assert url_lines[0].startswith("URL;VALUE=URI:")
 
 
-# ---------------------------------------------------------------------------
-# calendar_token storage round-trip (regression for the "always anonymous"
-# bug: the token must be queryable yet never leak into any SSE projection).
-# ---------------------------------------------------------------------------
+# Regression for the "always anonymous" bug: calendar_token must be queryable
+# yet never leak into any SSE projection.
 
 
 def _make_user(token: str | None = None) -> User:

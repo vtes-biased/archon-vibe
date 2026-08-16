@@ -1,58 +1,16 @@
 """ETL + daily merge: legacy **archon** DB → **archon-vibe** unified `objects` table.
 
-Two modes against the same mapping code:
-
-* **Insert-only ETL** (default): Phase 0 of the production migration — initial
-  population of an empty new DB (`--truncate` wipes first). Kept for beta
-  rebuilds and as a disaster fallback.
-* **Idempotent merge** (`--merge`): run daily on the new stack during the
-  parallel run, old archon being a temporary second upstream (read-only) until
-  decommission. Single writer per field: the VEKN sync owns identity
-  (name/country/city/state), this sync owns archon-local fields (contact /
-  nickname / discord / coopted_by, sanctions, leagues, rich play data), and
-  ROLES are never UPDATED by either — seeded on a member's first import (by
-  this ETL/merge, or VEKN-derived in the member sync's create path when it
-  gets there first), app-managed thereafter. Fields recorded in
-  `User.local_modifications` are never overwritten (same contract as the VEKN
-  member sync). Merge mode takes a pre-run `pg_dump` of the NEW DB so a buggy
-  merge is restore-fix-rerun.
-
-  Members are matched on **VEKN id** (the stable cross-system key), NOT on the
-  old-archon uid — which diverges whenever the live account was VEKN-sync-created
-  (fresh uuid7) and then claimed. The merge merges archon-owned fields into that
-  live account and NEVER tombstones it (matching on uid used to detach claimed
-  accounts); every play-data reference to an old-archon member uid is
-  remapped to the live uid via `member_uid_map`. Members with no VEKN id are
-  seeded as soft-deleted shells (historical tournaments reference them; they
-  aren't live identities). This is what makes the prod migration **sync-first**
-  (VEKN sync creates the accounts, the merge layers history on) instead of
-  ETL-first — see `wiki/vekn.md`.
+Two modes against the same mapping code: insert-only ETL (default;
+`--truncate` wipes first) for beta rebuilds and disaster fallback, and
+idempotent `--merge`, run daily during the parallel-run period against old
+archon as a read-only second upstream.
 
 Reads the OLD archon Postgres (members / leagues / tournaments / clients /
 member_deletions) and writes the NEW archon-vibe schema, REUSING the backend's
 own `save_*` helpers so the public/member/full access projections are computed
-byte-identically to runtime. Note: writes from this script are NOT broadcast
-live over SSE (broadcast is in-process in the backend); clients pick them up
-through the catch-up sync on their next SSE reconnect.
-
-Mapping decisions and merge semantics are recorded in `wiki/vekn.md`. Highlights:
-  * roles    Admin→IC, Playtester→PT (others identical) — seed only, see above
-  * format   Draft→Limited (draft is a limited format)
-  * rank     Grand Prix→BASIC (new model has no GP rank; GP lives in league mode)
-  * state    Finals→Playing (new model has no FINALS tournament state)
-  * sanctions old free-ish category/level → new JG-v2 category(+subcategory)
-  * OAuth    clients table is empty in prod → nothing to migrate (re-register)
-  * ratings  skipped — recomputed from tournaments post-import
-
-Tournament matching in merge mode (at most one LIVE tournament per vekn event
-id): match by uid, else by `external_ids.archon` (set when a previous run
-merged the rich payload into a vekn-created copy), else by `external_ids.vekn`
-— rich data merges INTO the vekn-created copy (its uid survives, deep links
-stay valid); a round-less incoming copy never overwrites a rich original (echo
-guard, on every match path — uid and marker included, where legacy's copy of an
-event run live in the new app stays round-less forever); on the vekn/name paths
-both rich is a one-app-per-event violation: logged loudly, skipped (on the
-uid/marker paths both rich is a legacy-run event mid-merge — legacy wins).
+byte-identically to runtime. Writes from this script are NOT broadcast live
+over SSE; clients pick them up through the catch-up sync on their next SSE
+reconnect.
 
 Dry-run against the sandbox (from the repo root):
     OLD_DATABASE_URL=postgresql://etl:etl@localhost:5544/archon_old \\
@@ -82,9 +40,8 @@ from pathlib import Path
 from typing import NamedTuple
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-# Make `backend.src` importable from a source checkout (local `uv run`). On the
-# deployed box it's already installed in the venv, so skip the insert there —
-# adding the repo root could otherwise let a stray src/ shadow the wheel package.
+# Skip on the deployed box (already installed in the venv) — inserting the repo
+# root there could let a stray src/ shadow the wheel package.
 try:
     _have_backend = importlib.util.find_spec("backend.src") is not None
 except ModuleNotFoundError:
@@ -129,15 +86,10 @@ from backend.src.models import (
 )
 from backend.src.vekn_sync import OFFICIALS_EMAILS
 
-# Applied to both DSNs in run(). Deliberately wider than db.batch_read_connection's
-# 120s: that guards single pooled reads inside a live server, this is a whole daily
-# job with a 24h window. Still capped, not disabled — a runaway read here would hold
-# the source transaction open and overlap the next timer firing.
+# Wider than db.batch_read_connection's 120s: this is a whole daily job with a
+# 24h window, not a pooled read inside a live server. Still capped, not disabled.
 BATCH_STATEMENT_TIMEOUT_MS = 600_000
 
-# --------------------------------------------------------------------------- #
-# Mapping tables                                                               #
-# --------------------------------------------------------------------------- #
 
 ROLE_MAP: dict[str, Role] = {
     "Admin": Role.IC,
@@ -194,7 +146,6 @@ SANCTION_LEVEL_MAP: dict[str, SanctionLevel] = {
     "Ban": SanctionLevel.SUSPENSION,  # closest long-term removal
 }
 
-# old category → (new category, new subcategory | None)
 SANCTION_CATEGORY_MAP: dict[
     str, tuple[SanctionCategory, SanctionSubcategory | None]
 ] = {
@@ -246,10 +197,8 @@ STANDINGS_MODE_MAP: dict[str, StandingsMode] = {
     "Public": StandingsMode.PUBLIC,
 }
 
-# Archon-local member fields this sync owns in merge mode. Identity
-# (name/country/city/state) is the VEKN sync's (old-archon identity edits reach
-# us through vekn.net), roles are app-managed post-seed, and anything listed in
-# the user's local_modifications is never overwritten.
+# This sync's field set in merge mode — identity is the VEKN sync's, roles are
+# app-managed, local_modifications fields are never overwritten either way.
 ARCHON_USER_FIELDS = (
     "nickname",
     "contact_email",
@@ -267,11 +216,6 @@ DECK_NS = uuid.uuid5(uuid.NAMESPACE_URL, "archon-vibe/legacy-deck")
 
 def deck_uid(tuid: str, puid: str, round_idx: int | None) -> str:
     return str(uuid.uuid5(DECK_NS, f"{tuid}:{puid}:{round_idx}"))
-
-
-# --------------------------------------------------------------------------- #
-# Small helpers                                                                #
-# --------------------------------------------------------------------------- #
 
 
 def _raw_dt(v) -> datetime | None:
@@ -295,13 +239,8 @@ def parse_dt(v) -> datetime | None:
 
 def parse_wall_dt(v, tz_name: str | None) -> datetime | None:
     """Parse a tournament start/finish: NAIVE wall clock paired with `timezone`.
-
-    Both stacks store them that way — old archon indexes on
-    `(start || ' ' || timezone)::timestamptz`, so its stored values carry no
-    offset. Reading them as instants stamped UTC onto that wall clock, and every
-    reader that anchors the naive value in the tournament timezone then shifted
-    it by the venue's offset.
-    """
+    Reading it as an instant stamps UTC onto that wall clock, then every reader
+    that anchors it in the tournament timezone shifts it a second time."""
     d = _raw_dt(v)
     if d is None or d.tzinfo is None:
         return d
@@ -359,14 +298,8 @@ def loud(msg: str) -> None:
     print(f"!! {msg}", flush=True)
 
 
-# --------------------------------------------------------------------------- #
-# Live-object lookups (merge mode)                                             #
-#                                                                              #
-# Soft-deleted rows must not match: tombstones from previous dedups would      #
-# otherwise shadow the live holder.                                            #
-# --------------------------------------------------------------------------- #
-
-
+# Soft-deleted rows must not match: tombstones from previous dedups would
+# otherwise shadow the live holder.
 async def live_user_by_vekn_id(vekn_id: str) -> db.User | None:
     async with db.get_connection() as conn:
         res = await conn.execute(
@@ -380,11 +313,8 @@ async def live_user_by_vekn_id(vekn_id: str) -> db.User | None:
 
 
 async def live_tournament_by_vekn(ext_id: str) -> Tournament | None:
-    # 'vekn' stays a literal: it is the only external_ids key schema.sql indexes,
-    # and the planner only matches idx_objects_tournament_vekn against that exact
-    # expression. Passing the key as a parameter still folds to a constant and
-    # still uses the index — but a DIFFERENT key silently seq-scans + detoasts
-    # every tournament row, which is what the archon-marker lookup used to do.
+    # 'vekn' stays a literal: it's the only external_ids key schema.sql indexes
+    # (idx_objects_tournament_vekn); a different key seq-scans + detoasts every row.
     async with db.get_connection() as conn:
         res = await conn.execute(
             """SELECT "full" FROM objects
@@ -399,11 +329,8 @@ async def live_tournament_by_vekn(ext_id: str) -> Tournament | None:
 async def live_same_event_tournament(d: dict, old_uid: str) -> Tournament | None:
     """The live copy of this vekn-id-less legacy event, matched on name + start day.
 
-    Only fires as the last key (see process_tournament_row). Name+day identifies an
-    event only where it is UNIQUE — old archon is full of placeholder names shared
-    by dozens of distinct same-day events — so more than one candidate means the
-    key doesn't discriminate and we insert a separate copy rather than guess. A
-    candidate claimed by a DIFFERENT old-archon row is likewise not ours.
+    Fires only as the last key. More than one candidate means the key doesn't
+    discriminate; a separate copy is inserted rather than guessed.
     """
     start = parse_wall_dt(d.get("start"), d.get("timezone"))
     name = d.get("name") or ""
@@ -428,10 +355,8 @@ async def live_same_event_tournament(d: dict, old_uid: str) -> Tournament | None
 async def archon_uid_index() -> dict[str, str]:
     """`external_ids['archon']` → live uid, in ONE scan (merge mode).
 
-    Marks events a previous run merged INTO a vekn-created copy, so the old uid
-    no longer finds them. Only 'vekn' is indexed, so looking this up per row cost
-    a full seq scan + detoast of every tournament each time. Strings only —
-    decoding the rows here would be ~70 MB; hits re-fetch by uid and are rare.
+    Strings only, not decoded Tournaments — decoding every row here would be
+    ~70 MB; hits re-fetch by uid and are rare.
     """
     async with db.get_connection() as conn:
         res = await conn.execute(
@@ -454,28 +379,17 @@ async def other_live_vekn_holders(ext_id: str, but_uid: str) -> list[Tournament]
     return [db.decode_json(row[0], Tournament) for row in rows]
 
 
-# --------------------------------------------------------------------------- #
-# #216 — VEKN-less legacy tournament-participant fixups                         #
-#                                                                              #
-# Old archon's Register never enforced vekn_id, so a handful of players landed #
-# in finished tournaments with no VEKN id; the new engine's VeknIdRequired     #
-# blocks new ones, so this set is fully bounded by the prod dump. The rule: a   #
-# VEKN-less player with NO round seating is a registration artifact → drop; one #
-# who actually played must be resolved (match a real account → remap, else      #
-# allocate a real id + push). Keyed by opaque old-archon uid only (no           #
-# names/emails).                                                                #
-# --------------------------------------------------------------------------- #
+# #216: VEKN-less legacy participants. A player with no round seating is a
+# registration artifact (drop); one who actually played must resolve to a real
+# account (remap below, or allocate). Keyed by opaque old-archon uid only.
 
-# old-archon member uid → the real VEKN id its tournament refs remap onto (the
-# played throwaway of a member who already holds that VEKN account; resolved to
-# the live account by resolve_known_remaps after the full member pass).
+# old-archon member uid → the real VEKN id its tournament refs remap onto,
+# resolved to the live account by resolve_known_remaps after the member pass.
 KNOWN_REMAP: dict[str, str] = {
     "06194fea-a366-4d28-a89c-eb2ead795d65": "3390002",
 }
 
-# VEKN-less member uids dropped wholesale: registration artifacts with 0 seating,
-# each in a single tournament. Never seeded; their lone players-dict entry is
-# stripped from the tournament at build time (no seating/standings ref to fix).
+# VEKN-less member uids dropped wholesale: 0-seating registration artifacts.
 KNOWN_DROP: frozenset[str] = frozenset(
     {
         "021937b2-a40a-415d-a021-6ff3fe7da4a3",  # Neonate Revolution registrant, 0 rounds
@@ -483,12 +397,9 @@ KNOWN_DROP: frozenset[str] = frozenset(
     }
 )
 
-# (tournament_uid, member_uid) entries dropped from ONE tournament's players dict
-# only. Here: the real account's redundant 0-round no-show registration in the
-# funeral wake — the person actually played under the VEKN-less throwaway that
-# KNOWN_REMAP folds onto this same account, so keeping it would duplicate the
-# remapped entry. That member is a real, active player in OTHER events, so the
-# drop must be tournament-scoped, never a wholesale KNOWN_DROP.
+# (tournament_uid, member_uid) dropped from ONE tournament's players dict only:
+# a real account's redundant no-show entry that KNOWN_REMAP would otherwise
+# duplicate there — that member plays elsewhere, so the drop can't be wholesale.
 KNOWN_DROP_IN_TOURNAMENT: frozenset[tuple[str, str]] = frozenset(
     {
         (
@@ -497,11 +408,6 @@ KNOWN_DROP_IN_TOURNAMENT: frozenset[tuple[str, str]] = frozenset(
         ),
     }
 )
-
-
-# --------------------------------------------------------------------------- #
-# Members                                                                      #
-# --------------------------------------------------------------------------- #
 
 
 def build_user(row: dict, stats: Stats) -> tuple[db.User, dict]:
@@ -537,11 +443,8 @@ def build_user(row: dict, stats: Stats) -> tuple[db.User, dict]:
         phone_is_whatsapp=bool(whatsapp),
         coopted_by=nz(d.get("sponsor")),
         vekn_prefix=nz(d.get("prefix")),
-        # Imported members owe no VEKN push: they either already exist in the
-        # vekn.net registry or predate it. Without this, batch_push would
-        # re-register ~19k members on its first run (model default False), and
-        # the residue unmatched by the first member sync would stay
-        # push-eligible forever.
+        # Imported members owe no VEKN push: they already exist on vekn.net or
+        # predate it. Default False would make batch_push re-register ~19k members.
         vekn_synced=True,
     )
     return user, discord
@@ -550,10 +453,8 @@ def build_user(row: dict, stats: Stats) -> tuple[db.User, dict]:
 async def ensure_discord_auth(user_uid: str, discord: dict, stats: Stats) -> None:
     """Insert the Discord auth method if that Discord account isn't linked yet.
 
-    Legacy password hashes are NOT argon2 and can't be verified by the new
-    stack, so no (broken) email/password auth is created — email users
-    re-establish access via magic-link (keyed on the migrated contact_email) or
-    Discord.
+    No email/password auth is created — legacy hashes aren't argon2 and can't be
+    verified; email users re-establish access via magic-link or Discord instead.
     """
     discord_id = nz(discord.get("id"))
     if not discord_id:
@@ -581,10 +482,8 @@ async def ensure_discord_auth(user_uid: str, discord: dict, stats: Stats) -> Non
 
 
 async def seed_vekn_less_shell(user: db.User, stats: Stats) -> None:
-    """A legacy member with no VEKN id: seed a soft-deleted shell under its old
-    uid so historical tournament/sanction references to it resolve, WITHOUT
-    creating a live identity (it isn't on vekn.net and can't be claimed). Mirrors
-    the member_deletions shells. Never resurrects or modifies an existing row."""
+    """Seed a soft-deleted shell under the old uid so historical refs resolve
+    without creating a live identity. Never resurrects or modifies an existing row."""
     if await db.get_user_by_uid(user.uid) is not None:
         return
     now = datetime.now(UTC)
@@ -593,11 +492,8 @@ async def seed_vekn_less_shell(user: db.User, stats: Stats) -> None:
 
 
 async def collect_tournament_participant_uids(old: psycopg.AsyncConnection) -> set[str]:
-    """Member uids referenced as tournament participants (players-dict keys ∪
-    round-seating player_uid). #216 uses it to tell a VEKN-less member that
-    ACTUALLY played (→ allocate a real id + push) from a non-participant
-    (→ soft-deleted shell). One server-side DISTINCT scan; ~11k uids for prod
-    (a few hundred KB — within the VPS budget)."""
+    """Member uids referenced as tournament participants, used by #216 to tell a
+    VEKN-less member who actually played from a non-participant."""
     async with old.cursor(row_factory=dict_row) as cur:
         await cur.execute(
             """
@@ -617,14 +513,9 @@ async def collect_tournament_participant_uids(old: psycopg.AsyncConnection) -> s
 async def allocate_veknless_participant(
     user: db.User, discord: dict, stats: Stats
 ) -> None:
-    """A genuinely VEKN-less legacy tournament participant (#216): allocate a real
-    VEKN id, create a LIVE member under the old-archon uid, and mark it
-    push-eligible (vekn_synced=False) so batch_push registers the id on vekn.net —
-    claiming the gap-filled id so a future vekn.net assignment of it can't collide
-    (#184-class). Called AFTER the full member pass so allocate_next_vekn_id sees
-    the complete vekn-id space (mid-pass the first gap may be a not-yet-imported
-    member). Idempotent: a live VEKN-bearing row from a prior run is reused; a
-    leftover #169 soft-deleted shell under this uid is resurrected into it."""
+    """A genuinely VEKN-less participant (#216): allocate a real VEKN id and mark it
+    push-eligible so batch_push claims it before a future vekn.net assignment can
+    collide (#184-class). Must run after the full member pass."""
     existing = await db.get_user_by_uid(user.uid)
     if existing is not None and not existing.deleted_at and existing.vekn_id:
         return
@@ -636,11 +527,9 @@ async def allocate_veknless_participant(
 
 
 async def resolve_known_remaps(member_uid_map: dict[str, str], stats: Stats) -> None:
-    """Point each #216 KNOWN_REMAP source uid at the LIVE account carrying its
+    """Point each #216 KNOWN_REMAP source uid at the live account carrying its
     target VEKN id. Run after the full member pass so the lookup is
-    order-independent (the real account may be imported/VEKN-synced in the same
-    run). The source member is never seeded; its tournament refs flow through this
-    remap instead."""
+    order-independent; the source member is never seeded."""
     for old_uid, target_vekn in KNOWN_REMAP.items():
         if old_uid not in member_uid_map:
             continue  # not in this import (e.g. --limit subset)
@@ -657,20 +546,11 @@ async def resolve_known_remaps(member_uid_map: dict[str, str], stats: Stats) -> 
 
 
 async def merge_member(user: db.User, discord: dict, stats: Stats) -> str:
-    """Idempotent member upsert keyed on VEKN id. Returns the LIVE uid this
-    old-archon member maps to (the caller records old_uid → live_uid in
-    `member_uid_map` and remaps every play-data reference through it).
+    """Idempotent member upsert keyed on VEKN id. Returns the live uid the caller
+    records in `member_uid_map` to remap play-data references.
 
-    The VEKN id is the stable cross-system identity key, so we match on it rather
-    than on the old-archon uid — which diverges whenever the live account was
-    created by the VEKN sync (fresh uuid7) and then claimed. Matching on uid here
-    used to tombstone such a claimed account and null its vekn_id (silent data
-    loss); this never tombstones a live account.
-
-    - no vekn_id        → soft-deleted shell (refs resolve; not a live identity)
-    - vekn_id matches a live account → merge archon-owned fields into it
-      (respecting local_modifications); identity / vekn_id / roles untouched
-    - vekn_id unknown here → seed-insert under the old-archon uid
+    Matches on vekn_id, not old-archon uid — matching on uid used to tombstone a
+    VEKN-sync-created account that was later claimed, nulling its vekn_id.
     """
     if not user.vekn_id:
         await seed_vekn_less_shell(user, stats)
@@ -678,10 +558,9 @@ async def merge_member(user: db.User, discord: dict, stats: Stats) -> str:
 
     live = await live_user_by_vekn_id(user.vekn_id)
     if live is None:
-        # vekn.net hasn't produced this account yet (VEKN sync didn't create it,
-        # or this is a vekn-sync-less env): seed under the old-archon uid. A
-        # previous run's seed already holds the vekn_id, so it is found above on
-        # the next run — idempotent.
+        # vekn.net hasn't produced this account yet: seed under the old-archon
+        # uid. A previous run's seed already holds the vekn_id, so it is found
+        # above on the next run — idempotent.
         existing = await db.get_user_by_uid(user.uid)
         if existing is not None:
             if existing.deleted_at:
@@ -738,14 +617,9 @@ async def migrate_members(
     participant_uids: set[str],
 ) -> dict[str, str]:
     """members → User (+ AuthMethod rows). Returns `member_uid_map`: old-archon
-    member uid → the LIVE uid it maps to (identity in ETL mode where uids are
-    preserved; the vekn-matched live account in merge mode). Every downstream
-    member-uid reference is remapped through this map. Also collects
-    (live_uid, old_sponsor_uid) pairs for the deferred coopted_by remap.
-
-    `participant_uids` is the set of member uids any tournament references (#216):
-    a VEKN-less member in it that actually played is allocated a real id, a
-    VEKN-less non-participant stays a shell."""
+    member uid → the live uid every downstream reference remaps through. Also
+    collects (live_uid, old_sponsor_uid) pairs for the deferred coopted_by remap.
+    """
     member_uid_map: dict[str, str] = {}
     veknless_participants: list[tuple[db.User, dict]] = []
     q = "SELECT uid, vekn, data, last_updated FROM members"
@@ -756,10 +630,8 @@ async def migrate_members(
         await cur.execute(q)
         async for row in cur:
             user, discord = build_user(row, stats)
-            # #216 VEKN-less legacy tournament-participant fixups (both modes;
-            # allocation deferred to the post-loop pass below for a stable id
-            # space). A non-participant VEKN-less member falls through to the
-            # normal path (merge: shell; ETL: live row, as before).
+            # #216: allocation deferred to the post-loop pass for a stable id
+            # space. A non-participant falls through to the normal path.
             if not user.vekn_id:
                 if user.uid in KNOWN_DROP:
                     # unseeded; the lone players-dict ref is stripped at build
@@ -801,19 +673,10 @@ async def remap_coopted_by(
     member_uid_map: dict[str, str],
     stats: Stats,
 ) -> None:
-    """Set coopted_by to the sponsor's LIVE uid, once the full member_uid_map is
-    known (coopted_by is a member→member reference, so the sponsor may be unseen
-    when the member is written, and the merge loop deliberately skips the field).
-    This is the SOLE writer of coopted_by in this sync: it writes the remapped
-    value directly and idempotently, so daily re-runs are a no-op (writing the
-    un-remapped old uid in the merge loop instead would flip-flop against this).
-    A local edit wins; the ETL identity map writes the unchanged uid (no-op).
-
-    A sponsor that does NOT resolve through the map is never written: legacy's
-    sponsor refs can dangle even within its own members table and rotate to a
-    fresh uid nightly — chasing them rewrote ~10k users (and their SSE
-    re-download) every night, with dangling values that also blocked the VEKN
-    sync's coopted_by inference from ever filling the field properly."""
+    """Set coopted_by to the sponsor's live uid, once member_uid_map is complete.
+    Sole writer of coopted_by in this sync — idempotent daily re-runs. An
+    unresolved sponsor is never written: legacy refs dangle and rotate uid
+    nightly, and chasing them rewrote ~10k users every night."""
     for live_uid, old_sponsor in coopted_pending:
         desired = member_uid_map.get(old_sponsor)
         if desired is None:
@@ -833,9 +696,8 @@ async def remap_coopted_by(
 async def migrate_member_deletions(
     old: psycopg.AsyncConnection, live: set[str], stats: Stats, merge: bool
 ) -> None:
-    """member_deletions → soft-deleted User shells (ETL: preserve referential
-    integrity for historical records pointing at a deleted member; merge: also
-    propagate deletions of members that exist live on the new stack)."""
+    """member_deletions → soft-deleted User shells. Merge mode also propagates
+    deletions of members that exist live on the new stack."""
     async with old.cursor(row_factory=dict_row) as cur:
         await cur.execute("SELECT uid, deleted_at FROM member_deletions")
         rows = await cur.fetchall()
@@ -861,11 +723,6 @@ async def migrate_member_deletions(
             )
         )
         stats.bump("deleted_user_shells")
-
-
-# --------------------------------------------------------------------------- #
-# Leagues                                                                      #
-# --------------------------------------------------------------------------- #
 
 
 async def migrate_leagues(
@@ -919,11 +776,6 @@ async def migrate_leagues(
         stats.bump("leagues")
 
 
-# --------------------------------------------------------------------------- #
-# Sanctions                                                                    #
-# --------------------------------------------------------------------------- #
-
-
 def build_sanction(
     s: dict, user_uid: str, fallback_tournament_uid: str | None, stats: Stats
 ) -> Sanction:
@@ -950,11 +802,6 @@ def build_sanction(
         description=s.get("comment") or "",
         issued_at=issued_at,
     )
-
-
-# --------------------------------------------------------------------------- #
-# Tournaments                                                                  #
-# --------------------------------------------------------------------------- #
 
 
 class _DeckCtx(NamedTuple):
@@ -990,9 +837,8 @@ def _build_seats(
     total: dict[str, list[float]],
     decks: list[DeckObject],
 ) -> list[Seat]:
-    """Build Seats from old seating (scores PRESERVED from source), accumulating
-    prelim-only (non-finals) and prelim+finals score sums per player, and
-    extracting per-round decks for multideck tournaments."""
+    """Build Seats from old seating (scores preserved from source), accumulating
+    prelim-only and prelim+finals score sums per player."""
     seats: list[Seat] = []
     for s in seating_raw:
         puid = str(s.get("player_uid"))
@@ -1045,9 +891,7 @@ def build_tournament(
     stats: Stats,
 ) -> tuple[Tournament, list[DeckObject]]:
     """Old tournament JSON → (Tournament under target_uid, extracted decks).
-
-    Accumulates tournament-embedded sanctions into `sanctions` (keyed to
-    target_uid; tref-sourced tournament refs are remapped by the caller)."""
+    Accumulates tournament-embedded sanctions into `sanctions`."""
     players_dict: dict = d.get("players") or {}
     finals_seeds = [str(x) for x in (d.get("finals_seeds") or [])]
     finals_set = set(finals_seeds)
@@ -1068,13 +912,9 @@ def build_tournament(
     finals_src = old_rounds[-1] if has_finals else None
     decks: list[DeckObject] = []
 
-    # Seat scores are PRESERVED from old archon (verified correct: 0 GW-rule
-    # violations across prod prelim seats, finals GW matches the engine's
-    # finals rule). VP/GW/TP are summed per player into prelim-only (feeds
-    # `standings`) and prelim+finals (feeds Player.result). Keeping the two
-    # separated is the actual fix: league scoring (league.rs) adds finals on
-    # top of prelim standings, and the old vekn-push bug came from folding
-    # finals into prelim. The new standings model is "prelim-only".
+    # Seat scores are preserved verbatim from old archon. VP/GW/TP are kept
+    # split prelim-only (`standings`) vs prelim+finals (`Player.result`) —
+    # folding finals into prelim was the old vekn-push bug.
     prelim: dict[str, list[float]] = {str(u): [0.0, 0.0, 0.0] for u in players_dict}
     total: dict[str, list[float]] = {str(u): [0.0, 0.0, 0.0] for u in players_dict}
     deck_ctx = _DeckCtx(
@@ -1175,19 +1015,15 @@ def build_tournament(
                 )
             )
 
-    # description note for migrated Draft-format tournaments
     description = d.get("description") or ""
     if d.get("format") == "Draft":
         description = ("[Originally Draft format] " + description).strip()
 
     league_ref = d.get("league") or {}
-    # old archon stored the vekn.net event id in extra.vekn_id; the new stack
-    # keys vekn tournaments by external_ids["vekn"], so map it there — that lets
-    # the later VEKN tournament sync MATCH these instead of creating duplicates.
-    # In merge mode, entries the new stack already carries are preserved, and
-    # the old-archon uid is recorded under "archon" when the rich payload
-    # merged into a vekn-created copy (so later runs find it again by marker
-    # instead of mistaking their own merge for a both-rich conflict).
+    # old archon's extra.vekn_id maps onto external_ids["vekn"] here so the VEKN
+    # tournament sync matches instead of duplicating; "archon" is recorded when
+    # the rich payload merged into a vekn-created copy, so a later run finds it
+    # by marker instead of mistaking its own merge for a both-rich conflict.
     old_uid = str(d.get("uid") or target_uid)
     extra = d.get("extra") or {}
     external_ids: dict[str, str] = dict(existing.external_ids) if existing else {}
@@ -1233,10 +1069,8 @@ def build_tournament(
         decklists_mode=decklists_mode,
         max_rounds=int(d.get("max_rounds", 0) or 0),
         external_ids=external_ids,
-        # Carry forward the existing new-app code (organizers may have printed the
-        # QR) → legacy code (never set — new-app concept) → generate. An empty
-        # existing code (previously-migrated under the old `or ""`) is falsy, so
-        # the next nightly run self-backfills it with a stable random code.
+        # Existing new-app code (may be printed as a QR) wins over legacy (never
+        # set) over a fresh generate; an empty existing code self-backfills.
         checkin_code=(
             (existing.checkin_code if existing else None)
             or d.get("checkin_code")
@@ -1247,22 +1081,13 @@ def build_tournament(
         finals=finals,
         winner=winner_uid,
         standings=standings,
-        # Migrated events owe new archon no VEKN push. Under one-app-per-event
-        # legacy owns each event until it's finished there; legacy pushes it
-        # and the daily --merge then carries the vekn id + results + this
-        # stamp back, so new archon must never (re)create a calendar event or
-        # (re)upload results for a migrated event. Stamp every NON-PLANNED import
-        # — finished AND in-flight — the exact inverse of batch_push's
-        # `state != 'Planned'` calendar-event gate (and a superset of the
-        # finished+rounds results guard), so queries 2 and 3 both skip them.
-        # Planned drafts aren't push-eligible anyway. Genuinely-new events created
-        # in-app aren't ETL-stamped, so they still push normally. An existing
-        # stamp is preserved (idempotent across daily merges).
+        # Migrated events owe new archon no VEKN push — legacy owns and pushes
+        # each event until finished there. Stamped on every non-Planned import,
+        # the inverse of batch_push's calendar/results gates, so both skip them.
         vekn_pushed_at=(existing.vekn_pushed_at if existing else None)
         or (datetime.now(UTC) if state != TournamentState.PLANNED else None),
     )
 
-    # accumulate tournament-embedded sanctions (dict[member_uid → [Sanction]])
     for member_uid, slist in (d.get("sanctions") or {}).items():
         for s in slist:
             if s.get("uid"):
@@ -1276,17 +1101,10 @@ def build_tournament(
 def _remap_member_refs(
     t: Tournament, decks: list[DeckObject], member_uid_map: dict[str, str]
 ) -> tuple[Tournament, list[DeckObject]]:
-    """Rewrite every member-uid reference the importer BUILDS — players, winner,
-    rounds+finals seating (player_uid + judge_uid), finals.seed_order, standings,
-    organizers_uids, offline_user_uid, deck.user_uid — through `member_uid_map`
-    (old-archon uid → live uid). Centralised so no ref field is missed: a missed
-    one silently splits a tournament across the old and live uid spaces (the live
-    account's players came from the VEKN sync as uuid7, the rich rounds carry old
-    uids) — and the cross-object orphan scan can't catch it. (ScoreOverride.judge_uid
-    and RaffleDraw.winners are also member refs but the importer never builds them,
-    so they stay empty and need no remap.) Empty map (ETL identity) → no-op. The
-    deck *uid* (uuid5 of the old player uid) is intentionally left stable across
-    modes; only deck.user_uid is remapped."""
+    """Rewrite every member-uid reference the importer builds through
+    `member_uid_map`, centralised so none is missed — a missed one silently
+    splits a tournament across the old and live uid spaces. The deck *uid*
+    (uuid5 of the old player uid) stays stable; only deck.user_uid is remapped."""
     if not member_uid_map:
         return t, decks
 
@@ -1329,12 +1147,9 @@ def _remap_member_refs(
 
 
 async def carry_league_onto_echo(existing: Tournament, d: dict, stats: Stats) -> None:
-    """League membership is archon-only knowledge — the VEKN sync can't set it
-    (and its rebuild used to clear it) — so an echo-skip must still carry the
-    legacy league ref onto the surviving copy, or a legacy league event whose
-    results arrived via vekn.net stays league-less forever. Leagues keep their
-    uids across the merge, so the ref maps 1:1. Idempotent: writes only when
-    the ref resolves to a live league and differs from what's stored."""
+    """League membership is archon-only knowledge, so an echo-skip must still
+    carry the legacy league ref onto the surviving copy, or it stays
+    league-less forever. Idempotent: writes only on an actual change."""
     league_uid = nz((d.get("league") or {}).get("uid"))
     if not league_uid or existing.league_uid == league_uid:
         return
@@ -1359,8 +1174,7 @@ async def process_tournament_row(
     archon_ix: dict[str, str],
 ) -> None:
     """Migrate/merge one old tournament row. Records old_uid → surviving uid in
-    `uid_map` (used to remap sanction tournament refs); remaps every member-uid
-    in the rich payload through `member_uid_map` (old member uid → live uid)."""
+    `uid_map`, used to remap sanction tournament refs."""
     member_uid_map = member_uid_map or {}
     d = dict(row["data"] or {})
     old_uid = str(row["uid"])
@@ -1394,9 +1208,7 @@ async def process_tournament_row(
             return
         if existing is None:
             # A previous run merged this event's rich payload into a
-            # vekn-created copy: find it again by the marker. The index is built
-            # once per run (see archon_uid_index) — each old_uid is processed at
-            # most once, so a pre-loop snapshot can't go stale under us.
+            # vekn-created copy: find it again by the marker.
             live_uid = archon_ix.get(old_uid)
             existing = await db.get_tournament_by_uid(live_uid) if live_uid else None
             if existing is not None:
@@ -1406,13 +1218,9 @@ async def process_tournament_row(
             and not d.get("rounds")
             and (existing.rounds or existing.finals)
         ):
-            # Echo guard, uid/marker edition: a legacy-born event later run live
-            # in the new app (the supported cutover flow) leaves legacy's copy
-            # round-less at Registration forever — without this, every nightly
-            # merge reverts the rich row's play data + state to that stale copy
-            # (wiped 'Open de Coya 2026', vekn 13412, on 2026-08-03). Both-rich
-            # stays an overwrite here: a legacy-run event is rich on both sides
-            # after its first merge, and legacy owns it until finished there.
+            # Echo guard: without this, every nightly merge reverts the rich
+            # row's play data + state to legacy's stale round-less copy (wiped
+            # 'Open de Coya 2026', vekn 13412, on 2026-08-03).
             uid_map[old_uid] = target_uid
             stats.bump("tournaments.echo_skipped_by_uid")
             await carry_league_onto_echo(existing, d, stats)
@@ -1422,9 +1230,8 @@ async def process_tournament_row(
             if x is not None:
                 incoming_rich = bool(d.get("rounds"))
                 if not incoming_rich:
-                    # Echo guard: old archon's round-less copy of an event whose
-                    # results live elsewhere (it synced them from vekn.net).
-                    # Never import the pale copy over the original.
+                    # Echo guard: never import old archon's round-less copy
+                    # over the vekn.net-synced original.
                     uid_map[old_uid] = x.uid
                     stats.bump("tournaments.echo_skipped")
                     await carry_league_onto_echo(x, d, stats)
@@ -1439,15 +1246,11 @@ async def process_tournament_row(
                     stats.bump("tournaments.both_rich_conflict")
                     return
                 # Merge the rich payload INTO the vekn-created copy: its uid
-                # survives (deep links stay valid, no client tombstone); the
-                # next VEKN sync run hits the rich-guard and refreshes metadata
-                # only.
+                # survives (deep links stay valid, no client tombstone).
                 target_uid, existing = x.uid, x
         if existing is None and not vekn_eid:
-            # Old archon never recorded a vekn id for this event, so neither key
-            # above can see the copy the VEKN sync already created from vekn.net —
-            # this is where the #520 duplicate pairs came from. Fall back to
-            # name + start-day and reuse the same rich/echo arbitration.
+            # No vekn id recorded, so neither key above sees the VEKN-sync copy —
+            # source of the #520 duplicate pairs. Fall back to name + start-day.
             x = await live_same_event_tournament(d, old_uid)
             if x is not None:
                 incoming_rich = bool(d.get("rounds"))
@@ -1474,12 +1277,9 @@ async def process_tournament_row(
     t, decks = _remap_member_refs(t, decks, member_uid_map)
     uid_map[old_uid] = target_uid
 
-    # vekn-linked events: the VEKN tournament sync owns descriptive metadata —
-    # its rich-guard path refreshes name/format/rank/online/dates/timezone/
-    # country/venue/proxies fields from vekn.net and unions organizers. Writing
-    # old archon's values for those would flip-flop daily with that refresh. Keep
-    # the existing metadata, write play data + archon-only config, and union
-    # organizers the same way the VEKN sync does.
+    # vekn-linked events: the VEKN sync owns descriptive metadata (writing old
+    # archon's values would flip-flop daily against its refresh) — keep it, write
+    # play data + archon-only config, and union organizers the same way it does.
     if merge and existing is not None and "vekn" in t.external_ids:
         t = msgspec.structs.replace(
             existing,
@@ -1617,9 +1417,8 @@ async def save_sanctions(
     member_uid_map: dict[str, str],
 ) -> None:
     for s in sanctions.values():
-        # Remap tournament refs to the surviving uid for events whose rich
-        # payload merged into a vekn-created copy, and the sanctioned member +
-        # issuing judge to their live uids (old-archon uid → live).
+        # Remap to surviving/live uids: tournament (rich-merge target),
+        # sanctioned member, issuing judge.
         if s.tournament_uid:
             s.tournament_uid = uid_map.get(s.tournament_uid, s.tournament_uid)
         s.user_uid = member_uid_map.get(s.user_uid, s.user_uid)
@@ -1634,11 +1433,6 @@ async def save_sanctions(
                 s.modified = datetime.now(UTC)
         await db.save_sanction(s)
         stats.bump("sanctions")
-
-
-# --------------------------------------------------------------------------- #
-# Entry point                                                                  #
-# --------------------------------------------------------------------------- #
 
 
 async def truncate_new() -> None:
@@ -1664,13 +1458,9 @@ def backup_new_db(dsn: str, backup_dir: Path) -> Path:
 
 
 async def run(args: argparse.Namespace) -> None:
-    # Both DSNs get the relaxed guard: this is an off-request, fail-safe batch job
-    # (it pg_dumps the new DB first), so it must not inherit the cluster's 30s
-    # USER-REQUEST statement_timeout — same escape hatch as db.batch_read_connection,
-    # just wider, since a daily job has a 24h window. Without it the #216 participant
-    # pre-pass (one full-corpus JSONB expansion over legacy tournaments) blew the 30s
-    # guard nightly on the latency-bound prod disk and the merge never ran.
-    # make_conninfo, not string concat: --old-dsn/--new-dsn take URI *or* keyword form.
+    # Both DSNs get the relaxed guard — without it the #216 participant pre-pass
+    # blew the 30s statement_timeout nightly on prod and the merge never ran.
+    # make_conninfo, not string concat: --old-dsn/--new-dsn take URI or keyword form.
     relaxed = {"options": f"-c statement_timeout={BATCH_STATEMENT_TIMEOUT_MS}"}
     db.DB_URL = make_conninfo(args.new_dsn, **relaxed)
     os.environ["DATABASE_URL"] = db.DB_URL
@@ -1693,9 +1483,7 @@ async def run(args: argparse.Namespace) -> None:
     coopted_pending: list[tuple[str, str]] = []
     try:
         print("→ members")
-        # #216 pre-pass: which member uids any tournament references, so a
-        # VEKN-less member who actually played is allocated a real id rather than
-        # shelled. Full scan, unaffected by --limit (a smoke-test classification).
+        # #216 pre-pass, unaffected by --limit — a smoke-test classification.
         participant_uids = await collect_tournament_participant_uids(old)
         member_uid_map = await migrate_members(
             old, stats, args.limit, args.merge, coopted_pending, participant_uids

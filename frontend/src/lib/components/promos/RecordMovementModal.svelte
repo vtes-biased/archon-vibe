@@ -1,8 +1,6 @@
 <script lang="ts">
-  // Record a promo inventory movement (officials). Intake = print batch
-  // received from BCP (NC for themselves, IC for anyone); assignment = stock
-  // handed to a member; distribution = copies handed out to players outside a
-  // tournament report. Negative qty records a compensating correction.
+  // Record a promo inventory movement (officials): intake = print batch received from BCP, assignment
+  // = stock moved holder→holder, distribution = a non-tournament exit. Negative qty is a compensating correction.
   import type { Promo, PromoLedgerKind, User } from "$lib/types";
   import { createPromoLedgerEntry } from "$lib/api";
   import { getAuthState } from "$lib/stores/auth.svelte";
@@ -143,7 +141,6 @@
     </div>
 
     <form onsubmit={(e) => { e.preventDefault(); submit(); }} class="p-6 space-y-4">
-      <!-- Kind segmented toggle -->
       <div class="grid grid-cols-3 bg-surface-muted rounded-lg border border-line p-1">
         {#each kinds as k (k)}
           <button

@@ -1,19 +1,8 @@
-"""Regression tests for /sanctions endpoint invariants.
-
-1. Level-only edit expiry validation. `_validate_expiry` used to run only inside
-   `if expires_at is not None`, so editing *just the level* SUSPENSION->PROBATION
-   skipped it and persisted a PROBATION with expires_at=None. That is not cosmetic:
-   a null-expiry PROBATION reads as PERMANENTLY active in
-   `user_has_active_suspension` (accounts.py — `expires_at is None` -> active
-   forever), permanently blocking the member from abandoning their VEKN ID. The
-   fix validates the resulting level+expires_at pair unconditionally.
-
-2. One active DQ per player per tournament. A second concurrent DQ is meaningless
-   and, once one is lifted, would strand the player zeroed with a FINISHED state.
-   create now 409s on a duplicate.
-
-Runs real: real Postgres, real route/auth, no engine (the DQ/SA recompute branches
-are gated on the tournament existing, and the guards reject before reaching them).
+"""Regression tests for /sanctions endpoint invariants: a level-only edit must
+validate the resulting level+expires_at pair together (skipping it let
+SUSPENSION->PROBATION persist a null expiry, which `user_has_active_suspension`
+reads as permanently active); and only one active DQ may exist per
+player+tournament (create 409s a duplicate).
 """
 
 from datetime import UTC, datetime
@@ -130,9 +119,8 @@ async def test_create_second_active_dq_rejected(test_client):
 
 @pytest.mark.asyncio
 async def test_dq_delete_restores_playable_state(test_client):
-    """Deleting an active DQ mid-event returns the player to a PLAYABLE state
-    (Playing while their table is live), not Finished/withdrawn — a
-    fat-fingered DQ is fully reversible (reversibility over confirmation)."""
+    """Deleting an active DQ mid-event restores the player to PLAYABLE (Playing,
+    not Finished/withdrawn) — a fat-fingered DQ must be fully reversible."""
     ic = User(uid=str(uuid7()), modified=datetime.now(UTC), name="IC", roles=[Role.IC])
     target = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Player")
     await db.save_user(ic)

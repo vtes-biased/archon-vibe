@@ -202,7 +202,6 @@ async def revoke_oauth_tokens_for_user_client(user_uid: str, client_id: str) -> 
 
 
 async def cleanup_expired_oauth_codes() -> int:
-    """Delete expired authorization codes."""
     async with get_connection() as conn:
         result = await conn.execute(
             """
@@ -216,16 +215,9 @@ async def cleanup_expired_oauth_codes() -> int:
 
 
 async def cleanup_expired_oauth_tokens() -> int:
-    """Delete tokens that expired more than 7 days ago.
-
-    Expiry alone is the predicate: an expired record is dead weight whether or not
-    it was revoked, and the old `revoked AND expired` gate never deleted the common
-    case — expired-but-never-revoked access tokens, the default fate of every
-    issuance — so oauth_tokens grew without bound. Revoked-but-unexpired rows are
-    deliberately kept: they are still needed for refresh-token reuse / chain
-    revocation detection (OAuthToken.expires_at is a required non-null field, so no
-    record escapes the comparison).
-    """
+    """Expiry alone is the predicate: revoked-but-unexpired rows are kept
+    deliberately, still needed for refresh-token reuse / chain revocation
+    detection."""
     async with get_connection() as conn:
         result = await conn.execute(
             """

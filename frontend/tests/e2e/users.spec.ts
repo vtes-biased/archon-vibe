@@ -16,8 +16,6 @@ import { waitForUsers, waitForSync } from './helpers/wait';
  * - Route mocks (login error, forgot password): 2s
  */
 
-// ─── App Load ──────────────────────────────────────────────────
-
 test.describe('App loads correctly', () => {
   test('redirects / to /tournaments', async ({ page }) => {
     await page.goto('/');
@@ -58,8 +56,6 @@ test.describe('App loads correctly', () => {
   });
 });
 
-// ─── Community Tab ────────────────────────────────────────────
-
 test.describe('Community tab', () => {
   test('shows all three sections with seeded links', async ({ page }) => {
     // Officials Directory is gated behind sign-in, so authenticate first.
@@ -79,14 +75,11 @@ test.describe('Community tab', () => {
     const searchInput = page.getByPlaceholder('Search countries...');
     await searchInput.fill('Germany');
     await page.waitForTimeout(300);
-    // Verify Germany appears in the communities list and France is filtered out
     const communitiesList = searchInput.locator('..').locator('..');
     await expect(communitiesList.getByText('Germany').first()).toBeVisible();
     await expect(communitiesList.getByRole('button', { name: /France/ })).not.toBeVisible();
   });
 });
-
-// ─── Login Page ────────────────────────────────────────────────
 
 test.describe('Login page', () => {
   test('displays login form elements', async ({ page }) => {
@@ -152,8 +145,6 @@ test.describe('Login page', () => {
     await expect(page.getByText('user@example.com')).toBeVisible();
   });
 });
-
-// ─── Users List & Filtering ────────────────────────────────────
 
 test.describe('Users list filtering', () => {
   test('filters users by name search', async ({ page }) => {
@@ -234,12 +225,10 @@ test.describe('Users list filtering', () => {
   });
 });
 
-// ─── Authenticated Features ────────────────────────────────────
-
 test.describe('Edit user (authenticated)', () => {
-  // Helper: navigate to another user's profile as IC organizer.
-  // Requires WASM engine + auth to be fully loaded, so we warm up via
-  // /tournaments first (same pattern as tournament lifecycle test).
+  // Navigate to another user's profile as IC organizer; requires WASM engine
+  // + auth fully loaded, so warm up via /tournaments first (same pattern as
+  // the tournament lifecycle test).
   async function goToUserProfile(page: Page) {
     const state = getE2EState();
     await setupAuthBeforeNavigation(page);

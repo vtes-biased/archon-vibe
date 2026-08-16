@@ -1,13 +1,4 @@
-"""Tests for implicit organizer access and VEKN sync organizer mapping.
-
-Covers:
-- _is_organizer: IC role grants implicit organizer access
-- _is_organizer: NC same-country grants implicit organizer access
-- _build_actor_context: IC/NC role sets is_organizer=True
-- _map_vekn_to_tournament: organizer_veknid mapped to organizers_uids
-- can_link_tournament_to_league: the open_to_country_princes flag round-trips
-  through the real backend→engine marshalling boundary
-"""
+"""Tests for implicit organizer access and VEKN sync organizer mapping."""
 
 from datetime import UTC, datetime
 
@@ -50,11 +41,6 @@ def _tournament(organizers_uids=None, country=None):
     )
 
 
-# ============================================================================
-# _is_organizer tests
-# ============================================================================
-
-
 class TestIsOrganizer:
     def test_explicit_organizer(self):
         user = _user("org1")
@@ -77,13 +63,11 @@ class TestIsOrganizer:
         assert permissions.is_organizer(user, t) is True
 
     def test_nc_same_country_is_implicit_organizer(self):
-        """NC with matching country should get implicit organizer access."""
         user = _user("nc-user", roles=[Role.NC], country="France")
         t = _tournament(organizers_uids=["someone-else"], country="France")
         assert permissions.is_organizer(user, t) is True
 
     def test_prince_same_country_not_implicit_organizer(self):
-        """Prince does NOT get implicit organizer access (only NC does)."""
         user = _user("prince-user", roles=[Role.PRINCE], country="France")
         t = _tournament(organizers_uids=[], country="France")
         assert permissions.is_organizer(user, t) is False
@@ -104,11 +88,6 @@ class TestIsOrganizer:
         assert permissions.is_organizer(user, t) is False
 
 
-# ============================================================================
-# _build_actor_context tests
-# ============================================================================
-
-
 class TestBuildActorContext:
     def test_ic_gets_is_organizer_true(self):
         user = _user("ic-user", roles=[Role.IC])
@@ -125,18 +104,10 @@ class TestBuildActorContext:
         assert ctx["is_organizer"] is False
 
 
-# ============================================================================
-# can_link_tournament_to_league: flag round-trips backend → engine
-# ============================================================================
-
-
 class TestCanLinkTournamentToLeague:
-    """The open_to_country_princes flag governs the same-country Prince attach
-    grant. Engine logic is covered in permissions.rs; this pins the ONE seam the
-    engine test can't reach — the flag's new JSON key surviving the bespoke
-    descriptor build in permissions.py and OwnedResource::from_json. If that
-    marshalling drifts (or a DRY consolidation drops the flag), the grant fails
-    closed silently; here it fails loudly instead."""
+    """The open_to_country_princes flag governs the same-country Prince attach grant.
+    Engine logic is covered in permissions.rs; this pins the one seam it can't reach —
+    the flag surviving permissions.py's marshalling into OwnedResource."""
 
     def test_prince_attach_gated_by_flag(self):
         prince = _user("p", roles=[Role.PRINCE], country="France")
@@ -149,11 +120,6 @@ class TestCanLinkTournamentToLeague:
         )
 
 
-# ============================================================================
-# _map_vekn_to_tournament organizer mapping
-# ============================================================================
-
-
 class TestVeknOrganizerMapping:
     def _users_by_vekn(self):
         return {
@@ -163,7 +129,6 @@ class TestVeknOrganizerMapping:
         }
 
     def test_organizer_mapped_from_veknid(self):
-        """organizer_veknid in VEKN data should map to organizers_uids."""
         data = {
             "event_id": 999,
             "event_name": "Test Event",
@@ -197,7 +162,6 @@ class TestVeknOrganizerMapping:
         assert t.organizers_uids == ["uid-org"]
 
     def test_unknown_organizer_veknid_gives_empty(self):
-        """If organizer_veknid doesn't match a known user, organizers_uids is empty."""
         data = {
             "event_id": 999,
             "event_name": "Test Event",
@@ -221,7 +185,6 @@ class TestVeknOrganizerMapping:
         assert t.organizers_uids == []
 
     def test_no_organizer_veknid_gives_empty(self):
-        """Missing organizer_veknid field gives empty organizers_uids."""
         data = {
             "event_id": 999,
             "event_name": "Test Event",
@@ -235,7 +198,6 @@ class TestVeknOrganizerMapping:
         assert t.state == TournamentState.PLANNED
 
     def test_planned_tournament_gets_organizer(self):
-        """Future tournament (no players) still gets organizer mapping."""
         data = {
             "event_id": 999,
             "event_name": "Future Event",

@@ -232,7 +232,6 @@
         <input id="promo-release-date" type="date" bind:value={releaseDate} class={inputClass} />
       </div>
 
-      <!-- Image -->
       <div>
         <span class="block text-sm text-ink-muted mb-1">{m.promo_image_label()}</span>
         {#if shownImageUrl}
@@ -262,7 +261,6 @@
         {/if}
       </div>
 
-      <!-- Rank gating -->
       <div>
         <span class="block text-sm text-ink-muted mb-1">{m.promo_allowed_ranks_label()}</span>
         <div class="space-y-1">
@@ -281,7 +279,6 @@
         <p class="text-xs text-ink-faint">{m.promo_allowed_ranks_hint()}</p>
       </div>
 
-      <!-- League gating -->
       <div>
         <span class="block text-sm text-ink-muted mb-1">{m.promo_leagues_label()}</span>
         {#if leagues.length > 0}
@@ -304,7 +301,6 @@
         {/if}
       </div>
 
-      <!-- Active -->
       <label class="flex items-center gap-3 min-h-[44px] cursor-pointer">
         <input
           type="checkbox"

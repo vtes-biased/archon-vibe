@@ -1,12 +1,10 @@
 ---
-# ansible-lint config for the archon-vibe deploy
 # See https://ansible.readthedocs.io/projects/lint/configuring/
 
 profile: production
 
-# Collections are pre-installed into galaxy_collections/ by `just galaxy` (a
-# lint dependency) and resolved via ansible.cfg's collections_path — no need
-# for ansible-lint to re-download requirements.yml into its own .ansible/.
+# Collections resolve via ansible.cfg's collections_path (pre-installed by
+# `just galaxy`) — no need to re-download requirements.yml into .ansible/.
 offline: true
 
 exclude_paths:
@@ -18,8 +16,7 @@ exclude_paths:
   - inventories/beta/group_vars/vault.yml
   - inventories/prod/group_vars/vault.yml
 
-# We deliberately pass a single `r` dict into parameterised roles (matches the
-# reference deploys) rather than prefixing every variable. This makes it trivial
-# to invoke a role twice with different inputs in one playbook.
+# A single `r` dict is passed into parameterised roles rather than prefixing
+# every variable, so a role can be invoked twice with different inputs.
 skip_list:
   - var-naming[no-role-prefix]

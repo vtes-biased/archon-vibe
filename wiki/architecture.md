@@ -356,7 +356,11 @@ lazily on fetch and a device may go offline having never viewed the promo.
 Online-only, and **entirely optional** — `round_time = 0` means no timer, and
 offline venues and async pods run on the wall clock. Timer state lives on the
 `Tournament` object and syncs via the normal SSE CRUD-on-save; clients compute the
-countdown locally, so there are no per-second broadcasts.
+countdown locally, so there are no per-second broadcasts. The countdown anchors on
+`Date.now()` against the server-written timer state, deliberately not
+`performance.now()`: the wall clock survives sleep and hibernation and gives every
+viewer the same single server-clock reference, so devices converge on one
+remaining time; the monotonic clock serves only as a divergence watchdog.
 
 The rules put a **two-hour floor** on a round
 ([§3.1.1](domain/tournament-rules.md#round-structure)), and a round shorter than
@@ -523,7 +527,9 @@ is the join link rather than a venue website.
 
 `GET /api/tournaments/{uid}/report` (organizer-only) yields text (standings and
 results) or JSON (full data). Sharing produces a canvas-rendered PNG plus plain
-text with deck info, from the finished-tournament views.
+text with deck info, from the finished-tournament views. The player-facing
+copy-results action shares text plus the link only, with no image generation of
+its own — the OG stub below already turns the shared link into the picture card.
 
 **Open Graph stubs.** Social link-preview crawlers don't run JavaScript, so they
 would always see the static SPA shell with the site-wide `og:image`. nginx

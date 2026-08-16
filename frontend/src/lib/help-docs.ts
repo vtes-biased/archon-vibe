@@ -9,9 +9,8 @@ import judgesGuideRaw from "$lib/help-content/judges-guide.md?raw";
 import judgesGuideEsRaw from "$lib/help-content/judges-guide.es.md?raw";
 import codeOfEthicsRaw from "$lib/help-content/code-of-ethics.md?raw";
 
-// Translated reference docs, by slug then locale. A static import (not a dynamic
-// one) on purpose: the service worker precaches every built chunk at install, so
-// splitting these out would still download them — it would only add machinery.
+// Translated reference docs, by slug then locale. A static import (not a dynamic one) on purpose:
+// the service worker precaches every built chunk at install, so splitting these out would still download them.
 const translations: Record<string, Record<string, string>> = {
   "judges-guide": { es: judgesGuideEsRaw },
 };
@@ -36,7 +35,6 @@ export interface HelpDoc {
   isComponent?: boolean; // true if rendered by a Svelte component
 }
 
-/** Extract table of contents entries from rendered HTML */
 export function extractToc(html: string, maxDepth: number): TocEntry[] {
   const entries: TocEntry[] = [];
   const regex = /<h([1-4])\s+id="([^"]+)"[^>]*>([^<]*(?:<[^/][^>]*>[^<]*<\/[^>]+>)*[^<]*)/g;
@@ -45,7 +43,6 @@ export function extractToc(html: string, maxDepth: number): TocEntry[] {
     const depth = parseInt(match[1]!);
     if (depth > maxDepth) continue;
     const id = match[2]!;
-    // Strip HTML tags and decode entities from the heading text, remove trailing # anchor
     let text = match[3]!.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s*#\s*$/, "").trim();
     // Shorten "2.3. Procedural Error — Game Rule Violation" to "2.3. Game Rule Violation"
     text = text.replace(/^(\d[\d.]*\.\s+).+?\s—\s+/, "$1");
@@ -54,7 +51,6 @@ export function extractToc(html: string, maxDepth: number): TocEntry[] {
   return entries;
 }
 
-// Lazy-render cache
 const renderCache = new Map<string, string>();
 function getRendered(slug: string, raw: string): string {
   const key = `${slug}:${getLocale()}`;
@@ -117,8 +113,6 @@ export const helpDocs: Record<string, HelpDoc> = {
   },
 };
 
-/** Ordered list of reference doc slugs */
 export const referenceDocs = ["rules", "tournament-rules", "judges-guide", "code-of-ethics"];
 
-/** Ordered list of user guide slugs */
 export const userGuides = ["player-guide", "organizer-guide"];

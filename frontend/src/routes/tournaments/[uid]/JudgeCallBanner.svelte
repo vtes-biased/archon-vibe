@@ -19,9 +19,7 @@
     const id = nextId++;
     const ts = Date.now();
     calls = [...calls, { ...data, id, ts }];
-    // Play audio chime
     playChime();
-    // Auto-dismiss after 120s
     dismissTimers.set(id, setTimeout(() => dismiss(id), 120_000));
   }
 

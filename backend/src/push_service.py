@@ -1,23 +1,8 @@
-"""Web Push (#314): VAPID config, payload building, and delivery.
+"""Web Push: VAPID config, payload building, and delivery.
 
-Push subscriptions are server-side send credentials in the ``push_subscriptions`` side
-table — NOT the synced objects pipeline (they're endpoints the backend sends to, never
-display data). This module loads the VAPID keypair from the environment, builds the three
-notification types (seating, announcement, judge call), and delivers them with
-``pywebpush.webpush_async`` over a single shared ``aiohttp.ClientSession``. The session's
-TCPConnector pools connections per push host (most Chrome subs share fcm.googleapis.com),
-so a fan-out reuses keep-alive connections instead of a fresh TLS handshake per push;
-``limit`` / ``limit_per_host`` bound concurrency on the small box. (pywebpush owns the
-RFC 8291 payload encryption + RFC 8292 VAPID signing — the crypto we must not hand-roll.)
-
-Callers fire sends as ``asyncio.create_task`` AFTER a tournament transaction commits — a
-delivery failure must never fail or delay the action response, and a DB-touching task
-must never run inside ``tournament_transaction`` (the connection-owner guard). Dead
-subscriptions are pruned on 404/410; other failures are transient and left in place.
-
-The feature degrades gracefully: with no VAPID keys configured, ``is_configured()`` is
-False and every send is a no-op (dev without keys, or an env before the vault entry).
-"""
+Callers fire sends as ``asyncio.create_task`` AFTER a tournament transaction
+commits — a DB-touching task must never run inside ``tournament_transaction``.
+Dead subscriptions are pruned on 404/410; other failures are left in place."""
 
 from __future__ import annotations
 
@@ -67,14 +52,8 @@ def vapid_public_key() -> str:
     return _VAPID_PUBLIC_KEY
 
 
-# --- Localized message templates ----------------------------------------------
-#
-# Only the TEMPLATED bodies are localized. The announcement body is organizer free
-# text (rendered as typed); a title that is a tournament name isn't translatable.
-# Bodies render per-SUBSCRIPTION (a user may carry a FR phone and an EN laptop),
-# keyed by the locale stored on each push_subscriptions row. en is the source; the
-# other locales are maintained by the i18n-translator — keep the {placeholders} intact.
-
+# Only TEMPLATED bodies are localized (announcement text and tournament-name
+# titles render as typed). Rendered per-SUBSCRIPTION, keyed by that row's locale.
 _FALLBACK_LOCALE = "en"
 
 _PUSH_MESSAGES: dict[str, dict[str, str]] = {
@@ -168,13 +147,8 @@ def _finals_seat_spec(t: Tournament, seat_idx: int) -> dict:
 
 def build_seating_specs(t: Tournament, event_type: str) -> list[tuple[str, dict]]:
     """(user_uid, spec) for each player seated by a just-started round/finals.
-
-    A *spec* is locale-independent data; ``render_payload(spec, locale)`` turns it into
-    the wire notification. Enumerates ONLY the newly-appended round (``t.rounds[-1]``) or
-    the finals table, so StartRound (all tables), SelfOrganizeRound (one pod), and
-    StartFinals are uniform; a parallel-pod player who was not re-seated gets nothing.
-    RestoreRound is excluded by the caller (it re-seats no one).
-    """
+    Enumerates ONLY the newly-appended round or finals table, so a parallel-pod
+    player who was not re-seated gets nothing. RestoreRound is excluded by the caller."""
     if event_type == "StartFinals":
         if t.finals is None:
             return []
@@ -194,15 +168,9 @@ def build_seating_specs(t: Tournament, event_type: str) -> list[tuple[str, dict]
 
 
 def build_reseat_specs(old: Tournament, new: Tournament) -> list[tuple[str, dict]]:
-    """(user_uid, spec) for players whose table/seat changed under a re-seat action
-    (AlterSeating / SwapSeats / SeatPlayer / UnseatPlayer): the substitute and every
-    moved player need a fresh notification replacing their stale table assignment,
-    while re-notifying unmoved players is spam — only changed assignments are pushed.
-    Diffs every round pairwise plus the finals (re-seats can target any live round
-    under parallel pods), but only pages players landing on a still-live table:
-    seating corrections to finished tables/events are bookkeeping, not seat calls.
-    Unseated players get nothing — there is no assignment to announce.
-    """
+    """(user_uid, spec) for players whose table/seat changed under a re-seat action.
+    Only pages players landing on a still-live table — corrections to finished
+    tables are bookkeeping, not seat calls. Unseated players get nothing."""
     if new.state != TournamentState.PLAYING:
         return []
     out: list[tuple[str, dict]] = []
@@ -243,9 +211,8 @@ def build_announcement_spec(t: Tournament, body: str) -> dict:
         "title": t.name,
         "body": body,
         "url": f"/tournaments/{t.uid}",
-        # Shared tag: the latest announcement replaces a stale one (announcements
-        # are one-per-critical-moment); renotify keeps each replacement audible
-        # instead of dead-silent, mirroring the judge-call config.
+        # Shared tag: the latest announcement replaces a stale one; renotify keeps
+        # each replacement audible instead of dead-silent.
         "tag": f"announce-{t.uid}",
         "renotify": True,
     }

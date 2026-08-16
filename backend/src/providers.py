@@ -1,10 +1,6 @@
 """Deck URL providers: fetch + resolve deck data from VDB, VTESDecks, Amaranth.
-
-krcg does the fetching and, crucially, maps each provider's native card ids to VEKN
-ids — notably Amaranth, whose API returns its own ids (storing them verbatim was the
-original import bug). Resolution uses krcg's bundled card DB, independent of our
-generated ``cards.json``.
-"""
+krcg maps each provider's native card ids to VEKN ids (notably Amaranth's own),
+using its bundled card DB, independent of our generated ``cards.json``."""
 
 import asyncio
 import logging

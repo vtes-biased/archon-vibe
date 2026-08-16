@@ -1,10 +1,5 @@
 /// League standings computation shared between frontend (WASM) and backend (PyO3).
-///
-/// Three standings modes:
-/// - **RTP**: Sum of per-tournament rating points, on the same total as the global
-///   rating (prelim + finals + the no-final tournament-win GW); GW/VP include finals
-/// - **Score**: Sum of preliminary GW/VP/TP only (finals + win GW excluded)
-/// - **GP**: Position-based points per tournament; GW/VP include finals
+/// Modes: RTP (full rating total), Score (preliminary GW/VP/TP only), GP (position-based points).
 use json::JsonValue;
 
 use crate::error::EngineError;
@@ -21,26 +16,8 @@ struct PlayerEntry {
     tournaments_count: i32,
 }
 
-/// Compute league standings from tournament data.
-///
-/// Input JSON:
-/// ```json
-/// {
-///   "standings_mode": "RTP" | "Score" | "GP",
-///   "tournaments": [
-///     {
-///       "uid": "...",
-///       "rank": "" | "National Championship" | "Continental Championship",
-///       "standings": [{ "user_uid": "...", "gw": 1.0, "vp": 3.5, "tp": 48, "finalist": false }],
-///       "player_count": 20,
-///       "finals": [{ "player_uid": "...", "gw": 0, "vp": 1.5, "tp": 0 }] // seats if finals exist
-///     }
-///   ]
-/// }
-/// ```
-///
-/// Output JSON: array of standing entries sorted by ranking, each with:
-/// `{ "user_uid", "gw", "vp", "tp", "points", "rank", "tournaments_count" }`
+/// Computes league standings from `{standings_mode, tournaments: [{uid, rank, standings,
+/// player_count, finals}]}`. Output: entries sorted by rank, `{user_uid, gw, vp, tp, points, rank, tournaments_count}`.
 pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError> {
     let config = json::parse(config_json)?;
     let mode = config["standings_mode"].as_str().unwrap_or("RTP");
@@ -52,10 +29,8 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
         let rank = tournament["rank"].as_str().unwrap_or("");
         let player_count = tournament["player_count"].as_i32().unwrap_or(0);
 
-        // GP and RTP score by *final* placement (winner 1st even if they did not
-        // lead the preliminaries; other finalists tie for 2nd). Resolve every
-        // player's final-placement rank once per tournament from the shared
-        // engine helper, then the loop below just looks it up.
+        // GP and RTP score by *final* placement (winner 1st even if they did not lead
+        // the preliminaries; other finalists tie for 2nd), resolved once per tournament.
         let winner = tournament["winner"].as_str().unwrap_or("");
         let final_place: std::collections::HashMap<String, usize> = if mode == "Score" {
             std::collections::HashMap::new()
@@ -66,12 +41,8 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
                 .collect()
         };
 
-        // Finals seats indexed by player (flattened {player_uid, gw, vp, tp}). For
-        // the non-Score modes the per-tournament VP/GW base is the SAME total the
-        // global per-tournament rating uses (compute_rating_vp_gw): prelim + finals +
-        // the tournament-win GW credited to the winner when no finals table was
-        // played (a no-final import; native leaves winner=="", so it stays inert).
-        // Score stays prelim-only — it adds none of this, final or not.
+        // Non-Score modes use the SAME per-tournament VP/GW total as the global rating
+        // (compute_rating_vp_gw): prelim + finals + the no-final tournament-win GW.
         let has_finals = !tournament["finals"].is_empty();
         let finals_by_uid: std::collections::HashMap<String, (f64, f64, i32)> = tournament
             ["finals"]
@@ -98,10 +69,8 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
             if standing["non_competing"].as_bool().unwrap_or(false) {
                 continue;
             }
-            // DQ'd: earns no league standing either — their row is zeroed, so keeping
-            // it would still collect the RTP participation base / a GP bucket slot.
-            // Mirrors ratings.py _is_disqualified (a DQ earns no rating). player_count
-            // is unaffected (it still counts them, lifting others' coefficient).
+            // DQ'd: earns no league standing either (mirrors ratings.py _is_disqualified).
+            // player_count is unaffected — it still counts them, lifting others' coefficient.
             if standing["disqualified"].as_bool().unwrap_or(false) {
                 continue;
             }
@@ -142,10 +111,8 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
 
             match mode {
                 "RTP" => {
-                    // Finalist bonus is gated on the finalist flag (every data source
-                    // sets it when a final is played); winner (final rank 1) = 1, other
-                    // finalists = 2. Points use the full rating total so league RTP
-                    // matches the global per-tournament rating.
+                    // Finalist bonus is gated on the finalist flag: winner (final rank 1)
+                    // = 1, other finalists = 2, using the full total to match the global rating.
                     let finalist_position = if finalist {
                         if final_place.get(&uid) == Some(&1) {
                             1
@@ -180,7 +147,6 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
         }
     }
 
-    // Sort players
     let mut sorted: Vec<PlayerEntry> = players.into_values().collect();
     match mode {
         "Score" => {
@@ -300,8 +266,7 @@ mod tests {
     #[test]
     fn test_rtp_points_count_finals_and_no_final_win_gw() {
         // League RTP points must use the FULL rating total (prelim + finals + the
-        // no-final tournament-win GW), so they match the global per-tournament rating
-        // (compute_rating_vp_gw → compute_rating_points) — not the prelim-only base.
+        // no-final tournament-win GW), matching the global per-tournament rating — not the prelim-only base.
         let pts = |parsed: &json::JsonValue, uid: &str| -> i32 {
             parsed
                 .members()
@@ -440,11 +405,8 @@ mod tests {
 
     #[test]
     fn test_gp_non_prelim_first_winner() {
-        // p2 wins the finals despite finishing 2nd in the prelims. The finals
-        // winner must score 25 (GP rank 1); the prelim leader who lost the
-        // finals drops into the flat 2nd-5th band (15). Non-finalists are
-        // unaffected. Guards the core of the bug: GP must follow final
-        // placement, not prelim order.
+        // p2 wins the finals despite finishing 2nd in the prelims: the finals winner
+        // scores 25 (GP rank 1), the prelim leader drops to the flat 2nd-5th band (15).
         let config = r#"{
             "standings_mode": "GP",
             "tournaments": [{
@@ -490,10 +452,8 @@ mod tests {
 
     #[test]
     fn test_gp_rank_resets_between_tournaments() {
-        // Guards the per-tournament reset of gp_rank/gp_prev_key. T1 ends on a
-        // tie at rank 2 (b,c share key (10,30,60)); T2's first player d shares
-        // that exact key. If the rank state leaked across tournaments, d would
-        // keep rank 2 (15pts) instead of being T2's rank 1 (25pts).
+        // Guards the per-tournament reset of rank state. T1 ends on a tie at rank 2
+        // (b,c); T2's first player d shares that exact key and must not inherit it.
         let config = r#"{
             "standings_mode": "GP",
             "tournaments": [

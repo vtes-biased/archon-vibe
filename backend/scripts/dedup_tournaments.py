@@ -157,12 +157,8 @@ async def probe_both_vekn(decisions: list[str]) -> int:
                     print(f"probe failed for {eid}: {e}")
                     status[eid] = None
             if all(status.values()):
-                # The common case — distinct events sharing a name+day, or a
-                # double-entry vekn.net must delete on its side. One line, or
-                # placeholder clusters drown the actionable few. No double-rating
-                # warning here: two distinct events both rated is CORRECT, and
-                # without a dead id the shapes are indistinguishable — a bare
-                # count is a hint for triaging known double-entries, not an alarm.
+                # The common case — one line, or placeholder clusters drown the
+                # actionable few. No dead id means the rated-count is just a hint.
                 all_live += 1
                 rated = [t for t in copies if rating_eligible(t)]
                 hint = f" [{len(rated)} copies rated]" if len(rated) > 1 else ""

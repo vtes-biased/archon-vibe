@@ -31,13 +31,9 @@ export function getE2EState(): E2EState {
 
 /**
  * Set real auth tokens in localStorage so the app recognizes the organizer.
- * Must be called after page.goto() (needs a page context for localStorage).
- *
- * Also clears lastSyncTimestamp from IDB so the next page load fetches a
- * fresh snapshot at the full access level (not the stale public-level data).
+ * Must be called after page.goto() — needs a page context for localStorage.
  */
 export async function loginAsOrganizer(page: Page) {
-  // Wait for anonymous sync to complete (synced state = IDB stores created + data loaded)
   await expect(
     page.locator('[data-sync-state="synced"]').first(),
   ).toBeVisible({ timeout: 8_000 });
@@ -48,9 +44,8 @@ export async function loginAsOrganizer(page: Page) {
       localStorage.setItem('archon_access_token', access);
       localStorage.setItem('archon_refresh_token', refresh);
 
-      // Clear lastSyncTimestamp so the next page load fetches a fresh
-      // full-level snapshot instead of doing a catch-up from the old
-      // public-level timestamp (which would miss the level change).
+      // Clear lastSyncTimestamp so the next load fetches a fresh full-level
+      // snapshot rather than a catch-up from the stale public-level timestamp.
       const req = indexedDB.open('archon-db');
       req.onsuccess = () => {
         const db = req.result;
@@ -64,14 +59,9 @@ export async function loginAsOrganizer(page: Page) {
 }
 
 /**
- * Register auth tokens via addInitScript so they are available BEFORE
- * page scripts run. This ensures the first sync uses full-level data.
- *
- * Must be called BEFORE the first page.goto(). The sync will fetch the
- * full-level snapshot (~7MB) which takes longer but includes all users.
- *
- * Required for tests that need full-level IDB data (e.g., tournament
- * player search that relies on all users being in IDB).
+ * Registers tokens via addInitScript so they exist before page scripts run —
+ * call before the first page.goto(). Needed for tests relying on full-level
+ * IDB data (e.g. player search over all users).
  */
 export async function setupAuthBeforeNavigation(page: Page) {
   const state = getE2EState();

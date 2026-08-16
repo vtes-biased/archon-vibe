@@ -1,10 +1,7 @@
 ---
-# Daily cluster-wide postgres backup on the prod box, mirroring server-setup's
-# mechanism on frankfurt (scripts kept in sync with that repo): pg_dump -F c of
-# every non-template DB — so it covers both `archon` and legacy `archondb`
-# while the parallel run coexists, and the Phase-4 decommission needs no config
-# change — local prune after retention_days, optional restic push to S3, and a
-# weekly restore-verify round-trip. Runs as postgres (peer auth, no password).
+# pg_dump -F c of every non-template DB, so it covers both `archon` and legacy
+# `archondb` while the parallel run coexists, with no config change needed at
+# Phase-4 decommission.
 - name: Assert required inputs
   ansible.builtin.assert:
     that:

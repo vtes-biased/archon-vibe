@@ -40,7 +40,6 @@
   $effect(() => { if (!showForceUnlockConfirm) unlockAck = false; });
 </script>
 
-<!-- Delete Tournament Confirmation Modal -->
 {#if showDeleteConfirm}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
@@ -77,7 +76,6 @@
   </div>
 {/if}
 
-<!-- Go Offline Confirmation Modal -->
 {#if showGoOfflineConfirm}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
@@ -120,7 +118,6 @@
   </div>
 {/if}
 
-<!-- Go Online Confirmation Modal -->
 {#if showGoOnlineConfirm}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
@@ -155,7 +152,6 @@
   </div>
 {/if}
 
-<!-- Force Takeover Confirmation Modal -->
 {#if showForceTakeoverConfirm}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
@@ -195,7 +191,7 @@
   </div>
 {/if}
 
-<!-- Force Unlock Confirmation Modal (IC emergency: clears the lock WITHOUT syncing) -->
+<!-- IC emergency: clears the lock without syncing. -->
 {#if showForceUnlockConfirm}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div

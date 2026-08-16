@@ -16,22 +16,18 @@
   const doc = $derived(helpDocs[slug]);
   const isComponent = $derived(doc?.isComponent ?? false);
 
-  // For markdown docs: rendered HTML and TOC
   const html = $derived(!isComponent ? (doc?.content ?? "") : "");
   const markdownToc = $derived(!isComponent && doc ? extractToc(html, doc.tocDepth) : []);
 
-  // For component docs: TOC extracted from DOM after mount
   let componentToc = $state<TocEntry[]>([]);
   let guideEl: HTMLElement | undefined = $state();
 
   const tocEntries = $derived(isComponent ? componentToc : markdownToc);
   let activeHeading = $state("");
 
-  // Set up heading observer for component guides
   onMount(() => {
     if (!isComponent || !guideEl || !doc) return;
 
-    // Extract headings from rendered DOM
     const headings = guideEl.querySelectorAll<HTMLElement>('h1[id], h2[id], h3[id], h4[id]');
     const entries: TocEntry[] = [];
     const headingEls: HTMLElement[] = [];
@@ -64,7 +60,6 @@
     );
     for (const el of headingEls) observer.observe(el);
 
-    // Hash scroll
     if (window.location.hash) {
       const target = document.getElementById(window.location.hash.slice(1));
       if (target) setTimeout(() => target.scrollIntoView(), 100);
@@ -73,7 +68,6 @@
     return () => observer.disconnect();
   });
 
-  // Redirect if invalid slug
   $effect(() => {
     if (slug && !doc) {
       goto("/help");
@@ -88,18 +82,14 @@
 {#if doc}
   <div class="p-4 sm:p-8">
     <div class="max-w-6xl mx-auto">
-      <!-- Back link -->
       <a href="/help" class="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-link mb-4 transition-colors">
         <ArrowLeft class="w-4 h-4" />
         {m.help_back_to_list()}
       </a>
 
-      <!-- Title -->
       <h1 class="text-3xl font-semibold text-accent mb-6">{doc.title}</h1>
 
-      <!-- Layout: TOC sidebar + content -->
       <div class="flex gap-8">
-        <!-- Content -->
         <div class="flex-1 min-w-0">
           {#if isComponent}
             <article bind:this={guideEl} class="doc-prose prose max-w-none">
@@ -114,7 +104,6 @@
           {/if}
         </div>
 
-        <!-- TOC (desktop sidebar + mobile drawer) -->
         {#if tocEntries.length > 0}
           <TableOfContents entries={tocEntries} {activeHeading} />
         {/if}

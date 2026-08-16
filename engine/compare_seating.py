@@ -4,7 +4,6 @@
 import os
 import sys
 
-# Add parent directory for openpyxl
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import openpyxl
@@ -14,7 +13,6 @@ def get_table_sizes(n):
     """Get VEKN table sizes for n players: 4 or 5 player tables only."""
     if n < 4:
         return []
-    # n = 5*a + 4*b where a, b >= 0, minimize tables (maximize 5s)
     for num_5s in range(n // 5, -1, -1):
         leftover = n - 5 * num_5s
         if leftover >= 0 and leftover % 4 == 0:
@@ -24,23 +22,17 @@ def get_table_sizes(n):
 
 
 def parse_round_cells(cells, n_players):
-    """Parse a round from Excel cells. Use n_players to determine table splits.
-
-    The Excel format lists players in sequence. We ignore any gaps and split
-    purely based on VEKN table sizes (4 or 5 players per table).
-    """
-    # Get expected table sizes
+    """Excel lists players in sequence; gaps are ignored and split is purely by
+    VEKN table sizes (4 or 5), not by the sheet's own grouping."""
     sizes = get_table_sizes(n_players)
     if not sizes:
         return None  # Staggered format, skip
 
-    # Collect all player numbers (ignore None gaps - they're just formatting)
     players = [int(c) for c in cells if isinstance(c, (int, float))]
 
     if len(players) != n_players:
         return None  # Unexpected number of players
 
-    # Split by VEKN table sizes
     tables = []
     idx = 0
     for size in sizes:
@@ -50,12 +42,11 @@ def parse_round_cells(cells, n_players):
 
 
 def extract_seatings_3r(sheet, max_players=50):
-    """Extract 3-round seatings from Excel sheet."""
     seatings = {}
     row = 1
 
     while row < 1500:
-        # Look for "N Players" pattern in column D
+        # column D holds the player count, column E the "N Players" label
         d_val = sheet.cell(row=row, column=4).value
         e_val = sheet.cell(row=row, column=5).value
 
@@ -66,7 +57,6 @@ def extract_seatings_3r(sheet, max_players=50):
                 continue
 
             rounds = []
-            # Read the next 3 rows for rounds
             for r_offset in range(1, 6):
                 r = row + r_offset
                 label = sheet.cell(row=r, column=5).value
@@ -85,8 +75,6 @@ def extract_seatings_3r(sheet, max_players=50):
 
 
 def compute_score(rounds):
-    """Compute score for given rounds."""
-    # Find max player number
     all_players = set()
     for r in rounds:
         for t in r:
@@ -95,10 +83,10 @@ def compute_score(rounds):
     n = max(all_players)
     rounds_count = len(rounds)
 
-    # Initialize measure matrix (n+1 x n+1 x 8) - 1-indexed
+    # 1-indexed; measure[i][i] holds i's own stats, measure[i][j] (i!=j) the
+    # i-vs-j opponent relationship — one matrix serves both purposes.
     measure = [[[0] * 8 for _ in range(n + 1)] for _ in range(n + 1)]
 
-    # Position vectors
     POSITIONS_4 = [
         [1, 4, 1, 1, 0, 0, 0, 0],
         [1, 4, 2, 0, 1, 0, 0, 0],
@@ -113,7 +101,6 @@ def compute_score(rounds):
         [1, 5, 4, 0, 0, 0, 0, 1],
     ]
 
-    # Opponent vectors
     OPPONENTS_4 = [
         [1, 1, 0, 0, 0, 0, 1, 0],  # prey
         [1, 0, 0, 0, 0, 1, 0, 1],  # cross
@@ -135,18 +122,15 @@ def compute_score(rounds):
             opponents = OPPONENTS_4 if size == 4 else OPPONENTS_5
 
             for seat, player in enumerate(table):
-                # Position on diagonal
                 for k in range(8):
                     measure[player][player][k] += positions[seat][k]
 
-                # Opponent relationships
                 for rel in range(size - 1):
                     opp_seat = (seat + rel + 1) % size
                     opp = table[opp_seat]
                     for k in range(8):
                         measure[player][opp][k] += opponents[rel][k]
 
-    # Compute rule violations
     r1 = r2 = r4 = r5 = r6 = r7 = r9 = 0
     vps_list = []
     transfers_list = []
@@ -200,12 +184,6 @@ def compute_score(rounds):
     return [r1, r2, r3, r4, r5, r6, r7, r8, r9]
 
 
-def run_rust_and_get_score(n_players, rounds_count=3):
-    """Run Rust seating and get score by calling cargo test."""
-    # TODO: implement Rust benchmark parsing
-    return None
-
-
 def main():
     print("Loading Excel file...")
     wb = openpyxl.load_workbook("../INCOMING/thearchon1.5l.xlsx", data_only=True)
@@ -225,11 +203,9 @@ def main():
     for n_players in sorted(seatings.keys()):
         rounds = seatings[n_players]
 
-        # For staggered counts (6, 7, 11), they might have different round counts
         if n_players in [6, 7, 11]:
-            continue  # Skip staggered for now
+            continue  # staggered counts have a different round structure
 
-        # Take first 3 rounds
         if len(rounds) < 3:
             continue
 
@@ -244,15 +220,12 @@ def main():
             f"{n_players:3d}p: {status} R1={score[0]:.0f} R2={score[1]:.0f} R3={score[2]:.2f} R4={score[3]:.0f} R5={score[4]:.0f} R6={score[5]:.0f} R7={score[6]:.0f} R8={score[7]:.2f} R9={score[8]:.0f}"
         )
 
-    # Now let's compare with our Rust implementation
-    # We'll output a simple comparison format
     print("\n" + "=" * 80)
     print("To compare with Rust, run benchmarks and compare R1-R9 values")
     print("=" * 80)
 
-    # Output data for Rust comparison
     print("\nExcel optimal data (for Rust comparison test):")
-    for n_players, score in results[:15]:  # First 15 for focused comparison
+    for n_players, score in results[:15]:
         print(f"({n_players}, {score}),")
 
 

@@ -23,7 +23,6 @@ from src.vekn_sync import FIX_CITIES  # noqa: E402
 
 
 def _country_name_to_code() -> dict[str, str]:
-    """Build country name -> ISO code mapping."""
     countries = load_countries()
     return {c["name"]: code for code, c in countries.items()}
 
@@ -59,7 +58,6 @@ async def main() -> None:
             no_country += 1
             continue
 
-        # Apply FIX_CITIES
         city = city_raw
         was_fixed = False
         if country_name in FIX_CITIES:
@@ -79,7 +77,6 @@ async def main() -> None:
                 (city_raw if not was_fixed else f"{city_raw} -> {city}", 1)
             )
 
-    # Aggregate unmatched by (country, city)
     unmatched_agg: dict[str, Counter] = defaultdict(Counter)
     for country, entries in unmatched_cities.items():
         for city_label, count in entries:
@@ -87,7 +84,6 @@ async def main() -> None:
 
     total_unmatched = sum(sum(c.values()) for c in unmatched_agg.values())
 
-    # Check stale FIX_CITIES entries (targets that don't resolve)
     for country_name, fixes in FIX_CITIES.items():
         cc = name_to_code.get(country_name)
         if not cc:
@@ -97,7 +93,6 @@ async def main() -> None:
             if not match_city(target, cc):
                 stale_fixes.append((country_name, src, target))
 
-    # --- Report ---
     print("=" * 70)
     print("CITY AUDIT REPORT")
     print("=" * 70)

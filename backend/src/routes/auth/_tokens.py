@@ -13,28 +13,22 @@ from ...jwt_config import JWT_ALGORITHM, JWT_SECRET
 router = APIRouter()
 encoder = msgspec.json.Encoder()
 
-# JWT settings
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 
 class TokenResponse(BaseModel):
-    """Token response payload."""
-
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
-    expires_in: int  # seconds until access token expires
+    expires_in: int
 
 
 class RefreshRequest(BaseModel):
-    """Token refresh request payload."""
-
     refresh_token: str
 
 
 def create_access_token(user_uid: str) -> tuple[str, int]:
-    """Create a short-lived access token (15 minutes)."""
     expires_delta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     expire = datetime.now(UTC) + expires_delta
     payload = {
@@ -48,7 +42,6 @@ def create_access_token(user_uid: str) -> tuple[str, int]:
 
 
 def create_refresh_token(user_uid: str) -> str:
-    """Create a long-lived refresh token (7 days)."""
     expire = datetime.now(UTC) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     payload = {
         "sub": user_uid,
@@ -60,7 +53,6 @@ def create_refresh_token(user_uid: str) -> str:
 
 
 def verify_token(token: str, expected_type: str = "access") -> str:
-    """Verify a JWT token and return the user UID."""
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         if payload.get("type") != expected_type:
@@ -76,13 +68,9 @@ def verify_token(token: str, expected_type: str = "access") -> str:
 
 
 async def assert_account_active(user_uid: str) -> None:
-    """Reject a login-flow token mint for a tombstoned account.
-
-    A soft-deleted (IC-deleted) user keeps its auth_method rows — only a merge
-    reassigns them — so a surviving passkey/email/magic-link credential must
-    re-check deleted_at before minting, the same guard get_current_user and
-    /auth/refresh apply at resolution time.
-    """
+    """A soft-deleted user keeps its auth_method rows, so a surviving credential
+    must re-check deleted_at before minting — the same guard get_current_user
+    and /auth/refresh apply."""
     user = await get_user_by_uid(user_uid)
     if not user or user.deleted_at:
         raise HTTPException(status_code=403, detail="This account is no longer active")
@@ -90,18 +78,15 @@ async def assert_account_active(user_uid: str) -> None:
 
 @router.post("/refresh")
 async def refresh_token_endpoint(request: RefreshRequest) -> Response:
-    """Refresh an access token using a refresh token."""
     user_uid = verify_token(request.refresh_token, expected_type="refresh")
 
-    # Verify user still exists and is not tombstoned — refresh mints fresh 7d
-    # tokens, so an IC-deleted / merge-absorbed account must not renew here.
+    # Refresh mints a fresh 7d token pair, so an IC-deleted/merge-absorbed
+    # account must not renew here.
     user = await get_user_by_uid(user_uid)
     if not user or user.deleted_at:
         raise HTTPException(status_code=401, detail="User not found")
 
-    # Generate new tokens
     access_token, expires_in = create_access_token(user_uid)
-    # Also issue new refresh token (token rotation for security)
     new_refresh_token = create_refresh_token(user_uid)
 
     response = TokenResponse(

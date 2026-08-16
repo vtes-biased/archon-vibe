@@ -11,7 +11,6 @@ fn make_players(count: usize) -> Vec<String> {
 fn test_build_round_8_players() {
     let players = make_players(8);
     let round = build_round(&players);
-    // 8 players = 2 tables of 4
     assert_eq!(round.len(), 2);
     assert_eq!(round[0].len(), 4);
     assert_eq!(round[1].len(), 4);
@@ -21,7 +20,6 @@ fn test_build_round_8_players() {
 fn test_build_round_9_players() {
     let players = make_players(9);
     let round = build_round(&players);
-    // 9 players = 1 table of 5 + 1 table of 4
     assert_eq!(round.len(), 2);
     assert_eq!(round[0].len(), 5);
     assert_eq!(round[1].len(), 4);
@@ -31,7 +29,6 @@ fn test_build_round_9_players() {
 fn test_build_round_10_players() {
     let players = make_players(10);
     let round = build_round(&players);
-    // 10 players = 2 tables of 5
     assert_eq!(round.len(), 2);
     assert_eq!(round[0].len(), 5);
     assert_eq!(round[1].len(), 5);
@@ -41,7 +38,6 @@ fn test_build_round_10_players() {
 fn test_build_round_20_players() {
     let players = make_players(20);
     let round = build_round(&players);
-    // 20 players = 4 tables of 5
     assert_eq!(round.len(), 4);
     for table in &round {
         assert_eq!(table.len(), 5);
@@ -59,14 +55,12 @@ fn test_measure_4_player_table() {
     let mapping = build_mapping(std::slice::from_ref(&round));
     let m = measure_round(&mapping, &round);
 
-    // Check diagonal (position info)
     let a = mapping["A"];
     assert_eq!(m.get(a, a, 0), 1); // played
     assert_eq!(m.get(a, a, 1), 4); // vps available
     assert_eq!(m.get(a, a, 2), 1); // transfers (seat 1)
     assert_eq!(m.get(a, a, 3), 1); // seat 1
 
-    // Check opponent relationships
     let b = mapping["B"];
     assert_eq!(m.get(a, b, 0), 1); // opponent
     assert_eq!(m.get(a, b, 1), 1); // B is A's prey
@@ -81,19 +75,16 @@ fn test_compute_seating_small() {
     let (rounds, score) = result.unwrap();
     assert_eq!(rounds.len(), 3);
 
-    // All players should play in each round
     for round in &rounds {
         let total: usize = round.iter().map(|t| t.len()).sum();
         assert_eq!(total, 8);
     }
 
-    // No hard constraint violations expected for 8 players, 3 rounds
     assert_eq!(score.rules[0], 0.0, "R1 should be 0");
 }
 
 #[test]
 fn test_compute_seating_is_deterministic() {
-    // Same players + same seed => byte-identical seating (WASM/PyO3/offline/bot agree).
     let players = make_players(13);
     let a = compute_seating(&players, 3, None, 12345).unwrap().0;
     let b = compute_seating(&players, 3, None, 12345).unwrap().0;
@@ -103,7 +94,6 @@ fn test_compute_seating_is_deterministic() {
     // select_players_for_round before seating.
     assert!(compute_seating(&make_players(7), 3, None, 999).is_err());
 
-    // seed_for_round is stable for a given uid+round, and round-dependent.
     let s0 = seed_for_round("tournament-xyz", 0);
     assert_eq!(s0, seed_for_round("tournament-xyz", 0));
     assert_ne!(s0, seed_for_round("tournament-xyz", 1));
@@ -124,7 +114,6 @@ fn test_compute_seating_medium() {
         assert_eq!(total, 20);
     }
 
-    // Hard constraints should be satisfied
     assert_eq!(score.rules[0], 0.0, "R1 should be 0");
     assert_eq!(score.rules[1], 0.0, "R2 should be 0");
 }
@@ -133,17 +122,14 @@ fn test_compute_seating_medium() {
 fn test_compute_seating_with_previous_rounds() {
     let players = make_players(8);
 
-    // Generate first 2 rounds
     let (initial_rounds, _) = compute_seating(&players, 2, None, 42).unwrap();
 
-    // Generate 3rd round with first 2 fixed
     let result = compute_seating(&players, 3, Some(&initial_rounds), 42);
     assert!(result.is_ok());
 
     let (rounds, _) = result.unwrap();
     assert_eq!(rounds.len(), 3);
 
-    // First 2 rounds should be identical
     assert_eq!(rounds[0], initial_rounds[0]);
     assert_eq!(rounds[1], initial_rounds[1]);
 }
@@ -176,52 +162,40 @@ fn test_seating_50_players() {
         assert_eq!(total, 50);
     }
 
-    // Hard constraints should be satisfied
     assert_eq!(score.rules[0], 0.0, "R1 should be 0");
 }
 
 #[test]
 fn test_compute_next_round_with_dropout() {
-    // Start with 12 players
     let players = make_players(12);
     let (rounds, _) = compute_seating(&players, 2, None, 42).unwrap();
 
-    // Simulate 2 players dropping out for round 3
     let remaining: Vec<String> = (1..=10).map(|i| format!("P{}", i)).collect();
 
-    // Compute round 3 with dropouts
     let (round3, score) = compute_next_round(&remaining, &rounds, 42).unwrap();
 
-    // Should have correct table structure for 10 players
     let total: usize = round3.iter().map(|t| t.len()).sum();
     assert_eq!(total, 10);
 
-    // Tables should be 5+5
     assert_eq!(round3.len(), 2);
     assert_eq!(round3[0].len(), 5);
     assert_eq!(round3[1].len(), 5);
 
-    // No hard constraint violations
     assert_eq!(score.rules[0], 0.0, "R1 should be 0");
 }
 
 #[test]
 fn test_compute_next_round_with_addition() {
-    // Start with 8 players
     let players = make_players(8);
     let (rounds, _) = compute_seating(&players, 2, None, 42).unwrap();
 
-    // Add 2 new players for round 3
     let expanded: Vec<String> = (1..=10).map(|i| format!("P{}", i)).collect();
 
-    // Compute round 3 with new players
     let (round3, score) = compute_next_round(&expanded, &rounds, 42).unwrap();
 
-    // Should have correct table structure for 10 players
     let total: usize = round3.iter().map(|t| t.len()).sum();
     assert_eq!(total, 10);
 
-    // No hard constraint violations
     assert_eq!(score.rules[0], 0.0, "R1 should be 0");
 }
 
@@ -230,7 +204,6 @@ fn test_compute_next_round_with_addition() {
 fn benchmark_seating() {
     use std::time::Instant;
 
-    // Benchmark different sizes
     for &count in &[8, 20, 50, 100] {
         let players = make_players(count);
         let start = Instant::now();
@@ -245,7 +218,6 @@ fn benchmark_seating() {
             count, elapsed, score.rules
         );
 
-        // Performance targets
         match count {
             8 | 20 => assert!(elapsed.as_secs() < 1, "Small/medium should be < 1s"),
             50 => assert!(elapsed.as_secs() < 3, "50 players should be < 3s"),
@@ -257,7 +229,6 @@ fn benchmark_seating() {
 
 #[test]
 fn test_minimum_violations_single_table() {
-    // 4 players, 2 rounds, single table of 4 each round
     let players: Vec<String> = vec!["A", "B", "C", "D"]
         .into_iter()
         .map(|s| s.to_string())
@@ -281,7 +252,6 @@ fn test_minimum_violations_single_table() {
 
 #[test]
 fn test_minimum_violations_multi_table() {
-    // 8 players, 2 rounds, 2 tables of 4
     let players = make_players(8);
     let (rounds, _) = compute_seating(&players, 2, None, 42).unwrap();
     let mins = compute_minimum_violations(&rounds);
@@ -294,7 +264,6 @@ fn test_minimum_violations_multi_table() {
 
 #[test]
 fn test_minimum_violations_forced_r4() {
-    // 8 players, 3 rounds, 2 tables of 4 each
     let players = make_players(8);
     let (rounds, _) = compute_seating(&players, 3, None, 42).unwrap();
     let mins = compute_minimum_violations(&rounds);
@@ -302,10 +271,6 @@ fn test_minimum_violations_forced_r4() {
     // total pair-slots = 3 * 12 = 36; C(8,2) = 28; excess = 8; min_R4 = ceil(8/2) = 4
     assert_eq!(mins[3], 4.0, "R4 min should be 4 for 8 players, 3 rounds");
 }
-
-// ================================================================
-// compute_player_issues tests
-// ================================================================
 
 #[test]
 fn test_player_issues_empty_rounds() {
@@ -315,7 +280,6 @@ fn test_player_issues_empty_rounds() {
 
 #[test]
 fn test_player_issues_single_round_no_issues() {
-    // Single round: no repeats possible, no issues expected
     let rounds = vec![vec![
         vec!["A".into(), "B".into(), "C".into(), "D".into()],
         vec!["E".into(), "F".into(), "G".into(), "H".into()],
@@ -326,14 +290,12 @@ fn test_player_issues_single_round_no_issues() {
 
 #[test]
 fn test_player_issues_identical_seating_detects_violations() {
-    // Identical seating across 2 rounds forces every violation
     let table = vec!["A".into(), "B".into(), "C".into(), "D".into()];
     let rounds = vec![vec![table.clone()], vec![table.clone()]];
     let issues = compute_player_issues(&rounds);
 
-    // Should have issues: R1 (pred-prey repeat), R4 (opponent twice),
-    // R5 won't fire (no 5th seat), R6 (same position), R7 (same seat),
-    // R9 (same position group)
+    // Identical 4-player table across 2 rounds should trip R1, R4, R6, R7, R9
+    // (not R5 — no 5th seat); only R1 and R7 are asserted explicitly below.
     assert!(
         !issues.is_empty(),
         "Identical seating should produce issues"
@@ -345,9 +307,8 @@ fn test_player_issues_identical_seating_detects_violations() {
         !r1_issues.is_empty(),
         "Should detect predator-prey repeats (R1)"
     );
-    // Each pair direction: A->B prey, B->C prey, C->D prey, D->A prey
-    // In the measure, prey (k=1) and pred (k=4) are tracked per ordered pair
-    // For 4 players with identical seating, each adjacent pair has prey/pred repeat
+    // prey/pred are tracked per ordered pair (k=1 and k=4), so each adjacent
+    // pair contributes twice; hence >=2 rather than an exact count.
     assert!(
         r1_issues.len() >= 2,
         "Should have multiple R1 violations for identical 4-player table"
@@ -367,7 +328,6 @@ fn test_player_issues_identical_seating_detects_violations() {
         !r7_issues.is_empty(),
         "Should detect same-seat repeats (R7)"
     );
-    // Each player sat in the same seat twice, so each of the 4 players triggers R7
     assert_eq!(r7_issues.len(), 4, "All 4 players should have seat repeats");
 }
 
@@ -375,13 +335,11 @@ fn test_player_issues_identical_seating_detects_violations() {
 fn test_player_issues_r2_requires_more_than_2_rounds() {
     // R2 (opponent all rounds) only fires when rounds > 2
     let table = vec!["A".into(), "B".into(), "C".into(), "D".into()];
-    // 2 identical rounds: all 6 pairs meet in all rounds, but R2 should NOT fire
     let rounds_2 = vec![vec![table.clone()], vec![table.clone()]];
     let issues_2 = compute_player_issues(&rounds_2);
     let r2_count = issues_2.iter().filter(|i| i.rule == 1).count();
     assert_eq!(r2_count, 0, "R2 should not fire with only 2 rounds");
 
-    // 3 identical rounds: R2 SHOULD fire
     let rounds_3 = vec![
         vec![table.clone()],
         vec![table.clone()],
@@ -397,10 +355,8 @@ fn test_player_issues_r2_requires_more_than_2_rounds() {
 
 #[test]
 fn test_player_issues_optimal_seating_no_issues() {
-    // Use precomputed optimal seating for 8 players -- should have zero issues
     let players = make_players(8);
     let (rounds, score) = compute_seating(&players, 3, None, 42).unwrap();
-    // Precomputed seatings for 8 players are known optimal
     assert_eq!(
         score.rules[0], 0.0,
         "Optimal seating should have no R1 violations"
@@ -416,7 +372,6 @@ fn test_player_issues_optimal_seating_no_issues() {
 
 #[test]
 fn test_player_issues_json_roundtrip() {
-    // Verify to_json() produces correct structure
     let table = vec!["P1".into(), "P2".into(), "P3".into(), "P4".into()];
     let rounds = vec![vec![table.clone()], vec![table.clone()]];
     let issues = compute_player_issues(&rounds);
@@ -458,21 +413,17 @@ fn test_select_players_normal_count() {
 #[test]
 fn test_select_players_6_three_rounds() {
     let players = make_players(6);
-    // R1: should select 4
     let r1 = select_players_for_round(&players, &[]);
     assert_eq!(r1.len(), 4);
-    let rounds = vec![vec![r1.clone()]]; // one round with one table of 4
+    let rounds = vec![vec![r1.clone()]];
 
-    // R2: should select 4 (prioritize the 2 who sat out)
     let r2 = select_players_for_round(&players, &rounds);
     assert_eq!(r2.len(), 4);
     let rounds2 = vec![vec![r1.clone()], vec![r2.clone()]];
 
-    // R3: equalizing - players with 1 round should be 4
     let r3 = select_players_for_round(&players, &rounds2);
     assert_eq!(r3.len(), 4);
 
-    // Verify everyone plays exactly 2
     let mut counts: HashMap<String, usize> = HashMap::new();
     for uid in r1.iter().chain(r2.iter()).chain(r3.iter()) {
         *counts.entry(uid.clone()).or_default() += 1;
@@ -511,7 +462,7 @@ fn test_select_players_11_three_rounds() {
     let r1 = select_players_for_round(&players, &[]);
     assert_eq!(r1.len(), 9);
 
-    // Simulate R1 as 1×5 + 1×4 tables
+    // Split into 1×5 + 1×4 tables, as a real round would.
     let round1 = vec![r1[..5].to_vec(), r1[5..].to_vec()];
     let rounds = vec![round1.clone()];
 
@@ -534,7 +485,6 @@ fn test_select_players_11_three_rounds() {
 
 #[test]
 fn test_select_players_dropout_out_of_stagger() {
-    // 6→5: should return all 5 (valid count)
     let players = make_players(5);
     let selected = select_players_for_round(&players, &[]);
     assert_eq!(selected.len(), 5);
@@ -542,7 +492,6 @@ fn test_select_players_dropout_out_of_stagger() {
 
 #[test]
 fn test_select_players_dropout_into_stagger() {
-    // 8→7: should activate stagger, seat 5
     let players = make_players(7);
     let selected = select_players_for_round(&players, &[]);
     assert_eq!(selected.len(), 5);

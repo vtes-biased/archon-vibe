@@ -6,10 +6,9 @@
   import Button from "$lib/components/Button.svelte";
   import * as m from "$lib/paraglide/messages.js";
 
-  // The generated results IMAGE that used to sit beside this is gone: sharing
-  // the tournament link already renders a proper cover, because backend/src/og.py
-  // serves a per-tournament og:image built from the banner. Organizers copy from
-  // the Tools sheet; this is the player-facing button.
+  // The tournament link itself renders a proper cover via backend/src/og.py's
+  // per-tournament og:image. Organizers copy from the Tools sheet; this is the
+  // player-facing button.
   let {
     tournament,
     playerInfo,

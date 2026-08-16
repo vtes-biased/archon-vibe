@@ -154,7 +154,6 @@
   }
 </script>
 
-<!-- VEKN Management Section -->
 <div>
   <h2 class="text-lg font-semibold text-ink-bright mb-3">{m.vekn_title()}</h2>
   <div class="bg-surface-card border border-line rounded-lg p-4">
@@ -229,7 +228,6 @@
   </div>
 </div>
 
-<!-- Sponsor Confirmation Modal -->
 {#if showSponsorConfirm}
   <div
     role="presentation"
@@ -265,7 +263,6 @@
   </div>
 {/if}
 
-<!-- Link VEKN ID Modal -->
 {#if showLinkModal}
   <div
     role="presentation"
@@ -327,7 +324,6 @@
   </div>
 {/if}
 
-<!-- Force Abandon Confirmation Modal -->
 {#if showForceAbandonConfirm}
   <div
     role="presentation"
@@ -367,7 +363,6 @@
   </div>
 {/if}
 
-<!-- Merge Users Modal -->
 {#if showMergeModal}
   <div
     role="presentation"
@@ -469,7 +464,6 @@
   </div>
 {/if}
 
-<!-- Delete Member Confirmation Modal -->
 {#if showDeleteConfirm}
   <div
     role="presentation"

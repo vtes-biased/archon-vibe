@@ -1,8 +1,4 @@
-/**
- * Shared TypeScript type definitions.
- *
- * Keep synchronized with backend/src/models.py using python-to-typescript-models rule.
- */
+// Keep synchronized with backend/src/models.py using the python-to-typescript-models rule.
 
 export type DataLevel = "public" | "member" | "full";
 
@@ -43,9 +39,8 @@ export type SanctionCategory =
   | "tournament_error"
   | "unsportsmanlike_conduct";
 
-// Category/subcategory vocabulary mirrors engine/src/sanctions.rs, which owns
-// the Judges-Guide tables (grouping, baselines, escalation) — read them at
-// runtime via getSanctionReference() in $lib/engine.
+// Category/subcategory vocabulary mirrors engine/src/sanctions.rs, which owns the Judges-Guide
+// tables — read them at runtime via getSanctionReference() in $lib/engine.
 export type SanctionSubcategory =
   // Procedural Errors
   | "missed_mandatory_effect"
@@ -80,20 +75,19 @@ export type SanctionSubcategory =
 export interface BaseObject {
   uid: string; // UUID v7
   modified: string; // ISO datetime string
-  deleted_at?: string | null; // Soft delete timestamp
+  deleted_at?: string | null;
 }
 
 export interface User extends BaseObject {
   name: string;
   country: string | null; // ISO 3166-1 alpha-2 country code
-  vekn_id?: string | null; // Optional VEKN ID
+  vekn_id?: string | null;
   city?: string | null;
   city_geoname_id?: number | null;
-  state?: string | null; // State/region
+  state?: string | null;
   nickname?: string | null;
   roles: Role[];
 
-  // Profile
   avatar_path?: string | null; // Server-stored compressed image path
   // promo_uid → computed remaining copies. Server-written (promo recompute);
   // full projection only — reaches the holder (own profile) and officials.
@@ -101,19 +95,18 @@ export interface User extends BaseObject {
 
   // Contact info (visible based on role-based access rules)
   contact_email?: string | null;
-  contact_discord?: string | null; // Discord handle
+  contact_discord?: string | null;
   discord_id?: string | null; // Discord numeric user ID (from linked account)
   contact_phone?: string | null;
   phone_is_whatsapp?: boolean;
 
   // Linked GitHub account (full projection only) — attributes feedback issues.
-  github_login?: string | null; // GitHub @handle
-  github_id?: string | null; // GitHub numeric user id
+  github_login?: string | null;
+  github_id?: string | null;
 
   // Community links (officials only)
   community_links?: CommunityLink[];
 
-  // Cooptation tracking (who granted VEKN membership)
   coopted_by?: string | null; // user_uid of Prince/NC/IC who granted VEKN ID
   coopted_at?: string | null;
 
@@ -122,7 +115,6 @@ export interface User extends BaseObject {
   deceased_at?: string | null;
   deceased_by_uid?: string | null; // full projection only
 
-  // VEKN sync tracking
   vekn_synced?: boolean;
   vekn_synced_at?: string | null;
   local_modifications?: string[];
@@ -142,8 +134,8 @@ export interface User extends BaseObject {
 }
 
 export interface Sanction extends BaseObject {
-  user_uid: string; // Who received sanction
-  issued_by_uid: string; // Who issued it
+  user_uid: string;
+  issued_by_uid: string;
   tournament_uid: string | null; // If tournament-related
   level: SanctionLevel;
   category: SanctionCategory;
@@ -155,8 +147,6 @@ export interface Sanction extends BaseObject {
   lifted_at: string | null;
   lifted_by_uid: string | null;
 }
-
-// League types
 
 export type LeagueKind = "League" | "Meta-League";
 export type LeagueStandingsMode = "RTP" | "Score" | "GP";
@@ -176,8 +166,6 @@ export interface League extends BaseObject {
   // Optional: rows synced before the field existed lack it (treat as false).
   open_to_country_princes?: boolean;
 }
-
-// Promotional items (BCP promo cards/packs)
 
 export type PromoKind = "card" | "pack" | "other";
 
@@ -218,8 +206,6 @@ export interface PromoLedgerEntry {
   created_by: string;
   created_at: string;
 }
-
-// Tournament types
 
 export type TournamentState = "Planned" | "Registration" | "Waiting" | "Playing" | "Finished";
 export type TournamentFormat = "Standard" | "V5" | "Limited";
@@ -317,13 +303,8 @@ export interface Deck {
   attribution?: string | null; // null = anonymous, vekn_id = attributed to member
 }
 
-/**
- * Unified Tournament type. Fields are optional based on the data level:
- * - public: uid, modified, name, format, rank, online, start, finish, timezone, country, state
- * - member: everything except checkin_code and VEKN push bookkeeping
- * - full: everything
- * Decks are now separate DeckObject entities (not embedded in tournament).
- */
+/** Fields are optional based on the data level (public/member/full — see backend access_levels.py).
+ * Decks are separate DeckObject entities, not embedded here. */
 export interface Tournament extends BaseObject {
   name: string;
   format: TournamentFormat;
@@ -376,7 +357,6 @@ export interface Tournament extends BaseObject {
   // Promo distribution report (organizer-entered, replace-whole-list, member-visible)
   promos_distributed?: PromoDistribution[];
   promo_stock_source_uid?: string;
-  // Offline mode
   offline_mode?: boolean;
   offline_device_id?: string;
   offline_user_uid?: string;
@@ -411,8 +391,6 @@ export interface DeckObject extends BaseObject {
   public: boolean;
 }
 
-// Rating types
-
 export type RatingCategory = "constructed_online" | "constructed_offline" | "limited_online" | "limited_offline";
 
 export interface TournamentRatingEntry {
@@ -433,7 +411,6 @@ export interface CategoryRating {
   tournaments: TournamentRatingEntry[];
 }
 
-// Card types (VTES card database)
 export interface VtesCard {
   id: number;
   /** Bare name, for display (group/advanced shown as separate badges). */
@@ -455,7 +432,6 @@ export interface VtesCard {
   name_variants: string[];
 }
 
-// GeoNames types
 export type Continent = "AF" | "AN" | "AS" | "EU" | "NA" | "OC" | "SA";
 
 export interface Country {

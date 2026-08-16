@@ -14,16 +14,11 @@ router = APIRouter(prefix="/api/calendar", tags=["calendar"])
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
-# How long a finished event stays in a PERSONAL feed (keyed on finish).
-# Subscribed calendars reconcile on every poll: an event leaving the feed is
-# DELETED from the subscriber's calendar, so a player's own history must not
-# vanish the moment the event finishes. Discovery/league/public feeds stay
-# upcoming-only.
+# Personal feeds only; other feeds stay upcoming-only.
 FINISHED_WINDOW_DAYS = 90
 
 
 def _escape_ical(text: str) -> str:
-    """Escape text for iCal format."""
     return (
         text.replace("\\", "\\\\")
         .replace(";", "\\;")
@@ -33,10 +28,6 @@ def _escape_ical(text: str) -> str:
 
 
 def _as_utc(dt: datetime, tz_name: str) -> datetime:
-    """Anchor a naive wall-clock datetime in the tournament's timezone, then UTC.
-
-    Tournament.start/finish are stored naive (wall-clock in Tournament.timezone).
-    """
     if dt.tzinfo is None:
         try:
             dt = dt.replace(tzinfo=ZoneInfo(tz_name or "UTC"))
@@ -46,19 +37,16 @@ def _as_utc(dt: datetime, tz_name: str) -> datetime:
 
 
 def _format_dt(dt: datetime | None, tz_name: str = "UTC") -> str:
-    """Format datetime to iCal DTSTART/DTEND value."""
     if not dt:
         return ""
     return _as_utc(dt, tz_name).strftime("%Y%m%dT%H%M%SZ")
 
 
 def _tournament_to_vevent(t: Tournament, now_str: str) -> str:
-    """Convert a tournament to an iCal VEVENT string."""
     dtstart = _format_dt(t.start, t.timezone)
     if not dtstart:
         return ""
 
-    # End time: finish or start + 8h default
     if t.finish:
         dtend = _format_dt(t.finish, t.timezone)
     else:
@@ -67,7 +55,6 @@ def _tournament_to_vevent(t: Tournament, now_str: str) -> str:
             "%Y%m%dT%H%M%SZ"
         )
 
-    # Build description
     parts = []
     if t.format:
         parts.append(f"{t.format} tournament")
@@ -78,10 +65,7 @@ def _tournament_to_vevent(t: Tournament, now_str: str) -> str:
     url = f"{FRONTEND_URL}/tournaments/{t.uid}"
     description = _escape_ical(" ".join(parts) if parts else t.name)
 
-    # Location: venue/address render even in anonymous no-token feeds — they are
-    # public-projection fields (the .ics is an advertising artifact mirroring
-    # vekn.net's public event calendar; granularity is the organizer's
-    # data-entry choice). See wiki/architecture.md "Calendar".
+    # venue/address render even in anonymous feeds: public-projection fields.
     if t.online:
         location = "Online"
     elif t.venue or t.address:
@@ -90,7 +74,6 @@ def _tournament_to_vevent(t: Tournament, now_str: str) -> str:
     else:
         location = ""
 
-    # Categories
     categories = [t.format] if t.format else []
     if t.rank:
         categories.append(t.rank)
@@ -121,29 +104,22 @@ def _matches_agenda(
     continent_countries: list[str],
     include_online: bool,
 ) -> bool:
-    """Check if tournament matches the user's personal agenda criteria.
-
-    include_online gates only the DISCOVERY branch below — events the user
-    organizes or plays in always stay in their feed.
-    """
-    # User organizes it (any state; the feed SQL bounds Finished events to
-    # the FINISHED_WINDOW_DAYS window before they reach this function)
+    """include_online gates only the discovery branch below — events the user
+    organizes or plays in always stay in their feed regardless."""
+    # Finished events reach this function only within FINISHED_WINDOW_DAYS
+    # (bounded by the caller's SQL), so these two branches need no state check.
     if t.organizers_uids and user_uid in t.organizers_uids:
         return True
-    # User participates (any state, same window)
     if t.players and any(p.user_uid == user_uid for p in t.players):
         return True
     # Discovery below is upcoming-only: finished events never match by
     # geography/online — only the own-event branches above keep them.
     if t.state == TournamentState.FINISHED:
         return False
-    # Discovery: online events are opt-out via ?online=false
     if t.online:
         return include_online
-    # Same country
     if user_country and t.country == user_country:
         return True
-    # NC/CC on same continent
     if continent_countries and t.country in continent_countries:
         if t.rank in ("National Championship", "Continental Championship"):
             return True
@@ -152,11 +128,7 @@ def _matches_agenda(
 
 @router.get("/tournaments/{uid}.ics")
 async def tournament_event_ics(uid: str) -> Response:
-    """Single-VEVENT .ics download for one tournament (per-event add-to-calendar).
-
-    Public like the feeds — and like them it renders venue/address (the
-    deliberate projection exception documented above).
-    """
+    """Public like the feeds: the same venue/address projection exception applies."""
     from ..db import get_tournament_by_uid
 
     t = await get_tournament_by_uid(uid)
@@ -164,7 +136,7 @@ async def tournament_event_ics(uid: str) -> Response:
         raise HTTPException(status_code=404, detail="Tournament not found")
     now_str = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     vevent = _tournament_to_vevent(t, now_str)
-    if not vevent:  # no start date — nothing to put on a calendar
+    if not vevent:
         raise HTTPException(status_code=404, detail="Tournament has no start date")
 
     ical_content = (
@@ -199,19 +171,13 @@ async def tournament_calendar(
     format: str | None = Query(None, description="Filter by format"),
     league: str | None = Query(None, description="Only events of this league uid"),
 ) -> Response:
-    """Generate an iCal feed of upcoming tournaments.
-
-    If league is provided, returns that league's events (public data).
-    Else if token is provided, returns a personalized agenda feed (online
-    discovery honors ?online=false; own events always included, and
-    recently-finished ones stay for FINISHED_WINDOW_DAYS).
-    Otherwise, returns a public feed filtered by country/online/format params.
-    """
+    """iCal feed: league's events if `league`, else a personal agenda if `token`
+    (own events always included, recently-finished ones stay for
+    FINISHED_WINDOW_DAYS), else a public feed filtered by country/online/format."""
     from ..db import decode_json, get_connection
 
     now = datetime.now(UTC)
     now_str = now.strftime("%Y%m%dT%H%M%SZ")
-    # Include tournaments from last 7 days
     cutoff = (now - timedelta(days=7)).isoformat()
     finished_cutoff = (now - timedelta(days=FINISHED_WINDOW_DAYS)).isoformat()
 
@@ -220,10 +186,8 @@ async def tournament_calendar(
     if token and not league:
         user = await get_user_by_calendar_token(token)
 
-    # Query tournaments from DB. Finished events are excluded except for
-    # personal feeds, which keep them within FINISHED_WINDOW_DAYS (keyed on
-    # finish, falling back to start — some imported Finished rows carry no
-    # finish); _matches_agenda then restricts them to own events.
+    # Finished events are excluded except for personal feeds, which keep them
+    # within FINISHED_WINDOW_DAYS (keyed on finish, falling back to start).
     async with get_connection() as conn:
         result = await conn.execute(
             """

@@ -34,7 +34,6 @@
     });
   });
 
-  // Reset parent when switching to Meta-League
   $effect(() => {
     if (kind === "Meta-League") parentUid = "";
   });
@@ -103,14 +102,12 @@
 
       <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-6">
         <div class="bg-surface-card rounded-lg shadow p-6 border border-line space-y-4">
-          <!-- Name -->
           <div>
             <label for="name" class="block text-sm text-ink-muted mb-1">{m.tfield_name_label()} <span class="text-link text-xs">({m.common_required()})</span></label>
             <input id="name" type="text" bind:value={name} required
               class="w-full px-3 py-2 text-sm border rounded-lg bg-surface-card text-ink-bright focus:outline-none {name.trim() ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}" />
           </div>
 
-          <!-- Kind -->
           <div>
             <label for="kind" class="block text-sm text-ink-muted mb-1">{m.league_kind_label()}</label>
             <select id="kind" bind:value={kind}
@@ -123,7 +120,6 @@
             {/if}
           </div>
 
-          <!-- Parent league (only for regular leagues) -->
           {#if kind === "League" && metaLeagues.length > 0}
             <div>
               <label for="parent" class="block text-sm text-ink-muted mb-1">{m.league_parent_label()}</label>
@@ -138,7 +134,6 @@
             </div>
           {/if}
 
-          <!-- Standings mode -->
           <div>
             <label for="standings" class="block text-sm text-ink-muted mb-1">{m.league_standings_mode_label()}</label>
             <select id="standings" bind:value={standingsMode}
@@ -153,7 +148,6 @@
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <!-- Format restriction -->
             <div>
               <label for="format" class="block text-sm text-ink-muted mb-1">{m.tfield_format()}</label>
               <select id="format" bind:value={format}
@@ -165,7 +159,6 @@
               </select>
             </div>
 
-            <!-- Country -->
             <div>
               <label for="country" class="block text-sm text-ink-muted mb-1">{m.common_country()}</label>
               <select id="country" bind:value={country}
@@ -178,7 +171,6 @@
             </div>
           </div>
 
-          <!-- Country-princes attach tier (country leagues only) -->
           {#if kind === "League" && country}
             <div>
               <label class="flex items-start gap-2 text-sm text-ink-bright">
@@ -194,14 +186,12 @@
           {/if}
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <!-- Start date -->
             <div>
               <label for="start" class="block text-sm text-ink-muted mb-1">{m.tfield_start()} <span class="text-link text-xs">({m.common_required()})</span></label>
               <input id="start" type="date" bind:value={startDate} required
                 class="w-full px-3 py-2 text-sm border rounded-lg bg-surface-card text-ink-bright focus:outline-none {startDate ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}" />
             </div>
 
-            <!-- End date -->
             <div>
               <label for="finish" class="block text-sm text-ink-muted mb-1">{m.tfield_finish()}</label>
               <input id="finish" type="date" bind:value={finishDate}
@@ -210,7 +200,6 @@
             </div>
           </div>
 
-          <!-- Description -->
           <div>
             <label for="desc" class="block text-sm text-ink-muted mb-1">{m.common_description()}</label>
             <span class="text-xs text-ink-faint mb-1 block">

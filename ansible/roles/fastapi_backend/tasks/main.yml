@@ -39,9 +39,8 @@
     group: "{{ r.group }}"
     mode: "0755"
 
-# Operator tooling run by hand against the live DB with the deployed venv (ETL
-# merge, dedup, validation). Not imported by the service — shipping it here just
-# means an on-call run needs no checkout on the box.
+# Operator tooling run by hand against the live DB with the deployed venv. Not
+# imported by the service — just saves an on-call run a checkout on the box.
 - name: Ship backend ops scripts
   ansible.builtin.copy:
     src: "{{ r.ops_scripts_src }}"
@@ -78,12 +77,8 @@
     mode: "0644"
   notify: Restart backend service
 
-# Beta has no bootstrap step (server-setup owns the foundation) and neither deploy
-# playbook re-runs the common role on a python_version bump — so the uv-managed
-# interpreter must be ensured here, as root, before any venv work. Without it,
-# `uv venv --python X.Y` (run as the unprivileged service user) tries to download
-# the interpreter into the root-owned install dir and dies with EACCES. Idempotent:
-# `uv python install` is a no-op when the version is already present.
+# Without this, `uv venv --python X.Y` (run as the unprivileged service user)
+# tries to download the interpreter into the root-owned install dir and dies EACCES.
 - name: Ensure uv managed-python dir exists
   ansible.builtin.file:
     path: "{{ r.uv_python_install_dir }}"
@@ -114,11 +109,8 @@
   changed_when: false
   failed_when: false
 
-# The 'creates:' guard below makes venv creation a one-time artifact, so a
-# python_version bump never rebuilds an existing venv. uv pip install then targets
-# the stale interpreter and a requires-python>=N wheel fails to resolve. Drop the
-# mismatched venv here so the next task recreates it; deps + wheels reinstall
-# unconditionally afterwards, so a fresh venv is repopulated in full.
+# The next task's 'creates:' guard makes venv creation a one-time artifact, so
+# a python_version bump would target the stale interpreter unless dropped here first.
 - name: Remove venv when its Python differs from {{ r.python_version }}
   ansible.builtin.file:
     path: "{{ _venv_dir }}"
@@ -196,12 +188,8 @@
     mode: "0640"
   notify: Restart backend service
 
-# Personal data (scraped NC/Prince contacts). Provided as a per-env ansible-vault
-# file (the caller passes r.officials_contacts_vault — e.g. officials_contacts.json.beta.vault,
-# encrypted with that env's key; see role README). copy decrypts it to the runtime
-# path the backend reads (OFFICIALS_CONTACTS_FILE in env.j2). fileglob → no-op when
-# the file isn't present, so deploys never break and each env only ever touches its
-# own variant (so a single per-env vault password suffices).
+# Personal data (scraped NC/Prince contacts): delivered as a per-env ansible-vault
+# file (r.officials_contacts_vault); fileglob no-ops when absent, so deploys never break.
 - name: Deploy officials contacts (ansible-vault, optional)
   ansible.builtin.copy:
     src: "{{ item }}"
@@ -212,12 +200,8 @@
   loop: "{{ query('ansible.builtin.fileglob', r.officials_contacts_vault | default('officials_contacts.json.vault')) }}"
   notify: Restart backend service
 
-# GitHub App private key for the TWDA importer (PEM). Multi-line, so it can't ride
-# in the systemd EnvironmentFile — provided as a per-env ansible-vault file (the
-# caller passes r.twda_key_vault — e.g. twda_github_app.pem.beta.vault, encrypted
-# with that env's key). copy decrypts it to the runtime path TWDA_GITHUB_PRIVATE_KEY
-# points at (twda.py reads the path when the value isn't inline PEM). fileglob →
-# no-op when absent, so deploys never break and each env touches only its own variant.
+# Multi-line PEM can't ride in the systemd EnvironmentFile, so it's delivered
+# as a per-env ansible-vault file (r.twda_key_vault) instead.
 - name: Deploy TWDA GitHub App private key (ansible-vault, optional)
   ansible.builtin.copy:
     src: "{{ item }}"
@@ -228,10 +212,8 @@
   loop: "{{ query('ansible.builtin.fileglob', r.twda_key_vault | default('twda_github_app.pem.vault')) }}"
   notify: Restart backend service
 
-# GitHub App private key for the in-app feedback endpoint (PEM). Same out-of-band
-# delivery as the TWDA key above — a per-env ansible-vault file (r.feedback_key_vault,
-# e.g. feedback_github_app.pem.beta.vault) decrypted to the path FEEDBACK_GITHUB_PRIVATE_KEY
-# points at. A separate App/key from TWDA so the two integrations stay isolated.
+# Same out-of-band delivery as the TWDA key above; a separate App/key so the
+# two integrations stay isolated.
 - name: Deploy feedback GitHub App private key (ansible-vault, optional)
   ansible.builtin.copy:
     src: "{{ item }}"

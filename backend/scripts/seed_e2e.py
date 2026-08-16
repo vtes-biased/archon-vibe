@@ -9,7 +9,6 @@ import os
 import sys
 from pathlib import Path
 
-# Add backend to path for imports
 backend_dir = Path(__file__).parent.parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
@@ -112,9 +111,8 @@ async def seed() -> dict:
     await init_db()
     now = datetime.now(UTC)
 
-    # Destructive-op guard: this wipes ALL objects/auth_methods. Refuse to run
-    # against a non-empty DB unless explicitly forced (E2E_FORCE=1), so a stray
-    # DATABASE_URL pointing at a real DB can't be silently truncated.
+    # This wipes ALL objects/auth_methods — refuse on a non-empty DB unless
+    # E2E_FORCE=1, so a stray DATABASE_URL can't be silently truncated.
     if os.environ.get("E2E_FORCE") != "1":
         async with get_connection() as conn:
             result = await conn.execute("SELECT count(*) FROM objects")
@@ -127,12 +125,10 @@ async def seed() -> dict:
                 "archon_e2e database), or set E2E_FORCE=1 to override."
             )
 
-    # Truncate all objects so the test DB only contains our mock data.
     async with get_connection() as conn:
         await conn.execute("DELETE FROM objects")
         await conn.execute("DELETE FROM auth_methods")
 
-    # --- Organizer (IC) ---
     org_uid = str(uuid7())
     organizer = User(
         uid=org_uid,
@@ -163,7 +159,6 @@ async def seed() -> dict:
     )
     await save_user(organizer)
 
-    # Auth method (email + password)
     auth_uid = str(uuid7())
     auth_method = AuthMethod(
         uid=auth_uid,
@@ -178,7 +173,6 @@ async def seed() -> dict:
     )
     await insert_auth_method(auth_method)
 
-    # --- Players ---
     player_uids: list[str] = []
     for i, (name, country, roles, links) in enumerate(
         zip(PLAYER_NAMES, PLAYER_COUNTRIES, PLAYER_ROLES, PLAYER_LINKS, strict=True)
@@ -242,7 +236,6 @@ if __name__ == "__main__":
         result = asyncio.run(seed())
         output = json.dumps(result)
         print(output)
-        # Write to file if --output is specified
         if "--output" in sys.argv:
             idx = sys.argv.index("--output")
             out_path = Path(sys.argv[idx + 1])

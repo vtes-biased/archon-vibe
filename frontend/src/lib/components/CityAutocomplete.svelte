@@ -29,7 +29,6 @@
     let searching = $state(false);
     let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    // Sync input value with bound value
     $effect(() => {
         inputValue = value;
     });
@@ -43,7 +42,6 @@
             return;
         }
 
-        // Debounce search
         if (searchTimeout) {
             clearTimeout(searchTimeout);
         }
@@ -101,7 +99,6 @@
         setTimeout(() => {
             showSuggestions = false;
             selectedIndex = -1;
-            // Update bound value with current input
             if (inputValue !== value) {
                 value = inputValue;
                 geonameId = null; // User typed freely, no selection

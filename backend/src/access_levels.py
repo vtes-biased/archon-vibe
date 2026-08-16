@@ -1,20 +1,9 @@
-"""Access level projection functions for the new sync architecture.
-
-Pre-computes public/member/full JSONB columns at write time.
-All functions take a dict (full object data) and return a dict or None.
-None means the object is not visible at that access level.
-"""
-
 import base64
 
 from .models import ObjectType, Role
 
-# Contact fields cloaked in the PUBLIC projection only (anonymous viewers).
-# Reversible base64 keeps the plaintext — and any "@" — out of the public
-# snapshot, so naive bulk harvesters of /sync/snapshot?level=public come up
-# empty. The frontend decodes for display (deobfuscateContact in
-# lib/contact.ts); member/full projections (authenticated viewers) stay
-# plaintext. Mirror the prefix + scheme on both sides.
+# Reversible, not security — a harvester speed-bump only. Mirror the prefix +
+# scheme in the frontend's deobfuscateContact (lib/contact.ts).
 _OBFUSCATED_PREFIX = "#b64#"
 _PUBLIC_OBFUSCATED_FIELDS = ("contact_email", "contact_phone")
 
@@ -26,17 +15,12 @@ def _obfuscate(value: str) -> str:
 
 
 def _obfuscate_public_contacts(proj: dict) -> dict:
-    """In-place cloak the harvestable contact fields of a public projection."""
     for field in _PUBLIC_OBFUSCATED_FIELDS:
         value = proj.get(field)
         if isinstance(value, str) and value:
             proj[field] = _obfuscate(value)
     return proj
 
-
-# ---------------------------------------------------------------------------
-# User projections
-# ---------------------------------------------------------------------------
 
 _USER_PUBLIC_FIELDS = {
     "uid",
@@ -55,7 +39,6 @@ _USER_CONTACT_FIELDS = {
     "phone_is_whatsapp",
 }
 _USER_COMMUNITY_LINKS = {"community_links"}
-# Minimal fields for anonymous link browsing (no name/personal info)
 _USER_LINKS_ONLY_FIELDS = {
     "uid",
     "modified",
@@ -70,11 +53,9 @@ _USER_MEMBER_FIELDS = (
     # In-memoriam marker — members see the flag/date (not deceased_by_uid, which
     # is administrative and stays full-only).
     | {"deceased_at"}
-    # Discord snowflake (an opaque id, not contact info — owner: needs no
-    # protecting): the bot's judges-channel sync maps organizers through it, and
-    # organizers need no NC/Prince role, so it can't stay contact-set-only.
+    # Not contact info: the bot's judges-channel sync maps organizers through
+    # this id, and organizers need no NC/Prince role.
     | {"discord_id"}
-    # Rating fields (embedded in user after merge)
     | {
         "constructed_online",
         "constructed_offline",
@@ -91,13 +72,6 @@ def _pick(d: dict, keys: set[str]) -> dict:
 
 
 def compute_user_public(d: dict) -> dict | None:
-    """Public projection for User.
-
-    NC/Prince: public fields + contact info + community_links
-    IC: public fields + community_links only (no contact info)
-    Any user with community_links: minimal fields (country, roles, links) — no name
-    Others: hidden
-    """
     roles = d.get("roles", [])
     if Role.NC in roles or Role.PRINCE in roles:
         return _obfuscate_public_contacts(
@@ -111,13 +85,6 @@ def compute_user_public(d: dict) -> dict | None:
 
 
 def compute_user_member(d: dict) -> dict:
-    """Member projection for User.
-
-    All users visible with identity + rating fields.
-    NC/Prince: also get contact info + community_links.
-    IC: also get community_links (no contact — IC contact is restricted).
-    Any user with community_links: include them in member projection.
-    """
     roles = d.get("roles", [])
     if Role.NC in roles or Role.PRINCE in roles:
         return _pick(
@@ -131,18 +98,11 @@ def compute_user_member(d: dict) -> dict:
 
 
 def compute_user_full(d: dict) -> dict:
-    """Full projection for User. Everything except calendar_token."""
-    # Exclude calendar_token — private, only visible via /auth/me
+    # calendar_token is private, only ever surfaced via /auth/me.
     return {k: v for k, v in d.items() if k != "calendar_token"}
 
 
-# ---------------------------------------------------------------------------
-# Tournament projections
-# ---------------------------------------------------------------------------
-
-# What a prospective attendee needs before signing in. Omitting a BOOLEAN here
-# misinforms rather than withholds: absent and False are the same value after
-# JSON, so a missing `proxies` reads as "not allowed".
+# A missing bool reads as False after JSON — never omit one to withhold it.
 _TOURNAMENT_PUBLIC_FIELDS = {
     "uid",
     "modified",
@@ -173,7 +133,6 @@ _TOURNAMENT_PUBLIC_FIELDS = {
     "self_organized_rounds",
 }
 
-# Member gets everything EXCEPT checkin_code and the VEKN/TWDA push bookkeeping
 _TOURNAMENT_MEMBER_EXCLUDE = {
     "checkin_code",
     "vekn_pushed_at",
@@ -183,106 +142,53 @@ _TOURNAMENT_MEMBER_EXCLUDE = {
 
 
 def compute_tournament_public(d: dict) -> dict:
-    """Public projection: what an event advertisement may carry."""
     proj = _pick(d, _TOURNAMENT_PUBLIC_FIELDS)
-    # On an online event venue_url is the JOIN link, not a venue website (the
-    # form defaults it to a Discord invite), and an invite-only event has
-    # nowhere else to put it. calendar.py withholds it the same way.
+    # Online event: venue_url is the join link, not a website — withheld same
+    # as calendar.py's rendering.
     if d.get("online"):
         proj.pop("venue_url", None)
     return proj
 
 
 def compute_tournament_member(d: dict) -> dict:
-    """Member projection: everything except checkin_code and VEKN push bookkeeping.
-
-    No per-viewer filtering — all members see all data.
-    """
     return {k: v for k, v in d.items() if k not in _TOURNAMENT_MEMBER_EXCLUDE}
 
 
 def compute_tournament_full(d: dict) -> dict:
-    """Full projection: everything."""
     return dict(d)
 
 
-# ---------------------------------------------------------------------------
-# Sanction projections
-# ---------------------------------------------------------------------------
-
-
 def compute_sanction_public(d: dict) -> None:
-    """Sanctions are not visible to non-members."""
     return None
 
 
-# ---------------------------------------------------------------------------
-# Deck projections
-# ---------------------------------------------------------------------------
-
-
 def compute_deck_public(d: dict) -> None:
-    """Decks are never visible at public level."""
     return None
 
 
 def compute_deck_member(d: dict) -> dict | None:
-    """Member projection: visible if public flag is set.
-
-    The engine sets public=True based on decklists_mode + tournament state
-    + player status (winner/finalist/all). Own decks are always visible
-    via personal overlay in SSE (obj_user_uid == viewer.uid).
-    """
     if d.get("public"):
         return dict(d)
     return None
 
 
 def compute_deck_full(d: dict) -> dict:
-    """Full access always sees all decks."""
     return dict(d)
 
 
-# ---------------------------------------------------------------------------
-# League projections
-# ---------------------------------------------------------------------------
-
-
 def compute_league_public(d: dict) -> dict:
-    """Public projection: everything except the organizer roster.
-
-    Ordinary members have no public projection, so the uids would resolve to
-    nothing client-side and render as raw fragments.
-    """
     return {k: v for k, v in d.items() if k != "organizers_uids"}
 
 
 def compute_promo_public(d: dict) -> dict:
-    """Catalog only — the server-written inventory aggregates are officials-only.
-
-    Deliberately NOT gated on `active`: retired promos must keep resolving for
-    historical distribution rows and raffle prizes; the gallery UI filters.
-    """
+    # Not gated on `active` — retired promos must keep resolving for history
+    # and raffles; the gallery UI filters client-side.
     return {k: v for k, v in d.items() if k != "holdings"}
 
 
-# ---------------------------------------------------------------------------
-# Shared passthrough (identity projection)
-# ---------------------------------------------------------------------------
-
-
 def _identity(d: dict) -> dict:
-    """Identity projection: object fully visible at this level (no filtering).
-
-    Used where a type has no per-level field policy: leagues are unfiltered from
-    member level up, and sanctions are fully visible to any member.
-    """
     return dict(d)
 
-
-# ---------------------------------------------------------------------------
-# Dispatch tables
-# ---------------------------------------------------------------------------
 
 _PUBLIC_DISPATCH = {
     ObjectType.USER: compute_user_public,
@@ -313,7 +219,6 @@ _FULL_DISPATCH = {
 
 
 def compute_public(obj_type: str, full_dict: dict) -> dict | None:
-    """Compute the public projection for an object."""
     fn = _PUBLIC_DISPATCH.get(obj_type)
     if fn is None:
         raise ValueError(f"Unknown object type: {obj_type}")
@@ -321,7 +226,6 @@ def compute_public(obj_type: str, full_dict: dict) -> dict | None:
 
 
 def compute_member(obj_type: str, full_dict: dict) -> dict | None:
-    """Compute the member projection for an object."""
     fn = _MEMBER_DISPATCH.get(obj_type)
     if fn is None:
         raise ValueError(f"Unknown object type: {obj_type}")
@@ -329,10 +233,6 @@ def compute_member(obj_type: str, full_dict: dict) -> dict | None:
 
 
 def compute_full(obj_type: str, full_dict: dict) -> dict:
-    """Compute the full projection for an object.
-
-    This exists for consistency and to strip fields like calendar_token.
-    """
     fn = _FULL_DISPATCH.get(obj_type)
     if fn is None:
         raise ValueError(f"Unknown object type: {obj_type}")

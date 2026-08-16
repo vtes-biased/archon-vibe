@@ -4,10 +4,8 @@
   import { showToast } from "$lib/stores/toast.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  // Discord's Add Friend flow is username-based and there is no public
-  // add-friend deep link, so the primary action copies the username for
-  // pasting into Discord; the profile link is a secondary affordance
-  // (a friend-request button may appear there if privacy settings allow).
+  // Discord's Add Friend flow is username-based with no public deep link, so the primary action
+  // copies the username for pasting into Discord; the profile link is a secondary affordance.
   let { discordId, username = null }: { discordId: string; username?: string | null } = $props();
 
   let copied = $state(false);

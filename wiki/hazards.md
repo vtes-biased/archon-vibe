@@ -98,6 +98,14 @@ decision single-sourced in Rust. Frontend wrappers are UX-only and fail closed
 the same inputs**, and must match the backend's *inclusion filter* as well as its
 formula ([dogmas](dogmas.md#product)).
 
+**The raffle pool filter is implemented twice** — engine `get_raffle_pool` and
+`RaffleSection.svelte`'s `eligibleForPool()` compute the same eligibility;
+a change must land on both sides.
+
+**The bot's round-timer reminders duplicate the frontend countdown formula** —
+the schedule computation and `TimerDisplay.svelte` must stay in lockstep
+([discord](discord.md#the-sse-listener)).
+
 **`preview_scores_json` deliberately duplicates the `SetScore` GW/TP cascade** —
 the preview runs on not-yet-persisted scores, so the two paths cannot share state.
 A cascade change must land on both sides; the single equality test

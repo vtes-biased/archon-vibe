@@ -1,15 +1,6 @@
-"""Server-computed promo stock aggregates.
-
-The promo_ledger table and the tournaments' distribution reports are the
-source of truth; this module denormalizes them into `Promo.holdings` and
-`User.promo_stock` so every client reads the same authoritative remaining
-counts (streamed via SSE, never derived client-side — sync-state differences
-must not show different totals to different viewers).
-
-Triggered on ledger writes, promo catalog updates (self-heal after a potential
-read-modify-write overlap), any tournament save changing promos_distributed
-(ReportPromos action, offline push, soft-delete), and a daily full pass.
-Idempotent: recomputing from source data always converges.
+"""Server-computed promo stock aggregates: denormalizes promo_ledger and
+tournament distribution reports into Promo.holdings and User.promo_stock.
+Idempotent — recomputing from source data always converges.
 """
 
 import asyncio
@@ -33,10 +24,8 @@ from .models import PromoHolding, PromoLedgerKind
 
 logger = logging.getLogger(__name__)
 
-# Serializes recomputes: interleaved runs could otherwise finish out of order
-# and write stale aggregates last (each trigger commits its source row BEFORE
-# scheduling, so a serialized later run always reads — and writes — later
-# state, making convergence immediate instead of waiting on the daily pass).
+# Serializes recomputes: without this, interleaved runs could finish out of
+# order and leave stale aggregates written last.
 _recompute_lock = asyncio.Lock()
 
 
@@ -79,8 +68,7 @@ async def _recompute(promo_uids: list[str] | None) -> None:
 
     for e in entries:
         if e.kind == PromoLedgerKind.INTAKE:
-            # Print batch received from BCP: credits the holder (from_uid),
-            # debits nobody — the external origin is outside the ledger.
+            # Credits from_uid; no debit — external origin, outside the ledger.
             h = hold(e.promo_uid, e.from_uid)
             h.assigned += e.qty
             h.remaining += e.qty
@@ -89,9 +77,7 @@ async def _recompute(promo_uids: list[str] | None) -> None:
             h = hold(e.promo_uid, e.to_uid)
             h.assigned += e.qty
             h.remaining += e.qty
-        # Outflow from the source holder (assignment + distribution). Sources
-        # with no recorded intake go negative — unbounded fallback; UI hides
-        # pure supply sources.
+        # Sources with no recorded intake go negative (the UI hides them).
         h = hold(e.promo_uid, e.from_uid)
         h.remaining -= e.qty
 
@@ -99,9 +85,8 @@ async def _recompute(promo_uids: list[str] | None) -> None:
         h = hold(promo_uid, holder_uid)
         h.remaining -= qty
 
-    # Write changed Promo.holdings. Re-read right before saving so a catalog
-    # edit committed meanwhile isn't clobbered (and catalog PUT re-triggers a
-    # recompute, closing the reverse window).
+    # Re-read right before saving so a concurrent catalog edit isn't clobbered;
+    # catalog PUT re-triggers a recompute, closing the reverse race.
     for stale in promos:
         new_holdings = holdings[stale.uid]
         if msgspec.to_builtins(stale.holdings) == msgspec.to_builtins(new_holdings):
@@ -114,8 +99,8 @@ async def _recompute(promo_uids: list[str] | None) -> None:
         bd = await save_promo(promo)
         broadcast_precomputed(bd)
 
-    # Merge per-user stock for the target promos: set computed keys, drop
-    # stale ones (holders that no longer appear, e.g. a changed stock source).
+    # Drop stale per-user keys for holders who fall out (e.g. a changed stock
+    # source).
     user_stocks: dict[str, dict[str, int]] = {}
     for promo_uid, per_holder in holdings.items():
         for holder_uid, h in per_holder.items():

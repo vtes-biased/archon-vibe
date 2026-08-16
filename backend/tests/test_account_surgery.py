@@ -1,7 +1,7 @@
 """Regression tests for VEKN account-surgery.
 
 Covers the three db-layer primitives the detach/merge invariant rests on
-(wiki/architecture.md, Account surgery) plus the self-abandon suspension guard:
+plus the self-abandon suspension guard:
 
 - ``merge_users``       — survivor keeps identity + unlisted fields (e.g. wins); the
                           dying uid's contacts/roles/sanctions/decks/auth migrate over.
@@ -108,11 +108,6 @@ async def _deck_uids_for_user(user_uid: str) -> set[str]:
     return {row[0] for row in rows}
 
 
-# ---------------------------------------------------------------------------
-# merge_users
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.asyncio
 async def test_merge_preserves_unlisted_field_and_identity(test_db):
     """The latent bug: rebuilding User(...) from scratch dropped unlisted fields.
@@ -148,18 +143,13 @@ async def test_merge_preserves_unlisted_field_and_identity(test_db):
     # The survivor's update + the dying account's soft-delete are surfaced so
     # the route can push them to other clients' caches live.
     assert len(broadcasts) == 2
-    # (a) an unlisted field (wins) is PRESERVED from keep_user, not dropped.
     assert merged.wins == ["tourn-1"]
-    # identity prefers keep_user.
     assert merged.uid == keep.uid
     assert merged.name == "Keep Name"
     assert merged.vekn_id == "1234567"
-    # contact info prefers the claiming (delete) account.
     assert merged.contact_email == "claimer@example.com"
     assert merged.contact_phone == "+15550001111"
-    # roles are the union.
     assert set(merged.roles) == {Role.PRINCE, Role.JUDGE}
-    # the dying account is soft-deleted.
     gone = await db.get_user_by_uid(delete.uid)
     assert gone is None or gone.deleted_at is not None
 
@@ -188,21 +178,16 @@ async def test_merge_reassigns_decks_sanctions_auth(test_db):
         result = await accounts.merge_users(keep.uid, delete.uid)
         assert result is not None
         _merged, broadcasts = result
-        # Reassigned sanction + deck (and survivor + soft-delete) are all
-        # surfaced for broadcast so other clients don't keep stale copies. Auth
-        # methods aren't synced objects, so they don't appear here.
-        # survivor + sanction + deck + soft-delete == 4 (no coopted-by refs here).
+        # Broadcast count is survivor + sanction + deck + soft-delete = 4; auth methods
+        # aren't synced objects, so they don't appear here.
         assert len(broadcasts) == 4
 
-        # decks reassigned to the survivor.
         assert await _deck_uids_for_user(keep.uid) == {deck.uid}
         assert await _deck_uids_for_user(delete.uid) == set()
 
-        # sanctions reassigned.
         keep_sanctions = await db.get_sanctions_for_user(keep.uid)
         assert {s.uid for s in keep_sanctions} == {sanction.uid}
 
-        # auth methods reassigned.
         keep_auth = await db.get_auth_methods_for_user(keep.uid)
         assert {a.uid for a in keep_auth} == {auth.uid}
         assert await db.get_auth_methods_for_user(delete.uid) == []
@@ -210,13 +195,9 @@ async def test_merge_reassigns_decks_sanctions_auth(test_db):
 
 @pytest.mark.asyncio
 async def test_merge_refuses_to_absorb_vekn_account(test_db):
-    """The absorbed (soft-deleted) account must NOT hold a VEKN ID.
-
-    VEKN uids are immovable and never soft-deleted, and this also forbids merging
-    two VEKN identities. Guards admin/discord (claim/link can't reach it). Because
-    a non-VEKN account can't be a tournament participant, this is what makes the
-    deeper cross-tournament reference remap unnecessary.
-    """
+    """The absorbed (soft-deleted) account must NOT hold a VEKN ID — VEKN uids are
+    immovable and never soft-deleted, so this also forbids merging two VEKN
+    identities."""
     keep = User(
         uid=str(uuid7()), modified=datetime.now(UTC), name="Survivor", vekn_id="8000001"
     )
@@ -252,11 +233,6 @@ async def test_merge_same_account_is_noop(test_db):
     assert broadcasts == []
     still = await db.get_user_by_uid(user.uid)
     assert still is not None and still.deleted_at is None
-
-
-# ---------------------------------------------------------------------------
-# detach_user_from_vekn
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -301,7 +277,6 @@ async def test_detach_vekn_record_is_immovable(test_db):
         # New personal account + nulled vekn_record surfaced for broadcast.
         assert len(broadcasts) == 2
 
-        # --- vekn_record is immovable: same uid, keeps competitive identity ---
         assert vekn_record.uid == user.uid
         assert vekn_record.vekn_id == "9000001"
         assert set(vekn_record.roles) == {Role.PRINCE, Role.JUDGE}
@@ -312,20 +287,18 @@ async def test_detach_vekn_record_is_immovable(test_db):
         assert vekn_record.wins == ["tourney-uid-1"]
         assert len(vekn_record.community_links) == 1
 
-        # sanctions + decks stay attached (uid unchanged, never reassigned).
         assert {s.uid for s in await db.get_sanctions_for_user(user.uid)} == {
             sanction.uid
         }
         assert await _deck_uids_for_user(user.uid) == {deck.uid}
 
-        # PII wiped off the record (the split bug: discord_id must be nulled).
+        # The split bug: discord_id must be nulled here too.
         assert vekn_record.nickname is None
         assert vekn_record.contact_email is None
         assert vekn_record.discord_id is None
-        # modified bumped on the record (the other split bug).
+        # The other split bug: modified must bump on the orphaned record.
         assert vekn_record.modified >= user.modified
 
-        # --- personal account: fresh uid, login + PII only, no VEKN data ---
         assert personal.uid != user.uid
         assert personal.vekn_id is None
         assert personal.roles == []
@@ -334,12 +307,10 @@ async def test_detach_vekn_record_is_immovable(test_db):
         assert personal.community_links == []
         assert personal.constructed_online is None
         assert personal.wins == []
-        # PII follows the person.
         assert personal.name == "Holder"
         assert personal.nickname == "holdy"
         assert personal.contact_email == "holder@example.com"
         assert personal.discord_id == "discord-123"
-        # auth methods reassigned to the new uid.
         assert {a.uid for a in await db.get_auth_methods_for_user(personal.uid)} == {
             auth.uid
         }
@@ -351,9 +322,8 @@ async def test_detach_moves_calendar_token_to_personal(test_db):
     """The .ics feed token follows the human, not the orphaned VEKN record.
 
     calendar_token lives in a dedicated column (stripped from "full"), so detach
-    reads it explicitly and re-homes it on the personal account; the orphan is
-    cleared first so the token is never duplicated. This matches merge_users and
-    keeps the owner's existing subscription URL resolving.
+    must read and re-home it explicitly; the orphan is cleared first so the
+    token is never duplicated.
     """
     user = User(
         uid=str(uuid7()),
@@ -377,11 +347,6 @@ async def test_detach_moves_calendar_token_to_personal(test_db):
         resolved = await db.get_user_by_calendar_token("feed-token-xyz")
         assert resolved is not None
         assert resolved.uid == personal.uid
-
-
-# ---------------------------------------------------------------------------
-# user_has_active_suspension
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -423,11 +388,6 @@ async def test_active_suspension_false_when_lifted_expired_or_deleted(test_db):
         )
         await db.save_sanction(_sanction(uid, SanctionLevel.PROBATION, deleted=True))
         assert await accounts.user_has_active_suspension(uid) is False
-
-
-# ---------------------------------------------------------------------------
-# /vekn/abandon route guard (active suspension blocks self-abandon)
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio

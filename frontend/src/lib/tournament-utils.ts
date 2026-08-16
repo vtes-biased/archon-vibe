@@ -26,9 +26,8 @@ export type PlayerInfoMap = Record<
   { name: string; nickname: string | null; vekn: string | null; display_name?: string | null }
 >;
 
-/** The state is the one STATUS badge in the header — it is the only chip in the
- *  row allowed to carry a meaning-bearing colour. Tones only; the chip chrome
- *  belongs to <Badge>, so this can never drift into raw utilities again. */
+/** The state is the one STATUS badge in the header — the only chip allowed a meaning-bearing colour.
+ * Tones only; chip chrome belongs to <Badge>, so this can never drift into raw utilities again. */
 export function getStateTone(state: TournamentState): BadgeTone {
   switch (state) {
     case "Planned": return "neutral";      // not happening yet — quietest
@@ -40,9 +39,8 @@ export function getStateTone(state: TournamentState): BadgeTone {
   }
 }
 
-/** Privacy abbreviation for a real name: first whitespace word in full, then the
- *  capitalised initials of the remaining words, no dots/spaces between them.
- *  "Lionel Marie Panhaleux" -> "Lionel MP"; "John Smith" -> "John S"; "Cher" -> "Cher". */
+/** Privacy abbreviation: first word in full, then capitalised initials of the rest, no separators.
+ * "Lionel Marie Panhaleux" -> "Lionel MP"; "John Smith" -> "John S"; "Cher" -> "Cher". */
 export function abbreviateName(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
   if (!words.length) return "";
@@ -50,16 +48,8 @@ export function abbreviateName(name: string): string {
   return initials ? `${words[0]} ${initials}` : words[0]!;
 }
 
-/**
- * Render a player's name for display.
- *
- * Offline (IRL) events: real name + vekn only — the nickname is never shown.
- * Online events (privacy): show ONLY the nickname; the real name is never spelled
- * out — instead its abbreviation (abbreviateName) sits with the vekn id inside the
- * parens, e.g. "Lio (Lionel MP · 1234567)". With no nickname the abbreviation becomes
- * the primary, e.g. "Lionel MP (1234567)". Derived purely from whatever the viewer's
- * own access projection already put in playerInfo — nothing is precomputed server-side.
- */
+/** Offline events show real name + vekn (never nickname); online events show nickname only, with the
+ * abbreviated real name + vekn in parens — e.g. "Lio (Lionel MP · 1234567)". */
 export function seatDisplay(uid: string, playerInfo: PlayerInfoMap, online = false): string {
   const { primary, detail } = seatDisplayParts(uid, playerInfo, online);
   return detail ? `${primary} (${detail})` : primary;
@@ -127,17 +117,8 @@ export function top5HasScoreTies(standings: StandingEntry[]): boolean {
   return false;
 }
 
-/**
- * Build the ranked standings table for a tournament.
- *
- * Constructs preliminary entries (from rounds, or from synced/imported standings
- * when no rounds exist), then lets the engine assign final placement + ranks
- * (winner 1st, other finalists tied for 2nd, non-finalists 6+). The engine is the
- * single source of truth for placement — see compute_final_standings.
- *
- * Pure over `tournament`; callers that need to recompute when WASM finishes loading
- * should read the engine-ready signal in their reactive wrapper.
- */
+/** Preliminary entries come from rounds (or synced/imported standings when there are no rounds); the
+ * engine assigns final placement. Pure over `tournament` — callers must re-run when WASM finishes loading. */
 export function computeStandings(tournament: Tournament | null): StandingEntry[] {
   if (!tournament) return [];
   // Imported records can carry standings without a roster.
@@ -164,12 +145,8 @@ export function computeStandings(tournament: Tournament | null): StandingEntry[]
             toss: p.toss ?? 0, finalist: finalistUids.has(p.user_uid!),
           }));
   } else {
-    // Preliminary totals come from the engine-computed standings, which apply the
-    // standings_adjustment (SA) penalty to VP and re-decide GW/TP per table. Do NOT
-    // re-sum raw seat results here: the SA penalty lives only on the standings total
-    // (the per-seat result.vp stays raw so the game state stays valid), so summing
-    // seats would silently drop every SA. Fall back to raw aggregation only if the
-    // engine hasn't populated standings yet (e.g. before the first score).
+    // Preliminary totals come from engine-computed standings (SA penalty applied to VP, GW/TP re-decided
+    // per table). Do NOT re-sum raw seat results — SA lives only on the standings total, not per-seat.
     const map = new Map<string, { gw: number; vp: number; tp: number }>();
     if (tournament.standings?.length) {
       for (const s of tournament.standings) {
@@ -210,20 +187,16 @@ export function computeStandings(tournament: Tournament | null): StandingEntry[]
     }));
   }
 
-  // DQ'd players forfeit their own score (zeroed) and sort last; the engine
-  // mirrors this on the stored standings, but we re-derive here so the seat-sum
-  // fallback path is consistent too. Opponents' scores are untouched.
-  // DQ from live player state OR the engine-persisted standings flag (the latter
-  // covers VEKN-synced/imported tournaments that carry no live player.state).
+  // DQ'd players forfeit their own score (zeroed) and sort last; re-derived here so the seat-sum fallback
+  // stays consistent with the engine. DQ signal is live player.state OR the persisted standings flag.
   const dqUids = new Set<string>(
     players.filter(p => p.state === "Disqualified" && p.user_uid).map(p => p.user_uid!)
   );
   for (const s of tournament.standings ?? []) {
     if (s.disqualified) dqUids.add(s.user_uid);
   }
-  // Proxy (non-competing): excluded from rank like DQ, but the score is NOT zeroed
-  // (the seat's VPs are real). Same dual source as DQ: live player flag OR the
-  // engine-persisted standings flag (covers synced/imported tournaments).
+  // Proxy (non-competing): excluded from rank like DQ, but the score is NOT zeroed. Same dual source as
+  // DQ: live player flag OR the persisted standings flag (covers synced/imported tournaments).
   const ncUids = new Set<string>(
     players.filter(p => p.non_competing && p.user_uid).map(p => p.user_uid!)
   );
@@ -262,12 +235,8 @@ export function computeStandings(tournament: Tournament | null): StandingEntry[]
   });
 }
 
-/**
- * Short badge label for a championship rank ("" never renders a badge).
- * Deliberately NOT initials: "NC"/"CC" invert across the languages we ship
- * (Campeonato Nacional, Championnat National), and the full rank names are what
- * made the header row wrap in the first place — one word each is the middle.
- */
+/** Deliberately NOT initials: "NC"/"CC" invert across the languages we ship (Campeonato Nacional,
+ * Championnat National), and full rank names made the header wrap — one word each is the middle. */
 export function rankBadgeLabel(rank: TournamentRank): string {
   if (rank === 'National Championship') return m.promo_rank_national();
   if (rank === 'Continental Championship') return m.promo_rank_continental();
@@ -304,12 +273,8 @@ export function roundsPlayed(tournament: Tournament, uid: string): number {
   ).length;
 }
 
-/** Distinct players seated in ≥1 preliminary round (finals seats folded in), or —
- *  for a rounds-less VEKN import — standings rows carrying any score. Mirrors backend
- *  ratings.py `_players_with_rounds`/`_player_count` so league RTP shares the exact
- *  field size that feeds every profile-rating coefficient (t.players.length would
- *  over-count no-shows). Stays inclusive of DQ'd players: their head-count still lifts
- *  everyone else's finalist coefficient. */
+/** Distinct players in ≥1 preliminary round (finals folded in), or — for a rounds-less import —
+ * standings rows carrying any score. A twin of backend ratings.py's player-count function; keep them in sync. */
 export function playedPlayerUids(tournament: Tournament): Set<string> {
   const rounds = tournament.rounds ?? [];
   if (rounds.length) {
@@ -336,14 +301,8 @@ export type RankedStatus =
   | { ranked: false; reason: "few_players" | "no_final" | "open_rounds" }
   | null;
 
-/** Ranked/unranked eligibility (VEKN rules 3.1/3.1.6): international ranking
- *  needs ≥8 players AND a played final; open-rounds / self-organized events are
- *  the non-VEKN house format, never rated. Finished is definitive and comes
- *  from the engine's ranking_eligibility — the same single-sourced predicate
- *  backend ratings.py inclusion-filters on. Live events derive optimistically
- *  from checked-in players, assuming a final will be played. null =
- *  indeterminate: registration still open, the viewer's projection lacks the
- *  data (anonymous), or the WASM engine isn't loaded yet. */
+/** VEKN rules 3.1/3.1.6: ranked needs ≥8 players AND a played final, decided by the engine's
+ * ranking_eligibility (same predicate backend ratings.py inclusion-filters on). null = indeterminate. */
 export function rankedStatus(t: Tournament): RankedStatus {
   if (t.open_rounds || t.self_organized_rounds) return { ranked: false, reason: "open_rounds" };
   if (t.state === "Finished") {
@@ -383,10 +342,8 @@ export function ratingContext(tournament: Tournament, sanctions: Sanction[] | un
   };
 }
 
-/** Rating points a Finished tournament awards a standings entry, or null where the
- *  backend stores no entry — never played, DQ'd, proxy, ranking-ineligible event.
- *  Null renders blank (wiki/design.md). VP/GW come from the same engine call
- *  backend ratings.py uses; standings rows are prelim-only and carry no SA. */
+/** Null where the backend stores no entry — never played, DQ'd, proxy, ranking-ineligible (null renders
+ * blank). Same engine call backend ratings.py uses; standings rows are prelim-only, no SA applied. */
 export function getRatingPts(
   entry: StandingEntry,
   tournament: Tournament,

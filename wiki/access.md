@@ -37,6 +37,12 @@ omitted from the rows below.
 | `record_promo_intake`, `view_full_promo_ledger` | NC — global (the inventory chain is not country-scoped) |
 | `manage_oauth_clients` | DEV — global |
 
+Two rows carry a security rationale. `merge_accounts` is IC-only because a merge
+**unions both accounts' roles** — anyone who could merge could land a role by
+absorbing a shell account that carries it. `sponsor_member` is a single capability
+covering both minting the member and issuing the VEKN ID — splitting them invited
+the two halves to drift.
+
 **Appointments** — NC grants **Prince** in their own country; PTC grants **PT**;
 Rulemonger grants **Judge** and **Judgekin**; everything else is IC's. **A target
 must hold a `vekn_id` to hold any role.**

@@ -66,12 +66,8 @@
     mode: "0644"
   notify: Restart bot service
 
-# Beta has no bootstrap step (server-setup owns the foundation) and neither deploy
-# playbook re-runs the common role on a python_version bump — so the uv-managed
-# interpreter must be ensured here, as root, before any venv work. Without it,
-# `uv venv --python X.Y` (run as the unprivileged service user) tries to download
-# the interpreter into the root-owned install dir and dies with EACCES. Idempotent:
-# `uv python install` is a no-op when the version is already present.
+# Without this, `uv venv --python X.Y` (run as the unprivileged service user)
+# tries to download the interpreter into the root-owned install dir and dies EACCES.
 - name: Ensure uv managed-python dir exists
   ansible.builtin.file:
     path: "{{ r.uv_python_install_dir }}"
@@ -102,11 +98,8 @@
   changed_when: false
   failed_when: false
 
-# The 'creates:' guard below makes venv creation a one-time artifact, so a
-# python_version bump never rebuilds an existing venv. uv pip install then targets
-# the stale interpreter and a requires-python>=N wheel fails to resolve. Drop the
-# mismatched venv here so the next task recreates it; deps + wheels reinstall
-# unconditionally afterwards, so a fresh venv is repopulated in full.
+# The next task's 'creates:' guard makes venv creation a one-time artifact, so
+# a python_version bump would target the stale interpreter unless dropped here first.
 - name: Remove venv when its Python differs from {{ r.python_version }}
   ansible.builtin.file:
     path: "{{ _venv_dir }}"

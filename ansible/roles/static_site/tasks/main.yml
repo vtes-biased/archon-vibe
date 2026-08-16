@@ -27,10 +27,8 @@
     mode: "0755"
 
 - name: Rsync built frontend dist to the host
-  # No --chmod/--chown rsync_opts: macOS control nodes ship openrsync as
-  # /usr/bin/rsync, which rejects both flags ("invalid argument"). Archive mode
-  # (default) preserves the source 644/755 perms (Vite dist); ownership is set
-  # by the task below so this works with any control-node rsync (GNU or openrsync).
+  # No --chmod/--chown rsync_opts: macOS control nodes ship openrsync, which
+  # rejects both flags — ownership is set by the task below instead.
   ansible.posix.synchronize:
     src: "{{ r.dist_src }}/"
     dest: "{{ _dist_dir }}/"

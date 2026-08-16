@@ -1,20 +1,8 @@
-"""Regression test for the server-computed promo stock aggregates.
-
-`recompute_promo_stock` is the sole writer of `Promo.holdings` and
-`User.promo_stock` — the authoritative "remaining" counts every client reads via
-SSE (never derived client-side). The invariant it must hold: for each holder,
-remaining = credited in (assignments + intakes) − outflow out (assignments,
-distributions) − tournament attributions, and a holder that drops out of the
-recomputed set has its stale denormalized key cleaned. A sign flip, a dropped
-term, or a missed cleanup would show officials/organizers phantom or wrong
-physical-inventory counts — the whole point of the feature.
-
-One scenario drives every term through the shipped function against the real
-`test_db` Postgres: an intake crediting a holder with nobody debited, an
-assignment in, a generic distribution out, a compensating negative correction, a
-source with more assigned out than intaken going legitimately negative, a
-tournament attribution to a stock source, and — after re-pointing that stock
-source — the stale-key cleanup for the holder that no longer appears.
+"""Regression test for `recompute_promo_stock`, the sole writer of
+`Promo.holdings`/`User.promo_stock` — the authoritative counts every client
+reads via SSE. Drives every term (intake, assignment, distribution, correction,
+negative source, tournament attribution, stale-key cleanup) through the shipped
+function against the real `test_db` Postgres.
 """
 
 from datetime import UTC, datetime
@@ -67,9 +55,8 @@ async def test_recompute_nets_ledger_and_attributions_and_cleans_stale_holders(t
         for u in (ic, org_b, org_c):
             await db.save_user(u)
 
-        # IC intakes 4 from BCP, assigns 10 to B (net −6: partial intake keeps
-        # the unbounded-source path exercised); B gives away 3, then a -1
-        # compensating correction.
+        # IC intakes 4, assigns 10 to B (net −6, exercising the unbounded-source
+        # path); B distributes 3, then a −1 correction.
         for e in (
             _entry(PromoLedgerKind.INTAKE, p, 4, ic.uid, None),
             _entry(PromoLedgerKind.ASSIGNMENT, p, 10, ic.uid, org_b.uid),

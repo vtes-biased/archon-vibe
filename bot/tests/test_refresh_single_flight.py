@@ -1,14 +1,6 @@
-"""Single-flight token-refresh tests for ArchonAPI.
-
-Reproduces the backend's refresh-token *rotation + reuse-detection* in a fake
-backend, then asserts that concurrent refreshers (SSE loop + a slash command
-both hitting 401 at once) no longer double-spend the grant and self-revoke the
-organizer's whole token chain.
-
-Stdlib only — no pytest in the bot venv. Run:
-
-    bot/.venv/bin/python bot/tests/test_refresh_single_flight.py
-"""
+"""Reproduces the backend's refresh-token rotation + reuse-detection in a fake
+backend, so concurrent refreshers can't double-spend the grant and self-revoke
+the organizer's whole token chain."""
 
 from __future__ import annotations
 
@@ -168,11 +160,8 @@ class SingleFlightRefreshTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(r and r["access_token"] == "access-1" for r in results))
 
     async def test_fake_backend_models_the_bug(self) -> None:
-        """Guard: without single-flight, double-spend DOES revoke the chain.
-
-        Proves the fake faithfully reproduces the vulnerability, so the tests
-        above are meaningful regression coverage.
-        """
+        """Guard proving the fake faithfully reproduces the vulnerability, so
+        the tests above are meaningful regression coverage."""
         store = FakeStore(
             {
                 "archon_uid": ARCHON_UID,
@@ -215,9 +204,8 @@ class SingleFlightRefreshTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(backend.post_count, 1)
 
     async def test_transient_failure_keeps_tokens(self) -> None:
-        """A 5xx during refresh (backend restart) must NOT destroy the stored
-        pair — invalid-grant is signalled exclusively via 400. The caller gets
-        None (transient) and retries with the same, still-valid tokens."""
+        """A 5xx must NOT destroy the stored pair — invalid-grant is signalled
+        exclusively via 400."""
         store = FakeStore(
             {
                 "archon_uid": ARCHON_UID,

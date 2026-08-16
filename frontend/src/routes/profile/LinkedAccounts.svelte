@@ -67,7 +67,6 @@
 <div class="p-6 border-t border-line space-y-4">
   <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.profile_linked_accounts()}</h3>
 
-  <!-- Email & Password -->
   <div class="flex items-center justify-between">
     <div class="flex items-center gap-3">
       <Mail class="w-5 h-5 text-ink-muted" />
@@ -111,7 +110,6 @@
     {/if}
   {/if}
 
-  <!-- Discord -->
   <div class="flex items-center justify-between">
     <div class="flex items-center gap-3">
       <DiscordIcon class="w-5 h-5 text-[#5865F2]" />
@@ -140,7 +138,6 @@
     <p class="text-sm text-link">{discordError}</p>
   {/if}
 
-  <!-- GitHub -->
   <div class="flex items-center justify-between">
     <div class="flex items-center gap-3">
       <GithubIcon class="w-5 h-5 text-ink-strong" />
@@ -171,7 +168,6 @@
     <p class="text-sm text-link">{githubError}</p>
   {/if}
 
-  <!-- Passkey -->
   {#if isPasskeySupported()}
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-3">

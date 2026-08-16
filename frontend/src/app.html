@@ -7,19 +7,12 @@
     <link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
     <meta name="theme-color" content="#DC143C" />
     <!-- viewport-fit=cover: the bottom nav bleeds behind the home indicator
-         instead of sitting above an inert letterbox strip. It also un-insets the
-         TOP of the layout viewport, which is only visible in the installed PWA
-         (display: standalone has no browser chrome covering it) — hence the
-         safe-t padding on the shell and the banner stack. -->
+         instead of an inert letterbox strip, and un-insets the layout viewport's
+         top in the installed PWA — hence the safe-t padding on the shell. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="VEKN Tournament Management - Web App" />
-    <!-- Site-wide social card (Open Graph / Twitter). This static fallback ships
-         to every route; per-tournament og:image is server-rendered for crawlers
-         on /tournaments/{uid} (backend og.py + nginx UA-split). Image path is
-         root-relative on purpose: the same build ships to every domain (see
-         .env.production), crawlers resolve it against the page URL. The default
-         image is the square 512 icon, so the card stays "summary" — a
-         summary_large_image card would letterbox/crop a square asset. -->
+    <!-- Static fallback OG card; per-tournament og:image is server-rendered for
+         crawlers on /tournaments/{uid} (backend og.py + nginx UA-split). -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Archon" />
     <meta property="og:description" content="VEKN Tournament Management - Web App" />

@@ -1,10 +1,7 @@
-"""Country/city → IANA timezone reference data for VEKN event sync.
-
-Reference data only — kept out of vekn_tournament_sync.py so it can grow without
-touching the sync logic. Consumed by vekn_tournament_sync._guess_timezone.
+"""Country/city → IANA timezone reference data, consumed by
+vekn_tournament_sync._guess_timezone.
 """
 
-# Country code → IANA timezone (single-timezone countries, common VTES countries)
 COUNTRY_TIMEZONE: dict[str, str] = {
     "AR": "America/Argentina/Buenos_Aires",
     "AT": "Europe/Vienna",
@@ -39,7 +36,7 @@ COUNTRY_TIMEZONE: dict[str, str] = {
     "SG": "Asia/Singapore",
     "SK": "Europe/Bratislava",
     "ZA": "Africa/Johannesburg",
-    # Multi-timezone defaults (overridden by city lookup below)
+    # Multi-timezone defaults, overridden by CITY_TZ_OVERRIDES below
     "AU": "Australia/Melbourne",
     "BR": "America/Sao_Paulo",
     "CA": "America/Toronto",
@@ -48,10 +45,8 @@ COUNTRY_TIMEZONE: dict[str, str] = {
     "US": "America/New_York",
 }
 
-# City substring → timezone for multi-timezone countries.
 # Checked case-insensitively against venue city and address fields.
 CITY_TZ_OVERRIDES: list[tuple[str, str, str]] = [
-    # US
     ("US", "Berkeley", "America/Los_Angeles"),
     ("US", "Los Angeles", "America/Los_Angeles"),
     ("US", "San Francisco", "America/Los_Angeles"),
@@ -65,9 +60,7 @@ CITY_TZ_OVERRIDES: list[tuple[str, str, str]] = [
     ("US", "Houston", "America/Chicago"),
     ("US", "Dallas", "America/Chicago"),
     ("US", "Phoenix", "America/Phoenix"),
-    # BR
     ("BR", "Manaus", "America/Manaus"),
-    # CA
     ("CA", "Vancouver", "America/Vancouver"),
     ("CA", "Victoria", "America/Vancouver"),
     ("CA", "Winnipeg", "America/Winnipeg"),
@@ -76,7 +69,6 @@ CITY_TZ_OVERRIDES: list[tuple[str, str, str]] = [
     ("CA", "Calgary", "America/Edmonton"),
     ("CA", "Halifax", "America/Halifax"),
     ("CA", "Amherst", "America/Halifax"),
-    # AU
     ("AU", "Brisbane", "Australia/Brisbane"),
     ("AU", "Rockhampton", "Australia/Brisbane"),
     ("AU", "Townsville", "Australia/Brisbane"),

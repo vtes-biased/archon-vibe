@@ -7,14 +7,7 @@ from src.models import Role, User
 
 
 def generate_mock_users(count: int = 400) -> list[User]:
-    """Generate realistic mock VEKN users for testing.
-
-    Args:
-        count: Number of users to generate (default 400 for pagination testing)
-
-    Returns:
-        List of User objects with varied data
-    """
+    """Generate realistic mock VEKN users; count defaults to 400 for pagination testing."""
     first_names = [
         "John",
         "Jane",
@@ -277,7 +270,6 @@ def generate_mock_users(count: int = 400) -> list[User]:
             else None
         )
 
-        # Assign roles first - most users have 0-2 roles
         role_count = random.choices([0, 1, 2, 3], weights=[60, 25, 10, 5])[0]
         user_roles = (
             random.sample(all_roles, min(role_count, len(all_roles)))
@@ -285,31 +277,25 @@ def generate_mock_users(count: int = 400) -> list[User]:
             else []
         )
 
-        # Generate VEKN ID (sequential to avoid collisions with unique constraint).
-        # Officials always carry a vekn_id in prod (roles require one), so force one
-        # for any user with roles: the engine denies a role/country change on a
-        # vekn-less target before the IC bypass, an engine-impossible fixture state.
+        # Officials always carry a vekn_id (an engine-impossible state otherwise): force
+        # one for any user with roles, sequential to avoid the unique-constraint collision.
         if user_roles or random.random() > 0.2:
             vekn_id = str(next_vekn_id)
             next_vekn_id += 1
         else:
             vekn_id = None
 
-        # Some users have nicknames
         nickname = (
             f"{first_name[:3]}{random.randint(10, 99)}"
             if random.random() > 0.7
             else None
         )
 
-        # Modified time varies
         modified = base_time - timedelta(days=random.randint(0, 365))
 
-        # Some users are VEKN synced
         vekn_synced = random.random() > 0.3
         vekn_synced_at = modified if vekn_synced else None
 
-        # Generate proper UUID v7 format
         from uuid import uuid7
 
         user = User(
@@ -319,7 +305,7 @@ def generate_mock_users(count: int = 400) -> list[User]:
             country=country,
             vekn_id=vekn_id,
             city=city,
-            state=None,  # Keep simple for now
+            state=None,
             nickname=nickname,
             roles=user_roles,
             vekn_synced=vekn_synced,

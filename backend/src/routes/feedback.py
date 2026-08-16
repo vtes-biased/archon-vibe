@@ -1,17 +1,6 @@
-"""In-app feedback -> GitHub issues.
-
-Authenticated users submit feedback (category + title + description) which is
-filed as a GitHub issue on this repo via a dedicated GitHub App (Issues:write,
-installed only on this repo) -- never exposed client-side; the repo is public.
-A separate App from the TWDA importer so the two integrations stay isolated.
-
-Configuration (env vars):
-- FEEDBACK_GITHUB_CLIENT_ID: GitHub App client ID (used as the JWT iss).
-- FEEDBACK_GITHUB_PRIVATE_KEY: PEM private key contents, or path to the .pem file.
-- FEEDBACK_GITHUB_INSTALLATION_ID: the App's installation id on this repo (numeric).
-  Any unset -> the endpoint returns 503, so the feature degrades gracefully (same
-  pattern as the TWDA importer when its App isn't configured).
-"""
+"""In-app feedback -> GitHub issues, filed via a dedicated GitHub App (Issues:write,
+installed only on this repo) — a separate App from the TWDA importer, kept isolated.
+Config: FEEDBACK_GITHUB_{CLIENT_ID,PRIVATE_KEY,INSTALLATION_ID}; any unset -> 503."""
 
 import json
 import logging
@@ -54,11 +43,8 @@ _CATEGORIES: dict[str, tuple[str, str]] = {
     "question": ("Question", "question"),
 }
 
-# Lightweight per-user abuse guard. In-process (per-worker) -- fine for the
-# tournament-scale audience; the hard length caps on the body below are the real
-# protection against body-bombing. Stale timestamps are pruned per-user on access
-# (a never-returning user's empty list lingers, but that's a tiny, bounded leak at
-# this scale -- not worth a sweeper).
+# Lightweight per-user abuse guard, in-process (per-worker) — fine at this scale;
+# the length caps on the body below are the real protection against body-bombing.
 _COOLDOWN_S = 60
 _DAILY_CAP = 10
 _recent: dict[str, list[float]] = {}
@@ -77,13 +63,9 @@ def _rate_limited(user_uid: str) -> bool:
 async def _resolve_login(
     session: aiohttp.ClientSession, github_id: str | None, fallback: str | None
 ) -> str | None:
-    """Live @handle for a linked GitHub account, resolved from the stable numeric id.
-
-    github_login is a point-in-time snapshot — renames aren't pushed to us and freed
-    handles get recycled — so a stale login could mention/assign the wrong account in
-    this PUBLIC repo. github_id never changes, so re-resolve through it. Falls back to
-    the stored login on any error (GET /user/{id} accepts the installation token and
-    needs no permissions)."""
+    """Live @handle for a linked GitHub account, resolved from the stable numeric id
+    — github_login is a point-in-time snapshot (renames, recycled handles) that could
+    mention the wrong account in this PUBLIC repo. Falls back to the stored login on error."""
     if not github_id:
         return fallback
     try:
@@ -189,9 +171,8 @@ async def submit_feedback(body: FeedbackRequest, current_user: CurrentUser) -> R
                         detail="Could not file feedback right now; please try again later",
                     )
                 data = json.loads(text)
-    # ValueError = token fetch returned non-201 (github_app.get_installation_token);
-    # OSError = unreadable key file (load_private_key); PyJWTError = bad key content
-    # (create_jwt). All degrade to the same clean 502 instead of a raw 500.
+    # ValueError = non-201 token fetch; OSError = unreadable key file; PyJWTError =
+    # bad key content — all degrade to a clean 502 instead of a raw 500.
     except (aiohttp.ClientError, TimeoutError, ValueError, OSError, jwt.PyJWTError):
         logger.exception("Feedback issue creation error")
         raise HTTPException(

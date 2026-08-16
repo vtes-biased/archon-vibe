@@ -102,7 +102,19 @@ relevant state change — round start and end, finals, reconnect, `/sync`. A pur
 function computes the target set and a structure-signature hash guards it, so a
 reconcile is skipped when the structure is unchanged. A per-tournament
 `asyncio.Lock` serializes structural mutations, so concurrent events, reconnects
-and `/sync` never interleave.
+and `/sync` never interleave. Convergence diffs Discord's **actual** channels —
+one `fetch_guild_channels` call, matched by name — against the desired set, so a
+timed-out partial create converges on retry instead of duplicating channels.
+
+**Event dispatch is time-bounded** (`_DISPATCH_TIMEOUT`): a handler that blocks
+would freeze stream consumption silently — no error and no reconnect, since
+`sock_read` never fires while dispatch is stuck. The bound turns a permanent wedge
+into a logged skip that the next reconcile repairs.
+
+**Teardown order** — Discord *un-parents* a child channel to the guild root when
+its category is deleted; it never cascades. So teardown deletes the category last,
+only once every child is confirmed gone, and `extra_channel_ids` catches channels
+that drifted out of the category in an earlier partial teardown.
 
 **#judges privacy** — private from creation, with `@everyone` denied VIEW_CHANNEL
 and CONNECT. Every reconcile syncs its membership to the `/setup` runner plus the
@@ -118,7 +130,9 @@ scores to #announcement after the structural reconcile, suppressed during silent
 catch-up. It also mirrors organizer in-app announcements, diffing the list by `id`
 and posting new entries only.
 
-**Round-timer reminders** — a pure function mirrors the frontend countdown to
+**Round-timer reminders** — a pure function mirrors the frontend countdown
+(`TimerDisplay.svelte`'s exact formula: total − (elapsed before pause + since
+start) + extra time; the two must stay in lockstep) to
 schedule 15-minute and 5-minute warnings plus a time-up task per table, posting into
 each table's voice text chat. One authority cancels and rebuilds the whole schedule
 on every timer-signature change — start, pause, resume, per-table extra time, round

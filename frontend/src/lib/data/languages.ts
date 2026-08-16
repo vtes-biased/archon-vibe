@@ -1,7 +1,5 @@
-// Languages selectable for community links — the single point of truth for the
-// list (profile editor and community filter chips both import it; the backend
-// only validates the two-letter ISO 639-1 shape, so adding a language here is
-// the whole job). Covers every country with a VEKN presence; extend freely.
+// Single point of truth for community-link languages (profile editor and filter chips both import
+// it; the backend only validates the two-letter ISO 639-1 shape, so adding one here is the whole job).
 export const LANGUAGES: { value: string; label: string }[] = [
   { value: "en", label: "English" },
   { value: "es", label: "Español" },

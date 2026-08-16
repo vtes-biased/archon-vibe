@@ -2,14 +2,8 @@
   import { Info } from "@lucide/svelte";
   import type { Component, Snippet } from "svelte";
 
-  // One shape for "here is something you should know". The console had grown
-  // three: a bordered muted box, a warn banner, and a bare icon + line — with
-  // the same class of information (why the event is unranked, what happened to
-  // the TWDA submission) rendered two different ways side by side.
-  //
-  // Two tones, and the distinction is what the reader must DO: `info` states a
-  // fact and stays out of the way; `warn` needs attention, so it earns a box.
-  // Anything that is neither is not a notice.
+  // Two tones, and the distinction is what the reader must DO: `info` states a fact and stays out
+  // of the way; `warn` needs attention, so it earns a box. Anything that is neither is not a notice.
   let {
     tone = "info",
     icon = Info,

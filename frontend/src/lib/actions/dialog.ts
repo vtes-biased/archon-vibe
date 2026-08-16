@@ -1,17 +1,5 @@
-/**
- * Focus a dialog panel on mount and close it on Escape.
- *
- * Both halves belong together. The pattern this replaces put the Escape check on
- * the backdrop and an unconditional `e.stopPropagation()` on the panel, so the
- * keydown died on the panel and never reached the handler — and where nothing
- * focused the panel at all, it fired on `<body>` and missed the backdrop too.
- * Binding Escape to the element that actually holds focus makes it work in both
- * cases, and keeps a panel's own `stopPropagation` (which stops keystrokes
- * leaking to the page behind) harmless: same-element listeners all still run.
- *
- * Applies `tabindex="-1"` when the markup hasn't, since an unfocusable panel
- * silently defeats the whole thing.
- */
+/** Binds Escape to the element that actually holds focus, not the backdrop — the previous pattern's
+ * stopPropagation on the panel meant the keydown never reached a backdrop-bound handler. Sets tabindex="-1" when missing, since an unfocusable panel defeats this silently. */
 export function dialogPanel(node: HTMLElement, onClose?: () => void) {
   let close = onClose;
   if (!node.hasAttribute('tabindex')) node.tabIndex = -1;

@@ -1,13 +1,7 @@
-"""Streaming invariants for the two object streamers and the snapshot artifact.
-
-`stream_objects_new` pages by (modified_at, uid) with a LIMIT instead of one
-fetchall, to bound app heap. The risk is the batch seam: a run of rows split by
-the LIMIT must be neither skipped nor duplicated. The 400-user fixture drives a
-small batch_size so the keyset-continuation branch actually fires.
-
-The snapshot test asserts the *shipped file*, not the streamer: the JSONL
-bootstrap is the one path where a malformed byte means clients cannot load at
-all, and the client relies on the eof trailer to tell complete from truncated.
+"""Streaming invariants: `stream_objects_new` pages by (modified_at, uid) with
+a LIMIT to bound heap — the batch seam must neither skip nor duplicate rows.
+The snapshot test asserts the shipped file itself, since a malformed byte there
+means clients can't bootstrap at all.
 """
 
 import gzip
@@ -73,8 +67,8 @@ async def test_snapshot_files_are_complete_wellformed_jsonl(
         header, *body, trailer = lines
         assert header["type"] == "header"
         assert header["version"] == snapshots.SNAPSHOT_FORMAT_VERSION
-        # Both meta fields carry the generation instant — the client's `since` cursor
-        # must be that, never a max over the rows read (see wiki/sync.md).
+        # Both meta fields carry the generation instant — the client's `since`
+        # cursor must be that, never a max over the rows read.
         assert header["timestamp"] == header["generated_at"]
 
         assert trailer["type"] == "eof"

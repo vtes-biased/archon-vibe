@@ -17,7 +17,6 @@
   onMount(() => {
     if (!articleEl) return;
 
-    // Scroll to hash on mount
     if (window.location.hash) {
       const target = document.getElementById(window.location.hash.slice(1));
       if (target) {
@@ -25,7 +24,6 @@
       }
     }
 
-    // IntersectionObserver to track active heading
     const headingIds = tocEntries.map(e => e.id);
     const headingEls = headingIds
       .map(id => document.getElementById(id))
@@ -35,7 +33,6 @@
 
     const observer = new IntersectionObserver(
       (entries) => {
-        // Find the topmost visible heading
         for (const entry of entries) {
           if (entry.isIntersecting) {
             onActiveHeadingChange(entry.target.id);
@@ -49,7 +46,6 @@
 
     for (const el of headingEls) observer.observe(el);
 
-    // Classify images by aspect ratio and size for appropriate rendering
     for (const img of articleEl.querySelectorAll<HTMLImageElement>("img.doc-img")) {
       const classify = () => {
         const { naturalWidth: w, naturalHeight: h } = img;
@@ -63,7 +59,6 @@
       else img.addEventListener("load", classify, { once: true });
     }
 
-    // Click delegation for anchor links and internal navigation
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       const anchor = target.closest(".anchor-link");
@@ -75,12 +70,10 @@
         });
         return;
       }
-      // Internal hash links: update active TOC heading after scroll
       const link = target.closest("a[href^='#']");
       if (link instanceof HTMLAnchorElement) {
         const hash = link.getAttribute("href")!;
         requestAnimationFrame(() => {
-          // After browser scrolls, find topmost visible TOC heading
           let best: string | undefined;
           for (const el of headingEls) {
             if (el.getBoundingClientRect().top <= window.innerHeight * 0.2) best = el.id;

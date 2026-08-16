@@ -27,32 +27,22 @@ ph = PasswordHasher()
 
 
 class RegisterRequest(BaseModel):
-    """Registration request payload."""
-
     email: EmailStr
     password: str
     name: str
 
 
 class LoginRequest(BaseModel):
-    """Login request payload."""
-
     email: EmailStr
     password: str
 
 
 @router.post("/register", status_code=201)
 async def register(request: RegisterRequest) -> Response:
-    """Register a new user with email and password.
-
-    Creates both a User and an AuthMethod record.
-    """
-    # Check if email already exists
     existing = await get_auth_method_by_identifier("email", request.email.lower())
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
-    # Create user
     now = datetime.now(UTC)
     user = User(
         uid=str(uuid7()),
@@ -61,7 +51,6 @@ async def register(request: RegisterRequest) -> Response:
     )
     await save_user(user)
 
-    # Create auth method with hashed password
     password_hash = ph.hash(request.password)
     auth_method = AuthMethod(
         uid=str(uuid7()),
@@ -70,13 +59,12 @@ async def register(request: RegisterRequest) -> Response:
         method_type=AuthMethodType.EMAIL,
         identifier=request.email.lower(),
         credential_hash=password_hash,
-        verified=False,  # Email verification not implemented yet
+        verified=False,
         created_at=now,
         last_used_at=now,
     )
     await insert_auth_method(auth_method)
 
-    # Generate tokens
     access_token, expires_in = create_access_token(user.uid)
     refresh_token = create_refresh_token(user.uid)
 
@@ -94,13 +82,10 @@ async def register(request: RegisterRequest) -> Response:
 
 @router.post("/login")
 async def login(request: LoginRequest) -> Response:
-    """Login with email and password."""
-    # Find auth method
     auth_method = await get_auth_method_by_identifier("email", request.email.lower())
     if not auth_method:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    # Verify password
     try:
         ph.verify(auth_method.credential_hash, request.password)  # ty: ignore[invalid-argument-type]
     except VerifyMismatchError as err:
@@ -108,7 +93,6 @@ async def login(request: LoginRequest) -> Response:
             status_code=401, detail="Invalid email or password"
         ) from err
 
-    # Check if password needs rehashing (argon2 parameter updates)
     if ph.check_needs_rehash(auth_method.credential_hash):  # ty: ignore[invalid-argument-type]
         auth_method = AuthMethod(
             uid=auth_method.uid,
@@ -123,7 +107,6 @@ async def login(request: LoginRequest) -> Response:
         )
         await update_auth_method(auth_method)
     else:
-        # Just update last_used_at
         auth_method = AuthMethod(
             uid=auth_method.uid,
             modified=datetime.now(UTC),
@@ -140,7 +123,6 @@ async def login(request: LoginRequest) -> Response:
     # A tombstoned account keeps its email credential — block a fresh login.
     await assert_account_active(auth_method.user_uid)
 
-    # Generate tokens
     access_token, expires_in = create_access_token(auth_method.user_uid)
     refresh_token = create_refresh_token(auth_method.user_uid)
 

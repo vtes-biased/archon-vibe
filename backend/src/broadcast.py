@@ -1,8 +1,4 @@
-"""SSE broadcast system.
-
-Owns the connection set and all broadcast functions. Imported directly by any
-module that needs to push events — no monkey-patching required.
-"""
+"""SSE broadcast system: owns the connection set and all broadcast functions."""
 
 import asyncio
 import logging
@@ -20,27 +16,16 @@ logger = logging.getLogger(__name__)
 
 encoder = msgspec.json.Encoder()
 
-# Distinct pending frames a per-connection queue holds before overflow→close.
-# Each whole-tournament frame is ~300KB, so coalescing (below) already caps a
-# stalled tournament viewer at ~1 frame; this just bounds the count of DISTINCT
-# objects a stalled full-corpus browser can pile up. 100→30 as cheap insurance.
+# Distinct pending frames before overflow→close; coalescing below already caps
+# a stalled tournament viewer at ~1 frame. 100→30 as cheap insurance.
 _SSE_QUEUE_MAXSIZE = 30
 
 
 class CoalescingQueue:
-    """Per-connection SSE queue that keeps only the LATEST frame per key.
-
-    Tournament actions rebroadcast the WHOLE object, so a newer frame for a given
-    (type, uid) fully supersedes any older one still pending. Keying object frames
-    by (type, uid) and replacing in place bounds a stalled consumer to ~1 frame per
-    distinct object (~300KB for a 400-player tournament) instead of a backlog of
-    up-to-maxsize stale whole-object snapshots — the Peak-1 memory blowup. The
-    consumer then drains *current* state, not a replay of superseded frames.
-
-    Non-object events (resync, judge_call, shutdown wakeup) pass a distinct key so
-    they are never coalesced away. `maxsize` counts DISTINCT pending keys and a put
-    over the cap raises asyncio.QueueFull, so the existing overflow→close→reconnect
-    valve is unchanged. Single-consumer / event-loop-only: no locking needed.
+    """Per-connection SSE queue keeping only the LATEST frame per key — coalesced
+    by (type, uid), so a stalled consumer holds ~1 frame per object, not a backlog
+    of stale snapshots. Non-keyed events are never coalesced.
+    Single-consumer, event-loop-only: no locking.
     """
 
     def __init__(self, maxsize: int = _SSE_QUEUE_MAXSIZE) -> None:
@@ -50,9 +35,8 @@ class CoalescingQueue:
         self._seq = 0
 
     def put_nowait(self, msg: str, *, key: object = None) -> None:
-        """Enqueue `msg`. With `key`, an existing frame for that key is replaced in
-        place (coalesced, keeping its FIFO position); without one, the frame gets a
-        unique key and is never coalesced. Raises asyncio.QueueFull past maxsize."""
+        """A given `key` replaces any pending frame for it in place (FIFO position
+        kept); no key means never coalesced. Raises asyncio.QueueFull past maxsize."""
         if key is None:
             key = self._seq
             self._seq += 1
@@ -71,7 +55,7 @@ class CoalescingQueue:
         while not self._items:
             self._event.clear()
             await self._event.wait()
-        _, msg = self._items.popitem(last=False)  # FIFO
+        _, msg = self._items.popitem(last=False)
         return msg
 
     def empty(self) -> bool:
@@ -82,28 +66,17 @@ class CoalescingQueue:
 class SSEConnection:
     queue: CoalescingQueue = field(default_factory=CoalescingQueue)
     user: User | None = None
-    # Set when the queue overflows: the SSE generator checks this and ends the
-    # stream so the browser EventSource reconnects and runs a catch-up sync,
-    # rather than staying OPEN on a queue that no longer receives events.
+    # Set when the queue overflows: the SSE generator ends the stream so the
+    # browser reconnects and catches up, rather than staying open deaf.
     closed: bool = False
-    # Tournament-scoped connections (the Discord bot) receive ONLY events for
-    # this tournament — its own object, its sanctions, and its judge calls —
-    # instead of the whole corpus. None = unscoped (the browser's full sync).
+    # None = unscoped (browser full sync); otherwise scoped to one tournament's
+    # object, sanctions and judge calls (the Discord bot).
     tournament_uid: str | None = None
-    # The offline-lock device this browser identifies as (getDeviceId on the
-    # client; None for the bot / pre-device clients). Lets a write self-exclude
-    # the originating device from its own broadcast — see broadcast_precomputed's
-    # exclude_device_id, used by go-online so the device doesn't receive the
-    # offline_mode=false echo that races ahead of its own HTTP response.
+    # The offline-lock device this browser identifies as (None for the bot).
+    # Lets a write self-exclude its originating device from its own broadcast.
     device_id: str | None = None
-    # Scoped-only: the bot needs each seated participant's User identity
-    # (name/nickname) to render seating, but _scope_matches drops generic user
-    # broadcasts. So identities are pushed alongside the tournament: a tournament
-    # delivery sets `needs_participant_refresh`, and the async live loop then
-    # fetches+sends member-level user frames for participants not in
-    # `sent_participant_uids` (broadcast_precomputed is sync + no-DB and can't
-    # fetch here). The set is seeded by the scoped catch-up so steady-state
-    # tournament events that add no players do zero DB work.
+    # Scoped connections need seated participants' User identities, which the
+    # scope filter drops; the live loop fetches them when this flag is set.
     sent_participant_uids: set[str] = field(default_factory=set)
     needs_participant_refresh: bool = False
 
@@ -112,12 +85,8 @@ _sse_connections: set[SSEConnection] = set()
 
 
 def _conn_label(conn: SSEConnection) -> str:
-    """Identify a connection in logs: user + scope (tournament uid or full corpus).
-
-    Without this, overflow/close warnings can't be attributed to the bot vs a
-    browser tab — exactly the ambiguity that made the bot SSE-listener wedge hard
-    to diagnose from the backend logs.
-    """
+    """Identify a connection in logs by user + scope, so overflow/close warnings
+    can be attributed to the bot vs a browser tab."""
     user = conn.user.uid if conn.user else "anon"
     scope = (
         f"tournament={conn.tournament_uid}" if conn.tournament_uid else "full-corpus"
@@ -134,22 +103,16 @@ def entitled_level(
     org_uids: list[str] | None,
     obj_user_uid: str | None,
 ) -> str:
-    """The projection level a viewer is entitled to for one object.
-
-    Single source of truth for SSE access, shared by the live broadcast and the
-    tournament-scoped catch-up (main.stream_updates). Returns "public",
-    "member", or "full"; the caller maps that to its precomputed message or DB
-    column. IC sees full; an NC sees full in their own country; explicit
-    organizers see full for their tournaments; members see member (plus full for
-    their own profile/decks); everyone else sees public.
+    """Returns "public", "member" or "full" — the projection level `viewer` is
+    entitled to for one object. Single source of truth for SSE access, shared by
+    the live broadcast and the tournament-scoped catch-up (main.stream_updates).
     """
     if not viewer:
         return "public"
     if Role.IC in viewer.roles:
         return "full"
-    # Promo inventory chain (IC→NC→organizer) is not country-scoped: NC sees the
-    # full projection (holdings) for every promo. Princes/organizers stay member;
-    # an organizer's own stock reaches them via their own User full projection.
+    # Promo inventory chain isn't country-scoped — NC sees full (holdings)
+    # everywhere; Princes/organizers stay member.
     if obj_type == ObjectType.PROMO and Role.NC in viewer.roles:
         return "full"
     if (
@@ -163,20 +126,17 @@ def entitled_level(
         return "full"
     if viewer.vekn_id:
         if obj_type == ObjectType.USER and uid == viewer.uid:
-            return "full"  # Own profile
+            return "full"
         if obj_type == ObjectType.DECK and obj_user_uid == viewer.uid:
-            return "full"  # Own deck
+            return "full"
         return "member"
     return "public"
 
 
 def _scope_matches(conn: SSEConnection, bd: BroadcastData) -> bool:
-    """Whether a (possibly tournament-scoped) connection wants this object.
-
-    Unscoped connections want everything. A scoped connection wants only its own
-    tournament object and that tournament's sanctions — symmetric with the
-    scoped catch-up (main._scoped_catchup_frames); other types (users, decks,
-    leagues) are dropped.
+    """Whether a scoped connection wants this object. Unscoped connections want
+    everything; a scoped one wants only its own tournament and that tournament's
+    sanctions — keep symmetric with main._scoped_catchup_frames.
     """
     if conn.tournament_uid is None:
         return True
@@ -188,11 +148,10 @@ def _scope_matches(conn: SSEConnection, bd: BroadcastData) -> bool:
 
 
 def _wake_sse_connections() -> None:
-    """Wake up all SSE connections so they can check for shutdown."""
     for conn in list(_sse_connections):
         try:
             # Fixed key: repeat wakeups coalesce to one pending nudge.
-            conn.queue.put_nowait("", key="__wake__")  # wake up the queue.get()
+            conn.queue.put_nowait("", key="__wake__")
         except Exception:
             pass
 
@@ -202,20 +161,14 @@ def broadcast_precomputed(
 ) -> None:
     """Broadcast pre-computed projections to SSE connections. No DB access.
 
-    `exclude_device_id` skips every connection that identifies as that device —
-    used by go-online so the initiating device doesn't receive the
-    offline_mode=false echo of its own write (which would race ahead of the HTTP
-    response and trip the client's lost-lock warning). Excludes the whole device,
-    not one tab; offline mode is single-tab in practice (the WASM engine writes
-    IndexedDB directly), so there's no sibling tab to starve of the update.
+    `exclude_device_id` skips the initiating device so it doesn't get its own
+    write echoed back (go-online); excludes the whole device since offline mode
+    is single-tab.
     """
 
     def _make_msg(json_str: str) -> str:
-        # `ts` carries the authoritative modified_at so clients advance their
-        # sync cursor in the same value space as the `since` catch-up filter.
-        # NO `av` here: this is a per-LEVEL shared frame, but the fingerprint is
-        # per-USER — only broadcast_personal (per-user) may carry `av`. A shared
-        # frame's av would be wrong for some recipients → resync loop.
+        # `ts` carries modified_at for the sync cursor. NO `av` here: this frame is
+        # per-LEVEL shared, but the fingerprint is per-USER — only broadcast_personal carries it.
         ts = f',"ts":"{bd.modified_at}"' if bd.modified_at else ""
         return f'data: {{"type":"{bd.obj_type}","data":{json_str}{ts}}}\n\n'
 
@@ -245,19 +198,14 @@ def broadcast_precomputed(
             )
             msg = msg_by_level.get(level)
             if msg:
-                # Coalesce by (type, uid): a newer whole-object frame supersedes
-                # any older one still pending for the same object.
                 sse_conn.queue.put_nowait(msg, key=(bd.obj_type, bd.uid))
-                # A tournament delivery to the bot may carry new participants;
-                # flag the live loop to push their identities (see SSEConnection).
                 if (
                     sse_conn.tournament_uid is not None
                     and bd.obj_type == ObjectType.TOURNAMENT
                 ):
                     sse_conn.needs_participant_refresh = True
-                # Trace delivery to scoped (bot) connections only — low volume
-                # (one tournament) and answers "did this event reach the bot?".
-                # Full-corpus (browser) connections would be far too noisy.
+                # Scoped (bot) connections only: low volume; full-corpus browser
+                # connections would be far too noisy to log per-message.
                 if sse_conn.tournament_uid is not None:
                     logger.info(
                         "SSE → %s: queued %s %s (%s)",
@@ -319,7 +267,6 @@ async def broadcast_judge_call(
 
 
 async def broadcast_resync(user_uid: str) -> None:
-    """Push a resync event to a specific user's SSE connection(s)."""
     event_data = {"type": "resync"}
     message = f"data: {encoder.encode(event_data).decode('utf-8')}\n\n"
     for conn in _sse_connections:
@@ -349,19 +296,10 @@ def broadcast_personal(
     modified_at: str | None = None,
     access_version: str | None = None,
 ) -> None:
-    """Push ONE object to ONE user at that user's *currently*-entitled projection.
-
-    Targeted counterpart to broadcast_precomputed's per-level shared frame: it
-    re-derives the user's entitled_level for this object NOW and sends the matching
-    projection, so an entitlement transition (organizer add/remove) is delivered as
-    a single targeted update with no full resync. If the entitled projection is None
-    (e.g. a private deck once the viewer is no longer its organizer), a TOMBSTONE
-    frame (deleted_at) is sent so the client evicts just that one object.
-    `access_version`, when given, rides the frame so the client refreshes its stored
-    fingerprint without a reconnect (else it would mismatch and resync needlessly).
-
-    Browser (full-corpus) connections only — scoped (bot) streams replay full state
-    on every connect and never need targeted invalidation.
+    """Push ONE object to ONE user at their currently-entitled projection — the
+    targeted counterpart to broadcast_precomputed. A None projection sends a
+    tombstone so the client evicts the object. Browser connections only; scoped
+    (bot) streams replay full state on every connect and never need this.
     """
     av = f',"av":"{access_version}"' if access_version else ""
     ts = f',"ts":"{modified_at}"' if modified_at else ""

@@ -1,5 +1,3 @@
-"""Player commands: /register, /checkin, /report, /judge."""
-
 import logging
 import secrets
 
@@ -18,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 async def _ensure_auth(ctx: lightbulb.Context, store: TokenStore) -> dict | None:
-    """Ensure the user is authenticated. Returns tokens or sends OAuth link."""
     discord_id = str(ctx.user.id)
     tokens = await store.get_tokens(discord_id)
     if tokens:
@@ -39,9 +36,6 @@ async def _ensure_auth(ctx: lightbulb.Context, store: TokenStore) -> dict | None
         flags=hikari.MessageFlag.EPHEMERAL,
     )
     return None
-
-
-# --- VEKN ID Modal ---
 
 
 class VeknIdModal(miru.Modal, title="Enter your VEKN ID"):
@@ -72,17 +66,11 @@ class VeknIdModal(miru.Modal, title="Enter your VEKN ID"):
             )
             return
 
-        # The claim MERGES the bot-linked account into the VEKN one and
-        # tombstones the old uid — the stored OAuth tokens now authenticate a
-        # dead account (refresh keeps "succeeding" but every call 401s), so drop
-        # them; the next command re-links cleanly. The claim response carries a
-        # fresh first-party token pair for the merged account: use its access
-        # token once for the immediate follow-up action (it can't be stored —
-        # it's not an OAuth-client token and can't be refreshed as one).
+        # The claim tombstones the old uid, so the stored OAuth tokens now
+        # authenticate a dead account (401s) — drop them, and use the claim
+        # response's fresh access token below for this one follow-up call.
         await self._store.remove_tokens(discord_id)
 
-        # Mirror the has-VEKN mapping: Register during Registration, CheckIn
-        # during check-in — the engine rejects the wrong event for the phase.
         display_name = _get_display_name(ctx)
         merged = claim.data.get("user", {})
         event_name = "CheckIn" if self._action == "checkin" else "Register"
@@ -108,9 +96,6 @@ class VeknIdModal(miru.Modal, title="Enter your VEKN ID"):
                 f"Run `/{self._action}` again.",
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
-
-
-# --- VEKN ID Claim Button ---
 
 
 class VeknChoiceView(miru.View):
@@ -153,12 +138,10 @@ async def _handle_registration_pipeline(
     """Shared pipeline for /register and /checkin."""
     discord_id = str(ctx.user.id)
 
-    # Step 1: Check authentication
     tokens = await _ensure_auth(ctx, store)
     if not tokens:
         return
 
-    # Step 2: Check VEKN ID
     info = await fetch_userinfo(api, ctx, discord_id)
     if info is None:
         return
@@ -167,7 +150,6 @@ async def _handle_registration_pipeline(
     archon_uid = info.data["sub"]
 
     if vekn_id:
-        # Has VEKN ID → register/checkin directly
         display_name = _get_display_name(ctx)
         event_name = "CheckIn" if action == "checkin" else "Register"
 
@@ -183,7 +165,6 @@ async def _handle_registration_pipeline(
         if result.ok:
             msg = f"You're {'checked in' if action == 'checkin' else 'registered'}!"
 
-            # Check for missing decklist warning
             player_entry = next(
                 (
                     p
@@ -212,9 +193,8 @@ async def _handle_registration_pipeline(
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
     else:
-        # No VEKN ID linked. If they already have one, let them claim it here;
-        # new players are created at the door by an official (sponsorship is no
-        # longer a bot flow — the desk curates the member list).
+        # Sponsorship is no longer a bot flow — new players are created at the
+        # door by an official, who curates the member list.
         view = VeknChoiceView(store, api, tournament_uid, action)
         await ctx.respond(
             "**You need a VEKN ID to play.**\n"
@@ -295,12 +275,10 @@ class ReportCommand(
 
         discord_id = str(ctx.user.id)
 
-        # Check authentication
         tokens = await _ensure_auth(ctx, store)
         if not tokens:
             return
 
-        # Get user info for archon_uid
         info = await fetch_userinfo(api, ctx, discord_id)
         if info is None:
             return
@@ -308,7 +286,6 @@ class ReportCommand(
         archon_uid = info.data["sub"]
         guild_id = str(ctx.guild_id)
 
-        # Find player's table from cached tournament data
         from ..sse_listener import find_player_table
 
         location = find_player_table(guild_id, tournament_uid, archon_uid)
@@ -367,7 +344,6 @@ class JudgeCommand(
         judges_id = int(link["judges_channel_id"])
         display_name = _get_display_name(ctx) or ctx.user.username
 
-        # Use the channel name as table context
         table_info = "unknown location"
         try:
             channel = await ctx.client.app.rest.fetch_channel(ctx.channel_id)

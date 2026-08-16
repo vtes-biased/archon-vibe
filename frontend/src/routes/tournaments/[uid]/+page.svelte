@@ -16,7 +16,6 @@
   import { zonedDate } from "$lib/utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime, OfflineLockLostError } from "$lib/stores/offline.svelte";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
-  // The back link returns to the list the way it was left, like the nav menu.
   import { openLastView } from "$lib/last-view";
   import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Wrench, Settings2, ExternalLink, MapPin, CloudOff, CloudAlert, Upload, CloudUpload, Share2, CalendarPlus } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
@@ -26,8 +25,7 @@
   import { showToast } from "$lib/stores/toast.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  // Deck validation state for player's own deck
-  // null = validation unavailable (treated as no blocking errors — never gates)
+  // null = validation unavailable for player's own deck, treated as no blocking errors — never gates
   let myDeckErrors = $state<ValidationError[] | null>([]);
 
   import ActionBar from "./ActionBar.svelte";
@@ -66,26 +64,20 @@ import TournamentModals from "./TournamentModals.svelte";
   );
   const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
   // Strict null: undefined means the viewer's projection omits the field.
-  // rounds>0 mirrors batch_push's guard — results without in-app play data
-  // (VEKN imports, migrated history) are never pushed, so never "pending".
+  // rounds>0 mirrors batch_push's guard — VEKN imports/migrated history are never "pending".
   const veknResultsPending = $derived(
     veknPush && tournament?.state === "Finished" && tournament?.vekn_pushed_at === null
       && (tournament?.rounds?.length ?? 0) > 0
   );
-  // Deletable at any state until it reaches VEKN: once a calendar event
-  // (external_ids.vekn) or pushed results (vekn_pushed_at) exist, deleting here
-  // would orphan the vekn.net record — mirrors the server gate in tournaments.py.
+  // Once external_ids.vekn or vekn_pushed_at exist, deleting here would orphan
+  // the vekn.net record — mirrors the server gate in tournaments.py.
   const canDelete = $derived(
     !tournament?.external_ids?.vekn && !tournament?.vekn_pushed_at
   );
-  // Strengthen the delete confirmation once real play data exists.
   const deleteHasResults = $derived((tournament?.rounds?.length ?? 0) > 0);
   const currentPlayerEntry = $derived(
     tournament?.players?.find(p => p.user_uid === auth.user?.uid) ?? null
   );
-  // Push opt-in eligibility: a live tournament (Waiting/Playing) where notifications
-  // are useful — for a participant who hasn't dropped out ("which table am I at?",
-  // #314), or for an organizer (judge calls, #323).
   const pushLive = $derived(
     tournament?.state === "Waiting" || tournament?.state === "Playing"
   );
@@ -100,7 +92,6 @@ import TournamentModals from "./TournamentModals.svelte";
   );
   let viewAsPlayer = $state(false);
   let showDeleteConfirm = $state(false);
-  // Offline mode state
   const tournamentIsOffline = $derived(isOffline(uid));
   const deviceId = getDeviceId();
   const isLockedByOtherDevice = $derived(
@@ -136,7 +127,6 @@ import TournamentModals from "./TournamentModals.svelte";
   // Minimal view: API returned TournamentMinimal (no players array) — non-auth or non-member
   const isMinimalView = $derived(!tournament?.players);
 
-  // League name + parent meta-league for display
   let leagueName = $state<string | null>(null);
   let metaLeague = $state<{ uid: string; name: string } | null>(null);
   $effect(() => {
@@ -149,7 +139,6 @@ import TournamentModals from "./TournamentModals.svelte";
     });
   });
 
-  // Decks loaded from IDB (separate store)
   let decksByUser = $state<Record<string, DeckObject[]>>({});
 
   $effect(() => {
@@ -160,7 +149,6 @@ import TournamentModals from "./TournamentModals.svelte";
     });
   });
 
-  // Player's deck and validation status
   const myDeck = $derived(
     (auth.user?.uid && decksByUser[auth.user.uid]?.[0]) ?? null
   );
@@ -168,7 +156,6 @@ import TournamentModals from "./TournamentModals.svelte";
     !tournament?.decklist_required || (myDeck !== null && !(myDeckErrors ?? []).some(e => e.severity === 'error'))
   );
 
-  // Validate player's deck when it changes
   $effect(() => {
     const deck = myDeck;
     const format = tournament?.format;
@@ -181,12 +168,6 @@ import TournamentModals from "./TournamentModals.svelte";
     });
   });
 
-  // Tabs follow the event, like everything else in the console: a tab exists
-  // only where it has something to show. Setup is the work before the doors
-  // open and disappears once they have; Rounds is dead weight until a round
-  // exists. Tools remains the durable index of everything — a tab is the
-  // current moment's shortcut into it, the same relationship the action bar has
-  // with the one CTA it promotes.
   type TabId = 'players' | 'setup' | 'rounds' | 'finals';
   const preEvent = $derived(tournament?.state === "Planned" || tournament?.state === "Registration");
   let activeTab = $state<TabId>('players');
@@ -196,12 +177,9 @@ import TournamentModals from "./TournamentModals.svelte";
     toolsPanel = panel;
     showTools = true;
   }
-  // Archon import modal (organizer; opened from the action-bar More menu)
   let showArchonImport = $state(false);
   let showCsvImport = $state(false);
 
-  // Order is stable across states so the tabs never shuffle underfoot; only
-  // membership changes.
   const tabs = $derived.by(() => {
     const t: { id: TabId; label: string; icon: typeof Users }[] = [
       { id: 'players', label: m.tournament_tab_players(), icon: Users },
@@ -209,14 +187,11 @@ import TournamentModals from "./TournamentModals.svelte";
     if (showOrganizerView && preEvent) {
       t.push({ id: 'setup', label: m.tools_group_setup(), icon: Settings2 });
     }
-    // An empty Rounds tab is pure cost: no round, no tab.
     if ((tournament?.rounds?.length ?? 0) > 0) {
       t.push({ id: 'rounds', label: m.tournament_tab_rounds(), icon: Swords });
     }
-    // Show Finals tab when ≥2 rounds played. A finished event that ended
-    // without a final has none to show, and ending without one is legitimate
-    // (VEKN §3.1.6) — drop the tab rather than keep an empty state explaining
-    // an absence, which also buys the row back some width.
+    // A finished event can legitimately end with no final (VEKN §3.1.6);
+    // drop the tab rather than show an empty state explaining the absence.
     const hasFinalsCandidate = (tournament?.rounds?.length ?? 0) >= 2;
     const finishedWithoutFinals = tournament?.state === "Finished" && !tournament?.finals;
     if (!finishedWithoutFinals && (hasFinalsCandidate || tournament?.finals)) {
@@ -230,8 +205,6 @@ import TournamentModals from "./TournamentModals.svelte";
   $effect(() => {
     if (!tabs.some(t => t.id === activeTab)) activeTab = tabs[0]?.id ?? 'players';
   });
-  // Pre-event there are no players and no rounds, so setup is the only thing
-  // to do — land on it rather than on an empty roster.
   let landedOnSetup = false;
   $effect(() => {
     if (landedOnSetup || !tournament) return;
@@ -239,18 +212,15 @@ import TournamentModals from "./TournamentModals.svelte";
     if (showOrganizerView && tournament.state === "Planned") activeTab = 'setup';
   });
 
-  // Player display info keyed by uid
   let playerInfo = $state<PlayerInfoMap>({});
 
-  // Supersession guard: SSE bursts fire load()/loadPlayerNames concurrently and
-  // the runs finish out of order — only the newest run may assign state (the
-  // sync.ts epoch pattern), else the display rolls back mid-round.
+  // Epoch guard: concurrent SSE-triggered runs finish out of order — only the
+  // newest run may assign state, or the display rolls back mid-round.
   let playerNamesEpoch = 0;
 
   async function loadPlayerNames() {
     if (!tournament) return;
     const epoch = ++playerNamesEpoch;
-    // Build display_name lookup from tournament players
     const displayNames: Record<string, string | null> = {};
     for (const p of tournament.players ?? []) {
       if (p.user_uid) displayNames[p.user_uid] = p.display_name ?? null;
@@ -290,8 +260,7 @@ import TournamentModals from "./TournamentModals.svelte";
     playerInfo = info;
   }
 
-  // Info-card organizer names (organizers may not be players, so playerInfo
-  // can't serve them); resolved from IndexedDB like the league page does.
+  // Organizers may not be players, so playerInfo can't serve their names here.
   async function fetchOrganizerNames(t: Tournament): Promise<Record<string, string>> {
     const uids = t.organizers_uids ?? [];
     const users = await Promise.all(uids.map(u => getUser(u)));
@@ -308,7 +277,6 @@ import TournamentModals from "./TournamentModals.svelte";
 
   const isFinished = $derived(tournament?.state === "Finished");
 
-  // Player standings visibility
   const playerStandings = $derived.by(() => {
     if (!standings.length) return [];
     const mode = tournament?.standings_mode ?? "Private";
@@ -319,15 +287,14 @@ import TournamentModals from "./TournamentModals.svelte";
     return standings;
   });
 
-  // Cutoff score: 5th player's score threshold for finals selection
-  // Only show after at least one round is fully completed
+  // Cutoff score: the 5th-place threshold for finals selection, shown only
+  // once a round is fully completed.
   const cutoffScore = $derived.by(() => {
     if (tournament?.state === "Finished") return null;
     if ((tournament?.standings_mode ?? "Private") !== "Cutoff") return null;
     const rounds = tournament?.rounds?.length ?? 0;
     // During Playing, the last round is in progress, so completed = rounds - 1
     if (tournament?.state === "Playing" && rounds < 2) return null;
-    // During Waiting before any round, no data yet
     if (tournament?.state === "Waiting" && rounds < 1) return null;
     const entry = standings[4];
     if (!entry) return null;
@@ -343,10 +310,9 @@ import TournamentModals from "./TournamentModals.svelte";
     tournament?.state === "Waiting" || tournament?.state === "Playing" || tournament?.state === "Finished"
   );
 
-  // The banner is the per-tournament og:image, so it matters more now that
-  // sharing the link IS the share path — but it is a setup job, not something
-  // the masthead should hold a dropzone open for. The cropper lives in the
-  // component; this just reaches in and opens it.
+  // The banner is the per-tournament og:image (sharing the link IS the share
+  // path), but it's a setup job, not something the masthead holds a dropzone
+  // open for; the cropper lives in the component, this just opens it.
   let bannerComp = $state<ReturnType<typeof TournamentBanner> | null>(null);
   const bannerItem = $derived({
     label: tournament?.banner_path ? m.tournament_banner_change() : m.tournament_banner_add(),
@@ -381,15 +347,9 @@ import TournamentModals from "./TournamentModals.svelte";
       syncingVekn = false;
     }
   }
-  // "Publish to VEKN" — register the calendar event on demand, and for a finished
-  // event also push results + the winner's TWDA deck. Shown whenever push is on and
-  // the event isn't fully on VEKN yet (never silently absent — an unconfigured round
-  // count is explained on click, not hidden). Not for non-VEKN open-rounds events.
-  // One endpoint, two jobs: registering the calendar event beforehand and
-  // reporting results afterwards. Naming each by what it does beats one label
-  // that means whichever the state happens to imply — and the name and the
-  // Tools group are decided together here, so the row can never sit in a group
-  // that contradicts what it calls itself.
+  // One endpoint, two jobs: register the calendar event, then (once finished)
+  // push results + the winner's TWDA deck. Label and Tools group are decided
+  // together, so the row can never contradict what it calls itself.
   const syncVeknItem = $derived.by(() => {
     if (!veknPush || tournament?.open_rounds || tournament?.self_organized_rounds) return null;
     const onCalendar = !!tournament?.external_ids?.vekn;
@@ -622,12 +582,10 @@ import TournamentModals from "./TournamentModals.svelte";
     await doAction("DropOut", { player_uid: playerUid });
   }
 
-  // QR self-check-in (?checkin=CODE from a native-camera scan of the printed QR).
-  // Stash the code and IMMEDIATELY strip the param from the address bar and
-  // history — after consumption the code must not be retrievable via copy-link,
-  // share sheet, or back-history (it never renders in the UI; full-projection
-  // only). Anonymous visitors keep the stash (NOT in the login redirect URL)
-  // and it is consumed on login-return.
+  // QR self-check-in (?checkin=CODE): stash the code and strip it from the
+  // address bar/history immediately, so it's never retrievable via copy-link,
+  // share sheet, or back-history. Anonymous visitors keep the stash and it's
+  // consumed on login-return.
   const QR_STASH_KEY = "archon-qr-checkin";
   $effect(() => {
     const code = $page.url.searchParams.get("checkin");
@@ -686,7 +644,6 @@ import TournamentModals from "./TournamentModals.svelte";
 
 <div class="p-4 sm:p-8">
   <div class="max-w-4xl mx-auto">
-    <!-- Back link -->
     <a href="/tournaments" onclick={(e) => openLastView(e, '/tournaments')} class="inline-flex items-center gap-2 text-ink-muted hover:text-ink-bright mb-4">
       <ArrowLeft class="w-4 h-4" />
       {m.nav_tournaments()}
@@ -711,7 +668,6 @@ import TournamentModals from "./TournamentModals.svelte";
         showEmpty={false}
       />
 
-      <!-- Offline mode banner (this device has lock) -->
       {#if tournamentIsOffline}
         <div class="banner-warn border rounded-lg p-4 mb-4 flex items-center justify-between gap-4">
           <div class="flex items-center gap-2 min-w-0">
@@ -732,9 +688,9 @@ import TournamentModals from "./TournamentModals.svelte";
         </div>
       {/if}
 
-      <!-- Unprepared-at-venue wedge: device offline, event NOT locked — every
-           action would optimistically apply then revert, and Go Offline itself
-           needs the server. Explain instead of failing silently. -->
+      <!-- Device offline, event NOT locked: every action would optimistically
+           apply then revert, and Go Offline itself needs the server — explain
+           instead of failing silently. -->
       {#if showOrganizerView && !deviceOnline && !tournament.offline_mode}
         <div class="banner-warn border rounded-lg p-3 mb-4 text-sm flex items-start gap-2">
           <WifiOff class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
@@ -742,7 +698,6 @@ import TournamentModals from "./TournamentModals.svelte";
         </div>
       {/if}
 
-      <!-- Locked by another device banner -->
       {#if isLockedByOtherDevice}
         <div class="bg-surface-muted/50 border border-line-strong rounded-lg p-4 mb-4">
           <div class="flex items-center justify-between gap-4">
@@ -767,9 +722,9 @@ import TournamentModals from "./TournamentModals.svelte";
         </div>
       {/if}
 
-      <!-- Header. The title owns its full width — sharing a row with the
-           buttons wrapped long names to three lines on a phone and wrapped the
-           buttons' own labels too. Buttons take the row beneath. -->
+      <!-- The title owns its full width — sharing a row with the buttons
+           wrapped long names to three lines on a phone and wrapped the
+           buttons' own labels too. -->
       <div class="mb-6">
         <div>
           <h1 class="text-3xl font-semibold text-accent">{tournament.name}</h1>
@@ -786,9 +741,9 @@ import TournamentModals from "./TournamentModals.svelte";
               <Badge title={tournament.rank}>{rankBadgeLabel(tournament.rank)}</Badge>
             {/if}
             <RankedBadge {tournament} />
-            <!-- No default either way, so both readings are news — but only once
-                 the field is there: an absent boolean is falsy, and the ternary
-                 would assert "not allowed" on a payload that never carried it. -->
+            <!-- No default either way: an absent boolean is falsy, and the
+                 ternary would assert "not allowed" on a payload that never
+                 carried the field. -->
             {#if tournament.proxies != null}
               <Badge>{tournament.proxies ? m.tournament_proxies_allowed() : m.tournament_proxies_not_allowed()}</Badge>
             {/if}
@@ -832,8 +787,8 @@ import TournamentModals from "./TournamentModals.svelte";
           </div>
         </div>
 
-        <!-- Own row, not beside the title. Delete moved into Tools; Go Offline
-             is state-dependent and time-critical, so it stays out of the drawer. -->
+        <!-- Own row, not beside the title: Go Offline is state-dependent and
+             time-critical, so it stays out of the Tools drawer. -->
         <div class="flex flex-wrap items-center gap-2 mt-3">
           <Button variant="ghost" size="md" onclick={shareEvent} title={m.tournament_share()}>
             <Share2 class="w-4 h-4" aria-hidden="true" />
@@ -860,7 +815,6 @@ import TournamentModals from "./TournamentModals.svelte";
         </div>
       {/if}
 
-      <!-- Info Card -->
       {#if !(showOrganizerView && eventUnderWay)}
       <div class="bg-surface-card rounded-lg shadow p-6 border border-line mb-6">
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
@@ -951,14 +905,13 @@ import TournamentModals from "./TournamentModals.svelte";
           {/if}
         </div>
       {:else}
-      <!-- Judge Call Banner (organizer only, shown in any view) -->
       {#if tournament.state === "Playing"}
         <JudgeCallBanner bind:this={judgeCallBanner} tournamentUid={uid} />
       {/if}
 
-      <!-- Live announcements: organizers compose & manage; everyone else sees the
-           banner. Hidden while offline-locked (announcements are online-only and
-           would just fail) — consistent with the timer/call-judge affordances. -->
+      <!-- Organizers compose & manage; everyone else sees the banner. Hidden
+           while offline-locked (announcements are online-only and would just
+           fail), consistent with the timer/call-judge affordances. -->
       <PushOptIn tournamentUid={uid} eligible={pushEligible} {isOrganizer} />
       {#if showOrganizerView && !tournament.offline_mode && tournament.state !== "Planned" && tournament.state !== "Registration"}
         <!-- Nobody is at the venue yet while planning, so there is no one to
@@ -968,7 +921,6 @@ import TournamentModals from "./TournamentModals.svelte";
         <AnnouncementBanner announcements={tournament.announcements ?? []} tournamentUid={uid} tournamentState={tournament.state} />
       {/if}
 
-      <!-- Organizer Console with Tabs -->
       {#if showOrganizerView}
         <div class="bg-surface-card rounded-lg shadow border border-line mb-6">
           <!-- The action bar leads: it is tournament-level and identical on every
@@ -984,12 +936,10 @@ import TournamentModals from "./TournamentModals.svelte";
             onAddBanner={() => bannerComp?.openCropper()}
           />
 
-          <!-- Tab bar. On a phone only the active tab spells itself out; the rest
-               are their icon. Four labelled tabs do not fit 360px in English and
-               are worse in the other four locales ("Jugadores/Rondas/Finales"),
-               and shrinking the type to make them fit would cost more than the
-               labels are worth on a tab you are not looking at. The accessible
-               name stays the full label at every width. -->
+          <!-- Four labelled tabs don't fit 360px in English, worse in the other
+               locales ("Jugadores/Rondas/Finales"); only the active tab spells
+               itself out, the rest show icon-only. The accessible name stays
+               the full label at every width. -->
           <div class="flex border-b border-line overflow-x-auto">
             {#each tabs as tab}
               {@const TabIcon = tab.icon}
@@ -1006,7 +956,6 @@ import TournamentModals from "./TournamentModals.svelte";
             {/each}
           </div>
 
-          <!-- Tab content -->
           <div class="p-3 sm:p-6">
             {#if activeTab === 'players'}
               <PlayersTab
@@ -1056,7 +1005,6 @@ import TournamentModals from "./TournamentModals.svelte";
         </div>
       {/if}
 
-      <!-- Player View (non-organizer) -->
       {#if !showOrganizerView && auth.isAuthenticated}
         <PlayerView
           {tournament}
@@ -1079,7 +1027,7 @@ import TournamentModals from "./TournamentModals.svelte";
           {decksByUser}
         />
       {/if}
-      {/if}<!-- end isMinimalView else -->
+      {/if}
     {/if}
   </div>
 </div>

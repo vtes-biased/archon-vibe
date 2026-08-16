@@ -12,10 +12,8 @@ EnvironmentFile={{ r.env_dir }}/{{ r.service_name }}.env
 # responsive (the merge spikes RAM/IO during its pg_dump + bulk upserts).
 Nice=10
 IOSchedulingClass=idle
-# Both stacks share one PG17 cluster, so an OOM-kill of postgres would take down
-# legacy too. Make the merge the guaranteed victim and cap its RAM: a runaway
-# dies (idempotent + pre-run pg_dump make a retry safe) while legacy survives.
-# Tune via `systemctl show -p MemoryPeak {{ r.service_name }}.service` after run 1.
+# Both stacks share one PG17 cluster, so an OOM-kill of postgres would take
+# down legacy too — make the merge the guaranteed victim instead.
 OOMScoreAdjust=800
 MemoryHigh=400M
 MemoryMax=600M

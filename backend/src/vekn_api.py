@@ -1,5 +1,3 @@
-"""VEKN API client for fetching member and event data."""
-
 import logging
 import os
 from collections.abc import AsyncIterator
@@ -55,20 +53,13 @@ class VEKNAPIError(Exception):
 
 
 class VEKNAPIConnectionError(VEKNAPIError):
-    """VEKN is unreachable or won't authenticate (transport error, timeout, auth).
-
-    Distinguished from plain VEKNAPIError so batch_push can fail-fast: a data
-    error skips one item, but a connection/auth failure means the whole batch is
-    doomed and should abort (it reruns next cycle). Subclasses VEKNAPIError so
-    existing callers that catch VEKNAPIError still see it.
+    """VEKN is unreachable or won't authenticate — distinguished from plain
+    VEKNAPIError so batch_push can fail-fast and abort the whole batch.
     """
 
 
 class VEKNAPIClient:
-    """Client for VEKN API."""
-
     def __init__(self) -> None:
-        """Initialize VEKN API client."""
         self.base_url = os.getenv("VEKN_API_BASE_URL", "https://www.vekn.net/api")
         self.username = os.getenv("VEKN_API_USERNAME")
         self.password = os.getenv("VEKN_API_PASSWORD")
@@ -76,25 +67,20 @@ class VEKNAPIClient:
         self._session: aiohttp.ClientSession | None = None
 
     def _get_session(self) -> aiohttp.ClientSession:
-        """Get or create HTTP session."""
         if self._session is None or self._session.closed:
-            # Fail fast: every operation is retried or safely re-invokable (batch_push
-            # reruns hourly, the manual push is idempotent, sync skips-and-continues),
-            # and the manual push-vekn route runs VEKN calls inline on the request —
-            # it must complete under nginx's 60s proxy_read_timeout.
+            # Must complete under nginx's 60s proxy_read_timeout — the manual
+            # push-vekn route runs these calls inline on the request.
             timeout = aiohttp.ClientTimeout(total=20, connect=10, sock_read=15)
             self._session = aiohttp.ClientSession(timeout=timeout)
         return self._session
 
     async def close(self) -> None:
-        """Close the HTTP client."""
         if self._session and not self._session.closed:
             await self._session.close()
 
     async def _authenticate(self) -> None:
-        """Authenticate with VEKN API and get auth token."""
-        # All failures here are batch-fatal (no creds, bad creds, transport down),
-        # so they raise the connection-class error → batch_push aborts.
+        # All failures here are batch-fatal (bad/missing creds, transport down)
+        # — raise the connection-class error so batch_push aborts.
         if (
             not self.username
             or not self.password
@@ -115,7 +101,6 @@ class VEKNAPIClient:
                 response.raise_for_status()
                 data = await response.json()
 
-                # VEKN API nests the actual data inside a 'data' field
                 inner_data = data.get("data", {})
                 self._check_vekn_error(
                     inner_data, "Authentication failed", exc=VEKNAPIConnectionError
@@ -137,10 +122,8 @@ class VEKNAPIClient:
         context: str = "",
         exc: type[VEKNAPIError] = VEKNAPIError,
     ) -> None:
-        """Check VEKN response for error codes and raise appropriate exception.
-
-        Pass exc=VEKNAPIConnectionError for batch-fatal contexts (e.g. auth).
-        """
+        """Raises exc (VEKNAPIConnectionError for batch-fatal contexts like auth)
+        on a non-200 VEKN response code."""
         code = data.get("code", 200)
         # Normalize code to int (API returns string "200" or int 200)
         if isinstance(code, str):
@@ -152,24 +135,13 @@ class VEKNAPIClient:
             raise exc(f"{prefix}{message} (code: {code})")
 
     async def _ensure_authenticated(self) -> None:
-        """Ensure we have a valid auth token."""
         if not self._auth_token:
             await self._authenticate()
 
     async def search_players(self, filter_str: str) -> list[dict[str, Any]]:
-        """
-        Search for players in the VEKN registry.
-
-        Args:
-            filter_str: Search filter (name or VEKN ID)
-
-        Returns:
-            List of player dictionaries
-        """
         await self._ensure_authenticated()
 
         try:
-            # Build params with auth key
             params = {
                 "app": "vekn",
                 "resource": "registry",
@@ -186,7 +158,6 @@ class VEKNAPIClient:
             ) as response:
                 response.raise_for_status()
 
-                # Check for empty response
                 content = await response.read()
                 if not content or not content.strip():
                     logger.warning(f"Empty response for filter: {filter_str}")
@@ -201,9 +172,8 @@ class VEKNAPIClient:
                     )
                     raise VEKNAPIError(f"Invalid JSON from API: {e}") from e
 
-                # VEKN API nests data inside 'data' field
                 inner_data = data.get("data", {})
-                # Check for errors (some endpoints don't return code on success)
+                # Some endpoints omit 'code' entirely on success.
                 if "code" in inner_data:
                     self._check_vekn_error(
                         inner_data, f"Search failed for '{filter_str}'"
@@ -215,15 +185,10 @@ class VEKNAPIClient:
 
                 return inner_data["players"]
 
-        # TimeoutError too: aiohttp's `total` timeout raises bare asyncio.TimeoutError
-        # (not a ClientError) — it must map to VEKNAPIError so fetch_all_members can
-        # skip the prefix and continue instead of the whole sync run dying.
+        # asyncio.TimeoutError isn't a ClientError — must be caught here too, or
+        # fetch_all_members dies instead of skipping this prefix and continuing.
         except (aiohttp.ClientError, TimeoutError) as e:
             raise VEKNAPIError(f"HTTP error searching players: {e}") from e
-
-    # -------------------------------------------------------------------------
-    # Push methods (VEKN down-sync: push data TO vekn.net)
-    # -------------------------------------------------------------------------
 
     async def create_event(
         self,
@@ -245,11 +210,10 @@ class VEKNAPIClient:
         website: str = "",
         description: str = "",
     ) -> str:
-        """Create a VEKN calendar event. Returns the event ID.
+        """Create a VEKN calendar event; returns the event ID.
 
-        date/time are four separate fields: startdate/enddate are "Y-m-d",
-        starttime/endtime are "H:i". VEKN's event.php requires all four non-empty
-        (a combined "date time" leaves starttime/endtime empty → 400 "empty").
+        VEKN's event.php requires four separate, non-empty date/time fields
+        ("Y-m-d"/"H:i") — a combined value leaves two empty and 400s.
         """
         await self._ensure_authenticated()
         session = self._get_session()
@@ -278,8 +242,7 @@ class VEKNAPIClient:
         headers: dict[str, str] = {}
         if self._auth_token:
             headers["Authorization"] = f"Bearer {self._auth_token}"
-        # Impersonate organizer so the event is created under their name
-        headers["Vekn-Id"] = organizer_vekn_id
+        headers["Vekn-Id"] = organizer_vekn_id  # impersonates the organizer
 
         try:
             async with session.post(
@@ -301,7 +264,6 @@ class VEKNAPIClient:
             raise VEKNAPIConnectionError(f"HTTP error creating event: {e}") from e
 
     async def upload_results(self, vekn_event_id: str, archondata: str) -> None:
-        """Upload archon data (results) for a VEKN event."""
         await self._ensure_authenticated()
         session = self._get_session()
 
@@ -340,7 +302,6 @@ class VEKNAPIClient:
         state: str = "",
         city: str = "",
     ) -> None:
-        """Register a new member in the VEKN registry."""
         await self._ensure_authenticated()
         session = self._get_session()
 
@@ -374,9 +335,9 @@ class VEKNAPIClient:
             raise VEKNAPIConnectionError(f"HTTP error creating member: {e}") from e
 
     async def fetch_venue(self, venue_id: str) -> dict[str, str]:
-        """Fetch venue details by ID. Returns venue dict or empty dict.
+        """Fetch venue details by ID, or {} when absent.
 
-        VEKN API returns: data.venues = [{name, address, city, country, website, ...}]
+        VEKN API shape: data.venues = [{name, address, city, country, ...}].
         """
         if not venue_id or venue_id == "0":
             return {}
@@ -404,14 +365,9 @@ class VEKNAPIClient:
             return {}
 
     async def fetch_event(self, event_id: int) -> dict | None:
-        """Fetch a single event by ID.
-
-        Returns the event dict, or None when the API confirms no event (404,
-        empty body, code != 200, empty events list). Raises VEKNAPIConnectionError
-        on a transient failure (network / 5xx / unparseable / auth rejection) so
-        fetch_all_events can tell 'no event' from 'could not read' and not end its
-        scan on an outage.
-        """
+        """Fetch a single event, or None when the API confirms no event. Raises
+        VEKNAPIConnectionError on a transient failure instead of returning None,
+        so fetch_all_events doesn't mistake an outage for the end of the scan."""
         await self._ensure_authenticated()
         try:
             params = {
@@ -440,10 +396,8 @@ class VEKNAPIClient:
                     raise VEKNAPIConnectionError(
                         f"Unparseable event response for id {event_id}"
                     ) from e
-                # Auth rejections come as a TOP-LEVEL err envelope with an empty
-                # data field — parsed naively they read as 'no events', turning
-                # e.g. an expired token into confirmed no-events (and a full scan
-                # into a silent early stop).
+                # Auth rejection is a top-level err envelope with empty data — parsed
+                # naively it reads as "no events", ending the scan early on an expired token.
                 err = data.get("err_code")
                 if err not in (None, 0, "0", ""):
                     raise VEKNAPIConnectionError(
@@ -457,7 +411,6 @@ class VEKNAPIClient:
                         code = int(code) if code.isdigit() else 0
                     if code != 200:
                         return None
-                # Extract first event from the events list
                 events = inner.get("events", [])
                 if not events:
                     return None
@@ -475,22 +428,8 @@ class VEKNAPIClient:
         empty_run_limit: int = 200,
         transient_limit: int = 200,
     ) -> AsyncIterator[dict]:
-        """Enumerate event IDs upward from 1 until the ID space is exhausted.
-
-        Probe-until-dry: stop once `empty_run_limit` consecutive IDs return no
-        event from the API. vekn.net IDs are dense in the modern range (worst
-        historical gap ~50 IDs), so 200 gives ~4x margin over the largest known
-        gap. Yields event dicts (venue info is embedded) that have players
-        (finished) OR are future-dated (planned).
-
-        Only 'API confirmed no event' (404/empty/code!=200) advances the empty
-        run — an event that exists but is filtered out (e.g. a past event with no
-        players) still resets the counter, so a cluster of skipped-but-present
-        events never ends the scan prematurely. A transient failure
-        (network/5xx/unparseable) confirms nothing: it never advances the empty run,
-        and `transient_limit` consecutive ones abort the scan so the daily retry
-        recovers instead of silently dropping later events.
-        """
+        """Probe IDs upward until `empty_run_limit` consecutive confirmed-no-event
+        IDs; `transient_limit` consecutive transient failures aborts the scan instead."""
         import asyncio
         from datetime import UTC, datetime
 
@@ -508,9 +447,8 @@ class VEKNAPIClient:
 
             for event_data in results:
                 if isinstance(event_data, BaseException):
-                    # Transient failure must not count as empty (that let an outage
-                    # end the scan); abort if the API stays down — the daily rescan
-                    # from ID 1 backfills.
+                    # Must not count as empty — an outage would otherwise end
+                    # the scan; abort instead if the API stays down.
                     consecutive_transient += 1
                     if consecutive_transient >= transient_limit:
                         raise VEKNAPIError(
@@ -526,11 +464,9 @@ class VEKNAPIClient:
                     consecutive_empty += 1
                     continue
 
-                # A real event exists here — the ID space is not exhausted.
                 consecutive_empty = 0
 
                 players = event_data.get("players", [])
-                # Check if future event
                 start_date_str = event_data.get("event_startdate", "")
                 is_future = False
                 if start_date_str:
@@ -542,14 +478,12 @@ class VEKNAPIClient:
                     except (ValueError, TypeError):
                         pass
 
-                # Filter: has players (finished) OR is future (planned)
                 if not players and not is_future:
                     continue
 
                 found += 1
                 yield event_data
 
-            # Progress log every 100 batches (1000 IDs)
             if start % 1000 == 1:
                 logger.info(
                     f"VEKN event scan: checked IDs {start}-{end - 1}, "
@@ -558,8 +492,7 @@ class VEKNAPIClient:
 
             start = end
 
-        # Always log the terminating point — makes 'reached end of ID space'
-        # distinguishable from a premature stop after the fact.
+        # Distinguishes "reached end of ID space" from a premature abort.
         logger.info(
             f"VEKN event scan complete: stopped at ID {start - 1} after "
             f"{consecutive_empty} consecutive empty IDs, {found} events found"
@@ -568,20 +501,9 @@ class VEKNAPIClient:
     async def _fetch_by_prefix(
         self, prefix: str, seen_ids: set[str], depth: int = 0
     ) -> list[dict[str, Any]]:
-        """
-        Recursively fetch players by prefix, subdividing when hitting the 100-result limit.
-
-        Args:
-            prefix: Current search prefix (e.g., "10", "100", "1001")
-            seen_ids: Set of already-seen VEKN IDs for deduplication
-            depth: Recursion depth (for logging)
-
-        Returns:
-            List of unique players for this prefix
-        """
+        """Recursively fetch players by prefix, subdividing at the API's 100-result cap."""
         players = await self.search_players(prefix)
 
-        # Deduplicate
         unique_players = []
         for player in players:
             vekn_id = str(player.get("veknid", ""))
@@ -589,7 +511,6 @@ class VEKNAPIClient:
                 seen_ids.add(vekn_id)
                 unique_players.append(player)
 
-        # If we hit the limit, subdivide with next digit (0-9)
         if len(players) >= 100:
             for digit in range(10):
                 sub_prefix = f"{prefix}{digit}"
@@ -601,23 +522,15 @@ class VEKNAPIClient:
         return unique_players
 
     async def fetch_all_members(self) -> list[dict[str, Any]]:
-        """
-        Fetch all VEKN members by searching with ranges.
-
-        VEKN IDs are 7 digits (0000000-9999999). The API returns max 100 results
-        per query. We search by prefixes and recursively subdivide when hitting
-        the limit to ensure full coverage.
-
-        Returns:
-            List of all player dictionaries
+        """Fetch all VEKN members: 7-digit IDs (0000000-9999999), 100 results max
+        per query — search by prefix, subdividing recursively for full coverage.
         """
         await self._ensure_authenticated()
 
         all_players: list[dict[str, Any]] = []
         seen_ids: set[str] = set()
 
-        # Search by 2-digit prefixes (00-99)
-        # API pads these to ranges: "00" -> 0000000-0099999, "10" -> 1000000-1099999
+        # API pads 2-digit prefixes into ranges: "00"->0000000-0099999.
         for prefix in range(100):
             prefix_str = f"{prefix:02d}"
             try:

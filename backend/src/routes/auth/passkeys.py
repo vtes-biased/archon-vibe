@@ -45,34 +45,24 @@ from ._tokens import (
 router = APIRouter()
 encoder = msgspec.json.Encoder()
 
-# WebAuthn settings
 WEBAUTHN_RP_ID = os.getenv("WEBAUTHN_RP_ID", "localhost")
 WEBAUTHN_RP_NAME = os.getenv("WEBAUTHN_RP_NAME", "Archon")
 WEBAUTHN_ORIGIN = os.getenv("WEBAUTHN_ORIGIN", "http://localhost:5173")
 
 
 class PasskeyRegisterVerifyRequest(BaseModel):
-    """Passkey registration verification request."""
-
     credential: dict  # Raw credential from navigator.credentials.create()
 
 
 class PasskeyLoginVerifyRequest(BaseModel):
-    """Passkey login verification request."""
-
     credential: dict  # Raw credential from navigator.credentials.get()
 
 
 @router.post("/passkey/register/options")
 async def passkey_register_options(current_user: CurrentUser) -> Response:
-    """Generate passkey registration options for an authenticated user.
-
-    User must be logged in to register a passkey.
-    """
     user = current_user
     user_uid = user.uid
 
-    # Get existing passkey credentials to exclude
     auth_methods = await get_auth_methods_for_user(user_uid)
     exclude_credentials = [
         PublicKeyCredentialDescriptor(id=base64.urlsafe_b64decode(m.identifier + "=="))
@@ -93,7 +83,6 @@ async def passkey_register_options(current_user: CurrentUser) -> Response:
         ),
     )
 
-    # Store challenge for verification
     challenge_b64 = (
         base64.urlsafe_b64encode(options.challenge).decode("utf-8").rstrip("=")
     )
@@ -118,10 +107,8 @@ async def passkey_register_verify(
     request: PasskeyRegisterVerifyRequest,
     current_user: CurrentUser,
 ) -> Response:
-    """Verify passkey registration and save the credential."""
     user_uid = current_user.uid
 
-    # Find the challenge
     client_data_json = base64.urlsafe_b64decode(
         request.credential["response"]["clientDataJSON"] + "=="
     )
@@ -136,7 +123,6 @@ async def passkey_register_verify(
     if stored["type"] != "registration":
         raise HTTPException(status_code=400, detail="Invalid challenge type")
 
-    # Verify the registration
     try:
         verification = verify_registration_response(
             credential=request.credential,
@@ -147,10 +133,8 @@ async def passkey_register_verify(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Verification failed: {e}") from e
 
-    # Clean up challenge
     await delete_transient_token(f"challenge:{challenge_b64}")
 
-    # Store the credential
     credential_id_b64 = (
         base64.urlsafe_b64encode(verification.credential_id).decode("utf-8").rstrip("=")
     )
@@ -166,9 +150,9 @@ async def passkey_register_verify(
         modified=now,
         user_uid=user_uid,
         method_type=AuthMethodType.PASSKEY,
-        identifier=credential_id_b64,  # Credential ID as identifier
-        credential_hash=public_key_b64,  # Public key stored here
-        verified=True,  # Passkeys are verified by definition
+        identifier=credential_id_b64,
+        credential_hash=public_key_b64,  # holds the public key, not a hash
+        verified=True,  # passkeys are verified by definition
         created_at=now,
         last_used_at=now,
     )
@@ -182,15 +166,10 @@ async def passkey_register_verify(
 
 @router.post("/passkey/create/options")
 async def passkey_create_options() -> Response:
-    """Generate passkey registration options for a new user.
-
-    No authentication required - this creates a new account.
-    Name is not required upfront; user will complete profile later.
-    """
-    # Generate a temporary user UID for the registration
+    """No auth required; creates a new account with a placeholder name
+    completed later via profile."""
     temp_user_uid = str(uuid7())
 
-    # Use a placeholder name - will be updated when user completes profile
     placeholder_name = "VEKN User"
 
     options = generate_registration_options(
@@ -205,7 +184,6 @@ async def passkey_create_options() -> Response:
         ),
     )
 
-    # Store challenge for verification
     challenge_b64 = (
         base64.urlsafe_b64encode(options.challenge).decode("utf-8").rstrip("=")
     )
@@ -227,8 +205,6 @@ async def passkey_create_options() -> Response:
 
 @router.post("/passkey/create/verify")
 async def passkey_create_verify(request: PasskeyRegisterVerifyRequest) -> Response:
-    """Verify passkey registration and create new user account."""
-    # Find the challenge
     client_data_json = base64.urlsafe_b64decode(
         request.credential["response"]["clientDataJSON"] + "=="
     )
@@ -241,7 +217,6 @@ async def passkey_create_verify(request: PasskeyRegisterVerifyRequest) -> Respon
     if stored["type"] != "create":
         raise HTTPException(status_code=400, detail="Invalid challenge type")
 
-    # Verify the registration
     try:
         verification = verify_registration_response(
             credential=request.credential,
@@ -252,19 +227,16 @@ async def passkey_create_verify(request: PasskeyRegisterVerifyRequest) -> Respon
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Verification failed: {e}") from e
 
-    # Clean up challenge
     await delete_transient_token(f"challenge:{challenge_b64}")
 
-    # Create the user with placeholder name
     now = datetime.now(UTC)
     user = User(
         uid=stored["temp_user_uid"],
         modified=now,
-        name="",  # Empty name - user will complete profile later
+        name="",
     )
     await save_user(user)
 
-    # Store the credential
     credential_id_b64 = (
         base64.urlsafe_b64encode(verification.credential_id).decode("utf-8").rstrip("=")
     )
@@ -287,7 +259,6 @@ async def passkey_create_verify(request: PasskeyRegisterVerifyRequest) -> Respon
     )
     await insert_auth_method(auth_method)
 
-    # Generate tokens
     access_token, expires_in = create_access_token(user.uid)
     refresh_token = create_refresh_token(user.uid)
 
@@ -305,16 +276,13 @@ async def passkey_create_verify(request: PasskeyRegisterVerifyRequest) -> Respon
 
 @router.post("/passkey/login/options")
 async def passkey_login_options() -> Response:
-    """Generate passkey authentication options.
-
-    Uses discoverable credentials (resident keys) so no user identification needed.
-    """
+    """Uses discoverable credentials (resident keys): no user identification is
+    passed, so the credential itself resolves the user."""
     options = generate_authentication_options(
         rp_id=WEBAUTHN_RP_ID,
         user_verification=UserVerificationRequirement.PREFERRED,
     )
 
-    # Store challenge for verification
     challenge_b64 = (
         base64.urlsafe_b64encode(options.challenge).decode("utf-8").rstrip("=")
     )
@@ -335,18 +303,14 @@ async def passkey_login_options() -> Response:
 
 @router.post("/passkey/login/verify")
 async def passkey_login_verify(request: PasskeyLoginVerifyRequest) -> Response:
-    """Verify passkey authentication and issue tokens."""
-    # Extract credential ID to find the user
     credential_id_raw = request.credential.get("id", "")
-    # The id is already base64url encoded from the browser
+    # id is already base64url-encoded by the browser.
     credential_id_b64 = credential_id_raw.rstrip("=")
 
-    # Find the auth method by credential ID
     auth_method = await get_auth_method_by_identifier("passkey", credential_id_b64)
     if not auth_method:
         raise HTTPException(status_code=401, detail="Passkey not found")
 
-    # Find the challenge
     client_data_json = base64.urlsafe_b64decode(
         request.credential["response"]["clientDataJSON"] + "=="
     )
@@ -359,7 +323,6 @@ async def passkey_login_verify(request: PasskeyLoginVerifyRequest) -> Response:
     if stored["type"] != "authentication":
         raise HTTPException(status_code=400, detail="Invalid challenge type")
 
-    # Verify the authentication
     assert auth_method.credential_hash is not None
     try:
         public_key = base64.urlsafe_b64decode(auth_method.credential_hash + "==")
@@ -376,10 +339,8 @@ async def passkey_login_verify(request: PasskeyLoginVerifyRequest) -> Response:
             status_code=401, detail=f"Authentication failed: {e}"
         ) from e
 
-    # Clean up challenge
     await delete_transient_token(f"challenge:{challenge_b64}")
 
-    # Update last_used_at and sign_count
     now = datetime.now(UTC)
     updated_auth_method = AuthMethod(
         uid=auth_method.uid,
@@ -398,7 +359,6 @@ async def passkey_login_verify(request: PasskeyLoginVerifyRequest) -> Response:
     # A tombstoned account keeps its passkey — block a fresh login from re-minting.
     await assert_account_active(auth_method.user_uid)
 
-    # Generate tokens
     access_token, expires_in = create_access_token(auth_method.user_uid)
     refresh_token = create_refresh_token(auth_method.user_uid)
 

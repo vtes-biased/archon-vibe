@@ -1,5 +1,3 @@
-"""SQLite-backed OAuth token storage keyed by Discord user ID."""
-
 import os
 
 import aiosqlite
@@ -14,10 +12,8 @@ class TokenStore:
 
     async def init(self) -> None:
         self._db = await aiosqlite.connect(self._db_path)
-        # This DB holds backend OAuth tokens (user:impersonate). Restrict it to
-        # owner-only at rest. systemd UMask=0077 covers the SQLite sidecar files
-        # (-wal/-shm/-journal); this best-effort chmod also hardens dev/non-systemd
-        # runs. No-op for ":memory:" or non-POSIX platforms.
+        # systemd UMask=0077 covers the SQLite sidecar files; this best-effort
+        # chmod also hardens dev/non-systemd runs. No-op for ":memory:".
         try:
             os.chmod(self._db_path, 0o600)
         except OSError:
@@ -33,7 +29,6 @@ class TokenStore:
         await self._db.execute(
             "CREATE INDEX IF NOT EXISTS idx_tokens_archon_uid ON tokens(archon_uid)"
         )
-        # Guild-tournament mapping: which tournament is linked to which guild
         await self._db.execute("""
             CREATE TABLE IF NOT EXISTS guild_tournaments (
                 guild_id TEXT NOT NULL,
@@ -54,7 +49,6 @@ class TokenStore:
             )
         except aiosqlite.OperationalError:
             pass
-        # Pending OAuth flows (state → PKCE verifier + who started it)
         await self._db.execute("""
             CREATE TABLE IF NOT EXISTS pending_oauth (
                 state TEXT PRIMARY KEY,
@@ -63,11 +57,7 @@ class TokenStore:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        # Migration: the pending-OAuth resume vestige is gone — the flow context
-        # (action/extra/guild_id/channel_id) was written but never acted on;
-        # users re-run the command, and respawn-on-reauth is the recovery.
-        # Ignore the does-not-exist error on re-run (same pattern as ADD above).
-        # Needs SQLite ≥ 3.35 (2021): older swallows "unsupported" here and the
+        # Needs SQLite >= 3.35 (2021): older swallows "unsupported" here and the
         # leftover NOT NULL columns make the next INSERT fail loudly.
         for col in ("action", "extra", "guild_id", "channel_id"):
             try:
@@ -79,8 +69,6 @@ class TokenStore:
     async def close(self) -> None:
         if self._db:
             await self._db.close()
-
-    # --- Token management ---
 
     async def get_tokens(self, discord_id: str) -> dict | None:
         assert self._db
@@ -117,7 +105,6 @@ class TokenStore:
         await self._db.commit()
 
     async def get_discord_id_by_archon_uid(self, archon_uid: str) -> str | None:
-        """Reverse lookup: archon_uid → discord_id."""
         assert self._db
         async with self._db.execute(
             "SELECT discord_id FROM tokens WHERE archon_uid = ?",
@@ -129,7 +116,6 @@ class TokenStore:
     async def get_discord_ids_by_archon_uids(
         self, archon_uids: list[str]
     ) -> dict[str, str]:
-        """Batch reverse lookup: archon_uids → {archon_uid: discord_id}."""
         assert self._db
         if not archon_uids:
             return {}
@@ -147,8 +133,6 @@ class TokenStore:
         assert self._db
         await self._db.execute("DELETE FROM tokens WHERE discord_id = ?", (discord_id,))
         await self._db.commit()
-
-    # --- Guild-tournament mapping ---
 
     async def link_tournament(
         self,
@@ -209,7 +193,6 @@ class TokenStore:
     async def set_scheduled_event_id(
         self, guild_id: str, tournament_uid: str, event_id: str | None
     ) -> None:
-        """Record (or clear) the Discord scheduled-event id for a linked tournament."""
         assert self._db
         await self._db.execute(
             """UPDATE guild_tournaments SET scheduled_event_id = ?
@@ -238,7 +221,6 @@ class TokenStore:
     async def get_tournament_by_category(
         self, guild_id: str, category_id: str
     ) -> dict | None:
-        """Find the tournament linked to a specific Discord category."""
         assert self._db
         async with self._db.execute(
             """SELECT tournament_uid, organizer_discord_id, category_id,
@@ -259,7 +241,6 @@ class TokenStore:
             }
 
     async def get_all_guild_tournaments(self) -> list[dict]:
-        """Get all guild-tournament links (for SSE resume on restart)."""
         assert self._db
         rows = []
         async with self._db.execute(
@@ -283,8 +264,6 @@ class TokenStore:
         )
         await self._db.commit()
 
-    # --- Pending OAuth ---
-
     async def store_pending_oauth(
         self,
         state: str,
@@ -301,9 +280,8 @@ class TokenStore:
 
     async def get_pending_oauth(self, state: str) -> dict | None:
         assert self._db
-        # Expire entries older than 15 minutes. Commit immediately: without it the
-        # DELETE's implicit write transaction dangles on the shared connection
-        # until some unrelated commit, and is lost entirely on crash.
+        # Commit immediately: without it the DELETE's implicit write transaction
+        # dangles on the shared connection and is lost entirely on crash.
         await self._db.execute(
             "DELETE FROM pending_oauth WHERE created_at < datetime('now', '-15 minutes')"
         )

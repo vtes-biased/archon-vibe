@@ -48,9 +48,8 @@
     announce = '';
   }
 
-  // Per-move undo: snapshot before each swap/move, so one wrong tap doesn't
-  // force Cancel (which discards ALL draft moves). Component remounts per
-  // alter session, so the stack scopes itself.
+  // Per-move undo: snapshot before each swap/move, so one wrong tap doesn't force Cancel (which
+  // discards ALL draft moves). Component remounts per alter session, so the stack scopes itself.
   let undoStack = $state<string[][][]>([]);
   function snapshot() {
     undoStack = [...undoStack, tables.map(t => [...t])];
@@ -104,9 +103,8 @@
     focusSeat(movingUid!);
   }
 
-  // Ordinal seating-issue severity → colour + a shape-distinct icon + screen-reader
-  // tier name, so severity reads without relying on colour alone (#225). `level` is
-  // the VEKN rule index: 0 (R1 predator-prey) blocks; lower = more severe.
+  // Ordinal seating-issue severity → colour + a shape-distinct icon + screen-reader tier name.
+  // `level` is the VEKN rule index: 0 (R1 predator-prey) blocks; lower = more severe.
   type IssueTier = { color: string; Icon: typeof Info; sr: string };
   function issueTier(level: number): IssueTier {
     if (level === 0) return { color: 'text-link', Icon: OctagonX, sr: m.seating_severity_blocking() };
@@ -134,9 +132,8 @@
 
 {#if selected}
   {@const selName = seatDisplay(tables[selected.table]?.[selected.seat] ?? '')}
-  <!-- Sticky resolves against the scrollport (the viewport), NOT the shell's
-       pt-safe-t padding box, so under viewport-fit=cover a bare top-2 parks this
-       behind the status bar and the layout's z-55 scrim. -->
+  <!-- Sticky resolves against the scrollport, NOT the shell's padding box, so a bare offset here
+       parks this behind the status bar under viewport-fit=cover. -->
   <div class="sticky top-[calc(0.5rem+var(--spacing-safe-t))] z-10 mb-3 flex items-center justify-between gap-2 bg-surface-hover border border-select-border rounded-lg px-3 py-2 text-sm shadow-lg">
     <span class="text-select">
       {isFinals ? m.rounds_seating_moving_finals({ name: selName }) : m.rounds_seating_moving({ name: selName })}

@@ -60,7 +60,6 @@ async def main(args) -> int:
         if not ok and hard:
             hard_failures += 1
 
-    # ---- counts -----------------------------------------------------------
     print("== row-count parity ==")
     old_members = await scalar(old, "SELECT count(*) FROM members")
     old_deletions = await scalar(old, "SELECT count(*) FROM member_deletions")
@@ -83,9 +82,8 @@ async def main(args) -> int:
     new_decks = await scalar(new, "SELECT count(*) FROM objects WHERE type='deck'")
     new_auth = await scalar(new, "SELECT count(*) FROM auth_methods")
 
-    # #216 leaves the dropped + remapped VEKN-less participants UNSEEDED (the
-    # allocated ones stay live, so they don't shift this count); see KNOWN_DROP /
-    # KNOWN_REMAP in migrate_from_archon.py.
+    # #216 leaves the dropped + remapped VEKN-less participants UNSEEDED (allocated
+    # ones stay live); see KNOWN_DROP / KNOWN_REMAP in migrate_from_archon.py.
     veknless_unseeded = len(KNOWN_DROP) + len(KNOWN_REMAP)
     check(
         "live users == members (minus #216 dropped/remapped)",
@@ -141,7 +139,6 @@ async def main(args) -> int:
     )
     print(f"  (info) auth_methods={new_auth}")
 
-    # ---- orphan references (inside new DB) --------------------------------
     print("== orphan reference scan ==")
     orphans = {
         "tournament.players[].user_uid → user": """
@@ -187,12 +184,8 @@ async def main(args) -> int:
                  jsonb_array_elements_text(t."full"->'organizers_uids') o
             WHERE t.type='tournament'
               AND NOT EXISTS (SELECT 1 FROM objects u WHERE u.type='user' AND u.uid = o)""",
-        # #216 invariant: no tournament participant ref resolves to a VEKN-less
-        # member. The fixup drops registration artifacts, remaps matched dups, and
-        # allocates real ids for genuine players, so every players/seating uid
-        # points at a VEKN-bearing member. This JOIN only catches refs to an
-        # EXISTING vekn-less user; a ref to a NON-existent member (e.g. a botched
-        # drop) is caught by the players/seating NOT-EXISTS scans above — keep both.
+        # #216 invariant: no participant ref resolves to a VEKN-less member. This
+        # JOIN only catches an EXISTING one; a NON-existent ref is caught above.
         "tournament participant ref → VEKN-less member": """
             WITH refs AS (
                 SELECT p->>'user_uid' u FROM objects t,
@@ -205,10 +198,8 @@ async def main(args) -> int:
             SELECT count(*) FROM refs JOIN objects u
               ON u.type='user' AND u.uid = refs.u
             WHERE COALESCE(u."full"->>'vekn_id','') = ''""",
-        # internal consistency: every member-uid across ALL play data
-        # (rounds + finals seating, finals seed_order, standings) must also be a
-        # player — catches a partial remap that splits one tournament across the
-        # old and live uid spaces (which the cross-object scans above miss).
+        # every member-uid across ALL play data must also be a player — catches a
+        # partial remap splitting one tournament across old/live uid spaces.
         "play-data uids ⊆ players[].user_uid (no uid split)": """
             WITH pdata AS (
                 SELECT t.uid AS tuid, s->>'player_uid' AS u FROM objects t,
@@ -261,12 +252,10 @@ async def main(args) -> int:
         n = await scalar(new, q)
         check(label, n == 0, f"{n} orphans")
 
-    # ---- projection sanity ------------------------------------------------
     print("== projection sanity ==")
     null_full = await scalar(new, 'SELECT count(*) FROM objects WHERE "full" IS NULL')
     check('every object has a "full" projection', null_full == 0, f"{null_full} null")
 
-    # ---- semantic invariants ----------------------------------------------
     print("== semantic invariants ==")
     # standings are PRELIM-ONLY: standings VP == sum of seat VP over the stored
     # rounds (new `rounds` excludes finals; finals lives in `finals`).
@@ -346,7 +335,6 @@ async def main(args) -> int:
             f"{new_nondefault} vs {old_nondefault}",
         )
 
-    # ---- spot-check random tournaments ------------------------------------
     print(f"== spot-check {args.samples} random tournaments ==")
     sample = await (
         await old.execute(
@@ -373,9 +361,8 @@ async def main(args) -> int:
         n_players = len(nf.get("players") or [])
         o_winner = o.get("winner") or ""
         n_winner = nf.get("winner") or ""
-        # finalist membership is preserved on player.finalist for ALL tournaments;
-        # finals.seed_order only exists for tournaments that had round detail, so
-        # compare the meaningful invariant: # of seeded finalists.
+        # finals.seed_order only exists for tournaments with round detail, so
+        # compare the invariant that survives both: # of seeded finalists.
         o_seeds = len(o.get("finals_seeds") or [])
         n_finalists = sum(1 for p in (nf.get("players") or []) if p.get("finalist"))
 

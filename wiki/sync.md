@@ -193,6 +193,11 @@ rules are unchanged — `entitled_level()` applies per object, just restricted t
 tournament's scope. The bot opens one scoped stream per watched tournament rather
 than streaming the whole corpus.
 
+The scoped stream answers **200 whether or not the tournament exists** — an
+unknown or unreadable uid simply omits the tournament frame — so a consumer
+probing for existence (the bot's `/setup`) must treat "no tournament frame before
+`sync_complete`" as the failure, not the status code.
+
 Scoped streams carry no access-version handshake **by design**: they replay full
 (small) state on every connect so they are never stale, and they receive no decks,
 so the private-deck leak the fingerprint guards against cannot occur. Entitlement
@@ -471,6 +476,18 @@ work plans one). Update this table in the same change.
 A generic `ObjectSpec` array (`SPECS`) handles all types uniformly in the sync
 manager, and a single `isSynced` flag tracks state.
 
+**The in-memory user search index** (`db.ts` `getUserIndex`) exists because a
+`getAll()` scan of ~10k members costs 100ms+ per keystroke — completions over
+300ms were reported before it. It is a cache over the users store: every path
+that writes or clears that store must update or null the index promise, or search
+serves stale members.
+
+**Cache Storage is allowlist-only.** The service worker writes exactly two things
+to Cache Storage: precached build assets and SPA navigations. Every other
+same-origin GET — `/api`, `/stream`, `/snapshot?token=`, `/auth`, `/admin` —
+passes through untouched, so a JWT-bearing response can never be served from
+cache. Widening the cache rule is a security change, not a performance tweak.
+
 **Universal soft-delete**: on a tombstone the client **hard-deletes** the row from
 its store, otherwise it saves. No type is exempt, **users included** — every
 deletable member is VEKN-less, and tournament participation requires a `vekn_id`,
@@ -514,6 +531,14 @@ revert them. "Server wins" for non-engine fields, same as `organizers_uids`. **A
 new backend-only Tournament field must join this list**, or an offline round-trip
 silently reverts it; the online action path is safe because the engine preserves
 unknown JSON keys.
+
+**Offline player resolution** — go-online resolves each `TEMP-` player by VEKN id
+first, then by email, else creates a member. The VEKN-id match never cross-checks
+the name, so a transposed digit in a hand-typed id silently binds the seat — and
+the event's results and ratings — to the wrong real member. The email fallback
+reconciles by email alone, so an offline "create" for someone who already holds an
+account under another email mints a duplicate. Both risks are why the go-online
+summary lists players matched and accounts created for the organizer to review.
 
 **Atomicity** — the tournament snapshot, offline sanctions and offline decks all
 persist inside the SAME locked transaction, with broadcasts fired post-commit. A

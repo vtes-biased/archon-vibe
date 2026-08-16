@@ -1,16 +1,13 @@
 ---
-# Swap safety-net for memory-constrained hosts (opt-in). The role never
-# reformats or re-activates an already-active swapfile — swapfile_size only
-# applies on a fresh create, so bumping it won't resize an existing file.
+# The role never reformats or re-activates an already-active swapfile —
+# swapfile_size only applies on a fresh create.
 swapfile_enabled: false
 swapfile_path: /swapfile
 swapfile_size: 1G
 swappiness: 10
 
-# Wheels-only deploy: servers never build, runtime Python is uv-managed, so no
-# git/make/pip/venv/-dev toolchain here. certbot runs `certonly --webroot`
-# (nginx_tls), not the nginx plugin. state=present never uninstalls, so pruning
-# this list only shapes the next fresh provision, not live boxes.
+# Wheels-only deploy: no git/make/pip/venv/-dev toolchain needed here.
+# state=present never uninstalls, so pruning this list only shapes fresh provisions.
 common_base_packages:
   - acl
   - ca-certificates

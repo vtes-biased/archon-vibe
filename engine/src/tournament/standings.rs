@@ -1,5 +1,3 @@
-//! Standings computation and management.
-
 use json::JsonValue;
 
 use super::sanctions::{
@@ -7,7 +5,6 @@ use super::sanctions::{
 };
 use super::scoring::{compute_gw, compute_gw_finals, compute_tp};
 
-/// Player standing: (user_uid, gw, vp, tp, toss, finalist, disqualified)
 pub(super) struct Standing {
     pub user_uid: String,
     pub gw: f64,
@@ -18,21 +15,13 @@ pub(super) struct Standing {
     /// DQ'd players forfeit their own score (gw/vp/tp zeroed) and sort last, but
     /// stay in standings flagged — opponents keep the VPs they earned vs them.
     pub disqualified: bool,
-    /// Proxy: a non-competing official stood in for this player. Excluded from
-    /// rank/rating/finals and sorted last like DQ, but — unlike DQ — the score is
-    /// NOT zeroed (the seat's VPs are real for opponents and table-sum checks).
+    /// Proxy: excluded from rank/rating/finals, sorted last like DQ, but unlike DQ
+    /// the score is NOT zeroed (VPs stay real for opponents/table-sum checks).
     pub non_competing: bool,
 }
 
-/// Compute standings from all rounds. Sorted by GW desc, VP desc, TP desc, toss desc.
-///
-/// GW and TP are **recomputed** per table from raw VPs + current sanctions (not
-/// summed from the stored seat values), so a standings_adjustment issued *after*
-/// a round was scored still re-decides who has the GW and re-ranks TP — the seat
-/// `result.gw`/`result.tp` are frozen at score time and would otherwise go stale.
-/// VP sums the raw per-seat VP, then the full SA penalty (`-1.0` per played-round
-/// SA, JG v2 1.1.3) is subtracted, which may take a player's total negative.
-/// Per-seat `result.vp` stays raw for display.
+/// Sorted GW desc, VP desc, TP desc, toss desc. GW/TP recompute per table from raw
+/// VPs + current sanctions each call, so a late SA re-ranks (`result.vp` stays raw).
 pub(super) fn compute_preliminary_standings(
     tournament: &JsonValue,
     sanctions: &JsonValue,
@@ -41,11 +30,10 @@ pub(super) fn compute_preliminary_standings(
         std::collections::HashMap::new();
     let effective_sas = resolve_sa_effective_rounds(tournament, sanctions);
 
-    // Recompute GW/TP per table from raw VPs + current sanctions; sum raw VP.
     for (round_index, round) in tournament["rounds"].members().enumerate() {
         for table in round.members() {
             if table["state"].as_str() == Some("Cancelled") {
-                continue; // soft-cancelled round contributes no score
+                continue;
             }
             let seating = &table["seating"];
             let vps: Vec<f64> = seating
@@ -68,12 +56,8 @@ pub(super) fn compute_preliminary_standings(
         }
     }
 
-    // Apply the full SA penalty (-1.0 per resolved SA; may go negative) to each
-    // penalized player, per JG v2 1.1.3. The per-round result.vp stays raw; the
-    // penalty lives only in the standings total. Same resolved-SA list the GW/TP
-    // cascade above used, so VP and GW/TP agree on every effective round.
-    // Finals-round SAs (index nrounds) are excluded: they penalize the finals
-    // result (finals GW/winner + rating VP), not the preliminary totals.
+    // -1.0 per resolved SA (JG v2 §1.1.3), applied only here. Finals-round SAs
+    // (index nrounds) are excluded: they penalize the finals result instead.
     let nrounds = tournament["rounds"].len();
     let prelim_sas: Vec<(String, usize)> = effective_sas
         .iter()
@@ -89,7 +73,6 @@ pub(super) fn compute_preliminary_standings(
         }
     }
 
-    // Build standings with toss and finalist from player records
     let mut standings: Vec<Standing> = map
         .into_iter()
         .map(|(uid, (gw, vp, tp))| {
@@ -100,14 +83,10 @@ pub(super) fn compute_preliminary_standings(
             let finalist = player
                 .and_then(|p| p["finalist"].as_bool())
                 .unwrap_or(false);
-            // DQ (state set by the backend on a DQ sanction, or an active DQ
-            // sanction — same dual signal the check-in skip uses): forfeit the
-            // player's own score. Their seat is left intact above, so the per-table
-            // GW/TP the opponents earned already stand.
+            // DQ signal is state=="Disqualified" OR an active DQ sanction — the same
+            // combined signal used elsewhere; forfeits the player's own score only.
             let disqualified = player.and_then(|p| p["state"].as_str()) == Some("Disqualified")
                 || has_dq_sanction(sanctions, &uid);
-            // Proxy: excluded from rank like DQ, but the score is kept (not zeroed) —
-            // the seat's VPs are real for opponents / table-sum validation.
             let non_competing = player
                 .and_then(|p| p["non_competing"].as_bool())
                 .unwrap_or(false);
@@ -129,14 +108,9 @@ pub(super) fn compute_preliminary_standings(
         })
         .collect();
 
-    // Sort desc by score, then toss (finals cutoff tiebreak), then user_uid as a
-    // deterministic terminal key — without it, players fully tied on (gw, vp, tp,
-    // toss) come out in nondeterministic HashMap order, flipping rank-based GP
-    // league points. Note: toss decides the finals cutoff only; it does NOT split
-    // ranks for GP points (that key is gw/vp/tp — see league.rs).
+    // user_uid is a deterministic tiebreak: without it, players tied on (gw, vp, tp,
+    // toss) come out in nondeterministic HashMap order. Toss decides the finals cutoff only.
     standings.sort_by(|a, b| {
-        // Non-ranked players (DQ'd or proxy) sort last (false < true), then by
-        // score within each group.
         (a.disqualified || a.non_competing)
             .cmp(&(b.disqualified || b.non_competing))
             .then(b.gw.partial_cmp(&a.gw).unwrap())
@@ -149,8 +123,7 @@ pub(super) fn compute_preliminary_standings(
     standings
 }
 
-/// Compute standings and store them on the tournament JSON object.
-/// Guard: does NOT overwrite standings if rounds are empty (preserves VEKN-synced data).
+/// Guard: skips when rounds are empty, preserving VEKN-synced standings.
 pub(super) fn update_standings(tournament: &mut JsonValue, sanctions: &JsonValue) {
     if tournament["rounds"].is_empty() {
         return;
@@ -175,14 +148,8 @@ pub(super) fn update_standings(tournament: &mut JsonValue, sanctions: &JsonValue
     refresh_finals_scoring(tournament, sanctions);
 }
 
-/// Re-score a Finished finals table from raw VPs + current sanctions, and re-derive
-/// `tournament.winner` when one is already set (post-FinishFinals). Prelim seat
-/// results may go stale harmlessly (standings recompute per table on the fly), but
-/// the finals seat `result.gw`/`result.tp` and `winner` ARE the stored truth that
-/// ratings ([`compute_rating_vp_gw`]) and final placement consume — so a
-/// finals-round SA issued or lifted after the finals were scored must rewrite them.
-/// Uses the same [`compute_gw_finals`] call SetScore and FinishFinals use, so all
-/// three paths always agree.
+/// Re-score a Finished finals table from raw VPs + current sanctions and re-derive
+/// `winner` when already set, using the same [`compute_gw_finals`] call SetScore/FinishFinals use.
 fn refresh_finals_scoring(tournament: &mut JsonValue, sanctions: &JsonValue) {
     if tournament["finals"]["state"].as_str() != Some("Finished") {
         return;
@@ -219,59 +186,30 @@ fn refresh_finals_scoring(tournament: &mut JsonValue, sanctions: &JsonValue) {
     }
 }
 
-/// Clone a preliminary standing entry and tag it with a 1-based final `rank`.
 fn with_rank(standing: &JsonValue, rank: usize) -> JsonValue {
     let mut obj = standing.clone();
     obj["rank"] = (rank as i32).into();
     obj
 }
 
-/// Reorder preliminary `standings` into **final placement** and tag each entry
-/// with a 1-based `rank`, per VEKN §3.7.5 / §3.1. Single source of truth for
-/// "who placed where" — consumed by league GP/RTP scoring and the post-finals
-/// results display.
-///
-/// - The finals `winner` (when present in `standings`) is **rank 1**.
-/// - Every other flagged finalist shares **rank 2**: non-winner finalists tie
-///   for 2nd with no tiebreak (§3.7.5). Their array order is cosmetic (the
-///   input's deterministic preliminary order) and never changes the rank.
-/// - Non-finalists keep preliminary order and use standard competition ranking
-///   (shared rank on equal gw/vp/tp, skipping after ties), numbered from
-///   `finalist_count + 1`.
-/// - Disqualified players (the `disqualified` flag) are held out of the ranked
-///   buckets entirely and appended last with no competitive place (JG v2 §1.1.4).
-///
-/// **Whether a final happened is read from the `finalist` flags**, not from any
-/// separate finals data — that flag is the one signal every writer sets (engine
-/// `StartFinals`, the archon importer, and VEKN sync all flag their finalists;
-/// VEKN sync notably stores no finals table at all, so the flag — not finals
-/// seating — is the portable signal). With no flagged finalists (a genuine
-/// no-finals event) this degrades to plain preliminary competition ranking; a
-/// winner, if one is set, is still pulled to rank 1 defensively.
-///
-/// Invariant: a player gets rank 1 iff they are the `winner` *and* appear in
-/// `standings`. `standings` is assumed pre-sorted descending by preliminary
-/// score (as produced by [`compute_preliminary_standings`]); order is only preserved within
-/// buckets, never recomputed.
+/// Reorders preliminary `standings` (must arrive sorted desc by score) into final
+/// placement per §3.7.5/§3.1: `winner` is rank 1, finalists share rank 2, DQ'd/proxy excluded and appended last.
 pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonValue> {
     let winner_present = !winner.is_empty()
         && standings
             .members()
             .any(|s| s["user_uid"].as_str() == Some(winner));
 
-    // Partition into placement buckets, each preserving preliminary order.
     let mut winner_entry: Option<&JsonValue> = None;
-    let mut finalists: Vec<&JsonValue> = Vec::new(); // flagged, non-winner
+    let mut finalists: Vec<&JsonValue> = Vec::new();
     let mut non_finalists: Vec<&JsonValue> = Vec::new();
     let mut excluded: Vec<&JsonValue> = Vec::new();
     for s in standings.members() {
         if s["disqualified"].as_bool().unwrap_or(false)
             || s["non_competing"].as_bool().unwrap_or(false)
         {
-            // DQ'd or proxy: never a placed competitor — held out of the ranked
-            // buckets so they don't tie with (or displace) a real competitor, then
-            // appended last (below). The UI renders these rows as "—" off the flag,
-            // not the rank.
+            // DQ'd/proxy never place — excluded here so they can't tie with or displace
+            // a real competitor. UI renders their row via the flag, not the rank value.
             excluded.push(s);
         } else if winner_present && s["user_uid"].as_str() == Some(winner) {
             winner_entry = Some(s);
@@ -289,10 +227,9 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
         out.push(with_rank(w, 1));
     }
     for s in &finalists {
-        out.push(with_rank(s, 2)); // shared rank 2 — finalists tie for 2nd
+        out.push(with_rank(s, 2));
     }
 
-    // Non-finalists: standard competition ranking from finalist_count + 1.
     let start = if finalist_count > 0 {
         finalist_count + 1
     } else {
@@ -307,15 +244,14 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
             s["tp"].as_i32().unwrap_or(0) as i64,
         );
         if prev_key != Some(key) {
-            rank = start + idx; // skip ranks after a tie group
+            rank = start + idx;
             prev_key = Some(key);
         }
         out.push(with_rank(s, rank));
     }
 
-    // Excluded players (DQ'd or proxy) have no competitive place: append them last
-    // with ranks that continue past every ranked player, so any rank-keyed sort keeps
-    // them at the bottom. The number is never shown — the UI renders them "—" + badge.
+    // Ranks here just need to sort last; the value itself is never shown (UI
+    // renders these rows via the flag, not the rank).
     let excluded_start = finalist_count + non_finalists.len() + 1;
     for (i, s) in excluded.iter().enumerate() {
         out.push(with_rank(s, excluded_start + i));
@@ -323,21 +259,8 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
     out
 }
 
-/// Compute a player's SA-adjusted rating VP and GW for a finished tournament.
-/// Prelim VP/GW come from the rounds when per-round detail exists (GW
-/// **recomputed** per table from raw VPs + current sanctions, so a late SA that
-/// flips a GW is reflected, matching [`compute_preliminary_standings`]; VP minus
-/// the full SA penalty via [`sa_vp_penalty`], may go negative); otherwise from the
-/// player's (prelim-only) standings row as-is (VEKN-synced/rounds-less imports —
-/// SA is already baked into synced numbers, so it is not re-applied there). Finals
-/// VP/GW are then added from the finals seat (native, or a reconstructed import
-/// final). When **no** finals table recorded the win, the tournament winner is
-/// credited a +1 GW (a NO-final VEKN import; a native no-final once #341 sets
-/// `winner` — native today leaves `winner==""`, so this stays inert).
-///
-/// Single source so the backend rating and VEKN-push paths consume the SA rule
-/// from Rust instead of re-implementing it. Unlike preliminary standings VP, this
-/// **includes finals** VP/GW (the rating counts the final table). Returns `(vp, gw)`.
+/// SA-adjusted rating VP/GW for a finished tournament, including finals VP/GW unlike
+/// preliminary standings. A win with no finals table credits +1 GW (inert when `winner == ""`).
 pub fn compute_rating_vp_gw(
     tournament: &JsonValue,
     sanctions: &JsonValue,
@@ -358,8 +281,6 @@ pub fn compute_rating_vp_gw(
 
     let mut vp = 0.0;
     let mut gw = 0.0;
-    // Prelim VP/GW: sum the rounds when we have per-round detail; otherwise read the
-    // (prelim-only) standings row. Imports keep finals in the finals object below.
     if tournament["rounds"].is_empty() {
         for s in tournament["standings"].members() {
             if s["user_uid"].as_str() == Some(user_uid) {
@@ -373,7 +294,7 @@ pub fn compute_rating_vp_gw(
         for (round_index, round) in tournament["rounds"].members().enumerate() {
             for table in round.members() {
                 if table["state"].as_str() == Some("Cancelled") {
-                    continue; // soft-cancelled round earns no rating VP/GW
+                    continue;
                 }
                 let seating = &table["seating"];
                 let Some(i) = seating
@@ -393,28 +314,24 @@ pub fn compute_rating_vp_gw(
         }
         vp -= sa_vp_penalty(&effective_sas, user_uid);
     }
-    // Finals VP/GW from the finals table (native, or a reconstructed import final).
     for seat in tournament["finals"]["seating"].members() {
         if seat["player_uid"].as_str() == Some(user_uid) {
             vp += seat["result"]["vp"].as_f64().unwrap_or(0.0);
             gw += seat["result"]["gw"].as_f64().unwrap_or(0.0);
         }
     }
-    // No finals table recorded the win → credit the tournament-win GW to the winner.
     if tournament["finals"].is_null() && tournament["winner"].as_str() == Some(user_uid) {
         gw += 1.0;
     }
     (vp, gw)
 }
 
-/// Check if top 5 has unbroken ties (players at the cutoff boundary with same scores and no toss differentiation)
-/// Takes the *eligible* standings (DQ'd/withdrawn already filtered) so the cutoff tie check
-/// matches the players who actually form the finals — not the raw standings.
+/// Takes *eligible* standings (DQ'd/withdrawn already filtered) — the cutoff
+/// check must match players who actually form the finals, not raw standings.
 pub(super) fn top5_has_ties(standings: &[&Standing]) -> bool {
     if standings.len() < 5 {
         return false;
     }
-    // Check all pairs in top 5 for ties not broken by toss
     for i in 0..5 {
         for j in (i + 1)..5 {
             let a = standings[i];
@@ -424,7 +341,6 @@ pub(super) fn top5_has_ties(standings: &[&Standing]) -> bool {
             }
         }
     }
-    // Also check if #5 ties with #6+
     if standings.len() > 5 {
         let fifth = standings[4];
         for &s in &standings[5..] {
@@ -521,10 +437,8 @@ mod tests {
 
     #[test]
     fn final_standings_partial_final_offsets_non_finalists() {
-        // Sub-5 final (3 finalists — small event or finals shrunk by DQ/dropout).
-        // Guards the `finalist_count + 1` offset: non-finalists must start at 4,
-        // not a hardcoded 6. The 5-finalist tests above can't catch a broken
-        // offset because there player_count == finalist_count.
+        // Sub-5 final guards the `finalist_count + 1` offset (must start at 4, not a
+        // hardcoded 6) — the 5-finalist tests above can't catch this.
         let standings = json::parse(
             r#"[
             {"user_uid":"p1","gw":3.0,"vp":6.0,"tp":180,"finalist":true},
@@ -549,9 +463,8 @@ mod tests {
 
     #[test]
     fn final_standings_dq_appended_last_without_displacing_ranks() {
-        // p2 is disqualified (zeroed by compute_preliminary_standings). The non-DQ
-        // players must rank 1..N contiguously as if p2 weren't there, and p2 lands
-        // last with a rank past every non-DQ rank (UI renders it as "—"/DQ).
+        // p2 is disqualified: non-DQ players must rank 1..N contiguously as if p2
+        // weren't there, and p2 lands last past every non-DQ rank.
         let standings = json::parse(
             r#"[
             {"user_uid":"p1","gw":2.0,"vp":5.0,"tp":120,"finalist":false,"disqualified":false},

@@ -41,17 +41,14 @@
   let githubError = $state("");
   let passkeyMessage = $state("");
 
-  // VEKN claim/abandon state
   let showClaimModal = $state(false);
   let claimVeknIdInput = $state("");
   let claimingVekn = $state(false);
   let showAbandonConfirm = $state(false);
   let abandoningVekn = $state(false);
 
-  // Avatar state
   let showAvatarCropper = $state(false);
 
-  // Derived from auth
   const hasEmail = $derived(
     auth.isAuthenticated && auth.authMethods.some((am) => am.type === "email")
   );
@@ -72,7 +69,6 @@
   const hasGithub = $derived(!!auth.user?.github_login);
   const githubUsername = $derived(auth.user?.github_login || null);
 
-  // Handle Discord / GitHub link callbacks
   onMount(async () => {
     const params = new URLSearchParams(window.location.search);
     const discordLinked = params.get("discord_linked");
@@ -248,8 +244,8 @@
           onClaimVekn={() => (showClaimModal = true)}
         />
         {/key}
-        <!-- Own ratings + HoF: the what-did-this-event-do-to-my-number path
-             used to dead-end (PlayerRatings only mounted on public /users/[uid]) -->
+        <!-- Own ratings + HoF: mounted here too, since PlayerRatings otherwise
+             only appears on the public /users/[uid] page. -->
         <div class="p-6 border-t border-line space-y-4">
           <div class="flex items-center justify-between gap-3 flex-wrap">
             <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.user_detail_ratings()}</h3>
@@ -298,7 +294,6 @@
   </div>
 </div>
 
-<!-- Claim VEKN ID Modal -->
 {#if showClaimModal}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
@@ -338,12 +333,10 @@
   </div>
 {/if}
 
-<!-- Avatar Cropper Modal -->
 {#if showAvatarCropper}
   <AvatarCropper onSave={handleSaveAvatar} onCancel={() => (showAvatarCropper = false)} />
 {/if}
 
-<!-- Abandon VEKN ID Confirmation Modal -->
 {#if showAbandonConfirm}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div

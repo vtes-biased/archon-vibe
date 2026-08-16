@@ -6,7 +6,6 @@
 
   let { sanction }: { sanction: Sanction } = $props();
 
-  // Check if sanction is lifted or expired
   const isLifted = $derived(sanction.lifted_at !== null);
   const isExpired = $derived.by(() => {
     if (!sanction.expires_at) return false;
@@ -40,7 +39,6 @@
   const tone = $derived(SANCTION_TONES[sanction.level]);
   const label = $derived(levelLabelFns[sanction.level]());
 
-  // Format date for tooltip
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   };

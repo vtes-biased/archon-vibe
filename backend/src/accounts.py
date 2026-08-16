@@ -1,10 +1,7 @@
 """Account surgery: merge (join), detach (split), and the reassignment helpers.
 
-These operations move data between user accounts. They build on the plain CRUD in
-db.py (one-way import — db.py never calls back here, so there is no cycle). Each
-returns the BroadcastData for every synced row it changes so the calling route can
-push the change to other clients' caches live; db.py can't import broadcast
-(layering), so the route does the broadcasting.
+db.py cannot import broadcast (layering), so each function here returns the
+BroadcastData for every synced row it changes and the calling route broadcasts it.
 """
 
 from datetime import UTC, datetime
@@ -30,7 +27,6 @@ from .models import AuthMethod, DeckObject, ObjectType, SanctionLevel, User
 
 
 async def reassign_auth_methods(from_user_uid: str, to_user_uid: str) -> int:
-    """Reassign all auth methods from one user to another. Returns count updated."""
     async with get_connection() as conn:
         result = await conn.execute(
             "SELECT data FROM auth_methods WHERE data->>'user_uid' = %s",
@@ -64,11 +60,6 @@ async def reassign_auth_methods(from_user_uid: str, to_user_uid: str) -> int:
 async def reassign_sanctions(
     from_user_uid: str, to_user_uid: str
 ) -> list[BroadcastData]:
-    """Reassign all sanctions from one user to another.
-
-    Returns the BroadcastData for each moved sanction so the caller can push the
-    new user_uid to other clients' caches live, not only on reconnect.
-    """
     sanctions = await get_sanctions_for_user(from_user_uid)
     broadcasts = []
     for sanction in sanctions:
@@ -78,11 +69,6 @@ async def reassign_sanctions(
 
 
 async def reassign_decks(from_user_uid: str, to_user_uid: str) -> list[BroadcastData]:
-    """Reassign all decks from one user to another.
-
-    Returns the BroadcastData for each moved deck so the caller can push the new
-    user_uid to other clients' caches live, not only on reconnect.
-    """
     async with get_connection() as conn:
         result = await conn.execute(
             """SELECT "full"::text FROM objects
@@ -104,11 +90,6 @@ async def reassign_decks(from_user_uid: str, to_user_uid: str) -> list[Broadcast
 async def reassign_coopted_by_references(
     from_user_uid: str, to_user_uid: str
 ) -> list[BroadcastData]:
-    """Repoint every user whose coopted_by references from_user_uid to to_user_uid.
-
-    Returns the BroadcastData for each repointed user so the caller can push the
-    change to other clients' caches live, not only on reconnect.
-    """
     async with get_connection() as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
@@ -129,55 +110,32 @@ async def reassign_coopted_by_references(
 async def merge_users(
     keep_uid: str, delete_uid: str
 ) -> tuple[User, list[BroadcastData]] | None:
-    """Merge two user accounts.
-
-    Transfers all auth methods from delete_uid to keep_uid,
-    merges user data (preferring non-empty values from keep_uid),
-    reassigns sanctions and coopted_by references,
-    then deletes the duplicate account.
-
-    Returns (merged_user, broadcasts) or None if keep_uid doesn't exist.
-    `broadcasts` are the BroadcastData for every synced row this changes — the
-    survivor's update, the reassigned sanctions/decks/coopted-by users, and the
-    dying account's soft-delete; the caller must `broadcast_precomputed` each so
-    other clients update their cached copies live, not only on their next
-    reconnect (db.py can't import broadcast — layering — so the route does it).
-    """
+    """Returns (merged_user, broadcasts), or None if keep_uid doesn't exist."""
     keep_user = await get_user_by_uid(keep_uid)
     delete_user_obj = await get_user_by_uid(delete_uid)
 
     if not keep_user:
         return None
     if keep_uid == delete_uid:
-        return keep_user, []  # Same account — nothing to merge
+        return keep_user, []
     if not delete_user_obj:
-        return keep_user, []  # Nothing to merge
-    # invariant: a uid carrying a vekn_id is immovable and is NEVER
-    # soft-deleted. merge soft-deletes delete_uid, so the absorbed account must
-    # not hold a VEKN ID — which also forbids merging two VEKN identities.
-    # /claim and /link structurally guarantee delete has no vekn_id; admin and
-    # discord-link do not, so this is the single chokepoint. A non-VEKN account
-    # can't be a tournament participant/organizer (engine requires a VEKN ID),
-    # so this guarantees the soft-deleted account leaves no orphaned tournament
-    # refs — the reason the deeper cross-tournament remap is unnecessary.
+        return keep_user, []
+    # A uid holding a vekn_id is immovable and never soft-deleted — this is the one
+    # chokepoint enforcing it for callers (admin, discord-link) that don't guarantee it structurally.
     if delete_user_obj.vekn_id:
         raise ValueError(
             "Cannot merge an account that holds a VEKN ID — VEKN identities are "
             "immovable and are never merged away (keep the VEKN account as the survivor)"
         )
 
-    # calendar_token is stripped from "full", so read it from its column
-    # (prefer the claiming/delete account's feed, like the contact fields below).
+    # calendar_token lives outside "full", read explicitly; prefer the
+    # claiming account's feed, like the contact fields below.
     merged_calendar_token = await get_calendar_token(
         delete_uid
     ) or await get_calendar_token(keep_uid)
 
-    # Merge from keep_user as the base so every field survives by default
-    # (identity, roles, ratings, wins, and any future field) — building User(...)
-    # from scratch silently dropped unlisted fields. Only the
-    # fields with a real merge policy are overridden below: identity prefers
-    # keep_user, contact info prefers delete_user (the claiming account),
-    # roles/local_modifications union.
+    # msgspec.structs.replace keeps every unlisted field; only fields with a
+    # real merge policy are overridden below.
     merged = msgspec.structs.replace(
         keep_user,
         name=keep_user.name or delete_user_obj.name,
@@ -207,10 +165,8 @@ async def merge_users(
     )
 
     merged_bd = await save_user(merged)
-    # Everything keyed to the dying delete_uid must migrate to the survivor.
-    # auth_methods aren't synced objects (no SSE); the rest are, so collect their
-    # BroadcastData too — reassigned sanctions/decks/coopted-by users
-    # otherwise stay stale on other clients until reconnect.
+    # auth_methods aren't synced (no SSE); the rest are — collect their
+    # BroadcastData too.
     await reassign_auth_methods(delete_uid, keep_uid)
     broadcasts = [merged_bd]
     broadcasts += await reassign_sanctions(delete_uid, keep_uid)
@@ -223,12 +179,8 @@ async def merge_users(
 
 
 async def user_has_active_suspension(user_uid: str) -> bool:
-    """True if the user holds an active suspension or probation.
-
-    Active = not soft-deleted, not lifted, and either permanent (no expiry) or
-    not yet expired. Used to block self-abandon of a VEKN ID (you can't abandon
-    your way out of a suspension — see wiki/architecture.md).
-    """
+    """True if the user holds an active (non-lifted, unexpired) suspension or
+    probation — blocks self-abandon of a VEKN ID."""
     now = datetime.now(UTC)
     for s in await get_sanctions_for_user(user_uid):
         if s.deleted_at is not None or s.lifted_at is not None:
@@ -243,31 +195,11 @@ async def user_has_active_suspension(user_uid: str) -> bool:
 async def detach_user_from_vekn(
     user_uid: str,
 ) -> tuple[User, User, list[BroadcastData]] | None:
-    """Detach a person from their VEKN record (the strip/split operation).
+    """Split into (personal_account, vekn_record, broadcasts), or None if not found.
 
-    Splits one account into two. The original record is **immovable**: it keeps
-    its uid and vekn_id plus everything keyed to that uid — roles, cooptation,
-    prefix, ratings, wins, community_links, and (untouched, because they key on
-    uid) sanctions, decks and tournament results. Only the human moves: a fresh
-    uid carrying the login (auth methods) and personal/contact data.
-
-    Used both to displace a holder before re-linking the VEKN ID to someone else
-    (caller then merges the freed record into the new owner) and to abandon a
-    VEKN ID (record left orphaned for a future claim). The two flows are
-    identical here; their only difference (the re-merge) lives in the caller.
-    See wiki/architecture.md (Account surgery) for the full rule.
-
-    Returns (personal_account, vekn_record, broadcasts) or None if the user is
-    not found. `broadcasts` are the BroadcastData for the new personal account
-    and the nulled vekn_record; the caller must `broadcast_precomputed` each so
-    other clients drop the moved-out PII (e.g. the orphan's now-nulled
-    discord_id/contacts) live, not only on their next reconnect (db.py can't
-    import broadcast — layering — so the route does it).
-
-    Adding a User field: only null it on `vekn_record` (and let it ride on
-    `personal`) if it is genuinely personal/login data; otherwise leave it on
-    `vekn_record` and null it on `personal` — the safe default is that VEKN
-    history never follows the person.
+    vekn_record keeps the uid and everything keyed to it. A new personal/login
+    field must be added to the null-list on vekn_record below, or it leaks onto
+    the record for the next claimant.
     """
     user = await get_user_by_uid(user_uid)
     if not user:
@@ -276,15 +208,11 @@ async def detach_user_from_vekn(
     new_uid = str(uuid7())
     now = datetime.now(UTC)
 
-    # The human's .ics feed follows the human: calendar_token lives in a dedicated
-    # column (stripped from "full"), so read it explicitly and carry it to the new
-    # personal account — their existing subscription URL keeps resolving. Same as
-    # merge_users; clear it on the orphan first so the token is never duplicated.
+    # calendar_token lives outside "full"; carry it to the personal account so the
+    # existing .ics URL resolves, clearing the orphan's first so it's never duplicated.
     feed_token = await get_calendar_token(user_uid)
     await clear_calendar_token(user_uid)
 
-    # The person walks away with login + personal data only — no VEKN identity,
-    # roles, cooptation, official links, ratings or wins.
     personal = msgspec.structs.replace(
         user,
         uid=new_uid,
@@ -308,9 +236,8 @@ async def detach_user_from_vekn(
     personal_bd = await save_user(personal)
     await reassign_auth_methods(user_uid, new_uid)
 
-    # The VEKN record keeps everything; only the PII that moved out is wiped.
-    # Sanctions and decks are NOT reassigned — they key on this stable uid.
-    # (calendar_token already cleared above; the None here is a no-op via COALESCE.)
+    # Sanctions/decks are NOT reassigned — they key on this stable uid.
+    # calendar_token=None here is a no-op via COALESCE (already cleared above).
     vekn_record = msgspec.structs.replace(
         user,
         modified=now,

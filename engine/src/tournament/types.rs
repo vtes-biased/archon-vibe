@@ -1,5 +1,3 @@
-//! Type definitions for tournament engine.
-
 use crate::error::EngineError;
 use json::JsonValue;
 
@@ -41,8 +39,8 @@ pub enum PlayerState {
     Registered,
     CheckedIn,
     Playing,
-    /// Open rounds: player reached their per-player round cap. Done with prelims, still present
-    /// and finals-eligible (distinct from Finished, which means withdrew/dropped/tournament-over).
+    /// Reached the per-player round cap: done with prelims, still finals-eligible
+    /// (distinct from `Finished`, which means withdrew/dropped/tournament-over).
     Completed,
     Finished,
     Disqualified,
@@ -76,7 +74,6 @@ impl PlayerState {
 
 #[derive(Debug, Clone)]
 pub enum TournamentEvent {
-    // State transitions
     OpenRegistration,
     CloseRegistration,
     CancelRegistration,
@@ -84,7 +81,6 @@ pub enum TournamentEvent {
     ReopenTournament,
     FinishTournament,
 
-    // Player management
     Register {
         user_uid: String,
         vekn_id: Option<String>,
@@ -115,20 +111,18 @@ pub enum TournamentEvent {
     CheckInAll,
     ResetCheckIn,
 
-    // Payment
     SetPaymentStatus {
         player_uid: String,
         status: String,
     },
     MarkAllPaid,
 
-    // Proxy (non-competing official standing in for a player; UI label "Proxy")
+    /// UI label is "Proxy" — the field name avoids colliding with `Tournament.proxies`.
     SetNonCompeting {
         player_uid: String,
         non_competing: bool,
     },
 
-    // Round management
     StartRound {
         seating: Option<Vec<Vec<String>>>,
     },
@@ -183,7 +177,6 @@ pub enum TournamentEvent {
         table: usize,
     },
 
-    // Finals
     SetToss {
         player_uid: String,
         toss: u32,
@@ -193,13 +186,11 @@ pub enum TournamentEvent {
     FinishFinals,
     CancelFinals,
 
-    // Seating alteration (batch)
     AlterSeating {
         round: usize,
         seating: Vec<Vec<String>>, // table -> player UIDs in order
     },
 
-    // Deck management
     UpsertDeck {
         player_uid: String,
         deck: JsonValue,
@@ -211,7 +202,6 @@ pub enum TournamentEvent {
         multideck: bool,
     },
 
-    // Raffle
     RaffleDraw {
         label: String,
         pool: String,
@@ -225,14 +215,13 @@ pub enum TournamentEvent {
     RaffleUndo,
     RaffleClear,
 
-    // Promo distribution report (replace-the-whole-list; no state gate —
-    // post-finish corrections are first-class)
+    /// Replace-the-whole-list; no state gate — post-finish corrections are
+    /// first-class.
     ReportPromos {
         promos: JsonValue,
         stock_source_uid: Option<String>,
     },
 
-    // Config update (partial fields)
     UpdateConfig {
         config: JsonValue,
     },
@@ -244,7 +233,6 @@ pub struct SeatScore {
     pub vp: f64,
 }
 
-/// VP validation error types
 #[derive(Debug, Clone, PartialEq)]
 pub enum VpError {
     InvalidTableSize,
@@ -252,18 +240,16 @@ pub enum VpError {
     /// being entered. Not an error the user should be shown.
     IncompleteTotal,
     ExcessiveTotal,
-    /// Every seat is scored and the total is one a real table can reach, but a
-    /// VP sits with a Methuselah who did not make the oust. Only a judge can
-    /// close this table.
+    /// A valid total, but a VP sits with a Methuselah who did not make the
+    /// oust — only a judge can close this table.
     RedirectedVp,
     MissingVp(usize),          // seat index (0-based)
     MissingHalfVp(Vec<usize>), // seat indices
 }
 
 impl VpError {
-    /// Stable code plus the seats at fault, for the UI to explain why a table
-    /// will not close. The `Debug` form stays log text; this is what callers
-    /// branch on.
+    /// Stable code plus seats at fault, for the UI. `Debug` stays log text —
+    /// callers branch on this instead.
     pub fn to_json(&self) -> JsonValue {
         let (code, seats): (&str, Vec<usize>) = match self {
             VpError::InvalidTableSize => ("invalid_table_size", vec![]),

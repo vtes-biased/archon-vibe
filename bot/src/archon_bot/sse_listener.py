@@ -1,5 +1,3 @@
-"""SSE subscription per organizer for real-time tournament state changes."""
-
 import asyncio
 import base64
 import binascii
@@ -38,21 +36,13 @@ from .token_store import TokenStore
 
 logger = logging.getLogger(__name__)
 
-# Hard cap on how long a single SSE event may take to handle. Handlers do
-# blocking Discord REST work (posting messages, creating voice channels); if one
-# stalls on an un-timed-out await, processing events INLINE in the read loop
-# would freeze stream consumption indefinitely (the listener goes silent — no
-# error, no reconnect, since sock_read never fires while stuck in a handler).
-# Bounding each dispatch turns a permanent wedge into a logged, recoverable skip;
-# any side-effect missed on a skip is repaired by reconcile on the next sync.
+# A handler stuck on an un-timed-out await freezes stream consumption silently —
+# sock_read never fires while stuck in a handler, so no error, no reconnect.
 _DISPATCH_TIMEOUT = 90
 
 
 def _access_token_expired(token: str, *, skew_seconds: int = 60) -> bool:
-    """Decode the UNVERIFIED JWT payload (the bot holds no signing secret) to read
-    ``exp``. True if it expires within ``skew_seconds`` or can't be parsed, so the
-    caller refreshes before connecting rather than after a 401.
-    """
+    """Decodes the UNVERIFIED JWT payload — the bot holds no signing secret."""
     try:
         payload_b64 = token.split(".")[1]
         payload_b64 += "=" * (-len(payload_b64) % 4)  # restore base64 padding
@@ -62,53 +52,41 @@ def _access_token_expired(token: str, *, skew_seconds: int = 60) -> bool:
         return True
 
 
-# Track active SSE tasks: guild_id+tournament_uid → asyncio.Task
+# All keyed by guild_id:tournament_uid (_task_key). Written by reconcile_channels,
+# read by the announcement layer to route sanctions/scores.
 _sse_tasks: dict[str, asyncio.Task] = {}
-
-# key → table/finals voice channel ids in desired order. Written by
-# reconcile_channels; read by the announcement layer to route sanctions/scores.
 _table_channels: dict[str, list[int]] = defaultdict(list)
 
-# key → the previous tournament snapshot: announcements diff against it and the
+# The previous tournament snapshot: announcements diff against it and the
 # reconcile guard hashes it. Seeded silently at catch-up, popped in stop_sse.
 _last_tournament: dict[str, dict] = {}
 
-# key → lock serializing all structural mutation (live/reconnect reconcile, /sync,
-# /teardown). NOT popped in stop_sse: popping mid-hold would hand a waiter a fresh
-# lock, and a torn-down link makes every holder no-op after its re-read anyway.
+# NOT popped in stop_sse: popping mid-hold would hand a waiter a fresh lock, and
+# a torn-down link makes every holder no-op after its re-read anyway.
 _structural_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
-# Cache participant identities (uid → {"name", "nickname", "discord_id"}) per
-# tournament, seeded from `user` SSE events (the scoped stream now pushes the
-# tournament's participants alongside the tournament object). Lets seating/
-# standings resolve a name for players not linked to Discord, and the judges
-# sync resolve organizers who linked Discord on the webapp but never ran
-# /register (User.discord_id is in the member projection). Popped in stop_sse.
+# Participant identities (uid → {"name", "nickname", "discord_id"}), seeded from
+# `user` SSE events, for players/organizers with no Discord link. Popped in stop_sse.
 _user_names: dict[str, dict[str, dict]] = defaultdict(dict)
 
-# key → organizer uids already flagged in #judges as having no known Discord
-# account (so the notice fires once per listener lifetime). Popped in stop_sse.
+# Organizer uids already flagged in #judges as having no known Discord account,
+# so the notice fires once per listener lifetime. Popped in stop_sse.
 _warned_unlinked_organizers: dict[str, set[str]] = defaultdict(set)
 
-
-# key → pending asyncio.Task for scheduled round-timer reminders. Cancelled and
-# rebuilt whenever the timer signature changes (start/pause/resume/extra-time/round
-# change) and after a reconnect's catch-up. Cleared in stop_sse.
+# Pending timer-reminder tasks; cancelled and rebuilt on every timer-signature
+# change and after a reconnect's catch-up. Cleared in stop_sse.
 _timer_tasks: dict[str, list[asyncio.Task]] = defaultdict(list)
 
-# key → reminder tokens (round_tag, table_index, threshold) already posted, so a
-# reschedule (re-broadcast, added extra time, reconnect) never double-fires. Reset
-# when the round_tag changes (a new round has fresh thresholds). Cleared in stop_sse.
-# The check-then-add in _fire_timer_reminder is unlocked: it relies on SSE dispatch
-# being serial (one event handled at a time) — parallelizing handlers would need a lock.
+# Reminder tokens (round_tag, table_index, threshold) already posted, so a
+# reschedule never double-fires. The check-then-add in _fire_timer_reminder is
+# unlocked: it relies on SSE dispatch being serial. Cleared in stop_sse.
 _timer_fired: dict[str, set] = defaultdict(set)
 
-# key → the round_tag _timer_fired currently belongs to; a change resets the set.
+# The round_tag _timer_fired currently belongs to; a change resets the set.
 _timer_round_tag: dict[str, str] = {}
 
 
 def _cache_user_identity(key: str, user_obj: dict) -> None:
-    """Record a participant's display identity from a `user` SSE event."""
     uid = user_obj.get("uid")
     if uid:
         _user_names[key][uid] = {
@@ -131,10 +109,6 @@ def structural_lock(guild_id: str, tournament_uid: str) -> asyncio.Lock:
 def find_player_table(
     guild_id: str, tournament_uid: str, player_uid: str
 ) -> tuple[int, int] | None:
-    """Find a player's (round_index, table_index) from cached tournament data.
-
-    Returns None if not found or no active round.
-    """
     key = _task_key(guild_id, tournament_uid)
     tournament = _last_tournament.get(key)
     if not tournament:
@@ -148,14 +122,12 @@ def find_player_table(
     if not rounds:
         return None
 
-    # Check latest round first
     round_idx = len(rounds) - 1
     for ti, table in enumerate(rounds[round_idx]):
         seating = table.get("seating", [])
         if any(s.get("player_uid") == player_uid for s in seating):
             return (round_idx, ti)
 
-    # Check finals (round index = len(rounds))
     finals = tournament.get("finals")
     if finals and not finals.get("result"):
         seating = finals.get("seating", [])
@@ -167,16 +139,15 @@ def find_player_table(
 
 async def start_sse(
     bot,
-    api,  # shared ArchonAPI instance
+    api,
     store: TokenStore,
     guild_id: str,
     tournament_uid: str,
     organizer_discord_id: str,
 ) -> None:
-    """Start an SSE listener for a tournament using the organizer's token."""
     key = _task_key(guild_id, tournament_uid)
     if key in _sse_tasks and not _sse_tasks[key].done():
-        return  # Already listening
+        return
 
     task = asyncio.create_task(
         _sse_loop(bot, api, store, guild_id, tournament_uid, organizer_discord_id)
@@ -185,19 +156,13 @@ async def start_sse(
 
 
 def tracked_table_channels(guild_id: str, tournament_uid: str) -> list[int]:
-    """Snapshot the table/finals voice channels currently tracked for a tournament.
-
-    ``/teardown`` passes these to ``teardown_tournament`` so it also deletes
-    channels that have drifted out of the category (which the category scan would
-    miss). Returns a copy; call it BEFORE ``stop_sse``, which clears the map.
-    """
+    """Call BEFORE ``stop_sse``, which clears the map this reads."""
     return [
         c for c in _table_channels.get(_task_key(guild_id, tournament_uid), []) if c
     ]
 
 
 async def stop_sse(guild_id: str, tournament_uid: str) -> None:
-    """Stop SSE listener for a tournament and clean up all cached state."""
     key = _task_key(guild_id, tournament_uid)
     task = _sse_tasks.pop(key, None)
     if task and not task.done():
@@ -214,19 +179,13 @@ async def stop_sse(guild_id: str, tournament_uid: str) -> None:
 
 
 async def probe_tournament(
-    api,  # shared ArchonAPI instance
+    api,
     store: TokenStore,
     organizer_discord_id: str,
     tournament_uid: str,
 ) -> dict | None:
-    """One-shot scoped-stream probe: return the tournament object, or None.
-
-    ``/setup`` calls this BEFORE creating channels/link/listener so a typo'd or
-    inaccessible uid creates nothing. The backend answers 200 regardless and
-    simply omits the tournament frame when the uid is unknown or unreadable, so
-    absence before ``sync_complete`` — like any connection failure — means
-    "not found / no access".
-    """
+    """The backend answers 200 and just omits the tournament frame when the uid
+    is unknown/unreadable, so absence before ``sync_complete`` means "no access"."""
     tokens = await store.get_tokens(organizer_discord_id)
     if not tokens:
         return None
@@ -266,7 +225,6 @@ async def probe_tournament(
 
 
 async def _read_probe_frames(resp, tournament_uid: str) -> dict | None:
-    """Read catch-up frames until the tournament object or ``sync_complete``."""
     data_lines: list[str] = []
     async for line_bytes in resp.content:
         line = line_bytes.decode("utf-8").rstrip("\n\r")
@@ -291,17 +249,12 @@ async def _read_probe_frames(resp, tournament_uid: str) -> dict | None:
 
 async def _sse_loop(
     bot,
-    api,  # shared ArchonAPI instance
+    api,
     store: TokenStore,
     guild_id: str,
     tournament_uid: str,
     organizer_discord_id: str,
 ) -> None:
-    """Long-running SSE connection that reacts to tournament state changes.
-
-    Uses a single aiohttp session for the lifetime of the loop, reused across
-    all reconnections. The session is scoped to this task.
-    """
     key = _task_key(guild_id, tournament_uid)
     retry_delay = 1
 
@@ -329,9 +282,7 @@ async def _sse_loop(
                 headers = {"Authorization": f"Bearer {tokens['access_token']}"}
                 async with session.get(
                     f"{config.ARCHON_URL}/stream",
-                    # Tournament-scoped: the backend streams only this
-                    # tournament + its sanctions + judge calls, not the whole
-                    # corpus (which overflowed aiohttp's 512KB line limit).
+                    # Scoped: the whole corpus overflowed aiohttp's 512KB line limit.
                     params={"tournament": tournament_uid},
                     headers=headers,
                     timeout=aiohttp.ClientTimeout(total=None, sock_read=300),
@@ -342,16 +293,12 @@ async def _sse_loop(
                             stale_access_token=tokens["access_token"],
                         )
                         if refreshed:
-                            # Fresh token: retry at once (token renewal is
-                            # one-shot, not a failure to back off from).
+                            # Token renewal is one-shot, not a failure to back off from.
                             continue
                         if not await store.get_tokens(organizer_discord_id):
-                            # Invalid grant — the pair was removed. Stop; a
-                            # fresh /register OAuth grant respawns this listener.
+                            # Invalid grant, pair removed; a fresh /register respawns this.
                             logger.error("Refresh token rejected for SSE, stopping")
                             return
-                        # Transient refresh failure (backend restart, timeout):
-                        # tokens kept — fall through to the backoff sleep.
                         logger.warning(
                             "Transient token refresh failure for SSE %s; will retry",
                             key,
@@ -366,11 +313,7 @@ async def _sse_loop(
                             tournament_uid,
                         )
 
-                        # The backend sends no `event:` field — every message is a
-                        # single `data: {"type":...}` line, so we dispatch on the
-                        # payload `type`, never on an SSE event name. `synced` flips
-                        # at `sync_complete`; before that we only seed state (no
-                        # announcements) so the catch-up replay doesn't spam.
+                        # No `event:` field; dispatch on the payload `type` instead.
                         synced = False
                         data_lines: list[str] = []
 
@@ -393,10 +336,6 @@ async def _sse_loop(
                                     continue
 
                                 if data.get("type") == "resync":
-                                    # Server wants a clean re-sync. Reconnect for
-                                    # a fresh scoped catch-up (the bot sends no
-                                    # `since`, so a reconnect always replays the
-                                    # tournament's full current state).
                                     logger.info(
                                         "Resync requested, reconnecting SSE for %s",
                                         key,
@@ -417,10 +356,8 @@ async def _sse_loop(
                                         timeout=_DISPATCH_TIMEOUT,
                                     )
                                 except TimeoutError:
-                                    # The connection is fine — only the handler
-                                    # stalled. Log and keep reading so one slow
-                                    # Discord call can't wedge the whole stream;
-                                    # reconcile repairs any missed side-effect.
+                                    # Connection is fine, only the handler stalled;
+                                    # keep reading — reconcile repairs the miss.
                                     logger.error(
                                         "Timed out (%ds) handling SSE %s for %s; "
                                         "skipping to keep the stream flowing",
@@ -428,10 +365,7 @@ async def _sse_loop(
                                         data.get("type"),
                                         key,
                                     )
-                                # Catch-up just completed: reconcile Discord to the
-                                # current tournament state (create round channels
-                                # missed while we were disconnected). Bounded
-                                # separately so a slow reconcile can't unset
+                                # Bounded separately so a slow reconcile can't unset
                                 # `synced` and silence live announcements.
                                 if synced and not was_synced:
                                     logger.info(
@@ -453,12 +387,9 @@ async def _sse_loop(
                                         logger.error("Reconcile timed out for %s", key)
                                     except Exception as e:
                                         logger.error("Reconcile failed: %s", e)
-                                # A completed catch-up proves the connection
-                                # works, so reset backoff for a prompt reconnect.
-                                # Reset only on a *healthy* sync — NOT right after
-                                # the 200 — so a connection that fails mid-read
-                                # (e.g. an oversized catch-up frame) keeps backing
-                                # off instead of hammering /stream once per second.
+                                # Reset only on a *healthy* sync, not right after the
+                                # 200, so a mid-read failure keeps backing off instead
+                                # of hammering /stream once per second.
                                 if synced:
                                     retry_delay = 1
                             # `:`-comment lines (": connected"/": keepalive") ignored
@@ -469,10 +400,8 @@ async def _sse_loop(
             except Exception as e:
                 logger.error("SSE error for %s: %s", key, e)
 
-            # Back off before every reconnect (clean EOF, non-200, resync, or
-            # error). Reset to 1 above only after a healthy sync. This line is
-            # the single observable proof the listener is still alive and will
-            # reconnect — if it stops appearing, the loop is wedged.
+            # This line is the single observable proof the listener is still
+            # alive and will reconnect — if it stops appearing, it's wedged.
             logger.info(
                 "SSE disconnected for %s; reconnecting in %ds", key, retry_delay
             )
@@ -481,13 +410,8 @@ async def _sse_loop(
 
 
 def _normalize_events(data: dict) -> list[dict]:
-    """Flatten one SSE message into a list of singular ``{type, data}`` events.
-
-    Catch-up and personal-overlay phases send plural arrays
-    (``{"type":"tournaments","data":[...]}``); the live phase sends singular
-    objects (``{"type":"tournament","data":{...}}``). Returns singular-typed
-    events uniformly either way (``users``→``user``, ``sanctions``→``sanction``).
-    """
+    """Catch-up sends plural arrays (``{"type":"tournaments","data":[...]}``);
+    live sends singular objects. Normalizes both to singular-typed events."""
     msg_type = data.get("type", "")
     payload = data.get("data")
     if isinstance(payload, list):
@@ -504,12 +428,8 @@ async def _dispatch_event(
     data: dict,
     synced: bool,
 ) -> bool:
-    """Route one parsed SSE message; return the updated ``synced`` flag.
-
-    Until ``sync_complete`` arrives we only seed state (no announcements) so a
-    (re)connect's catch-up replay doesn't spam every past transition into the
-    channels. After it, tournament/sanction objects drive live announcements.
-    """
+    """Until ``sync_complete`` arrives, only seed state — no announcements —
+    so a catch-up replay doesn't spam every past transition into the channels."""
     msg_type = data.get("type", "")
     key = _task_key(guild_id, tournament_uid)
 
@@ -525,7 +445,6 @@ async def _dispatch_event(
     events = _normalize_events(data)
 
     if not synced:
-        # Catch-up / overlay: seed tournament state, post nothing.
         logger.info("SSE catch-up: seeding %d object(s) for %s", len(events), key)
         _handle_snapshot(key, tournament_uid, events)
         return synced
@@ -537,12 +456,8 @@ async def _dispatch_event(
 
 
 def _handle_snapshot(key: str, tournament_uid: str, data: dict | list) -> None:
-    """Seed the previous-state snapshot from catch-up without posting anything.
-
-    Catch-up replays the tournament's full current state; recording it silently
-    means the next live event diffs against where we actually are (no spam), and a
-    reconnect's reconcile reads it to repair channels.
-    """
+    """Recording it silently means the next live event diffs against where we
+    actually are, and a reconnect's reconcile reads it to repair channels."""
     items = data if isinstance(data, list) else [data]
     for item in items:
         obj = item.get("data", item)
@@ -561,12 +476,8 @@ def _handle_snapshot(key: str, tournament_uid: str, data: dict | list) -> None:
 
 
 async def _post(bot, channel_id: int, content: str) -> None:
-    """Post a message to a channel, logging failures.
-
-    Logs before AND after the Discord call: a "→ create_message" with no
-    matching "✓" pins a hung/slow REST call (the listener-wedge failure mode) to the exact
-    channel, since the bot has no CI and we debug from logs.
-    """
+    """Logs before AND after the Discord call: a "→" with no matching "✓" pins a
+    hung/slow REST call to the exact channel — the bot has no CI, we debug from logs."""
     logger.info("→ create_message channel=%s (%d chars)", channel_id, len(content))
     try:
         await bot.rest.create_message(channel_id, content)
@@ -576,10 +487,6 @@ async def _post(bot, channel_id: int, content: str) -> None:
 
 
 def _extract_round_seating(tournament: dict) -> list[set[str]] | None:
-    """Extract current round seating as list of player UID sets per table.
-
-    Returns None if no active round.
-    """
     rounds = tournament.get("rounds", [])
     if not rounds:
         return None
@@ -592,7 +499,6 @@ def _extract_round_seating(tournament: dict) -> list[set[str]] | None:
 
 
 def _seat_results(table: dict) -> dict[str, tuple]:
-    """Map each seated player UID → its (gw, vp, tp) score tuple for diffing."""
     out: dict[str, tuple] = {}
     for s in table.get("seating", []):
         r = s.get("result") or {}
@@ -601,11 +507,8 @@ def _seat_results(table: dict) -> dict[str, tuple]:
 
 
 def _active_tables(obj: dict) -> tuple[str, list[dict]]:
-    """The tables whose voice channels are currently live in ``_table_channels``:
-    finals if seated, otherwise the latest round. The returned tag identifies the
-    context (``finals`` / ``round<N>``) so a round-change or prelim→finals
-    transition is never mistaken for a score being reported.
-    """
+    """The returned tag (``finals`` / ``round<N>``) lets a round-change or
+    prelim→finals transition be told apart from a score being reported."""
     finals = obj.get("finals") or {}
     if finals.get("seating"):
         return "finals", [finals]
@@ -622,27 +525,17 @@ def compute_result_announcements(
     players: list,
     user_names: dict | None = None,
 ) -> list[tuple[int, str]]:
-    """Pure: which table channels to notify of a reported score, and with what.
-
-    A table is announced when its seating is unchanged (same players) but a
-    reported score differs from the previous tournament snapshot — i.e. someone
-    entered or edited VPs. Skips:
-      - context changes (new round / finals start): tag mismatch — those have
-        their own seating announcement;
-      - seating swaps (different players at a position): handled elsewhere;
-      - no-op pushes (sanctions, check-ins, …) that left scores untouched.
-    Returns ``[(channel_id, message), …]`` index-aligned to ``table_chs``.
-    """
+    """Announces a table only when its seating is unchanged but a reported score
+    differs from the previous snapshot — a tag mismatch (round/finals change)
+    or seating swap is skipped, handled by their own announcements instead."""
     cur_tag, cur_tables = _active_tables(cur_obj)
     prev_tag, prev_tables = _active_tables(prev_obj)
     if not cur_tag or cur_tag != prev_tag:
         return []
     is_finals = cur_tag == "finals"
     out: list[tuple[int, str]] = []
-    # Positional alignment: cur_tables[i] ↔ table_chs[i]. Safe because the engine
-    # never reorders existing tables within a round; a mid-round table ADD only
-    # appends (i ≥ len(prev_tables) is clamped out — a fresh table has no prior
-    # score to diff), and a remove shrinks both lists from the tail.
+    # cur_tables[i] ↔ table_chs[i]: the engine never reorders existing tables
+    # within a round, a mid-round add only appends, and a remove shrinks the tail.
     for i, table in enumerate(cur_tables):
         # `not table_chs[i]` skips a 0 sentinel left by a failed reconcile create.
         if i >= len(table_chs) or i >= len(prev_tables) or not table_chs[i]:
@@ -665,14 +558,9 @@ def compute_result_announcements(
 def compute_announcement_posts(
     prev_obj: dict | None, cur_obj: dict
 ) -> list[tuple[str, str]]:
-    """Pure: organizer in-app announcements to mirror to Discord, in list order.
-
-    Diffs the tournament's append-only ``announcements`` list (newest last, capped
-    at 20) by ``id``: any id present in cur but not prev is new. Returns
-    ``[(id, message), …]``. Returns ``[]`` when ``prev_obj`` is None — catch-up
-    seeds the snapshot silently, so a (re)connect never re-posts the backlog (the
-    idempotency-across-restart guard the ticket calls for).
-    """
+    """Diffs the append-only ``announcements`` list by ``id``. Returns ``[]`` on a
+    None ``prev_obj`` — catch-up seeds it silently, so a reconnect never re-posts
+    the backlog."""
     if prev_obj is None:
         return []
     prev_ids = {a.get("id") for a in (prev_obj.get("announcements") or [])}
@@ -687,25 +575,16 @@ def compute_announcement_posts(
     return out
 
 
-# Terminal table states: play has stopped (result reported, voided, or finalized).
-# There is no top-level ``result`` field on a table (only per-seat ``result``), so
+# No top-level ``result`` field on a table (only per-seat ``result``), so
 # state + override is the only completion signal.
 _TABLE_DONE_STATES = {"Finished", "Invalid", "Cancelled"}
 
 
 def _table_pending(table: dict) -> bool:
-    """A table still being played — the only kind that wants a timer reminder.
-
-    Anything with a reported/voided/judge-finalized result (``Finished`` /
-    ``Invalid`` / ``Cancelled`` or an ``override``) has stopped play, so a
-    "15 minutes left" or "Time!" post would just be noise. An unset state
-    defaults to pending.
-    """
     return table.get("state") not in _TABLE_DONE_STATES and not table.get("override")
 
 
 def _live_round_count(obj: dict) -> int:
-    """Prelim rounds with at least one table still in play — the parallel-round gauge."""
     return sum(1 for r in obj.get("rounds", []) if any(_table_pending(t) for t in r))
 
 
@@ -716,8 +595,6 @@ _TIMER_THRESHOLDS = (900, 300, 0)
 
 @dataclass(frozen=True)
 class TimerReminder:
-    """One scheduled timer post: where, the dedup token, the delay, the text."""
-
     channel_id: int
     token: tuple
     delay: float  # wall-clock seconds from `now`; ≤0 means the threshold has passed
@@ -725,11 +602,7 @@ class TimerReminder:
 
 
 def _parse_started_at_epoch(started_at: str | None) -> float | None:
-    """Parse the timer's ISO ``started_at`` to a UTC epoch (seconds), or None.
-
-    msgspec serializes ``datetime.now(UTC)`` as an offset-aware ISO string; a bare
-    ``Z`` and naive strings are handled defensively (naive ⇒ assume UTC).
-    """
+    """A bare ``Z`` and naive strings are handled defensively (naive ⇒ assume UTC)."""
     if not started_at:
         return None
     try:
@@ -742,18 +615,9 @@ def _parse_started_at_epoch(started_at: str | None) -> float | None:
 def compute_timer_reminders(
     obj: dict, table_chs: list[int], now: float
 ) -> list[TimerReminder]:
-    """Pure: the per-table timer reminders to schedule, given ``now`` (UTC epoch).
-
-    Mirrors the frontend countdown exactly (TimerDisplay.svelte): per table,
-    ``remaining = total - (elapsed_before_pause + (now - started_at)) + extra``,
-    where ``total`` is ``finals_time or round_time`` for finals else ``round_time``.
-    A reminder's ``delay`` is when that table hits the threshold, in wall-clock
-    seconds from ``now``; the caller suppresses any ``delay ≤ 0`` (already passed)
-    so a reconnect/restart never posts a stale reminder.
-
-    Returns ``[]`` when no clock is running: not Playing, no ``round_time`` set,
-    paused, or no ``started_at`` — i.e. nothing to count down to.
-    """
+    """Mirrors the frontend countdown formula exactly (TimerDisplay.svelte):
+    ``remaining = total - (elapsed_before_pause + (now - started_at)) + extra``.
+    The two must change together or the bot's reminders drift from the display."""
     if obj.get("state", "") != "Playing":
         return []
     timer = obj.get("timer") or {}
@@ -767,9 +631,8 @@ def compute_timer_reminders(
     if not tag:
         return []
     is_finals = tag == "finals"
-    # Deactivate the timer during parallel rounds: it tracks one shared clock, which
-    # is meaningless once >1 prelim round is live (self-organized pods each push their
-    # own round). Mirrors the frontend, which hides the timer in the same case.
+    # One shared clock is meaningless once >1 prelim round is live; mirrors the
+    # frontend, which hides the timer in the same case.
     if not is_finals and _live_round_count(obj) > 1:
         return []
     total = (
@@ -787,10 +650,8 @@ def compute_timer_reminders(
         if i >= len(table_chs) or not table_chs[i]:  # skip 0 sentinel / missing
             continue
         if not _table_pending(table):
-            # Only tables still in play want a reminder. A table with a reported,
-            # voided, or judge-finalized result has stopped — and a finished finals
-            # (seating still populated) would otherwise keep a stale "Time!"
-            # scheduled until the tournament is formally finalized.
+            # A finished finals (seating still populated) would otherwise keep a
+            # stale "Time!" scheduled until the tournament is formally finalized.
             continue
         extra = extra_map.get(str(i), 0)
         deadline = started_epoch + total + extra - elapsed_before
@@ -808,13 +669,8 @@ def compute_timer_reminders(
 
 
 def _timer_signature(obj: dict) -> tuple:
-    """Cheap digest of the timer-affecting fields — the reschedule guard.
-
-    Equal between two snapshots ⇒ the schedule still holds (skips score/sanction
-    churn). The active-tables ``tag`` flips on a round change or prelim→finals; the
-    per-table pending flags flip when a table finishes early (so its reminder is
-    cancelled); the extra-time map flips when an extension pushes a deadline out.
-    """
+    """Equal between two snapshots means the schedule still holds — skips
+    score/sanction churn that doesn't touch any table's deadline."""
     timer = obj.get("timer") or {}
     tag, tables = _active_tables(obj)
     return (
@@ -832,7 +688,6 @@ def _timer_signature(obj: dict) -> tuple:
 
 
 def _cancel_timer_tasks(key: str) -> None:
-    """Cancel and drop all pending timer reminders for a tournament."""
     for t in _timer_tasks.get(key, []):
         if not t.done():
             t.cancel()
@@ -840,11 +695,8 @@ def _cancel_timer_tasks(key: str) -> None:
 
 
 async def _fire_timer_reminder(bot, key: str, reminder: TimerReminder) -> None:
-    """Sleep until a reminder's threshold, then post it once.
-
-    Cancellation (a reschedule supersedes this one) returns silently. The fired
-    set guards the narrow window where this posts just as a reschedule recomputes.
-    """
+    """The fired set guards the narrow window where this posts just as a
+    reschedule recomputes."""
     try:
         await asyncio.sleep(reminder.delay)
     except asyncio.CancelledError:
@@ -858,19 +710,11 @@ async def _fire_timer_reminder(bot, key: str, reminder: TimerReminder) -> None:
 async def _reschedule_timers(
     bot, guild_id: str, tournament_uid: str, obj: dict
 ) -> None:
-    """Rebuild a tournament's timer reminders from the current snapshot.
-
-    Idempotent and the single authority for the schedule: cancels everything
-    pending, then re-schedules each future threshold not already fired. A passed
-    threshold (``delay ≤ 0``) is marked fired WITHOUT posting — that suppresses
-    stale reminders on reconnect/restart. Reads the live table voice channels from
-    ``_table_channels`` (populated by reconcile), so reminders land in the same
-    per-table chats as score posts.
-    """
+    """The single authority for the schedule: a passed threshold is marked fired
+    WITHOUT posting, suppressing stale reminders on reconnect/restart."""
     key = _task_key(guild_id, tournament_uid)
     _cancel_timer_tasks(key)
 
-    # A new round/finals has fresh thresholds — drop the prior round's fired set.
     tag, _ = _active_tables(obj)
     if _timer_round_tag.get(key) != tag:
         _timer_round_tag[key] = tag
@@ -896,7 +740,6 @@ async def _reschedule_timers(
 async def _build_discord_id_map(
     store: TokenStore, archon_uids: set[str]
 ) -> dict[str, int]:
-    """Batch-lookup discord IDs and cast to int."""
     raw = await store.get_discord_ids_by_archon_uids(list(archon_uids))
     return {uid: int(did) for uid, did in raw.items()}
 
@@ -909,7 +752,6 @@ async def _warn_unlinked_players(
     players: list,
     user_names: dict | None = None,
 ) -> None:
-    """Post a warning to #judges about seated players without a Discord link."""
     unlinked = player_uids - set(discord_id_map.keys())
     if not unlinked:
         return
@@ -927,12 +769,7 @@ async def _warn_unlinked_players(
 async def _warn_unlinked_organizers(
     bot, key: str, judges_id: int, unlinked_uids: set[str], players: list
 ) -> None:
-    """One-time #judges notice for organizers with no known Discord account.
-
-    They can't see the (private) judges channel until they run ``/register``
-    once or link Discord on the webapp; the notice tells the linked organizers
-    who to nudge. Fires once per organizer per listener lifetime.
-    """
+    """Fires once per organizer per listener lifetime."""
     new = unlinked_uids - _warned_unlinked_organizers[key]
     if not new:
         return
@@ -965,24 +802,9 @@ async def reconcile_channels(
     tournament_uid: str,
     obj: dict,
 ) -> ReconcileSummary:
-    """The single idempotent authority for a tournament's round/finals voice channels.
-
-    Drives Discord to ``desired_channels(obj)`` from ONE ``fetch_guild_channels``
-    call, diffing by channel NAME (so a timed-out partial create converges without
-    duplicates): create the missing, delete the no-longer-desired, perm-sync the
-    survivors — threading each survivor's overrides off the payload so
-    ``sync_table_permissions`` never re-fetches per channel. Writes
-    ``_table_channels`` in desired order for the announcement layer.
-
-    An empty desired set (non-Playing, or a finished finals) deletes everything —
-    that IS round-close cleanup.
-
-    Callers MUST hold ``structural_lock``; the link is re-read here (teardown may
-    have removed it while we waited) and a missing link no-ops. v1 reconciles only
-    the volatile round/finals channels — never the category/text channels — but
-    aborts and warns #judges if the category itself is gone, rather than recreate
-    an unparented mess.
-    """
+    """Callers MUST hold ``structural_lock``. Reconciles only the volatile
+    round/finals channels, never category/text — aborts and warns #judges if
+    the category itself is gone rather than recreate an unparented mess."""
     key = _task_key(guild_id, tournament_uid)
     link = await store.get_tournament_link(guild_id, tournament_uid)
     if not link:
@@ -1019,7 +841,6 @@ async def reconcile_channels(
 
     summary = ReconcileSummary()
 
-    # No longer desired: closed round, prelim tables under finals, stale round prefix.
     extra = [ch for name, ch in current.items() if name not in desired_by_name]
     if extra:
         await delete_channels(bot, [int(ch.id) for ch in extra])
@@ -1057,9 +878,6 @@ async def reconcile_channels(
                 logger.warning("Reconcile %s: sync '%s' failed: %s", key, dc.name, e)
             name_to_id[dc.name] = int(ch.id)
 
-    # Judges channel: privacy + membership. Desired = the /setup runner plus the
-    # tournament's organizers, so a web-app organizer add/remove propagates on
-    # the next reconcile (structure_signature is keyed on the organizer set).
     judges_ch = next((ch for ch in channels if int(ch.id) == judges_id), None)
     if judges_ch is None:
         logger.warning(
@@ -1070,8 +888,7 @@ async def reconcile_channels(
     else:
         organizer_uids = set(obj.get("organizers_uids", []))
         judge_map = await _build_discord_id_map(store, organizer_uids)
-        # Fallback for organizers who never ran /register: the backend
-        # User.discord_id, delivered by the scoped stream's participant frames.
+        # Fallback for organizers who never ran /register.
         for uid in organizer_uids - set(judge_map):
             did = (_user_names[key].get(uid) or {}).get("discord_id")
             if did:
@@ -1081,10 +898,8 @@ async def reconcile_channels(
             await sync_judges_channel(bot, int(guild_id), judges_ch, desired_judges)
         except Exception as e:
             logger.warning("Reconcile %s: judges sync failed: %s", key, e)
-        # Warn only organizers whose identity is cached WITHOUT a discord_id: a
-        # uid with no cached user frame yet is likely a live add whose
-        # participant frame is still in flight — the user-event re-sync in
-        # _handle_update grants (or a later reconcile warns) when it lands.
+        # A uid with no cached user frame yet is likely a live add still in
+        # flight; only warn once its identity is cached and confirmed unlinked.
         known_unlinked = {
             uid
             for uid in organizer_uids - set(judge_map)
@@ -1094,9 +909,8 @@ async def reconcile_channels(
             bot, key, judges_id, known_unlinked, obj.get("players", [])
         )
 
-    # Positional: index i ↔ desired table i, the contract the announcement layer
-    # (score + sanction routing) indexes into. A failed create leaves a 0 sentinel
-    # so later tables keep their index instead of shifting; consumers skip 0.
+    # index i ↔ desired table i, the contract the announcement layer indexes
+    # into. A failed create leaves a 0 sentinel so later tables keep their index.
     _table_channels[key] = [name_to_id.get(dc.name, 0) for dc in desired]
     logger.info(
         "Reconcile %s: +%d -%d ~%d (state=%s, %d channels)",
@@ -1116,11 +930,7 @@ async def sync_now(
     guild_id: str,
     tournament_uid: str,
 ) -> ReconcileSummary | None:
-    """Reconcile against the cached tournament object, under the structural lock.
-
-    Backs the ``/sync`` command. Returns ``None`` if no tournament state is cached
-    yet (the listener is still connecting), else the reconcile summary.
-    """
+    """Returns ``None`` if no tournament state is cached yet (still connecting)."""
     async with structural_lock(guild_id, tournament_uid):
         obj = _last_tournament.get(_task_key(guild_id, tournament_uid))
         if obj is None:
@@ -1135,12 +945,8 @@ async def _handle_update(
     tournament_uid: str,
     data: dict,
 ) -> None:
-    """Handle one live SSE update (tournament, sanction, or participant user).
-
-    A tournament event splits in two: the STRUCTURAL half (channels+perms) is
-    reconciled only when ``structure_signature`` changes (skipping score-report
-    churn); the ANNOUNCEMENT half is edge-triggered off the prev→cur diff.
-    """
+    """A tournament event splits in two: the STRUCTURAL half is reconciled only
+    when ``structure_signature`` changes; the ANNOUNCEMENT half is edge-triggered."""
     obj_type = data.get("type")
 
     if obj_type == "sanction":
@@ -1148,17 +954,13 @@ async def _handle_update(
         return
 
     if obj_type == "user":
-        # Participant identity pushed alongside the tournament — cache it for name
-        # resolution; never announced directly.
         key = _task_key(guild_id, tournament_uid)
         user_obj = data.get("data") or {}
         uid = user_obj.get("uid")
         had_discord = bool((_user_names[key].get(uid) or {}).get("discord_id"))
         _cache_user_identity(key, user_obj)
         # Live-path ordering: a tournament frame reconciles BEFORE its
-        # participant user frames arrive, so an organizer added on the webapp
-        # can be unresolvable at that reconcile. Their late-arriving identity
-        # is the trigger to sync the judges channel again.
+        # participant frames, so a late-arriving identity re-triggers the sync.
         obj = _last_tournament.get(key)
         if (
             uid
@@ -1205,7 +1007,6 @@ async def _handle_update(
         len(obj.get("players", [])),
     )
 
-    # Structural half — only when the structure changed (skips score-report churn).
     if structure_signature(prev_obj or {}) != structure_signature(obj):
         async with structural_lock(guild_id, tournament_uid):
             try:
@@ -1213,7 +1014,6 @@ async def _handle_update(
             except Exception as e:
                 logger.error("Reconcile failed for %s: %s", key, e)
 
-    # Announcement half — edge-triggered.
     try:
         await _emit_announcements(
             bot, store, guild_id, tournament_uid, prev_obj, obj, link
@@ -1221,9 +1021,7 @@ async def _handle_update(
     except Exception as e:
         logger.error("Announcement emit failed for %s: %s", key, e)
 
-    # Scheduled-event half — driven off the public-field signature (name/start/
-    # finish/banner/state), independent of channel structure. Same structural lock so
-    # a concurrent reconcile can't race the stored event id.
+    # Same structural lock so a concurrent reconcile can't race the stored event id.
     if event_signature(prev_obj or {}) != event_signature(obj):
         async with structural_lock(guild_id, tournament_uid):
             try:
@@ -1233,10 +1031,8 @@ async def _handle_update(
             except Exception as e:
                 logger.error("Scheduled-event ensure failed for %s: %s", key, e)
 
-    # Timer half — reschedule per-table round-timer reminders when the timer state
-    # changed (start/pause/resume, added extra time, new round). No structural lock:
-    # it only touches in-process reminder tasks, never Discord channels. Runs after
-    # any structural reconcile above so _table_channels is current.
+    # No structural lock: only touches in-process tasks, never Discord channels.
+    # Runs after any structural reconcile above so _table_channels is current.
     if _timer_signature(prev_obj or {}) != _timer_signature(obj):
         try:
             await _reschedule_timers(bot, guild_id, tournament_uid, obj)
@@ -1256,11 +1052,8 @@ async def _emit_announcements(
     obj: dict,
     link: dict,
 ) -> None:
-    """The ANNOUNCEMENT half: edge-triggered posts on the prev→cur diff.
-
-    Deliberately NOT idempotent — each fires once on its transition (re-posting
-    seating would be spam). Channel structure/perms are ``reconcile_channels``'s job.
-    """
+    """Deliberately NOT idempotent — each fires once on its transition;
+    re-posting seating would be spam."""
     key = _task_key(guild_id, tournament_uid)
     announcement_id = int(link["announcement_channel_id"])
     lobby_id = int(link["lobby_channel_id"])
@@ -1277,7 +1070,6 @@ async def _emit_announcements(
     players = obj.get("players", [])
     round_count = len(rounds)
 
-    # ── Registration opened (Planned → Registration) ──
     if state == "Registration" and prev_state != "Registration":
         await _post(
             bot,
@@ -1296,7 +1088,6 @@ async def _emit_announcements(
             f"**{name}** — Registration opened.\nManage tournament: {webapp_url}",
         )
 
-    # ── Check-in opened (Registration → Waiting) ──
     if state == "Waiting" and prev_state == "Registration":
         registered = len(players)
         decklist_note = ""
@@ -1326,7 +1117,6 @@ async def _emit_announcements(
             f"Close check-in and start Round 1 from the webapp when ready.\n{webapp_url}",
         )
 
-    # ── Round finished → back to Waiting (channel cleanup is reconcile's job) ──
     if state == "Waiting" and prev_state == "Playing":
         standings = obj.get("standings", [])
         standings_mode = obj.get("standings_mode", "Private")
@@ -1351,15 +1141,12 @@ async def _emit_announcements(
             f"Start next round or finals from the webapp.\n{webapp_url}",
         )
 
-    # ── New round started ──
     if state == "Playing" and round_count > prev_round_count and rounds:
         await _announce_round_seating(bot, store, guild_id, tournament_uid, obj, link)
 
-    # ── Finals started ──
     if obj.get("finals") and state == "Playing" and prev_state != "Playing":
         await _announce_finals(bot, store, guild_id, tournament_uid, obj, link)
 
-    # ── Mid-round seating change (SwapSeats, AlterSeating, AddTable, …) ──
     if (
         state == "Playing"
         and round_count == prev_round_count
@@ -1377,23 +1164,18 @@ async def _emit_announcements(
                 bot, store, guild_id, tournament_uid, obj, link
             )
 
-    # ── Score reported at a table (open reporting = anti-cheat visibility) ──
-    # A pure score report makes no structural change, so reconcile was skipped and
-    # _table_channels still maps the live tables. Gated on Playing — Finished has none.
+    # A pure score report makes no structural change, so _table_channels still
+    # maps the live tables (reconcile was skipped).
     if state == "Playing" and prev_obj is not None:
         for ch_id, msg in compute_result_announcements(
             prev_obj, obj, _table_channels.get(key, []), players, _user_names[key]
         ):
             await _post(bot, ch_id, msg)
 
-    # ── Organizer in-app announcements mirrored to the Discord announcement channel ──
-    # Diffed by id against the prev snapshot (catch-up seeds it silently, so a
-    # reconnect doesn't re-post the backlog). Not state-gated — an organizer can
-    # broadcast at any phase.
+    # Not state-gated — an organizer can broadcast at any phase.
     for _aid, msg in compute_announcement_posts(prev_obj, obj):
         await _post(bot, announcement_id, msg)
 
-    # ── Tournament finished (channel cleanup is reconcile's job) ──
     if state == "Finished" and prev_state != "Finished":
         standings = obj.get("standings", [])
         winner = obj.get("winner", "")
@@ -1430,7 +1212,6 @@ async def _announce_round_seating(
     obj: dict,
     link: dict,
 ) -> None:
-    """Post a new round's seating to #announcement + #judges; warn unlinked players."""
     key = _task_key(guild_id, tournament_uid)
     announcement_id = int(link["announcement_channel_id"])
     judges_id = int(link["judges_channel_id"])
@@ -1480,7 +1261,6 @@ async def _announce_finals(
     obj: dict,
     link: dict,
 ) -> None:
-    """Post the finalists to #announcement + #judges; warn unlinked finalists."""
     key = _task_key(guild_id, tournament_uid)
     announcement_id = int(link["announcement_channel_id"])
     judges_id = int(link["judges_channel_id"])
@@ -1526,7 +1306,6 @@ async def _announce_seating_update(
     obj: dict,
     link: dict,
 ) -> None:
-    """Post updated mid-round seating to #announcement; warn newly unlinked players."""
     key = _task_key(guild_id, tournament_uid)
     announcement_id = int(link["announcement_channel_id"])
     judges_id = int(link["judges_channel_id"])
@@ -1569,36 +1348,23 @@ async def _reconcile(
     guild_id: str,
     tournament_uid: str,
 ) -> None:
-    """Repair channels to the seeded state after a (re)connect's silent catch-up.
-
-    reconcile_channels makes Discord match current state (create missing, delete a
-    closed round's, re-adopt existing), so a normal reconnect is silent. STRUCTURAL
-    ONLY by design: a seating announcement missed during the disconnect is not
-    replayed (it can't be edge-derived without re-spamming every reconnect); the
-    voice channels — what players need — are always restored.
-    """
+    """STRUCTURAL ONLY by design: a seating announcement missed during the
+    disconnect is not replayed; the voice channels are always restored."""
     key = _task_key(guild_id, tournament_uid)
     obj = _last_tournament.get(key)
     state = obj.get("state", "") if obj else "(none)"
     logger.info("Reconciling %s after (re)connect (state=%s)", key, state)
     if not obj:
-        # Catch-up filters deleted_at IS NULL, so a tournament soft-deleted while the
-        # bot was DOWN never reappears here — no ensure runs, and any scheduled event
-        # is left for /teardown to remove (the authority for a deleted tournament's
-        # Discord cleanup). Narrow window: tournament delete is PLANNED-state only.
+        # A tournament soft-deleted while the bot was DOWN never reappears here
+        # (catch-up filters deleted_at); /teardown is the authority for its cleanup.
         return
     async with structural_lock(guild_id, tournament_uid):
         await reconcile_channels(bot, store, guild_id, tournament_uid, obj)
-        # Initial create + restart idempotency: the stored event id survives in
-        # SQLite, so ensure no-ops (edits) rather than double-creating.
         try:
             await ensure_scheduled_event(bot, store, guild_id, tournament_uid, obj)
         except Exception as e:
             logger.error("Scheduled-event ensure failed for %s: %s", key, e)
 
-    # Re-arm timer reminders from the seeded snapshot (channels now reconciled): a
-    # restart mid-round rebuilds the schedule — passed thresholds are suppressed,
-    # still-future ones re-scheduled. No persisted cron; this is the recompute.
     try:
         await _reschedule_timers(bot, guild_id, tournament_uid, obj)
     except Exception as e:
@@ -1608,13 +1374,8 @@ async def _reconcile(
 def sanction_table_channel(
     tournament: dict | None, round_number: int, user_uid: str, table_chs: list[int]
 ) -> int | None:
-    """Pure: the table voice channel to notify of a sanction, or None (→ lobby).
-
-    ``table_chs`` maps the LIVE context's channels (reconcile's contract), so a
-    sanction routes to a table only when its round IS that context — a past
-    round's same-index table would seat strangers, and a live finals replaces
-    the prelim channels. Everything else falls back to the lobby.
-    """
+    """``table_chs`` maps the LIVE context only, so a past round's same-index
+    table (which would seat strangers) falls back to the lobby instead."""
     if not tournament or not table_chs:
         return None
     tag, live_tables = _active_tables(tournament)
@@ -1635,20 +1396,11 @@ async def _handle_sanction_update(
     tournament_uid: str,
     data: dict,
 ) -> None:
-    """Handle a sanction SSE event.
-
-    - Always posts to #judges channel
-    - If the sanction targets the live round and the player's table channel
-      exists: posts to that table channel
-    - Otherwise: posts to #lobby
-    """
     obj = data.get("data", data)
 
-    # Only handle sanctions for this tournament
     if obj.get("tournament_uid") != tournament_uid:
         return
 
-    # Skip lifted/deleted sanctions
     if obj.get("lifted_at") or obj.get("deleted_at"):
         return
 
@@ -1666,7 +1418,6 @@ async def _handle_sanction_update(
     round_number = obj.get("round_number")
     user_uid = obj.get("user_uid", "")
 
-    # Try to find the player's Discord mention
     player_discord_id = await store.get_discord_id_by_archon_uid(user_uid)
     player_mention = f"<@{player_discord_id}>" if player_discord_id else user_uid[:8]
 
@@ -1681,16 +1432,12 @@ async def _handle_sanction_update(
         _task_key(guild_id, tournament_uid),
     )
 
-    # Post to judges channel
     try:
         logger.info("→ create_message sanction→judges channel=%s", judges_id)
         await bot.rest.create_message(judges_id, judges_msg)
     except Exception as e:
         logger.warning("Failed to post sanction to judges: %s", e)
 
-    # Notify the player in the appropriate channel:
-    # - If the sanction targets the live round, post to the player's table
-    # - Otherwise, post to lobby
     key = _task_key(guild_id, tournament_uid)
 
     posted_to_table = False
@@ -1710,7 +1457,6 @@ async def _handle_sanction_update(
                 logger.warning("Failed to post sanction to table %s: %s", target, e)
 
     if not posted_to_table:
-        # Past-round correction, no live tables, or player not seated — post to lobby
         try:
             logger.info("→ create_message sanction→lobby channel=%s", lobby_id)
             await bot.rest.create_message(lobby_id, player_msg)
@@ -1725,12 +1471,8 @@ async def _handle_judge_call(
     tournament_uid: str,
     data: dict,
 ) -> None:
-    """Handle a judge_call ephemeral event.
-
-    ``data`` is the inner payload (``{tournament_uid, table, table_label,
-    player_name}``). One organizer token streams judge calls for all their
-    tournaments, so filter to this listener's tournament.
-    """
+    """One organizer token streams judge calls for all their tournaments, so
+    filter to this listener's tournament."""
     if data.get("tournament_uid") != tournament_uid:
         return
 

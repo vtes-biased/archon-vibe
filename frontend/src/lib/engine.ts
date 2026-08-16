@@ -1,32 +1,16 @@
-/**
- * WASM Engine wrapper for offline-first tournament operations.
- *
- * This module provides a typed interface to the Rust engine compiled to WASM.
- * It enables identical business logic in browser (offline) and server (online).
- */
-
 import type { DeckObject, Sanction, SanctionCategory, SanctionLevel, SanctionSubcategory, Tournament, User } from './types';
 import { getAllLeagues } from './db';
 import { engineReady, markEngineReady, markEngineLoadFailed } from './stores/engine-ready.svelte';
 import { engineErrorFromThrown } from './error-codes';
 
-// Import types from the WASM package (path from frontend/src/lib/ to engine/pkg/)
 type WasmEngine = import('../../../engine/pkg/archon_engine').WasmEngine;
 
-// Content-hashed .wasm asset URL, resolved by Vite. We hand it to the
-// wasm-bindgen init explicitly (see initEngine) rather than relying on the glue's
-// default — `new URL('archon_engine_bg.wasm', import.meta.url)` resolves relative
-// to the *chunk* it's bundled into (/_app/immutable/chunks/), doubling the path
-// to /_app/immutable/chunks/_app/immutable/assets/…wasm → 404 (engine never loads).
-// Vite emits this as a base-relative string ("./_app/immutable/assets/…wasm").
+// wasm-bindgen's default init resolves `new URL(wasmUrl, import.meta.url)` against the chunk it's
+// bundled into, doubling the path and 404ing — hand it wasmUrl explicitly instead (see initEngine).
 import wasmUrl from '../../../engine/pkg/archon_engine_bg.wasm?url';
 
-/**
- * Run a raw WASM engine call. wasm-bindgen throws the `Err` arm as a JS string
- * primitive — since that string is the engine's `{code,params,message}`
- * wire JSON — so re-throw it as a typed `EngineError` for localized display.
- * The catch wraps the call itself, NOT the `JSON.parse` of its success result.
- */
+/** wasm-bindgen throws the Err arm as a JS string (the engine's `{code,params,message}` JSON), so
+ * re-throw it as a typed `EngineError`. The catch wraps only the call, not the `JSON.parse` of a success. */
 export function callEngine<T>(fn: () => T): T {
   try {
     return fn();
@@ -40,10 +24,6 @@ let initPromise: Promise<void> | null = null;
 let initError: Error | null = null;
 
 
-/**
- * Initialize the WASM engine (lazy, called once).
- * Exported for use in layout initialization.
- */
 export async function initEngine(): Promise<WasmEngine> {
   if (wasmEngine) return wasmEngine;
   if (initError) throw initError;
@@ -52,16 +32,14 @@ export async function initEngine(): Promise<WasmEngine> {
     initPromise = (async () => {
       try {
         const wasm = await import('../../../engine/pkg/archon_engine');
-        // Root the base-relative `wasmUrl` against the origin. The glue feeds it
-        // to fetch(), which would otherwise resolve "./_app/…" against the current
-        // page — fine on "/", but 404 on deep routes (e.g. /tournaments/<uid>).
-        // paths.base is empty, so origin-rooted "/_app/…" matches every other asset.
+        // Root the base-relative wasmUrl against the origin: fetch() would otherwise resolve it
+        // against the current page, which 404s on deep routes (e.g. /tournaments/<uid>).
         await wasm.default({ module_or_path: new URL(wasmUrl, location.origin).href });
         wasmEngine = new wasm.WasmEngine();
         markEngineReady();
       } catch (e) {
         initError = e instanceof Error ? e : new Error(String(e));
-        markEngineLoadFailed(); // reactive signal so the UI can surface the degraded state
+        markEngineLoadFailed();
         throw initError;
       }
     })();
@@ -71,9 +49,6 @@ export async function initEngine(): Promise<WasmEngine> {
   return wasmEngine!;
 }
 
-/**
- * Score seating synchronously (returns null if engine not initialized).
- */
 export function scoreSeatingSync(
   rounds: string[][][]
 ): { rules: number[]; minimums: number[]; mean_vps: number; mean_transfers: number } | null {
@@ -87,22 +62,16 @@ export function scoreSeatingSync(
   }
 }
 
-// Preview memo: template {@const}s call previewScoresSync once per rendered
-// seat, so key on object identity (tournament/sanctions are replaced wholesale
-// on every update) and serialize the tournament only once per table per update.
+// Keyed on tournament/sanctions object identity (both replaced wholesale each update), so repeated
+// {@const} calls per rendered seat serialize the tournament once per table per update.
 let previewCache: {
   tournament: Tournament;
   sanctions: Sanction[] | undefined;
   results: Map<string, { gw: number[]; tp: number[] } | null>;
 } | null = null;
 
-/**
- * Preview GW/TP for one table exactly as the engine's SetScore computes them —
- * including standings-adjustment penalties — so the live preview can never
- * drift from persisted results. `round === tournament.rounds.length` previews
- * the finals table (`table` ignored). Returns null if the engine isn't
- * initialized (callers fall back to stored results).
- */
+/** Computes GW/TP exactly as SetScore does, so the preview never drifts from persisted results.
+ * `round === tournament.rounds.length` previews the finals table (`table` param ignored). */
 export function previewScoresSync(
   tournament: Tournament,
   sanctions: Sanction[] | undefined,
@@ -147,11 +116,8 @@ export type VpIssue = {
   seats: number[];
 };
 
-/**
- * Explain why a table won't close, using the same check that decides its state
- * server-side. Returns null when the VPs are scorable (or the engine isn't up —
- * callers then say nothing rather than guessing).
- */
+/** Same check that decides a table's close-state server-side. Null when scorable, or when the
+ * engine isn't up (callers then say nothing rather than guessing). */
 export function checkTableVpsSync(vps: number[]): VpIssue | null {
   const engine = getEngineReactive();
   if (!engine) return null;
@@ -235,7 +201,6 @@ export interface TournamentEvent {
   deck_index?: number | null;
   multideck?: boolean;
   config?: Record<string, unknown>;
-  // Raffle
   label?: string;
   pool?: string;
   exclude_drawn?: boolean;
@@ -251,10 +216,6 @@ export interface ActorContext {
   now?: string; // request timestamp (ISO-8601 UTC); resolves suspension expiry in the engine
 }
 
-/**
- * Build sanctions payload for the Rust engine.
- * Extracts only the fields the engine needs from full Sanction objects.
- */
 export function buildSanctionsPayload(sanctions: Sanction[]): string {
   return JSON.stringify(
     sanctions
@@ -287,9 +248,6 @@ export interface EngineResult {
   deckOps: DeckOp[];
 }
 
-/**
- * Build decks metadata JSON for the engine's decks parameter.
- */
 function buildDecksPayload(decks: DeckObject[]): string {
   return JSON.stringify(
     decks.map(d => ({
@@ -300,16 +258,6 @@ function buildDecksPayload(decks: DeckObject[]): string {
   );
 }
 
-/**
- * Process a tournament event using the WASM engine.
- *
- * @param tournament Current tournament state
- * @param event Event to process
- * @param actor User performing the action
- * @param sanctions Sanctions for this tournament
- * @param decks Existing deck objects for this tournament
- * @returns Updated tournament state and deck operations
- */
 export async function processTournamentEvent(
   tournament: Tournament,
   event: TournamentEvent,
@@ -335,11 +283,8 @@ export async function processTournamentEvent(
   };
 }
 
-/**
- * Recompute standings from current sanctions. Offline sanction management:
- * the device-locked client mirrors the server's PyEngine.update_standings —
- * same shared Rust, fed from IDB sanctions instead of Postgres.
- */
+/** Offline sanction management: the device-locked client mirrors the server's
+ * PyEngine.update_standings — same shared Rust, fed from IDB sanctions instead of Postgres. */
 export async function updateStandings(
   tournament: Tournament,
   sanctions: Sanction[]
@@ -351,32 +296,17 @@ export async function updateStandings(
   return JSON.parse(resultJson) as Tournament;
 }
 
-/**
- * Permission result from the engine.
- */
 export interface PermissionResult {
   allowed: boolean;
   reason: string | null;
 }
 
-/**
- * Get the engine synchronously (returns null if not initialized).
- */
 function getEngineSync(): WasmEngine | null {
   return wasmEngine;
 }
 
-/**
- * Subscribe the current reaction to WASM readiness and return the engine.
- *
- * `wasmEngine` is a plain module `let` Svelte can't track, so a sync wrapper
- * called inside a `$derived`/render that only read `getEngineSync()` would
- * compute once cold (engine null → fallback) and never recover. Reading
- * `engineReady()` here registers a reactive dependency, so every sync wrapper
- * below re-runs once the engine lands. Harmless outside a reaction (returns the
- * flag, registers nothing). Async wrappers don't need this — they `await
- * initEngine()` and so always resolve hot.
- */
+/** `wasmEngine` is a plain module `let` Svelte can't track; reading `engineReady()` here registers
+ * a reactive dependency so sync wrappers below re-run once the engine loads, instead of computing once cold. */
 function getEngineReactive(): WasmEngine | null {
   engineReady();
   return getEngineSync();
@@ -391,10 +321,6 @@ export interface SanctionReference {
 
 let sanctionReference: SanctionReference | null = null;
 
-/**
- * Judges-Guide penalty reference from the engine (sync; null until the
- * engine is initialized). Static data — parsed once, then cached.
- */
 export function getSanctionReference(): SanctionReference | null {
   if (sanctionReference) return sanctionReference;
   const engine = getEngineReactive();
@@ -412,21 +338,11 @@ export function getSanctionReference(): SanctionReference | null {
   return sanctionReference;
 }
 
-// Type for user context in permission checks
 type UserContext = { uid: string; roles?: string[] | null; country?: string | null; vekn_id?: string | null };
 type Resource = { country?: string | null; organizers_uids?: string[] };
 
-/**
- * Ask the engine whether `actor` holds `capability` in this context.
- *
- * The single authorization entry point: every gate below is one call of this,
- * naming a capability from the engine's table (engine/src/permissions.rs).
- * Fill only what the capability reads — an absent field matches no grant.
- *
- * Fail-closed: denies with a null reason until the WASM engine is loaded, so a
- * cold page never shows a control the backend would refuse. Callers rendering a
- * deny reason should treat null as "not yet known".
- */
+/** Single authorization entry point: every capability check below is one call of this, naming a
+ * capability from engine/src/permissions.rs. Fail-closed (null reason) until WASM loads — fill only what the capability reads. */
 function checkPermission(
   capability: string,
   actor: UserContext | null,
@@ -457,7 +373,6 @@ function checkPermission(
   return JSON.parse(callEngine(() => engine.checkPermission(capability, JSON.stringify(request))));
 }
 
-/** Grant or revoke one role — see the engine's appointment matrix. */
 export function canChangeRole(
   actor: UserContext,
   target: UserContext,
@@ -477,10 +392,7 @@ export function canChangeRole(
   return JSON.parse(resultJson);
 }
 
-/**
- * Move a member between countries. For an official target this takes the
- * authority that could change their highest official role.
- */
+/** For an official target this takes the authority that could change their highest official role. */
 export function canChangeCountry(actor: UserContext, target: UserContext): PermissionResult {
   const engine = getEngineReactive();
   if (!engine) return { allowed: false, reason: null };
@@ -496,12 +408,8 @@ export function canChangeCountry(actor: UserContext, target: UserContext): Permi
   return JSON.parse(resultJson);
 }
 
-/**
- * Whether a member holds the official badge (IC/NC/Prince).
- *
- * Identity, not authority — badges, quotas and warnings only. Never gate on it:
- * ask for the capability the control actually needs.
- */
+/** Identity, not authority — badges, quotas and warnings only. Never gate on this: ask for the
+ * capability the control actually needs. */
 export function isOfficial(user: UserContext | null): boolean {
   if (!user) return false;
   const engine = getEngineReactive();
@@ -509,31 +417,24 @@ export function isOfficial(user: UserContext | null): boolean {
   return callEngine(() => engine.isOfficial(JSON.stringify({ roles: user.roles ?? [] })));
 }
 
-/**
- * Bring someone into VEKN: mint a member record, or issue a VEKN ID to an
- * account that has none. One authority — both allocate an ID and stamp
- * coopted_by. Deliberately cross-country.
- */
+/** Mints a member record or issues a VEKN ID to an existing account — one authority for both,
+ * which also stamps `coopted_by`. Deliberately cross-country. */
 export function canSponsorMember(actor: UserContext | null): PermissionResult {
   return checkPermission('sponsor_member', actor);
 }
 
-/** Edit a user's profile fields. */
 export function canEditUser(actor: UserContext | null, target: UserContext): PermissionResult {
   return checkPermission('edit_member_profile', actor, { target });
 }
 
-/** Link or force-abandon a target's VEKN ID. */
 export function canManageVekn(actor: UserContext | null, target: UserContext): PermissionResult {
   return checkPermission('manage_vekn', actor, { target });
 }
 
-/** Merge one account into another. */
 export function canMergeAccounts(actor: UserContext | null): PermissionResult {
   return checkPermission('merge_accounts', actor);
 }
 
-/** Set or clear a member's deceased status. */
 export function canMarkDeceased(
   actor: UserContext | null,
   targetCountry: string | null
@@ -541,17 +442,15 @@ export function canMarkDeceased(
   return checkPermission('mark_deceased', actor, { targetCountry });
 }
 
-/** Soft-delete a member. The target-must-be-VEKN-less rule is enforced by the route. */
+/** The target-must-be-VEKN-less rule is enforced by the route, not here. */
 export function canDeleteMember(actor: UserContext | null): PermissionResult {
   return checkPermission('delete_member', actor);
 }
 
-/** Hide or clear a member's community link (self-moderation included). */
 export function canModerateLink(actor: UserContext | null, target: UserContext): PermissionResult {
   return checkPermission('moderate_link', actor, { target });
 }
 
-/** Promote a link to the national listing. */
 export function canPromoteLinkNational(
   actor: UserContext | null,
   target: UserContext
@@ -559,25 +458,20 @@ export function canPromoteLinkNational(
   return checkPermission('promote_link_national', actor, { target });
 }
 
-/** Promote a link to the global listing. */
 export function canPromoteLinkGlobal(actor: UserContext | null): PermissionResult {
   return checkPermission('promote_link_global', actor);
 }
 
-/** Create a tournament. */
 export function canCreateTournament(actor: UserContext | null): PermissionResult {
   return checkPermission('create_tournament', actor);
 }
 
-/** Create and delete leagues. */
 export function canManageLeagues(actor: UserContext | null): PermissionResult {
   return checkPermission('manage_leagues', actor);
 }
 
-/**
- * Take a tournament offline, or force-take its lock: run the event AND hold the
- * member-creation power the lock carries. Fail-closed until WASM is loaded.
- */
+/** Governs both going offline and force-taking the lock: the event action AND the
+ * member-creation power the lock carries share one capability check. */
 export function canTakeTournamentOffline(
   user: UserContext | null,
   tournament: Resource
@@ -595,32 +489,26 @@ export function canTakeTournamentOffline(
   ).allowed;
 }
 
-/** Break an offline device lock. */
 export function canForceUnlockTournament(actor: UserContext | null): PermissionResult {
   return checkPermission('force_unlock_tournament', actor);
 }
 
-/** Create, edit and allocate promos. */
 export function canManagePromos(actor: UserContext | null): PermissionResult {
   return checkPermission('manage_promos', actor);
 }
 
-/** See the whole promo ledger rather than one's own entries. */
 export function canViewFullPromoLedger(actor: UserContext | null): PermissionResult {
   return checkPermission('view_full_promo_ledger', actor);
 }
 
-/** Register and revoke OAuth clients. */
 export function canManageOauthClients(actor: UserContext | null): PermissionResult {
   return checkPermission('manage_oauth_clients', actor);
 }
 
-/** Trigger and inspect the VEKN/TWDA sync jobs. */
 export function canRunAdminSync(actor: UserContext | null): PermissionResult {
   return checkPermission('run_admin_sync', actor);
 }
 
-/** Issue an organizer-level sanction at a tournament. */
 export function canIssueTournamentSanction(
   actor: UserContext | null,
   tournament: Resource
@@ -628,15 +516,10 @@ export function canIssueTournamentSanction(
   return checkPermission('issue_tournament_sanction', actor, { resource: tournament });
 }
 
-/** Issue a suspension or probation. */
 export function canIssueRestrictedSanction(actor: UserContext | null): PermissionResult {
   return checkPermission('issue_restricted_sanction', actor);
 }
 
-/**
- * Run a tournament: an explicit organizer, or implicitly IC/NC.
- * Fail-closed (false) until the WASM engine is loaded — never default-allow.
- */
 export function isOrganizer(
   user: UserContext | null,
   tournament: Resource
@@ -644,9 +527,6 @@ export function isOrganizer(
   return checkPermission('organize_tournament', user, { resource: tournament }).allowed;
 }
 
-/**
- * Edit a league. Fail-closed (false) until the WASM engine is loaded.
- */
 export function canEditLeague(
   user: UserContext | null,
   league: Resource
@@ -654,11 +534,7 @@ export function canEditLeague(
   return checkPermission('edit_league', user, { resource: league }).allowed;
 }
 
-/**
- * Check if a user can attach a tournament to a league (sync): league editors,
- * or a same-country Prince when the league is open to them.
- * Fail-closed (false) until the WASM engine is loaded.
- */
+/** League editors, or a same-country Prince when the league is `open_to_country_princes`. */
 export function canLinkTournamentToLeague(
   user: { uid: string; roles?: string[]; country?: string | null } | null,
   league: { country?: string | null; organizers_uids?: string[]; open_to_country_princes?: boolean }
@@ -675,10 +551,6 @@ export function canLinkTournamentToLeague(
   return JSON.parse(callEngine(() => engine.canLinkTournamentToLeague(actorJson, user.uid, leagueJson))).allowed;
 }
 
-/**
- * Compute rating points for a single tournament entry using the WASM engine.
- * Returns 0 if engine is not initialized.
- */
 export function computeRatingPoints(
   vp: number,
   gw: number,
@@ -691,10 +563,8 @@ export function computeRatingPoints(
   return engine.computeRatingPoints(vp, gw, finalistPosition, playerCount, rank);
 }
 
-/**
- * A player's SA-adjusted (vp, gw), finals included — the same aggregation backend
- * ratings.py stores. Null while the engine isn't loaded.
- */
+/** A player's SA-adjusted (vp, gw), finals included — the same aggregation backend
+ * ratings.py stores. Null while the engine isn't loaded. */
 export function computeRatingVpGw(
   tournamentJson: string,
   sanctionsJson: string,
@@ -707,25 +577,14 @@ export function computeRatingVpGw(
   return vp === undefined || gw === undefined ? null : [vp, gw];
 }
 
-/**
- * Ranking-eligibility gate (VEKN rules 3.1/3.1.6), single-sourced in the engine
- * alongside backend ratings.py's inclusion filter.
- * Returns "eligible" | "open_rounds" | "few_players" | "no_final",
- * or null while the engine isn't loaded yet.
- */
+/** VEKN rules 3.1/3.1.6 ranking-eligibility gate, single-sourced with backend
+ * ratings.py's inclusion filter. */
 export function rankingEligibility(tournament: unknown): string | null {
   const engine = getEngineReactive();
   if (!engine) return null;
   return engine.rankingEligibility(JSON.stringify(tournament));
 }
 
-/**
- * Compute league standings using the WASM engine.
- *
- * @param standingsMode "RTP" | "Score" | "GP"
- * @param tournaments Array of finished tournament data
- * @returns Array of standing entries sorted by ranking
- */
 export async function computeLeagueStandings(
   standingsMode: string,
   tournaments: Array<{
@@ -751,15 +610,8 @@ export async function computeLeagueStandings(
   return JSON.parse(resultJson);
 }
 
-/**
- * Reorder preliminary standings into final placement (winner first, other
- * finalists tied for 2nd per VEKN §3.7.5, then non-finalists), tagging each with
- * a 1-based `rank`. Single source of truth shared with league scoring.
- *
- * Synchronous (used inside `$derived`); returns [] if the engine isn't yet
- * initialized. `standings` must be pre-sorted descending by preliminary score;
- * "did a final happen?" is read from the `finalist` flags.
- */
+/** Reorders standings into final placement per VEKN §3.7.5 (other finalists tie for 2nd); shared
+ * source of truth with league scoring. `standings` must be pre-sorted descending by preliminary score. */
 export function computeFinalStandings(
   standings: Array<{ user_uid: string; gw: number; vp: number; tp: number; toss?: number; finalist?: boolean; disqualified?: boolean; non_competing?: boolean }>,
   winner: string
@@ -770,10 +622,6 @@ export function computeFinalStandings(
   return JSON.parse(resultJson);
 }
 
-/**
- * Compute per-player seating issues synchronously.
- * Returns null if engine not initialized.
- */
 export function computePlayerIssuesSync(
   rounds: string[][][]
 ): { rule: number; players: string[] }[] | null {
@@ -788,9 +636,6 @@ export function computePlayerIssuesSync(
   }
 }
 
-/**
- * Create a tournament using the WASM engine (for offline creation).
- */
 export async function createTournamentWithEngine(
   config: Record<string, unknown>,
   actor: { uid: string; roles: string[]; is_organizer: boolean; can_organize_league_uids: string[] }
@@ -800,9 +645,6 @@ export async function createTournamentWithEngine(
   return JSON.parse(result);
 }
 
-/**
- * Build actor context from current user and tournament.
- */
 export async function buildActorContext(
   user: User | null, tournament: Tournament, actionType?: string
 ): Promise<ActorContext> {
@@ -829,27 +671,19 @@ export async function buildActorContext(
   };
 }
 
-/**
- * Validation error from deck validation.
- */
 export interface ValidationError {
   severity: 'error' | 'warning';
   message: string;
 }
 
-/**
- * Validate a deck against format rules using WASM engine.
- * Returns null when validation is unavailable (cards not hydrated yet, engine
- * failure) — the scoreSeatingSync convention. [] means genuinely valid, so
- * callers must not read null as a pass.
- */
+/** Null means validation is unavailable (cards not hydrated, engine failure) — the scoreSeatingSync
+ * convention. `[]` means genuinely valid; callers must not read null as a pass. */
 export async function validateDeck(
   deck: { cards: Record<string, number>; name?: string },
   format: string
 ): Promise<ValidationError[] | null> {
   const engine = await initEngine();
   try {
-    // Get cards JSON from cards module
     const { getCardsJson } = await import('./cards');
     const cardsJson = await getCardsJson();
     if (!cardsJson) return null;

@@ -53,6 +53,8 @@ standing traps are catalogued in [hazards](hazards.md).
 A comment is justified only by a subtle non-local constraint invisible at the
 point of reading. No narration, no changelogs, no TODOs — discovered work goes
 through ingress or gets done now. A comment past ~2 lines is usually narrating.
+Code never references the wiki: a trap comment states its constraint and stands
+alone; the wiki points at code, never the reverse.
 
 **Component splitting.** A Svelte page past ~1000 lines gets its sections
 extracted into child components: props down, state ownership stays in the parent.

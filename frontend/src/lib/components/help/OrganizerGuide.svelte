@@ -97,9 +97,8 @@
 
 {@html renderGuideSection(m.og_configuration())}
 
-<!-- One card per section of the real settings form (Tools > Settings), in the
-     same order, so the reference reads as a map of the screen rather than a
-     second taxonomy the organizer has to translate. -->
+<!-- One card per section of the real settings form (Tools > Settings), in the same order, so the
+     reference reads as a map of the screen rather than a second taxonomy to translate. -->
 <div class="not-prose my-4 grid gap-3 sm:grid-cols-2">
   <div class="rounded-lg border border-line-strong bg-surface-muted/40 p-4">
     <h4 class="text-sm font-semibold text-ink-strong mb-2">{m.og_cfg_play_options()}</h4>

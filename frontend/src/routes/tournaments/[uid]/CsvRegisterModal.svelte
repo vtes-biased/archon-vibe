@@ -79,7 +79,6 @@
         parseError = m.csv_import_empty();
         return;
       }
-      // Header row: map known column names (case-insensitive)
       const header = (records[0] ?? []).map(h => h.trim().toLowerCase());
       const colOf = (key: keyof Row) =>
         header.findIndex(h => HEADER_ALIASES[key].includes(h));
@@ -166,7 +165,6 @@
       </div>
       <div class="p-6 space-y-4">
         {#if result}
-          <!-- Outcome -->
           <p class="text-sm text-info inline-flex items-center gap-1.5">
             <CircleCheck class="w-4 h-4 shrink-0" aria-hidden="true" />
             {m.csv_import_done({ registered: String(result.registered.length), already: String(result.already_registered.length) })}

@@ -12,7 +12,6 @@
 
   const auth = $derived(getAuthState());
 
-  // Authorization request details from the API
   let clientName = $state("");
   let scopes = $state<string[]>([]);
   let scopeDescriptions = $state<Record<string, string>>({});
@@ -24,17 +23,13 @@
   let submitting = $state(false);
   let error = $state<string | null>(null);
 
-  // If the user was auto-redirected (existing consent), this won't render
-
   onMount(async () => {
-    // The root layout hydrates auth in its own onMount, which fires AFTER this
-    // page's — so auth.isAuthenticated is still its initial `false` here on a
-    // fresh load. Settle auth first, or a logged-in user gets bounced to login
-    // and a fresh /consent load loops instead of ever showing the prompt.
+    // Root layout's auth hydration fires AFTER this page's onMount, so
+    // auth.isAuthenticated is stale here on load; settle it first or a
+    // logged-in user loops back to login instead of seeing the prompt.
     if (auth.isLoading) await initAuth();
 
     if (!auth.isAuthenticated) {
-      // Redirect to login, then back here
       const currentUrl = window.location.href;
       const params = new URLSearchParams(window.location.search);
       const loginHint = params.get("login_hint");
@@ -44,7 +39,6 @@
       return;
     }
 
-    // Forward the original query params to the authorize endpoint
     const params = new URLSearchParams(window.location.search);
     const token = getAccessToken();
     if (!token) {
@@ -157,7 +151,6 @@
       const data = await response.json();
       window.location.href = data.redirect_url;
     } catch {
-      // On deny, redirect with error
       const params = new URLSearchParams({ error: "access_denied" });
       if (stateParam) params.set("state", stateParam);
       window.location.href = `${redirectUri}?${params.toString()}`;

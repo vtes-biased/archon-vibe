@@ -27,20 +27,18 @@
     showAdvisory?: boolean;
   } = $props();
 
-  // Keep the server-clock offset synced while any timer is on screen (see the
-  // clock store): corrects Date.now()'s skew so a mis-set
-  // device clock doesn't show phantom elapsed time.
+  // Keeps the server-clock offset synced while any timer is on screen: corrects
+  // Date.now() skew so a mis-set device clock doesn't show phantom elapsed time.
   $effect(() => activateClock());
 
-  // The final is a single table (index 0): its widget needs BOTH the global
-  // start/pause/reset controls and per-table time extensions, so it counts down
-  // finals_time (via roundTime below) with the finals-table extension applied.
+  // The final is a single table (index 0): its widget needs both the global
+  // controls and per-table extensions, counting down finals_time with the
+  // finals-table extension applied.
   const effTableIndex = $derived(finals ? 0 : tableIndex);
 
   let now = $state(Date.now());
   let loading = $state(false);
 
-  // Tick every second
   $effect(() => {
     const interval = setInterval(() => { now = Date.now(); }, 1000);
     return () => clearInterval(interval);
@@ -54,7 +52,6 @@
 
   const timerActive = $derived(roundTime > 0 && tournament.state === "Playing");
 
-  // Base elapsed seconds
   const baseElapsed = $derived.by(() => {
     const t = tournament.timer;
     if (!t) return 0;
@@ -69,7 +66,6 @@
 
   const baseRemaining = $derived(Math.max(0, roundTime - baseElapsed));
 
-  // Per-table remaining (includes extensions)
   const tableRemaining = $derived.by(() => {
     if (effTableIndex == null) return baseRemaining;
     const key = String(effTableIndex);
@@ -79,7 +75,7 @@
 
   const displaySeconds = $derived(effTableIndex != null ? tableRemaining : baseRemaining);
   const expired = $derived(displaySeconds <= 0 && baseElapsed > 0);
-  const warning = $derived(displaySeconds > 0 && displaySeconds <= 300); // <5 min
+  const warning = $derived(displaySeconds > 0 && displaySeconds <= 300);
 
   function formatTime(secs: number): string {
     const total = Math.ceil(secs);
@@ -92,9 +88,9 @@
   const tableExtraTime = $derived(tableKey ? (tournament.table_extra_time?.[tableKey] ?? 0) : 0);
   const isPaused = $derived(tournament.timer?.paused ?? true);
 
-  // Non-blocking notice when THIS device's clock is far enough off that the user
-  // should fix it (it also breaks their auth-token timing/calendar). The timer
-  // itself is already corrected via the offset — this just surfaces the fault.
+  // Non-blocking notice when this device's clock is off enough to fix (it also
+  // skews auth-token timing/calendar); the timer itself is already corrected
+  // via the offset.
   const clockSkewMs = $derived(showAdvisory ? getClockSkewAdvisory() : null);
   const clockSkewLabel = $derived.by(() => {
     if (clockSkewMs == null) return "";
@@ -125,7 +121,6 @@
 
 {#if timerActive}
   <div class="flex flex-col items-center gap-2">
-    <!-- Timer display -->
     <div class="flex items-center gap-2">
       <Clock class="w-4 h-4 {expired ? 'text-link' : warning ? 'text-warn' : 'text-info'}" />
       <span class="font-mono text-2xl font-bold tabular-nums {expired ? 'text-link animate-pulse' : warning ? 'text-warn' : 'text-info'}">
@@ -140,7 +135,6 @@
       {/if}
     </div>
 
-    <!-- Table extensions info -->
     {#if effTableIndex != null && tableExtraTime > 0}
       <div class="text-xs text-ink-muted flex items-center gap-2">
         <span>+{Math.floor(tableExtraTime / 60)}:{(tableExtraTime % 60).toString().padStart(2, '0')} {m.timer_extra_time()}</span>
@@ -165,7 +159,6 @@
       </div>
     {/if}
 
-    <!-- Organizer per-table controls (time extensions) -->
     {#if isOrganizer && effTableIndex != null}
       <div class="flex items-center gap-1 flex-wrap">
         {#each [60, 120, 300, 600] as secs}
@@ -176,9 +169,8 @@
       </div>
     {/if}
 
-    <!-- Device-clock advisory (the timer stays corrected; this nudges a fix).
-         role=status: it appears async after the first sync resolves, so a live
-         region is what announces it to screen readers. -->
+    <!-- role=status: this appears async after the first sync resolves, so a
+         live region is what announces it to screen readers. -->
     {#if clockSkewMs != null}
       <div role="status" class="text-xs text-warn flex items-center gap-1.5 text-center max-w-xs">
         <TriangleAlert class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />

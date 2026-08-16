@@ -1,10 +1,7 @@
-"""A vekn.net event never creates a second copy of an event we already hold.
-
-The legacy-archon merge imports old events that carry no vekn id, so the VEKN
-tournament sync's external_ids.vekn lookup misses them and used to insert its own
-copy: members saw the event twice, the copies disagreed on results, and the
-vekn-less copy retried a calendar-event create that vekn.net rejects as already
-existing (a standing hourly push error on prod).
+"""A vekn.net event must never duplicate an event we already hold — legacy-
+archon-merged events carry no vekn id, so the sync's lookup used to miss them
+and insert a copy (double-visible, disagreeing results, and a rejected
+duplicate calendar-create).
 """
 
 from datetime import UTC, datetime, timedelta
@@ -54,13 +51,10 @@ async def test_vekn_event_adopts_veknless_copy_instead_of_duplicating(test_db):
 
 @pytest.mark.asyncio
 async def test_no_adoption_when_name_and_day_are_not_unique(test_db):
-    """Placeholder names cover many distinct events per day — never merge on one.
-
-    Legacy imports share names like "Imported VTES Event" across hundreds of
-    separate 2005 events, dozens falling on one Saturday. A vekn-less copy sitting
-    among same-day copies that already hold their own vekn ids must NOT be adopted:
-    the key doesn't identify anything there.
-    """
+    """Placeholder names cover many distinct events per day — never merge on
+    one. Legacy imports share names like "Imported VTES Event" across hundreds
+    of 2005 events; a vekn-less copy among same-day copies that already hold
+    their own vekn ids must NOT be adopted."""
     name = f"Imported VTES Event {uuid4()}"
     day = datetime(2005, 5, 14, 8, 0, tzinfo=UTC)
     distinct = _tournament(name, day, external_ids={"vekn": "630"})

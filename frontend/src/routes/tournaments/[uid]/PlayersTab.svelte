@@ -98,12 +98,9 @@
     if (w) { w.document.write(html); w.document.close(); }
   }
 
-  // Sanction modal state
   let sanctionTarget = $state<{ uid: string; name: string } | null>(null);
-  // Sanction list modal state (view + cancel issued sanctions)
   let sanctionListTarget = $state<{ uid: string; name: string } | null>(null);
 
-  // Build a map of player uid → their sanctions for this tournament
   const playerSanctionsMap = $derived.by(() => {
     const map: Record<string, Sanction[]> = {};
     for (const s of tournamentSanctions ?? []) {
@@ -112,7 +109,6 @@
     return map;
   });
 
-  // Current round for pre-filling sanction modal
   const currentRound = $derived.by(() => {
     const numRounds = tournament.rounds?.length ?? 0;
     if (numRounds === 0) return null;
@@ -136,7 +132,6 @@
   });
   const totalPlayers = $derived(rosterCount + archivalUids.size);
 
-  // Deck expansion state
   let expandedPlayer = $state<string | null>(null);
   let expandedDeckRound = $state<number | null>(null);
   let uploadingFor = $state<string | null>(null);
@@ -167,7 +162,6 @@
     const uid = uploadingFor;
     uploadingFor = null;
     uploadingRound = undefined;
-    // Clear validation cache so it re-validates with the new deck
     if (uid) {
       const { [uid]: _, ...rest } = validationCache;
       validationCache = rest;
@@ -176,9 +170,8 @@
 
   const isMultideck = $derived(!!tournament.multideck);
   const roundCount = $derived(tournament.rounds?.length ?? 0);
-  // Hide a deck's card contents from organizers until its round has started.
-  // Single-deck (round=null): hidden until round 1 starts.
-  // Multideck (round=N): hidden until round N+1 exists (i.e. round N has started).
+  // Hides deck contents from organizers until the round has started: single-deck
+  // (round=null) until round 1, multideck (round=N) until round N+1 exists.
   function isDeckHiddenFromOrganizer(round: number | null): boolean {
     if (!isOrganizer) return false;
     if (round === null) return roundCount === 0;
@@ -193,7 +186,6 @@
     return Array.from({ length: roundCount }, (_, r) => ({ round: r, deck: byRound.get(r) ?? null }));
   }
 
-  // Get player's decks (hide future-round decks from organizers during play)
   function getPlayerDecks(uid: string): DeckObject[] {
     const decks = decksByUser[uid] ?? [];
     if (!isMultideck || tournament.state !== 'Playing') return decks;
@@ -203,7 +195,6 @@
     return getPlayerDecks(uid)[0] ?? null;
   }
 
-  // Compute deck status for a player (aggregate across all decks)
   type DeckStatus = 'valid' | 'warning' | 'error' | 'none' | 'unknown';
   function getDeckStatus(uid: string): DeckStatus {
     const decks = getPlayerDecks(uid);
@@ -218,7 +209,6 @@
     return 'valid';
   }
 
-  // Validate decks when they change (all decks per player, aggregate errors)
   $effect(() => {
     const decks = decksByUser;
     const format = tournament.format;
@@ -249,15 +239,12 @@
   });
 
   const hasRounds = $derived((tournament?.rounds?.length ?? 0) > 0);
-  // The door desk. At registration and before round 1, taking payment and
-  // chasing decklists IS the work, so those controls stay inline on every card
-  // instead of one tap deep — the same state-owns-the-surface rule that
-  // collapses the card once the event is under way.
+  // At registration and before round 1, payment and decklists ARE the work, so
+  // those controls stay inline instead of one tap deep (state-owns-the-surface).
   const doorMode = $derived(isOrganizer && (tournament.state === "Registration" || (tournament.state === "Waiting" && !hasRounds)));
   const standingsMap = $derived(new Map(standings.map(s => [s.user_uid, s])));
-  // Exact-score ties involving a top-5 seat (either side of the pair) — the uids
-  // needing a toss to break the finals cutoff. Computed once instead of the
-  // former per-row O(n²) predicate; standings are sorted, so only i < 5 can pair.
+  // Exact-score ties involving a top-5 seat — the uids needing a toss to break
+  // the finals cutoff. Standings are sorted, so only i < 5 can pair.
   const tiedUids = $derived.by(() => {
     const out = new Set<string>();
     for (let i = 0; i < standings.length && i < 5; i++) {
@@ -353,11 +340,10 @@
 
   async function addPlayerByUser(user: User) {
     if (!user.vekn_id && "vekn_id" in user) {
-      // Empty at an access level that shows it → genuinely unsponsored; the
-      // modal explains eligibility. A missing KEY instead means the field is
-      // hidden from this viewer (public-level co-organizer): fall through —
-      // the server injects the authoritative vekn_id on AddPlayer, and
-      // sponsoring a member who already has one would 400.
+      // Empty vekn_id at a level that shows it means genuinely unsponsored; a
+      // missing key means the field is hidden (public-level co-organizer) —
+      // fall through, since the server injects the authoritative vekn_id on
+      // AddPlayer.
       sponsorTarget = user;
       return;
     }
@@ -411,7 +397,6 @@
 
   const isFinished = $derived(tournament.state === "Finished");
 
-  // Per-player "More" drawer (rare/destructive tail: drop/remove, sanction, proxy)
   let morePlayer = $state<string | null>(null);
   function toggleMore(uid: string) { morePlayer = morePlayer === uid ? null : uid; }
   // Proxy is settled once the event is decided — mirror the engine guard.
@@ -488,9 +473,7 @@
 
   <!-- Collapsed mobile card: two lines. Line one is who and where they stand,
        line two is their identity and their score — the two questions asked of a
-       player list. Payment used to be the loudest thing on the card, a solid
-       button outranking the result; it now lives in the expansion (or inline in
-       door mode, where it is the actual work). -->
+       player list. -->
   {#snippet cardSummary(player: Player, puid: string, expandable: boolean, open: boolean)}
     {@const entry = standingsMap.get(puid)}
     {@const standingsIdx = entry ? standings.indexOf(entry) : -1}
@@ -509,8 +492,8 @@
       {/if}
       {#if playerSanctionsMap[puid]?.length}
         <!-- Inert here: the card header is one tap target, so opening the
-             sanction list from inside it would nest a button in a button. The
-             list opens from the More drawer instead. -->
+             sanction list from inside it would nest a button in a button; it
+             opens from the More drawer instead. -->
         <SanctionIndicator sanctions={playerSanctionsMap[puid]} />
       {/if}
       <span class="flex-1"></span>
@@ -638,11 +621,10 @@
     {/if}
   {/snippet}
 
-  <!-- Header + Add Player -->
   <div class="space-y-2">
     <div class="flex items-center gap-3">
-      <!-- The paid / decks-in tallies used to be captions under their own chip
-           rows; they are counts of the roster, so they belong on the roster line. -->
+      <!-- The paid / decks-in tallies are counts of the roster, so they belong
+           on the roster line. -->
       <p class="text-ink-muted shrink-0">
         {#if (tournament.max_players ?? 0) > 0}
           {m.players_count_capped({ count: String(totalPlayers), cap: String(tournament.max_players) })}
@@ -668,7 +650,7 @@
       </div>
     {/if}
     <!-- One create surface, online and off: the modal requires an email and runs
-         the look-alike review, which a second inline form kept skipping. -->
+         the look-alike review that a second inline form would skip. -->
     {#if isOrganizer && isOfflineMode}
       <div class="border-t border-line pt-2">
         <button
@@ -682,7 +664,6 @@
     {/if}
   </div>
 
-  <!-- Toss controls (only between rounds, not during play) -->
   {#if isOrganizer && tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings)}
     <!-- Buttons only: the action bar already says to resolve ties with a toss, and
          a hint sharing this row squeezed both labels into mid-word wraps. -->
@@ -719,10 +700,9 @@
   {/if}
 
   {#if sortedPlayers.length > 0}
-    <!-- One control row. Sort, payment filter and deck filter were three chip
-         rows plus two captions; they are all "how do I want this list?", asked
-         once in a while, so they collapse behind a single settings menu and the
-         tab opens on the players instead of ~400px of controls. -->
+    <!-- Sort, payment and deck filters are all "how do I want this list?",
+         asked once in a while, so they collapse behind a single settings menu
+         instead of ~400px of controls. -->
     <div class="flex items-center gap-2">
       <ActionMenu label={m.players_sort_filter()} icon={SlidersHorizontal} indicator={filtersActive}>
         <div class="w-48 space-y-3">
@@ -775,7 +755,6 @@
       {/if}
     </div>
 
-    <!-- Mobile card layout -->
     <div class="sm:hidden space-y-2">
       {#each filteredPlayers as player}
         {@const puid = player.user_uid ?? ""}
@@ -783,9 +762,9 @@
         {@const standingsIdx = entry ? standings.indexOf(entry) : -1}
         {@const isTop5 = standingsIdx >= 0 && standingsIdx < 5}
         {@const isTied = entry ? tiedUids.has(entry.user_uid) : false}
-        <!-- Expandable except when the controls ARE the moment (door mode) or
-             when toss editing puts an input on the summary line — a tap target
-             cannot contain one. -->
+        <!-- Expandable except when the controls ARE the moment (door mode), or
+             toss editing puts an input on the summary line — a tap target
+             can't contain one. -->
         {@const expandable = isOrganizer && !doorMode && !editingToss}
         {@const open = doorMode || expandedCard === puid}
         <div class="bg-surface-muted/50 rounded-lg {isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'ring-1 ring-accent-soft-border' : ''}">
@@ -798,7 +777,6 @@
               {@render cardSummary(player, puid, false, open)}
             </div>
           {/if}
-          <!-- Organizer actions, revealed with the card -->
           {#if isOrganizer && open}
             <div class="px-3 pb-3 pt-2">
               <div class="flex items-center gap-2 flex-wrap">
@@ -830,10 +808,9 @@
                 <!-- Open rounds: at cap and not dropped — no check-in, show their played count. -->
                 <Button variant="ghost" size="sm" class="min-h-[44px]" disabled title={m.player_completed_hint()}>{roundsPlayedMap.get(puid)}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
               {:else if puid && (tournament.state === "Waiting" || tournament.state === "Playing") && (player.state === "Finished" || player.state === "Registered")}
-                <!-- Mid-round too: late arrivals check in for the next round or a short
-                     table, and Finished = dropped out, whom CheckIn reinstates —
-                     Checked-in under cap, Completed at it, back to their seat mid-round.
-                     Primary for waiting registrants: check-in is THE door action. -->
+                <!-- Finished = dropped out, which CheckIn reinstates (Checked-in
+                     under cap, Completed at it, back to their seat mid-round).
+                     Primary for waiting registrants: check-in is the door action. -->
                 <Button variant={player.state === "Registered" ? "primary" : "ghost"} size="sm" class="min-h-[44px]" onclick={() => doAction("CheckIn", { player_uid: puid })}>{m.players_check_in()}</Button>
               {:else if tournament.state === "Waiting" && player.state === "Checked-in" && puid}
                 <Button variant="ghost" size="sm" class="min-h-[44px]" onclick={() => doAction("CheckOut", { player_uid: puid })}>{m.players_check_out()}</Button>
@@ -860,7 +837,6 @@
       {/each}
     </div>
 
-    <!-- Desktop table -->
     <div class="hidden sm:block bg-surface-muted/50 rounded-lg p-4 overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
@@ -992,9 +968,9 @@
               {/if}
               {#if isOrganizer}
                 <td class="py-1.5">
-                  <!-- Flex row: two adjacent inline-flex Buttons on a text line
-                       baseline-shift when one leads with an icon (More).
-                       nowrap: labels must not wrap under column squeeze. -->
+                  <!-- Two adjacent inline-flex Buttons baseline-shift when one
+                       leads with an icon (More); nowrap keeps labels from
+                       wrapping under column squeeze. -->
                   <div class="flex items-center justify-end gap-1 whitespace-nowrap">
                     {#if tournament.state === "Waiting" && puid && openRounds && player.state !== "Disqualified" && player.state !== "Finished" && (roundsPlayedMap.get(puid) ?? 0) >= (tournament.max_rounds ?? 0)}
                       <Button variant="ghost" size="sm" disabled title={m.player_completed_hint()}>{roundsPlayedMap.get(puid)}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
@@ -1011,7 +987,6 @@
                 </td>
               {/if}
             </tr>
-            <!-- Expanded "More" row (drop/remove · sanction · proxy) -->
             {#if isOrganizer && morePlayer === puid}
               <tr class="bg-surface-muted/50">
                 <td colspan="99" class="px-4 pb-3 pt-1">
@@ -1019,7 +994,6 @@
                 </td>
               </tr>
             {/if}
-            <!-- Expanded deck row -->
             {#if expandedPlayer === puid}
               <tr class="bg-surface-muted/50">
                 <td colspan="99" class="p-4">
@@ -1036,7 +1010,6 @@
   {/if}
 </div>
 
-<!-- Tournament Sanction Modal -->
 {#if sanctionTarget && isOrganizer}
   <TournamentSanctionModal
     {tournament}
@@ -1060,7 +1033,6 @@
   />
 {/if}
 
-<!-- Sanction List Modal -->
 {#if sanctionListTarget}
   <SanctionListModal
     playerName={sanctionListTarget.name}

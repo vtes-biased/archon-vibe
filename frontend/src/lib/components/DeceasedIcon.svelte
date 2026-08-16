@@ -1,6 +1,4 @@
 <script lang="ts">
-  // Subtle in-memoriam marker rendered before a member's name in list views.
-  // Renders nothing unless the member is deceased.
   import { Flower2 } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 

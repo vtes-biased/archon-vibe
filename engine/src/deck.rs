@@ -1,6 +1,5 @@
-//! Deck parsing, validation, enrichment, and TWDA export.
-//!
-//! Handles Lackey, JOL, TWDA, and freeform deck list formats.
+//! Deck parsing, validation, enrichment, and TWDA export, for Lackey, JOL, TWDA
+//! and freeform deck list formats.
 
 use crate::cards::{Card, CardKind, CardMap};
 use crate::error::EngineError;
@@ -13,7 +12,7 @@ pub struct Deck {
     pub name: String,
     pub author: String,
     pub comments: String,
-    pub cards: HashMap<u32, u32>, // card_id → count
+    pub cards: HashMap<u32, u32>,
 }
 
 impl Deck {
@@ -61,10 +60,6 @@ impl Deck {
     }
 }
 
-// ============================================================================
-// Section headers detection
-// ============================================================================
-
 const SECTION_HEADERS: &[&str] = &[
     "crypt",
     "library",
@@ -87,7 +82,6 @@ const SECTION_HEADERS: &[&str] = &[
 fn is_section_header(line: &str) -> bool {
     let lower = line.trim().to_lowercase();
     let first_word = lower.split_whitespace().next().unwrap_or("");
-    // Strip leading punctuation/numbers
     let cleaned = first_word.trim_matches(|c: char| !c.is_alphabetic());
     SECTION_HEADERS
         .iter()
@@ -102,18 +96,12 @@ fn is_comment_line(line: &str) -> bool {
         || trimmed.is_empty()
 }
 
-// ============================================================================
-// Line parsing
-// ============================================================================
-
-/// Try to parse a card line. Returns (card_id, count) or None.
 fn parse_card_line(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
     let trimmed = line.trim();
     if trimmed.is_empty() || is_comment_line(trimmed) || is_section_header(trimmed) {
         return None;
     }
 
-    // Strip inline comments: everything after --, //, or #
     let clean = strip_inline_comment(trimmed);
     let clean = clean.trim();
     if clean.is_empty() {
@@ -130,7 +118,6 @@ fn parse_card_line(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
         return Some(result);
     }
 
-    // Try as bare card name (count=1)
     if let Some(card) = card_map.by_name(clean) {
         return Some((card.id, 1));
     }
@@ -151,18 +138,15 @@ fn strip_inline_comment(line: &str) -> &str {
 
 /// Parse "count [marker] name" format.
 fn try_count_first(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
-    // Match: optional markers, 1-2 digit count, optional x/*, then card name
     let bytes = line.as_bytes();
     let mut i = 0;
 
     // Skip leading markers: *, -, _, and an x/X multiplier before the count ("x2",
-    // "xx2"). A card name starting with x can't precede the count here, so a bare
-    // x-name (no count) just falls through to the bare-name lookup on the full line.
+    // "xx2"); a bare x-name (no count) just falls through to the bare-name lookup below.
     while i < bytes.len() && matches!(bytes[i], b'*' | b'-' | b'_' | b' ' | b'x' | b'X') {
         i += 1;
     }
 
-    // Read count (1-2 digits)
     let count_start = i;
     while i < bytes.len() && bytes[i].is_ascii_digit() {
         i += 1;
@@ -182,10 +166,8 @@ fn try_count_first(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
         return None;
     }
 
-    // Skip the count→name separator: whitespace, '*', minor punctuation, and an
-    // x/X multiplier marker. An x/X run is a marker only when whitespace follows
-    // it; otherwise it is the card name's first letter — "1x Xaviar" is count 1 of
-    // "Xaviar", not "aviar" (every X-named crypt card broke on the old greedy skip).
+    // x/X after the count is a marker only when whitespace follows it; otherwise
+    // it's the card name's first letter — "1x Xaviar" is count 1 of "Xaviar", not "aviar".
     while i < bytes.len() {
         match bytes[i] {
             b'*' | b' ' | b'\t' | b',' | b'.' | b'-' => i += 1,
@@ -209,14 +191,12 @@ fn try_count_first(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
         return None;
     }
 
-    // Try exact lookup first
     if let Some(card) = card_map.by_name(name) {
         return Some((card.id, count));
     }
 
-    // Strip crypt tail (capacity, disciplines, group info after the name),
-    // e.g. "Annabelle Triabell  9  aus cel pre dom for  primogen  Toreador:6".
-    // The trailing "Clan:Group" token disambiguates multi-group vampires.
+    // Strip crypt tail (capacity, disciplines, group info after the name); the
+    // trailing "Clan:Group" token (e.g. "Toreador:6") disambiguates multi-group vampires.
     let group = parse_crypt_tail_group(name);
     if let Some(card) = try_strip_crypt_tail(name, group, card_map) {
         return Some((card.id, count));
@@ -226,8 +206,7 @@ fn try_count_first(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
 }
 
 /// Group hint from a krcg-style crypt tail: the N in a trailing "Clan:N" or "gN"
-/// token (e.g. "Toreador:6" → 6, "g6" → 6). None when the last token carries no
-/// group. Parses the whole number, so two-digit groups resolve correctly.
+/// token (e.g. "Toreador:6" → 6, "g6" → 6); None when the last token carries none.
 fn parse_crypt_tail_group(line: &str) -> Option<u32> {
     let last = line.split_whitespace().next_back()?;
     let digits = last.rsplit(':').next().unwrap_or(last);
@@ -261,15 +240,12 @@ fn try_name_first(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
         }
     }
 
-    // Try trailing count patterns: "name x2", "name *2", "name (2)"
-    // Work backwards from the end
     let bytes = trimmed.as_bytes();
     let len = bytes.len();
     if len < 3 {
         return None;
     }
 
-    // Handle "(N)" suffix
     if bytes[len - 1] == b')' {
         if let Some(paren_start) = trimmed.rfind('(') {
             let inside = trimmed[paren_start + 1..len - 1].trim();
@@ -284,7 +260,6 @@ fn try_name_first(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
         }
     }
 
-    // Handle trailing "xN" or "N"
     let mut end = len;
     while end > 0 && bytes[end - 1].is_ascii_digit() {
         end -= 1;
@@ -295,7 +270,6 @@ fn try_name_first(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
             if let Ok(count) = count_str.parse::<u32>() {
                 if count > 0 && count <= 99 {
                     let mut name_end = end;
-                    // Skip trailing x, X, *, space
                     while name_end > 0
                         && matches!(
                             bytes[name_end - 1],
@@ -318,18 +292,13 @@ fn try_name_first(line: &str, card_map: &CardMap) -> Option<(u32, u32)> {
     None
 }
 
-/// Try to strip JOL/TWDA crypt tail info to find the card name.
-///
 /// Matches each trimmed candidate by EXACT name (a lenient prefix match would let
-/// a half-trimmed stem resolve back to a longer card). When `group` is known,
-/// prefer the group-qualified printing so a multi-group vampire whose name omits
-/// "(GN)" resolves to the group named in its "Clan:N" tail, not the earliest.
+/// a half-trimmed stem resolve back to a longer card); prefers a known `group` over the earliest.
 fn try_strip_crypt_tail<'a>(
     name: &str,
     group: Option<u32>,
     card_map: &'a CardMap,
 ) -> Option<&'a Card> {
-    // Progressively trim from the right, trying to match after each trim
     let words: Vec<&str> = name.split_whitespace().collect();
     for take in (1..words.len()).rev() {
         let candidate = words[..take].join(" ");
@@ -345,19 +314,14 @@ fn try_strip_crypt_tail<'a>(
     None
 }
 
-// ============================================================================
-// Deck parsing
-// ============================================================================
-
-/// Result of parsing a deck list text.
 #[derive(Debug)]
 pub struct ParseResult {
     pub deck: Deck,
     pub unrecognized_lines: Vec<String>,
 }
 
-/// Parse a deck list text into a Deck. Auto-detects format.
-/// Returns the parsed deck and any lines that looked like card entries but couldn't be matched.
+/// Returns the parsed deck plus any lines that looked like card entries but
+/// couldn't be matched.
 pub fn parse_deck(text: &str, card_map: &CardMap) -> Result<ParseResult, EngineError> {
     let mut deck = Deck::new();
     let mut header_lines: Vec<String> = Vec::new();
@@ -365,9 +329,7 @@ pub fn parse_deck(text: &str, card_map: &CardMap) -> Result<ParseResult, EngineE
     let mut found_card = false;
 
     for line in text.lines() {
-        // Collect header/metadata before first card
         if !found_card {
-            // Check for name/author headers
             let lower = line.trim().to_lowercase();
             if lower.starts_with("deck name:") || lower.starts_with("name:") {
                 deck.name = line
@@ -412,7 +374,6 @@ pub fn parse_deck(text: &str, card_map: &CardMap) -> Result<ParseResult, EngineE
         return Err(EngineError::DeckNoCards);
     }
 
-    // If no name was explicitly set, use first header line
     if deck.name.is_empty() && !header_lines.is_empty() {
         deck.name = header_lines.remove(0);
     }
@@ -422,10 +383,6 @@ pub fn parse_deck(text: &str, card_map: &CardMap) -> Result<ParseResult, EngineE
         unrecognized_lines,
     })
 }
-
-// ============================================================================
-// Validation
-// ============================================================================
 
 #[derive(Debug, Clone)]
 pub struct ValidationError {
@@ -451,11 +408,9 @@ impl ValidationError {
     }
 }
 
-/// Validate a deck against Standard format rules.
 pub fn validate_deck(deck: &Deck, card_map: &CardMap, format: &str) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
-    // Check for unknown card IDs (not in card database)
     let mut unknown_count = 0u32;
     for (&id, &count) in &deck.cards {
         if card_map.by_id(id).is_none() {
@@ -474,7 +429,6 @@ pub fn validate_deck(deck: &Deck, card_map: &CardMap, format: &str) -> Vec<Valid
     let crypt_count = deck.crypt_count(card_map);
     let library_count = deck.library_count(card_map);
 
-    // Crypt size
     if crypt_count < 12 {
         errors.push(ValidationError {
             severity: Severity::Error,
@@ -482,7 +436,6 @@ pub fn validate_deck(deck: &Deck, card_map: &CardMap, format: &str) -> Vec<Valid
         });
     }
 
-    // Library size
     if library_count < 60 {
         errors.push(ValidationError {
             severity: Severity::Error,
@@ -496,7 +449,6 @@ pub fn validate_deck(deck: &Deck, card_map: &CardMap, format: &str) -> Vec<Valid
         });
     }
 
-    // Check for banned cards
     for &id in deck.cards.keys() {
         if let Some(card) = card_map.by_id(id) {
             if !card.banned.is_empty() {
@@ -555,10 +507,6 @@ pub fn validate_deck(deck: &Deck, card_map: &CardMap, format: &str) -> Vec<Valid
     errors
 }
 
-// ============================================================================
-// TWDA Export
-// ============================================================================
-
 /// Canonical TWDA library type ordering.
 const LIBRARY_TYPE_ORDER: &[&str] = &[
     "Master",
@@ -587,11 +535,6 @@ fn library_type_index(t: &str) -> usize {
         .unwrap_or(LIBRARY_TYPE_ORDER.len())
 }
 
-/// Export a deck in TWDA text format.
-///
-/// Parameters:
-/// - `tournament_format`: e.g. "2R+F", "3R+F"
-/// - `tournament_url`: URL to the tournament page (can be empty)
 #[allow(clippy::too_many_arguments)]
 pub fn export_twda(
     deck: &Deck,
@@ -606,7 +549,6 @@ pub fn export_twda(
 ) -> String {
     let mut lines = Vec::new();
 
-    // Header
     lines.push(tournament_name.to_string());
     lines.push(tournament_place.to_string());
     lines.push(tournament_date.to_string());
@@ -635,7 +577,6 @@ pub fn export_twda(
         lines.push(String::new());
     }
 
-    // Crypt
     let mut crypt_entries: Vec<(&Card, u32)> = deck
         .cards
         .iter()
@@ -669,7 +610,6 @@ pub fn export_twda(
         ));
     }
 
-    // Library
     let mut lib_entries: Vec<(&Card, u32)> = deck
         .cards
         .iter()
@@ -702,7 +642,6 @@ pub fn export_twda(
                 .filter(|(c, _)| c.types.first().map(|s| s.as_str()).unwrap_or("") == card_type)
                 .map(|(_, c)| c)
                 .sum();
-            // TODO: Add trifle counts when card data includes trifle flag
             lines.push(format!("{card_type} ({type_count})"));
         }
         lines.push(format!("{}x {}", count, card.unique_name));
@@ -778,27 +717,22 @@ mod tests {
     fn test_parse_count_first() {
         let cm = CardMap::load(test_cards_json()).unwrap();
 
-        // Standard: "2x .44 Magnum"
         assert_eq!(parse_card_line("2x .44 Magnum", &cm), Some((100001, 2)));
-        // Without x: "3 Delaying Tactics"
         assert_eq!(
             parse_card_line("3 Delaying Tactics", &cm),
             Some((100519, 3))
         );
-        // With asterisk: "1 * 419 Operation"
         assert_eq!(parse_card_line("1 * 419 Operation", &cm), Some((100002, 1)));
     }
 
     #[test]
     fn test_count_marker_keeps_x_name() {
-        // The x/X count marker must not swallow the leading 'x' of a card name:
-        // "1x Xaviar" is count 1 of Xaviar, not "aviar". Regression: the greedy
-        // separator skip ate x/X, so every X-named crypt card failed to parse.
+        // The x/X count marker must not swallow the card name's leading 'x':
+        // "1x Xaviar" is count 1 of Xaviar, not "aviar".
         let cm = CardMap::load(test_cards_json()).unwrap();
         assert_eq!(parse_card_line("1x Xaviar", &cm), Some((201477, 1)));
         assert_eq!(parse_card_line("2x Xaviar (G3)", &cm), Some((201477, 2)));
         assert_eq!(parse_card_line("1 Xaviar", &cm), Some((201477, 1)));
-        // a normal x-marker line (with a following card name) still parses
         assert_eq!(parse_card_line("2xx .44 Magnum", &cm), Some((100001, 2)));
         // leading x/X multiplier before the count ("x2", "xx2")
         assert_eq!(parse_card_line("x2 Xaviar", &cm), Some((201477, 2)));
@@ -808,10 +742,9 @@ mod tests {
     #[test]
     fn test_parse_419_operation() {
         let cm = CardMap::load(test_cards_json()).unwrap();
-        // "419 Operation" should NOT be parsed as count=419
-        // Since 419 is 3 digits, our parser rejects it as a count
+        // "419 Operation" is not parsed as count=419: 419 is 3 digits, and the
+        // parser rejects that as a count.
         assert_eq!(parse_card_line("2 419 Operation", &cm), Some((100002, 2)));
-        // Bare name
         assert_eq!(parse_card_line("419 Operation", &cm), Some((100002, 1)));
     }
 
@@ -824,9 +757,8 @@ mod tests {
 
     #[test]
     fn test_crypt_tail_group_disambiguates_multigroup_vampire() {
-        // Modern TWDA/krcg crypt lines carry the group only in the "Clan:N" tail,
-        // not as a "(GN)" name suffix. Annabelle exists in G3 (200103) and G6
-        // (201693); the bare name defaults to G3, so the tail group must win.
+        // Modern TWDA/krcg crypt lines carry the group only in the "Clan:N" tail. Annabelle
+        // exists in G3 (200103) and G6 (201693); bare name defaults to G3, so the tail must win.
         let cm = CardMap::load(test_cards_json()).unwrap();
         assert_eq!(
             parse_card_line(
@@ -890,7 +822,6 @@ mod tests {
         let mut deck = Deck::new();
         deck.cards.insert(100001, 5);
         let errors = validate_deck(&deck, &cm, "Standard");
-        // Should have errors for insufficient crypt and library
         assert!(errors.iter().any(|e| e.message.contains("Crypt")));
         assert!(errors.iter().any(|e| e.message.contains("Library")));
     }

@@ -8,7 +8,6 @@
 
   const auth = $derived(getAuthState());
 
-  // Read tab from URL query param
   const urlTab = $derived($page.url.searchParams.get('tab'));
   // Sponsor mode: arrived from a "get sponsored" pointer — focus the officials directory
   const sponsorMode = $derived($page.url.searchParams.get('sponsor') !== null);

@@ -1,12 +1,7 @@
-"""Tests for SSE broadcast envelope + overflow handling.
-
-Covers two sync-correctness invariants:
-- broadcast_precomputed emits the authoritative modified_at as the envelope
-  `ts` field, so clients advance their sync cursor in the same value space as
-  the server's `since` catch-up filter.
-- On asyncio.QueueFull the connection is marked closed and evicted, so the SSE
-  generator ends the stream and the browser reconnects + catches up instead of
-  staying OPEN on a queue that no longer receives events.
+"""SSE broadcast envelope + overflow handling: broadcast_precomputed's `ts`
+must equal the authoritative modified_at (same value space as the `since`
+catch-up filter), and asyncio.QueueFull must mark+evict the connection so the
+client reconnects instead of stalling on a dead queue.
 """
 
 import asyncio
@@ -100,8 +95,8 @@ def test_scoped_connection_only_receives_its_tournament():
 
 def test_tournament_delivery_flags_scoped_conn_for_participant_refresh():
     """A tournament delivery to the bot flags the live loop to push participant
-    identities (so newly-seated players resolve to names). Sanction deliveries
-    and unscoped (browser) connections must not set the flag."""
+    identities (newly-seated players resolve to names); sanction deliveries and
+    unscoped connections must not set the flag."""
     scoped = SSEConnection(user=None, tournament_uid="t1")
     unscoped = SSEConnection(user=None)
     _sse_connections.clear()
@@ -154,10 +149,9 @@ def test_scope_matches_sanction_by_tournament_uid():
 
 
 def test_broadcast_precomputed_excludes_originating_device():
-    """exclude_device_id skips every connection identifying as that device (the
-    go-online self-exclusion that stops the initiating device receiving its own
-    offline_mode=false echo) while other devices and unidentified connections
-    still get the frame."""
+    """exclude_device_id skips every connection identifying as that device — the
+    go-online self-exclusion stopping the initiating device from receiving its
+    own offline_mode=false echo. Other devices still get the frame."""
     initiating = SSEConnection(user=None, device_id="dev-A")
     other_device = SSEConnection(user=None, device_id="dev-B")
     no_device = SSEConnection(user=None)  # bot / pre-device client
@@ -173,9 +167,9 @@ def test_broadcast_precomputed_excludes_originating_device():
 
 
 def test_broadcast_precomputed_coalesces_repeat_frames_per_object():
-    """Repeated whole-object frames for the same (type,uid) supersede each other:
-    the stalled queue holds ONE frame (the latest) per object, not a backlog —
-    the memory fix. Distinct objects are NOT coalesced."""
+    """Repeated whole-object frames for the same (type,uid) supersede each
+    other — the stalled queue holds only the latest per object, not a backlog
+    (the memory fix). Distinct objects are NOT coalesced."""
     conn = SSEConnection(user=None)  # public projection
     _sse_connections.clear()
     _sse_connections.add(conn)
@@ -213,15 +207,10 @@ def test_broadcast_precomputed_closes_connection_on_overflow():
         _sse_connections.clear()
 
 
-# ---------------------------------------------------------------------------
-# broadcast_personal — targeted per-user/per-object invalidation (205b)
-# ---------------------------------------------------------------------------
-
-
 def test_personal_private_deck_demote_emits_tombstone():
-    """THE gate: a demoted organizer (no longer in org_uids) has only member
-    entitlement for a private deck, whose member projection is None — so the push
-    is a tombstone (uid + deleted_at, no deck contents) that evicts just that deck."""
+    """A demoted organizer (no longer in org_uids) has only member entitlement
+    for a private deck, whose member projection is None — so the push is a
+    tombstone (uid + deleted_at only) evicting that deck."""
     viewer = _member()
     conn = SSEConnection(user=viewer)
     _sse_connections.clear()

@@ -1,9 +1,6 @@
-"""Tests for VEKN push sync — archondata format generation.
-
-The archondata string is consumed by the VEKN API (vekn.net) to import
-tournament results. Getting the format wrong means silent data corruption
-on the VEKN registry. These tests verify the output format, field ordering,
-and edge cases (finals GW subtraction, missing users, etc.).
+"""VEKN push archondata format generation: getting the format wrong means
+silent data corruption on the VEKN registry. Tests verify field ordering and
+edge cases (finals GW subtraction, missing users, etc.).
 """
 
 from datetime import UTC, datetime
@@ -23,10 +20,6 @@ from src.models import (
     User,
 )
 from src.vekn_push import generate_archondata, tournament_to_vekn_type
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _user(uid: str, name: str, vekn_id: str, city: str = "") -> User:
@@ -64,8 +57,7 @@ def _make_tournament(
     )
 
 
-# Stub out the rating-point computation (_compute_entry).
-# We only care about the archondata *format*, not the rating computation.
+# Stub _compute_entry: only the archondata *format* is under test here.
 class FakeEntry:
     def __init__(self, points: int = 42):
         self.points = points
@@ -75,11 +67,6 @@ def _fake_compute(
     tournament, t_json, sanctions_json, user_uid, player_count, positions
 ):
     return FakeEntry(points=10)
-
-
-# ---------------------------------------------------------------------------
-# tournament_to_vekn_type
-# ---------------------------------------------------------------------------
 
 
 def test_vekn_type_standard_basic():
@@ -114,11 +101,6 @@ def test_vekn_type_unmappable_is_none():
     assert tournament_to_vekn_type(TournamentFormat.V5, TournamentRank.CC) is None
 
 
-# ---------------------------------------------------------------------------
-# generate_archondata — format validation
-# ---------------------------------------------------------------------------
-
-
 @patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
 def test_archondata_basic_format(mock_compute):
     """Verify the basic archondata format: nrounds¤rank§first§last§city§vekn§gw§vp§vpf§tp§toss§rtp§"""
@@ -130,7 +112,6 @@ def test_archondata_basic_format(mock_compute):
         Standing(user_uid="u1", gw=2.0, vp=8.5, tp=60, toss=3),
         Standing(user_uid="u2", gw=1.0, vp=5.0, tp=48, toss=1),
     ]
-    # 2 rounds of tables, no finals
     rounds = [
         [
             Table(
@@ -151,14 +132,10 @@ def test_archondata_basic_format(mock_compute):
     # nrounds = len(rounds) + (1 if finals else 0) = 2
     assert result.startswith("2¤")
 
-    # Split off the nrounds prefix
-    after_nrounds = result[2:]  # skip "2¤"
-
-    # Each player block ends with §, and blocks are concatenated
-    # Player 1: rank=1
-    # Fields: rank§first§last§city§vekn§gw§vp§vpf§tp§toss§rtp§
+    after_nrounds = result[2:]
+    # Each player block is 11 §-terminated fields:
+    # rank§first§last§city§vekn§gw§vp§vpf§tp§toss§rtp§
     parts = after_nrounds.split("§")
-    # Alice Smith: rank 1, first=Alice, last=Smith, city=Paris, vekn=1000001, gw=2, vp=8.5, vpf=0.0, tp=60, toss=3, rtp=10
     assert parts[0] == "1"  # rank
     assert parts[1] == "Alice"  # first name
     assert parts[2] == "Smith"  # last name
@@ -305,7 +282,6 @@ def test_archondata_skips_missing_users(mock_compute):
     t = _make_tournament(rounds=rounds, standings=standings)
     result = generate_archondata(t, users)
 
-    # Should only contain Alice, not Bob
     assert "1000001" in result
     assert "u2" not in result
 

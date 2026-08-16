@@ -64,9 +64,8 @@
     return seatDisplayUtil(uid, playerInfo, tournament.online);
   }
 
-  // Raffle base: players seated in any round, plus players currently present
-  // (Checked-in/Playing) not yet seated — so a raffle at check-in, before the
-  // first round, still draws from the checked-in players. Mirrors engine
+  // Base: players seated in any round, plus checked-in/playing players not yet
+  // seated, so a pre-round-1 raffle still draws from check-in. Mirrors engine
   // raffle.rs get_raffle_base_uids().
   const baseUids = $derived.by(() => {
     const set = new Set<string>();
@@ -85,7 +84,6 @@
     return set;
   });
 
-  // Finalists set
   const finalistUids = $derived.by(() => {
     const set = new Set<string>();
     if (tournament.finals) {
@@ -96,9 +94,9 @@
     return set;
   });
 
-  // Live GW/VP map: uid -> { gw, vp }, summed from per-seat round results.
-  // Do NOT use tournament.standings here: it only refreshes on FinishRound,
-  // so it misses GW/VP earned in the round in progress.
+  // Live GW/VP, summed from per-seat round results — do NOT use
+  // tournament.standings, which only refreshes on FinishRound and misses the
+  // round in progress.
   const standingsMap = $derived.by(() => {
     const map = new Map<string, { gw: number; vp: number }>();
     for (const round of tournament.rounds ?? []) {
@@ -115,7 +113,6 @@
     return map;
   });
 
-  // Already-drawn UIDs
   const drawnUids = $derived.by(() => {
     const set = new Set<string>();
     for (const draw of tournament.raffles ?? []) {
@@ -124,8 +121,7 @@
     return set;
   });
 
-  // Compute eligible count per pool
-  // NOTE: Pool filtering logic must match engine raffle.rs get_raffle_pool()
+  // Pool filtering logic must match engine raffle.rs get_raffle_pool()
   function eligibleForPool(p: RafflePool): number {
     let uids: string[];
     const base = [...baseUids];
@@ -149,7 +145,6 @@
     Math.max(1, Math.min(count || 1, Math.max(currentEligible, 1)))
   );
 
-  // Pool options with labels
   const poolOptions: { value: RafflePool; labelFn: () => string }[] = [
     { value: "AllPlayers", labelFn: () => m.raffle_pool_all_players() },
     { value: "NonFinalists", labelFn: () => m.raffle_pool_non_finalists() },
@@ -182,8 +177,6 @@
 <div class="space-y-3">
 
   {#if isOrganizer && doAction}
-    <!-- Organizer controls: labeled single-column form; the pre-filled name
-         makes "draw 1 winner from all players" a one-tap flow. -->
     <div class="space-y-3">
       {#if !hasRaffles}
         <p class="text-xs text-ink-faint">{m.raffle_help()}</p>

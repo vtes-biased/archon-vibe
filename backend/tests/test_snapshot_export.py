@@ -1,8 +1,7 @@
-"""The data export's zip envelope must be readable by an ordinary unzip.
-
-`_iter_snapshot_zip` hand-streams the archive into a non-seekable sink (data
-descriptors, central directory written on close), so a framing slip yields a file
-that downloads fine and refuses to open — the one failure mode worth pinning.
+"""The data export's zip envelope must be readable by an ordinary unzip:
+`_iter_snapshot_zip` hand-streams into a non-seekable sink (data descriptors,
+central directory on close), so a framing slip yields a file that downloads
+fine and refuses to open.
 """
 
 import gzip

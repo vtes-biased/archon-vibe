@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Online-only ledger read (the sanctioned wiki/sync.md carve-out) with simple
-  // client-side filters. Rendered inside the inventory panel.
+  // Online-only ledger read — a sanctioned carve-out from offline-first — with simple client-side
+  // filters. Rendered inside the inventory panel.
   import type { Promo, PromoLedgerEntry, PromoLedgerKind } from "$lib/types";
   import { getPromoLedger } from "$lib/api";
   import { getUser } from "$lib/db";
@@ -87,7 +87,6 @@
 </script>
 
 <div>
-  <!-- Filters -->
   <div class="flex flex-wrap gap-2 mb-3">
     <select bind:value={filterPromo} aria-label={m.promo_ledger_filter_promo()} class={selectClass}>
       <option value="">{m.promo_ledger_all_promos()}</option>

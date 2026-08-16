@@ -1,12 +1,7 @@
-"""Tests for the TWDA submission designer credit.
-
-When a sanctioned tournament finishes, the winner's deck is auto-submitted to
-the TWDA. The generated entry must credit the deck *designer* via the deck's
-`attribution` field — not blindly echo the free-text `author`. In particular,
-an anonymous deck (attribution=None) must never leak a stored author name.
-
-These tests pin the `Created by:` value handed to the engine exporter for each
-attribution case. The DB/engine/network deps are mocked so no DB is needed.
+"""TWDA submission designer credit: the generated entry must credit the deck's
+`attribution` field, never blindly echo `author` — an anonymous deck
+(attribution=None) must never leak a stored author name. DB/engine/network
+deps are mocked (no DB needed).
 """
 
 import json
@@ -173,9 +168,8 @@ async def test_twda_sentinel_passes_author_through():
 
 @pytest.mark.asyncio
 async def test_below_participation_floor_skips_twda():
-    """Fewer than TWDA_MIN_PLAYERS who actually played -> the winner's deck is NOT
-    published to the public TWDA. Small sanctioned events are valid but not
-    TWDA-worthy; guards against leaking a sub-floor deck to a third-party archive."""
+    """Fewer than TWDA_MIN_PLAYERS who played -> the winner's deck is NOT
+    published: small sanctioned events are valid but not TWDA-worthy."""
     tournament = _tournament("w-001", seated=TWDA_MIN_PLAYERS - 1)
     submit = AsyncMock(return_value="http://pr")
     record = AsyncMock()

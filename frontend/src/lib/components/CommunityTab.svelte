@@ -18,9 +18,8 @@
   import { ChevronDown, ChevronRight, Globe, Hash, Pencil, Search, Users, Video } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  // Sponsor mode (?sponsor=1): the visitor came to find an official to sponsor
-  // them for a VEKN ID — show only the officials directory, pre-filtered to
-  // their country, with an explicit contact CTA.
+  // Sponsor mode (?sponsor=1): the visitor came to find an official to sponsor them for a VEKN ID —
+  // show only the officials directory, pre-filtered to their country, with an explicit contact CTA.
   let { sponsorMode = false }: { sponsorMode?: boolean } = $props();
 
   const auth = $derived(getAuthState());
@@ -36,9 +35,8 @@
   let searchQuery = $state("");
   let selectedLanguage = $state("");
 
-  // Moderation is scoped to the link's owner, so these stay per-target: an NC
-  // moderates their own country, IC anywhere. Reading engineReady() keeps the
-  // deriveds that call them recomputing once WASM lands.
+  // Moderation is scoped to the link's owner, so these stay per-target: an NC moderates their own
+  // country, IC anywhere. Reading engineReady() keeps the deriveds recomputing once WASM lands.
   const canModerate = (target: User) => canModerateLink(auth.user, target).allowed;
   const canPromoteNational = (target: User) => canPromoteLinkNational(auth.user, target).allowed;
   const canPromoteGlobal = $derived(canPromoteLinkGlobal(auth.user).allowed);
@@ -58,7 +56,6 @@
     return links;
   });
 
-  // Social links grouped by country
   const socialGroups = $derived.by(() => {
     const grouped = new Map<string, { user: User; links: CommunityLink[] }[]>();
     for (const u of allUsersWithLinks) {
@@ -71,7 +68,6 @@
       if (!grouped.has(country)) grouped.set(country, []);
       grouped.get(country)!.push({ user: u, links: socialLinks });
     }
-    // Sort users within each country: pinned (scoped promotion) first, then officials
     for (const users of grouped.values()) {
       users.sort((a, b) => {
         const aPin = a.links.some(l => pinScope(l)) ? 0 : 1;
@@ -100,7 +96,6 @@
       });
   });
 
-  // Content links with language filtering
   const contentItems = $derived.by(() => {
     const items: { user: User; link: CommunityLink }[] = [];
     for (const u of allUsersWithLinks) {
@@ -112,8 +107,6 @@
         items.push({ user: u, link: l });
       }
     }
-    // Sort: national pin, other promoted, then officials/user name (global
-    // pins are excluded above — they live in Global Resources)
     const rank = (l: CommunityLink) => {
       if (l.moderation?.status !== "promoted") return 3;
       if (l.moderation.scope === "national") return 1;
@@ -131,7 +124,6 @@
     return items;
   });
 
-  // Available content languages
   const contentLanguages = $derived.by(() => {
     const langs = new Set<string>();
     for (const u of allUsersWithLinks) {
@@ -143,7 +135,6 @@
     return [...langs].sort();
   });
 
-  // Officials directory (NC/Prince with contact info)
   interface OfficialGroup {
     code: string;
     name: string;
@@ -176,9 +167,8 @@
       });
   });
 
-  // Officials directory carries contact info — gate it behind sign-in so it isn't
-  // shown directly to logged-out visitors (the public projection still ships the
-  // data; this is a display gate, see wiki/sync.md).
+  // Officials directory carries contact info — gate it behind sign-in so it isn't shown directly to
+  // logged-out visitors; the public projection still ships the data, this is a display-only gate.
   const showOfficials = $derived(auth.isAuthenticated && officialGroups.length > 0);
 
   // In sponsor mode, narrow to the visitor's country; fall back to all countries
@@ -193,7 +183,6 @@
 
   async function loadData() {
     const allUsers = await getAllUsers();
-    // All users with community links
     allUsersWithLinks = allUsers.filter(u =>
       !u.deleted_at && u.community_links?.length
     );
@@ -204,7 +193,6 @@
       u.roles?.some(r => r === "NC" || r === "Prince") &&
       (u.contact_email || u.discord_id || u.contact_phone)
     );
-    // Auto-expand user's country (the language filter defaults to "All")
     if (auth.user?.country) {
       expandedCountries = new Set([auth.user.country]);
       expandedOfficialCountries = new Set([auth.user.country]);
@@ -232,13 +220,12 @@
         method: "PATCH",
         body: JSON.stringify({ url, action }),
       });
-      await loadData(); // Refresh after moderation
+      await loadData();
     } catch (e: any) {
       showToast({ type: "error", message: e.detail || m.community_moderation_failed() });
     }
   }
 
-  // Load on mount and refresh on sync
   $effect(() => {
     loadData();
     const handler = (event: { type: string }) => {
@@ -252,14 +239,12 @@
 {#if !loaded}
   <div class="text-center py-8 text-ink-muted">{m.common_loading()}</div>
 {:else}
-  <!-- Sponsor-mode contact CTA -->
   {#if sponsorMode && auth.isAuthenticated}
     <div class="p-4 mb-6 rounded-lg border text-sm banner-info">
       {m.community_sponsor_cta()}
     </div>
   {/if}
 
-  <!-- Global Resources: links pinned globally by a moderator -->
   {#if !sponsorMode && globalLinks.length > 0}
     <div class="bg-surface-card rounded-lg shadow border border-line p-5 mb-6">
       <div class="flex items-center gap-2 mb-3">
@@ -281,7 +266,6 @@
     </div>
   {/if}
 
-  <!-- Add links prompt -->
   {#if auth.isAuthenticated && auth.user?.vekn_id}
     <a href="/profile" class="flex items-center gap-2 rounded-lg bg-surface-muted border border-line-strong px-4 py-3 mb-6 text-sm text-ink-strong hover:bg-surface-muted transition-colors">
       <Pencil class="w-4 h-4 text-link shrink-0" />
@@ -289,7 +273,6 @@
     </a>
   {/if}
 
-  <!-- Country-not-set prompt -->
   {#if auth.isAuthenticated && !auth.user?.country}
     <div class="p-4 mb-6 rounded-lg border text-sm banner-warn">
       {m.community_set_country_prompt()}
@@ -297,7 +280,6 @@
     </div>
   {/if}
 
-  <!-- Not logged in prompt -->
   {#if !auth.isAuthenticated}
     <div class="p-4 mb-6 rounded-lg bg-surface-muted border border-line-strong text-sm text-ink">
       {m.community_login_prompt()}
@@ -305,7 +287,6 @@
     </div>
   {/if}
 
-  <!-- Communities Section (Social links by country) -->
   {#if !sponsorMode && socialGroups.length > 0}
     <div class="mb-8">
       <div class="flex items-center gap-2 mb-3">
@@ -313,7 +294,6 @@
         <h2 class="text-lg font-medium text-ink-strong">{m.community_section_communities()}</h2>
       </div>
 
-      <!-- Country search -->
       <div class="relative mb-3">
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
         <input
@@ -337,7 +317,6 @@
     </div>
   {/if}
 
-  <!-- Content Section (language-filtered) -->
   {#if !sponsorMode && (contentItems.length > 0 || contentLanguages.length > 0)}
     <div class="mb-8">
       <div class="flex items-center gap-2 mb-3">
@@ -358,7 +337,6 @@
     </div>
   {/if}
 
-  <!-- Officials Directory (signed-in only) -->
   {#if showOfficials}
     <div>
       <div class="flex items-center gap-2 mb-3">

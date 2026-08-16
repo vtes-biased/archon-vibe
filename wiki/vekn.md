@@ -318,12 +318,33 @@ syncs:
 | rich play data — rounds, seatings, decks, finals | archon sync |
 | `local_modifications` fields | nobody — local edits trump both syncs |
 
+`coopted_by` carries an extra rule: `remap_coopted_by` is its sole writer, running
+once the full uid map is known, and an **unresolved sponsor is never written** —
+legacy refs dangle and rotate uid nightly, and chasing them rewrote ~10k users
+every night, all re-downloaded by every client at its next reconnect.
+
 **Tournament matching** in merge mode, at most one live tournament per vekn event
 id: by uid → idempotent update; else by `external_ids.archon` or
 `external_ids.vekn` → merge rich data INTO the vekn-created copy, whose uid
 survives, and a round-less incoming copy never overwrites a rich original; else
-insert under the old archon uid. A both-rich conflict — a one-app-per-event
-violation — is logged loudly and skipped.
+insert under the old archon uid. Both-rich behaves differently by path: on the
+vekn/name paths it is a one-app-per-event violation, logged loudly and skipped;
+on the uid and `archon`-marker paths it is an intentional overwrite — a
+legacy-run event is rich on both sides mid-parallel-run and old archon owns it
+until it finishes there. The `archon` marker, recorded whenever a rich payload
+merges into a vekn-created copy, is the echo guard letting a later run recognize
+its **own** merge rather than mistake it for a both-rich conflict — its absence
+wiped a live event on 2026-08-03 (Open de Coya 2026, vekn 13412).
+
+**VEKN-less legacy participants** — legacy archon never enforced a VEKN id at
+registration, so the merge resolves the survivors through fixed uid-keyed lists
+bounded by the production dump, deliberately not a general algorithm. A player
+with **no round seating** is a registration artifact: dropped wholesale
+(`KNOWN_DROP`), or dropped from a single tournament's players when the account
+plays elsewhere (`KNOWN_DROP_IN_TOURNAMENT`). One who **actually played** must
+resolve to a real account: `KNOWN_REMAP` onto the member's real VEKN id, or a
+fresh VEKN id allocated and marked push-eligible so the batch push claims the
+number on vekn.net before a future vekn.net assignment can collide with it.
 
 Other invariants: deterministic deck uids (uuid5 of tournament + user + round); a
 pre-run `pg_dump` for recovery; merge writes are **not** live-broadcast over SSE,

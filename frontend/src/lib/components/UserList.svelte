@@ -21,8 +21,8 @@
   let filteredUsers = $state<UserType[]>([]);
   let error = $state<string | null>(null);
   let isOnline = $state(navigator.onLine);
-  let isSyncing = $state(true); // True until sync_complete received from backend
-  let hasLoadedOnce = $state(false); // True after first successful IndexedDB load
+  let isSyncing = $state(true);
+  let hasLoadedOnce = $state(false);
   let showSyncing = $state(false);
   // Delay showing syncing spinner to avoid flash on fast IDB reads
   $effect(() => {
@@ -31,7 +31,6 @@
     return () => clearTimeout(timer);
   });
 
-  // Create user form
   let showCreateForm = $state(false);
 
   const availableRoles: Role[] = [
@@ -45,10 +44,8 @@
     "DEV",
   ];
 
-  // Pagination and filtering. The public filters live in the query string (see
-  // $lib/url-filters) so leaving for a member page and coming back restores the
-  // list; the officials-only triage toggles below stay local — restoring one for
-  // a viewer who cannot see its control would filter the list unaccountably.
+  // Public filters live in the query string (url-filters) so leaving and returning restores the list;
+  // officials-only triage toggles stay local — restoring one for a viewer who can't see its control would filter unaccountably.
   const urlParams = currentParams();
   let currentPage = $state(readPageParam() + 1);
   let pageSize = 250;
@@ -66,13 +63,11 @@
   let sponsorFilter = $state<"all" | "mine" | "none">("all");
   let filterNoVekn = $state(false);
 
-  // Display refresh scheduling - simple debounce
   let displayRefreshTimer: ReturnType<typeof setTimeout> | undefined;
-  let isLoadingUsers = false; // Prevent concurrent loadUsers() calls
+  let isLoadingUsers = false;
 
-  // Officials receive members' contact info (full projection), so only they can
-  // search by email/Discord — advertise it in the placeholder for them alone.
-  // Identity, not authority: the search itself is filtered by what synced.
+  // Officials receive members' contact info (full projection), so only they can search by email/Discord
+  // — advertise it in the placeholder for them alone. Identity, not authority: the search is filtered by what synced.
   const isOfficial = $derived(engineIsOfficial(getAuthState().user));
 
   const countries = getCountries();
@@ -106,7 +101,6 @@
     loadUsers();
   }
 
-  // Mirror the public filters + page into the address bar.
   $effect(() => {
     syncQueryParams({
       q: debouncedSearch.trim() || null,
@@ -126,7 +120,6 @@
   let totalPages = $derived(Math.ceil(filteredUsers.length / pageSize));
 
   async function loadUsers() {
-    // Prevent concurrent calls - just schedule a refresh if already loading
     if (isLoadingUsers) {
       scheduleDisplayRefresh();
       return;
@@ -136,11 +129,9 @@
     try {
       error = null;
 
-      // Get filters from display context (single source of truth)
       const { country, roles, nameSearch, hasPastSanctions, currentlySanctioned, sponsor, noVekn } = displayContext.getFilters();
       let users = await getFilteredUsers(country, roles, nameSearch);
 
-      // Apply sanction filters (async per-user checks)
       if (hasPastSanctions || currentlySanctioned) {
         const sanctionChecks = await Promise.all(
           users.map(async (user) => {
@@ -170,7 +161,6 @@
 
       filteredUsers = users;
 
-      // Track if we have any cached data (used to decide whether to show syncing UI)
       if (!hasLoadedOnce) {
         const hasData = await hasAnyUsers();
         if (hasData) {
@@ -178,7 +168,6 @@
         }
       }
 
-      // Update pagination context with currently visible users
       updatePaginationContext();
     } catch (e) {
       error = toUserMessage(e, m.user_error_load_users());
@@ -194,7 +183,6 @@
   }
 
   async function handleUserCreated(_created: UserType) {
-    // Reload from DB to get sorted data
     showCreateForm = false;
     await loadUsers();
   }
@@ -204,37 +192,22 @@
   }
 
 
-  /**
-   * Handle incoming sync user update with filter awareness.
-   * Uses debounced refresh to avoid flooding during initial sync.
-   */
   function handleSyncUserUpdate(user: UserType) {
-    // Refresh when the update is relevant to the current view. matchesCurrentFilters
-    // sees the NEW data, so it only catches users moving INTO the filter — a displayed
-    // user edited OUT of it (e.g. country FR→DE while filtering FR) would otherwise
-    // linger stale. So also refresh if the user is currently displayed.
+    // matchesCurrentFilters sees the NEW data, so it only catches users moving INTO the filter — a
+    // displayed user edited OUT of it (e.g. country FR→DE while filtering FR) would otherwise linger stale, so also refresh if currently displayed.
     const isDisplayed = filteredUsers.some((u) => u.uid === user.uid);
     if (!isDisplayed && !displayContext.matchesCurrentFilters(user)) {
       return;
     }
 
-    // Always use debounced refresh - this coalesces multiple rapid events
-    // The debounce timer is short (100ms) so display updates quickly
     scheduleDisplayRefresh();
   }
 
-  /**
-   * Schedule a display refresh. If already scheduled, do nothing.
-   * Uses a short debounce to coalesce rapid SSE events.
-   * Skips refresh if a user is being edited (might have modal open).
-   */
   function scheduleDisplayRefresh() {
-    // If refresh already scheduled, do nothing - the pending refresh will pick up new data
     if (displayRefreshTimer) {
       return;
     }
 
-    // Schedule refresh after 100ms - this coalesces multiple rapid events
     displayRefreshTimer = setTimeout(async () => {
       displayRefreshTimer = undefined;
       await loadUsers();
@@ -247,9 +220,8 @@
     } else {
       selectedRoles = [...selectedRoles, role];
     }
-    currentPage = 1; // Reset to first page
+    currentPage = 1;
 
-    // Update display context immediately before async loadUsers()
     updateDisplayContext();
     loadUsers();
   }
@@ -257,16 +229,12 @@
   function handleCountryChange(e: Event) {
     const target = e.target as HTMLSelectElement;
     selectedCountry = target.value;
-    currentPage = 1; // Reset to first page
+    currentPage = 1;
 
-    // Update display context immediately before async loadUsers()
     updateDisplayContext();
     loadUsers();
   }
 
-  /**
-   * Update display context with current filter state.
-   */
   function updateDisplayContext() {
     const country = selectedCountry !== "all" ? selectedCountry : undefined;
     const roles = selectedRoles.length > 0 ? selectedRoles : undefined;
@@ -283,7 +251,7 @@
   }
 
   function setSponsorFilter(mode: "mine" | "none") {
-    sponsorFilter = sponsorFilter === mode ? "all" : mode; // toggle off if re-clicked
+    sponsorFilter = sponsorFilter === mode ? "all" : mode;
     currentPage = 1;
     updateDisplayContext();
     loadUsers();
@@ -307,7 +275,6 @@
     loadUsers();
   }
 
-  // Debounced search handler
   let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   function handleSearchInput() {
     if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -322,14 +289,10 @@
   function goToPage(page: number) {
     if (page >= 1 && page <= totalPages) {
       currentPage = page;
-      // Update pagination context when page changes
       updatePaginationContext();
     }
   }
 
-  /**
-   * Update pagination context based on current state.
-   */
   function updatePaginationContext() {
     const start = (currentPage - 1) * pageSize;
     const end = start + pageSize;
@@ -337,35 +300,28 @@
     displayContext.setPagination(currentPage, pageSize, visibleUsers);
   }
 
-  // Initial load and SSE event listeners
   // SSE connection is managed by +layout.svelte — this component only listens for events
   $effect(() => {
-    // Use untrack to prevent filter state from becoming dependencies
     untrack(() => {
       updateDisplayContext();
       loadUsers();
     });
 
-    // If sync already completed before mount, refresh immediately
     if (syncManager.isSynced) {
       isSyncing = false;
       untrack(() => scheduleDisplayRefresh());
     }
 
-    // Listen for sync events
     const handleSyncEvent = (event: any) => {
       if (event.type === "user" && event.data) {
         handleSyncUserUpdate(event.data);
       } else if (event.type === "sync_complete") {
-        // Historical sync complete - stop showing syncing spinner
         isSyncing = false;
-        // Refresh display to show any final data
         scheduleDisplayRefresh();
       } else if (event.type === "error") {
         error = event.error || m.sync_error_generic();
-        isSyncing = false; // Stop showing syncing on error
+        isSyncing = false;
       } else if (event.type === "disconnected") {
-        // Connection lost - stop syncing state to avoid stuck spinner
         isSyncing = false;
       }
     };
@@ -383,7 +339,6 @@
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
 
-      // Clear any pending timers
       if (displayRefreshTimer) {
         clearTimeout(displayRefreshTimer);
       }
@@ -396,7 +351,6 @@
 
 <div class="p-4 sm:p-8">
   <div class="max-w-6xl mx-auto">
-    <!-- Header -->
     <div class="mb-8">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-3xl font-semibold text-accent">{m.nav_users()}</h1>
@@ -417,12 +371,10 @@
       </div>
 
       <div class="mb-4">
-        <!-- Filters -->
         <div
           class="bg-surface-card rounded-lg shadow p-4 mb-4 border border-line"
         >
           <div class="flex flex-wrap gap-4">
-            <!-- Name Search -->
             <div class="flex-1 min-w-[200px]">
               <label
                 for="name-search"
@@ -439,7 +391,6 @@
                 class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright placeholder:text-ink-faint"
               />
             </div>
-            <!-- Country Filter -->
             <div class="flex-1 min-w-[200px]">
               <label
                 for="country-filter"
@@ -463,7 +414,6 @@
             </div>
           </div>
 
-          <!-- Role Filters -->
           <div class="mt-4">
             <div class="block text-sm font-medium text-ink-muted mb-2">{m.common_roles()}</div>
             <div class="flex flex-wrap gap-2">
@@ -482,7 +432,6 @@
             </div>
           </div>
 
-          <!-- Sanction Filters -->
           <div class="mt-4">
             <div class="block text-sm font-medium text-ink-muted mb-2">{m.sanction_mgr_title()}</div>
             <div class="flex flex-wrap gap-2">
@@ -505,7 +454,6 @@
             </div>
           </div>
 
-          <!-- Sponsor / VEKN filters (organizer & NC sponsor-management workflow) -->
           {#if isOfficial}
             <div class="mt-4">
               <div class="block text-sm font-medium text-ink-muted mb-2">{m.user_list_filter_sponsor_title()}</div>
@@ -548,7 +496,6 @@
       </div>
     </div>
 
-    <!-- Create User Form -->
     {#if showCreateForm}
       <div class="mb-6">
         <User
@@ -559,7 +506,6 @@
       </div>
     {/if}
 
-    <!-- Error State -->
     {#if error}
       <div
         class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4 mb-6"
@@ -568,13 +514,11 @@
       </div>
     {/if}
 
-    <!-- User List -->
     {#if filteredUsers.length > 0}
       <div
         id="users-list-container"
         class="bg-surface-card rounded-lg shadow overflow-hidden border border-line"
       >
-        <!-- Table Header (hidden on mobile) -->
         <div
           id="users-table-header"
           class="hidden sm:grid sm:grid-cols-12 gap-4 px-6 py-3 bg-surface-muted text-sm font-medium text-ink border-b border-line-strong"
@@ -585,7 +529,6 @@
           <div id="header-roles" class="col-span-5">{m.common_roles()}</div>
         </div>
 
-        <!-- User Rows -->
         <div id="users-rows-container" class="divide-y divide-line">
           {#each paginatedUsers as user (user.uid)}
               <div
@@ -596,7 +539,6 @@
                 role="button"
                 tabindex="0"
               >
-                <!-- Mobile Layout -->
                 <div class="sm:hidden space-y-2">
                   <div class="flex items-start justify-between">
                     <div>
@@ -629,7 +571,6 @@
                   {/if}
                 </div>
 
-                <!-- Desktop Table Layout -->
                 <div class="hidden sm:grid sm:grid-cols-12 gap-4 items-center">
                   <div class="col-span-3">
                     <div class="user-name font-semibold text-ink-strong">
@@ -666,7 +607,6 @@
         </div>
       </div>
 
-      <!-- Pagination Controls -->
       {#if totalPages > 1}
         <div class="mt-6 flex items-center justify-between">
           <div class="text-sm text-ink-muted">
@@ -699,18 +639,15 @@
       {/if}
     {/if}
 
-    <!-- Empty State -->
     {#if !error && filteredUsers.length === 0 && (hasLoadedOnce || showSyncing)}
       <div class="text-center py-12">
         {#if showSyncing}
-          <!-- Syncing state -->
           <div class="text-ink-faint mb-4">
             <RefreshCw class="mx-auto h-12 w-12 animate-spin" />
           </div>
           <h3 class="text-lg font-medium text-ink-strong mb-2">{m.status_syncing()}...</h3>
           <p class="text-ink-muted">{m.user_list_loading_from_server()}</p>
         {:else}
-          <!-- Truly empty state -->
           <div class="text-ink-faint mb-4">
             <Users class="mx-auto h-12 w-12" />
           </div>

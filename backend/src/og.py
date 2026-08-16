@@ -1,14 +1,7 @@
 """Server-rendered Open Graph stubs for shared tournament and league links.
 
-Social link-preview crawlers (Discord, Facebook, Reddit, WhatsApp, …) don't run
-JavaScript, so the SPA's client-set <meta> tags are invisible to them — every
-share would fall back to the static app.html site-wide card. nginx UA-splits
-``/tournaments/{uid}`` and ``/leagues/{uid}``: humans get the static SPA shell,
-crawlers are proxied to the routes that render this HTML with per-object
-og:title/description/image.
-
-Pure render here (no request/db); the routes in main.py supply the public-level
-projection dict so this stays unit-testable and can't over-expose member fields.
+Pure render, no request/db: the routes in main.py supply the public-level
+projection dict, so this stays unit-testable and can't over-expose member fields.
 """
 
 import html
@@ -92,9 +85,8 @@ def _render_stub(
     def e(s: object) -> str:
         return html.escape(str(s), quote=True)
 
-    # No JS redirect: in the UA-split (single canonical URL) a misfiring browser
-    # would loop on location.replace back to this same path. Crawlers read <head>
-    # only; the body is a courtesy for the rare human who reaches the stub.
+    # No JS redirect: a misfiring browser would loop on location.replace back to
+    # this same UA-split path. Crawlers read <head> only; the body is a courtesy.
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -121,13 +113,8 @@ def _render_stub(
 
 
 def render_og_html(base_url: str, uid: str, pub: dict | None) -> str:
-    """Render the og-tagged HTML stub for /tournaments/{uid}.
-
-    `base_url` is the absolute origin (scheme://host) — og:image MUST be absolute
-    for crawlers. `pub` is the tournament's public projection (or None / deleted →
-    site-wide card, never an error). A banner yields a large card; the square
-    fallback icon a summary card.
-    """
+    """`base_url` must be absolute (scheme://host) — og:image requires it for
+    crawlers. `pub` is None or deleted → site-wide card, never an error."""
     title, description, banner = SITE_TITLE, SITE_DESCRIPTION, None
     if pub and not pub.get("deleted_at"):
         title = pub.get("name") or SITE_TITLE
@@ -150,10 +137,8 @@ def render_league_og_html(
     return _render_stub(base_url, f"/leagues/{uid}", title, description, None)
 
 
-# Static help pages, so a shared reference doc previews as itself instead of the
-# generic site card. Mirrors helpDocs in frontend/src/lib/help-docs.ts (the
-# help_*_title / help_*_description messages); crawlers get one language, so only
-# the base-locale strings live here. Unknown slug → site card, as for an unknown uid.
+# Mirrors helpDocs in frontend/src/lib/help-docs.ts — keep both in sync.
+# Crawlers get one language, so only base-locale strings live here.
 HELP_PAGES: dict[str, tuple[str, str]] = {
     "rules": (
         "VTES Comprehensive Rules",

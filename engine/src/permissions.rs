@@ -1,24 +1,8 @@
-//! Authorization: every rule in the stack, expressed as one declarative table.
-//!
-//! A capability names a distinct authority ("edit a member's profile", "issue a
-//! suspension"). [`CAPABILITIES`] maps each one to the roles that hold it and the
-//! scope they hold it in; [`ROLE_APPOINTMENTS`] does the same for who may grant
-//! or revoke each role. Both are data — a change to the role matrix edits a row,
-//! not a function.
-//!
-//! Everything below the tables is either the evaluator ([`check`]) or a resolver:
-//! a thin function for the handful of rules that need a precondition the table
-//! cannot express (a sanction's level, a tournament's state, a target's own
-//! roles). Deny by default: a capability with no matching grant is refused.
-//!
-//! This module is the only place a role literal may be used to *decide* access.
-//! Backend routes and frontend gates are callers; see backend/src/permissions.py
-//! and frontend/src/lib/engine.ts.
+//! The permission matrix as data ([`CAPABILITIES`], [`ROLE_APPOINTMENTS`]), the evaluator ([`check`]), and resolvers for preconditions the table can't express.
 
 use crate::error::EngineError;
 use json::JsonValue;
 
-/// Roles that users can have
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Role {
     IC,
@@ -84,7 +68,6 @@ impl Role {
 // Short names for the tables — they only read as a matrix without the prefix.
 use Role::{Ethics, Judge, Judgekin, Prince, Rulemonger, DEV, IC, NC, PT, PTC};
 
-/// Minimal user context needed for permission checks
 #[derive(Debug, Clone)]
 pub struct UserContext {
     pub roles: Vec<Role>,
@@ -118,7 +101,6 @@ impl UserContext {
     }
 }
 
-/// Permission check results with reason
 #[derive(Debug, Clone)]
 pub struct PermissionResult {
     pub allowed: bool,
@@ -148,10 +130,8 @@ impl PermissionResult {
     }
 }
 
-/// A tournament or league reduced to the fields needed for ownership checks.
-///
-/// The route/frontend fetches the full object and passes only this flat
-/// descriptor across the binding boundary — never the whole object.
+/// A tournament or league reduced to the fields needed for ownership checks,
+/// passed across the binding boundary instead of the whole object.
 #[derive(Debug, Clone, Default)]
 pub struct OwnedResource {
     pub country: Option<String>,
@@ -178,32 +158,24 @@ impl OwnedResource {
     }
 }
 
-// ============================================================================
-// Capabilities
-// ============================================================================
-
 /// A distinct authority somebody may hold. One variant per thing the stack gates
 /// on; every variant must have exactly one [`CAPABILITIES`] row (asserted below).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Capability {
-    // Members
     SponsorMember,
     EditMemberProfile,
     DeleteMember,
     MarkDeceased,
     ManageVekn,
     MergeAccounts,
-    // Tournaments & leagues
     CreateTournament,
     OrganizeTournament,
     ForceUnlockTournament,
     ManageLeagues,
     EditLeague,
-    // Community links
     ModerateLink,
     PromoteLinkNational,
     PromoteLinkGlobal,
-    // Sanctions
     IssueRestrictedSanction,
     IssueTournamentSanction,
     LiftRestrictedSanction,
@@ -212,7 +184,6 @@ pub enum Capability {
     ModifySanction,
     DeleteAnySanction,
     DeleteOrganizerSanction,
-    // Admin
     ManagePromos,
     RecordPromoIntake,
     ViewFullPromoLedger,
@@ -242,35 +213,27 @@ pub struct Rule {
     pub capability: Capability,
     /// Wire name, used by the PyO3/WASM `check_permission` entry point.
     pub name: &'static str,
-    /// Roles that hold the capability everywhere.
     pub global: &'static [Role],
-    /// Roles that hold it only over their own country: the actor must have a
-    /// country and it must equal the request's `target_country`.
+    /// The actor must have a country and it must equal the request's
+    /// `target_country`.
     pub same_country: &'static [Role],
-    /// The actor acting on themselves (`target_uid` == `actor_uid`).
     pub self_service: bool,
-    /// An organizer of the request's resource (tournament or league).
     pub organizer: bool,
-    /// User-facing denial.
     pub deny: &'static str,
     /// Denial used instead when the actor holds a `same_country` role but the
     /// countries differ — "you, but not here" rather than "not you".
     pub deny_scope: Option<&'static str>,
 }
 
-/// The "official" roles that create tournaments and members. Shared by the three
-/// rows below and by `ActorContext::can_manage_tournaments` (raw role strings),
-/// so a role addition/rename cannot make "create" and "manage" diverge.
+/// The "official" roles that create tournaments and members. Shared with
+/// `ActorContext::can_manage_tournaments` so "create" and "manage" can't diverge.
 pub const OFFICIAL_ROLES: [Role; 3] = [IC, NC, Prince];
 
-/// **The permission matrix.** Deny by default; a role appears here or it has no
-/// authority. The matrix is documented in wiki/access.md.
+/// **The permission matrix.** Deny by default: a role appears here or it has no
+/// authority.
 pub const CAPABILITIES: &[Rule] = &[
-    // ---- Members ----------------------------------------------------------
-    // Bringing someone into VEKN — minting a member record, or issuing a VEKN ID
-    // to an account that has none. One authority, not two: both allocate an ID
-    // and stamp coopted_by, and splitting them only invited the two halves to
-    // drift. Deliberately cross-country: any official may sponsor anywhere.
+    // One authority for both minting a member and issuing a VEKN ID —
+    // splitting them invited the two halves to drift.
     Rule {
         capability: Capability::SponsorMember,
         name: "sponsor_member",
@@ -333,7 +296,6 @@ pub const CAPABILITIES: &[Rule] = &[
         deny: "Only IC can merge accounts",
         deny_scope: None,
     },
-    // ---- Tournaments & leagues -------------------------------------------
     Rule {
         capability: Capability::CreateTournament,
         name: "create_tournament",
@@ -344,7 +306,6 @@ pub const CAPABILITIES: &[Rule] = &[
         deny: "Only IC, NC, or Prince can manage tournaments",
         deny_scope: None,
     },
-    // Implicit organizers: IC anywhere, NC over their own country.
     Rule {
         capability: Capability::OrganizeTournament,
         name: "organize_tournament",
@@ -385,9 +346,8 @@ pub const CAPABILITIES: &[Rule] = &[
         deny: "You don't have permission to edit this league",
         deny_scope: None,
     },
-    // ---- Community links --------------------------------------------------
-    // Officials pin and clear their own links through the same grant — an NC is
-    // trivially in their own country — so no self-service row is needed.
+    // Officials pin/clear their own links through the ordinary same-country
+    // grant, not self-service — no self_service row needed.
     Rule {
         capability: Capability::ModerateLink,
         name: "moderate_link",
@@ -418,7 +378,6 @@ pub const CAPABILITIES: &[Rule] = &[
         deny: "Only IC can promote a link globally",
         deny_scope: None,
     },
-    // ---- Sanctions --------------------------------------------------------
     // "Restricted" = suspension/probation; see `restricted_level`.
     Rule {
         capability: Capability::IssueRestrictedSanction,
@@ -500,7 +459,6 @@ pub const CAPABILITIES: &[Rule] = &[
         deny: "You don't have permission to delete this sanction",
         deny_scope: None,
     },
-    // ---- Admin ------------------------------------------------------------
     Rule {
         capability: Capability::ManagePromos,
         name: "manage_promos",
@@ -511,7 +469,6 @@ pub const CAPABILITIES: &[Rule] = &[
         deny: "Only IC can manage promos",
         deny_scope: None,
     },
-    // NC records intakes and sees the whole ledger regardless of country.
     Rule {
         capability: Capability::RecordPromoIntake,
         name: "record_promo_intake",
@@ -542,7 +499,6 @@ pub const CAPABILITIES: &[Rule] = &[
         deny: "Only IC or DEV can manage OAuth clients",
         deny_scope: None,
     },
-    // Trigger and inspect the VEKN/TWDA sync jobs.
     Rule {
         capability: Capability::RunAdminSync,
         name: "run_admin_sync",
@@ -558,7 +514,6 @@ pub const CAPABILITIES: &[Rule] = &[
 /// Who may grant or revoke a role. Same shape as [`CAPABILITIES`]: `global`
 /// applies anywhere, `same_country` only over the actor's own country.
 pub struct Appointment {
-    /// The role being granted or revoked.
     pub role: Role,
     pub global: &'static [Role],
     pub same_country: &'static [Role],
@@ -587,7 +542,6 @@ pub const ROLE_APPOINTMENTS: &[Appointment] = &[
         global: &[IC, Rulemonger],
         same_country: &[],
     },
-    // Council-level roles and DEV: IC only.
     Appointment {
         role: IC,
         global: &[IC],
@@ -619,10 +573,6 @@ pub const ROLE_APPOINTMENTS: &[Appointment] = &[
         same_country: &[],
     },
 ];
-
-// ============================================================================
-// Evaluator
-// ============================================================================
 
 /// What a capability is being asked about. Only fill the fields the capability's
 /// row actually uses — an absent field simply matches no grant.
@@ -661,7 +611,6 @@ impl<'a> Request<'a> {
         self
     }
 
-    /// The actor's country, when they have one and it matches the target's.
     fn in_own_country(&self) -> bool {
         self.actor.country.is_some() && self.actor.country.as_deref() == self.target_country
     }
@@ -705,12 +654,8 @@ pub fn allows(capability: Capability, req: &Request) -> bool {
     check(capability, req).allowed
 }
 
-/// Every capability the actor holds unconditionally — anywhere, over anyone.
-///
-/// What a remote client (the Discord bot) needs to decide what to offer without
-/// carrying its own copy of the matrix. Country- and resource-scoped grants are
-/// deliberately absent: they have no answer without a target, so a client that
-/// wants one must ask for that specific case.
+/// Every capability the actor holds unconditionally — anywhere, over anyone. For
+/// a remote client (the Discord bot) with no per-request target to resolve against.
 pub fn unconditional_capabilities(actor: &UserContext) -> Vec<&'static str> {
     CAPABILITIES
         .iter()
@@ -719,9 +664,7 @@ pub fn unconditional_capabilities(actor: &UserContext) -> Vec<&'static str> {
         .collect()
 }
 
-// ============================================================================
-// Resolvers — rules with a precondition the table cannot express
-// ============================================================================
+// Resolvers: rules with a precondition the table cannot express.
 
 fn appointment_for(role: Role) -> &'static Appointment {
     ROLE_APPOINTMENTS
@@ -730,10 +673,8 @@ fn appointment_for(role: Role) -> &'static Appointment {
         .expect("every Role has a ROLE_APPOINTMENTS row (asserted by test)")
 }
 
-/// Check if actor can grant or revoke `role` on target.
-///
-/// [`ROLE_APPOINTMENTS`] plus one target-state precondition: roles hang off a
-/// VEKN ID, so a member without one cannot hold any.
+/// [`ROLE_APPOINTMENTS`] plus one precondition the table can't express: roles
+/// hang off a VEKN ID, so a member without one cannot hold any.
 pub fn can_change_role(actor: &UserContext, target: &UserContext, role: Role) -> PermissionResult {
     if target.vekn_id.is_none() {
         return PermissionResult::deny("User must have a VEKN ID to be assigned roles");
@@ -761,13 +702,8 @@ pub fn can_change_role(actor: &UserContext, target: &UserContext, role: Role) ->
 /// overlay, so changing it takes the authority that could change that role.
 const OFFICIAL_ROLES_BY_AUTHORITY: [Role; 3] = [IC, NC, Prince];
 
-/// Check if actor can change target's country.
-///
-/// For an official target, gated by the authority that could change their
-/// highest official role — a self-service country change by an NC/Prince is an
-/// unauthorized data-scope change. A non-official target is unrestricted
-/// (ordinary self-service / same-country admin edit, already gated by
-/// [`Capability::EditMemberProfile`]).
+/// An official target is gated by the authority over their highest official role;
+/// a non-official target is unrestricted here (already gated by [`Capability::EditMemberProfile`]).
 pub fn can_change_country(actor: &UserContext, target: &UserContext) -> PermissionResult {
     match OFFICIAL_ROLES_BY_AUTHORITY
         .iter()
@@ -780,16 +716,12 @@ pub fn can_change_country(actor: &UserContext, target: &UserContext) -> Permissi
     }
 }
 
-/// Whether a member holds the official badge (IC/NC/Prince).
-///
-/// Identity, not authority: this answers "is this person an official", and is
-/// for badges and quotas only. Never gate on it — ask for the capability.
+/// Identity, not authority — "is this person an official," for badges and
+/// quotas only. Never gate on it; ask for the capability instead.
 pub fn is_official(actor: &UserContext) -> bool {
     actor.has_any(&OFFICIAL_ROLES)
 }
 
-/// Check if actor is an organizer of a tournament: an explicit organizer, or an
-/// implicit one — IC (any tournament) or NC (same country as the tournament).
 pub fn is_organizer(actor: &UserContext, actor_uid: &str, tournament: &OwnedResource) -> bool {
     allows(
         Capability::OrganizeTournament,
@@ -799,12 +731,8 @@ pub fn is_organizer(actor: &UserContext, actor_uid: &str, tournament: &OwnedReso
     )
 }
 
-/// Check if actor can take a tournament offline, or force-take its lock.
-///
-/// A conjunction, which the table cannot express: running the event AND the
-/// member-creation power the lock carries — offline play mints real members at
-/// go-online. A Prince is never an implicit organizer, so they hold this only
-/// on a tournament they are actually named on.
+/// Conjunction the table can't express: organizing the event AND the member-creation
+/// power the lock carries. A Prince is never an implicit organizer.
 pub fn can_take_tournament_offline(
     actor: &UserContext,
     actor_uid: &str,
@@ -822,7 +750,6 @@ pub fn can_take_tournament_offline(
     check(Capability::SponsorMember, &Request::new(actor, actor_uid))
 }
 
-/// Check if actor can edit a league: IC, NC (same country), or a league organizer.
 pub fn can_edit_league(
     actor: &UserContext,
     actor_uid: &str,
@@ -836,10 +763,7 @@ pub fn can_edit_league(
     )
 }
 
-/// Check if actor can attach a tournament to a league: anyone who can edit the
-/// league, or — when the league is open to country princes — a Prince of the
-/// league's country. Attach-only: this never grants league edit rights, and a
-/// worldwide league (no country) has no "country princes" to open up to.
+/// Attach-only — never grants league edit rights.
 pub fn can_link_tournament_to_league(
     actor: &UserContext,
     actor_uid: &str,
@@ -915,7 +839,6 @@ fn organizer_issuable(level: &str) -> bool {
     )
 }
 
-/// Check if actor can issue a sanction of `level`.
 pub fn can_issue_sanction(
     issuer: &UserContext,
     issuer_uid: &str,
@@ -933,11 +856,8 @@ pub fn can_issue_sanction(
     )
 }
 
-/// Check if actor can lift a sanction.
-///
-/// Restricted levels are the Ethics chain's alone. Otherwise the tournament-level
-/// grant applies, widened for a disqualification to the organizers of the league
-/// the tournament belongs to.
+/// Restricted levels are the Ethics chain's alone; otherwise the
+/// tournament-level grant applies, widened for a DQ to the league organizers.
 pub fn can_lift_sanction(
     user: &UserContext,
     user_uid: &str,
@@ -963,11 +883,8 @@ pub fn can_lift_sanction(
     )
 }
 
-/// Check if actor can delete a sanction.
-///
-/// IC/Ethics for any of them; an organizer only for what they could have issued,
-/// and only while the tournament is unfinished — so a mistake can be undone at
-/// the event without escalating.
+/// IC/Ethics for any; an organizer only for what they could have issued, and
+/// only while the tournament is unfinished — undo without escalating.
 pub fn can_delete_sanction(
     user: &UserContext,
     user_uid: &str,
@@ -996,12 +913,9 @@ mod tests {
         }
     }
 
-    /// Evaluate a capability for an actor over a target country.
     fn over_country(cap: Capability, actor: &UserContext, country: Option<&str>) -> bool {
         allows(cap, &Request::new(actor, "actor").target_country(country))
     }
-
-    // ---- Table integrity --------------------------------------------------
 
     #[test]
     fn test_every_capability_has_exactly_one_rule() {
@@ -1011,7 +925,6 @@ mod tests {
                 .filter(|r| r.capability == rule.capability)
                 .count();
             assert_eq!(matches, 1, "duplicate row for {:?}", rule.capability);
-            // Round-trips through the wire name used by the bindings.
             assert_eq!(Capability::from_str(rule.name), Some(rule.capability));
         }
     }
@@ -1030,13 +943,10 @@ mod tests {
 
     #[test]
     fn test_ic_holds_every_capability() {
-        // "IC may do anything" is the matrix's first line, and `require_role`
-        // grants IC implicitly — the table must not contradict that.
         let ic = ctx(vec![IC], Some("US"));
         for rule in CAPABILITIES {
             // Role-less rows (lift_league_disqualification, delete_organizer_sanction)
-            // widen an organizer's reach on top of a primary capability IC already
-            // holds — they grant nobody anything by role, IC included.
+            // grant nobody anything by role — they only widen an organizer's reach.
             if rule.global.is_empty() && rule.same_country.is_empty() {
                 continue;
             }
@@ -1049,7 +959,7 @@ mod tests {
         let nobody = ctx(vec![Judge], Some("FR"));
         for rule in CAPABILITIES {
             if rule.self_service {
-                continue; // covered by the per-capability tests
+                continue;
             }
             let req = Request::new(&nobody, "actor").target_country(Some("FR"));
             assert!(
@@ -1059,8 +969,6 @@ mod tests {
             );
         }
     }
-
-    // ---- Evaluator semantics ---------------------------------------------
 
     #[test]
     fn test_same_country_needs_a_country_on_both_sides() {
@@ -1100,15 +1008,12 @@ mod tests {
         assert!(!allows(Capability::DeleteMember, &req("me")));
     }
 
-    // ---- Members ----------------------------------------------------------
-
     #[test]
     fn test_edit_member_profile() {
         let cap = Capability::EditMemberProfile;
         assert!(over_country(cap, &ctx(vec![IC], Some("US")), Some("FR")));
         assert!(over_country(cap, &ctx(vec![NC], Some("FR")), Some("FR")));
         assert!(!over_country(cap, &ctx(vec![NC], Some("US")), Some("FR")));
-        // A Prince holds no member-data authority, not even at home.
         assert!(!over_country(
             cap,
             &ctx(vec![Prince], Some("FR")),
@@ -1174,8 +1079,6 @@ mod tests {
             Some("FR")
         ));
     }
-
-    // ---- Role appointment -------------------------------------------------
 
     #[test]
     fn test_ic_can_change_any_role() {
@@ -1244,8 +1147,6 @@ mod tests {
         // Highest role wins: an NC+Prince target needs NC-level authority.
         assert!(!can_change_country(&nc_fr, &ctx(vec![NC, Prince], Some("FR"))).allowed);
     }
-
-    // ---- Tournaments & leagues -------------------------------------------
 
     #[test]
     fn test_create_tournament() {
@@ -1341,7 +1242,6 @@ mod tests {
             organizers_uids: vec!["org-1".to_string()],
             open_to_country_princes: open,
         };
-        // League editors (IC/NC-same-country/organizer) can always link
         assert!(
             can_link_tournament_to_league(
                 &ctx(vec![IC], Some("US")),
@@ -1400,8 +1300,6 @@ mod tests {
         );
     }
 
-    // ---- Community links --------------------------------------------------
-
     #[test]
     fn test_link_moderation_scopes() {
         assert!(over_country(
@@ -1440,8 +1338,7 @@ mod tests {
 
     #[test]
     fn test_officials_moderate_their_own_links() {
-        // Officials pin their own links through the ordinary grant, not a
-        // self-service exemption — so an unprivileged member gets no such reach.
+        // Via the ordinary grant, not a self-service exemption.
         let nc = ctx(vec![NC], Some("FR"));
         let member = ctx(vec![], Some("FR"));
         let own = |actor| {
@@ -1456,8 +1353,6 @@ mod tests {
         assert!(!own(&member));
     }
 
-    // ---- Sanctions --------------------------------------------------------
-
     #[test]
     fn test_can_issue_sanction() {
         let no_t = OwnedResource::default();
@@ -1468,9 +1363,7 @@ mod tests {
         assert!(can_issue_sanction(&ctx(vec![IC], None), "x", "suspension", &no_t).allowed);
         assert!(can_issue_sanction(&ctx(vec![Ethics], None), "x", "probation", &no_t).allowed);
         assert!(!can_issue_sanction(&ctx(vec![NC], None), "x", "suspension", &no_t).allowed);
-        // Organizer cannot issue a suspension
         assert!(!can_issue_sanction(&ctx(vec![], None), "org-1", "suspension", &t).allowed);
-        // Tournament-level: IC/Ethics or an organizer
         assert!(can_issue_sanction(&ctx(vec![IC], None), "x", "caution", &no_t).allowed);
         assert!(can_issue_sanction(&ctx(vec![], None), "org-1", "warning", &t).allowed);
         assert!(!can_issue_sanction(&ctx(vec![], None), "nobody", "caution", &t).allowed);
@@ -1491,7 +1384,6 @@ mod tests {
             )
             .allowed
         };
-        // Suspension/probation: IC or Ethics
         assert!(lift(vec![IC], None, "x", "suspension", None, vec![]));
         assert!(lift(vec![Ethics], None, "x", "probation", None, vec![]));
         assert!(!lift(
@@ -1502,9 +1394,7 @@ mod tests {
             None,
             vec![]
         ));
-        // Tournament-level: IC or Rulemonger always
         assert!(lift(vec![Rulemonger], None, "x", "caution", None, vec![]));
-        // NC of the tournament's country
         assert!(lift(
             vec![NC],
             Some("FR"),
@@ -1521,7 +1411,6 @@ mod tests {
             Some("FR".to_string()),
             vec![]
         ));
-        // League organizer can lift a DQ, but nothing else
         assert!(lift(
             vec![],
             None,
@@ -1549,10 +1438,8 @@ mod tests {
             )
             .allowed
         };
-        // IC/Ethics: any sanction
         assert!(del(vec![IC], "x", "suspension", "", vec![]));
         assert!(del(vec![Ethics], "x", "warning", "Finished", vec![]));
-        // Organizer: issuable levels on their own open tournament
         assert!(del(vec![], "org-1", "caution", "Playing", vec!["org-1"]));
         assert!(del(
             vec![],
@@ -1571,11 +1458,8 @@ mod tests {
             "Playing",
             vec!["org-1"]
         ));
-        // Non-organizer without privileged role
         assert!(!del(vec![NC], "x", "caution", "Playing", vec!["org-1"]));
     }
-
-    // ---- Admin ------------------------------------------------------------
 
     #[test]
     fn test_admin_capabilities() {

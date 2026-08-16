@@ -32,7 +32,6 @@
   <div class="max-w-4xl mx-auto">
     <h1 class="text-3xl font-semibold text-accent mb-8">{m.help_page_title()}</h1>
 
-    <!-- Reference Documents -->
     <section class="mb-8">
       <h2 class="text-lg font-medium text-ink-strong mb-4">{m.help_reference_docs()}</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -57,7 +56,6 @@
       </div>
     </section>
 
-    <!-- User Guides -->
     <section class="mb-8">
       <h2 class="text-lg font-medium text-ink-strong mb-4">{m.help_user_guides()}</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -96,7 +94,6 @@
       </section>
     {/if}
 
-    <!-- Legal -->
     <section>
       <h2 class="text-lg font-medium text-ink-strong mb-4">{m.help_legal_section()}</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

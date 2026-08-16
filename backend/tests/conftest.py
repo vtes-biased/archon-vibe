@@ -10,17 +10,15 @@ import psycopg
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-# Add backend/src to path for imports
 backend_src = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(backend_src.parent))
 
-# Set test database URL before importing app modules
 _TEST_DB_URL = os.getenv(
     "TEST_DATABASE_URL",
     "postgresql://archon:archon_dev_password@localhost:5433/archon_test",
 )
 os.environ["DATABASE_URL"] = _TEST_DB_URL
-os.environ["VEKN_SYNC_ENABLED"] = "false"  # Disable VEKN sync in tests
+os.environ["VEKN_SYNC_ENABLED"] = "false"
 
 
 def _ensure_test_db_exists() -> None:
@@ -44,11 +42,8 @@ def _ensure_test_db_exists() -> None:
 # Auto-create test database before any test collection
 _ensure_test_db_exists()
 
-# migrate_from_archon.py is a prod-standalone script: it imports the package by its
-# installed name (`backend.src.*`), while this harness sets it up as top-level `src.*`
-# (backend/ on sys.path). Alias so both names resolve to ONE module object — otherwise
-# `backend.src.db` and `src.db` are distinct modules with separate _pool globals and the
-# script's db calls never see test_db()'s init_db().
+# migrate_from_archon.py imports as `backend.src.*`; this harness sets up `src.*`.
+# Alias both names to one module object, or the script's db calls miss test_db()'s init_db().
 import importlib
 import types
 
@@ -66,7 +61,6 @@ from tests.mock_vekn_data import generate_mock_users
 
 
 def make_auth_header(user_uid: str) -> dict[str, str]:
-    """Create an Authorization header with a valid access token for the given user."""
     token, _ = create_access_token(user_uid)
     return {"Authorization": f"Bearer {token}"}
 
@@ -80,17 +74,13 @@ async def seed_tournament(tournament):
 
 @pytest_asyncio.fixture
 async def test_db() -> AsyncIterator[None]:
-    """Initialize test database and clean it up after tests."""
-    # Initialize database
     await db.init_db()
 
-    # Clean existing data
     async with db.get_connection() as conn:
         await conn.execute("DELETE FROM objects WHERE type = 'user'")
 
     yield
 
-    # Clean up after test
     async with db.get_connection() as conn:
         await conn.execute("DELETE FROM objects WHERE type = 'user'")
 
@@ -99,7 +89,6 @@ async def test_db() -> AsyncIterator[None]:
 
 @pytest_asyncio.fixture
 async def test_client(test_db) -> AsyncIterator[AsyncClient]:
-    """Create test client for API requests."""
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",
@@ -109,10 +98,8 @@ async def test_client(test_db) -> AsyncIterator[AsyncClient]:
 
 @pytest_asyncio.fixture
 async def populated_db(test_db) -> list:
-    """Populate database with mock users for testing."""
     users = generate_mock_users(400)
 
-    # Insert all users
     for user in users:
         await db.save_user(user)
 

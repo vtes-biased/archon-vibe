@@ -20,7 +20,6 @@
   let organizers = $state<Record<string, User | null>>({});
   let loading = $state(false);
 
-  // Load organizer details
   async function loadOrganizers() {
     const result: Record<string, User | null> = {};
     for (const uid of organizerUids) {
@@ -63,7 +62,6 @@
 </script>
 
 <div class="space-y-3">
-  <!-- Current organizers -->
   <div class="flex flex-wrap gap-2">
     {#each organizerUids as uid (uid)}
       {@const user = organizers[uid]}
@@ -87,7 +85,6 @@
     {/each}
   </div>
 
-  <!-- Search to add -->
   <UserPicker
     onselect={handleAdd}
     placeholder={m.organizers_search_placeholder()}

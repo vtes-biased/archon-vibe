@@ -127,16 +127,13 @@
     }
     league = l;
 
-    // Resolve parent meta-league (for the appartenance badge)
     const p = l.parent_uid ? await getLeague(l.parent_uid) : undefined;
     parentLeague = p && !p.deleted_at ? { uid: p.uid, name: p.name } : null;
 
-    // Load associated tournaments
     const allTournaments = await getAllTournaments();
     leagueTournaments = allTournaments.filter(t => t.league_uid === uid && !t.deleted_at);
     upcomingTournamentCount = sortUpcomingFirst(leagueTournaments);
 
-    // Load child leagues if meta-league
     if (l.kind === "Meta-League") {
       const allLeagues = await getAllLeagues();
       childLeagues = allLeagues
@@ -145,7 +142,6 @@
       orphanLeagues = allLeagues
         .filter(cl => cl.kind === "League" && !cl.parent_uid && !cl.deleted_at && cl.uid !== uid)
         .sort((a, b) => (a.name).localeCompare(b.name));
-      // Also include child league tournaments
       const childUids = childLeagues.map(cl => cl.uid);
       const childTournaments = allTournaments.filter(
         t => childUids.includes(t.league_uid ?? "") && !t.deleted_at
@@ -157,7 +153,6 @@
       orphanLeagues = [];
     }
 
-    // Load organizer names
     const names: Record<string, string> = {};
     for (const ouid of l.organizers_uids ?? []) {
       const u = await getUser(ouid);
@@ -165,7 +160,6 @@
     }
     organizerNames = names;
 
-    // Compute standings from finished tournaments
     standingsError = false;
     const finishedTournaments = leagueTournaments.filter(t => t.state === "Finished" && t.standings?.length);
     if (finishedTournaments.length > 0) {
@@ -193,14 +187,12 @@
           })) || [],
         }));
         const result = await computeLeagueStandings(l.standings_mode, tournamentData);
-        // Resolve user names
         for (const entry of result) {
           const u = await getUser(entry.user_uid);
           (entry as StandingEntry).name = u?.name || entry.user_uid.slice(0, 8);
         }
         standings = result as StandingEntry[];
       } catch (e) {
-        // Was console-only: standings silently rendered empty with no recourse.
         console.error("Failed to compute league standings:", e);
         standings = [];
         standingsError = true;
@@ -212,7 +204,6 @@
     loaded = true;
   }
 
-  // Edit fields
   let editName = $state("");
   let editFormat = $state("");
   let editCountry = $state("");
@@ -314,13 +305,11 @@
     }
   }
 
-  // Initial load
   $effect(() => {
     const _uid = uid;
     loadLeague();
   });
 
-  // SSE sync listener
   $effect(() => {
     const handleSyncEvent = (event: { type: string }) => {
       if (event.type === "league" || event.type === "tournament" || event.type === "sync_complete") {
@@ -349,7 +338,6 @@
         <a href="/leagues" class="text-link hover:text-link-soft">{m.league_back_to_list()}</a>
       </div>
     {:else}
-      <!-- Header -->
       <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
         <div class="flex items-center gap-3">
           <a href="/leagues" class="text-ink-muted hover:text-ink-strong">
@@ -403,17 +391,14 @@
         </div>
       {/if}
 
-      <!-- Edit form -->
       {#if editing}
         <div class="bg-surface-card rounded-lg shadow p-6 border border-line mb-6 space-y-4">
-          <!-- Name -->
           <div>
             <label for="edit-name" class="block text-sm text-ink-muted mb-1">{m.tfield_name_label()} <span class="text-link text-xs">({m.common_required()})</span></label>
             <input id="edit-name" type="text" bind:value={editName} required
               class="w-full px-3 py-2 text-sm border rounded-lg bg-surface-card text-ink-bright focus:outline-none {editName.trim() ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}" />
           </div>
 
-          <!-- Standings Mode & Format -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label for="edit-mode" class="block text-sm text-ink-muted mb-1">{m.league_standings_mode_label()}</label>
@@ -439,7 +424,6 @@
             </div>
           </div>
 
-          <!-- Dates -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label for="edit-start" class="block text-sm text-ink-muted mb-1">{m.tfield_start()} <span class="text-link text-xs">({m.common_required()})</span></label>
@@ -454,7 +438,6 @@
             </div>
           </div>
 
-          <!-- Country -->
           <div>
             <label for="edit-country" class="block text-sm text-ink-muted mb-1">{m.common_country()}</label>
             <select id="edit-country" bind:value={editCountry}
@@ -466,7 +449,6 @@
             </select>
           </div>
 
-          <!-- Country-princes attach tier (country leagues only) -->
           {#if league.kind === "League" && editCountry}
             <div>
               <label class="flex items-start gap-2 text-sm text-ink-bright">
@@ -480,7 +462,6 @@
             </div>
           {/if}
 
-          <!-- Description -->
           <div>
             <label for="edit-desc" class="block text-sm text-ink-muted mb-1">{m.common_description()}</label>
             <textarea id="edit-desc" bind:value={editDescription} rows={10}
@@ -494,7 +475,6 @@
         </div>
       {/if}
 
-      <!-- Info cards -->
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div class="bg-surface-card rounded-lg shadow p-4 border border-line">
           <div class="text-sm text-ink-muted">{m.league_col_dates()}</div>
@@ -525,7 +505,6 @@
         <FoldableDescription description={league.description} title={league.name} />
       {/if}
 
-      <!-- Child leagues (meta-league) -->
       {#if league.kind === "Meta-League"}
         <div class="mb-6">
           <h2 class="text-xl font-medium text-ink-strong mb-3">{m.league_child_leagues()}</h2>
@@ -579,7 +558,6 @@
         </div>
       {/if}
 
-      <!-- Tournaments -->
       <div class="mb-6">
         <div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
           <h2 class="text-xl font-medium text-ink-strong">
@@ -662,10 +640,8 @@
         {/if}
       </div>
 
-      <!-- Standings -->
       <div>
         <h2 class="text-xl font-medium text-ink-strong mb-1">{m.league_col_standings()}</h2>
-        <!-- Mode caption: what the Points column means on THIS league -->
         {#if league}
           <p class="text-sm text-ink-muted mb-3">
             <span class="font-medium text-ink">{standingsModeLabel(league.standings_mode)}</span>
@@ -676,7 +652,6 @@
           </p>
         {/if}
         {#if standings.length > 0}
-          <!-- Champion flourish: crowned once the league season is over -->
           {#if !isActive() && champions.length > 0}
             <div class="bg-surface-card rounded-lg shadow border border-line p-4 mb-3 flex items-center gap-3">
               <Crown class="w-8 h-8 shrink-0 text-accent" aria-hidden="true" />
@@ -689,7 +664,6 @@
               </div>
             </div>
           {/if}
-          <!-- Mobile card layout -->
           <div class="sm:hidden bg-surface-card rounded-lg shadow overflow-hidden border border-line divide-y divide-line">
             {#each standings as entry (entry.user_uid)}
               {@const isMe = entry.user_uid === auth.user?.uid}
@@ -715,7 +689,6 @@
             {/each}
           </div>
 
-          <!-- Desktop table -->
           <div class="hidden sm:block bg-surface-card rounded-lg shadow overflow-hidden border border-line">
             <div class="overflow-x-auto">
               <table class="w-full text-sm">

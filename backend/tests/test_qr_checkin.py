@@ -1,10 +1,6 @@
-"""qr_checkin must never authorize check-in on an empty stored code.
-
-Regression guard for the access-control hole: a migrated/legacy tournament that
-slipped through with checkin_code='' would let an authenticated VEKN-ID holder
-self-check-in with code='' (the old gate did a bare `request.code != code`, so
-'' == '' passed), auto-registering them as a player. The empty-code guard returns
-403 before delegating to the engine.
+"""Empty stored checkin_code must never authorize check-in — the old gate did a
+bare `request.code != code`, so '' == '' passed and auto-registered any
+authenticated VEKN-ID holder as a player.
 """
 
 from datetime import UTC, datetime
@@ -30,8 +26,6 @@ async def test_qr_checkin_rejects_empty_stored_code(test_client):
             json={"code": ""},
             headers=make_auth_header("qr-user-1"),
         )
-        # An empty stored code must never authorize check-in, even when the
-        # submitted code equals it exactly.
         assert resp.status_code == 403
     finally:
         async with db.get_connection() as conn:

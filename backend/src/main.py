@@ -66,51 +66,25 @@ from .routes import (
 from .vekn_sync import VEKNSyncService
 from .version import __version__
 
-# Load environment variables
 load_dotenv()
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-# Global scheduler and sync service
 _scheduler: AsyncIOScheduler | None = None
 _sync_service: VEKNSyncService | None = None
 
-# Shutdown event for graceful SSE termination
 _shutdown_event: asyncio.Event | None = None
 
 
 def _install_fast_shutdown_signals() -> None:
-    """Flip _shutdown_event the instant SIGTERM/SIGINT arrives so the long-lived
-    /stream generators self-close within ~1s instead of stalling the restart.
-
-    uvicorn shuts down gracefully on these signals, but its lifespan-shutdown —
-    where _shutdown_event would otherwise be set — runs only AFTER it has drained
-    open connections. The SSE generators never end on their own, so that signal
-    arrives too late and the drain blocks until --timeout-graceful-shutdown (or,
-    absent that, systemd's SIGKILL at TimeoutStopSec) cuts it off. Setting the
-    event from the signal handler itself — before uvicorn's handler flips
-    should_exit and the loop begins the drain — lets the generators (which poll
-    it every <=1s) return promptly, so the drain finishes in ~1s instead of
-    waiting out the graceful timeout.
-
-    Mechanism (version-coupled): uvicorn installs handle_exit via plain
-    signal.signal (its capture_signals()), so signal.getsignal() returns that
-    real handler for us to chain. We run inside the same synchronous signal
-    invocation — set the event first, then call uvicorn's handler (which only
-    sets should_exit) — so the event is provably set before the loop drains. If
-    uvicorn ever switched to loop.add_signal_handler, getsignal() would return
-    asyncio's no-op instead and this chain would silently stop driving uvicorn's
-    shutdown; revisit then.
-
-    Only Event.set() is touched here, and no coroutine ever waits on
-    _shutdown_event (the generators only read .is_set()), so set() is a plain
-    attribute write with no loop interaction — safe from a signal handler.
-    """
+    """Flip _shutdown_event on SIGTERM/SIGINT before uvicorn's own handler runs, so
+    /stream generators self-close within ~1s instead of stalling until uvicorn's
+    post-drain lifespan-shutdown sets it too late. Chains onto uvicorn's plain
+    `signal.signal` handler — breaks silently if uvicorn switches to `loop.add_signal_handler`."""
 
     def _make_handler(prev):
         def _handler(signum, frame):
@@ -184,7 +158,6 @@ async def run_vekn_sync() -> None:
     # Tournament sync runs after member sync (needs user UIDs).
     await run_tournament_sync()
 
-    # Import TWDA winner decklists for matched tournaments
     try:
         from .twda_import import import_twda_decks
 
@@ -194,38 +167,30 @@ async def run_vekn_sync() -> None:
     except Exception as e:
         logger.error(f"Error during TWDA deck import: {e}", exc_info=True)
 
-    # Recompute ratings after tournaments are up to date
+    # Ratings and snapshot both need tournaments up to date, hence run last.
     await run_rating_recompute()
-
-    # Generate snapshot after all data is up to date
     await run_snapshot_generation()
 
 
 async def run_sanction_cleanup() -> None:
-    """Run sanction cleanup (scheduled task).
-
-    1. Soft-delete sanctions that are past 18 months (excluding permanent bans)
-    2. Hard-delete sanctions that were soft-deleted more than 30 days ago
-    """
+    """Soft-delete sanctions past 18 months, then hard-delete ones soft-deleted
+    >30 days ago (scheduled task)."""
     from datetime import UTC, datetime
 
     try:
         logger.info("Starting sanction cleanup")
 
-        # Step 1: Soft-delete expired sanctions
         expired = await get_expired_sanctions()
         now = datetime.now(UTC)
 
         for sanction in expired:
             updated = msgspec.structs.replace(sanction, modified=now, deleted_at=now)
             bd = await save_sanction(updated)
-            # Broadcast the soft-delete so clients can sync
             broadcast_precomputed(bd)
 
         if expired:
             logger.info(f"Soft-deleted {len(expired)} expired sanctions")
 
-        # Step 2: Hard-delete sanctions soft-deleted >30 days ago
         to_delete = await get_sanctions_for_cleanup(days=30)
         for sanction in to_delete:
             await delete_sanction_hard(sanction.uid)
@@ -266,7 +231,6 @@ async def run_rating_recompute() -> None:
 
 
 async def run_vekn_push() -> None:
-    """Run VEKN push batch (scheduled task)."""
     from .vekn_status import record_error, record_success
 
     try:
@@ -327,12 +291,10 @@ async def run_oauth_cleanup() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Application lifespan manager."""
     global _scheduler, _sync_service, _shutdown_event
 
     logger.info(f"Archon backend starting (version {__version__})")
 
-    # Startup — check JWT secret safety
     from .jwt_config import JWT_DEFAULT_SECRET, JWT_SECRET
 
     environment = os.getenv("ENVIRONMENT", "development")
@@ -342,7 +304,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "Set the JWT_SECRET environment variable."
         )
 
-    # Check cards.json availability
     cards_data, _ = cards._load_cards()
     if cards_data is None:
         logger.warning(
@@ -354,7 +315,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _install_fast_shutdown_signals()
     await init_db()
 
-    # Register Discord Linked Roles metadata (idempotent)
     if os.getenv("DISCORD_CLIENTID"):
         try:
             from .roles_hook import register_metadata
@@ -363,10 +323,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         except Exception:
             logger.exception("Failed to register Discord Linked Roles metadata")
 
-    # Initialize scheduler for background jobs
     _scheduler = AsyncIOScheduler()
 
-    # Initialize VEKN sync if enabled
     sync_enabled = os.getenv("VEKN_SYNC_ENABLED", "false").lower() == "true"
     if sync_enabled:
         logger.info("VEKN sync is enabled")
@@ -378,7 +336,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             member_sync=run_member_sync, tournament_sync=run_tournament_sync
         )
 
-        # Set up periodic sync
         sync_interval_hours = int(os.getenv("VEKN_SYNC_INTERVAL_HOURS", "6"))
         _scheduler.add_job(
             run_vekn_sync,
@@ -389,13 +346,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
         logger.info(f"VEKN sync scheduled every {sync_interval_hours} hours")
 
-        # Run initial sync in background (don't block startup)
         asyncio.create_task(run_vekn_sync())
         logger.info("Initial VEKN sync scheduled in background")
     else:
         logger.info("VEKN sync is disabled")
 
-    # Schedule sanction cleanup job (runs daily)
     _scheduler.add_job(
         run_sanction_cleanup,
         trigger=IntervalTrigger(hours=24),
@@ -405,7 +360,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     logger.info("Sanction cleanup scheduled daily")
 
-    # Schedule daily rating recompute (consistency check)
     _scheduler.add_job(
         run_rating_recompute,
         trigger=IntervalTrigger(hours=24),
@@ -415,7 +369,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     logger.info("Rating recompute scheduled daily (initial run after VEKN sync)")
 
-    # Schedule daily promo stock recompute (self-healing consistency pass)
     _scheduler.add_job(
         run_promo_stock_recompute,
         trigger=IntervalTrigger(hours=24),
@@ -425,7 +378,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     logger.info("Promo stock recompute scheduled daily")
 
-    # Schedule VEKN push batch (runs hourly if VEKN_PUSH enabled)
     if os.getenv("VEKN_PUSH", "").lower() == "true":
         push_interval = int(os.getenv("VEKN_PUSH_INTERVAL_HOURS", "1"))
         _scheduler.add_job(
@@ -437,7 +389,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
         logger.info(f"VEKN push scheduled every {push_interval} hours")
 
-    # Schedule OAuth token/code cleanup (runs every hour)
     _scheduler.add_job(
         run_oauth_cleanup,
         trigger=IntervalTrigger(hours=1),
@@ -447,7 +398,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     logger.info("OAuth cleanup scheduled hourly")
 
-    # Schedule snapshot generation (every 15 minutes)
     _scheduler.add_job(
         run_snapshot_generation,
         trigger=IntervalTrigger(minutes=15),
@@ -457,7 +407,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     logger.info("Snapshot generation scheduled every 15 minutes")
 
-    # Schedule purge of soft-deleted objects (runs daily)
     _scheduler.add_job(
         run_purge_deleted_objects,
         trigger=IntervalTrigger(hours=24),
@@ -467,25 +416,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     logger.info("Purge of deleted objects scheduled daily")
 
-    # Always generate at startup, even when run_vekn_sync will regenerate at the end of
-    # its chain: until a file exists /snapshot 503s and no client can bootstrap, and on
-    # a deploy that changes the snapshot filename there is no previous file to serve.
-    # Waiting for members→tournaments→TWDA→ratings would leave that window open for
-    # minutes. A redundant pass is one corpus scan; a bootstrap outage is worse.
+    # Always regenerate at startup: until a file exists /snapshot 503s, blocking
+    # bootstrap for the minutes the full sync chain would otherwise take.
     asyncio.create_task(run_snapshot_generation())
 
     _scheduler.start()
 
     yield
 
-    # Shutdown
-    # Signal all SSE connections to close
     if _shutdown_event:
         logger.info("Signaling SSE connections to close...")
         _shutdown_event.set()
         _wake_sse_connections()
-        # Give connections a moment to close gracefully
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.5)  # let connections close gracefully
 
     if _scheduler:
         _scheduler.shutdown()
@@ -526,14 +469,10 @@ if os.getenv("ENVIRONMENT", "development") == "development":
 
     @app.exception_handler(Exception)
     async def cors_aware_500_handler(request: Request, exc: Exception) -> JSONResponse:
-        """Dev-only: Starlette forces ServerErrorMiddleware outermost — *outside*
-        CORSMiddleware — so an unhandled 500 ships without Access-Control-Allow-Origin.
-        The cross-origin dev frontend (:5173→:8000) then sees a blocked response /
-        fetch TypeError and mislabels the real server error as a network failure.
-        An Exception handler is installed *on* ServerErrorMiddleware, so it runs
-        outermost: re-attach CORS headers here. ServerErrorMiddleware still re-raises
-        after we respond, so uvicorn's traceback logging is preserved. Prod is
-        same-origin via nginx and never enters this block."""
+        """Dev-only: ServerErrorMiddleware wraps outside CORSMiddleware, so an
+        unhandled 500 ships with no CORS headers and the cross-origin dev frontend
+        sees a blocked response. Re-attach them; ServerErrorMiddleware still
+        re-raises after, preserving uvicorn's traceback logging."""
         origin = request.headers.get("origin")
         headers = (
             {
@@ -551,7 +490,6 @@ if os.getenv("ENVIRONMENT", "development") == "development":
         )
 
 
-# Include routers
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(admin.router)
@@ -577,12 +515,9 @@ async def root() -> dict[str, str]:
 async def server_time() -> Response:
     """Microsecond server clock for the frontend's mini-NTP offset sync.
 
-    The round timer subtracts a server-stamped started_at from a client Date.now(),
-    so a mis-set device clock shows phantom elapsed time. The client probes this a
-    few times, keeps the min-RTT sample, and corrects Date.now()'s offset against
-    our clock (the one that stamps started_at) — see the frontend clock store.
-    No auth, no DB: just the wall clock.
-    Must not be cached — a stale timestamp defeats the sync.
+    The round timer diffs a server-stamped started_at against client
+    Date.now(), so a mis-set device clock shows phantom elapsed time; the
+    client probes this to correct the offset. Must not be cached.
     """
     body = msgspec.json.encode({"server_time": time.time_ns() // 1000})
     return Response(
@@ -640,11 +575,6 @@ async def help_og_stub(slug: str, request: Request) -> Response:
     )
 
 
-# ---------------------------------------------------------------------------
-# Data-level helpers
-# ---------------------------------------------------------------------------
-
-
 def _viewer_level(viewer: User | None) -> DataLevel:
     """Determine the viewer's base data level (delegates to db.base_data_level —
     the single source the access-version fingerprint also reuses)."""
@@ -694,11 +624,9 @@ async def _resolve_viewer(
 def _iter_file_chunks(path, chunk_size: int = 64 * 1024) -> Iterator[bytes]:
     """Yield a file's bytes in chunks, holding ONE fd open for the whole response.
 
-    The held fd pins the inode, so an atomic os.rename over the path mid-stream
-    (snapshot regen) is safe: this reader keeps serving the file it opened. Bounded
-    heap (one chunk). Sync generator → Starlette iterates it in a threadpool, so the
-    blocking reads stay off the event loop; the `with` closes the fd on completion
-    or client disconnect.
+    The held fd pins the inode, so an atomic os.rename mid-stream (snapshot
+    regen) is safe. Sync generator → Starlette iterates it in a threadpool,
+    keeping the blocking reads off the event loop.
     """
     with open(path, "rb") as f:
         while chunk := f.read(chunk_size):
@@ -706,13 +634,9 @@ def _iter_file_chunks(path, chunk_size: int = 64 * 1024) -> Iterator[bytes]:
 
 
 class _ZipSink:
-    """Write-only, non-seekable sink zipfile can stream an archive into.
-
-    zipfile falls back to per-entry data descriptors when its output can `tell()`
-    but not `seek()` — which is what makes a streamed archive possible at all.
-    `pos` must keep counting past a drain: it is the entry header offset zipfile
-    records in the central directory.
-    """
+    """Write-only, non-seekable sink zipfile can stream an archive into — the
+    `tell()`-without-`seek()` combo triggers zipfile's data-descriptor fallback.
+    `pos` must keep counting past a drain: it's the central-directory header offset."""
 
     def __init__(self) -> None:
         self._buf = bytearray()
@@ -744,12 +668,9 @@ def _iter_snapshot_zip(
 ) -> Iterator[bytes]:
     """Yield a single-entry .zip holding the snapshot's JSONL, streamed.
 
-    The stored snapshot is a .gz, which Windows can't open without a third-party
-    tool, so the export is re-enveloped: inflate and re-deflate through zipfile.
-    That costs one compression round per download — fine for a manual admin action,
-    and the zero-CPU alternative (transmuxing the gzip deflate stream straight into
-    a zip entry) buys it with hand-packed headers. Heap stays bounded either way:
-    the sink is drained every chunk_size bytes.
+    The stored snapshot is .gz, unreadable by stock Windows tools, so the
+    export re-envelopes it: inflate and re-deflate through zipfile, sink
+    drained every chunk_size bytes to keep heap bounded.
     """
     info = zipfile.ZipInfo(name, time.localtime(mtime)[:6])
     info.compress_type = zipfile.ZIP_DEFLATED
@@ -777,21 +698,10 @@ async def get_snapshot(
     download: bool = False,
     authorization: Annotated[str | None, Header()] = None,
 ) -> Response:
-    """Serve pre-computed gzip snapshot for the viewer's access level.
-
-    Streamed from disk in chunks (see _iter_file_chunks) — never read whole into
-    app heap. The snapshot carries the entire global VEKN roster + all tournaments,
-    so at doors-open hundreds of clients hit this near-simultaneously; a
-    read_bytes() per request would stack hundreds of full-file copies in heap and
-    blow the small-VPS budget. The generator holds ONE fd for the whole response,
-    so the 15-min atomic-rename regen (which WILL fire during a long doors-open) is
-    consistent mid-stream: in-flight readers keep their inode, new requests get the
-    fresh file — no truncation, no spurious reconnect. A further prod win would be
-    nginx X-Accel-Redirect (zero app IO), but that needs an `internal` location and
-    a snapshot dir nginx can read — out of scope here.
-
-    `download=1` is the data-export mode (admin affordance / curl recipe): the same
-    content, re-enveloped as a .zip attachment instead of a transfer-encoded body.
+    """Serve pre-computed gzip snapshot for the viewer's access level, streamed
+    from disk — never read whole into heap. One fd held for the whole response,
+    so a mid-stream atomic-rename regen leaves in-flight readers on their old inode.
+    `download=1` re-envelopes the same content as a .zip attachment.
     """
     from .snapshots import get_snapshot_path
 
@@ -807,21 +717,16 @@ async def get_snapshot(
             headers={"Retry-After": "60"},
         )
 
-    # The snapshot body is a per-LEVEL file shared across users, so the per-USER
-    # access-version fingerprint can't live in it — seed it as a per-response header
-    # the client reads (via fetch) before it opens /stream, so the first connect
-    # echoes a matching `av` and doesn't resync. Chunked (no Content-Length) so a
-    # mid-stream regen can't size-mismatch, and ranges aren't offered (a partial
-    # gzip slice can't be inflated).
+    # The snapshot body is per-LEVEL, so the per-USER access-version fingerprint
+    # can't live in it — seed it as a header the client reads before /stream.
     headers = {
         "Cache-Control": "no-cache",
         "Accept-Ranges": "none",
         "X-Access-Version": await compute_access_version(viewer),
     }
     if download:
-        # Dated from the file's mtime — the regen that produced it, not "now". No
-        # Content-Encoding: the .zip is the payload, not a transfer envelope, so
-        # the browser writes its bytes to disk instead of inflating them.
+        # Dated from the file's mtime (regen time, not "now"). No Content-Encoding:
+        # the .zip is the payload, so the browser writes it to disk, not inflated.
         mtime = snapshot_path.stat().st_mtime
         stem = f"archon-export-{level.value}-" + time.strftime(
             "%Y-%m-%d", time.localtime(mtime)
@@ -841,26 +746,18 @@ async def get_snapshot(
     )
 
 
-# ---------------------------------------------------------------------------
-# SSE stream types for catch-up
-# ---------------------------------------------------------------------------
 _STREAM_TYPES = list(ObjectType)
 
-# Max bytes of joined object JSON packed into a single SSE `data:` line. The
-# browser EventSource has no per-line cap, but the Discord bot's aiohttp
-# StreamReader rejects any line over 512KB ("Got more than 524288 bytes when
-# reading"), so an unbounded catch-up frame (all objects of a type in one line)
-# crash-loops the bot. Keep frames well under that limit. A single object larger
-# than the budget is emitted alone (never split).
+# The Discord bot's aiohttp StreamReader rejects lines over 512KB; keep frames
+# well under that. A single object over budget is emitted alone, never split.
 _SSE_LINE_BUDGET = 200_000
 
 
 def _sse_object_lines(batch_type: str, json_strings: list[str]):
-    """Yield SSE `data:` frames for `json_strings`, each payload under the byte
-    budget so no single line exceeds the bot client's StreamReader limit.
+    """Yield SSE `data:` frames for `json_strings`, each under the byte budget.
 
-    Sizes by UTF-8 byte length (not str length) — the 512KB limit is in bytes,
-    so multibyte names (CJK/accents) must count for what they weigh on the wire.
+    Sizes by UTF-8 byte length, not str length — multibyte names must count
+    for what they weigh on the wire.
     """
     batch: list[str] = []
     size = 0
@@ -878,22 +775,9 @@ def _sse_object_lines(batch_type: str, json_strings: list[str]):
 async def _participant_user_frames(
     db_conn, tournament_uid: str, sent: set[str]
 ) -> list[str]:
-    """Member-level identity frames for a tournament's participants not in `sent`.
-
-    The bot's tournament-scoped stream otherwise carries no user objects (see
-    broadcast._scope_matches), so it can't resolve seated players' names. This
-    pushes each participant's User object (player user_uids + organizers) so the
-    bot renders names/nicknames; `sent` dedups across calls and is mutated here.
-
-    Sends the MEMBER column for ALL participants regardless of viewer
-    entitlement — deliberately NOT entitled_level. The bot needs only
-    name/nickname (both in member); routing through entitled_level would upgrade
-    an organizer viewer to `full` and stream participant CONTACT INFO to the
-    Discord process. Member is the minimal projection that carries identity.
-
-    Caller passes an open pooled connection (catch-up reuses its own; the live
-    refresh opens+releases one) — never yield while holding the pool.
-    """
+    """Member-level identity frames for a tournament's participants not in `sent`
+    (mutated here). Deliberately not `entitled_level` — that would upgrade an
+    organizer viewer to `full` and leak participant CONTACT INFO to the Discord process."""
     row = await (
         await db_conn.execute(
             'SELECT "full"::text FROM objects WHERE uid = %s AND type = %s '
@@ -925,15 +809,9 @@ async def _participant_user_frames(
 async def _scoped_catchup_frames(
     viewer, tournament_uid: str, sent: set[str]
 ) -> tuple[list[str], str | None]:
-    """Catch-up frames for a tournament-scoped SSE connection.
-
-    Returns (frames, last_modified_at) for the one tournament + its sanctions +
-    its participants' identities, each at the viewer's entitled projection (the
-    same access rule the live broadcast uses). Far smaller than the full-corpus
-    catch-up — this is what lets the bot watch a tournament without streaming the
-    whole database. Seeds `sent` with the participant uids it emits so the first
-    live tournament event doesn't re-send everyone.
-    """
+    """Catch-up frames for a tournament-scoped SSE connection: one tournament +
+    its sanctions + participant identities, far smaller than the full-corpus
+    catch-up. Seeds `sent` so the first live event doesn't re-send everyone."""
     from .broadcast import entitled_level
     from .db import _pool
 
@@ -1003,15 +881,9 @@ async def _scoped_catchup_frames(
 
 async def _overlay_frames(viewer) -> tuple[list[str], int]:
     """Personal-overlay frames for a member connection: own profile/decks at full
-    level, plus NC same-country and organizer full data.
-
-    Buffers every frame while holding ONE pooled connection, then returns them so
-    the caller can release the connection BEFORE draining to the client. Yielding
-    inside `async with _pool.connection()` would pin the slot for the whole client
-    read and, on a mid-drain disconnect, return an ACTIVE connection to the pool
-    (which then fails its reset-rollback and is discarded). Mirrors
-    _scoped_catchup_frames.
-    """
+    level, plus NC same-country and organizer full data. Buffers every frame
+    while holding ONE pooled connection, then returns them so the caller releases
+    it BEFORE draining — yielding inside the `async with` would pin the slot."""
     from .db import _pool
 
     frames: list[str] = []
@@ -1020,7 +892,6 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
         return frames, count
 
     async with _pool.connection() as db_conn:
-        # Own user profile at full level
         row = await (
             await db_conn.execute(
                 'SELECT "full"::text FROM objects WHERE uid = %s AND type = %s',
@@ -1031,7 +902,7 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
             frames.append(f'data: {{"type":"user","data":{row[0]}}}\n\n')
             count += 1
 
-        # Own decks at full level (even if member=null)
+        # Own decks at full level, even when member=null.
         rows = await (
             await db_conn.execute(
                 'SELECT "full"::text FROM objects WHERE type = %s '
@@ -1043,7 +914,6 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
             frames.extend(_sse_object_lines("decks", [r[0] for r in rows]))
             count += len(rows)
 
-        # NC: full for same-country users + tournaments
         if viewer.country and Role.NC in viewer.roles:
             rows = await (
                 await db_conn.execute(
@@ -1067,9 +937,8 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
                 frames.extend(_sse_object_lines("tournaments", [r[0] for r in rows]))
                 count += len(rows)
 
-        # NC: full for all promos (inventory chain is not country-scoped) —
-        # mirrors the entitled_level promo branch; without this a resync would
-        # re-deliver member promos (holdings stripped) to NC officials.
+        # Mirrors the entitled_level promo branch (NC full regardless of country)
+        # — omitting this lets a resync re-deliver member-level promos to NC.
         if Role.NC in viewer.roles:
             rows = await (
                 await db_conn.execute(
@@ -1082,11 +951,10 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
                 frames.extend(_sse_object_lines("promos", [r[0] for r in rows]))
                 count += len(rows)
 
-        # Organizer: full for organized tournaments + their decks
+        # Literal type (not %s) so the partial index's `type = 'tournament'`
+        # predicate provably holds; @> (not ?) so its jsonb_path_ops applies.
         rows = await (
             await db_conn.execute(
-                # Literal type (not %s) so the partial index's `type = 'tournament'`
-                # predicate provably holds; @> (not ?) so its jsonb_path_ops applies.
                 "SELECT uid, \"full\"::text FROM objects WHERE type = 'tournament' "
                 "AND (\"full\"->'organizers_uids') @> %s::jsonb AND deleted_at IS NULL",
                 (msgspec.json.encode([viewer.uid]).decode(),),
@@ -1097,7 +965,6 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
             frames.extend(_sse_object_lines("tournaments", [r[1] for r in rows]))
             count += len(rows)
 
-            # Decks for organized tournaments (single IN query)
             placeholders = ", ".join(["%s"] * len(t_uids))
             deck_rows = await (
                 await db_conn.execute(
@@ -1125,31 +992,19 @@ async def stream_updates(
     device_id: str | None = None,
     authorization: Annotated[str | None, Header()] = None,
 ) -> StreamingResponse:
-    """Stream object updates via SSE (new sync architecture).
-
-    Reads pre-computed access level columns — no per-item filtering.
-    Personal overlay sends full-level data for own objects and
-    role-based full access (NC same country, organizer).
-
-    `tournament=<uid>` opens a tournament-scoped stream (the Discord bot): the
-    catch-up carries only that tournament + its sanctions, and live events are
-    filtered to that tournament (its object, sanctions, judge calls). Access is
-    unchanged — the same per-object projection rule applies, just restricted to
-    one tournament's objects — so it adds no new visibility.
-    """
+    """Stream object updates via SSE, reading pre-computed access columns — no
+    per-item filtering. `tournament=<uid>` opens a bot-scoped stream: catch-up and
+    live events restricted to that tournament + its sanctions, same access rule."""
     from .db import _pool, stream_objects_new
 
     stream_user = await _resolve_viewer(request, token, authorization)
-    # One label identifies this connection in every log line below: who + scope
-    # (a tournament-scoped bot stream vs a full-corpus browser stream). Makes
-    # open/close/overflow/sync-complete attributable — the gap that made the bot
-    # SSE-listener wedge hard to trace from backend logs.
+    # One label per connection in every log line: who + scope — makes
+    # open/close/overflow/sync-complete attributable when tracing an SSE issue.
     _who = stream_user.uid if stream_user else "anon"
     _scope = f"tournament={tournament}" if tournament else "full-corpus"
     conn_label = f"user={_who} {_scope}"
     logger.info(f"SSE connection opening: {conn_label}")
 
-    # Determine base level
     level = _viewer_level(stream_user)
 
     from datetime import UTC, datetime, timedelta
@@ -1163,10 +1018,8 @@ async def stream_updates(
         except (ValueError, TypeError):
             return None
 
-    # "Current as of" = the LATER of the data cursor (`since` = max modified_at applied)
-    # and the snapshot's generation instant (`generated_at`). `since` alone is a data
-    # timestamp, not wall-clock: on a quiet system it lags real time, so it can't measure
-    # client-away time. `generated_at` is the real freshness signal (used by the guard below).
+    # Effective "now" = later of the data cursor (`since`) and `generated_at` —
+    # `since` alone lags real time on a quiet system and can't measure client-away time.
     fresh_dts = [d for d in (_parse_ts(since), _parse_ts(generated_at)) if d]
     fresh_dt = max(fresh_dts) if fresh_dts else None
 
@@ -1174,25 +1027,19 @@ async def stream_updates(
     force_resync = False
     scoped_stream = tournament is not None
 
-    # Access-version handshake: the SOLE access-change mechanism. The client echoes the
-    # opaque fingerprint it was seeded with; if it no longer matches the entitlements it
-    # CURRENTLY has, its cached corpus predates a level/role/country/org-set change the
-    # since-delta can't repair — re-snapshot. A tagless client (no `av`) mismatches once,
-    # then carries the fp from the snapshot header. Scoped (bot) streams replay full state
-    # every connect, carry no `av`, and never resync — skip the compare (and its org query).
+    # Sole access-change mechanism: a stale fp means an entitlement change a
+    # since-delta can't repair. Scoped (bot) streams carry no `av`, so they skip this.
     if not scoped_stream and av != await compute_access_version(stream_user):
         force_resync = True
         effective_since = None
 
-    # Stale-client guard (orthogonal to entitlement, so the fingerprint can't cover it):
-    # away >3 days, so a soft-deleted object may have been hard-purged (30-day purge) and
-    # the delta would miss the deletion — re-snapshot.
+    # Orthogonal to entitlement: away >3 days risks a soft-delete already
+    # hard-purged by the 30-day job, which a since-delta would miss.
     if fresh_dt and datetime.now(UTC) - fresh_dt > timedelta(days=3):
         force_resync = True
         effective_since = None
 
     async def event_generator():
-        """Generate SSE events from pre-computed columns."""
         conn = SSEConnection(
             user=stream_user, tournament_uid=tournament, device_id=device_id
         )
@@ -1201,14 +1048,12 @@ async def stream_updates(
         try:
             yield ": connected\n\n"
 
-            # Tournament-scoped (bot) streams replay full state every connect, so a forced
-            # resync is a no-op for them — skip the line and fall through to the replay.
+            # Scoped (bot) streams replay full state every connect, so a forced
+            # resync is a no-op for them — skip and fall through to the replay.
             scoped = tournament is not None
             if force_resync and not scoped:
-                # Tell the browser to clear IndexedDB and re-fetch the snapshot, then STOP:
-                # the client tears down on this line, so streaming the whole corpus after it
-                # is wasted AND a mid-fetchall teardown discards the pooled connection
-                # ("another command is already in progress").
+                # Client tears down on this line — streaming the corpus after it
+                # is wasted, and a mid-fetchall teardown discards the pooled connection.
                 yield 'data: {"type":"resync"}\n\n'
                 return
 
@@ -1218,10 +1063,8 @@ async def stream_updates(
             last_timestamp: str | None = None
             totals: dict[str, int] = {}
 
-            # Tournament-scoped catch-up (the Discord bot): only that tournament
-            # + its sanctions, instead of the whole corpus. Skips the per-type
-            # catch-up and personal overlay below. `since` is ignored here — the
-            # scoped state is small, so every (re)connect replays it in full.
+            # Only that tournament + its sanctions, skipping the catch-up/overlay
+            # below. `since` ignored — scoped state always replays in full.
             if scoped:
                 frames, last_timestamp = await _scoped_catchup_frames(
                     stream_user, tournament, conn.sent_participant_uids
@@ -1231,7 +1074,6 @@ async def stream_updates(
                         return
                     yield line
 
-            # Catch-up phase: stream from objects table
             for obj_type in [] if scoped else _STREAM_TYPES:
                 count = 0
                 batch_type = obj_type + "s"  # "users", "tournaments", etc.
@@ -1257,9 +1099,8 @@ async def stream_updates(
 
                 totals[obj_type] = count
 
-            # Personal overlay phase: full-level data for own objects. Built off
-            # the pooled connection (see _overlay_frames), then drained — so the
-            # connection is never pinned across a client read.
+            # Built off one pooled connection (_overlay_frames), then drained —
+            # never pinned across a client read.
             if not scoped and stream_user and level == DataLevel.MEMBER and _pool:
                 try:
                     overlay, overlay_count = await _overlay_frames(stream_user)
@@ -1285,15 +1126,13 @@ async def stream_updates(
             sync_complete = {"type": "sync_complete", "timestamp": last_timestamp}
             yield f"data: {encoder.encode(sync_complete).decode('utf-8')}\n\n"
 
-            # Real-time updates
             keepalive_counter = 0
             while True:
                 if _shutdown_event and _shutdown_event.is_set():
                     return
 
-                # Queue overflowed: end the stream so the browser EventSource
-                # reconnects and runs a catch-up sync instead of staying OPEN
-                # on a connection that no longer receives broadcasts.
+                # Queue overflow: end the stream so EventSource reconnects, instead
+                # of staying OPEN on a connection that no longer receives broadcasts.
                 if conn.closed:
                     logger.warning(
                         f"SSE connection closed after queue overflow ({conn_label}); "
@@ -1306,11 +1145,8 @@ async def stream_updates(
                     if message:
                         yield message
                     keepalive_counter = 0
-                    # A tournament delivery may have added participants; push their
-                    # identities so the bot can name newly-seated players. Clear the
-                    # flag BEFORE fetching so a concurrent set isn't lost, and fetch
-                    # into a list with the pool released before yielding (the
-                    # _overlay_frames/_scoped_catchup contract).
+                    # Clear the flag BEFORE fetching so a concurrent set isn't lost;
+                    # fetch into a list with the pool released before yielding.
                     if scoped and conn.needs_participant_refresh and _pool:
                         conn.needs_participant_refresh = False
                         try:

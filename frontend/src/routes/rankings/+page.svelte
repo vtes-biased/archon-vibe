@@ -104,7 +104,6 @@
     if (page > last) untrack(() => { page = last; });
   });
 
-  // Mirror filters + page into the address bar so Back restores this view.
   $effect(() => {
     syncQueryParams({
       tab: activeTab === "constructed_offline" ? null : activeTab,
@@ -136,7 +135,6 @@
   <div class="max-w-6xl mx-auto">
     <h1 class="text-3xl font-semibold text-accent mb-6">{m.rankings_page_title()}</h1>
 
-    <!-- Tabs: rating categories + Hall of Fame -->
     <div class="flex flex-wrap gap-y-1 mb-6 bg-surface-card rounded-lg border border-line p-1 w-fit max-w-full">
       {#each tabs as tab}
         <button
@@ -148,10 +146,8 @@
       {/each}
     </div>
 
-    <!-- One-line caption per tab: what the Points column means on this ranking -->
     <p class="text-ink-muted text-sm mb-6">{tabs.find(t => t.value === activeTab)?.captionFn()}</p>
 
-    <!-- Country filter -->
     <div class="mb-4">
       <label for="ranking-country" class="sr-only">{m.common_country()}</label>
       <select
@@ -166,7 +162,6 @@
       </select>
     </div>
 
-    <!-- Table -->
     {#if !auth.isLoading && !auth.isAuthenticated}
       <div class="p-4 rounded-lg bg-surface-muted border border-line-strong text-sm text-ink">
         {m.rankings_login_prompt()}
@@ -197,8 +192,8 @@
             <tr class="border-b border-line text-ink-muted">
               <th class="py-2 px-3 text-left w-12">{m.rankings_col_rank()}</th>
               <th class="py-2 px-3 text-left">{m.rankings_col_player()}</th>
-              <!-- Flag-only on phones (wiki/design.md mobile reflow rule) — the name column
-                   is what pushes ~360px viewports into side-scroll. -->
+              <!-- Flag-only on phones: the name column is what pushes ~360px
+                   viewports into side-scroll. -->
               <th class="py-2 px-3 text-left"><span class="sr-only sm:not-sr-only">{m.common_country()}</span></th>
               <th class="py-2 px-3 text-right">{isHof ? m.hof_col_wins() : m.rankings_col_points()}</th>
             </tr>
@@ -236,7 +231,6 @@
         </table>
       </div>
 
-      <!-- Pagination -->
       {#if totalPages > 1}
         <div class="flex items-center justify-center gap-2 mt-4">
           <button

@@ -1,12 +1,7 @@
 <script lang="ts">
-  // One entry point for everything that is NOT the current action. The action
-  // bar answers "what do I do now"; this answers "where is that thing".
-  //
-  // Rows are grouped and the groups run in EVENT CHRONOLOGY — set up, at the
-  // door, wrap up. That order is fixed (an event's chronology is fixed) so
-  // muscle memory holds; only which group starts open follows tournament state.
-  // A flat list would be the hamburger trap: finding anything means reading
-  // everything.
+  // Answers "where is that thing" (the action bar answers "what do I do now").
+  // Groups run in fixed event chronology — setup, door, wrap up — only which
+  // group starts open follows tournament state.
   import type { Component } from "svelte";
   import type { Tournament } from "$lib/types";
   import { addTournamentOrganizer, removeTournamentOrganizer } from "$lib/api";
@@ -29,8 +24,8 @@
 
   type ActionItem = { label: string; icon?: Component<any>; onclick: () => void; disabled?: boolean };
   type GroupId = "setup" | "door" | "wrapup";
-  // Table rooms left this sheet: they are part of the venue, so they live at the
-  // foot of Details > Venue instead of as a peer row.
+  // Table rooms live at the foot of Details > Venue, not as a peer row here —
+  // they're part of the venue.
   type PanelId = "details" | "organizers" | "qr" | "promos" | "raffle";
   const PANEL_GROUP: Record<PanelId, GroupId> = {
     details: "setup", organizers: "setup", qr: "door",
@@ -113,9 +108,8 @@
   // One panel at a time: the sheet is a directory, not a workspace.
   let openPanel = $state<PanelId | null>(null);
 
-  // Opening the sheet re-seats it on the current moment — or on the panel a
-  // deep link asked for. Closing forgets, so it never reopens showing whatever
-  // was last poked at.
+  // Opening re-seats the sheet on the current moment or a deep-linked panel;
+  // closing forgets, so it never reopens on whatever was last poked at.
   $effect(() => {
     if (!open) { openPanel = null; return; }
     const asked = requestPanel;
@@ -206,7 +200,6 @@
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto">
-        <!-- SET UP -->
         {@render groupHeader("setup", m.tools_group_setup())}
         {#if openGroup === "setup"}
           {@render panelRow("details", m.tools_details(), Settings2, detailsPanel)}
@@ -217,7 +210,6 @@
           {#if syncVeknItem?.group === "setup"}{@render actionRow(syncVeknItem, CloudUpload)}{/if}
         {/if}
 
-        <!-- AT THE DOOR -->
         {@render groupHeader("door", m.tools_group_door())}
         {#if openGroup === "door"}
           {#if qrAvailable}
@@ -227,7 +219,6 @@
           {/if}
         {/if}
 
-        <!-- WRAP UP -->
         {@render groupHeader("wrapup", m.tools_group_wrapup())}
         {#if openGroup === "wrapup"}
           {#if raffleAvailable}

@@ -42,14 +42,14 @@
   });
   let error = $state<string | null>(null);
 
-  // Filters and page live in the query string (see $lib/url-filters): coming
-  // back from a tournament remounts this component, so anything held only in
-  // local state is lost.
+  // Filters and page live in the query string ($lib/url-filters): returning
+  // from a tournament remounts this component, discarding anything held only
+  // in local state.
   const urlParams = currentParams();
 
-  // View mode. Agenda-vs-all is a display preference, not a filter: it outlives
-  // the tab like the theme does (localStorage), while the filters below only get
-  // the short-lived nav-menu memory in $lib/last-view.
+  // Agenda-vs-all is a display preference, not a filter: it outlives the tab
+  // via localStorage like the theme, while filters below only get the
+  // short-lived nav-menu memory ($lib/last-view).
   const VIEW_PREF_KEY = "archon:tournaments-view";
   const auth = $derived(getAuthState());
   const canUseAgenda = $derived(auth.isAuthenticated && auth.user?.vekn_id && auth.user?.country);
@@ -72,11 +72,10 @@
     if (canUseAgenda) localStorage.setItem(VIEW_PREF_KEY, viewMode);
   });
 
-  // Filters
   let searchQuery = $state(urlParams.get("q") ?? "");
-  // Debounced mirror of searchQuery: the search path scans the whole tournaments
-  // table per query, so don't re-query on every keystroke (country/format filters
-  // use narrower indexes and stay immediate).
+  // Debounced: search scans the whole tournaments table per query, so don't
+  // re-query every keystroke (country/format use narrower indexes and stay
+  // immediate).
   let debouncedSearch = $state(urlParams.get("q") ?? "");
   $effect(() => {
     const q = searchQuery;
@@ -92,11 +91,9 @@
   let selectedFormat = $state<string>(urlParams.get("format") ?? "all");
   let includeOnline = $state(urlParams.get("online") !== "false");
 
-  // Calendar
   let calendarLoading = $state(false);
   let copied = $state(false);
 
-  // Pagination
   let page = $state(readPageParam());
   const PAGE_SIZE = 50;
 
@@ -115,7 +112,6 @@
   const totalPages = $derived(Math.ceil(totalCount / PAGE_SIZE));
   const canCreate = $derived(canCreateTournament(auth.user).allowed);
 
-  // League names for display, plus parent meta-league (keyed by league_uid)
   let leagueNames = $state<Record<string, string>>({});
   let metaLeagues = $state<Record<string, { uid: string; name: string }>>({});
   $effect(() => {
@@ -193,7 +189,6 @@
     }
   }
 
-  // Re-query when filters or page change
   $effect(() => {
     const _s = debouncedSearch;
     const _o = selectedState;
@@ -225,9 +220,9 @@
     includeOnline = true;
   }
 
-  // Reset page when filters change. Comparing against the last key rather than
-  // resetting on every run keeps the mount pass from discarding a page number
-  // restored from the URL.
+  // Reset page on filter change; comparing against the last key (not resetting
+  // every run) keeps the mount pass from discarding a page number restored
+  // from the URL.
   let lastFilterKey = untrack(() => filterKey);
   $effect(() => {
     const key = filterKey;
@@ -238,16 +233,15 @@
     });
   });
 
-  // A page restored from the URL can point past the end (fewer matches than when
-  // the link was made). The list renders empty there, pagination controls and all,
-  // so there would be no way back except editing the address bar.
+  // A page restored from the URL can point past the end (fewer matches now);
+  // clamp once loaded, or the list renders empty with no way back but the
+  // address bar.
   $effect(() => {
     if (!loaded) return;
     const last = Math.max(0, totalPages - 1);
     if (page > last) untrack(() => { page = last; });
   });
 
-  // Mirror filters + page into the address bar so Back restores this view.
   $effect(() => {
     syncQueryParams({
       q: debouncedSearch,
@@ -260,7 +254,6 @@
     });
   });
 
-  // SSE sync listener
   $effect(() => {
     const handleSyncEvent = (event: { type: string }) => {
       if (event.type === "syncing") {
@@ -278,8 +271,8 @@
     return () => syncManager.removeEventListener(handleSyncEvent);
   });
 
-  // Calendar helpers — the feed URL mirrors the ACTIVE screen filters so the
-  // subscriber gets what the screen shows (format was silently dropped before).
+  // The feed URL mirrors the active screen filters, so the subscriber gets
+  // what the screen shows.
   const calendarUrl = $derived.by(() => {
     if (viewMode === "agenda" && auth.user?.calendar_token) {
       const params = new URLSearchParams({ token: auth.user.calendar_token });
@@ -339,7 +332,6 @@
 
 <div class="p-4 sm:p-8">
   <div class="max-w-6xl mx-auto">
-    <!-- Header -->
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-3xl font-semibold text-accent">{m.nav_tournaments()}</h1>
 
@@ -353,7 +345,6 @@
       {/if}
     </div>
 
-    <!-- View Mode Toggle -->
     {#if canUseAgenda}
       <div class="flex mb-4 bg-surface-card rounded-lg border border-line p-1 w-fit">
         <button
@@ -371,10 +362,8 @@
       </div>
     {/if}
 
-    <!-- Filters -->
     <div class="bg-surface-card rounded-lg shadow p-4 mb-4 border border-line">
       <div class="flex flex-wrap gap-4 items-end">
-        <!-- Search -->
         <div class="flex-1 min-w-[200px]">
           <label for="search" class="block text-sm font-medium text-ink-muted mb-1">{m.common_search()}</label>
           <input
@@ -386,7 +375,6 @@
           />
         </div>
 
-        <!-- Format -->
         <div class="min-w-[130px]">
           <label for="format-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.tournaments_format()}</label>
           <select
@@ -401,7 +389,6 @@
           </select>
         </div>
 
-        <!-- Country (hidden in agenda mode) -->
         {#if viewMode !== "agenda"}
           <div class="min-w-[180px]">
             <label for="country-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.common_country()}</label>
@@ -418,7 +405,6 @@
           </div>
         {/if}
 
-        <!-- State -->
         <div class="min-w-[130px]">
           <label for="state-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.tournaments_col_state()}</label>
           <select
@@ -432,7 +418,6 @@
           </select>
         </div>
 
-        <!-- Include online -->
         <div class="flex items-center gap-3 pb-1">
           <label class="inline-flex items-center gap-2 cursor-pointer">
             <input type="checkbox" bind:checked={includeOnline} class="sr-only peer" />
@@ -445,8 +430,8 @@
       </div>
     </div>
 
-    <!-- Calendar Subscribe — hidden offline: token generation is an API call
-         and webcal makes the OS calendar fetch the feed immediately -->
+    <!-- Hidden offline: token generation is an API call, and webcal makes the
+         OS calendar fetch the feed immediately. -->
     {#if auth.isAuthenticated && isBrowserOnline()}
       <div class="mb-6 px-1">
         {#if viewMode === "agenda" && !auth.user?.calendar_token}
@@ -479,17 +464,14 @@
       </div>
     {/if}
 
-    <!-- Error -->
     {#if error}
       <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4 mb-6">
         <p class="text-link-soft">{error}</p>
       </div>
     {/if}
 
-    <!-- Tournament List -->
     {#if tournaments.length > 0}
       <div class="bg-surface-card rounded-lg shadow overflow-hidden border border-line">
-        <!-- Header (desktop) -->
         <div class="hidden sm:grid sm:grid-cols-12 gap-4 px-6 py-3 bg-surface-muted text-sm font-medium text-ink border-b border-line-strong">
           <div class="col-span-4">{m.tournaments_col_name()}</div>
           <div class="col-span-2">{m.tournaments_col_date()}</div>
@@ -509,7 +491,6 @@
               href="/tournaments/{tournament.uid}"
               class="block px-6 py-4 hover:bg-surface-muted/50 transition-colors"
             >
-              <!-- Mobile -->
               <div class="sm:hidden space-y-2">
                 <div class="flex items-start justify-between">
                   <div>
@@ -542,7 +523,6 @@
                 </div>
               </div>
 
-              <!-- Desktop -->
               <div class="hidden sm:grid sm:grid-cols-12 gap-4 items-center">
                 <div class="col-span-4">
                   <div class="font-semibold text-ink-strong">{tournament.name}</div>
@@ -622,8 +602,7 @@
           {/if}
         </p>
         <!-- A view restored by the nav menu can come up empty on filters the
-             viewer did not just set, so the way out is one click, not a hunt
-             through the controls. -->
+             viewer didn't just set, so clearing them is one click, not a hunt. -->
         {#if hasFilters}
           <Button variant="secondary" size="md" class="mt-4" onclick={clearFilters}>
             {m.filters_clear()}

@@ -16,11 +16,8 @@ import { waitForSync } from './helpers/wait';
  * server response where the next step depends on a server-side effect.
  */
 
-/**
- * The action bar's primary CTA. Once the bar scrolls off screen a sticky strip
- * renders the same CTA again, labelled "<action> — <state>", so an inexact name
- * match resolves to two buttons.
- */
+/** The action bar's primary CTA — exact match avoids the sticky strip's
+ *  duplicate "<action> — <state>" button once the bar scrolls off screen. */
 function cta(page: Page, name: string) {
   return page.getByRole('button', { name, exact: true });
 }
@@ -33,10 +30,8 @@ function actionResponse(page: Page, action: string) {
   );
 }
 
-/**
- * Score a table through the UI: give the first seat all VPs (a sweep is a
- * valid oust order) and wait for the table badge to flip to Finished.
- */
+/** Score a table via the UI: give the first seat all VPs (a valid oust order)
+ *  and wait for the Finished badge. */
 async function sweepTable(page: Page, heading: string, vp: number) {
   const card = page
     .locator('div.bg-surface-muted\\/50')
@@ -45,8 +40,8 @@ async function sweepTable(page: Page, heading: string, vp: number) {
   // them directly. Expand only when the trigger is present.
   const enter = card.getByRole('button', { name: 'Manage' });
   if (await enter.count()) await enter.click();
-  // Give the first seat all VPs (a sweep is a valid oust order). VP is now a
-  // button group (VpInput), not a <select>.
+  // First seat gets all VPs (a sweep is a valid oust order); VP is a button
+  // group (VpInput), so this clicks a button, not a <select>.
   await card
     .locator('[role="group"]')
     .first()
@@ -79,18 +74,15 @@ test.describe('Tournament lifecycle', () => {
   test('create, run rounds, toss, finals, and rank the winner', async ({ page }) => {
     const state = getE2EState();
 
-    // ── Setup: navigate, wait for sync, then set auth tokens ──
     await page.goto('/tournaments');
     await loginAsOrganizer(page);
     // Navigate to pick up auth state (SSE reconnects with full-level access)
     await page.goto('/tournaments');
     await waitForSync(page);
 
-    // ── Step 1: Navigate to new tournament page ──
     await page.getByText('+ New Tournament').click();
     await expect(page).toHaveURL(/\/tournaments\/new/);
 
-    // ── Step 2: Create tournament (optimistic: redirect is instant) ──
     await page.locator('#name').fill('E2E Test Tournament');
     await page.locator('#start').fill('2099-01-01T10:00');
     await page.locator('#country').selectOption('US');
@@ -102,11 +94,9 @@ test.describe('Tournament lifecycle', () => {
     await expect(page.locator('h1')).toContainText('E2E Test Tournament');
     await expect(page.getByText('Planned').first()).toBeVisible();
 
-    // ── Step 3: Open Registration (optimistic) ──
     await cta(page, 'Open Registration').click();
     await expect(page.getByRole('button', { name: /Start Check-in/ })).toBeVisible({ timeout: 2_000 });
 
-    // ── Step 4: Add Players via VEKN ID search ──
     await page.getByRole('button', { name: 'Players' }).click();
 
     for (let i = 0; i < 8; i++) {
@@ -125,11 +115,10 @@ test.describe('Tournament lifecycle', () => {
     // "8" ("…a48 Registered" contains "8 registered" case-insensitively).
     await expect(page.getByText('8 registered', { exact: true })).toBeVisible({ timeout: 2_000 });
 
-    // ── Step 5: Close Registration & Check In All (optimistic) ──
     await cta(page, 'Start Check-in').click();
-    // Bulk check-in lives in the toolbar "More" overflow menu (one primary CTA per
-    // state). Per-player rows also carry a "More" drawer, so scope to the overflow
-    // trigger (the only one with aria-haspopup) to avoid a strict-mode match.
+    // Bulk check-in lives in the toolbar's "More" overflow (per-player rows have
+    // their own "More" too) — scope to the overflow trigger, the only one with
+    // aria-haspopup, to avoid a strict-mode match.
     await page.getByRole('button', { name: 'More' }).and(page.locator('[aria-haspopup="true"]')).click();
     await expect(page.getByRole('button', { name: 'Check All In' })).toBeVisible({ timeout: 2_000 });
     await page.getByRole('button', { name: 'Check All In' }).click();
@@ -137,7 +126,6 @@ test.describe('Tournament lifecycle', () => {
       cta(page, 'Start Round 1'),
     ).toBeVisible({ timeout: 2_000 });
 
-    // ── Step 5b: Organizer enters a player's decklist, then replaces it ──
     // The Players tab renders mobile + desktop variants; scope to the
     // visible desktop table for the upload form.
     const playersDesktop = page
@@ -152,7 +140,6 @@ test.describe('Tournament lifecycle', () => {
     await playersDesktop.getByRole('button', { name: 'Replace' }).click();
     await uploadDeck(playersDesktop, 'E2E Deck v2');
 
-    // ── Steps 6-7: Rounds 1 and 2, scored through the Rounds tab UI ──
     for (const round of [1, 2]) {
       // Wait for the server POST so seating is committed before scoring
       const started = actionResponse(page, 'StartRound');
@@ -180,7 +167,6 @@ test.describe('Tournament lifecycle', () => {
           .filter({ has: page.getByRole('heading', { name: 'Table 1', exact: true }) });
         const seatRows = table1.locator('.divide-y > div');
 
-        // ── Seating modification: unseat the first seat, re-seat them last ──
         const movedPlayer = (await seatRows.first().locator('span').first().innerText()).trim();
         await seatRows.first().getByTitle('Unseat player').click();
         await expect(seatRows).toHaveCount(3, { timeout: 2_000 });
@@ -189,7 +175,6 @@ test.describe('Tournament lifecycle', () => {
         await expect(seatRows).toHaveCount(4, { timeout: 2_000 });
         await expect(seatRows.last()).toContainText(movedPlayer);
 
-        // ── In-event sanction: caution the (new) first seat ──
         // The indicator dot renders from IDB, so its appearance proves the
         // sanction came back over SSE (POST /sanctions is not optimistic).
         await seatRows.first().getByTitle('Sanction').click();
@@ -205,13 +190,12 @@ test.describe('Tournament lifecycle', () => {
       await expect(page.getByText(`Round ${round} complete`)).toBeVisible({ timeout: 5_000 });
     }
 
-    // ── Step 8: Random toss resolves the guaranteed cutoff ties ──
     await expect(page.getByText(/Resolve top 5 ties/)).toBeVisible({ timeout: 2_000 });
     await page.getByRole('button', { name: 'Players' }).click();
     await page.getByRole('button', { name: 'Random Toss' }).click();
     await expect(page.getByText(/start finals/)).toBeVisible({ timeout: 2_000 });
 
-    // ── Step 9: Finals (StartFinals auto-switches to the Finals tab) ──
+    // StartFinals auto-switches to the Finals tab.
     await cta(page, 'Start Finals').click();
     await sweepTable(page, 'Finals Table', 5);
 
@@ -221,8 +205,6 @@ test.describe('Tournament lifecycle', () => {
     await expect(page.getByText('Finished').first()).toBeVisible({ timeout: 2_000 });
     await expect(page.getByText('Tournament complete.')).toBeVisible({ timeout: 2_000 });
 
-    // ── Step 10: Winner banner ── (shown directly in the Finished view; the
-    // former Overview tab was removed and its contents re-homed here)
     const winnerBanner = page.locator('.banner-highlight').filter({ hasText: 'Winner' });
     await expect(winnerBanner).toBeVisible({ timeout: 2_000 });
     // Banner shows "Name (vekn_id)" — strip the id to match plain names
@@ -231,7 +213,6 @@ test.describe('Tournament lifecycle', () => {
       .trim();
     expect(state.player_names).toContain(winnerName);
 
-    // ── Step 11: Rating points landed — winner appears on /rankings ──
     await page.goto('/rankings');
     await waitForSync(page);
     await expect(page.locator('tbody').getByText(winnerName)).toBeVisible({ timeout: 10_000 });

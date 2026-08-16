@@ -14,11 +14,8 @@
   let query = $state('');
   let results = $state<VtesCard[]>([]);
   let selectedIndex = $state(-1);
-  // Searching is sub-millisecond against the token cache, so there is nothing
-  // left to debounce — a 200ms timer here was pure added latency. It was also
-  // doubling as the race guard (each keystroke cleared the pending one), hence
-  // the explicit sequence guard now: the first query builds the card cache and
-  // can otherwise resolve after the later ones it should have preceded.
+  // Searching is sub-millisecond against the token cache, so there is nothing left to debounce — this
+  // sequence guard replaces the debounce timer's old race-guard role: the first query builds the card cache and can otherwise resolve after later ones it should have preceded.
   let searchSeq = 0;
 
   onMount(() => { getCards(); });
