@@ -475,7 +475,7 @@ Committing the mapping is fine under the no-PII rule: TWDA already publishes
 every winner name alongside its event, and our uids are meaningless outside the
 app.
 
-## Phase 1 — Winner identity — **done 2026-08-16, 94.3% resolved, 50 names to officials**
+## Phase 1 — Winner identity — **done 2026-08-16, 96.7% resolved, 27 names to officials**
 
 The archive gives a name string and nothing else: 1549 distinct normalised
 winner names, 234 of them at >= 5 IRL entries.
@@ -635,6 +635,46 @@ a resolved winner. Several rows will have no right answer: a 2005–2010 winner 
 never registered with the VEKN is not in the roster, and *no member* is the
 correct verdict. Those stay held out of the import rather than imported
 winner-less, per the rule below.
+
+#### Decided by hand, owner 2026-08-16
+
+23 of the 50, leaving 37 entries over 27 names and taking coverage to **1095 of
+1132 (96.7%)**. Every VEKN id given was checked to exist and to carry the name
+claimed for it. Recorded as uids, which mean nothing outside the app; the
+membership numbers stay out of this public repo.
+
+| archive name | member | uid |
+|---|---|---|
+| Alejandro Hernandez Molina | Alejandro H. Molina | `019f1a00-ad0c-77a5-8a54-4fde20bbf720` |
+| BJ Conant | Brian J. Conant | `019f19ff-8b14-72f7-aa69-4cc6ba29a53b` |
+| Ben O'Neill | Ben ONeill | `019f1a00-78c6-775b-9abe-ee9d668bd22e` |
+| Bernie MacNaught | Bernard MacNaught | `019f1a00-7ad6-76d4-b406-07930b3a7995` |
+| Bruno Keiti Tamane | Bruno Keiti | `019f1a00-9750-750c-98a5-f6cac873c649` |
+| Caroline Hyll | Caroline Vallee | `019f1a00-051f-72e2-8d11-84db64f3c8eb` |
+| Daniel Stefanutti | Daniel Albert Stefanutti Lindemann | `019f1a00-99b0-74c4-82b6-02c60be77f1a` |
+| Denny Bruset | Danny Buset | `019f1a00-6fa7-7124-a580-f8286a140696` |
+| Eric Haas | Eric Haas | `019f1a00-cb3d-709f-97d7-0cc13d04f27f` |
+| Jeff Lamothe | Jean-François Lamothe | `019f19ff-bb89-72fa-80f8-f715da313543` |
+| Jessie Ellison | Jessica Ellison | `019f1a00-0ca1-7118-9a42-c5cb884647ad` |
+| Karl Cheng Chua | Karl Ian Uy Cheng Chua | `019f19ff-8d41-7753-bec8-f9766c35afda` |
+| Lander Ladislao | Lander | `019f19ff-c1b2-73a8-a55f-c77bb71a4b5a` |
+| Mattrim Dixon | Matthew Dixon | `019f19ff-8a0d-7379-8a21-bb8d74ce59c5` |
+| Michael Corriea | Micheal Correia | `019f1a00-590f-767f-9fb2-e12baf29eade` |
+| Michael W. Jones | Michael Jones | `019f19ff-f6b5-7547-9d3b-1d9961c8d961` |
+| Michele | Michele Polo | `019f19ff-9b2d-73bf-adc6-0f22875e1991` |
+| Miguel Vazquez | Miguel Angel Vasquez | `019f1a00-9aaf-7311-ac03-7ac9fb108439` |
+| Pau Villar | Pau Vilar | `019f19ff-958f-7525-9cbe-7c09d97b6fd0` |
+| Peter Jaworski | Piotr Jaworski | `019f19ff-d108-7768-b0c7-7d86834194bc` |
+| Robert Müller | Robert Mueller | `019f1a00-7178-7411-b905-17f89b980eaf` |
+| Steve Van Nus | Steve Vannus | `019f1a00-7a78-7520-b2bf-de27662ae01a` |
+| Tim Smith | Tim Smith | `019f1a00-7c54-7373-bedc-ecd71868c096` |
+
+`Tim Smith` and `Eric Haas` are the two the automated passes refused on purpose —
+each had a second member of the same name, and the owner picked between them.
+**`Caroline Hyll` → `Caroline Vallee` is the one ruling no signal in the data
+supports**: her two wins are Stockholm 2010 and the member is in Québec, while a
+`Kari Hyll` shares her surname and her city. Recorded as given, and worth a second
+look before Phase 2 consumes it.
 
 ### The six HoF-relevant names — confirmed by the owner 2026-08-16
 
