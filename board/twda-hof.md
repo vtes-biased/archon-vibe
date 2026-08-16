@@ -161,6 +161,12 @@ and counting.
    version (member names should not bleed into non-member space)."* `wins` stays
    in `_USER_MEMBER_FIELDS` (`access_levels.py:83`); logged-out visitors get the
    explicit sign-in state already scoped in `#613` item 5, not an empty table.
+7. **The VEKN record outranks the archive** (owner, 2026-08-16): *"The VEKN record
+   is higher on the trust scale. TWDA is only when record does not have the
+   info."* Where both describe one event the VEKN result stands and the archive
+   fills only the gaps. Its sharpest consequence is that `reported_player_count`
+   is stamped on archival rows and **never on a VEKN import** — see *Archival
+   results*, which is what makes wiring the rating coefficient safe.
 
 ## The rule
 
@@ -1053,14 +1059,21 @@ events — the engine already computes that correctly, and stamping it would cre
 a drift vector on reopen/rescore.
 
 It covers the enum's whole job: has-round-detail stays `rounds.is_empty()`;
-roster-completeness falls out as `reported_player_count > len(players)`, which
-*already* applies to VEKN imports (they silently drop players whose VEKN id we
-don't hold, `vekn_tournament_sync.py:222-224`); is-archival for the UI is
-`state === "Finished" && !rounds?.length`, or the `external_ids['twda']` badge in
-Phase 4.3.
+is-archival for the UI is `state === "Finished" && !rounds?.length`, or the
+`external_ids['twda']` badge in Phase 4.3.
 
-Per producer: VEKN sync → `len(data["players"])`; archon ETL round-less → the old
-count; TWDA → `players_count`; native → 0.
+**Per producer: archon ETL round-less → the old count; TWDA → `players_count`;
+VEKN sync → nothing; native → 0.** Owner, 2026-08-16: *"The VEKN record is higher
+on the trust scale. TWDA is only when record does not have the info."* An earlier
+draft of this plan had the VEKN sync stamp `len(data["players"])`, on the grounds
+that it silently drops players whose VEKN id we do not hold
+(`vekn_tournament_sync.py:222-224`) and so its own count is the truer field size.
+That is out, permanently — not deferred. It is the only way this field could ever
+move a live rating, since the count feeds `compute_rating_points`' coefficient
+over a rolling 18-month window and every partial-roster import inside it would
+lift its winner and runner-up. The archival rows it *is* stamped on are decades
+outside that window and rounds-less besides, so they cannot. See
+[vekn](../wiki/vekn.md#inbound).
 
 **Name it `reported_player_count`, never `player_count`.** `engine/src/league.rs:53`
 already reads `tournament["player_count"]` from a caller-*synthesized* summary
@@ -1167,16 +1180,24 @@ safer — adopting a TWDA row and overwriting it with VEKN data needs no mode fl
 because `rounds` becomes non-empty (or stays empty with a real roster) and every
 derivation self-corrects.
 
-## Rating coefficient — explicitly out of scope here
+## Rating coefficient — safe, because of where the field is never stamped
 
-Stamping `reported_player_count` on existing VEKN imports is honest and cheap,
-but **do not wire it into `compute_rating_points`'s coefficient in this ticket.**
-If you did, every finalist in a partial-roster import gains points, the 18-month
-top-8 window reshuffles, and rankings visibly move. That is a separate, measured
-change. Also note `TournamentRatingEntry.player_count` (`models.py:201`) is
-embedded in every entry, so a changed count re-saves and re-broadcasts every
-affected `User` — bulk it like Phase 2.6 if it ever happens.
+The board line requires the attested count to feed the rating coefficient, and it
+can: `compute_rating_points` takes `player_count` and builds
+`ln(pc²)/ln(15) − 1 + rank_bonus`, applied only where the finalist bonus is
+non-zero. Nothing published moves, for two independent reasons. The rows carrying
+the field are 1997–2013 archival reconstructions, and the window is a rolling 18
+months (`ratings.py:35`, applied as a cutoff on the query at `:188`) — they are
+decades outside it. They are also rounds-less, so `ranking_eligibility`'s
+8-player floor rejects them before the coefficient is reached.
+
+**Both reasons rest on the VEKN sync never stamping the field.** That is the rule
+above, and it is what keeps this section true; wiring the coefficient while
+stamping live imports is the combination that would visibly reshuffle rankings.
+Note also that `TournamentRatingEntry.player_count` (`models.py:201`) is embedded
+in every entry, so a changed count re-saves and re-broadcasts every affected
+`User` — which is a second reason not to restamp a live corpus.
 
 Verified unmoved by the field: `UNPUSHED_RESULTS_QUERY` (`vekn_push.py:429`)
-stays rounds-keyed, dedup `richness` stays play-data-keyed, league standings move
-only if the coefficient is wired.
+stays rounds-keyed, dedup `richness` stays play-data-keyed, and league standings
+read a caller-synthesized summary rather than this field.
