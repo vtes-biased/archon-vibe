@@ -104,9 +104,7 @@ def normalize(value: str) -> str:
 
     The fold must go through `fold_ascii`, not a bare NFD mark-drop: ł does not
     decompose, so "Paweł" would keep it, the alphanumeric filter would eat it,
-    and the archive's ASCII "Pawel" would never match. Six Polish events,
-    including two national championships, were reconstructed as duplicates
-    before that was found.
+    and the archive's ASCII "Pawel" would never match.
     """
     return re.sub(r"[^a-z0-9]+", " ", fold_ascii(value or "").lower()).strip()
 

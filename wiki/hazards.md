@@ -67,15 +67,21 @@ the candidate set, so there `XX` and `Online` must both stay open, and switching
 to `country_key` would silently drop the `XX` rows' true matches.
 
 **Dropping NFD combining marks is not an ASCII fold.** ł, ø, æ, ß and friends
-decompose to themselves, so a mark-dropping pass leaves a non-ASCII letter that
-the alphanumeric filter downstream then eats — `Paweł` becomes `pawe`, which
-never matches the archive's `Pawel`. Fold through `geonames.fold_ascii` or the
-engine's `fold_ascii` (`engine/src/cards.rs`), never a hand-written NFD loop:
-the two carry the same explicit map, and the engine's is pinned by a CI guard
-asserting every shipped card name normalizes to pure ASCII. The Polish and
-Nordic cohorts are where this bites, and it is silent — a hand-rolled fold in
-`reconcile_twda.py` cost six Polish events, two of them national championships,
-which would have been reconstructed as duplicates.
+decompose to themselves, so a mark-dropping pass leaves a non-ASCII letter
+behind — `Paweł` normalizes to `pawe` where an alphanumeric filter eats it, and
+to `paweł` where one does not. Either way the accent-free `Pawel` never matches.
+The explicit map that fixes it lives twice: `engine/src/cards.rs` `fold_ascii`,
+pinned by a CI guard asserting every shipped card name normalizes to pure ASCII,
+and its Python twin `geonames.fold_ascii`. Fold through one of those on the
+Python and Rust sides, never a hand-written NFD loop — a hand-rolled one in
+`reconcile_twda.py` was silently reconstructing six Polish events as duplicates.
+
+**The frontend cannot reach either, and has the bug.** The Rust `fold_ascii` is
+private and not WASM-exported, so `normalizeSearch`
+(`frontend/src/lib/utils.ts`) is a third, mark-strip-only implementation — and
+it feeds the member, card and city search indexes, where typing `Pawel` finds no
+`Paweł`. Deliberately left standing rather than fixed in passing; it is a
+user-facing search defect, not a matcher one.
 
 ## Two implementations of one gate
 

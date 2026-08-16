@@ -233,7 +233,7 @@ def match_city(name: str, country_code: str) -> City | None:
     # 2. ASCII name match
     if city := by_ascii.get((cc, name.lower())):
         return city
-    # 3. Strip diacritics from input, try ASCII
+    # 3. Fold the input to ASCII, try ASCII
     stripped = fold_ascii(name)
     if stripped != name:
         if city := by_ascii.get((cc, stripped.lower())):
