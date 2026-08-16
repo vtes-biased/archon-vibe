@@ -58,7 +58,13 @@ directly: the resolver returns `None` for a spelling it does not know (`Czechia`
 unknown value equal to every other and **disables the caller's guard**.
 `country_key` compares such values as themselves, so an unrecognised spelling
 narrows the candidates instead. `normalize_country` is for resolving a code out of
-a name, where `None` legitimately means "says nothing" — the TWDA's `Online`.
+a name, where `None` legitimately means "says nothing" — the TWDA's `Online`, and
+the `XX` placeholder 8 live rows carry. Which function a caller wants turns on
+whether it is a **guard** or a **tie-break**: `find_same_event_tournaments` stamps a
+vekn id onto its single survivor, so an unknown spelling must narrow;
+`reconcile_twda.py` only ever breaks ties and discards a filter that would empty
+the candidate set, so there `XX` and `Online` must both stay open, and switching it
+to `country_key` would silently drop the `XX` rows' true matches.
 
 ## Two implementations of one gate
 

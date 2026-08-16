@@ -199,9 +199,6 @@ def resolve(entry: dict, corpus: Corpus) -> tuple[str, str, str]:
     """Return (action, target, why) for one TWDA entry."""
     uid = archon_uid(entry)
     if uid:
-        # The two link forms carry uids from two different id spaces: the live
-        # one quotes our uid, the dead legacy one quotes the uid legacy archon
-        # minted, which we keep in external_ids['archon'] on the imported row.
         row = corpus.by_uid.get(uid) or corpus.by_archon.get(uid)
         if row:
             return "attach", row["uid"], "own link"
@@ -330,7 +327,7 @@ async def load_corpus() -> Corpus:
         return Corpus(await result.fetchall())
 
 
-def write_report(path: str, verdicts: list[tuple], corpus: Corpus, reasons: Counter):
+def write_report(path: str, verdicts: list[list], corpus: Corpus, reasons: Counter):
     review = [v for v in verdicts if v[1] == "review"]
     create = [v for v in verdicts if v[1] == "create"]
     lines = [

@@ -267,9 +267,12 @@ and is **read-only** — it has no `--apply`. Its output is a decisions file a h
 reviews and the reconstruction later consumes; unreviewed entries are skipped,
 never created. Four tiers: an `archon.vekn.net` link in `event_link`; the vekn
 event id; a **name-free** match on date ± 1 day, winner name and country, with the
-event name and then the player count breaking a tie; then a reconstruction
-candidate. Neither the name nor the count is a key — 869 pre-2014 rows are named
-`Imported VTES Event`, and the count is absent on 100 entries and collides freely —
+event name and then the **roster length** breaking a tie; then a reconstruction
+candidate. That length is `len(players)`, not any of the four "how many played"
+implementations [hazards](hazards.md) indexes — it is a matching confirmer only and
+never reaches a rating or a floor. Neither the name nor the count is a key — 869
+pre-2014 rows are named `Imported VTES Event`, and the count is absent on 100
+entries of the archive and collides freely across the corpus —
 while winner name resolves half the unlinked corpus at 99.9% precision, measured
 against the linked entries. As a *tie-break* the count is decisive, because the
 archive and the archon row agree on it exactly for most of the multi-event weekends
