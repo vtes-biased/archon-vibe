@@ -483,21 +483,23 @@ Committing the mapping is fine under the no-PII rule: TWDA already publishes
 every winner name alongside its event, and our uids are meaningless outside the
 app.
 
-## Phase 1 — Winner identity — **done 2026-08-17, 94.1% resolved at 100% precision**
+## Phase 1 — Winner identity — **done 2026-08-17, 95.1% resolved at 100% precision**
 
 **Re-derived 2026-08-17, when the matcher moved into `reconcile_twda.py`.** The
 96.7% first reported here came from passes that only ever ran in a scratchpad, and
 re-running them under measurement found one wrong match in 1121: the
 surname-anchored classes were auto-applying on surnames dozens of members share,
 where the given name carries the whole claim. Gated at
-`MAX_SHARING_SURNAME`, the passes score **100% precise over 1116 labelled names**
-and reach **1065 of 1132** reconstructions. The gate costs 9 names / 11 entries,
-all of them plausible on sight and all now decidable as rulings.
+`MAX_SHARING_SURNAME`, the passes score **100% precise over 1116 labelled names**.
+The gate held back 9 names / 11 entries, all plausible on sight; the owner
+confirmed all nine on 2026-08-17 and they are rulings now, which is why the
+coverage lands back at **1076 of 1132** with none of it resting on an
+unmeasured class.
 
-The number to hold on to is not the coverage: **zero of the 50 unresolved names is
+The number to hold on to is not the coverage: **zero of the 41 unresolved names is
 HoF-relevant** (none has 5+ IRL entries), so no Hall of Fame place turns on the
 queue — the same conclusion the first pass reached. What it costs is archival
-completeness on 67 entries and the decklists that come with a resolved winner.
+completeness on 56 entries and the decklists that come with a resolved winner.
 
 Both halves are now re-derivable — `--validate` scores the winner passes against
 the bootstrap the same way it scores the event tiers, and every human decision
