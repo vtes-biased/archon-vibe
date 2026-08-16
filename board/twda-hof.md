@@ -437,9 +437,11 @@ those resolves to a live user with a name — no dangling uids. `country` is set
 3278 (90.4%), so the second confirmer is real. The `Imported VTES Event` count
 reproduced exactly at 869.
 
-**And every one of the 3627 has zero rounds.** The archival shape is not something
-the reconstruction introduces — it is the existing shape of the entire historic
-corpus. See *Archival results* for what that costs Phase 3.
+**And every one of the 3627 has zero rounds** — the archival shape is not
+something the reconstruction introduces, it is the existing shape of the whole
+historic corpus. It costs Phase 3 nothing, though: all 3627 also carry scored
+standings, which is the branch `players_with_rounds` falls back to. See *Archival
+results*.
 
 Confirmers, strongest first:
 
@@ -1001,17 +1003,33 @@ per-round play data" is a real, unnamed thing (three producers already emit it:
 TWDA reconstruction here) and proposed formalising it as an explicit **mode** on
 `Tournament`, with either a players list or just a count.
 
-**Its scope is the whole historic corpus, not the reconstruction.** Measured on
-prod 2026-08-16: **all 3627 pre-2014 live tournaments have zero rounds.** So
-`players_with_rounds` returns 0 for every one of them, and the 10-player floor
-rejects every pre-2014 win unless `reported_player_count` is **backfilled onto the
-existing rows**, not merely stamped on the ~1136 reconstructed ones. Today
-`get_tournament_wins_for_users` has no player-count gate at all, so those wins
-currently do count: introducing the floor without the backfill would not shave the
-47 members sitting at exactly 5, it would evict essentially the whole historic Hall
-of Fame — including the three names in the done-condition. This makes *Archival
-results* a hard prerequisite of Phase 3, not a parallel track, and makes Phase 3.5's
-"diff before flipping" a certainty rather than a caution.
+**Its scope is the reconstruction, and only the reconstruction. There is no
+backfill.** Measured on prod 2026-08-16: all 3627 pre-2014 live tournaments are
+rounds-less, and **every single one carries scored standings** — zero rows have
+neither. `players_with_rounds` falls back to counting standings rows with a
+non-zero `gw`/`vp`/`tp` (`engine/src/ratings.rs:80-86`), so it already returns a
+real number across the whole historic corpus and the 10-player floor can read it
+today.
+
+An earlier version of this section said the opposite, on a measurement of
+`rounds == []` alone. That is the wrong predicate: it says nothing about the
+fallback branch, and reading it as "the count is 0" turned a true measurement into
+a false conclusion — that the floor would evict the historic Hall of Fame, which it
+will not. **Measure `players_with_rounds`, never `len(rounds)`**, whenever the
+question is how big the field was.
+
+What genuinely needs the field is the ~1132 events the reconstruction will
+*create*: their standings are a single row of zeros (Phase 2.3), so
+`players_with_rounds` really is 0 for them and the floor really would reject every
+reconstructed win. That keeps *Archival results* ahead of Phase 3 — the epic
+exists to make those wins count — but it is now a small field-and-guard change
+rather than a corpus-wide backfill, with no re-projection of 3627 rows and nothing
+published moving.
+
+One residual to check before Phase 3 flips the floor: the fallback counts only
+players who *scored*, so a legacy row where several players finished on zero reads
+short. That undercount cannot evict the corpus, but it can shave events sitting
+just above ten.
 
 **Recommendation: add the missing fact, do not add the mode.** The gap is real
 and is a hard blocker; the enum is over-modelling. Three reasons.
@@ -1053,10 +1071,22 @@ derivation, the list and the calendar — silently. The general rule is recorded
 reported_player_count: int = 0
 ```
 
-*Externally attested field size, when our roster is known to be incomplete or
-absent. 0 = no attestation, derive as today.* Never written for natively-run
-events — the engine already computes that correctly, and stamping it would create
-a drift vector on reopen/rescore.
+*Externally attested field size, for a row that carries no evidence of one. 0 = no
+attestation, derive as today.*
+
+**Stamped only where `players_with_rounds(t) == 0`** — no rounds, and no standings
+row carrying a score. Owner, 2026-08-16: *"we never stamp the field if we have
+rounds or standings that give this information."* That is one predicate doing
+three jobs: it decides whether the field may be written, it is the `"no_results"`
+eligibility guard below, and it is the gate on `SetArchivalResults`. The plan's
+earlier guard for that event was `state == Finished && rounds.is_empty()`, which
+would have let an IC overwrite a rounds-less row carrying real scored standings —
+exactly the shape all 3627 legacy imports have.
+
+It follows that `attested_player_count`'s `max()` can never see two competing
+non-zero numbers: wherever the field is set, the other term is 0 by construction.
+Keep the `max()` anyway — it is what makes a mis-stamped row harmless rather than
+authoritative.
 
 It covers the enum's whole job: has-round-detail stays `rounds.is_empty()`;
 is-archival for the UI is `state === "Finished" && !rounds?.length`, or the
@@ -1154,9 +1184,11 @@ violation prints a raw UUID); in the engine it is enforced once.
 - Payload `{winner, players: [uid], reported_player_count}`. **Deliberately not
   `standings`** — they are contractually prelim-only and we have no prelim data;
   keep the zeros.
-- Guard: reject unless `state == Finished && rounds.is_empty()`. That single gate
-  makes it structurally impossible to touch a natively-run event — and note it is
-  again a *data-shape* gate, not a mode flag.
+- Guard: reject unless `state == Finished && players_with_rounds(t) == 0`. A
+  *data-shape* gate, not a mode flag, and it must be the full predicate rather
+  than `rounds.is_empty()` — all 3627 legacy imports are rounds-less while
+  carrying real scored standings, and the weaker gate would let an IC overwrite
+  their results.
 - Guard: `reported_player_count >= len(players)`; auto-materialise the winner's
   `Player{state: Finished, finalist: true}` and matching `Standing`.
 - New explicit `EngineError` variants per the error-codes contract.
