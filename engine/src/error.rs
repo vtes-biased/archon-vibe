@@ -89,6 +89,11 @@ pub enum EngineError {
     SelfOrganizeNotOpenRounds,
     SelfOrganizeNotSeated,
     SelfOrganizeIneligible { player: String },
+    ArchivalResultsForbidden,
+    ArchivalResultsHasPlay,
+    ArchivalResultsVeknLinked,
+    ArchivalResultsWinnerNotListed,
+    ArchivalResultsCountBelowRoster { reported: usize, listed: usize },
     Internal { detail: String },
 }
 
@@ -187,6 +192,13 @@ impl EngineError {
             SelfOrganizeNotOpenRounds => "tournament.self_organize_not_open_rounds",
             SelfOrganizeNotSeated => "tournament.self_organize_not_seated",
             SelfOrganizeIneligible { .. } => "tournament.self_organize_ineligible",
+            ArchivalResultsForbidden => "tournament.archival_results_forbidden",
+            ArchivalResultsHasPlay => "tournament.archival_results_has_play",
+            ArchivalResultsVeknLinked => "tournament.archival_results_vekn_linked",
+            ArchivalResultsWinnerNotListed => "tournament.archival_results_winner_not_listed",
+            ArchivalResultsCountBelowRoster { .. } => {
+                "tournament.archival_results_count_below_roster"
+            }
             Internal { .. } => "internal",
         }
     }
@@ -209,6 +221,10 @@ impl EngineError {
                 ("completed", completed.to_string()),
             ],
             VeknFrozenField { field } => vec![("field", field.clone())],
+            ArchivalResultsCountBelowRoster { reported, listed } => vec![
+                ("reported", reported.to_string()),
+                ("listed", listed.to_string()),
+            ],
             Internal { detail } => vec![("detail", detail.clone())],
             _ => vec![],
         }
@@ -388,6 +404,26 @@ impl fmt::Display for EngineError {
                 f,
                 "Player {} is already playing or done and cannot be seated",
                 player
+            ),
+            ArchivalResultsForbidden => write!(
+                f,
+                "Only the International Coordinator can correct an archival record"
+            ),
+            ArchivalResultsHasPlay => write!(
+                f,
+                "This event has recorded results — correct them through the rounds and finals"
+            ),
+            ArchivalResultsVeknLinked => write!(
+                f,
+                "This event is linked to vekn.net, which would overwrite the correction on its next sync"
+            ),
+            ArchivalResultsWinnerNotListed => {
+                write!(f, "The winner must be one of the listed players")
+            }
+            ArchivalResultsCountBelowRoster { reported, listed } => write!(
+                f,
+                "Player count {} is below the {} players listed",
+                reported, listed
             ),
             Internal { detail } => write!(f, "Internal error: {}", detail),
         }

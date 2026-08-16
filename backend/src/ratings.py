@@ -65,15 +65,6 @@ def _players_with_rounds(t: Tournament) -> set[str]:
     return {s.user_uid for s in t.standings if s.gw or s.vp or s.tp}
 
 
-def _player_count(t: Tournament) -> int:
-    """Count of players with ≥1 round played.
-
-    Stays inclusive of disqualified players (tournament-rules A.2): a DQ'd player
-    still inflates the head-count feeding everyone else's finalist coefficient.
-    """
-    return len(_players_with_rounds(t))
-
-
 def _final_positions(t: Tournament) -> dict[str, int]:
     """{user_uid: final placement} for one finished tournament, from the engine's
     shared rule — computed once per tournament, never per (user, tournament)."""
@@ -165,12 +156,13 @@ def _compute_entry_sync(
 ) -> TournamentRatingEntry:
     """Compute a TournamentRatingEntry without DB access (uses pre-loaded sanctions);
     encodes + counts on the spot, delegating to _compute_entry."""
+    t_json = msgspec.json.encode(t).decode()
     return _compute_entry(
         t,
-        msgspec.json.encode(t).decode(),
+        t_json,
         msgspec.json.encode(sanctions or []).decode(),
         user_uid,
-        _player_count(t),
+        _engine.attested_player_count(t_json),
         _final_positions(t),
     )
 
@@ -226,7 +218,8 @@ async def recompute_ratings_for_players(
         eligible.append(t)
         played_by_t[t.uid] = _players_with_rounds(t)
         json_by_t[t.uid] = t_json
-        count_by_t[t.uid] = len(played_by_t[t.uid])
+        # Who earns an entry vs how big the field was: two questions, two counts.
+        count_by_t[t.uid] = _engine.attested_player_count(t_json)
         positions_by_t[t.uid] = _final_positions(t)
     all_tournaments = eligible
 

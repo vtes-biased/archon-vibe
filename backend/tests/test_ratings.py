@@ -14,7 +14,6 @@ from src.ratings import (
     _final_positions,
     _finalist_position,
     _is_disqualified,
-    _player_count,
 )
 
 _engine = PyEngine()
@@ -308,7 +307,7 @@ def test_dq_player_earns_no_rating_entry_co_player_unaffected_count_inclusive():
     assert clean_entry.vp == 2.0 and clean_entry.gw == 1
 
     # Head-count stays inclusive of DQ'd players (finalist-coefficient base).
-    assert _player_count(t) == 3
+    assert _engine.attested_player_count(msgspec.json.encode(t).decode()) == 3
 
 
 def test_final_positions_excludes_dq_and_proxy_rows():

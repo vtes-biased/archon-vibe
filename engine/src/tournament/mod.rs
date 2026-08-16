@@ -2482,5 +2482,83 @@ fn apply_event(
 
             Ok(())
         }
+
+        TournamentEvent::SetArchivalResults {
+            winner,
+            players,
+            reported_player_count,
+        } => {
+            if !crate::permissions::allows(
+                crate::permissions::Capability::SetArchivalResults,
+                &crate::permissions::Request::new(&actor.user_context(), &actor.uid),
+            ) {
+                return Err(EngineError::ArchivalResultsForbidden);
+            }
+            require_state(state, TournamentState::Finished)?;
+            // The data-shape gate, not a mode flag: every legacy import is
+            // rounds-less while carrying a real scored result sheet, and this
+            // must never overwrite one.
+            if crate::ratings::players_with_rounds(tournament) != 0 {
+                return Err(EngineError::ArchivalResultsHasPlay);
+            }
+            // The nightly calendar sync rebuilds any rounds-less vekn-linked row
+            // from upstream, so the correction would vanish on its next run.
+            if !tournament["external_ids"]["vekn"]
+                .as_str()
+                .unwrap_or("")
+                .is_empty()
+            {
+                return Err(EngineError::ArchivalResultsVeknLinked);
+            }
+            if !players.iter().any(|p| p == winner) {
+                return Err(EngineError::ArchivalResultsWinnerNotListed);
+            }
+            if *reported_player_count < players.len() {
+                return Err(EngineError::ArchivalResultsCountBelowRoster {
+                    reported: *reported_player_count,
+                    listed: players.len(),
+                });
+            }
+
+            let ordered = std::iter::once(winner)
+                .chain(players.iter().filter(|p| *p != winner))
+                .collect::<Vec<_>>();
+            tournament["players"] = JsonValue::Array(
+                ordered
+                    .iter()
+                    .map(|uid| {
+                        json::object! {
+                            user_uid: uid.as_str(),
+                            state: "Finished",
+                            payment_status: "Paid",
+                            toss: 0,
+                            result: { gw: 0, vp: 0.0, tp: 0 },
+                            finalist: *uid == winner,
+                            non_competing: false,
+                        }
+                    })
+                    .collect(),
+            );
+            tournament["standings"] = JsonValue::Array(
+                ordered
+                    .iter()
+                    .map(|uid| {
+                        json::object! {
+                            user_uid: uid.as_str(),
+                            gw: 0.0,
+                            vp: 0.0,
+                            tp: 0,
+                            toss: 0,
+                            finalist: *uid == winner,
+                            disqualified: false,
+                            non_competing: false,
+                        }
+                    })
+                    .collect(),
+            );
+            tournament["winner"] = winner.as_str().into();
+            tournament["reported_player_count"] = (*reported_player_count).into();
+            Ok(())
+        }
     }
 }

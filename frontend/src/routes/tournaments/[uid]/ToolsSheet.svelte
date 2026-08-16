@@ -8,15 +8,18 @@
   import TournamentDetailsForm from "./TournamentDetailsForm.svelte";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import PromosDistributedEditor from "./PromosDistributedEditor.svelte";
+  import ArchivalResultsEditor from "./ArchivalResultsEditor.svelte";
   import QrCheckinDisplay from "$lib/components/QrCheckinDisplay.svelte";
   import RaffleSection from "./RaffleSection.svelte";
   import ReopenConfirmModal from "./ReopenConfirmModal.svelte";
   import FinishConfirmModal from "./FinishConfirmModal.svelte";
   import Button from "$lib/components/Button.svelte";
   import { copyResults } from "$lib/copy-results";
-  import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
+  import { playedPlayerUids, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { canSetArchivalResults } from "$lib/engine";
+  import { getAuthState } from "$lib/stores/auth.svelte";
   import type { TournamentEventType } from "$lib/engine";
-  import { ChevronDown, ChevronRight, X, Settings2, Users, Upload, CloudUpload, QrCode, Gift, Ticket, ClipboardCopy, Download, Undo2, Trash2, Image, TriangleAlert } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight, X, Settings2, Users, Upload, CloudUpload, QrCode, Gift, Ticket, ClipboardCopy, Download, Undo2, Trash2, Image, TriangleAlert, ScrollText } from "@lucide/svelte";
   import type { DeckObject } from "$lib/types";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -26,10 +29,10 @@
   type GroupId = "setup" | "door" | "wrapup";
   // Table rooms live at the foot of Details > Venue, not as a peer row here —
   // they're part of the venue.
-  type PanelId = "details" | "organizers" | "qr" | "promos" | "raffle";
+  type PanelId = "details" | "organizers" | "qr" | "promos" | "raffle" | "archival";
   const PANEL_GROUP: Record<PanelId, GroupId> = {
     details: "setup", organizers: "setup", qr: "door",
-    promos: "wrapup", raffle: "wrapup",
+    promos: "wrapup", raffle: "wrapup", archival: "wrapup",
   };
 
   let {
@@ -81,6 +84,14 @@
   // there is an event to draw at.
   const raffleAvailable = $derived(
     tournament.state === "Waiting" || tournament.state === "Playing" || isFinished
+  );
+  // Same shape the engine gates on: nothing played, and no vekn.net row whose
+  // nightly sync would overwrite the correction.
+  const archivalCorrectable = $derived(
+    isFinished
+    && playedPlayerUids(tournament).size === 0
+    && !tournament.external_ids?.vekn
+    && canSetArchivalResults(getAuthState().user).allowed
   );
 
   function downloadEventCopy() {
@@ -225,6 +236,9 @@
             {@render panelRow("raffle", m.raffle_title(), Ticket, rafflePanel)}
           {/if}
           {@render panelRow("promos", m.promos_title(), Gift, promosPanel)}
+          {#if archivalCorrectable}
+            {@render panelRow("archival", m.archival_title(), ScrollText, archivalPanel)}
+          {/if}
           {#if hasStandings}
             {@render actionRow({ label: m.tools_copy_results(), onclick: () => copyResults(tournament, playerInfo, standings) }, ClipboardCopy)}
             {@render actionRow({ label: m.tools_download_event(), onclick: downloadEventCopy }, Download)}
@@ -272,6 +286,10 @@
 
 {#snippet promosPanel()}
   <PromosDistributedEditor {tournament} onupdate={(t) => { tournament = t; }} />
+{/snippet}
+
+{#snippet archivalPanel()}
+  <ArchivalResultsEditor {tournament} {playerInfo} onupdate={(t) => { tournament = t; }} />
 {/snippet}
 
 {#snippet rafflePanel()}

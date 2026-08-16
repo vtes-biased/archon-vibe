@@ -995,259 +995,37 @@ child rather than carrying it here.
 
 ---
 
-# Archival results — the missing fact
+# Archival results — shipped 2026-08-16
 
-The owner's instinct was that "a finished tournament we hold results for but no
-per-round play data" is a real, unnamed thing (three producers already emit it:
-`vekn_tournament_sync.py:215-321`, `migrate_from_archon.py:1066-1163`, and the
-TWDA reconstruction here) and proposed formalising it as an explicit **mode** on
-`Tournament`, with either a players list or just a count.
+The field-and-guard change this epic was blocked on is in. What the remaining
+phases can now rely on, in one place — the standing statement is
+[tournaments](../wiki/tournaments.md), [vekn](../wiki/vekn.md#inbound) and
+[hazards](../wiki/hazards.md):
 
-**Its scope is the reconstruction, and only the reconstruction. There is no
-backfill.** Measured on prod 2026-08-16: all 3627 pre-2014 live tournaments are
-rounds-less, and **every single one carries scored standings** — zero rows have
-neither. `players_with_rounds` falls back to counting standings rows with a
-non-zero `gw`/`vp`/`tp` (`engine/src/ratings.rs:80-86`), so it already returns a
-real number across the whole historic corpus and the 10-player floor can read it
-today.
+- `Tournament.reported_player_count`, an externally attested field size, `0`
+  meaning no attestation. Member projection, not public.
+- `attested_player_count` over PyO3 and WASM: rounds, then the attestation, then
+  the standings length. Feeds the rating coefficient and the win floors.
+  `players_with_rounds` is unchanged and still answers who played.
+- `ranking_eligibility` returns `"no_results"` where nothing was played, so an
+  archival stub can never enter the rating set however large its attested count.
+- `SetArchivalResults`, IC only, gated on `players_with_rounds(t) == 0`, refusing
+  any row carrying `external_ids['vekn']` while the calendar sync is live. The
+  lift is deferred in [vekn-decommission](../wiki/vekn-decommission.md).
 
-An earlier version of this section said the opposite, on a measurement of
-`rounds == []` alone. That is the wrong predicate: it says nothing about the
-fallback branch, and reading it as "the count is 0" turned a true measurement into
-a false conclusion — that the floor would evict the historic Hall of Fame, which it
-will not. **Measure `players_with_rounds`, never `len(rounds)`**, whenever the
-question is how big the field was.
+**Phase 2.3 must stamp the field** from the entry's `players_count` on every row
+it creates, and must not stamp anything else. Without it every reconstructed win
+sits at an attested size of 1 and never clears the 10-player floor, which is the
+whole point of the epic.
 
-What genuinely needs the field is the ~1132 events the reconstruction will
-*create*: their standings are a single row of zeros (Phase 2.3), so
-`players_with_rounds` really is 0 for them and the floor really would reject every
-reconstructed win. That keeps *Archival results* ahead of Phase 3 — the epic
-exists to make those wins count — but it is now a small field-and-guard change
-rather than a corpus-wide backfill, with no re-projection of 3627 rows and nothing
-published moving.
+Two things measured while building it, that the later phases depend on and would
+be expensive to re-derive:
 
-The floor still needs care, and it is measured below rather than left as a
-caution: the scored-standings fallback would have shaved 580 real events, which
-is what the standings-length term in `attested_player_count` exists to prevent.
-
-**Recommendation: add the missing fact, do not add the mode.** The gap is real
-and is a hard blocker; the enum is over-modelling. Three reasons.
-
-**1. The ~11 `len(rounds) == 0` sites are not one predicate — they are three,
-and only one needs a new field.**
-
-| what the site actually asks | sites | correct answer |
-|---|---|---|
-| "is there per-round detail to read?" | `ratings.rs:73`, `ratings.py:52-72`, `standings.rs:363-370`, `tournament-utils.ts:148`, `[uid]/+page.svelte:213,220` | `rounds.is_empty()` — already complete |
-| "did these results originate here / is this copy richer?" | `vekn_push.py:429-438`, `vekn_tournament_sync.py:411-417` and `:492`, `migrate_from_archon.py:1548-1563`, `dedup_tournaments.py:87` | `external_ids` — already correct, and the fixes in *Traps* are already keyed that way |
-| **"how big was the field?"** | `ratings.rs:73` returning 0 for a roster-less row | **nothing today — this is the gap** |
-
-For the first group an enum changes `if rounds.is_empty()` into
-`if results != Native`: identical code, except the enum **can lie**.
-`rounds.is_empty()` is correct by construction; a persisted enum must be
-maintained through reopen, `RestoreRound`, an archon import onto an existing row,
-and `_adopt_same_event` overwriting a TWDA row with VEKN data. Six writers, and
-one forgotten transition makes every downstream guard silently wrong.
-
-**2. The field needs no backfill; the enum needs a risky one.**
-`reported_player_count: int = 0` means "no attestation, behave exactly as today"
-for all ~30k existing rows — no classification pass, no `explicit OR derived`
-transition scaffolding. The enum requires retroactively classifying every
-finished row, where a misclassification silently moves ratings.
-
-**3. It must not touch the state machine.** `state` is in
-`_TOURNAMENT_PUBLIC_FIELDS` (`access_levels.py:159`), so adding an enum value to
-a synced field is a **breaking change for offline-first clients**: a PWA running
-last week's bundle receives the new value over SSE, writes it to IndexedDB, and
-falls through every `state === "Finished"` branch in `rankedStatus`, tab
-derivation, the list and the calendar — silently. The general rule is recorded in
-`wiki/sync.md#frontend-storage`.
-
-## The shape
-
-```python
-# models.py Tournament
-reported_player_count: int = 0
-```
-
-*Externally attested field size, for a row that carries no evidence of one. 0 = no
-attestation, derive as today.*
-
-**Stamped only where `players_with_rounds(t) == 0`** — no rounds, and no standings
-row carrying a score. Owner, 2026-08-16: *"we never stamp the field if we have
-rounds or standings that give this information."* That is one predicate doing
-three jobs: it decides whether the field may be written, it is the `"no_results"`
-eligibility guard below, and it is the gate on `SetArchivalResults`. The plan's
-earlier guard for that event was `state == Finished && rounds.is_empty()`, which
-would have let an IC overwrite a rounds-less row carrying real scored standings —
-exactly the shape all 3627 legacy imports have.
-
-It follows that the field is only ever *read* on a row where nothing else answers
-— `attested_player_count` reaches its last branch only when both rounds and
-standings are empty, which is the same condition that permits the write.
-
-It covers the enum's whole job: has-round-detail stays `rounds.is_empty()`;
-is-archival for the UI is `state === "Finished" && !rounds?.length`, or the
-`external_ids['twda']` badge in Phase 4.3.
-
-**Per producer: archon ETL round-less → the old count; TWDA → `players_count`;
-VEKN sync → nothing; native → 0.** Owner, 2026-08-16: *"The VEKN record is higher
-on the trust scale. TWDA is only when record does not have the info."* An earlier
-draft of this plan had the VEKN sync stamp `len(data["players"])`, on the grounds
-that it silently drops players whose VEKN id we do not hold
-(`vekn_tournament_sync.py:222-224`) and so its own count is the truer field size.
-That is out, permanently — not deferred. It is the only way this field could ever
-move a live rating, since the count feeds `compute_rating_points`' coefficient
-over a rolling 18-month window and every partial-roster import inside it would
-lift its winner and runner-up. The archival rows it *is* stamped on are decades
-outside that window and rounds-less besides, so they cannot. See
-[vekn](../wiki/vekn.md#inbound).
-
-**Name it `reported_player_count`, never `player_count`.** `engine/src/league.rs:53`
-already reads `tournament["player_count"]` from a caller-*synthesized* summary
-(built at `leagues/[uid]/+page.svelte:177`); a real model field of that name would
-silently satisfy that read with different semantics.
-
-**Projection: public**, alongside `open_rounds` (`access_levels.py:172`) and for
-the same reason — `rankedStatus` reads it and must not lie to anonymous viewers.
-
-## The trap this replaces (and the bug in the first draft of this plan)
-
-The earlier version of this plan said "fix `players_with_rounds` to fall back to
-a stored count" **and** "the row is floor-ineligible for ratings, so zeros are
-harmless". Those contradict each other, and the first one is actively dangerous.
-Walk it: `ranking_eligibility` (`engine/src/ratings.rs:53-68`) tests
-`open_rounds` → `players_with_rounds < 8` → `has_final`. With a naive fallback a
-TWDA row scores count=20 and passes `has_final` (a non-empty `winner` already
-implies one, `ratings.rs:63`) → **`eligible`**. It then enters the eligible set at
-`ratings.py:252`, its winner gets a `TournamentRatingEntry` with vp=0/gw=0, and
-`tournament-utils.ts:349` badges ~2300 archival stubs as **Ranked**. That is
-silent corruption of the international ranking, shipped by a change described as
-making the badge honest.
-
-**Two functions, not one:**
-
-```rust
-fn players_with_rounds(t) -> usize            // unchanged: eligibility + prelim scoring
-pub fn attested_player_count(t) -> usize {    // new: floors that measure event SIZE
-    if !t["rounds"].is_empty() { return players_with_rounds(t); }
-    if !t["standings"].is_empty() { return t["standings"].len(); }
-    t["reported_player_count"]
-}
-```
-
-**A precedence, not a maximum** — the same trust order as everywhere else in this
-plan: our own play data, then the VEKN record's result sheet, then an external
-attestation, and each is consulted only when the one above it is absent. Written
-as a `max()` it invites the reading that the terms compete and might disagree.
-They cannot: whichever one answers, the others are empty by construction.
-
-**The middle term is where the care is, and it is measured.** Owner, 2026-08-16:
-*"A score of zero is fine. The point is: if we have standings from VEKN, we don't
-touch the number of players. The number of players who played are the ones listed
-in the vekn record."* So a rounds-less row takes the standings **length** —
-`players_with_rounds`' scored-standings filter is never consulted for size at all.
-That filter is right where it lives, asking whether anyone actually played, and
-would be wrong here: measured on prod 2026-08-16, **580 pre-2014 events have a
-roster of 10 or more but fewer than 10 scorers**, so a floor reading the filtered
-count would silently stop counting their wins — 16% of the historic corpus. 2080
-clear the floor on scorers, 2660 on standings length, and **zero** rows are left
-with a 10+ roster and a shorter standings list.
-
-plus an explicit guard at the top of `ranking_eligibility`: **no rounds and no
-scored standings → `"no_results"`**. Then the HoF's 10-floor consumes
-`attested_player_count`, ratings keep `players_with_rounds`, and `rankedStatus`
-correctly reads Unranked for an archival stub. The "zeros are harmless" claim in
-Phase 2.3 is true *because of* that guard, not automatically — do not remove it.
-
-**The HoF floor and the TWDA floor then use different counters.** The rule above
-says the HoF uses "the TWDA floor (`TWDA_MIN_PLAYERS`)" — that means the
-**constant**, not the function: `_played_player_count`
-(`routes/tournaments.py:369`) is rounds-only *and* subtracts `non_competing`
-proxies, so wiring it in would return 0 for every archival row. Share the
-constant, never the function.
-
-## Four implementations of the count rule — the cleanup this ticket earns
-
-Beyond the Rust/Python twin there are two more, with a *third* definition:
-
-- `routes/tournaments.py:369` `_played_player_count` — rounds-only, minus proxies
-- `frontend/src/lib/tournament-utils.ts:311-329` `playedPlayerUids` /
-  `seatedPlayerCount` — and this one feeds **client-side league standings**
-  (`leagues/[uid]/+page.svelte:170-200`), so league RTP depends on a TS
-  reimplementation of a Rust rule
-- `routes/tournaments.py:1989` uses bare `len(tournament.players)` as
-  `player_count` in the archondata/report payload — a fifth reading, wrong for
-  every import
-
-Expose `attested_player_count(t_json) -> i32` over PyO3 + WASM in
-`engine/src/lib.rs` and delete the arithmetic in `ratings.py:75` and
-`tournament-utils.ts:328`, keeping the set-returning helpers (enumeration, not
-rule). Leave `_played_player_count` but comment the deliberate divergence. The
-`player_count` name-collision hazard is in `wiki/hazards.md`.
-
-## The in-app correction path
-
-**An engine event, not a backend route, and IC-only.** The reason is not offline
-support — nobody corrects a 2007 record in a basement — but that a backend route
-would be the **fourth** non-engine writer of `winner`/`players`/`standings`, and
-unlike the three batch importers it is interactive and repeatable. Batch ETL
-bypassing the engine is a defensible one-off; a user-facing edit form doing it is
-business logic creeping into Python. There is already an invariant a third writer
-must not re-break (the winner-must-have-a-`Player`-row rule in *Traps*, whose
-violation prints a raw UUID); in the engine it is enforced once.
-
-`SetArchivalResults`:
-
-- Payload `{winner, players: [uid], reported_player_count}`. **Deliberately not
-  `standings`** — they are contractually prelim-only and we have no prelim data;
-  keep the zeros.
-- Guard: reject unless `state == Finished && players_with_rounds(t) == 0`. A
-  *data-shape* gate, not a mode flag, and it must be the full predicate rather
-  than `rounds.is_empty()` — all 3627 legacy imports are rounds-less while
-  carrying real scored standings, and the weaker gate would let an IC overwrite
-  their results.
-- Guard: `reported_player_count >= len(players)`; auto-materialise the winner's
-  `Player{state: Finished, finalist: true}` and matching `Standing`.
-- New explicit `EngineError` variants per the error-codes contract.
-- **Authz: IC only**, predicate in `engine/src/permissions.rs` beside
-  `can_delete_sanction`. Not organizer — TWDA reconstructions have empty
-  `organizers_uids`, and for VEKN imports the organizer is whatever upstream
-  claimed. VEKN 8.6 invalidation authority is IC's anyway.
-- **Refuse rows carrying `external_ids['vekn']` while the VEKN sync is live.**
-  `vekn_tournament_sync.py:492`'s full-rebuild branch fires whenever
-  `not existing.rounds and tournament.players`, so an IC correction to a
-  vekn-linked round-less row is wiped on the next nightly run, silently and
-  permanently. One line; lift it after `#579`. (The alternative — a
-  `results_corrected_at` marker the sync respects — is a second field for a
-  capability that expires with `#579`.)
-- Check that an archival row cannot be taken offline
-  (`permissions.rs:816 can_take_tournament_offline`) — pointless and a
-  lock-orphan risk.
-
-Bonus of this shape: the `_adopt_same_event` fix in *Traps* gets simpler and
-safer — adopting a TWDA row and overwriting it with VEKN data needs no mode flip,
-because `rounds` becomes non-empty (or stays empty with a real roster) and every
-derivation self-corrects.
-
-## Rating coefficient — safe, because of where the field is never stamped
-
-The board line requires the attested count to feed the rating coefficient, and it
-can: `compute_rating_points` takes `player_count` and builds
-`ln(pc²)/ln(15) − 1 + rank_bonus`, applied only where the finalist bonus is
-non-zero. Nothing published moves, for two independent reasons. The rows carrying
-the field are 1997–2013 archival reconstructions, and the window is a rolling 18
-months (`ratings.py:35`, applied as a cutoff on the query at `:188`) — they are
-decades outside it. They are also rounds-less, so `ranking_eligibility`'s
-8-player floor rejects them before the coefficient is reached.
-
-**Both reasons rest on the VEKN sync never stamping the field.** That is the rule
-above, and it is what keeps this section true; wiring the coefficient while
-stamping live imports is the combination that would visibly reshuffle rankings.
-Note also that `TournamentRatingEntry.player_count` (`models.py:201`) is embedded
-in every entry, so a changed count re-saves and re-broadcasts every affected
-`User` — which is a second reason not to restamp a live corpus.
-
-Verified unmoved by the field: `UNPUSHED_RESULTS_QUERY` (`vekn_push.py:429`)
-stays rounds-keyed, dedup `richness` stays play-data-keyed, and league standings
-read a caller-synthesized summary rather than this field.
+- **There is no historic backfill.** All 3627 pre-2014 live tournaments are
+  rounds-less, but every one carries scored standings, so `players_with_rounds`
+  already returns a real number for the whole corpus. Only the ~1132 rows this
+  epic creates need the field.
+- **The size counter must not use the scored filter.** 580 pre-2014 events have a
+  roster of 10 or more but fewer than 10 scorers; a floor reading the filtered
+  count would stop counting their wins — 16% of the historic corpus. On standings
+  length, 2660 clear the floor and zero rows are left short.

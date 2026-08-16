@@ -506,6 +506,10 @@ class Tournament(TournamentConfig, kw_only=True):
     winner: str = ""
     # engine-computed or VEKN-sync-populated; not cleared when rounds are empty.
     standings: list[Standing] = msgspec.field(default_factory=list)
+    # Externally attested field size for a row that carries no roster of its own.
+    # 0 = no attestation, derive as before. Never `player_count`: league scoring
+    # already reads that key off a synthesized summary object.
+    reported_player_count: int = 0
     raffles: list[RaffleDraw] = msgspec.field(default_factory=list)
     # organizer-entered via ReportPromos; server never writes this — the offline
     # device is authoritative on go-online.

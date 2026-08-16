@@ -29,7 +29,17 @@ server (PyO3) behave identically.
 **Ranking eligibility** — the engine's `ranking_eligibility` is the single
 predicate behind the rating inclusion filter, the ranked/unranked badge and the
 RtP column: at least 8 players who played **and** a played final, never for
-open-rounds or self-organized events.
+open-rounds or self-organized events, and never for a row with no play data at all
+(`no_results` — an archival record carries a winner but nothing that was played).
+
+**Two counts, two questions.** `players_with_rounds` answers *who played* — seats
+across rounds and finals, or, on a rounds-less import, standings rows carrying a
+score. It decides eligibility and who earns a rating entry.
+`attested_player_count` answers *how big the field was*, for the rating
+coefficient and the win floors, and takes the whole result sheet including seats
+that scored nothing. It is a precedence, never a maximum: our own play data, then
+`reported_player_count`, then the standings length. Both are exported over PyO3
+and WASM; nothing re-derives them.
 
 `UpdateConfig` is available in **any** state — mid-event typo fixes matter — with
 targeted locks instead of a state gate: `open_rounds`/`max_rounds` lock once rounds
@@ -317,6 +327,16 @@ are typically entered post-finish and re-entered on correction.
 
 **Config** — `UpdateConfig`.
 
+**Archival correction** — `SetArchivalResults` (`{winner, players, reported_player_count}`),
+IC only. Replaces the roster and the winner wholesale on a Finished event we hold
+no play data for, and stamps the attested field size. The gate is the data shape,
+not a stored mode: it refuses whenever `players_with_rounds` is non-zero, so it can
+never overwrite a real result sheet. It also refuses a row carrying a vekn.net id,
+whose nightly sync would rebuild the row and silently drop the correction —
+lift that once the calendar sync retires ([vekn-decommission](vekn-decommission.md)).
+No `standings` payload: they are prelim-only by contract and an archival record has
+no prelim, so the rows stay zeroed.
+
 ### Who may do what
 
 | Action | Who |
@@ -326,6 +346,7 @@ are typically entered post-finish and re-entered on correction.
 | Self-organize a round | registered players, open rounds with `self_organized_rounds`, Waiting/Playing, no finals |
 | Set score | players at the table during Playing; organizers whenever rounds exist |
 | Deck upload | players for their own deck, organizers for any |
+| Correct an archival record | IC |
 | Everything else | organizers |
 
 Enforcement is single-sourced in `engine/src/permissions.rs` and applied at both
@@ -500,6 +521,10 @@ The non-obvious structure:
 - `Score = {gw, vp, tp}` per seat; only `vp` is submitted.
 - `finals.seed_order` holds player **user_uids** — easily missed in any per-player
   UID remap.
+- `reported_player_count` — externally attested field size, `0` meaning no
+  attestation. Written only where nothing else answers, and read only there too,
+  so it can never contradict a roster we hold. Never named `player_count`: that
+  key is already taken ([hazards](hazards.md)).
 
 ## Where the code lives
 

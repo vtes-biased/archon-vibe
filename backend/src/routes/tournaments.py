@@ -1344,6 +1344,9 @@ class TournamentActionRequest(BaseModel):
     exclude_drawn: bool | None = None
     count: int | None = None
     seed: int | None = None
+    winner: str | None = None  # For SetArchivalResults
+    players: list[str] | None = None  # For SetArchivalResults: the known roster
+    reported_player_count: int | None = None  # For SetArchivalResults
 
 
 @router.post("/{uid}/action")
@@ -1406,6 +1409,12 @@ async def tournament_action(
         event_data["count"] = request.count
     if request.seed is not None:
         event_data["seed"] = request.seed
+    if request.winner is not None:
+        event_data["winner"] = request.winner
+    if request.players is not None:
+        event_data["players"] = request.players
+    if request.reported_player_count is not None:
+        event_data["reported_player_count"] = request.reported_player_count
 
     # SELECT FOR UPDATE: serialize concurrent writes to this tournament
     async with tournament_transaction(uid) as (tournament, tx_conn):

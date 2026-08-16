@@ -24,7 +24,7 @@ from .models import (
     TournamentState,
     User,
 )
-from .ratings import _compute_entry, _final_positions, _player_count
+from .ratings import _compute_entry, _engine, _final_positions
 from .vekn_api import VEKNAPIClient, VEKNAPIConnectionError, VEKNAPIError
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ def generate_archondata(
     # the SA penalty reaches the pushed rating (standing.vp is already SA-adjusted).
     t_json = msgspec.json.encode(tournament).decode()
     sanctions_json = msgspec.json.encode(sanctions or []).decode()
-    player_count = _player_count(tournament)
+    player_count = _engine.attested_player_count(t_json)
     positions = _final_positions(tournament)
 
     parts: list[str] = []

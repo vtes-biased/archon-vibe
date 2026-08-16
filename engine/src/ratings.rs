@@ -35,14 +35,21 @@ pub fn compute_rating_points(
 /// never for open-rounds/self-organized. Single source — ratings.py and the frontend badge read this, don't re-derive.
 ///
 /// Returns "eligible" or the blocking reason, first match wins:
-/// "open_rounds" | "few_players" | "no_final".
+/// "open_rounds" | "no_results" | "few_players" | "no_final".
 pub fn ranking_eligibility(t: &json::JsonValue) -> &'static str {
     if t["open_rounds"].as_bool().unwrap_or(false)
         || t["self_organized_rounds"].as_bool().unwrap_or(false)
     {
         return "open_rounds";
     }
-    if players_with_rounds(t) < 8 {
+    // An archival row carries a winner and an attested size but no play data at
+    // all. Without this it reads "few_players" — and any later widening of the
+    // count would silently let it rate off nothing.
+    let played = players_with_rounds(t);
+    if played == 0 {
+        return "no_results";
+    }
+    if played < 8 {
         return "few_players";
     }
     // A reconstructed VEKN import carries a winner but no finals object.
@@ -55,7 +62,7 @@ pub fn ranking_eligibility(t: &json::JsonValue) -> &'static str {
 
 /// Players with >= 1 round played: distinct seats across rounds + finals, or
 /// (rounds-less VEKN import) standings rows carrying any score. DQ'd players count (A.2).
-fn players_with_rounds(t: &json::JsonValue) -> usize {
+pub(crate) fn players_with_rounds(t: &json::JsonValue) -> usize {
     let mut played = std::collections::HashSet::new();
     if !t["rounds"].is_empty() {
         for round in t["rounds"].members() {
@@ -84,6 +91,26 @@ fn players_with_rounds(t: &json::JsonValue) -> usize {
                 || s["tp"].as_f64().unwrap_or(0.0) != 0.0
         })
         .count()
+}
+
+/// How big the field was — for the rating coefficient and the win floors. Not
+/// "who played" (`players_with_rounds`): a seat that scored nothing still made
+/// the event that size.
+///
+/// A precedence, never a maximum: our own play data, then an attestation, then
+/// the imported result sheet. The attestation is only ever written where
+/// `players_with_rounds` is 0, so it can never contradict a VEKN record — and it
+/// has to outrank the sheet, because a TWDA reconstruction's standings hold the
+/// winner alone.
+pub fn attested_player_count(t: &json::JsonValue) -> usize {
+    if !t["rounds"].is_empty() {
+        return players_with_rounds(t);
+    }
+    let reported = t["reported_player_count"].as_usize().unwrap_or(0);
+    if reported > 0 {
+        return reported;
+    }
+    t["standings"].len()
 }
 
 /// Returns one of: "constructed_online", "constructed_offline", "limited_online", "limited_offline"
@@ -174,6 +201,51 @@ mod tests {
             }).collect::<Vec<_>>(),
         };
         assert_eq!(ranking_eligibility(&import), "eligible");
+
+        // Archival stub: a winner and an attested size, no play data. Must never
+        // reach the rating set, whatever the attested count says.
+        let archival = json::object! {
+            "rounds" => json::array![],
+            "finals" => json::JsonValue::Null,
+            "winner" => "a",
+            "reported_player_count" => 42,
+            "standings" => json::array![json::object! {
+                "user_uid" => "a", "gw" => 0, "vp" => 0, "tp" => 0, "finalist" => true,
+            }],
+        };
+        assert_eq!(ranking_eligibility(&archival), "no_results");
+    }
+
+    #[test]
+    fn test_attested_player_count() {
+        // Rounds present: seats win, the attestation is ignored.
+        let played = json::object! {
+            "rounds" => json::array![json::array![json::object! {
+                "seating" => json::array![
+                    json::object! { "player_uid" => "a" },
+                    json::object! { "player_uid" => "b" },
+                ],
+            }]],
+            "reported_player_count" => 42,
+        };
+        assert_eq!(attested_player_count(&played), 2);
+
+        // Rounds-less import: the whole result sheet, scorers and non-scorers alike.
+        let import = json::object! {
+            "rounds" => json::array![],
+            "standings" => (0..12)
+                .map(|i| json::object! { "user_uid" => format!("p{i}"), "vp" => if i < 9 { 1 } else { 0 } })
+                .collect::<Vec<_>>(),
+        };
+        assert_eq!(attested_player_count(&import), 12);
+
+        // Archival reconstruction: the attestation, not its one synthetic row.
+        let archival = json::object! {
+            "rounds" => json::array![],
+            "reported_player_count" => 42,
+            "standings" => json::array![json::object! { "user_uid" => "a" }],
+        };
+        assert_eq!(attested_player_count(&archival), 42);
     }
 
     #[test]

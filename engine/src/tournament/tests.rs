@@ -3444,3 +3444,64 @@ fn redirected_vp_reads_as_blocked_not_unfinished() {
         Some(VpError::ExcessiveTotal)
     );
 }
+
+/// The gate is the data shape, not the mode: every legacy import is rounds-less
+/// while carrying a real scored result sheet, and a correction must never
+/// overwrite one.
+#[test]
+fn test_set_archival_results() {
+    let mut tournament = make_tournament();
+    tournament["state"] = "Finished".into();
+    tournament["standings"] = json::array![];
+    let ic = json::object! { uid: "ic-1", roles: ["IC"], is_organizer: true };
+    let event = json::object! {
+        type: "SetArchivalResults",
+        winner: "player-1",
+        players: ["player-2", "player-1"],
+        reported_player_count: 42,
+    };
+
+    assert_eq!(
+        run_event(&tournament, &event, &make_organizer()).unwrap_err(),
+        EngineError::ArchivalResultsForbidden
+    );
+
+    let updated = json::parse(&run_event(&tournament, &event, &ic).unwrap()).unwrap();
+    assert_eq!(updated["winner"], "player-1");
+    assert_eq!(updated["reported_player_count"], 42);
+    // Winner first, and the only finalist.
+    assert_eq!(updated["standings"][0]["user_uid"], "player-1");
+    assert_eq!(updated["standings"][0]["finalist"], true);
+    assert_eq!(updated["standings"][1]["finalist"], false);
+    assert_eq!(updated["players"].len(), 2);
+    assert_eq!(crate::ratings::attested_player_count(&updated), 42);
+    assert_eq!(crate::ratings::ranking_eligibility(&updated), "no_results");
+
+    let mut scored = tournament.clone();
+    scored["standings"] = json::array![json::object! { user_uid: "someone", vp: 3.0 }];
+    assert_eq!(
+        run_event(&scored, &event, &ic).unwrap_err(),
+        EngineError::ArchivalResultsHasPlay
+    );
+
+    let mut linked = tournament.clone();
+    linked["external_ids"] = json::object! { vekn: "12794" };
+    assert_eq!(
+        run_event(&linked, &event, &ic).unwrap_err(),
+        EngineError::ArchivalResultsVeknLinked
+    );
+
+    let short = json::object! {
+        type: "SetArchivalResults",
+        winner: "player-1",
+        players: ["player-2", "player-1"],
+        reported_player_count: 1,
+    };
+    assert_eq!(
+        run_event(&tournament, &short, &ic).unwrap_err(),
+        EngineError::ArchivalResultsCountBelowRoster {
+            reported: 1,
+            listed: 2
+        }
+    );
+}

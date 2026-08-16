@@ -16,6 +16,7 @@
       case "few_players": return m.tournament_unranked_reason_few_players();
       case "no_final": return m.tournament_unranked_reason_no_final();
       case "open_rounds": return m.tournament_unranked_reason_open_rounds();
+      case "no_results": return m.tournament_unranked_reason_no_results();
     }
   });
   const hint = $derived(status?.ranked ? m.tournament_ranked_hint() : reasonLabel);

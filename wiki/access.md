@@ -24,7 +24,7 @@ omitted from the rows below.
 |---|---|
 | `sponsor_member`, `create_tournament` | NC, Prince — global (a visiting official can sponsor abroad) |
 | `edit_member_profile`, `manage_vekn`, `mark_deceased` | NC — own country |
-| `merge_accounts`, `delete_member`, `force_unlock_tournament`, `manage_promos`, `run_admin_sync`, `promote_link_global` | nobody |
+| `merge_accounts`, `delete_member`, `force_unlock_tournament`, `manage_promos`, `run_admin_sync`, `promote_link_global`, `set_archival_results` | nobody |
 | `moderate_link`, `promote_link_national` | NC — own country |
 | `organize_tournament` | NC — own country; explicit organizer |
 | `manage_leagues` | NC — global |
@@ -36,6 +36,10 @@ omitted from the rows below.
 | `delete_organizer_sanction` | tournament organizer, while the tournament is unfinished |
 | `record_promo_intake`, `view_full_promo_ledger` | NC — global (the inventory chain is not country-scoped) |
 | `manage_oauth_clients` | DEV — global |
+
+`set_archival_results` is IC-only rather than organizer, because the rows it
+applies to have no real organizer: a TWDA reconstruction has none at all, and an
+import's is whatever upstream claimed. Invalidation authority is IC's anyway (8.6).
 
 Two rows carry a security rationale. `merge_accounts` is IC-only because a merge
 **unions both accounts' roles** — anyone who could merge could land a role by

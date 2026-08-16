@@ -10,9 +10,9 @@
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
   import { getUser } from "$lib/db";
   import type { League, Tournament, LeagueStandingsMode } from "$lib/types";
-  import { canEditLeague, canLinkTournamentToLeague, computeLeagueStandings, isOrganizer as engineIsOrganizer } from "$lib/engine";
+  import { attestedPlayerCount, canEditLeague, canLinkTournamentToLeague, computeLeagueStandings, isOrganizer as engineIsOrganizer } from "$lib/engine";
   import { tournamentAction } from "$lib/tournament-actions";
-  import { translateTournamentState, getStateTone, seatedPlayerCount } from "$lib/tournament-utils";
+  import { translateTournamentState, getStateTone } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
@@ -168,7 +168,7 @@
           uid: t.uid,
           rank: t.rank || "",
           // Match ratings.py: players seated in ≥1 round (not all registered incl. no-shows).
-          player_count: seatedPlayerCount(t),
+          player_count: attestedPlayerCount(t),
           winner: t.winner || "",
           standings: (t.standings || []).map(s => ({
             user_uid: s.user_uid,

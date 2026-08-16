@@ -1,6 +1,6 @@
 import type { Sanction, Tournament, TournamentState, TournamentRank } from "./types";
 import type { BadgeTone } from "./components/Badge.svelte";
-import { computeFinalStandings, computeRatingPoints, computeRatingVpGw, rankingEligibility } from "./engine";
+import { attestedPlayerCount, computeFinalStandings, computeRatingPoints, computeRatingVpGw, rankingEligibility } from "./engine";
 import { formatScore } from "./utils";
 import * as m from './paraglide/messages.js';
 
@@ -292,13 +292,9 @@ export function playedPlayerUids(tournament: Tournament): Set<string> {
   );
 }
 
-export function seatedPlayerCount(tournament: Tournament): number {
-  return playedPlayerUids(tournament).size;
-}
-
 export type RankedStatus =
   | { ranked: true }
-  | { ranked: false; reason: "few_players" | "no_final" | "open_rounds" }
+  | { ranked: false; reason: "few_players" | "no_final" | "open_rounds" | "no_results" }
   | null;
 
 /** VEKN rules 3.1/3.1.6: ranked needs ≥8 players AND a played final, decided by the engine's
@@ -311,7 +307,7 @@ export function rankedStatus(t: Tournament): RankedStatus {
     const verdict = rankingEligibility(t);
     if (verdict === null) return null;
     if (verdict === "eligible") return { ranked: true };
-    return { ranked: false, reason: verdict as "few_players" | "no_final" | "open_rounds" };
+    return { ranked: false, reason: verdict as "few_players" | "no_final" | "open_rounds" | "no_results" };
   }
   if (t.state === "Waiting" || t.state === "Playing") {
     if (!t.players) return null;
@@ -325,7 +321,7 @@ export function rankedStatus(t: Tournament): RankedStatus {
  *  the whole tournament plus its sanctions, not standings-row fields. */
 export interface RatingContext {
   played: Set<string>;
-  playedCount: number;
+  fieldSize: number;
   tournamentJson: string;
   sanctionsJson: string;
   eligible: boolean;
@@ -335,7 +331,7 @@ export function ratingContext(tournament: Tournament, sanctions: Sanction[] | un
   const played = playedPlayerUids(tournament);
   return {
     played,
-    playedCount: played.size,
+    fieldSize: attestedPlayerCount(tournament),
     tournamentJson: JSON.stringify(tournament),
     sanctionsJson: JSON.stringify(sanctions ?? []),
     eligible: rankingEligibility(tournament) === "eligible",
@@ -356,7 +352,7 @@ export function getRatingPts(
   const finalistPos = entry.user_uid === tournament.winner ? 1
     : (tournament.finals?.seating.some((s) => s.player_uid === entry.user_uid) ? 2 : 0);
   // Engine returns gw as f64; the backend stores int(gw) before scoring it.
-  return computeRatingPoints(vpGw[0], Math.trunc(vpGw[1]), finalistPos, ctx.playedCount, tournament.rank);
+  return computeRatingPoints(vpGw[0], Math.trunc(vpGw[1]), finalistPos, ctx.fieldSize, tournament.rank);
 }
 
 export function translateStandingsMode(mode: string | undefined): string {

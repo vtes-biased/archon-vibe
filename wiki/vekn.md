@@ -249,14 +249,19 @@ attribution is intentional — the TWDA is the public win registry.
 
 **The VEKN record outranks the archive.** Where both describe the same event, the
 VEKN result stands and the TWDA fills only what the record does not carry. The
-concrete consequence is that `reported_player_count` is stamped **only on rows
-whose roster is genuinely absent or unattested** — the archival reconstructions —
-and **never on a VEKN import**, even though the sync drops players whose VEKN id
-we do not hold and its `len(data["players"])` would be a truer field size than the
-roster that survived. Stamping those would move a live rating: the count feeds
-`compute_rating_points`' coefficient, the window is a rolling 18 months, and the
-winner and runner-up of every partial-roster import inside it would gain points.
-The archival rows cannot, being decades outside that window.
+concrete consequence is that `reported_player_count` is stamped **only where
+`players_with_rounds` is zero** — no rounds and no standings row carrying a score,
+which is the archival reconstructions and nothing else — and **never on a VEKN
+import**, even though the sync drops players whose VEKN id we do not hold and its
+`len(data["players"])` would be a truer field size than the roster that survived.
+Stamping those would move a live rating: the count feeds `compute_rating_points`'
+coefficient, the window is a rolling 18 months, and the winner and runner-up of
+every partial-roster import inside it would gain points. The archival rows cannot,
+being decades outside that window.
+
+The same predicate gates the write and the read — `attested_player_count` reaches
+the field only where nothing else answers — so the attestation can never contradict
+a record we hold.
 
 `twda_import.py` pulls winner decklists from
 `static.krcg.org/data/twda.json` and creates decks for matched tournaments, running

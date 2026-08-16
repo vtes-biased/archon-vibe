@@ -301,6 +301,23 @@ impl TournamentEvent {
                 }
                 Ok(Self::UpdateConfig { config })
             }
+            "SetArchivalResults" => {
+                let players: Vec<String> = value["players"]
+                    .members()
+                    .filter_map(|p| p.as_str().map(String::from))
+                    .filter(|p| !p.is_empty())
+                    .collect();
+                Ok(Self::SetArchivalResults {
+                    winner: value["winner"]
+                        .as_str()
+                        .ok_or("winner required")?
+                        .to_string(),
+                    players,
+                    reported_player_count: value["reported_player_count"]
+                        .as_usize()
+                        .ok_or("reported_player_count required")?,
+                })
+            }
             _ => Err(EngineError::internal(format!(
                 "Unknown event type: {}",
                 event_type

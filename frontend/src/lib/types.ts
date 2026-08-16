@@ -353,6 +353,8 @@ export interface Tournament extends BaseObject {
   finals?: FinalsTable | null;
   winner?: string;
   standings?: Standing[];
+  // Externally attested field size for a row with no roster of its own; 0 = none.
+  reported_player_count?: number;
   raffles?: RaffleDraw[];
   // Promo distribution report (organizer-entered, replace-whole-list, member-visible)
   promos_distributed?: PromoDistribution[];

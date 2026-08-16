@@ -172,7 +172,8 @@ export type TournamentEventType =
   | 'ReportPromos'
   | 'RaffleUndo'
   | 'RaffleClear'
-  | 'UpdateConfig';
+  | 'UpdateConfig'
+  | 'SetArchivalResults';
 
 export interface TournamentEvent {
   type: TournamentEventType;
@@ -206,6 +207,9 @@ export interface TournamentEvent {
   exclude_drawn?: boolean;
   count?: number;
   seed?: number;
+  winner?: string; // SetArchivalResults
+  players?: string[]; // SetArchivalResults: the known roster
+  reported_player_count?: number; // SetArchivalResults
 }
 
 export interface ActorContext {
@@ -527,6 +531,10 @@ export function isOrganizer(
   return checkPermission('organize_tournament', user, { resource: tournament }).allowed;
 }
 
+export function canSetArchivalResults(user: UserContext | null): PermissionResult {
+  return checkPermission('set_archival_results', user);
+}
+
 export function canEditLeague(
   user: UserContext | null,
   league: Resource
@@ -583,6 +591,14 @@ export function rankingEligibility(tournament: unknown): string | null {
   const engine = getEngineReactive();
   if (!engine) return null;
   return engine.rankingEligibility(JSON.stringify(tournament));
+}
+
+/** How big the field was, for the coefficient and the win floors — distinct from
+ * the played-player set the caller enumerates for membership. 0 until WASM loads. */
+export function attestedPlayerCount(tournament: unknown): number {
+  const engine = getEngineReactive();
+  if (!engine) return 0;
+  return engine.attestedPlayerCount(JSON.stringify(tournament));
 }
 
 export async function computeLeagueStandings(

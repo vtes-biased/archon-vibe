@@ -109,6 +109,11 @@ const ENGINE_MESSAGES: Record<string, (p: Record<string, string>) => string> = {
   'tournament.self_organize_not_open_rounds': () => m.err_tournament_self_organize_not_open_rounds(),
   'tournament.self_organize_not_seated': () => m.err_tournament_self_organize_not_seated(),
   'tournament.self_organize_ineligible': (p) => m.err_tournament_self_organize_ineligible({ player: p.player ?? '' }),
+  'tournament.archival_results_forbidden': () => m.err_tournament_archival_results_forbidden(),
+  'tournament.archival_results_has_play': () => m.err_tournament_archival_results_has_play(),
+  'tournament.archival_results_vekn_linked': () => m.err_tournament_archival_results_vekn_linked(),
+  'tournament.archival_results_winner_not_listed': () => m.err_tournament_archival_results_winner_not_listed(),
+  'tournament.archival_results_count_below_roster': (p) => m.err_tournament_archival_results_count_below_roster({ reported: p.reported ?? '', listed: p.listed ?? '' }),
   // Backend-origin (not an engine/error.rs code): create_user's dup-email 409.
   'user.email_exists': () => m.err_user_email_exists(),
   'deck.no_cards': () => m.err_deck_no_cards(),

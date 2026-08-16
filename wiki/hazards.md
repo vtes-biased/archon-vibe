@@ -150,27 +150,30 @@ anchor an SA — and its redirect can land later than the stored round.
 standings VP/GW; the global rating uses totals including finals. Verify the
 `points` field, not just the displayed GW/VP.
 
-**"How many players played" has four implementations**, and two definitions. The
-canonical one is `engine/src/ratings.rs` `players_with_rounds` — rounds and finals
-seats, falling back to standings rows carrying any score, DQ-inclusive per rules
-A.2. `backend/src/ratings.py` is a hand-written Python twin of it, feeding the
-rating computation and the VEKN push. `frontend/src/lib/tournament-utils.ts` is a
-TypeScript twin, consumed by the league page, which computes standings client-side
-and injects the count into the engine. But
-`backend/src/routes/tournaments.py` `_played_player_count`, which gates the TWDA
-floor, **differs by design**: seats only, with no standings fallback — so it returns
-0 for a rounds-less import — and it *subtracts* non-competing proxies.
+**"How many players" is two questions, and the wrong one is easy to reach for.**
+`players_with_rounds` answers *who played*; `attested_player_count` answers *how
+big the field was*. Both live in `engine/src/ratings.rs` and are exported over
+PyO3 and WASM — every count now comes from there, so a rule change lands once.
+What still has hand-written twins is the played-player **set**
+(`ratings.py` `_players_with_rounds`, `tournament-utils.ts` `playedPlayerUids`),
+because callers need the uids, not a number. Those are enumeration; the rule is
+not in them. `backend/src/routes/tournaments.py` `_played_player_count`, gating the
+TWDA floor, is the one deliberate divergence: seats only, no standings fallback —
+so 0 for a rounds-less import — and it *subtracts* non-competing proxies. Share
+the constant with it, never the function.
 
-Any change to the counting rule must land in all four, or they silently disagree.
-Between the TWDA gate and the rest, share the constant rather than the function.
-Prefer a single PyO3/WASM entry point that deletes the two twins over writing a
-fifth copy.
+`len(rounds) == 0` is not "no results", and never measures field size. Every
+pre-2014 import is rounds-less while carrying a full scored result sheet, so the
+rounds-less branch of `players_with_rounds` already returns a real number for the
+whole historic corpus. Measuring `len(rounds)` and reading it as a count has
+already produced one confidently wrong conclusion about the archive.
 
 **`player_count` is a taken name.** `engine/src/league.rs` reads
 `tournament["player_count"]` from a **caller-synthesized** summary object, not from
-the Tournament model. Adding a `player_count` field to `Tournament` would make real
-tournament JSON silently satisfy that read with different semantics — name any new
-count field something else.
+the Tournament model. A `player_count` field on `Tournament` would make real
+tournament JSON silently satisfy that read with different semantics — which is why
+the attested size is stored as `reported_player_count`. Name any further count
+field the same way.
 
 **Role writes have two out-of-band consumers** — the Discord Linked Roles push,
 which fires on any role delta with no periodic reconcile, and the resync

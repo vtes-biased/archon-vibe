@@ -170,7 +170,7 @@ rebuilds both targets; build one directly with `wasm-pack` or `maturin develop`
 | `tournament/standings.rs` | standings, rating VP/GW, final placement |
 | `tournament/sanctions.rs` | SA effective-round resolution (distinct from `sanctions.rs`) |
 | `deck.rs` | deck parse/validate, TWDA export |
-| `ratings.rs` | rating points, `ranking_eligibility` |
+| `ratings.rs` | rating points, `ranking_eligibility`, the two player counts |
 | `league.rs` | league standings (RTP/Score/GP) |
 | `cards.rs` | card database lookup and name normalization |
 | `error.rs` | the error taxonomy |

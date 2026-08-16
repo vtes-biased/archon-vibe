@@ -266,6 +266,20 @@ name synthesized from place and date — and must never be deleted.
 
 Found 2026-08-16 while deciding the Hall of Fame reconciliation queue.
 
+### Lift the vekn-linked refusal on archival correction
+
+**Deferred ask** — delete the `ArchivalResultsVeknLinked` guard in
+`engine/src/tournament/`. Done when an IC can correct a rounds-less row carrying
+`external_ids['vekn']` and the correction survives a full sync run.
+
+The guard exists only because `vekn_tournament_sync.py`'s full-rebuild branch fires
+whenever `not existing.rounds and tournament.players`, so a correction to such a
+row is wiped on the next nightly run — silently, and permanently. It is one refusal
+in one match arm, and it is what keeps the two disagreeing rows below parked. The
+alternative considered and rejected: a `results_corrected_at` marker the sync
+respects, which is a second persisted field for a capability that expires with this
+trigger.
+
 ### IC record curation — rows that disagree with the archive about who won
 
 **Deferred ask** — settle the winner on the two rows below and correct whichever
@@ -274,10 +288,10 @@ side is wrong. Done when each row's `winner` matches the record the IC accepts.
 Both came to us through their vekn event id, so the disagreement is between the
 vekn.net result and the winning deck the TWDA holds for the same event. One side
 is wrong and neither is ours to decide unilaterally. They wait on this section's
-trigger because the correction path (`SetArchivalResults`, in the Hall of Fame
-plan) deliberately refuses any row carrying `external_ids['vekn']` while the
-calendar sync is live — the sync's full-rebuild branch would wipe the correction
-on its next run.
+trigger because the correction path — the `SetArchivalResults` engine event
+([tournaments](tournaments.md#engine-event-catalog)) — deliberately refuses any row
+carrying `external_ids['vekn']` while the calendar sync is live: the sync's
+full-rebuild branch would wipe the correction on its next run.
 
 | uid | date | event | our winner | the archive's |
 |---|---|---|---|---|

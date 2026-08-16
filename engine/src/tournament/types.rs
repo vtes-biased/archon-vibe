@@ -225,6 +225,16 @@ pub enum TournamentEvent {
     UpdateConfig {
         config: JsonValue,
     },
+
+    /// IC correction of an event we hold no play data for. Replaces the roster
+    /// and the winner wholesale — on such a row there is nothing else to keep.
+    /// No `standings` payload: they are prelim-only by contract and an archival
+    /// record has no prelim, so the rows stay zeroed.
+    SetArchivalResults {
+        winner: String,
+        players: Vec<String>,
+        reported_player_count: usize,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -297,6 +307,20 @@ impl ActorContext {
             can_organize_league_uids,
             now,
         })
+    }
+
+    /// The permission-table view of this actor. Roles arrive as strings here;
+    /// unrecognised ones drop, same as `UserContext::from_json`.
+    pub fn user_context(&self) -> crate::permissions::UserContext {
+        crate::permissions::UserContext {
+            roles: self
+                .roles
+                .iter()
+                .filter_map(|r| crate::permissions::Role::from_str(r))
+                .collect(),
+            country: None,
+            vekn_id: None,
+        }
     }
 
     pub fn can_manage_tournaments(&self) -> bool {

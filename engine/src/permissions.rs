@@ -189,6 +189,7 @@ pub enum Capability {
     ViewFullPromoLedger,
     ManageOauthClients,
     RunAdminSync,
+    SetArchivalResults,
 }
 
 impl Capability {
@@ -507,6 +508,18 @@ pub const CAPABILITIES: &[Rule] = &[
         self_service: false,
         organizer: false,
         deny: "Only IC can trigger a sync",
+        deny_scope: None,
+    },
+    // Not the organizer: a reconstruction has none, and an import's organizer is
+    // whatever upstream claimed. Invalidation authority is IC's anyway (8.6).
+    Rule {
+        capability: Capability::SetArchivalResults,
+        name: "set_archival_results",
+        global: &[IC],
+        same_country: &[],
+        self_service: false,
+        organizer: false,
+        deny: "Only IC can correct an archival record",
         deny_scope: None,
     },
 ];
