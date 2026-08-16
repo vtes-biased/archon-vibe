@@ -246,23 +246,31 @@ Against the live corpus:
 | outcome | entries |
 |---|---|
 | attach — vekn id | 2177 |
-| attach — winner + date (name-free) | 1171 |
+| attach — winner + date (name-free) | 1177 |
 | attach — winner + date + player count | 28 |
 | attach — winner + date + event name | 11 |
 | attach — our own link | 3 |
-| **create — no candidate** | **1136** |
+| **create — no candidate** | **1130** |
 | **review — needed a human** | **12** |
 
-**The reconstruction is 1136 events, not the 2257 this plan sized it at.** The
+**The reconstruction is 1130 events, not the 2257 this plan sized it at.** The
 "mostly linking, not importing" claim below is confirmed and then some, and the
 review queue was twelve decisions rather than hundreds. The name-free tier measures
-**99.9% precise at 95.6% recall** against the linked entries as ground truth, and
+**99.9% precise at 95.8% recall** against the linked entries as ground truth, and
 both of its two remaining misses are artifacts rather than defects: one is scored
 against the `delete me` row (the tier is right and the ground truth is wrong), the
 other follows a TWDA date a month off its true one, which the vekn id fixes on the
 real run.
 
-Five design corrections the measurement forced, all already in the script:
+Six design corrections the measurement forced, all already in the script:
+
+- **Comparing names needs a real ASCII fold, not an NFD mark-drop.** ł does not
+  decompose, so `Paweł` normalised to `pawe` and never met the archive's `Pawel`.
+  Six Polish events were reconstructing as duplicates, `Polish NC 2009` and
+  `Polish ECQ 2011` among them — the cohort three of whose players are this
+  epic's done-condition. The fold now goes through `geonames.fold_ascii`, which
+  gained the engine's explicit map; recall rose 95.6% → 95.8% at unchanged
+  precision.
 
 - **The vekn event id is not proof of identity.** Entry `12797` names an id its
   submitter abandoned; ours holds a 0-player row called `delete me` while the real
@@ -467,38 +475,66 @@ Committing the mapping is fine under the no-PII rule: TWDA already publishes
 every winner name alongside its event, and our uids are meaningless outside the
 app.
 
-## Phase 1 — Winner identity (read-only, feeds the same decisions file)
+## Phase 1 — Winner identity — **bootstrap measured 2026-08-16, matching pending**
 
-The archive gives a name string and nothing else. 1552 distinct normalised
-names.
+The archive gives a name string and nothing else: 1549 distinct normalised
+winner names, 234 of them at >= 5 IRL entries.
 
-**The bootstrap is the key insight.** 812 of the 1552 names appear in at least
-one *linked* entry — an entry whose event we already hold with a resolved
-`winner` uid. For those, the name → member mapping can be **read straight off
-our own data**, with no name matching at all. That leaves **740 names needing
-true matching, of which only 61 are HoF-relevant** (>= 5 entries). The top of
-that list is recognisable veterans who stopped winning around 2013 — Erik
-Torstensson (35), John Bell (29), Robyn Tatu (21), Rob Treasure (18), James
-Messer (15).
+**Phase 0 shrank this phase by an order of magnitude.** The bootstrap reads the
+name → member mapping straight off our own data — every attached entry hands over
+the resolved `winner` uid of the tournament it attached to, with no name matching
+at all. Against the decided queue that is **1156 of the 1549 names**, leaving
+**393 needing true matching, of which only 8 are HoF-relevant**: Rob Treasure
+(18 IRL entries), Josh Duffin (10), David Quinonero Santiago, Sten During and
+John Newquist (7 each), Tomasz Kowalewski (6), Michael Courtois and Alex Ek (5).
+The plan sized this at 740 names and 61 HoF-relevant off the 2211 linked entries;
+the reconciliation's 3406 attaches absorbed the rest — Torstensson, Bell, Tatu
+and Messer, named here as the hard cases, are all bootstrapped now.
 
-So the review is tractable: a few dozen decisions that matter, not 1552.
+**And the mapping is only ever consulted for the reconstruction.** An attached
+entry's winner is the tournament's `winner` uid by construction; only the 1132
+`create` entries need a name resolved. 634 distinct winners among them, 241
+already bootstrapped, so **544 reconstruction entries across 393 names** are the
+actual work — and an unresolved one costs one archival row, not a HoF place,
+unless its name is one of the 8.
 
-1. Bootstrap the 812 from existing tournament winners. One name mapping to two
-   different uids is a genuine homonym — flag it, never merge.
-2. For the remaining 740, match the normalised name against `User.name`
+1. Bootstrap from the attached entries. One name mapping to two different uids is
+   a genuine homonym — flag it, never merge. **Measured: 3 of 1156**, each a lone
+   entry against a 3-to-31-entry majority, and only one of the three
+   (`Gines Quinonero`) is reached by any reconstruction entry at all. Two of the
+   three are not homonyms but *disagreements* — see below.
+2. For the remaining 393, match the normalised name against `User.name`
    (`vekn_sync.py:558` builds it as `"firstname lastname"`, the same shape as
-   the TWDA string), using the existing `_strip_diacritics` technique
-   (`geonames.py:102`). Require a **unique** hit.
+   the TWDA string), folding through `geonames.fold_ascii`. Require a **unique**
+   hit. **Needs the member roster off prod** — the one input this phase does not
+   already have.
 3. Country is a **tie-breaker, never a gate**: 107 of the 237 >= 5-entry names
    appear in more than one country and 46 have no country holding 80% of their
    entries — top players travel. `"Online"` is a pseudo-country in `place` and
    must not be read as one.
 4. **Validate the matcher against the bootstrap before trusting it.** Run it
-   over the 812 known-correct names and measure precision. That number decides
+   over the 1156 known-correct names and measure precision. That number decides
    whether auto-attach is safe at all, and it is free.
 5. Emit `auto` / `ambiguous (N candidates)` / `unknown`, sorted by entry count
    descending so HoF-relevant names are reviewed first. Owner confirms; a
    handful of member creations may be approved for the genuinely unfindable.
+
+**Expect the roster to spell names differently from the archive.** Measured over
+the 2180 entries the two name-blind tiers matched — pairings established without
+ever looking at a name, so the disagreements are real drift and not matcher error
+— 2107 agree exactly and **73 do not**: 34 where our name is the fuller one
+(`Javier Naranjo` → `Javier Naranjo Ortiz`), 13 where the archive's is, 23 typos,
+transliterations and nicknames baked into the member record
+(`Mateus Silva De Souza` against our `Mateus "The Doctor" Souza`), and 3 outright
+disjoint. So an exact-match-only matcher will miss around 3% of resolvable names,
+and that is the floor to judge step 4's precision against.
+
+**Two of our live rows disagree with the archive about who won**, surfaced free by
+the bootstrap and recorded in `wiki/vekn-decommission.md` for IC curation: the
+2023-10-22 Palma event `Matusalén,¿dónde está mi promo?` and the 2021-09-19
+Brazilian `Roundhouse`. Both came to us through their vekn event id, so the
+disagreement is between the vekn.net result and the deck the archive holds for it;
+one side is wrong and neither is ours to decide.
 
 **Entries whose winner never resolves are held OUT of the import**, in the
 re-runnable queue — not imported winner-less. `Tournament.winner` is a user uid

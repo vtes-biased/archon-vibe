@@ -143,11 +143,37 @@ def get_countries_on_continent(country_code: str) -> list[str]:
     return [c["iso_code"] for c in countries.values() if c["continent"] == continent]
 
 
-def _strip_diacritics(s: str) -> str:
-    """Remove diacritics from a string (e.g. 'São Paulo' -> 'Sao Paulo')."""
-    return "".join(
-        c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn"
-    )
+# The letters that carry no NFD decomposition, so dropping combining marks
+# leaves them untouched. Python twin of `fold_ascii` in `engine/src/cards.rs`.
+_FOLD = {
+    "ł": "l",
+    "ø": "o",
+    "đ": "d",
+    "ð": "d",
+    "ħ": "h",
+    "ı": "i",
+    "ŧ": "t",
+    "æ": "ae",
+    "œ": "oe",
+    "þ": "th",
+    "ß": "ss",
+}
+
+
+def fold_ascii(s: str) -> str:
+    """Fold Latin letters to ASCII ('São Paulo' -> 'Sao Paulo', 'Łódź' -> 'Lodz').
+
+    NFD alone is not enough: ł, ø, æ and friends decompose to themselves, so a
+    mark-dropping pass leaves a non-ASCII letter behind and an accent-free
+    spelling of the same name never matches it.
+    """
+    out = []
+    for c in unicodedata.normalize("NFD", s):
+        if unicodedata.category(c) == "Mn":
+            continue
+        folded = _FOLD.get(c.lower())
+        out.append(c if folded is None else folded.upper() if c.isupper() else folded)
+    return "".join(out)
 
 
 # Regex to strip parenthetical suffixes: "Washington (DC)" -> "Washington"
@@ -192,7 +218,7 @@ def _build_city_index() -> tuple[
 def match_city(name: str, country_code: str) -> City | None:
     """Match a city name against the geonames database.
 
-    Tries exact name, ASCII name, diacritics-stripped, and base name (no parens).
+    Tries exact name, ASCII name, ASCII-folded, and base name (no parens).
     Returns the City dict or None if no match found.
     """
     name = name.strip()
@@ -208,7 +234,7 @@ def match_city(name: str, country_code: str) -> City | None:
     if city := by_ascii.get((cc, name.lower())):
         return city
     # 3. Strip diacritics from input, try ASCII
-    stripped = _strip_diacritics(name)
+    stripped = fold_ascii(name)
     if stripped != name:
         if city := by_ascii.get((cc, stripped.lower())):
             return city

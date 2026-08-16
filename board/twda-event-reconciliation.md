@@ -8,8 +8,8 @@ Run 2026-08-16 against 8475 live tournaments and 4538 TWDA entries. The archive 
 | outcome | entries |
 |---|---|
 | attach — vekn id | 2177 |
-| attach — winner+date | 1171 |
-| create — no candidate | 1136 |
+| attach — winner+date | 1177 |
+| create — no candidate | 1130 |
 | attach — winner+date+size | 28 |
 | attach — winner+date+name | 11 |
 | review — 2 candidates | 8 |
@@ -17,7 +17,7 @@ Run 2026-08-16 against 8475 live tournaments and 4538 TWDA entries. The archive 
 | review — target claimed by another entry | 3 |
 | review — vekn id contested | 1 |
 
-**1136 entries have no candidate** and are the reconstruction.
+**1130 entries have no candidate** and are the reconstruction.
 **12 need a human.**
 
 ## Review queue

@@ -66,6 +66,17 @@ vekn id onto its single survivor, so an unknown spelling must narrow;
 the candidate set, so there `XX` and `Online` must both stay open, and switching it
 to `country_key` would silently drop the `XX` rows' true matches.
 
+**Dropping NFD combining marks is not an ASCII fold.** ł, ø, æ, ß and friends
+decompose to themselves, so a mark-dropping pass leaves a non-ASCII letter that
+the alphanumeric filter downstream then eats — `Paweł` becomes `pawe`, which
+never matches the archive's `Pawel`. Fold through `geonames.fold_ascii` or the
+engine's `fold_ascii` (`engine/src/cards.rs`), never a hand-written NFD loop:
+the two carry the same explicit map, and the engine's is pinned by a CI guard
+asserting every shipped card name normalizes to pure ASCII. The Polish and
+Nordic cohorts are where this bites, and it is silent — a hand-rolled fold in
+`reconcile_twda.py` cost six Polish events, two of them national championships,
+which would have been reconstructed as duplicates.
+
 ## Two implementations of one gate
 
 **Online create bypasses the engine.** `POST /tournaments` builds the Tournament
@@ -191,9 +202,6 @@ lookup keys, with distinct roles: printed (display), unique (text export), full
 **The deck parser's count-strip and prefix match miscount count-less lines** —
 card names ending in digits or containing a slash are the failure cases. The fix is
 exact-key gating, not a looser regex.
-
-The accent fold has no CI ASCII guard, and the non-NFD fold branch (ł, ø, œ — a
-dozen real cards) is untested.
 
 ## Rounds and the bot
 

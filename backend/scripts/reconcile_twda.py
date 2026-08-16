@@ -57,7 +57,6 @@ import importlib.util
 import os
 import re
 import sys
-import unicodedata
 from collections import Counter, defaultdict
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -72,7 +71,7 @@ if not _have_backend:
 import aiohttp  # noqa: E402
 
 from backend.src import db  # noqa: E402
-from backend.src.geonames import normalize_country  # noqa: E402
+from backend.src.geonames import fold_ascii, normalize_country  # noqa: E402
 from backend.src.models import ObjectType  # noqa: E402
 from backend.src.twda_import import TWDA_URL, extract_vekn_event_id  # noqa: E402
 
@@ -101,13 +100,15 @@ CORPUS_QUERY = """
 
 
 def normalize(value: str) -> str:
-    """Casefold, strip diacritics and punctuation — for comparing names."""
-    stripped = "".join(
-        c
-        for c in unicodedata.normalize("NFD", value or "")
-        if unicodedata.category(c) != "Mn"
-    )
-    return re.sub(r"[^a-z0-9]+", " ", stripped.lower()).strip()
+    """Casefold, fold to ASCII and drop punctuation — for comparing names.
+
+    The fold must go through `fold_ascii`, not a bare NFD mark-drop: ł does not
+    decompose, so "Paweł" would keep it, the alphanumeric filter would eat it,
+    and the archive's ASCII "Pawel" would never match. Six Polish events,
+    including two national championships, were reconstructed as duplicates
+    before that was found.
+    """
+    return re.sub(r"[^a-z0-9]+", " ", fold_ascii(value or "").lower()).strip()
 
 
 def archon_uid(entry: dict) -> str | None:

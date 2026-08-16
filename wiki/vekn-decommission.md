@@ -266,6 +266,33 @@ name synthesized from place and date — and must never be deleted.
 
 Found 2026-08-16 while deciding the Hall of Fame reconciliation queue.
 
+### IC record curation — rows that disagree with the archive about who won
+
+**Deferred ask** — settle the winner on the two rows below and correct whichever
+side is wrong. Done when each row's `winner` matches the record the IC accepts.
+
+Both came to us through their vekn event id, so the disagreement is between the
+vekn.net result and the winning deck the TWDA holds for the same event. One side
+is wrong and neither is ours to decide unilaterally. They wait on this section's
+trigger because the correction path (`SetArchivalResults`, in the Hall of Fame
+plan) deliberately refuses any row carrying `external_ids['vekn']` while the
+calendar sync is live — the sync's full-rebuild branch would wipe the correction
+on its next run.
+
+| uid | date | event | our winner | the archive's |
+|---|---|---|---|---|
+| `019f1a1a-1923-766f-bba2-ae0291673caa` | 2023-10-22 | `Matusalén,¿dónde está mi promo?` | Jose Maria Prieto Amengual | Gines Quinonero |
+| `019f1a19-a603-773a-a922-d6dbe2146b47` | 2021-09-19 | `Roundhouse` | Joab Rogerio Barbosa Da Silva | Jose Roberio Barbosa Da Silva |
+
+The Brazilian pair are two distinct live members whose names differ by four
+letters, so that one is as likely a transcription slip upstream as a wrong result.
+
+Found 2026-08-16 by the Hall of Fame winner-identity bootstrap, which reads each
+TWDA entry's submitter against the resolved winner of the tournament it attached
+to: 3 of 1156 names mapped to two members, and these are the two that are not
+genuine homonyms. The third — two live members both named `Pedro Paulo`, in
+Fortaleza and Campina Grande — is a real homonym and needs nothing.
+
 ## Trigger: the VEKN API decommission scope is decided
 
 ### TWDA submission continuity
