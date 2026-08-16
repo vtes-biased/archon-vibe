@@ -13,6 +13,12 @@ the way the archon migration did. Clients pick the corpus up on their next resyn
 
 Idempotent: an entry already carrying a reconstruction is recognised by its
 `twda` external id and skipped, so a half-finished run is resumed by re-running.
+
+**Regenerate the decisions file against this database first.** Its targets are
+uids: one that moved since the file was written attaches nothing, or reconstructs
+an event whose winner resolves to no member and renders as a raw uuid.
+
+    reconcile_twda.py --emit-decisions backend/src/data/twda_decisions.tsv --validate
 """
 
 import argparse
