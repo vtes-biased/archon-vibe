@@ -650,7 +650,7 @@ membership numbers stay out of this public repo.
 | Ben O'Neill | Ben ONeill | `019f1a00-78c6-775b-9abe-ee9d668bd22e` |
 | Bernie MacNaught | Bernard MacNaught | `019f1a00-7ad6-76d4-b406-07930b3a7995` |
 | Bruno Keiti Tamane | Bruno Keiti | `019f1a00-9750-750c-98a5-f6cac873c649` |
-| Caroline Hyll | Caroline Vallee | `019f1a00-051f-72e2-8d11-84db64f3c8eb` |
+| Caroline Hyll | Kari Hyll | `019f19ff-b402-779c-932c-99168acfc5fa` |
 | Daniel Stefanutti | Daniel Albert Stefanutti Lindemann | `019f1a00-99b0-74c4-82b6-02c60be77f1a` |
 | Denny Bruset | Danny Buset | `019f1a00-6fa7-7124-a580-f8286a140696` |
 | Eric Haas | Eric Haas | `019f1a00-cb3d-709f-97d7-0cc13d04f27f` |
@@ -671,10 +671,12 @@ membership numbers stay out of this public repo.
 
 `Tim Smith` and `Eric Haas` are the two the automated passes refused on purpose —
 each had a second member of the same name, and the owner picked between them.
-**`Caroline Hyll` → `Caroline Vallee` is the one ruling no signal in the data
-supports**: her two wins are Stockholm 2010 and the member is in Québec, while a
-`Kari Hyll` shares her surname and her city. Recorded as given, and worth a second
-look before Phase 2 consumes it.
+
+`Caroline Hyll` → `Kari Hyll` was corrected on review: the first ruling reached a
+`Caroline Vallee` in Québec against wins played in Stockholm, where `Kari Hyll`
+shares both the surname and the city. It is the one row where the generated
+candidate list ranked the right answer first and the hand pass took a lower one —
+worth remembering as the failure mode of a long queue, not of the matcher.
 
 ### The six HoF-relevant names — confirmed by the owner 2026-08-16
 
