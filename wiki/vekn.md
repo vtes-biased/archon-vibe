@@ -255,6 +255,29 @@ the event link. It creates a deck only when the winner has none for that
 tournament, with `attribution="twda"` and `public=True`. The ETag cache is
 in-memory only and the ~12 MB JSON is released after parsing.
 
+**That key reaches only half the archive.** The TWDA began carrying vekn event
+links around 2013, so of 4538 entries 2211 are linked and 2327 are not — 2257 of
+them dated before 2014. The unlinked half is a **linking gap, not an event gap**:
+our corpus reaches back to 2004 and holds most of those events already, imported
+from legacy archon with no vekn id. Reconstructing them blind would mint about a
+thousand duplicates.
+
+`backend/scripts/reconcile_twda.py` resolves the archive against the live corpus
+and is **read-only** — it has no `--apply`. Its output is a decisions file a human
+reviews and the reconstruction later consumes; unreviewed entries are skipped,
+never created. Four tiers: an `archon.vekn.net` link in `event_link`; the vekn
+event id; a **name-free** match on date ± 1 day, winner name and country; then a
+reconstruction candidate. The event name is deliberately not a key — 869 pre-2014
+rows are named `Imported VTES Event` — while winner name resolves half the
+unlinked corpus at 99.9% precision, measured against the linked entries.
+
+**A vekn event id is not proof of identity.** An organizer can submit an entry
+under an id they later abandoned, leaving ours holding the empty husk. A
+disagreeing winner name does not by itself unseat the id — our names are routinely
+fuller than the archive's (`Javier Naranjo Ortiz` vs `Javier Naranjo`), and 75
+entries disagree that way harmlessly — only a rival event on the same date won by
+the same player does.
+
 ## Legacy archon sync
 
 `backend/scripts/migrate_from_archon.py` has two modes sharing the mapping code:

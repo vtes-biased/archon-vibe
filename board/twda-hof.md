@@ -232,7 +232,39 @@ of VEKN-imported and ETL-migrated rows and should not wait on this epic:
 Sequencing: `#615` and `#616` run first and create nothing; `#614` can run in
 parallel; then `#617` → `#618` → `#619`.
 
-## Phase 0 — Event reconciliation (read-only, produces a reviewed decisions file)
+## Phase 0 — Event reconciliation — **DONE 2026-08-16**
+
+`backend/scripts/reconcile_twda.py` is landed and read-only; the review table is
+`board/twda-event-reconciliation.md`. Against the live corpus:
+
+| outcome | entries |
+|---|---|
+| attach — vekn id | 2177 |
+| attach — winner + date (name-free) | 1174 |
+| attach — winner + date + event name | 11 |
+| attach — our own link | 1 |
+| **create — no candidate** | **1136** |
+| **review — needs a human** | **39** |
+
+**The reconstruction is 1136 events, not the 2257 this plan sized it at.** The
+"mostly linking, not importing" claim below is confirmed and then some, and the
+review queue is 39 decisions rather than hundreds. The name-free tier measures
+**99.9% precise at 94.9% recall** against the linked entries as ground truth.
+
+Two design corrections the measurement forced, both already in the script:
+
+- **The vekn event id is not proof of identity.** Entry `12797` names an id its
+  submitter abandoned; ours holds a 0-player row called `delete me` while the real
+  event is `12794`. But a disagreeing winner name alone must **not** unseat the id —
+  75 entries disagree harmlessly because our names are fuller than the archive's
+  (`Javier Naranjo Ortiz` vs `Javier Naranjo`). Only a rival event on the same date
+  won by the same player does. An id we do not hold falls through to the name-free
+  tier instead of going straight to review.
+- **In a TWDA entry `name` is the DECK name; the event name is `event`.** Keying
+  the tie-break confirmer on `name` compares decks to tournaments and silently
+  never fires.
+
+The rest of this section is the standing rationale for that design.
 
 **This phase gates every later one. It creates nothing.**
 
@@ -315,13 +347,15 @@ event names for events we hold as `"Imported VTES Event"`. This ticket can
 **restore genuine names to hundreds of nameless legacy events** — arguably a
 bigger visible win than the Hall of Fame itself.
 
-**Blocking unknown, needs one query against prod before Phase 0 is designed:**
-how many of our 3627 pre-2014 tournaments actually have `winner` set? `winner`
-is not in the public projection, so it could not be measured from the anonymous
-snapshot. If most do, the winner-name matcher is strong; if the ETL only set it
-where it had finals data, the whole approach weakens and Phase 0 needs a
-different plan. Run:
-`SELECT count(*), count(NULLIF("full"->>'winner','')) FROM objects WHERE type='tournament' AND deleted_at IS NULL AND ("full"->>'start') < '2014';`
+**Answered on prod 2026-08-16 — the winner-name matcher is strong.** Of the 3627
+pre-2014 live tournaments, **3516 (96.9%) carry a `winner`**, and every one of
+those resolves to a live user with a name — no dangling uids. `country` is set on
+3278 (90.4%), so the second confirmer is real. The `Imported VTES Event` count
+reproduced exactly at 869.
+
+**And every one of the 3627 has zero rounds.** The archival shape is not something
+the reconstruction introduces — it is the existing shape of the entire historic
+corpus. See *Archival results* for what that costs Phase 3.
 
 Confirmers, strongest first:
 
@@ -672,6 +706,18 @@ per-round play data" is a real, unnamed thing (three producers already emit it:
 `vekn_tournament_sync.py:215-321`, `migrate_from_archon.py:1066-1163`, and the
 TWDA reconstruction here) and proposed formalising it as an explicit **mode** on
 `Tournament`, with either a players list or just a count.
+
+**Its scope is the whole historic corpus, not the reconstruction.** Measured on
+prod 2026-08-16: **all 3627 pre-2014 live tournaments have zero rounds.** So
+`players_with_rounds` returns 0 for every one of them, and the 10-player floor
+rejects every pre-2014 win unless `reported_player_count` is **backfilled onto the
+existing rows**, not merely stamped on the ~1136 reconstructed ones. Today
+`get_tournament_wins_for_users` has no player-count gate at all, so those wins
+currently do count: introducing the floor without the backfill would not shave the
+47 members sitting at exactly 5, it would evict essentially the whole historic Hall
+of Fame — including the three names in the done-condition. This makes *Archival
+results* a hard prerequisite of Phase 3, not a parallel track, and makes Phase 3.5's
+"diff before flipping" a certainty rather than a caution.
 
 **Recommendation: add the missing fact, do not add the mode.** The gap is real
 and is a hard blocker; the enum is over-modelling. Three reasons.

@@ -49,6 +49,13 @@ access-version handshake nor any test can catch the missing backfill — see
 [sync](sync.md#access-levels) for the re-save script and
 [testing](testing.md#traps) for why no test covers it.
 
+**`Tournament.country` is not always an ISO code.** 208 live rows store the country
+*name* — `Brazil`, `Spain`, `United States` — in a field every consumer reads as a
+two-letter code. Any exact comparison silently drops them, including
+`find_same_event_tournaments`' country filter (`db.py`), which is the duplicate
+guard `_adopt_same_event` relies on. Normalise both sides before comparing;
+`COUNTRY_ALIASES` in `backend/scripts/reconcile_twda.py` maps every observed name.
+
 ## Two implementations of one gate
 
 **Online create bypasses the engine.** `POST /tournaments` builds the Tournament

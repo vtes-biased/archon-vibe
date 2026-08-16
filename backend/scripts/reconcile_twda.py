@@ -1,0 +1,399 @@
+"""Resolve every TWDA entry against our live tournament corpus. Read-only.
+
+Half the TWDA carries no vekn event id — the archive only began linking events
+around 2013 — so `import_twda_decks` never sees those entries and the historic
+Hall of Fame is derived from the half we can link. Most of the unlinked entries
+are events we ALREADY HOLD, imported from legacy archon without a vekn id: the
+gap is a linking gap, not an event gap, and reconstructing blind would mint a
+thousand duplicates.
+
+    # report, and write the proposed decisions
+    /opt/archon/backend/.venv/bin/python \\
+      /opt/archon/backend/scripts/reconcile_twda.py --emit-decisions /tmp/twda.tsv
+
+    # also write the human-readable review table
+    … reconcile_twda.py --emit-decisions /tmp/twda.tsv --report /tmp/table.md
+
+This script creates nothing and has no --apply: its output is a decisions file a
+human reviews, which the reconstruction then consumes. Entries left unreviewed
+are skipped by that consumer, never created.
+
+Four tiers, strongest first:
+
+1. an archon.vekn.net link in `event_link` — both the live /tournaments/<uid>
+   form and the dead legacy /tournament/<uid>/display.html one. A uid that no
+   longer resolves is reported, never passed down to the weaker tiers.
+2. the vekn event id. NOT infallible: an organizer can submit under an event id
+   they later abandoned (12797 points at a 0-player row named "delete me" while
+   the real event is 12794). A disagreeing winner name alone does not unseat it —
+   ours are routinely fuller than the archive's — only a rival event on the same
+   date actually won by that player does. An id we do not hold falls through to
+   tier 3, since we often hold the event without its id.
+3. name-free — date +/- 1 day, winner name, country narrowing. The event NAME is
+   deliberately not a key: 869 of our pre-2014 tournaments are named "Imported
+   VTES Event", so name matching tops out around 22% of the corpus while winner
+   name resolves half of it. Measured against the tier-2 entries as ground truth,
+   this tier is 99.9% precise at 93.5% recall.
+4. no match — a reconstruction candidate.
+
+Country only ever BREAKS TIES: a candidate that declares no country stays in, and
+a filter that would empty the candidate set is discarded. Both sides are
+normalised to ISO codes first because 208 live rows store a country NAME in a
+field that holds a code ("Brazil", not "BR"), which an exact match would drop.
+"""
+
+import argparse
+import asyncio
+import importlib.util
+import os
+import re
+import sys
+import unicodedata
+from collections import Counter, defaultdict
+from datetime import date, timedelta
+from pathlib import Path
+
+try:
+    _have_backend = importlib.util.find_spec("backend.src") is not None
+except ModuleNotFoundError:
+    _have_backend = False
+if not _have_backend:
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+import aiohttp  # noqa: E402
+
+from backend.src import db  # noqa: E402
+from backend.src.models import ObjectType  # noqa: E402
+from backend.src.twda_import import TWDA_URL, extract_vekn_event_id  # noqa: E402
+
+# The tail of a TWDA `place` ("City (STATE), Country") mapped to the ISO code our
+# `country` field holds. The whole archive uses 45 distinct tails, so this map is
+# complete rather than best-effort. It also repairs OUR side: 208 live rows store
+# the name. "Online" is absent deliberately — it is a pseudo-country in `place`
+# and reading it as one would filter real events out.
+COUNTRY_ALIASES = {
+    "USA": "US",
+    "United States": "US",
+    "Columbus OH USA": "US",
+    "Brazil": "BR",
+    "Spain": "ES",
+    "Finland": "FI",
+    "France": "FR",
+    "Italy": "IT",
+    "Sweden": "SE",
+    "Poland": "PL",
+    "Hungary": "HU",
+    "England": "GB",
+    "Scotland": "GB",
+    "Wales": "GB",
+    "United Kingdom": "GB",
+    "Australia": "AU",
+    "Germany": "DE",
+    "Canada": "CA",
+    "Czech Republic": "CZ",
+    "Portugal": "PT",
+    "Netherlands": "NL",
+    "Chile": "CL",
+    "Philippines": "PH",
+    "Belgium": "BE",
+    "Mexico": "MX",
+    "Serbia": "RS",
+    "South Africa": "ZA",
+    "Denmark": "DK",
+    "Norway": "NO",
+    "Croatia": "HR",
+    "Austria": "AT",
+    "Belarus": "BY",
+    "Russia": "RU",
+    "Russian Federation": "RU",
+    "Switzerland": "CH",
+    "Slovakia": "SK",
+    "Lithuania": "LT",
+    "Slovenia": "SI",
+    "New Zealand": "NZ",
+    "Greece": "GR",
+    "Singapore": "SG",
+    "Ireland": "IE",
+    "Iceland": "IS",
+    "Bahamas": "BS",
+    "Japan": "JP",
+}
+
+_ARCHON_UID_RE = re.compile(
+    r"archon\.vekn\.net/tournaments?/"
+    r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+    re.I,
+)
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+CORPUS_QUERY = """
+    SELECT t.uid,
+           t."full"->>'start',
+           coalesce(t."full"->>'country', ''),
+           btrim(coalesce(t."full"->>'name', '')),
+           coalesce(t."full"->>'winner', ''),
+           coalesce(u."full"->>'name', ''),
+           coalesce(t."full"->'external_ids'->>'vekn', '')
+    FROM objects t
+    LEFT JOIN objects u
+      ON u.type = %s AND u.deleted_at IS NULL AND u.uid = t."full"->>'winner'
+    WHERE t.type = %s AND t.deleted_at IS NULL AND t."full"->>'start' IS NOT NULL
+"""
+
+
+def normalise(value: str) -> str:
+    """Casefold, strip diacritics and punctuation — for comparing names."""
+    stripped = "".join(
+        c
+        for c in unicodedata.normalize("NFD", value or "")
+        if unicodedata.category(c) != "Mn"
+    )
+    return re.sub(r"[^a-z0-9]+", " ", stripped.lower()).strip()
+
+
+def iso_country(value: str) -> str | None:
+    """An ISO code from either side's country, or None if it says nothing."""
+    value = (value or "").strip()
+    if not value:
+        return None
+    return value.upper() if len(value) == 2 else COUNTRY_ALIASES.get(value)
+
+
+def archon_uid(entry: dict) -> str | None:
+    match = _ARCHON_UID_RE.search(entry.get("event_link", "") or "")
+    return match.group(1).lower() if match else None
+
+
+def twda_country(entry: dict) -> str | None:
+    place = (entry.get("place") or "").strip()
+    return iso_country(place.rsplit(",", 1)[-1]) if place else None
+
+
+class Corpus:
+    """Our live tournaments, indexed the three ways the tiers look them up."""
+
+    def __init__(self, rows: list[tuple]):
+        self.by_uid: dict[str, dict] = {}
+        self.by_vekn: dict[str, list[dict]] = defaultdict(list)
+        self.by_day: dict[str, list[dict]] = defaultdict(list)
+        for uid, start, country, name, winner_uid, winner_name, vekn in rows:
+            row = {
+                "uid": uid,
+                "start": start,
+                "cc": iso_country(country),
+                "name": name,
+                "winner_uid": winner_uid,
+                "winner": normalise(winner_name),
+                "vekn": vekn,
+            }
+            self.by_uid[uid] = row
+            if vekn:
+                self.by_vekn[vekn].append(row)
+            self.by_day[start[:10]].append(row)
+
+    def around(self, day: date) -> list[dict]:
+        """Candidates within a day either side — our start carries a GUESSED
+        venue timezone while the TWDA date is a bare local one, so the same
+        event routinely lands on the adjacent day."""
+        return [
+            row
+            for offset in (-1, 0, 1)
+            for row in self.by_day.get((day + timedelta(days=offset)).isoformat(), [])
+        ]
+
+
+def winner_candidates(entry: dict, corpus: Corpus) -> list[dict]:
+    """Our tournaments won by this entry's player within a day of its date.
+
+    The event NAME is not consulted: 869 of our pre-2014 rows are named
+    "Imported VTES Event", so the name carries no information for a quarter of
+    the era this reconciles. Country only narrows — a candidate declaring none
+    stays in, and a filter that would empty the set is discarded.
+    """
+    player = normalise(entry.get("player", ""))
+    day = entry.get("date", "")
+    if not player or not _ISO_DATE_RE.match(day):
+        return []
+    hits = [
+        row for row in corpus.around(date.fromisoformat(day)) if row["winner"] == player
+    ]
+    country = twda_country(entry)
+    if country:
+        narrowed = [row for row in hits if not row["cc"] or row["cc"] == country]
+        if narrowed:
+            return narrowed
+    return hits
+
+
+def resolve(entry: dict, corpus: Corpus) -> tuple[str, str, str]:
+    """Return (action, target, why) for one TWDA entry."""
+    uid = archon_uid(entry)
+    if uid:
+        if uid in corpus.by_uid:
+            return "attach", uid, "own link"
+        return "review", "", "own link resolves to nothing"
+
+    player = normalise(entry.get("player", ""))
+    vekn = extract_vekn_event_id(entry)
+    if vekn and corpus.by_vekn.get(vekn):
+        candidates = corpus.by_vekn[vekn]
+        if len(candidates) > 1:
+            return (
+                "review",
+                ",".join(r["uid"] for r in candidates),
+                "vekn id duplicated",
+            )
+        row = candidates[0]
+        # A disagreeing winner name is NOT enough to doubt the id — ours are
+        # fuller than the archive's ("Javier Naranjo Ortiz" vs "Javier Naranjo").
+        # Only a rival event actually won by this player unseats it, which is the
+        # abandoned-event-id shape: the entry names an id its submitter later
+        # replaced, and ours holds the empty husk.
+        rivals = [r for r in winner_candidates(entry, corpus) if r["uid"] != row["uid"]]
+        if row["winner"] != player and len(rivals) == 1:
+            return "review", f"{row['uid']},{rivals[0]['uid']}", "vekn id contested"
+        return "attach", row["uid"], "vekn id"
+
+    if not _ISO_DATE_RE.match(entry.get("date", "")):
+        return "review", "", "no usable date"
+    if not player:
+        return "review", "", "no winner name"
+
+    hits = winner_candidates(entry, corpus)
+    if len(hits) == 1:
+        return "attach", hits[0]["uid"], "winner+date"
+    if len(hits) > 1:
+        # `event` is the event name; `name` is the DECK's.
+        event = normalise(entry.get("event", ""))
+        exact = [row for row in hits if normalise(row["name"]) == event]
+        if len(exact) == 1:
+            return "attach", exact[0]["uid"], "winner+date+name"
+        return "review", ",".join(row["uid"] for row in hits), f"{len(hits)} candidates"
+    return "create", "", "no candidate"
+
+
+async def fetch_twda() -> list[dict]:
+    timeout = aiohttp.ClientTimeout(total=120.0)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.get(TWDA_URL) as resp:
+            resp.raise_for_status()
+            return await resp.json(content_type=None)
+
+
+async def load_corpus() -> Corpus:
+    async with db.get_connection() as conn:
+        result = await conn.execute(
+            CORPUS_QUERY, (ObjectType.USER, ObjectType.TOURNAMENT)
+        )
+        return Corpus(await result.fetchall())
+
+
+def write_report(path: str, verdicts: list[tuple], corpus: Corpus, reasons: Counter):
+    review = [v for v in verdicts if v[1] == "review"]
+    create = [v for v in verdicts if v[1] == "create"]
+    lines = [
+        "# TWDA event reconciliation",
+        "",
+        "Read-only output of `backend/scripts/reconcile_twda.py`. Deleted with the",
+        "board line that owns it.",
+        "",
+        "| outcome | entries |",
+        "|---|---|",
+    ]
+    for reason, count in reasons.most_common():
+        lines.append(f"| {reason} | {count} |")
+    lines += [
+        "",
+        f"**{len(create)} entries have no candidate** and are the reconstruction.",
+        f"**{len(review)} need a human.**",
+        "",
+        "## Review queue",
+        "",
+        "| twda id | date | winner | twda event | why | candidates |",
+        "|---|---|---|---|---|---|",
+    ]
+    for entry_id, _, target, why, meta in review:
+        cands = " ".join(
+            f"{corpus.by_uid[u]['name']!r}@{corpus.by_uid[u]['start'][:10]}"
+            for u in target.split(",")
+            if u in corpus.by_uid
+        )
+        lines.append(
+            f"| {entry_id} | {meta['date']} | {meta['player']} | "
+            f"{meta['name']} | {why} | {cands} |"
+        )
+    Path(path).write_text("\n".join(lines) + "\n")
+
+
+async def run(args: argparse.Namespace) -> int:
+    db.DB_URL = args.dsn
+    os.environ["DATABASE_URL"] = args.dsn
+    await db.init_db()
+    try:
+        corpus = await load_corpus()
+        print(f"corpus: {len(corpus.by_uid)} live tournaments")
+        entries = await fetch_twda()
+        print(f"twda:   {len(entries)} entries")
+
+        verdicts, reasons = [], Counter()
+        for entry in entries:
+            action, target, why = resolve(entry, corpus)
+            reasons[f"{action} — {why}"] += 1
+            verdicts.append(
+                (
+                    str(entry.get("id", "")),
+                    action,
+                    target,
+                    why,
+                    {
+                        "date": entry.get("date", ""),
+                        "player": entry.get("player", ""),
+                        "name": entry.get("event", ""),
+                    },
+                )
+            )
+
+        print()
+        for reason, count in reasons.most_common():
+            print(f"  {count:6d}  {reason}")
+        totals = Counter(v[1] for v in verdicts)
+        print(
+            f"\n  attach {totals['attach']}   create {totals['create']}   "
+            f"review {totals['review']}"
+        )
+
+        if args.emit_decisions:
+            body = "\n".join(
+                f"{entry_id}\t{action}"
+                + (f":{target}" if action == "attach" and target else "")
+                for entry_id, action, target, _, _ in verdicts
+                if action != "review"
+            )
+            Path(args.emit_decisions).write_text(
+                "# twda_id<TAB>action — action is attach:<tournament_uid>, create or "
+                "skip.\n# Review entries are omitted: decide them and add them here.\n"
+                + body
+                + "\n"
+            )
+            print(f"\nDecisions written to {args.emit_decisions} — review before use.")
+        if args.report:
+            write_report(args.report, verdicts, corpus, reasons)
+            print(f"Review table written to {args.report}.")
+        return 0
+    finally:
+        await db.close_db()
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--dsn", default=os.getenv("DATABASE_URL"), help="target DSN")
+    p.add_argument("--emit-decisions", metavar="PATH", help="write the decisions file")
+    p.add_argument("--report", metavar="PATH", help="write the human review table")
+    args = p.parse_args()
+    if not args.dsn:
+        p.error("--dsn or DATABASE_URL is required")
+    return args
+
+
+if __name__ == "__main__":
+    sys.exit(asyncio.run(run(parse_args())))

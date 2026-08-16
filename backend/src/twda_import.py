@@ -17,7 +17,7 @@ TWDA_URL = "https://static.krcg.org/data/twda.json"
 _last_etag: str | None = None
 
 
-def _extract_vekn_event_id(entry: dict) -> str | None:
+def extract_vekn_event_id(entry: dict) -> str | None:
     """Extract VEKN event ID from a TWDA entry.
 
     Recent entries have numeric `id` matching VEKN event IDs.
@@ -130,7 +130,7 @@ async def import_twda_decks() -> dict[str, int]:
             raw_entries: list[dict] = await resp.json(content_type=None)
     twda_lookup: dict[str, dict] = {}
     for entry in raw_entries:
-        event_id = _extract_vekn_event_id(entry)
+        event_id = extract_vekn_event_id(entry)
         if not event_id:
             continue
         twda_lookup[event_id] = {
