@@ -475,7 +475,7 @@ Committing the mapping is fine under the no-PII rule: TWDA already publishes
 every winner name alongside its event, and our uids are meaningless outside the
 app.
 
-## Phase 1 — Winner identity — **done 2026-08-16, 92.8% of the reconstruction resolved**
+## Phase 1 — Winner identity — **done 2026-08-16, 94.3% resolved, 50 names to officials**
 
 The archive gives a name string and nothing else: 1549 distinct normalised
 winner names, 234 of them at >= 5 IRL entries.
@@ -589,10 +589,52 @@ Three guards, each forced by a false match it produced:
   known-correct matches. `magri`/`martin` scores 0.727, which is why the floor is
   0.75 and not 0.7.
 
-29 further names, coverage to **1050 entries (92.8%)**. What is left is **82
-entries over 63 names, none of them HoF-relevant** — archival rows we decline to
-invent an owner for, held out of the import per the rule below rather than
-imported winner-less.
+29 further names, coverage to **1050 entries (92.8%)**.
+
+### The leading-prefix class — the archive kept only the first surnames
+
+Building the review queue exposed a class hiding in it: `César Brera` sitting
+next to `César Brera Márquez`, `Claudio Soulié` next to
+`Claudio Soulié Caratte` in the very city the event was played. That is the
+Iberian and Brazilian convention of a second surname the archive dropped, and it
+is the *inverse* of `member-subset`.
+
+Taken as a plain token subset it is the fallback rejected twice above at 93.3%.
+Requiring the archive's tokens to be a **leading prefix** of the member's, rather
+than merely contained in it, scores **4/4** and — decisively — kills the known
+error: `Matheus Oliveira` cannot prefix `Matheus **Rocha de** Oliveira`, while
+every true match only ever *appends*. 13 further names, coverage to **1068
+entries (94.3%)**.
+
+Country is again not used. Exactly one row would have needed it — `Tim Smith`,
+where the gate produces a unique answer only by discarding a second `Tim Smith`
+whose country is **unknown rather than different**, the failure
+[hazards](../wiki/hazards.md) names. It is in the review queue instead.
+
+### What no pass could resolve
+
+**64 entries over 50 names.** The queue is a per-name table of the wins with
+their dates, events and player counts, and every member who is plausibly that
+person, **grouped by the country the wins were played in** so a section can be
+handed to the official who would recognise the names. Candidates are scored, not
+merely collected: a shared given name alone drags in every `Claudio` in the
+roster, so playing in the same country as the wins is weighted as heavily as the
+name signal.
+
+**That table cannot live in this repo.** Its candidate columns are roster data —
+member name against VEKN id and city — and the repo is public
+([dogmas](../wiki/dogmas.md#dependencies-and-data)). The TWDA half of each row is
+already public, the roster half is not. It is delivered out of band, and the
+generator writes outside the tree. Only the *decisions* it produces come back
+here, as `winner:<user_uid>` lines in the decisions file, where a uid means
+nothing outside the app.
+
+None of the 50 reaches five wins, so **no Hall of Fame place turns on that
+queue** — what it buys is archival completeness and the decklists that come with
+a resolved winner. Several rows will have no right answer: a 2005–2010 winner who
+never registered with the VEKN is not in the roster, and *no member* is the
+correct verdict. Those stay held out of the import rather than imported
+winner-less, per the rule below.
 
 ### The six HoF-relevant names — confirmed by the owner 2026-08-16
 
