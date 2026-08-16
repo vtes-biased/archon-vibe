@@ -69,7 +69,7 @@ This corrects the framing in gh-7 and in the original ticket text: it is **not**
 a pre-2005 problem. It is pre-2014, and it is a *linking* gap, not necessarily
 an *event* gap — see Phase 0, which is the single biggest hazard here.
 
-`_extract_vekn_event_id` returns `None` for anything whose `id` is not numeric
+`extract_vekn_event_id` returns `None` for anything whose `id` is not numeric
 and whose `event_link` lacks `/event/`; the caller `continue`s, so more than
 half the archive never enters the lookup. Of the unlinked entries 2175 carry no
 `event_link` at all, and the rest point at `groups.google.com` (104),
@@ -98,10 +98,10 @@ Field completeness across the 2327 entries to reconstruct: `crypt`/`library`
 `tournament_format` 1472, deck `name` 1815. `place` is `"City (STATE), Country"`
 — only **45 distinct country strings** across the whole archive, and the messy
 ones are tiny (`England`/`Scotland`/`Wales` → GB, `United States`/`USA`,
-`Russia`/`Russian Federation`, one malformed `Columbus OH USA`). A hand-written
-45-entry alias map is complete and bounded; from there `geonames.match_city`
-(`backend/src/geonames.py:148`) resolves city + country, and its `_PAREN_RE`
-already strips the `(OH)` form.
+`Russia`/`Russian Federation`, one malformed `Columbus OH USA`). 39 of the 45
+resolve straight from the bundled GeoNames data, so `geonames.normalize_country`
+handles them with five real aliases plus `USA`; from there `geonames.match_city`
+resolves city + country, and its `_PAREN_RE` already strips the `(OH)` form.
 
 Missing: any player identity beyond a display name, and any non-winner.
 
@@ -232,10 +232,18 @@ of VEKN-imported and ETL-migrated rows and should not wait on this epic:
 Sequencing: `#615` and `#616` run first and create nothing; `#614` can run in
 parallel; then `#617` → `#618` → `#619`.
 
-## Phase 0 — Event reconciliation — **DONE 2026-08-16**
+## Phase 0 — Event reconciliation — **matcher landed 2026-08-16, review outstanding**
 
-`backend/scripts/reconcile_twda.py` is landed and read-only; the review table is
-`board/twda-event-reconciliation.md`. Against the live corpus:
+`backend/scripts/reconcile_twda.py` is landed and read-only; the proposal table is
+`board/twda-event-reconciliation.md`. **The reviewed decisions file does not exist
+yet** — the 39 `review` rows are undecided, and Phase 2 must not run until an owner
+has turned every one of them into `attach` / `create` / `skip`. The script writes
+them into the TSV as `review` lines rather than omitting them, so a premature
+consumer sees them and refuses instead of reading a short file as a complete one.
+Several belong to Torstensson, Angseesing and Keeney — career counts this epic
+exists to fix — so silently dropping them would defeat the ticket.
+
+Against the live corpus:
 
 | outcome | entries |
 |---|---|
@@ -263,6 +271,12 @@ Two design corrections the measurement forced, both already in the script:
 - **In a TWDA entry `name` is the DECK name; the event name is `event`.** Keying
   the tie-break confirmer on `name` compares decks to tournaments and silently
   never fires.
+- **The non-discriminating-name denylist below was not built, and is not needed.**
+  It guards a name-keyed matcher; the shipped one never keys on a name, so a
+  repeated or generic event name cannot produce a false match in the first place.
+  What survives from that paragraph is the *display* obligation — a row named
+  `tournament` is unusable in the UI, so Phase 2 still synthesizes a name from
+  `place` + date at review time.
 
 The rest of this section is the standing rationale for that design.
 

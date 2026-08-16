@@ -33,12 +33,12 @@ Four tiers, strongest first:
    deliberately not a key: 869 of our pre-2014 tournaments are named "Imported
    VTES Event", so name matching tops out around 22% of the corpus while winner
    name resolves half of it. Measured against the tier-2 entries as ground truth,
-   this tier is 99.9% precise at 93.5% recall.
+   this tier is 99.9% precise at 94.9% recall.
 4. no match — a reconstruction candidate.
 
 Country only ever BREAKS TIES: a candidate that declares no country stays in, and
 a filter that would empty the candidate set is discarded. Both sides are
-normalised to ISO codes first because 208 live rows store a country NAME in a
+normalized to ISO codes first because 208 live rows store a country NAME in a
 field that holds a code ("Brazil", not "BR"), which an exact match would drop.
 """
 
@@ -63,61 +63,9 @@ if not _have_backend:
 import aiohttp  # noqa: E402
 
 from backend.src import db  # noqa: E402
+from backend.src.geonames import normalize_country  # noqa: E402
 from backend.src.models import ObjectType  # noqa: E402
 from backend.src.twda_import import TWDA_URL, extract_vekn_event_id  # noqa: E402
-
-# The tail of a TWDA `place` ("City (STATE), Country") mapped to the ISO code our
-# `country` field holds. The whole archive uses 45 distinct tails, so this map is
-# complete rather than best-effort. It also repairs OUR side: 208 live rows store
-# the name. "Online" is absent deliberately — it is a pseudo-country in `place`
-# and reading it as one would filter real events out.
-COUNTRY_ALIASES = {
-    "USA": "US",
-    "United States": "US",
-    "Columbus OH USA": "US",
-    "Brazil": "BR",
-    "Spain": "ES",
-    "Finland": "FI",
-    "France": "FR",
-    "Italy": "IT",
-    "Sweden": "SE",
-    "Poland": "PL",
-    "Hungary": "HU",
-    "England": "GB",
-    "Scotland": "GB",
-    "Wales": "GB",
-    "United Kingdom": "GB",
-    "Australia": "AU",
-    "Germany": "DE",
-    "Canada": "CA",
-    "Czech Republic": "CZ",
-    "Portugal": "PT",
-    "Netherlands": "NL",
-    "Chile": "CL",
-    "Philippines": "PH",
-    "Belgium": "BE",
-    "Mexico": "MX",
-    "Serbia": "RS",
-    "South Africa": "ZA",
-    "Denmark": "DK",
-    "Norway": "NO",
-    "Croatia": "HR",
-    "Austria": "AT",
-    "Belarus": "BY",
-    "Russia": "RU",
-    "Russian Federation": "RU",
-    "Switzerland": "CH",
-    "Slovakia": "SK",
-    "Lithuania": "LT",
-    "Slovenia": "SI",
-    "New Zealand": "NZ",
-    "Greece": "GR",
-    "Singapore": "SG",
-    "Ireland": "IE",
-    "Iceland": "IS",
-    "Bahamas": "BS",
-    "Japan": "JP",
-}
 
 _ARCHON_UID_RE = re.compile(
     r"archon\.vekn\.net/tournaments?/"
@@ -141,7 +89,7 @@ CORPUS_QUERY = """
 """
 
 
-def normalise(value: str) -> str:
+def normalize(value: str) -> str:
     """Casefold, strip diacritics and punctuation — for comparing names."""
     stripped = "".join(
         c
@@ -151,22 +99,19 @@ def normalise(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", stripped.lower()).strip()
 
 
-def iso_country(value: str) -> str | None:
-    """An ISO code from either side's country, or None if it says nothing."""
-    value = (value or "").strip()
-    if not value:
-        return None
-    return value.upper() if len(value) == 2 else COUNTRY_ALIASES.get(value)
-
-
 def archon_uid(entry: dict) -> str | None:
     match = _ARCHON_UID_RE.search(entry.get("event_link", "") or "")
     return match.group(1).lower() if match else None
 
 
 def twda_country(entry: dict) -> str | None:
+    """The ISO code from a TWDA `place` ("City (STATE), Country").
+
+    "Online" is a pseudo-country here and resolves to None, which is what keeps
+    online events from being filtered as if they had a location.
+    """
     place = (entry.get("place") or "").strip()
-    return iso_country(place.rsplit(",", 1)[-1]) if place else None
+    return normalize_country(place.rsplit(",", 1)[-1]) if place else None
 
 
 class Corpus:
@@ -180,10 +125,10 @@ class Corpus:
             row = {
                 "uid": uid,
                 "start": start,
-                "cc": iso_country(country),
+                "cc": normalize_country(country),
                 "name": name,
                 "winner_uid": winner_uid,
-                "winner": normalise(winner_name),
+                "winner": normalize(winner_name),
                 "vekn": vekn,
             }
             self.by_uid[uid] = row
@@ -210,7 +155,7 @@ def winner_candidates(entry: dict, corpus: Corpus) -> list[dict]:
     the era this reconciles. Country only narrows — a candidate declaring none
     stays in, and a filter that would empty the set is discarded.
     """
-    player = normalise(entry.get("player", ""))
+    player = normalize(entry.get("player", ""))
     day = entry.get("date", "")
     if not player or not _ISO_DATE_RE.match(day):
         return []
@@ -233,7 +178,7 @@ def resolve(entry: dict, corpus: Corpus) -> tuple[str, str, str]:
             return "attach", uid, "own link"
         return "review", "", "own link resolves to nothing"
 
-    player = normalise(entry.get("player", ""))
+    player = normalize(entry.get("player", ""))
     vekn = extract_vekn_event_id(entry)
     if vekn and corpus.by_vekn.get(vekn):
         candidates = corpus.by_vekn[vekn]
@@ -264,8 +209,8 @@ def resolve(entry: dict, corpus: Corpus) -> tuple[str, str, str]:
         return "attach", hits[0]["uid"], "winner+date"
     if len(hits) > 1:
         # `event` is the event name; `name` is the DECK's.
-        event = normalise(entry.get("event", ""))
-        exact = [row for row in hits if normalise(row["name"]) == event]
+        event = normalize(entry.get("event", ""))
+        exact = [row for row in hits if normalize(row["name"]) == event]
         if len(exact) == 1:
             return "attach", exact[0]["uid"], "winner+date+name"
         return "review", ",".join(row["uid"] for row in hits), f"{len(hits)} candidates"
@@ -363,15 +308,19 @@ async def run(args: argparse.Namespace) -> int:
         )
 
         if args.emit_decisions:
+            # Undecided entries are written as `review`, never omitted: a consumer
+            # must be able to see that they exist and refuse, rather than read a
+            # short file as a complete one.
             body = "\n".join(
                 f"{entry_id}\t{action}"
                 + (f":{target}" if action == "attach" and target else "")
+                + (f"\t{target}" if action == "review" and target else "")
                 for entry_id, action, target, _, _ in verdicts
-                if action != "review"
             )
             Path(args.emit_decisions).write_text(
-                "# twda_id<TAB>action — action is attach:<tournament_uid>, create or "
-                "skip.\n# Review entries are omitted: decide them and add them here.\n"
+                "# twda_id<TAB>action — attach:<tournament_uid>, create, skip, or\n"
+                "# review (UNDECIDED, with candidate uids). Every review line must\n"
+                "# become one of the others before this file is consumed.\n"
                 + body
                 + "\n"
             )

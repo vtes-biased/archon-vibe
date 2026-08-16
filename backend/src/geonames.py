@@ -84,6 +84,39 @@ def get_country(iso_code: str) -> Country | None:
     return countries.get(iso_code.upper())
 
 
+# Names GeoNames does not carry: the constituent countries of the UK, and the
+# colloquial forms the TWDA's `place` field uses.
+_COUNTRY_NAME_ALIASES = {
+    "usa": "US",
+    "england": "GB",
+    "scotland": "GB",
+    "wales": "GB",
+    "russia": "RU",
+}
+
+
+@lru_cache(maxsize=1)
+def _country_names() -> dict[str, str]:
+    return {c["name"].lower(): c["iso_code"] for c in load_countries().values()}
+
+
+def normalize_country(value: str) -> str | None:
+    """An ISO country code from a code or a country name, or None.
+
+    `Tournament.country` is meant to hold the code but holds the name on some
+    rows, and external corpora quote names — normalise both sides through here
+    before comparing, or the mismatches silently drop real matches
+    ([hazards](../../wiki/hazards.md)).
+    """
+    value = (value or "").strip()
+    if not value:
+        return None
+    if len(value) == 2:
+        return value.upper() if value.upper() in load_countries() else None
+    lowered = value.lower()
+    return _country_names().get(lowered) or _COUNTRY_NAME_ALIASES.get(lowered)
+
+
 def get_continent(country_code: str) -> str | None:
     """Get the continent code for a country."""
     country = get_country(country_code)

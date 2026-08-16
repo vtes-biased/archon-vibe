@@ -51,10 +51,10 @@ access-version handshake nor any test can catch the missing backfill — see
 
 **`Tournament.country` is not always an ISO code.** 208 live rows store the country
 *name* — `Brazil`, `Spain`, `United States` — in a field every consumer reads as a
-two-letter code. Any exact comparison silently drops them, including
-`find_same_event_tournaments`' country filter (`db.py`), which is the duplicate
-guard `_adopt_same_event` relies on. Normalise both sides before comparing;
-`COUNTRY_ALIASES` in `backend/scripts/reconcile_twda.py` maps every observed name.
+two-letter code, so any exact comparison silently drops them as if they disagreed.
+Pass both sides through `geonames.normalize_country` before comparing. It resolves
+names from the bundled GeoNames data and carries the handful GeoNames lacks (the UK
+constituent countries, `USA`, `Russia`).
 
 ## Two implementations of one gate
 

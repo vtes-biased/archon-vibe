@@ -16,6 +16,7 @@ import msgspec
 import psycopg
 from psycopg_pool import AsyncConnectionPool
 
+from .geonames import normalize_country
 from .models import (
     AuthMethod,
     DeckObject,
@@ -1194,7 +1195,9 @@ async def find_same_event_tournaments(
     A hit is a candidate, not a match — see SAME_EVENT_QUERY. `country` drops
     candidates that declare a different one (a same-named event elsewhere on the
     same day is a different event); candidates or callers without a country
-    declared stay in, since most legacy imports have none.
+    declared stay in, since most legacy imports have none. Both sides go through
+    `normalize_country` because some rows hold the country NAME in that field —
+    comparing raw drops them as if they disagreed ([hazards](../../wiki/hazards.md)).
     """
     if not name or start is None:
         return []
@@ -1203,8 +1206,13 @@ async def find_same_event_tournaments(
             SAME_EVENT_QUERY, (exclude_uid, name, start.isoformat())
         )
         found = [decode_json(row[0], Tournament) for row in await result.fetchall()]
-    if country:
-        found = [t for t in found if not t.country or t.country == country]
+    wanted = normalize_country(country) if country else None
+    if wanted:
+        found = [
+            t
+            for t in found
+            if not t.country or normalize_country(t.country) in (None, wanted)
+        ]
     return found
 
 
