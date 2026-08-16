@@ -152,10 +152,10 @@ async def run_tournament_sync() -> None:
 async def run_twda_sync() -> None:
     """TWDA reconciliation with status recording (vekn_status).
 
-    On its own schedule, not chained inside the VEKN sync: static.krcg.org is a
-    different upstream that outlives the VEKN API, and with the archive becoming
-    the sole source of the historic Hall of Fame, a persistent failure here must
-    be visible on the status page rather than only in the log.
+    Its own job under its own flag, deliberately not chained inside the VEKN
+    sync: static.krcg.org is a different upstream, needs no VEKN credentials, and
+    outlives the VEKN API — chained, it would be deleted along with the chain and
+    take the historic Hall of Fame's only source with it.
     """
     from .vekn_status import record_error, record_success
 
@@ -180,9 +180,6 @@ async def run_vekn_sync() -> None:
     await run_member_sync()
     # Tournament sync runs after member sync (needs user UIDs).
     await run_tournament_sync()
-    # Still in the chain, still after the tournament sync — a reconstruction must
-    # not race the vekn-linked copy of the same event into the corpus.
-    await run_twda_sync()
 
     # Ratings and snapshot both need tournaments up to date, hence run last.
     await run_rating_recompute()
@@ -367,6 +364,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("Initial VEKN sync scheduled in background")
     else:
         logger.info("VEKN sync is disabled")
+
+    # Independent of VEKN_SYNC_ENABLED: a different upstream, no credentials, and
+    # it must outlive the VEKN API. Its runner is registered either way so the
+    # admin trigger works even with the schedule off.
+    admin.set_sync_runners(twda_sync=run_twda_sync)
+    if os.getenv("TWDA_SYNC_ENABLED", "false").lower() == "true":
+        twda_interval = int(os.getenv("TWDA_SYNC_INTERVAL_HOURS", "24"))
+        _scheduler.add_job(
+            run_twda_sync,
+            trigger=IntervalTrigger(hours=twda_interval),
+            id="twda_sync",
+            name="TWDA Sync",
+            replace_existing=True,
+        )
+        logger.info(f"TWDA sync scheduled every {twda_interval} hours")
+    else:
+        logger.info("TWDA sync is disabled")
 
     _scheduler.add_job(
         run_sanction_cleanup,

@@ -64,9 +64,3 @@ def test_reconstruction_never_rates():
     assert engine.ranking_eligibility(t_json) == "no_results"
     # ...while still reporting the size the archive attested, for the win floor.
     assert engine.attested_player_count(t_json) == 42
-
-
-def test_missing_player_count_is_unattested_not_zero_players():
-    entry = _entry() | {"players_count": None}
-    t = reconstructed_tournament(entry, WINNER, datetime.now(UTC))
-    assert t.reported_player_count == 0

@@ -41,6 +41,7 @@ from backend.src.twda_import import (  # noqa: E402
     _fetch_twda,
     _tournaments_by_twda_id,
     load_decisions,
+    run_twda_sync,
 )
 
 
@@ -69,9 +70,6 @@ async def run(args: argparse.Namespace) -> int:
         if not args.apply:
             print("\nDry run — pass --apply to write.")
             return 0
-
-        # Broadcasting suppressed: see the module docstring.
-        from backend.src.twda_import import run_twda_sync
 
         stats = await run_twda_sync(broadcast=False)
         print(f"\n{stats}")

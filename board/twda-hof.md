@@ -756,7 +756,29 @@ players — becomes adoptable by `_adopt_same_event`, i.e. a live duplicate
 magnet. What is lost is "the archive is complete" as a visible property;
 mitigate with a counter in the report, not with orphan rows.
 
-## Phase 2 — The sync
+## Phase 2 — The sync — **done 2026-08-17**
+
+All seven items landed, plus every trap below that guards them. What the build
+settled that the plan did not say:
+
+- **The winner identity had no durable home.** Phase 1's passes lived in scratchpad
+  scripts and its rulings in chat, so this phase could not write `winner=<uid>` at
+  all. Both moved into `reconcile_twda.py` and `backend/src/data/twda_rulings.tsv`
+  first — see the Phase 1 note above, including the wrong match that surfaced.
+- **Item 1 went further than "its own schedule".** `TWDA_SYNC_ENABLED` /
+  `TWDA_SYNC_INTERVAL_HOURS`, registered outside the `VEKN_SYNC_ENABLED` block, so
+  the archive sync survives `#579` deleting the chain. Set in both inventories.
+- **Two silent degradations the traps implied but did not name**: a decisions file
+  gone stale against the corpus attaches nothing, and a reconstructed row whose
+  archive entry disappears is invisible. Both are counted in the sync stats and
+  logged; neither is ever auto-repaired.
+
+**Still owed before this reaches the corpus**: regenerate
+`twda_decisions.tsv` against prod (it was generated from the 2026-08-16 extract,
+and its targets are uids), then `backfill_twda.py --apply`. The recurring task
+handles only the delta after that.
+
+### The plan, as executed
 
 1. **Make `twda_import.py` standalone.** It is currently chained inside
    `run_vekn_sync` (`main.py:187-196`) and dies with `#579`. Give it

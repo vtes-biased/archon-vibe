@@ -17,7 +17,6 @@ from datetime import UTC, datetime
 from uuid import uuid7
 
 import aiohttp
-import msgspec
 
 from .broadcast import broadcast_precomputed
 from .data.timezones import CITY_TZ_OVERRIDES, COUNTRY_TIMEZONE
@@ -77,28 +76,30 @@ def _flatten_twda_cards(entry: dict) -> dict[str, int]:
     return cards
 
 
-async def _get_decks_by_tournament_uids(
-    uids: list[str],
-) -> dict[str, list[DeckObject]]:
-    """Get existing decks grouped by tournament_uid."""
+async def _deck_owners_by_tournament(uids: list[str]) -> dict[str, set[str]]:
+    """tournament uid -> user uids that already have a deck there.
+
+    Owners only, not decks: the archive resolves against thousands of
+    tournaments at once and decoding every deck of every one of them to ask a
+    membership question is the whole corpus in memory for a boolean.
+    """
     if not uids:
         return {}
-    decoder = msgspec.json.Decoder(DeckObject)
-    result: dict[str, list[DeckObject]] = {}
+    owners: dict[str, set[str]] = {}
     async with get_connection() as conn:
         rows = await (
             await conn.execute(
-                """SELECT "full"::text FROM objects
-                WHERE type = %s
-                  AND "full"->>'tournament_uid' = ANY(%s)
-                  AND deleted_at IS NULL""",
+                """SELECT "full"->>'tournament_uid', "full"->>'user_uid'
+                   FROM objects
+                   WHERE type = %s
+                     AND "full"->>'tournament_uid' = ANY(%s)
+                     AND deleted_at IS NULL""",
                 (ObjectType.DECK, uids),
             )
         ).fetchall()
-    for row in rows:
-        d = decoder.decode(row[0].encode())
-        result.setdefault(d.tournament_uid, []).append(d)
-    return result
+    for tournament_uid, user_uid in rows:
+        owners.setdefault(tournament_uid, set()).add(user_uid)
+    return owners
 
 
 def load_decisions() -> dict[str, tuple[str, str]]:
@@ -129,9 +130,12 @@ def load_decisions() -> dict[str, tuple[str, str]]:
 
 
 def _twda_timezone(country: str | None, city: str) -> str:
-    """Best-effort IANA zone for an archive `place`. A local copy of the venue
-    sync's: that reads vekn.net venue records, this reads a "City (STATE),
-    Country" string, and the two sources part company when the API retires."""
+    """Best-effort IANA zone from a country code and a city name.
+
+    Line for line the venue sync's `_guess_timezone`, deliberately: that module
+    retires with the VEKN API and this one outlives it, so the survivor must not
+    import from it. The shared fact is the two tables, and those are shared.
+    """
     if not country:
         return "UTC"
     country = country.upper()
@@ -248,6 +252,8 @@ async def run_twda_sync(*, broadcast: bool = True) -> dict[str, int]:
         "entries": len(entries),
         "created": 0,
         "unresolved": 0,
+        "stale_targets": 0,
+        "orphaned": 0,
         "decks_created": 0,
     }
     # entry id -> (our tournament uid, winner uid or "" when the row knows its own)
@@ -273,7 +279,28 @@ async def run_twda_sync(*, broadcast: bool = True) -> dict[str, int]:
         resolved[entry_id] = (tournament.uid, target)
         stats["created"] += 1
 
-    stats["decks_created"] = await _import_decks(entries, resolved, now, broadcast)
+    # A `twda` row whose entry left the archive — renamed upstream, or withdrawn.
+    # Never auto-deleted: the row may hold a corrected result or a deck, and only
+    # a human can tell a rename from a retraction.
+    orphaned = sorted(set(known) - {str(e.get("id", "")) for e in entries})
+    stats["orphaned"] = len(orphaned)
+    if orphaned:
+        logger.warning(
+            f"TWDA sync: {len(orphaned)} reconstructed rows no longer have an "
+            f"archive entry, left alone for review: {orphaned[:20]}"
+        )
+
+    stats["decks_created"], stale = await _import_decks(
+        entries, resolved, now, broadcast
+    )
+    stats["stale_targets"] = len(stale)
+    if stale:
+        # The decisions file names uids; one that moved since it was written
+        # attaches nothing. Silent, and the whole file degrades this way.
+        logger.warning(
+            f"TWDA sync: {len(stale)} decisions point at tournaments we no longer "
+            f"hold — regenerate the decisions file: {stale[:20]}"
+        )
     logger.info(f"TWDA sync: {stats}")
     return stats
 
@@ -283,17 +310,19 @@ async def _import_decks(
     resolved: dict[str, tuple[str, str]],
     now: datetime,
     broadcast: bool,
-) -> int:
-    """One winner decklist per resolved event that does not already have one.
+) -> tuple[int, list[str]]:
+    """(decks created, decisions whose target we no longer hold).
 
+    One winner decklist per resolved event that does not already have one.
     `DeckObject.user_uid` is required and load-bearing in three indexes, so an
     entry whose winner we could not resolve gets no deck at all rather than an
     orphan owned by nobody.
     """
     uids = [uid for uid, _ in resolved.values()]
     winners = await _winners_by_tournament_uid(uids)
-    existing = await _get_decks_by_tournament_uids(uids)
+    existing = await _deck_owners_by_tournament(uids)
     created = 0
+    stale: list[str] = []
     for entry in entries:
         entry_id = str(entry.get("id", ""))
         target = resolved.get(entry_id)
@@ -302,12 +331,13 @@ async def _import_decks(
         tournament_uid, winner_uid = target
         row = winners.get(tournament_uid)
         if not row:
+            stale.append(entry_id)
             continue
         winner_uid = winner_uid or row[0]
         cards = _flatten_twda_cards(entry)
         if not winner_uid or not cards:
             continue
-        if any(d.user_uid == winner_uid for d in existing.get(tournament_uid, [])):
+        if winner_uid in existing.get(tournament_uid, ()):
             continue
         deck = DeckObject(
             uid=str(uuid7()),
@@ -326,7 +356,7 @@ async def _import_decks(
         if broadcast:
             broadcast_precomputed(bd)
         created += 1
-    return created
+    return created, stale
 
 
 async def _fetch_twda() -> list[dict]:

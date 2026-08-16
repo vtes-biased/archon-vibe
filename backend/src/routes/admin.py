@@ -120,10 +120,12 @@ async def trigger_twda_deck_import(
     if not permissions.can_run_admin_sync(manager):
         raise HTTPException(status_code=403, detail="Only IC can trigger sync")
 
-    from ..main import run_twda_sync
+    runner = _runners.get("twda_sync")
+    if not runner:
+        raise HTTPException(status_code=503, detail="TWDA sync is not available")
 
     logger.info("Manual TWDA sync dispatched via admin endpoint")
-    return _dispatch("twda", run_twda_sync)
+    return _dispatch("twda_sync", runner)
 
 
 @router.post("/users/merge")

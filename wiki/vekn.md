@@ -197,7 +197,11 @@ the merge refuses on more than one candidate, and a declared `country` that diff
 drops a candidate outright. The sync additionally refuses a candidate holding
 registered players but no rounds, because the round-less update path treats
 vekn.net as authoritative for players and adopting would wipe a live registration
-list.
+list — **except an archive reconstruction**, which has exactly that shape by
+construction. There, adopting is the point: a full VEKN result set is strictly
+richer than a one-player reconstruction, and refusing would mint a duplicate of
+an event we already hold. The carve-out reads `external_ids['twda']`, so the
+guard is keyed on where the row came from rather than on what it looks like.
 
 Duplicates that already exist are **reported, not repaired**: each run ends with
 one grouped query logging live copies of one event where **some but not all** hold
