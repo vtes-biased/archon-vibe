@@ -475,7 +475,7 @@ Committing the mapping is fine under the no-PII rule: TWDA already publishes
 every winner name alongside its event, and our uids are meaningless outside the
 app.
 
-## Phase 1 — Winner identity — **done 2026-08-16 bar an 18-row review queue**
+## Phase 1 — Winner identity — **done 2026-08-16, 92.8% of the reconstruction resolved**
 
 The archive gives a name string and nothing else: 1549 distinct normalised
 winner names, 234 of them at >= 5 IRL entries.
@@ -562,11 +562,37 @@ of the member's — is what `member-subset` became once inverted and guarded. In
 its original direction it scored 93.3% and put a Brazilian's win on a different
 real member; inverted, it is 7/7.
 
-**57 names auto-accept**, including the six below, taking reconstruction coverage
-from **900 entries (79.5%) to 999 (88.3%)**. A further 18 names sit in review at
-90.1%. What is left unresolved is **112 entries over 91 names, none of them
-HoF-relevant** — archival rows we decline to invent an owner for, held out of the
-import per the rule below rather than imported winner-less.
+**57 names auto-accept** and 18 more were confirmed by the owner, taking
+reconstruction coverage from 900 entries (79.5%) to **1020 (90.1%)**.
+
+### The fuzzy pass — for surnames that are misspelled, not just abbreviated
+
+Every class above anchors on an *exact* surname, so none of them can reach a
+surname the archive typed wrong. A whole-name similarity pass over the roster
+closes that: `Riku Niittymaki` → `Riku Niittymki` (the member record lost its
+`ä`), `Scott Christoferson` → `Scott Christofersen`, `Kirill Samoilov` →
+`Kirill Samoylov`. Both bootstrap names that reached it matched correctly, and it
+independently recovered the two the prefix bug had sent to the wrong member —
+`James Rodriguez` is `James Rodri**q**uez`, `Daniel Mota` is `Daniel Mo**tt**a`.
+
+Three guards, each forced by a false match it produced:
+
+- **A lone given name identifies nobody** — `Michele` matched `Michelle`.
+- **The runner-up must be clearly worse**, or two members are equally close and
+  the pass refuses rather than guessing.
+- **The archive's surname must have a counterpart scoring >= 0.75 somewhere in
+  the member's name**, or the member's name must be contained in the archive's.
+  A whole-name ratio clears the floor on given name and length alone:
+  `David Magri` reached `David Martín` at 0.87. Comparing *last* tokens is the
+  obvious form of this guard and is wrong — Spanish double surnames put the
+  counterpart in the middle (`Juan Luis Mejías **Luna**`), and it threw away both
+  known-correct matches. `magri`/`martin` scores 0.727, which is why the floor is
+  0.75 and not 0.7.
+
+29 further names, coverage to **1050 entries (92.8%)**. What is left is **82
+entries over 63 names, none of them HoF-relevant** — archival rows we decline to
+invent an owner for, held out of the import per the rule below rather than
+imported winner-less.
 
 ### The six HoF-relevant names — confirmed by the owner 2026-08-16
 
