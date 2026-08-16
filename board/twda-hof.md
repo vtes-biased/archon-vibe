@@ -475,7 +475,7 @@ Committing the mapping is fine under the no-PII rule: TWDA already publishes
 every winner name alongside its event, and our uids are meaningless outside the
 app.
 
-## Phase 1 — Winner identity — **measured 2026-08-16, six names await confirmation**
+## Phase 1 — Winner identity — **done 2026-08-16 bar an 18-row review queue**
 
 The archive gives a name string and nothing else: 1549 distinct normalised
 winner names, 234 of them at >= 5 IRL entries.
@@ -524,21 +524,54 @@ unless its name is one of the 8.
    descending so HoF-relevant names are reviewed first. Owner confirms; a
    handful of member creations may be approved for the genuinely unfindable.
 
-**A token-subset fallback was measured and rejected.** Matching where the
-archive's tokens are a subset of a member's (`Javier Naranjo` →
-`Javier Naranjo Ortiz`) scores **14 correct against 1 wrong = 93.3%** on the
-bootstrap, and its one error assigns a Brazilian's tournament win to a different
-real member with a similar name. It would lift reconstruction coverage from
-79.5% to 83.5% and resolves **none** of the HoF-relevant names. Not worth a
-misattributed win; if it is ever built, it generates review suggestions, never
-auto-attaches.
+### The near-match pass — surname-anchored, scored per class
 
-### The six HoF-relevant names the exact matcher missed
+The six HoF-relevant names the exact matcher missed were resolved by hand, by
+searching the roster for the surname and reading the candidates. That method
+generalises, and the generalisation is what recovered most of the tail — but only
+once each class is scored **separately** on the bootstrap's own 58 misses, where
+the truth is known and the class never saw it:
 
-None needs a member creation — every one is a given-name variant or a dropped
-second surname, and each resolves to exactly one plausible member. They are
-judgement calls, not matcher output, so they want confirmation before Phase 2
-consumes them:
+| class | what it matches | bootstrap | verdict |
+|---|---|---|---|
+| `member-subset` | the archive carries surnames the member record drops — `David Quinonero Santiago` → `David Quiñonero` | 7/7 | **auto** |
+| `given-prefix`, <= 3 share the surname | one given name is a prefix of the other — `Josh` → `Joshua` | 9/9 | **auto** |
+| `diminutive` | a curated nickname table — `Tomek`/`Tomasz`, `Mike`/`Michael` | 1/1 | **auto** |
+| `given-prefix`, >= 4 share the surname | same, on a crowded surname | 7/8 | review |
+| `given-fuzzy` | given names merely similar | never fired | review |
+| `surname-only` | nothing but the surname agrees | 0/1 | **rejected** |
+
+`surname-only` is not a weak signal, it is the wrong one: its proposals are
+`Caroline Hyll` → `Kari Hyll`, `Jennifer Goldberg` → `Paul Goldberg`,
+`Peter Korsos` → `Attila Korsos` — relatives and strangers, not spellings. It is
+refused outright rather than sent to review, because a reviewer reading 44 of
+those learns to click through them.
+
+Two guards the measurement forced, both of which had produced real false
+matches:
+
+- **A one-token member name cannot satisfy `member-subset`.** A member recorded
+  as `Nick ?` is a subset of every `Nick <surname>` in the archive.
+- **The length floor on a prefix applies to the shorter side.** Anchored on the
+  longer one, an initial or a particle matches: `James Rodriguez` took
+  `Miguel **J.** Blázquez Rodríguez`, and `Daniel Mota` took
+  `Hudson Silva **da** Mota`.
+
+The rejected token-subset fallback from the first pass — archive tokens a subset
+of the member's — is what `member-subset` became once inverted and guarded. In
+its original direction it scored 93.3% and put a Brazilian's win on a different
+real member; inverted, it is 7/7.
+
+**57 names auto-accept**, including the six below, taking reconstruction coverage
+from **900 entries (79.5%) to 999 (88.3%)**. A further 18 names sit in review at
+90.1%. What is left unresolved is **112 entries over 91 names, none of them
+HoF-relevant** — archival rows we decline to invent an owner for, held out of the
+import per the rule below rather than imported winner-less.
+
+### The six HoF-relevant names — confirmed by the owner 2026-08-16
+
+None needed a member creation. Every one is a given-name variant or a dropped
+second surname:
 
 | archive name | IRL entries | the member | vekn id | where |
 |---|---|---|---|---|
@@ -557,12 +590,6 @@ the same family cluster as the Palma disagreement recorded in
 The other two of the eight resolved automatically: Rob Treasure (18 entries) and
 **Sten Düring** (7) — the latter only because the ASCII fold now works, since the
 archive spells him `Sten During`.
-
-**Coverage: 900 of the 1132 reconstruction entries carry a resolved winner
-(79.5%) on the exact matcher alone, 940 (83.0%) once the six above are
-confirmed.** The 192 that remain span 160 names and **cost no Hall of Fame place
-at all** — they are archival rows we decline to invent an owner for, held out of
-the import per the rule below rather than imported winner-less.
 
 **Expect the roster to spell names differently from the archive.** Measured over
 the 2180 entries the two name-blind tiers matched — pairings established without
