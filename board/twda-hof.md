@@ -232,34 +232,37 @@ of VEKN-imported and ETL-migrated rows and should not wait on this epic:
 Sequencing: `#615` and `#616` run first and create nothing; `#614` can run in
 parallel; then `#617` → `#618` → `#619`.
 
-## Phase 0 — Event reconciliation — **matcher landed 2026-08-16, review outstanding**
+## Phase 0 — Event reconciliation — **done 2026-08-16, queue decided**
 
-`backend/scripts/reconcile_twda.py` is landed and read-only; the proposal table is
-`board/twda-event-reconciliation.md`. **The reviewed decisions file does not exist
-yet** — the 39 `review` rows are undecided, and Phase 2 must not run until an owner
-has turned every one of them into `attach` / `create` / `skip`. The script writes
-them into the TSV as `review` lines rather than omitting them, so a premature
-consumer sees them and refuses instead of reading a short file as a complete one.
-Several belong to Torstensson, Angseesing and Keeney — career counts this epic
-exists to fix — so silently dropping them would defeat the ticket.
+`backend/scripts/reconcile_twda.py` is landed and read-only; the generated proposal
+table is `board/twda-event-reconciliation.md`. The queue is **decided** — the twelve
+rows it lists have the rulings recorded below, and Phase 2 applies them to the
+emitted TSV before consuming it. The script writes review rows into the TSV as
+`review` lines rather than omitting them, so a consumer fed an undecided file sees
+them and refuses instead of reading a short file as a complete one.
 
 Against the live corpus:
 
 | outcome | entries |
 |---|---|
 | attach — vekn id | 2177 |
-| attach — winner + date (name-free) | 1174 |
+| attach — winner + date (name-free) | 1171 |
+| attach — winner + date + player count | 28 |
 | attach — winner + date + event name | 11 |
-| attach — our own link | 1 |
+| attach — our own link | 3 |
 | **create — no candidate** | **1136** |
-| **review — needs a human** | **39** |
+| **review — needed a human** | **12** |
 
 **The reconstruction is 1136 events, not the 2257 this plan sized it at.** The
 "mostly linking, not importing" claim below is confirmed and then some, and the
-review queue is 39 decisions rather than hundreds. The name-free tier measures
-**99.9% precise at 94.9% recall** against the linked entries as ground truth.
+review queue was twelve decisions rather than hundreds. The name-free tier measures
+**99.9% precise at 95.6% recall** against the linked entries as ground truth, and
+both of its two remaining misses are artifacts rather than defects: one is scored
+against the `delete me` row (the tier is right and the ground truth is wrong), the
+other follows a TWDA date a month off its true one, which the vekn id fixes on the
+real run.
 
-Two design corrections the measurement forced, both already in the script:
+Five design corrections the measurement forced, all already in the script:
 
 - **The vekn event id is not proof of identity.** Entry `12797` names an id its
   submitter abandoned; ours holds a 0-player row called `delete me` while the real
@@ -271,12 +274,57 @@ Two design corrections the measurement forced, both already in the script:
 - **In a TWDA entry `name` is the DECK name; the event name is `event`.** Keying
   the tie-break confirmer on `name` compares decks to tournaments and silently
   never fires.
+- **The two `event_link` url forms quote uids from two different id spaces.** The
+  live `/tournaments/<uid>` form quotes ours; the dead legacy
+  `/tournament/<uid>/display.html` form quotes the uid *legacy archon* minted, which
+  the import kept in `external_ids['archon']` on 255 rows. Looking only in our own
+  uid space reported both legacy links as dead — and the Valencia one would then
+  have been reconstructed as a duplicate, since the archive abbreviates its winner
+  (`Jose Vte Coll` against our `Jose Vicente Coll`) and no weaker tier can reach it.
+- **The player count is the confirmer that breaks the same-weekend clusters.** TWDA
+  `players_count` and our seat count agree *exactly* on most of the multi-event
+  weekends the name-free tier stalls on — a convention running four tournaments one
+  player each won. Added as a tie-break behind the event name it resolved 28 of the
+  39 rows the queue opened with, at zero cost to precision on the labelled set.
+- **A per-entry matcher cannot see that two entries claimed one tournament.** The
+  TWDA holds one winning deck per event, so a collision means at most one claimant
+  is right and the loser is an event we do not hold. A pass over the whole verdict
+  set now demotes the weaker tier's claim back to the queue, and a tie demotes both.
+  It caught two: `Blood League part IV.` had landed on `Breath of the Dragon`, and
+  `SuperHappyFunSlide Day 2` on `Day One`. Both losers are genuine reconstructions —
+  without the pass, one win would have been mislabelled and the other lost entirely.
 - **The non-discriminating-name denylist below was not built, and is not needed.**
   It guards a name-keyed matcher; the shipped one never keys on a name, so a
   repeated or generic event name cannot produce a false match in the first place.
   What survives from that paragraph is the *display* obligation — a row named
   `tournament` is unusable in the UI, so Phase 2 still synthesizes a name from
   `place` + date at review time.
+
+### The decided queue
+
+Ten attach, two create, no skips. Six of the attaches are forced by elimination:
+their partner entry from the same weekend was resolved by an exact player-count
+match, leaving exactly one candidate free. `2k5originssat` is the weakest of the
+twelve — the counts fit the *other* candidate, and only the date carries it.
+
+| twda id | ruling | grounds |
+|---|---|---|
+| `11429` | **create** | `Blood League part IV.` is not ours — we hold parts 1, II and III only. It had landed on `Breath of the Dragon`, which that event's own vekn id claims. |
+| `12797` | attach `019f1a1a-ba64-74fd-bc9f-0fed297e0263` | The abandoned id points at a 0-player shell named `delete me`; the real event carries 11 players, 2 rounds and its own legacy archon id. |
+| `2010ecday1` | attach `019f1a07-70ec-733f-a444-8a767501cc72` | Exact date and name. The archive's 155 is the whole Day 1 field; our row holds the 3rd group, 39 seats. |
+| `2010originsthu2` | attach `019f1a07-7ab5-7344-9f59-b10bca00efaf` | `PM` matches 5pm, and the 11am entry took `Origins Thurs AM` on an exact 24 = 24. |
+| `2010pwblaQ` | attach `019f1a07-7811-70f5-8ecf-ae1ce130e8e0` | Exact date, `Event #2` on both sides. We hold only events #2 and #3 of that Strategicon, both won by Keeney, so the archive's own numbering runs one behind ours. |
+| `2010shfsd1` | attach `019f1a07-789f-74cf-af36-be4ff5263c3b` | Exact date, `Day 1` is `Day One`. |
+| `2010shfsd2` | **create** | We hold Day One only; the ± 1 day window had pulled Day 2 onto it. |
+| `2013jbflac` | attach `019f1a18-aabd-7114-aa47-285296579918` | Exact date; our name is the archive's plus a ` - Gamex 2013 - Event #2` suffix. The Haymaker entry took the other on an exact 10 = 10. |
+| `2k5originssat` | attach `019f1a05-f050-71bf-86c8-78680ad7c182` | 2005-07-02 was the Saturday the entry names, and that row is the only one on it. Neither candidate's count matches, so size casts no vote. |
+| `2k5originsthur4` | attach `019f1a07-2d4d-732a-9d55-9c3d0c6471ad` | The 10am entry took the 10:00 / 24p row on an exact match; 12 ≈ 13, and the 04:00 start is a 4pm event with a 12-hour slip. |
+| `2k7losangelesqual` | attach `019f1a06-cfaa-75f5-b814-9969c052f6f9` | Exact date, both name the qualifier, 12 ≈ 13. |
+| `2k9italychamp` | attach `019f1a05-cd31-71a5-93f0-bcfe0aebe883` | Exact date; `Campionato Italiano 2009` is `Italian NC 2009`; 27 ≈ 26. |
+
+Re-running the script after the archive grows reopens the queue with these same
+twelve plus whatever is new. The rulings above are keyed on the stable TWDA entry
+id, so they can be reapplied rather than re-derived.
 
 The rest of this section is the standing rationale for that design.
 
@@ -310,16 +358,21 @@ unattributed events.
 
 Resolve every TWDA entry against the live corpus, in order:
 
-1. `event_link` → our own tournament uid — parse **both** the live
-   `/tournaments/<uid>` form and the dead legacy `/tournament/<uid>/display.html`
-   form. **Validate the uid resolves to a live tournament**; a stale or mistyped
+1. `event_link` → a tournament uid — parse **both** the live `/tournaments/<uid>`
+   form and the dead legacy `/tournament/<uid>/display.html` form, and look each up
+   in **both** id spaces: our uid, then `external_ids['archon']` for the uid legacy
+   archon minted. **Validate it resolves to a live tournament**; a stale or mistyped
    link must route to review, never fall through to name matching.
 2. numeric `id` / `vekn.net/event/<id>` → `external_ids['vekn']` (today's path)
-3. fallback: **a name-free match on date ± 1 day, winner name and country.**
+3. fallback: **a name-free match on date ± 1 day, winner name and country**, with
+   the event name and then the player count breaking a tie.
    `find_same_event_tournaments` is *not* it — that query keys on the event name,
    which is the one field this corpus cannot use. It keeps the ± 86400s window and
    the country filter this tier also wants, which is why it read as the obvious
    precedent; the shipped matcher borrows those two rules and drops the name.
+
+Then a pass over the whole verdict set, which is the only place a collision between
+two entries claiming one tournament is visible at all.
 
 **Do not use `DUPLICATE_GROUPS_QUERY`'s day-bucket key** (`db.py:1233`) even
 though it looked like the obvious precedent. It buckets on

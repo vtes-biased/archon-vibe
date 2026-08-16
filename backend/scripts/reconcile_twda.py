@@ -20,21 +20,30 @@ are skipped by that consumer, never created.
 
 Four tiers, strongest first:
 
-1. an archon.vekn.net link in `event_link` — both the live /tournaments/<uid>
-   form and the dead legacy /tournament/<uid>/display.html one. A uid that no
-   longer resolves is reported, never passed down to the weaker tiers.
+1. an archon.vekn.net link in `event_link`. The two url forms quote uids from two
+   different id spaces — the live /tournaments/<uid> one ours, the dead legacy
+   /tournament/<uid>/display.html one the uid legacy archon minted, which the
+   import kept in external_ids['archon'] — so both indexes are consulted. A uid
+   neither resolves is reported, never passed down to the weaker tiers.
 2. the vekn event id. NOT infallible: an organizer can submit under an event id
    they later abandoned (12797 points at a 0-player row named "delete me" while
    the real event is 12794). A disagreeing winner name alone does not unseat it —
    ours are routinely fuller than the archive's — only a rival event on the same
    date actually won by that player does. An id we do not hold falls through to
    tier 3, since we often hold the event without its id.
-3. name-free — date +/- 1 day, winner name, country narrowing. The event NAME is
-   deliberately not a key: 869 of our pre-2014 tournaments are named "Imported
-   VTES Event", so name matching tops out around 22% of the corpus while winner
-   name resolves half of it. Measured against the tier-2 entries as ground truth,
-   this tier is 99.9% precise at 94.9% recall.
+3. name-free — date +/- 1 day, winner name, country narrowing, with the event
+   name and then the player count breaking a tie. Neither is a KEY: 869 of our
+   pre-2014 tournaments are named "Imported VTES Event", so name matching tops
+   out around 22% of the corpus while winner name resolves half of it, and the
+   count is absent on 100 entries and collides freely across the corpus. As a
+   tie-break the count is decisive — the archive and the archon row agree on it
+   exactly for most of the same-winner-same-weekend clusters this tier stalls on.
+   Measured against the tier-2 entries as ground truth, this tier is 99.9%
+   precise at 95.6% recall.
 4. no match — a reconstruction candidate.
+
+A collision pass then runs over the whole verdict set, because the tiers above
+judge one entry at a time and cannot see that two of them claimed one tournament.
 
 Country only ever BREAKS TIES: a candidate that declares no country stays in, and
 a filter that would empty the candidate set is discarded. Both sides are
@@ -81,7 +90,9 @@ CORPUS_QUERY = """
            btrim(coalesce(t."full"->>'name', '')),
            coalesce(t."full"->>'winner', ''),
            coalesce(u."full"->>'name', ''),
-           coalesce(t."full"->'external_ids'->>'vekn', '')
+           coalesce(t."full"->'external_ids'->>'vekn', ''),
+           coalesce(t."full"->'external_ids'->>'archon', ''),
+           jsonb_array_length(coalesce(t."full"->'players', '[]'::jsonb))
     FROM objects t
     LEFT JOIN objects u
       ON u.type = %s AND u.deleted_at IS NULL AND u.uid = t."full"->>'winner'
@@ -115,13 +126,24 @@ def twda_country(entry: dict) -> str | None:
 
 
 class Corpus:
-    """Our live tournaments, indexed the three ways the tiers look them up."""
+    """Our live tournaments, indexed the four ways the tiers look them up."""
 
     def __init__(self, rows: list[tuple]):
         self.by_uid: dict[str, dict] = {}
+        self.by_archon: dict[str, dict] = {}
         self.by_vekn: dict[str, list[dict]] = defaultdict(list)
         self.by_day: dict[str, list[dict]] = defaultdict(list)
-        for uid, start, country, name, winner_uid, winner_name, vekn in rows:
+        for (
+            uid,
+            start,
+            country,
+            name,
+            winner_uid,
+            winner_name,
+            vekn,
+            archon,
+            size,
+        ) in rows:
             row = {
                 "uid": uid,
                 "start": start,
@@ -130,8 +152,11 @@ class Corpus:
                 "winner_uid": winner_uid,
                 "winner": normalize(winner_name),
                 "vekn": vekn,
+                "size": size,
             }
             self.by_uid[uid] = row
+            if archon:
+                self.by_archon[archon.lower()] = row
             if vekn:
                 self.by_vekn[vekn].append(row)
             self.by_day[start[:10]].append(row)
@@ -174,8 +199,12 @@ def resolve(entry: dict, corpus: Corpus) -> tuple[str, str, str]:
     """Return (action, target, why) for one TWDA entry."""
     uid = archon_uid(entry)
     if uid:
-        if uid in corpus.by_uid:
-            return "attach", uid, "own link"
+        # The two link forms carry uids from two different id spaces: the live
+        # one quotes our uid, the dead legacy one quotes the uid legacy archon
+        # minted, which we keep in external_ids['archon'] on the imported row.
+        row = corpus.by_uid.get(uid) or corpus.by_archon.get(uid)
+        if row:
+            return "attach", row["uid"], "own link"
         return "review", "", "own link resolves to nothing"
 
     player = normalize(entry.get("player", ""))
@@ -208,8 +237,48 @@ def resolve(entry: dict, corpus: Corpus) -> tuple[str, str, str]:
         exact = [row for row in hits if normalize(row["name"]) == event]
         if len(exact) == 1:
             return "attach", exact[0]["uid"], "winner+date+name"
+        size = entry.get("players_count")
+        sized = [row for row in hits if size and row["size"] == size]
+        if len(sized) == 1:
+            return "attach", sized[0]["uid"], "winner+date+size"
         return "review", ",".join(row["uid"] for row in hits), f"{len(hits)} candidates"
     return "create", "", "no candidate"
+
+
+_TIER_STRENGTH = {
+    "own link": 4,
+    "vekn id": 3,
+    "winner+date+name": 2,
+    "winner+date+size": 2,
+    "winner+date": 1,
+}
+
+
+def demote_collisions(verdicts: list[list]) -> int:
+    """Send every attach that contests an already-claimed tournament back to the queue.
+
+    `resolve` sees one entry at a time and so cannot notice that two of them
+    landed on the same tournament. The TWDA holds one winning deck per event, so
+    a collision means at most one claimant is right and the other is a real event
+    we do not hold — attaching it would both mislabel a tournament and lose a win.
+    The stronger tier keeps the target; a tie sends every claimant to the queue.
+    """
+    claims: dict[str, list[list]] = defaultdict(list)
+    for verdict in verdicts:
+        if verdict[1] == "attach":
+            claims[verdict[2]].append(verdict)
+    demoted = 0
+    for group in claims.values():
+        if len(group) < 2:
+            continue
+        ranked = sorted(group, key=lambda v: -_TIER_STRENGTH[v[3]])
+        strongest = _TIER_STRENGTH[ranked[0][3]]
+        keep = ranked[0] if strongest > _TIER_STRENGTH[ranked[1][3]] else None
+        for verdict in group:
+            if verdict is not keep:
+                verdict[1], verdict[3] = "review", "target claimed by another entry"
+                demoted += 1
+    return demoted
 
 
 def validate(entries: list[dict], corpus: Corpus) -> str:
@@ -291,13 +360,16 @@ def write_report(path: str, verdicts: list[tuple], corpus: Corpus, reasons: Coun
     ]
     for entry_id, _, target, why, meta in review:
         cands = " ".join(
-            f"{corpus.by_uid[u]['name']!r}@{corpus.by_uid[u]['start'][:10]}"
+            # 13 chars is where uuid7 stops colliding across the corpus — the
+            # 8-char prefix is shared by thousands of rows minted the same ms.
+            f"`{u[:13]}` {corpus.by_uid[u]['name']!r}"
+            f"@{corpus.by_uid[u]['start'][:10]}/{corpus.by_uid[u]['size']}p"
             for u in target.split(",")
             if u in corpus.by_uid
         )
         lines.append(
             f"| {entry_id} | {meta['date']} | {meta['player']} | "
-            f"{meta['name']} | {why} | {cands} |"
+            f"{meta['name']} ({meta['size'] or '?'}p) | {why} | {cands} |"
         )
     Path(path).write_text("\n".join(lines) + "\n")
 
@@ -312,12 +384,11 @@ async def run(args: argparse.Namespace) -> int:
         entries = await fetch_twda()
         print(f"twda:   {len(entries)} entries")
 
-        verdicts, reasons = [], Counter()
+        verdicts = []
         for entry in entries:
             action, target, why = resolve(entry, corpus)
-            reasons[f"{action} — {why}"] += 1
             verdicts.append(
-                (
+                [
                     str(entry.get("id", "")),
                     action,
                     target,
@@ -326,9 +397,12 @@ async def run(args: argparse.Namespace) -> int:
                         "date": entry.get("date", ""),
                         "player": entry.get("player", ""),
                         "name": entry.get("event", ""),
+                        "size": entry.get("players_count"),
                     },
-                )
+                ]
             )
+        print(f"\ncontested targets requeued: {demote_collisions(verdicts)}")
+        reasons = Counter(f"{v[1]} — {v[3]}" for v in verdicts)
 
         print()
         for reason, count in reasons.most_common():

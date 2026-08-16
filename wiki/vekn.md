@@ -266,10 +266,14 @@ thousand duplicates.
 and is **read-only** — it has no `--apply`. Its output is a decisions file a human
 reviews and the reconstruction later consumes; unreviewed entries are skipped,
 never created. Four tiers: an `archon.vekn.net` link in `event_link`; the vekn
-event id; a **name-free** match on date ± 1 day, winner name and country; then a
-reconstruction candidate. The event name is deliberately not a key — 869 pre-2014
-rows are named `Imported VTES Event` — while winner name resolves half the
-unlinked corpus at 99.9% precision, measured against the linked entries.
+event id; a **name-free** match on date ± 1 day, winner name and country, with the
+event name and then the player count breaking a tie; then a reconstruction
+candidate. Neither the name nor the count is a key — 869 pre-2014 rows are named
+`Imported VTES Event`, and the count is absent on 100 entries and collides freely —
+while winner name resolves half the unlinked corpus at 99.9% precision, measured
+against the linked entries. As a *tie-break* the count is decisive, because the
+archive and the archon row agree on it exactly for most of the multi-event weekends
+the tier otherwise stalls on.
 
 **A vekn event id is not proof of identity.** An organizer can submit an entry
 under an id they later abandoned, leaving ours holding the empty husk. A
@@ -277,6 +281,19 @@ disagreeing winner name does not by itself unseat the id — our names are routi
 fuller than the archive's (`Javier Naranjo Ortiz` vs `Javier Naranjo`), and 75
 entries disagree that way harmlessly — only a rival event on the same date won by
 the same player does.
+
+**The two `event_link` url forms quote uids from two different id spaces.** The
+live `/tournaments/<uid>` form quotes ours; the dead legacy
+`/tournament/<uid>/display.html` form quotes the uid legacy archon minted, which
+the import kept in `external_ids['archon']` on 255 rows. Resolving a legacy link
+against our own uid space alone reports it dead, and the entry then falls to a
+reconstruction it does not need.
+
+**One winning deck per event means two entries cannot share a tournament.** Each
+tier judges a single entry, so a collision between two of them is invisible until a
+pass over the whole verdict set; the weaker tier's claim yields, a tie yields both,
+and the loser is an event we genuinely do not hold. Without that pass one win is
+attached to the wrong tournament and the other is never recorded at all.
 
 ## Legacy archon sync
 
