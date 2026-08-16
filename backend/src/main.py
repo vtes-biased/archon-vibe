@@ -173,7 +173,9 @@ async def run_twda_sync() -> None:
 
 
 async def run_vekn_sync() -> None:
-    """Full scheduled chain: members → tournaments → TWDA → ratings → snapshot."""
+    """Full scheduled chain: members → tournaments → ratings → snapshot.
+
+    The TWDA sync is deliberately not in it — see `run_twda_sync`."""
     if not _sync_service:
         return
 

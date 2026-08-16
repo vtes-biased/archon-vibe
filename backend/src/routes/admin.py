@@ -23,7 +23,7 @@ encoder = msgspec.json.Encoder()
 
 # Will be set by main.py
 _sync_service = None
-# Recorded background runners injected by main.py (member_sync / tournament_sync).
+# Recorded background runners injected by main.py (member_sync / tournament_sync / twda_sync).
 _runners: dict[str, Callable[[], Awaitable[None]]] = {}
 # In-flight admin-dispatched jobs, keyed by job name — keeps the task referenced
 # (so it isn't GC'd) and lets a re-trigger see a run is already going.

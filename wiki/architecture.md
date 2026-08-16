@@ -591,7 +591,8 @@ rounds, tables, seating, scores and players, matching players by VEKN ID.
 
 | Job | Schedule | Module |
 |---|---|---|
-| VEKN sync (members, tournaments, TWDA decks) | every 6h, configurable | `vekn_sync.py`, `vekn_tournament_sync.py`, `twda_import.py` |
+| VEKN sync (members, tournaments) | every 6h, configurable | `vekn_sync.py`, `vekn_tournament_sync.py` |
+| TWDA sync (reconstruction + winner decks) | every 24h, configurable, own flag | `twda_import.py` |
 | VEKN push batch | hourly, configurable | `vekn_push.py` |
 | Legacy-archon merge | daily, systemd timer | `scripts/migrate_from_archon.py --merge` |
 | Sanction cleanup | daily | `db.py` |

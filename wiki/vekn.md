@@ -12,6 +12,8 @@ Work deferred until these syncs retire: [vekn-decommission](vekn-decommission.md
 | `VITE_VEKN_PUSH` | frontend env | restricts the `max_rounds` UI to 2–4, shows the VEKN link badge and the amber pending-sync badges |
 | `VEKN_SYNC_ENABLED` | backend env | enables periodic inbound member and tournament sync |
 | `VEKN_SYNC_INTERVAL_HOURS` | backend env | inbound period, default 6h |
+| `TWDA_SYNC_ENABLED` | backend env | enables the archive sync — separate from `VEKN_SYNC_ENABLED`, because it must outlive the VEKN API |
+| `TWDA_SYNC_INTERVAL_HOURS` | backend env | archive period, default 24h |
 | `VEKN_PUSH_INTERVAL_HOURS` | backend env | outbound push period, default 1h |
 
 All directions need `VEKN_API_BASE_URL`, `VEKN_API_USERNAME`,
@@ -270,11 +272,14 @@ a record we hold.
 `twda_import.py` reads `static.krcg.org/data/twda.json` and does two things:
 reconstructs the historic events the archive is the only record of, and gives every
 resolved winner their decklist (`attribution="twda"`, `public=True`, only where the
-winner has none for that tournament). It runs on `twda_sync`, its own job on the
-vekn-status panel — still inside the scheduled chain and still after the tournament
-sync, so a reconstruction cannot race the vekn-linked copy of the same event, but
-recorded and alertable in its own right now that the archive is the sole source of
-the historic Hall of Fame.
+winner has none for that tournament). It runs on `twda_sync`, **its own job under
+its own flag** and recorded on the vekn-status panel: a different upstream, no VEKN
+credentials, that has to outlive the VEKN API rather than be deleted along with the
+chain. Nothing sequences it against the tournament sync, so the two can both reach
+one event — what keeps that from becoming a duplicate is the `external_ids['twda']`
+carve-out in the adopt path above, and any pair that slips past it surfaces in the
+duplicate report, where an archive reconstruction is reported and never proposed
+for merging.
 
 **It resolves nothing at runtime.** Every entry is looked up in
 `backend/src/data/twda_decisions.tsv`, a reviewed mapping shipped in the wheel:
