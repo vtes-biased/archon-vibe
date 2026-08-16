@@ -1082,10 +1082,9 @@ earlier guard for that event was `state == Finished && rounds.is_empty()`, which
 would have let an IC overwrite a rounds-less row carrying real scored standings —
 exactly the shape all 3627 legacy imports have.
 
-It follows that `attested_player_count`'s `max()` can never see two competing
-non-zero numbers: wherever the field is set, the other term is 0 by construction.
-Keep the `max()` anyway — it is what makes a mis-stamped row harmless rather than
-authoritative.
+It follows that the field is only ever *read* on a row where nothing else answers
+— `attested_player_count` reaches its last branch only when both rounds and
+standings are empty, which is the same condition that permits the write.
 
 It covers the enum's whole job: has-round-detail stays `rounds.is_empty()`;
 is-archival for the UI is `state === "Finished" && !rounds?.length`, or the
@@ -1131,26 +1130,29 @@ making the badge honest.
 ```rust
 fn players_with_rounds(t) -> usize            // unchanged: eligibility + prelim scoring
 pub fn attested_player_count(t) -> usize {    // new: floors that measure event SIZE
-    max3(players_with_rounds(t),
-         if t["rounds"].is_empty() { t["standings"].len() } else { 0 },
-         t["reported_player_count"])
+    if !t["rounds"].is_empty() { return players_with_rounds(t); }
+    if !t["standings"].is_empty() { return t["standings"].len(); }
+    t["reported_player_count"]
 }
 ```
 
-**The standings-length term is load-bearing, and measured.** `players_with_rounds`
-filters its standings fallback on a non-zero `gw`/`vp`/`tp`, which is right for
-eligibility — it asks whether anyone actually played — and wrong for size, because
-a player who finished 0-0-0 still filled a seat. Measured on prod 2026-08-16:
-**580 pre-2014 events have a roster of 10 or more but fewer than 10 scorers**, so
-a floor reading the scored count would silently stop counting their wins, 16% of
-the historic corpus. Taking the standings *length* on a rounds-less row recovers
-every one of them — 2080 clear the floor on scorers, 2660 on standings length,
-and **zero** rows are left with a 10+ roster and a shorter standings list. For a
-rounds-less row the standings array simply is the result sheet.
+**A precedence, not a maximum** — the same trust order as everywhere else in this
+plan: our own play data, then the VEKN record's result sheet, then an external
+attestation, and each is consulted only when the one above it is absent. Written
+as a `max()` it invites the reading that the terms compete and might disagree.
+They cannot: whichever one answers, the others are empty by construction.
 
-The other two terms cover the rest: a natively-run event is dominated by the first
-term and never reaches the second, and a reconstruction has one standings row so
-`reported_player_count` carries it.
+**The middle term is where the care is, and it is measured.** Owner, 2026-08-16:
+*"A score of zero is fine. The point is: if we have standings from VEKN, we don't
+touch the number of players. The number of players who played are the ones listed
+in the vekn record."* So a rounds-less row takes the standings **length** —
+`players_with_rounds`' scored-standings filter is never consulted for size at all.
+That filter is right where it lives, asking whether anyone actually played, and
+would be wrong here: measured on prod 2026-08-16, **580 pre-2014 events have a
+roster of 10 or more but fewer than 10 scorers**, so a floor reading the filtered
+count would silently stop counting their wins — 16% of the historic corpus. 2080
+clear the floor on scorers, 2660 on standings length, and **zero** rows are left
+with a 10+ roster and a shorter standings list.
 
 plus an explicit guard at the top of `ranking_eligibility`: **no rounds and no
 scored standings → `"no_results"`**. Then the HoF's 10-floor consumes
