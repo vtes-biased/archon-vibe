@@ -315,8 +315,11 @@ Resolve every TWDA entry against the live corpus, in order:
    form. **Validate the uid resolves to a live tournament**; a stale or mistyped
    link must route to review, never fall through to name matching.
 2. numeric `id` / `vekn.net/event/<id>` → `external_ids['vekn']` (today's path)
-3. fallback: **`find_same_event_tournaments(name, start, country=…)`**
-   (`db.py:1189`, backed by `SAME_EVENT_QUERY` at `:1178`).
+3. fallback: **a name-free match on date ± 1 day, winner name and country.**
+   `find_same_event_tournaments` is *not* it — that query keys on the event name,
+   which is the one field this corpus cannot use. It keeps the ± 86400s window and
+   the country filter this tier also wants, which is why it read as the obvious
+   precedent; the shipped matcher borrows those two rules and drops the name.
 
 **Do not use `DUPLICATE_GROUPS_QUERY`'s day-bucket key** (`db.py:1233`) even
 though it looked like the obvious precedent. It buckets on

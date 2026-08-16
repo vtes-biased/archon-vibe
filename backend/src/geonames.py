@@ -117,6 +117,17 @@ def normalize_country(value: str) -> str | None:
     return _country_names().get(lowered) or _COUNTRY_NAME_ALIASES.get(lowered)
 
 
+def country_key(value: str) -> str:
+    """A key for comparing two country values, one of which may be a name.
+
+    Unresolvable values compare as themselves rather than as "unknown", so a
+    country this module has never heard of still fails a comparison against a
+    different one. Resolving to None instead would make every such value equal
+    to every other and silently disable the caller's guard.
+    """
+    return normalize_country(value) or value.strip().lower()
+
+
 def get_continent(country_code: str) -> str | None:
     """Get the continent code for a country."""
     country = get_country(country_code)

@@ -11,8 +11,8 @@ thousand duplicates.
     /opt/archon/backend/.venv/bin/python \\
       /opt/archon/backend/scripts/reconcile_twda.py --emit-decisions /tmp/twda.tsv
 
-    # also write the human-readable review table
-    … reconcile_twda.py --emit-decisions /tmp/twda.tsv --report /tmp/table.md
+    # also write the human-readable review table, and re-derive the tier-3 score
+    … reconcile_twda.py --emit-decisions /tmp/twda.tsv --report /tmp/table.md --validate
 
 This script creates nothing and has no --apply: its output is a decisions file a
 human reviews, which the reconstruction then consumes. Entries left unreviewed
@@ -50,7 +50,7 @@ import re
 import sys
 import unicodedata
 from collections import Counter, defaultdict
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 try:
@@ -189,11 +189,6 @@ def resolve(entry: dict, corpus: Corpus) -> tuple[str, str, str]:
                 "vekn id duplicated",
             )
         row = candidates[0]
-        # A disagreeing winner name is NOT enough to doubt the id — ours are
-        # fuller than the archive's ("Javier Naranjo Ortiz" vs "Javier Naranjo").
-        # Only a rival event actually won by this player unseats it, which is the
-        # abandoned-event-id shape: the entry names an id its submitter later
-        # replaced, and ours holds the empty husk.
         rivals = [r for r in winner_candidates(entry, corpus) if r["uid"] != row["uid"]]
         if row["winner"] != player and len(rivals) == 1:
             return "review", f"{row['uid']},{rivals[0]['uid']}", "vekn id contested"
@@ -215,6 +210,39 @@ def resolve(entry: dict, corpus: Corpus) -> tuple[str, str, str]:
             return "attach", exact[0]["uid"], "winner+date+name"
         return "review", ",".join(row["uid"] for row in hits), f"{len(hits)} candidates"
     return "create", "", "no candidate"
+
+
+def validate(entries: list[dict], corpus: Corpus) -> str:
+    """Score the name-free tier against the linked entries, which know the answer.
+
+    Every entry whose vekn id resolves to exactly one of our tournaments is a free
+    labelled example: hide the id and the link, let the weak tier answer blind, and
+    compare. This is the number that justifies keying on the winner rather than the
+    event name, so it has to stay re-derivable as both corpora move.
+    """
+    truth = {
+        str(e.get("id", "")): corpus.by_vekn[extract_vekn_event_id(e)][0]["uid"]
+        for e in entries
+        if extract_vekn_event_id(e)
+        and len(corpus.by_vekn.get(extract_vekn_event_id(e), [])) == 1
+    }
+    right = wrong = 0
+    for entry in entries:
+        known = truth.get(str(entry.get("id", "")))
+        if not known:
+            continue
+        blind = {k: v for k, v in entry.items() if k not in ("id", "event_link")}
+        action, target, _ = resolve(blind, corpus)
+        if action == "attach":
+            right += target == known
+            wrong += target != known
+    answered = right + wrong
+    if not answered:
+        return "no labelled entries — cannot validate"
+    return (
+        f"name-free tier: {right}/{answered} = {right / answered:.1%} precise, "
+        f"recall {answered / len(truth):.1%} over {len(truth)} labelled entries"
+    )
 
 
 async def fetch_twda() -> list[dict]:
@@ -241,6 +269,10 @@ def write_report(path: str, verdicts: list[tuple], corpus: Corpus, reasons: Coun
         "",
         "Read-only output of `backend/scripts/reconcile_twda.py`. Deleted with the",
         "board line that owns it.",
+        "",
+        f"Run {datetime.now(UTC).date().isoformat()} against {len(corpus.by_uid)} live "
+        f"tournaments and {len(verdicts)} TWDA entries. The archive grows weekly —"
+        " re-run before acting on a stale queue.",
         "",
         "| outcome | entries |",
         "|---|---|",
@@ -306,11 +338,10 @@ async def run(args: argparse.Namespace) -> int:
             f"\n  attach {totals['attach']}   create {totals['create']}   "
             f"review {totals['review']}"
         )
+        if args.validate:
+            print(f"\n  {validate(entries, corpus)}")
 
         if args.emit_decisions:
-            # Undecided entries are written as `review`, never omitted: a consumer
-            # must be able to see that they exist and refuse, rather than read a
-            # short file as a complete one.
             body = "\n".join(
                 f"{entry_id}\t{action}"
                 + (f":{target}" if action == "attach" and target else "")
@@ -338,6 +369,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dsn", default=os.getenv("DATABASE_URL"), help="target DSN")
     p.add_argument("--emit-decisions", metavar="PATH", help="write the decisions file")
     p.add_argument("--report", metavar="PATH", help="write the human review table")
+    p.add_argument(
+        "--validate",
+        action="store_true",
+        help="score the name-free tier against the vekn-linked entries",
+    )
     args = p.parse_args()
     if not args.dsn:
         p.error("--dsn or DATABASE_URL is required")

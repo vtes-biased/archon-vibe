@@ -3,6 +3,8 @@
 Read-only output of `backend/scripts/reconcile_twda.py`. Deleted with the
 board line that owns it.
 
+Run 2026-08-16 against 8475 live tournaments and 4538 TWDA entries. The archive grows weekly — re-run before acting on a stale queue.
+
 | outcome | entries |
 |---|---|
 | attach — vekn id | 2177 |

@@ -52,9 +52,13 @@ access-version handshake nor any test can catch the missing backfill — see
 **`Tournament.country` is not always an ISO code.** 208 live rows store the country
 *name* — `Brazil`, `Spain`, `United States` — in a field every consumer reads as a
 two-letter code, so any exact comparison silently drops them as if they disagreed.
-Pass both sides through `geonames.normalize_country` before comparing. It resolves
-names from the bundled GeoNames data and carries the handful GeoNames lacks (the UK
-constituent countries, `USA`, `Russia`).
+Compare through **`geonames.country_key`**, never through `normalize_country`
+directly: the resolver returns `None` for a spelling it does not know (`Czechia`,
+`South Korea`, `UK`), and treating that as "no country declared" makes every
+unknown value equal to every other and **disables the caller's guard**.
+`country_key` compares such values as themselves, so an unrecognised spelling
+narrows the candidates instead. `normalize_country` is for resolving a code out of
+a name, where `None` legitimately means "says nothing" — the TWDA's `Online`.
 
 ## Two implementations of one gate
 
