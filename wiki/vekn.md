@@ -281,6 +281,13 @@ carve-out in the adopt path above, and any pair that slips past it surfaces in t
 duplicate report, where an archive reconstruction is reported and never proposed
 for merging.
 
+**The scheduled run only ever does a delta.** More than `MAX_CREATES_PER_RUN`
+reconstructions pending means it is standing in for the initial backfill, so it
+creates none and logs an error naming `backfill_twda.py` — which lifts the cap and
+suppresses broadcasting. Without that, the first scheduled run after a deploy *is*
+the backfill, at a thousand SSE frames per connected client. Decks still land for
+everything already resolved, so a capped run is useful rather than merely refused.
+
 **It resolves nothing at runtime.** Every entry is looked up in
 `backend/src/data/twda_decisions.tsv`, a reviewed mapping shipped in the wheel:
 `attach` names one of our tournaments, `create` names the winning member and asks

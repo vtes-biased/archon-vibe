@@ -36,6 +36,11 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 TWDA_URL = "https://static.krcg.org/data/twda.json"
+# The scheduled task handles a delta. More than this many reconstructions in one
+# run means it is standing in for the initial backfill, which belongs in
+# `backend/scripts/backfill_twda.py` — a thousand saves here is a thousand SSE
+# frames at every connected client.
+MAX_CREATES_PER_RUN = 25
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -229,7 +234,9 @@ async def _winners_by_tournament_uid(uids: list[str]) -> dict[str, tuple[str, li
     return {row[0]: (row[1] or "", list(row[2] or [])) for row in rows}
 
 
-async def run_twda_sync(*, broadcast: bool = True) -> dict[str, int]:
+async def run_twda_sync(
+    *, broadcast: bool = True, max_creates: int | None = MAX_CREATES_PER_RUN
+) -> dict[str, int]:
     """Reconcile the whole archive against our corpus: reconstruct what the
     decisions file says we lack, then give every resolved winner their decklist.
 
@@ -241,7 +248,9 @@ async def run_twda_sync(*, broadcast: bool = True) -> dict[str, int]:
 
     `broadcast=False` is for the one-time backfill: pushing a thousand object
     frames at every connected client in a tight loop is a burst the recurring
-    delta never produces.
+    delta never produces. `max_creates=None` lifts the delta cap for it, so the
+    scheduled task cannot become the backfill by accident — which is exactly what
+    the first run after a deploy would otherwise be.
     """
     entries = await _fetch_twda()
     decisions = load_decisions()
@@ -255,9 +264,29 @@ async def run_twda_sync(*, broadcast: bool = True) -> dict[str, int]:
         "stale_targets": 0,
         "orphaned": 0,
         "decks_created": 0,
+        "deferred_to_backfill": 0,
     }
     # entry id -> (our tournament uid, winner uid or "" when the row knows its own)
     resolved: dict[str, tuple[str, str]] = {}
+
+    pending = sum(
+        1
+        for entry in entries
+        if decisions.get(str(entry.get("id", "")), ("", ""))[0] == "create"
+        and str(entry.get("id", "")) not in known
+    )
+    # A run this size is the initial backfill, not a delta, whatever invoked it.
+    # Reconstruct nothing and say so: the decks below still land for everything
+    # already resolved, so a capped run is useful rather than merely refused.
+    bulk = max_creates is not None and pending > max_creates
+    if bulk:
+        stats["deferred_to_backfill"] = pending
+        logger.error(
+            f"TWDA sync: {pending} entries await reconstruction, over the "
+            f"{max_creates} delta cap — creating none. Run "
+            f"backend/scripts/backfill_twda.py --apply, which suppresses "
+            f"broadcasting and regenerates the snapshot."
+        )
 
     for entry in entries:
         entry_id = str(entry.get("id", ""))
@@ -271,6 +300,8 @@ async def run_twda_sync(*, broadcast: bool = True) -> dict[str, int]:
         existing = known.get(entry_id)
         if existing:
             resolved[entry_id] = (existing, target)
+            continue
+        if bulk:
             continue
         tournament = reconstructed_tournament(entry, target, now)
         bd = await save_object_from_model(ObjectType.TOURNAMENT, tournament)

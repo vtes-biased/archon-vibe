@@ -71,7 +71,7 @@ async def run(args: argparse.Namespace) -> int:
             print("\nDry run — pass --apply to write.")
             return 0
 
-        stats = await run_twda_sync(broadcast=False)
+        stats = await run_twda_sync(broadcast=False, max_creates=None)
         print(f"\n{stats}")
         print("\nRegenerating snapshots...")
         print(await generate_snapshots())

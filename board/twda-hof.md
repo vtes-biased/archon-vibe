@@ -773,6 +773,12 @@ settled that the plan did not say:
   archive entry disappears is invisible. Both are counted in the sync stats and
   logged; neither is ever auto-repaired.
 
+- **The scheduled task cannot become the backfill.** `MAX_CREATES_PER_RUN` caps a
+  run at a delta; over it, it reconstructs nothing and names the script. Found by
+  asking whether the deploy could precede the backfill — it can, and with
+  `TWDA_SYNC_ENABLED` true in both inventories it would have run the bulk with
+  broadcasting on, which is the one thing item 6 exists to prevent.
+
 **Still owed before this reaches the corpus**: regenerate
 `twda_decisions.tsv` against prod (it was generated from the 2026-08-16 extract,
 and its targets are uids), then `backfill_twda.py --apply`. The recurring task
