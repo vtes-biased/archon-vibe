@@ -228,6 +228,44 @@ Found 2026-08-15 while measuring the tournament corpus for the Hall of Fame
 rebuild — a year histogram of all 8466 live tournaments put exactly one row in
 2034.
 
+#### 2. Placeholder-named rows carrying a VEKN id
+
+Three live `Finished` tournaments with **zero players and zero rounds**, whose
+names say outright that they were never events:
+
+| uid | date | vekn id | country | name |
+|---|---|---|---|---|
+| `f880a4c5-e8cc-4c75-b8e1-9168caf04842` | 2025-11-09 | `9955` | — | `TEST` |
+| `abd7e330-8005-49d5-97ce-c650bc6edb68` | 2025-11-15 | `12797` | Portugal | `delete me` |
+| `dde82ba8-6936-4ec4-94fc-130523c02cf7` | 2026-01-01 | `13235` | Brazil | `ND` |
+
+All three carry `external_ids['vekn']`, so deletion is refused today and the
+calendar sync would re-create them anyway — they wait on this section's trigger,
+not on an organizer.
+
+`delete me` is the costly one: a TWDA entry submitted under event `12797` points
+at it while the real event, `Bloodshed in VdC`, holds `12794`. That is the single
+`vekn id contested` row in the Hall of Fame reconciliation, and it is the reason
+the reconciler must treat a vekn event id as evidence rather than proof
+([vekn](vekn.md)). Deleting the husk retires that special case for good.
+
+**Two further rows named `Test` are probably not this population** —
+`ebcfaea6-babb-4725-8fb4-4cc755bbfd9e` (2020-09-01, Croatia, 1 player) and
+`4218a3a4-0a2e-434a-be14-2d7135d10688` (2025-09-13, Portugal, **8 players**).
+Neither carries a vekn id, so per the check above both may already be deletable
+by their organizer and belong nowhere near this list. The 8-player one should not
+be deleted on the strength of its name alone — that is a plausible real roster.
+`vekn_pushed_at` is unread for both; check it before acting.
+
+**Five more placeholder-looking names are real events, not junk** — `LoB`
+(2006, US, 12 players), `QCF` twice (2006, 29 and 6 players), `NA` (2006, FR, 23
+players) and `Tournament` (2007, CZ, 16 players). All are pre-2014 legacy archon
+imports with real rosters and vekn ids; the names are terse or generic, not
+wrong. They need the *display* treatment the Hall of Fame plan already carries — a
+name synthesized from place and date — and must never be deleted.
+
+Found 2026-08-16 while deciding the Hall of Fame reconciliation queue.
+
 ## Trigger: the VEKN API decommission scope is decided
 
 ### TWDA submission continuity
