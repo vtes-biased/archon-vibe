@@ -157,10 +157,12 @@ PyO3 and WASM — every count now comes from there, so a rule change lands once.
 What still has hand-written twins is the played-player **set**
 (`ratings.py` `_players_with_rounds`, `tournament-utils.ts` `playedPlayerUids`),
 because callers need the uids, not a number. Those are enumeration; the rule is
-not in them. `backend/src/routes/tournaments.py` `_played_player_count`, gating the
-TWDA floor, is the one deliberate divergence: seats only, no standings fallback —
-so 0 for a rounds-less import — and it *subtracts* non-competing proxies. Share
-the constant with it, never the function.
+not in them. Two readings in `backend/src/routes/tournaments.py` stay divergent:
+`_played_player_count`, gating the TWDA floor, is seats only with no standings
+fallback — so 0 for a rounds-less import — and it *subtracts* non-competing
+proxies; and the archondata report export sends `len(tournament.players)`, the
+registered roster including no-shows. Neither is the rule. Share the constant with
+the TWDA gate, never the function.
 
 `len(rounds) == 0` is not "no results", and never measures field size. Every
 pre-2014 import is rounds-less while carrying a full scored result sheet, so the

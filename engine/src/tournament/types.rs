@@ -310,7 +310,9 @@ impl ActorContext {
     }
 
     /// The permission-table view of this actor. Roles arrive as strings here;
-    /// unrecognised ones drop, same as `UserContext::from_json`.
+    /// unrecognised ones drop, same as `UserContext::from_json`. **No country** —
+    /// a tournament event carries none, so any `same_country` capability checked
+    /// through this fails closed.
     pub fn user_context(&self) -> crate::permissions::UserContext {
         crate::permissions::UserContext {
             roles: self

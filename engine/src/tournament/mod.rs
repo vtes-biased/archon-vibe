@@ -2523,20 +2523,41 @@ fn apply_event(
             let ordered = std::iter::once(winner)
                 .chain(players.iter().filter(|p| *p != winner))
                 .collect::<Vec<_>>();
+            // A native event finished from Waiting also reaches here, and its rows
+            // may carry a display name and a real payment status. Nothing else on
+            // them survives — the results are what this event replaces. A name-only
+            // player has no uid the payload could name, so they are carried through
+            // rather than deleted by an event that cannot address them.
+            let existing = tournament["players"].clone();
+            let nameless: Vec<JsonValue> = existing
+                .members()
+                .filter(|p| p["user_uid"].as_str().unwrap_or("").is_empty())
+                .cloned()
+                .collect();
             tournament["players"] = JsonValue::Array(
                 ordered
                     .iter()
                     .map(|uid| {
-                        json::object! {
+                        let prior = existing
+                            .members()
+                            .find(|p| p["user_uid"].as_str() == Some(uid.as_str()));
+                        let mut player = json::object! {
                             user_uid: uid.as_str(),
                             state: "Finished",
-                            payment_status: "Paid",
+                            payment_status: prior
+                                .and_then(|p| p["payment_status"].as_str())
+                                .unwrap_or("Paid"),
                             toss: 0,
                             result: { gw: 0, vp: 0.0, tp: 0 },
                             finalist: *uid == winner,
                             non_competing: false,
+                        };
+                        if let Some(dn) = prior.and_then(|p| p["display_name"].as_str()) {
+                            player["display_name"] = dn.into();
                         }
+                        player
                     })
+                    .chain(nameless)
                     .collect(),
             );
             tournament["standings"] = JsonValue::Array(
