@@ -1,0 +1,54 @@
+# Human rulings on the TWDA reconciliation, and the only hand-authored input to
+# it. `reconcile_twda.py` reads this, applies it over what the matchers derive,
+# and writes twda_decisions.tsv — which is generated, so never edit that one.
+#
+# kind <TAB> key <TAB> value
+#   event   <twda entry id>   <tournament uid> | create
+#     Overrides the event matcher for one archive entry. `create` means we
+#     checked and do not hold it.
+#   winner  <archive name>    <user uid>
+#     Binds an archive winner spelling to a member. The name is matched
+#     normalised (casefolded, ASCII-folded, punctuation dropped), so the exact
+#     capitalisation and accents here are documentation.
+#
+# A winner ruling is an identity claim about a real person. Every uid below was
+# checked to exist and to carry the name claimed for it.
+
+# --- events: the twelve the reconciliation queue could not settle (owner, 2026-08-16)
+event	11429	create
+event	12797	019f1a1a-ba64-74fd-bc9f-0fed297e0263
+event	2010ecday1	019f1a07-70ec-733f-a444-8a767501cc72
+event	2010originsthu2	019f1a07-7ab5-7344-9f59-b10bca00efaf
+event	2010pwblaQ	019f1a07-7811-70f5-8ecf-ae1ce130e8e0
+event	2010shfsd1	019f1a07-789f-74cf-af36-be4ff5263c3b
+event	2010shfsd2	create
+event	2013jbflac	019f1a18-aabd-7114-aa47-285296579918
+event	2k5originssat	019f1a05-f050-71bf-86c8-78680ad7c182
+event	2k5originsthur4	019f1a07-2d4d-732a-9d55-9c3d0c6471ad
+event	2k7losangelesqual	019f1a06-cfaa-75f5-b814-9969c052f6f9
+event	2k9italychamp	019f1a05-cd31-71a5-93f0-bcfe0aebe883
+
+# --- winners: 23 of the 50 the matchers left open (owner, 2026-08-16)
+winner	Alejandro Hernandez Molina	019f1a00-ad0c-77a5-8a54-4fde20bbf720
+winner	BJ Conant	019f19ff-8b14-72f7-aa69-4cc6ba29a53b
+winner	Ben O'Neill	019f1a00-78c6-775b-9abe-ee9d668bd22e
+winner	Bernie MacNaught	019f1a00-7ad6-76d4-b406-07930b3a7995
+winner	Bruno Keiti Tamane	019f1a00-9750-750c-98a5-f6cac873c649
+winner	Caroline Hyll	019f19ff-b402-779c-932c-99168acfc5fa
+winner	Daniel Stefanutti	019f1a00-99b0-74c4-82b6-02c60be77f1a
+winner	Denny Bruset	019f1a00-6fa7-7124-a580-f8286a140696
+winner	Eric Haas	019f1a00-cb3d-709f-97d7-0cc13d04f27f
+winner	Jeff Lamothe	019f19ff-bb89-72fa-80f8-f715da313543
+winner	Jessie Ellison	019f1a00-0ca1-7118-9a42-c5cb884647ad
+winner	Karl Cheng Chua	019f19ff-8d41-7753-bec8-f9766c35afda
+winner	Lander Ladislao	019f19ff-c1b2-73a8-a55f-c77bb71a4b5a
+winner	Mattrim Dixon	019f19ff-8a0d-7379-8a21-bb8d74ce59c5
+winner	Michael Corriea	019f1a00-590f-767f-9fb2-e12baf29eade
+winner	Michael W. Jones	019f19ff-f6b5-7547-9d3b-1d9961c8d961
+winner	Michele	019f19ff-9b2d-73bf-adc6-0f22875e1991
+winner	Miguel Vazquez	019f1a00-9aaf-7311-ac03-7ac9fb108439
+winner	Pau Villar	019f19ff-958f-7525-9cbe-7c09d97b6fd0
+winner	Peter Jaworski	019f19ff-d108-7768-b0c7-7d86834194bc
+winner	Robert Müller	019f1a00-7178-7411-b905-17f89b980eaf
+winner	Steve Van Nus	019f1a00-7a78-7520-b2bf-de27662ae01a
+winner	Tim Smith	019f1a00-7c54-7373-bedc-ecd71868c096

@@ -59,6 +59,7 @@ import re
 import sys
 from collections import Counter, defaultdict
 from datetime import UTC, date, datetime, timedelta
+from difflib import SequenceMatcher
 from pathlib import Path
 
 try:
@@ -169,6 +170,250 @@ class Corpus:
             for offset in (-1, 0, 1)
             for row in self.by_day.get((day + timedelta(days=offset)).isoformat(), [])
         ]
+
+
+ROSTER_QUERY = """
+    SELECT uid, btrim(coalesce("full"->>'name', ''))
+    FROM objects WHERE type = %s AND deleted_at IS NULL
+"""
+
+# Diminutives seen in the confirmed matches plus their obvious siblings.
+# Deliberately tiny: a longer list would fire on names it was never scored against.
+NICK = {
+    "tomek": "tomasz", "mike": "michael", "jon": "john", "jonny": "johnny",
+    "bob": "robert", "rob": "robert", "bill": "william", "will": "william",
+    "dave": "david", "dan": "daniel", "tom": "thomas", "chris": "christopher",
+    "nick": "nicholas", "matt": "matthew", "steve": "stephen", "jim": "james",
+    "pete": "peter", "rick": "richard", "dick": "richard", "ken": "kenneth",
+    "greg": "gregory", "andy": "andrew", "tony": "anthony", "joe": "joseph",
+    "ed": "edward", "sam": "samuel", "ben": "benjamin", "alex": "alexander",
+    "josh": "joshua", "zack": "zachary", "gabe": "gabriel", "vinny": "vincent",
+}  # fmt: skip
+
+
+# How many members may share a surname before the surname-anchored classes stop
+# being evidence. Every value from 1 to 5 scores 100% on the bootstrap; 3 is the
+# one the earlier pass was validated at.
+MAX_SHARING_SURNAME = 3
+
+
+def _similar(a: str, b: str) -> float:
+    return SequenceMatcher(None, a, b).ratio()
+
+
+class Roster:
+    """Our members, indexed the four ways the winner passes look them up."""
+
+    def __init__(self, rows: list[tuple]):
+        self.by_name: dict[str, list[dict]] = defaultdict(list)
+        self.by_surname: dict[str, list[dict]] = defaultdict(list)
+        self.by_token: dict[str, list[dict]] = defaultdict(list)
+        # Bucketed by the sorted letter-set of each token's first 4 characters,
+        # so a transposition or a doubled letter still lands somewhere comparable.
+        self.buckets: dict[str, set[str]] = defaultdict(set)
+        for uid, name in rows:
+            key = normalize(name)
+            if not key:
+                continue
+            member = {"uid": uid, "name": name, "key": key}
+            self.by_name[key].append(member)
+            tokens = key.split()
+            self.by_surname[tokens[-1]].append(member)
+            for token in set(tokens):
+                self.by_token[token].append(member)
+                if len(token) >= 4:
+                    self.buckets["".join(sorted(set(token[:4])))].add(key)
+
+    def exact(self, name: str) -> list[dict]:
+        return self.by_name.get(name, [])
+
+    def classes(self, name: str) -> tuple[str, list[dict]]:
+        """(class, members) — the strongest surname-anchored class yielding one member.
+
+        Country is deliberately not a tie-break anywhere in here: scored over the
+        bootstrap it fired 4 times and got 1 wrong, against 1095/1095 for the
+        paths that need no tie-break at all.
+        """
+        tokens = name.split()
+        if len(tokens) < 2:
+            return "too-short", []
+        surname, given = tokens[-1], tokens[:-1]
+
+        # 1. the archive carries surnames the member record drops. Anchored on the
+        # rarest token so the scan stays small. Two-token floor: a member recorded
+        # as "Nick ?" is a subset of every "Nick <surname>" in the archive.
+        rarest = min(tokens, key=lambda t: len(self.by_token.get(t, [])))
+        subset = [
+            m
+            for m in self.by_token.get(rarest, [])
+            if len(m["key"].split()) >= 2 and set(m["key"].split()) <= set(tokens)
+        ]
+        if len(subset) == 1:
+            return "member-subset", subset
+
+        # Everything below rests on "same surname, given names correspond". On a
+        # crowded surname that is not evidence: the given name is carrying the
+        # whole claim against dozens of candidates, and that is exactly where the
+        # bootstrap's one wrong match sits ("Matheus Oliveira" -> "Matheus Rocha
+        # de Oliveira", 55 Oliveiras, truth "Matheus Kurtz"). Refuse, and let it
+        # go to review and come back as a ruling.
+        pool = self.by_surname.get(surname, [])
+        if not pool:
+            return "no surname", []
+        if len(pool) > MAX_SHARING_SURNAME:
+            return f"surname-only ({len(pool)})", pool
+
+        # 2. same surname, one given name a prefix of the other. The floor is on
+        # the SHORTER side, or a lone initial or particle satisfies it.
+        prefix = [
+            m
+            for m in pool
+            if (g := m["key"].split()[:-1])
+            and any(
+                min(len(a), len(b)) >= 3 and (a.startswith(b) or b.startswith(a))
+                for a in given
+                for b in g
+            )
+        ]
+        if len(prefix) == 1:
+            return "given-prefix", prefix
+
+        # 3. same surname, given name a known diminutive of the member's
+        nick = [
+            m
+            for m in pool
+            if (g := m["key"].split()[:-1])
+            and {NICK.get(a, a) for a in given} & {NICK.get(b, b) for b in g}
+        ]
+        if len(nick) == 1:
+            return "diminutive", nick
+        return f"surname-only ({len(pool)})", pool
+
+    def fuzzy(self, name: str, floor: float = 0.86) -> list[dict]:
+        """Best whole-name match, only when it clearly beats the runner-up."""
+        if len(name.split()) < 2:  # a lone given name identifies nobody
+            return []
+        pool: set[str] = set()
+        for token in set(name.split()):
+            if len(token) >= 4:
+                pool |= self.buckets.get("".join(sorted(set(token[:4]))), set())
+        scored = sorted(((_similar(name, key), key) for key in pool), reverse=True)
+        if not scored or scored[0][0] < floor:
+            return []
+        if len(scored) > 1 and scored[1][0] > scored[0][0] - 0.04:
+            return []  # two equally good — ambiguous, refuse
+        best = scored[0][1]
+        # A whole-name ratio clears the floor on given name and length alone
+        # ("David Magri" against "David Martin"), so demand that the surnames
+        # correspond, or that the member's name is contained in the archive's.
+        # The counterpart may sit mid-name: Spanish double surnames put it there.
+        surname_ok = max(_similar(name.split()[-1], t) for t in best.split()) >= 0.75
+        if not (surname_ok or set(best.split()) <= set(name.split())):
+            return []
+        return self.by_name[best]
+
+
+def resolve_winner(name: str, roster: Roster, rulings: dict) -> tuple[str, str]:
+    """(user_uid, class) for one normalised archive winner name; uid "" = unresolved.
+
+    Ordered by measured precision. Every class below scored 100% against the
+    bootstrap — the entries whose event we already hold, which know the answer and
+    which no pass here ever sees. Classes that scored under that went to human
+    review instead and come back through `rulings`, never through code.
+    """
+    ruled = rulings.get(name)
+    if ruled:
+        return ruled, "ruling"
+    hits = roster.exact(name)
+    if len(hits) == 1:
+        return hits[0]["uid"], "exact"
+    if hits:
+        return "", f"ambiguous ({len(hits)} of that name)"
+    cls, hits = roster.classes(name)
+    if len(hits) == 1 and not cls.startswith("surname-only"):
+        return hits[0]["uid"], cls
+    hits = roster.fuzzy(name)
+    if len(hits) == 1:
+        return hits[0]["uid"], "whole-name fuzzy"
+    return "", "no member"
+
+
+def bootstrap_winners(verdicts: list[list], corpus: Corpus, by_id: dict) -> dict:
+    """archive name -> user_uid, taken from the events we already hold.
+
+    An entry that attaches to one of our tournaments hands over that tournament's
+    winner, so the archive's spelling of the name is labelled for free. This is
+    both the strongest resolver and the only honest scoring set for the others.
+    A name our corpus maps to two different members is dropped, not guessed.
+    """
+    seen: dict[str, set[str]] = defaultdict(set)
+    for entry_id, action, target, _, _ in verdicts:
+        if action != "attach":
+            continue
+        row = corpus.by_uid.get(target)
+        name = normalize(by_id[entry_id].get("player", "")) if entry_id in by_id else ""
+        if row and row["winner_uid"] and name:
+            seen[name].add(row["winner_uid"])
+    return {name: next(iter(uids)) for name, uids in seen.items() if len(uids) == 1}
+
+
+def validate_winners(bootstrap: dict, roster: Roster, rulings: dict) -> str:
+    """Score the winner passes against the bootstrap, which they never see.
+
+    Held to the same standard as the event tiers: a class that cannot be scored
+    here does not get to auto-apply. Rulings are excluded — they are the answer
+    key for names no pass reached, so scoring against them measures nothing.
+    """
+    score: Counter = Counter()
+    for name, truth in bootstrap.items():
+        uid, cls = resolve_winner(name, roster, {})
+        if not uid:
+            score["unresolved"] += 1
+            continue
+        score["correct" if uid == truth else "WRONG"] += 1
+        score[f"  .. via {cls}"] += 1
+    answered = score["correct"] + score["WRONG"]
+    if not answered:
+        return "no bootstrapped names — cannot validate"
+    scored = {
+        label.strip().removeprefix(".. via "): n
+        for label, n in score.items()
+        if label.startswith("  ")
+    }
+    detail = "  ".join(f"{cls} {n}" for cls, n in sorted(scored.items()))
+    # A class the bootstrap never exercises is unmeasured, not proven — say so
+    # rather than let its absence read as "no errors".
+    blind = sorted({"exact", "member-subset", "given-prefix", "diminutive",
+                    "whole-name fuzzy"} - set(scored))  # fmt: skip
+    return (
+        f"winner passes: {score['correct']}/{answered} = "
+        f"{score['correct'] / answered:.1%} precise, recall "
+        f"{answered / len(bootstrap):.1%} over {len(bootstrap)} labelled names\n"
+        f"    scored: {detail}"
+        + (
+            f"\n    UNMEASURED (no labelled example): {', '.join(blind)}"
+            if blind
+            else ""
+        )
+    )
+
+
+def load_rulings(path: Path) -> tuple[dict, dict]:
+    """(events, winners) from the hand-authored rulings file."""
+    events: dict[str, str] = {}
+    winners: dict[str, str] = {}
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        kind, key, value = line.split("\t")
+        if kind == "event":
+            events[key] = value
+        elif kind == "winner":
+            winners[normalize(key)] = value
+        else:
+            raise ValueError(f"unknown ruling kind {kind!r}")
+    return events, winners
 
 
 def winner_candidates(entry: dict, corpus: Corpus) -> list[dict]:
@@ -326,6 +571,12 @@ async def load_corpus() -> Corpus:
         return Corpus(await result.fetchall())
 
 
+async def load_roster() -> Roster:
+    async with db.get_connection() as conn:
+        result = await conn.execute(ROSTER_QUERY, (ObjectType.USER,))
+        return Roster(await result.fetchall())
+
+
 def write_report(path: str, verdicts: list[list], corpus: Corpus, reasons: Counter):
     review = [v for v in verdicts if v[1] == "review"]
     create = [v for v in verdicts if v[1] == "create"]
@@ -380,6 +631,11 @@ async def run(args: argparse.Namespace) -> int:
         entries = await fetch_twda()
         print(f"twda:   {len(entries)} entries")
 
+        roster = await load_roster()
+        print(f"roster: {len(roster.by_name)} distinct member names")
+        event_rulings, winner_rulings = load_rulings(args.rulings)
+        print(f"rulings: {len(event_rulings)} events, {len(winner_rulings)} winners")
+
         verdicts = []
         for entry in entries:
             action, target, why = resolve(entry, corpus)
@@ -398,7 +654,30 @@ async def run(args: argparse.Namespace) -> int:
                 ]
             )
         print(f"\ncontested targets requeued: {demote_collisions(verdicts)}")
+        # After the collision pass, so a ruling is never undone by it.
+        for verdict in verdicts:
+            ruled = event_rulings.get(verdict[0])
+            if ruled == "create":
+                verdict[1], verdict[2], verdict[3] = "create", "", "ruling"
+            elif ruled:
+                verdict[1], verdict[2], verdict[3] = "attach", ruled, "ruling"
         reasons = Counter(f"{v[1]} — {v[3]}" for v in verdicts)
+
+        by_id = {str(e.get("id", "")): e for e in entries}
+        bootstrap = bootstrap_winners(verdicts, corpus, by_id)
+        winners = {}
+        for verdict in verdicts:
+            if verdict[1] != "create":
+                continue
+            name = normalize(by_id[verdict[0]].get("player", ""))
+            if name not in winners:
+                uid = bootstrap.get(name)
+                winners[name] = (
+                    (uid, "bootstrap")
+                    if uid
+                    else resolve_winner(name, roster, winner_rulings)
+                )
+            verdict[2] = winners[name][0]
 
         print()
         for reason, count in reasons.most_common():
@@ -408,22 +687,41 @@ async def run(args: argparse.Namespace) -> int:
             f"\n  attach {totals['attach']}   create {totals['create']}   "
             f"review {totals['review']}"
         )
+        created = [v for v in verdicts if v[1] == "create"]
+        resolved = [v for v in created if v[2]]
+        print(
+            f"  reconstruction: {len(resolved)}/{len(created)} with a resolved "
+            f"winner ({len(resolved) / max(len(created), 1):.1%}), "
+            f"{len(created) - len(resolved)} held out"
+        )
+        by_class: Counter = Counter(cls for _, cls in winners.values())
+        for cls, n in by_class.most_common():
+            print(f"    {n:5d} names  {cls}")
+
         if args.validate:
             print(f"\n  {validate(entries, corpus)}")
+            print(f"  {validate_winners(bootstrap, roster, winner_rulings)}")
 
         if args.emit_decisions:
             body = "\n".join(
                 f"{entry_id}\t{action}"
                 + (f":{target}" if action == "attach" and target else "")
-                + (f"\t{target}" if action == "review" and target else "")
+                + (f"\t{target}" if action in ("create", "review") and target else "")
                 for entry_id, action, target, _, _ in verdicts
             )
             Path(args.emit_decisions).write_text(
-                "# twda_id<TAB>action — attach:<tournament_uid>, create, skip, or\n"
-                "# review (UNDECIDED, with candidate uids). Every review line must\n"
-                "# become one of the others before this file is consumed.\n"
-                + body
-                + "\n"
+                "# GENERATED by backend/scripts/reconcile_twda.py — do not hand-edit.\n"
+                "# Human decisions belong in backend/src/data/twda_rulings.tsv, which\n"
+                "# is an input to this file.\n"
+                "#\n"
+                "# twda_id<TAB>action[<TAB>target]\n"
+                "#   attach:<tournament_uid>  we already hold this event\n"
+                "#   create<TAB><user_uid>    reconstruct it, won by that member\n"
+                "#   create                   reconstruct nothing: winner unresolved\n"
+                "#   review<TAB><uids>        UNDECIDED, with the candidates\n"
+                "#\n"
+                "# The consumer creates only `create` lines carrying a winner. Every\n"
+                "# other shape is logged and skipped, never guessed at.\n" + body + "\n"
             )
             print(f"\nDecisions written to {args.emit_decisions} — review before use.")
         if args.report:
@@ -439,6 +737,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dsn", default=os.getenv("DATABASE_URL"), help="target DSN")
     p.add_argument("--emit-decisions", metavar="PATH", help="write the decisions file")
     p.add_argument("--report", metavar="PATH", help="write the human review table")
+    p.add_argument(
+        "--rulings",
+        metavar="PATH",
+        type=Path,
+        default=Path(__file__).parent.parent / "src" / "data" / "twda_rulings.tsv",
+        help="the hand-authored rulings file",
+    )
     p.add_argument(
         "--validate",
         action="store_true",
