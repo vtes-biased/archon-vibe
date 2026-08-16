@@ -475,7 +475,7 @@ Committing the mapping is fine under the no-PII rule: TWDA already publishes
 every winner name alongside its event, and our uids are meaningless outside the
 app.
 
-## Phase 1 — Winner identity — **bootstrap measured 2026-08-16, matching pending**
+## Phase 1 — Winner identity — **measured 2026-08-16, six names await confirmation**
 
 The archive gives a name string and nothing else: 1549 distinct normalised
 winner names, 234 of them at >= 5 IRL entries.
@@ -506,18 +506,63 @@ unless its name is one of the 8.
 2. For the remaining 393, match the normalised name against `User.name`
    (`vekn_sync.py:558` builds it as `"firstname lastname"`, the same shape as
    the TWDA string), folding through `geonames.fold_ascii`. Require a **unique**
-   hit. **Needs the member roster off prod** — the one input this phase does not
-   already have.
-3. Country is a **tie-breaker, never a gate**: 107 of the 237 >= 5-entry names
-   appear in more than one country and 46 have no country holding 80% of their
-   entries — top players travel. `"Online"` is a pseudo-country in `place` and
-   must not be read as one.
-4. **Validate the matcher against the bootstrap before trusting it.** Run it
-   over the 1156 known-correct names and measure precision. That number decides
-   whether auto-attach is safe at all, and it is free.
+   hit. Measured against the 18982-member roster: **227 auto, 164 unknown, 2
+   ambiguous**.
+3. **Country is not even a tie-breaker.** The plan had it as one, on the grounds
+   that top players travel — 107 of the 237 >= 5-entry names appear in more than
+   one country. The measurement is worse than that: used only to break a tie
+   between two same-named members it fired **4 times and got 1 wrong**, against
+   1095/1095 for the unique-name path. It is dropped, and those cases go to
+   review. The miss is instructive — `Julien Guérand` of Paris and
+   `Julien Guerand` of Los Angeles are two real members, and the French one's
+   entries include US events. `"Online"` is a pseudo-country in `place` and must
+   not be read as one either.
+4. **Validated against the bootstrap, which the matcher never saw**:
+   **1095/1095 = 100% precision at 95.0% recall** over the 1153 unambiguously
+   bootstrapped names. Auto-attach on a unique name hit is safe.
 5. Emit `auto` / `ambiguous (N candidates)` / `unknown`, sorted by entry count
    descending so HoF-relevant names are reviewed first. Owner confirms; a
    handful of member creations may be approved for the genuinely unfindable.
+
+**A token-subset fallback was measured and rejected.** Matching where the
+archive's tokens are a subset of a member's (`Javier Naranjo` →
+`Javier Naranjo Ortiz`) scores **14 correct against 1 wrong = 93.3%** on the
+bootstrap, and its one error assigns a Brazilian's tournament win to a different
+real member with a similar name. It would lift reconstruction coverage from
+79.5% to 83.5% and resolves **none** of the HoF-relevant names. Not worth a
+misattributed win; if it is ever built, it generates review suggestions, never
+auto-attaches.
+
+### The six HoF-relevant names the exact matcher missed
+
+None needs a member creation — every one is a given-name variant or a dropped
+second surname, and each resolves to exactly one plausible member. They are
+judgement calls, not matcher output, so they want confirmation before Phase 2
+consumes them:
+
+| archive name | IRL entries | the member | vekn id | where |
+|---|---|---|---|---|
+| Josh Duffin | 10 | `Joshua Duffin` | 1000085 | US, Washington DC |
+| John Newquist | 7 | `Jon Newquist` | 2020029 | US, Atlanta |
+| David Quinonero Santiago | 7 | `David Quiñonero` | 3190006 | ES |
+| Tomasz Kowalewski | 6 | `Tomek Kowalewski` | 8500001 | PL, Bytom |
+| Michael Courtois | 5 | `Mike Courtois` | 2200032 | US, Los Angeles |
+| Alex Ek | 5 | `Alexander Ek` | 3380042 | SE, Göteborg |
+
+Tomek is the Polish diminutive of Tomasz. `Courtois` has a second live member,
+`David Courtois` of Paris, who is a different person. The Quiñonero surname is
+the same family cluster as the Palma disagreement recorded in
+`wiki/vekn-decommission.md`.
+
+The other two of the eight resolved automatically: Rob Treasure (18 entries) and
+**Sten Düring** (7) — the latter only because the ASCII fold now works, since the
+archive spells him `Sten During`.
+
+**Coverage: 900 of the 1132 reconstruction entries carry a resolved winner
+(79.5%) on the exact matcher alone, 940 (83.0%) once the six above are
+confirmed.** The 192 that remain span 160 names and **cost no Hall of Fame place
+at all** — they are archival rows we decline to invent an owner for, held out of
+the import per the rule below rather than imported winner-less.
 
 **Expect the roster to spell names differently from the archive.** Measured over
 the 2180 entries the two name-blind tiers matched — pairings established without
