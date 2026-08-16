@@ -1026,10 +1026,9 @@ exists to make those wins count — but it is now a small field-and-guard change
 rather than a corpus-wide backfill, with no re-projection of 3627 rows and nothing
 published moving.
 
-One residual to check before Phase 3 flips the floor: the fallback counts only
-players who *scored*, so a legacy row where several players finished on zero reads
-short. That undercount cannot evict the corpus, but it can shave events sitting
-just above ten.
+The floor still needs care, and it is measured below rather than left as a
+caution: the scored-standings fallback would have shaved 580 real events, which
+is what the standings-length term in `attested_player_count` exists to prevent.
 
 **Recommendation: add the missing fact, do not add the mode.** The gap is real
 and is a hard blocker; the enum is over-modelling. Three reasons.
@@ -1132,9 +1131,26 @@ making the badge honest.
 ```rust
 fn players_with_rounds(t) -> usize            // unchanged: eligibility + prelim scoring
 pub fn attested_player_count(t) -> usize {    // new: floors that measure event SIZE
-    max(players_with_rounds(t), t["reported_player_count"])
+    max3(players_with_rounds(t),
+         if t["rounds"].is_empty() { t["standings"].len() } else { 0 },
+         t["reported_player_count"])
 }
 ```
+
+**The standings-length term is load-bearing, and measured.** `players_with_rounds`
+filters its standings fallback on a non-zero `gw`/`vp`/`tp`, which is right for
+eligibility — it asks whether anyone actually played — and wrong for size, because
+a player who finished 0-0-0 still filled a seat. Measured on prod 2026-08-16:
+**580 pre-2014 events have a roster of 10 or more but fewer than 10 scorers**, so
+a floor reading the scored count would silently stop counting their wins, 16% of
+the historic corpus. Taking the standings *length* on a rounds-less row recovers
+every one of them — 2080 clear the floor on scorers, 2660 on standings length,
+and **zero** rows are left with a 10+ roster and a shorter standings list. For a
+rounds-less row the standings array simply is the result sheet.
+
+The other two terms cover the rest: a natively-run event is dominated by the first
+term and never reaches the second, and a reconstruction has one standings row so
+`reported_player_count` carries it.
 
 plus an explicit guard at the top of `ranking_eligibility`: **no rounds and no
 scored standings → `"no_results"`**. Then the HoF's 10-floor consumes
