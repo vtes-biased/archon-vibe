@@ -100,7 +100,7 @@ async def vekn_status(
     manager: CurrentUser,
 ) -> dict:
     """State is in-process (resets on restart); keys: member_sync,
-    tournament_sync, batch_push.
+    tournament_sync, twda_sync, batch_push.
     """
     if not permissions.can_run_admin_sync(manager):
         raise HTTPException(status_code=403, detail="Only IC can view VEKN status")
@@ -110,30 +110,20 @@ async def vekn_status(
     return {"jobs": get_status()}
 
 
-async def _run_twda_import() -> None:
-    """TWDA import wrapped for background dispatch (logs its own outcome)."""
-    from ..twda_import import import_twda_decks
-
-    try:
-        logger.info("Starting TWDA deck import")
-        stats = await import_twda_decks()
-        logger.info(f"TWDA deck import: {stats}")
-    except Exception as e:
-        logger.error(f"Error during TWDA deck import: {e}", exc_info=True)
-
-
 @router.post("/sync-twda-decks")
 async def trigger_twda_deck_import(
     manager: CurrentUser,
 ) -> dict:
-    """Returns immediately; the outcome is logged only (no vekn-status panel
-    entry, unlike the VEKN syncs).
+    """Returns immediately; the outcome lands on the vekn-status panel as
+    `twda_sync`, same as the two VEKN syncs.
     """
     if not permissions.can_run_admin_sync(manager):
         raise HTTPException(status_code=403, detail="Only IC can trigger sync")
 
-    logger.info("Manual TWDA deck import dispatched via admin endpoint")
-    return _dispatch("twda", _run_twda_import)
+    from ..main import run_twda_sync
+
+    logger.info("Manual TWDA sync dispatched via admin endpoint")
+    return _dispatch("twda", run_twda_sync)
 
 
 @router.post("/users/merge")

@@ -214,6 +214,7 @@ async def probe_both_vekn(decisions: list[str]) -> int:
 
 async def audit(emit_path: str | None, probe: bool) -> int:
     decisions: list[str] = []
+    twda_groups = 0
     groups = await db.find_duplicate_tournament_groups()
     if not groups:
         print("No mixed-vekn duplicate groups.")
@@ -223,6 +224,14 @@ async def audit(emit_path: str | None, probe: bool) -> int:
         if len(rated) > 1:
             double_rated += 1
         if not copies:
+            continue
+        # An archive reconstruction is a one-player row, so `richness` always ranks
+        # it last. That is right for a true duplicate and destructive for a false
+        # pair thrown up by a generic event name, and the script cannot tell them
+        # apart. Report, never propose: this one is a human's call.
+        if any(t.external_ids.get("twda") for t in copies):
+            twda_groups += 1
+            print("    → no proposal: an archive reconstruction is in this group")
             continue
         keep = max(copies, key=richness)
         drop = [t.uid for t in copies if t.uid != keep.uid]
@@ -239,6 +248,11 @@ async def audit(emit_path: str | None, probe: bool) -> int:
             f"\n{len(groups)} mixed-vekn group(s); {double_rated} "
             "double-counted in ratings."
         )
+        if twda_groups:
+            print(
+                f"{twda_groups} of them hold an archive reconstruction and got no "
+                "proposal — decide those by hand."
+            )
     if probe:
         await probe_both_vekn(decisions)
     if emit_path:

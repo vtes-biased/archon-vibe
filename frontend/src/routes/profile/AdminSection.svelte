@@ -24,6 +24,7 @@
   const statusJobs: { key: string; label: () => string }[] = [
     { key: 'member_sync', label: m.admin_status_member_sync },
     { key: 'tournament_sync', label: m.admin_status_tournament_sync },
+    { key: 'twda_sync', label: m.admin_status_twda_sync },
     { key: 'batch_push', label: m.admin_status_batch_push },
   ];
 

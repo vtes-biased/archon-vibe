@@ -379,6 +379,9 @@ UNCREATED_EVENTS_QUERY = """
       AND "full"->>'start' IS NOT NULL
       AND ("full"->>'open_rounds') IS DISTINCT FROM 'true'
       AND ("full"->>'self_organized_rounds') IS DISTINCT FROM 'true'
+      -- Archive reconstructions carry no vekn id by design, so without this the
+      -- push would happily create 2005 calendar entries on vekn.net.
+      AND ("full"->'external_ids'->>'twda') IS NULL
 """
 
 # The rounds guard excludes results that didn't originate here (VEKN imports, ETL

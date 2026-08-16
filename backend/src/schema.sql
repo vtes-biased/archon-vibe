@@ -212,6 +212,11 @@ WHERE type = 'user' AND calendar_token IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_objects_tournament_vekn
 ON objects(("full"->'external_ids'->>'vekn'))
 WHERE type = 'tournament' AND "full"->'external_ids'->>'vekn' IS NOT NULL;
+-- Tournament TWDA external ID lookup — the reconstruction resolves every archive
+-- entry through it on each run, so without this it seq-scans the corpus per entry.
+CREATE INDEX IF NOT EXISTS idx_objects_tournament_twda
+ON objects(("full"->'external_ids'->>'twda'))
+WHERE type = 'tournament' AND "full"->'external_ids'->>'twda' IS NOT NULL;
 -- Backs the personal-overlay organizer lookup (`organizers_uids @> [uid]`), run on every
 -- member reconnect (ungated by `since`) — else a seq-scan of all tournaments each time.
 -- jsonb_path_ops is smaller than the default opclass and supports @> (but not `?`, hence @>).

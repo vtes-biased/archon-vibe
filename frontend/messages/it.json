@@ -1029,6 +1029,7 @@
   "admin_status_load_error": "Impossibile caricare lo stato della sincronizzazione.",
   "admin_status_member_sync": "Sincronizzazione membri VEKN",
   "admin_status_tournament_sync": "Sincronizzazione tornei VEKN",
+  "admin_status_twda_sync": "Sincronizzazione TWDA",
   "admin_status_batch_push": "Invio VEKN",
   "admin_status_never": "non ancora eseguito",
   "admin_status_last_success": "Ultimo successo",

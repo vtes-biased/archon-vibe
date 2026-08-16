@@ -1029,6 +1029,7 @@
   "admin_status_load_error": "Could not load sync status.",
   "admin_status_member_sync": "VEKN member sync",
   "admin_status_tournament_sync": "VEKN tournament sync",
+  "admin_status_twda_sync": "TWDA sync",
   "admin_status_batch_push": "VEKN push",
   "admin_status_never": "not run yet",
   "admin_status_last_success": "Last success",

@@ -337,7 +337,11 @@ async def _adopt_same_event(tournament: Tournament, event_id: Any) -> Tournament
         return None
 
     adopted = candidates[0]
-    if adopted.players and not adopted.rounds:
+    # A TWDA reconstruction has exactly this shape — a winner-only roster and no
+    # rounds — so the guard below would decline it and mint a duplicate of an
+    # event we already hold. Adopt instead: a full VEKN result set is strictly
+    # richer than a one-player reconstruction, and overwriting it is the point.
+    if adopted.players and not adopted.rounds and not adopted.external_ids.get("twda"):
         logger.warning(
             f"VEKN event {event_id} '{tournament.name}': same-day copy {adopted.uid} "
             f"holds {len(adopted.players)} registered players but no rounds — not "
@@ -496,7 +500,14 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                                 address=tournament.address,
                                 map_url=tournament.map_url,
                                 proxies=tournament.proxies,
-                                external_ids=tournament.external_ids,
+                                # Merged, not replaced: the incoming map holds
+                                # only `vekn`, and a round-less vekn-origin row is
+                                # exactly the class the archive links to, so a
+                                # replace drops its `twda` key on every rebuild.
+                                external_ids={
+                                    **existing.external_ids,
+                                    **tournament.external_ids,
+                                },
                                 organizers_uids=merged_organizers,
                                 max_rounds=tournament.max_rounds,
                                 players=tournament.players,
@@ -550,7 +561,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
     )
 
     # Reported, not repaired — the adoption guards above decline ambiguous cases,
-    # so duplicates still accumulate; resolve with scripts/dedup_tournaments.py.
+    # so duplicates still accumulate; resolve with backend/scripts/dedup_tournaments.py.
     for group in await find_duplicate_tournament_groups():
         logger.warning(
             f"Duplicate live tournaments: '{group['name']}' on {group['day']} — "

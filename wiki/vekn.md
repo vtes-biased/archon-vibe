@@ -263,13 +263,34 @@ The same predicate gates the write and the read — `attested_player_count` reac
 the field only where nothing else answers — so the attestation can never contradict
 a record we hold.
 
-`twda_import.py` pulls winner decklists from
-`static.krcg.org/data/twda.json` and creates decks for matched tournaments, running
-inside the VEKN sync after tournament sync and before the rating recompute. Recent
-entries match by numeric `id` = `external_ids["vekn"]`, older ones by VEKN ID in
-the event link. It creates a deck only when the winner has none for that
-tournament, with `attribution="twda"` and `public=True`. The ETag cache is
-in-memory only and the ~12 MB JSON is released after parsing.
+`twda_import.py` reads `static.krcg.org/data/twda.json` and does two things:
+reconstructs the historic events the archive is the only record of, and gives every
+resolved winner their decklist (`attribution="twda"`, `public=True`, only where the
+winner has none for that tournament). It runs on `twda_sync`, its own job on the
+vekn-status panel — still inside the scheduled chain and still after the tournament
+sync, so a reconstruction cannot race the vekn-linked copy of the same event, but
+recorded and alertable in its own right now that the archive is the sole source of
+the historic Hall of Fame.
+
+**It resolves nothing at runtime.** Every entry is looked up in
+`backend/src/data/twda_decisions.tsv`, a reviewed mapping shipped in the wheel:
+`attach` names one of our tournaments, `create` names the winning member and asks
+for a reconstruction, and anything else is counted and skipped. A wrong
+reconstruction mints a duplicate event and credits a real person with a win they
+did not take, so the file is the gate and there is no fallback path around it.
+
+**No ETag.** There was one, and it is gone deliberately: once identities come from
+a reviewed file, *our* side moves while the archive sits still — a member is
+created, renamed, or claims a VEKN id — and a 304 would skip the reconciliation
+forever, silently and permanently. A 12 MB fetch against a static CDN every cycle
+is the cheaper half of that trade.
+
+The reconstruction writes the same rounds-less archival shape the VEKN and archon
+imports already produce, plus the attested `reported_player_count`
+([tournaments](tournaments.md)), and deliberately **not** `vekn_pushed_at` — that
+would claim results were exchanged with vekn.net, and it trips the delete guard
+that a bad reconstruction needs open. `UNCREATED_EVENTS_QUERY` excludes them
+explicitly, or the push would create 2005 calendar entries on vekn.net.
 
 **That key reaches only half the archive.** The TWDA began carrying vekn event
 links around 2013, so of 4538 entries 2211 are linked and 2327 are not — 2257 of
@@ -279,9 +300,12 @@ from legacy archon with no vekn id. Reconstructing them blind would mint about a
 thousand duplicates.
 
 `backend/scripts/reconcile_twda.py` resolves the archive against the live corpus
-and is **read-only** — it has no `--apply`. Its output is a decisions file a human
-reviews and the reconstruction later consumes; unreviewed entries are skipped,
-never created. Four tiers: an `archon.vekn.net` link in `event_link`; the vekn
+and is **read-only** — it has no `--apply`. It writes the decisions file above;
+human decisions go the other way, into `backend/src/data/twda_rulings.tsv`, which
+is an *input* to it. That split is what keeps the generated file safe to
+regenerate: rulings are never re-derived and a re-run never clobbers a decision.
+
+It answers two questions per entry. **Which event** — four tiers: an `archon.vekn.net` link in `event_link`; the vekn
 event id; a **name-free** match on date ± 1 day, winner name and country, with the
 event name and then the **roster length** breaking a tie; then a reconstruction
 candidate. That length is `len(players)`, not any of the four "how many played"
@@ -293,6 +317,18 @@ while winner name resolves half the unlinked corpus at 99.9% precision, measured
 against the linked entries. As a *tie-break* the count is decisive, because the
 archive and the archon row agree on it exactly for most of the multi-event weekends
 the tier otherwise stalls on.
+
+**And which member won it** — the archive gives a name string and nothing else.
+Strongest first: the *bootstrap*, which reads the answer off our own data (an entry
+that attaches hands over that tournament's resolved winner, no name matching at
+all, and is also the only honest scoring set for everything below it); an exact
+normalised-name match on a name exactly one member holds; surname-anchored classes;
+and a whole-name fuzzy match that must clear a floor, clearly beat the runner-up,
+and agree on the surname. The surname-anchored classes refuse a surname more than
+`MAX_SHARING_SURNAME` members share — there the given name carries the whole claim,
+and that is where the one wrong match in the bootstrap sat. `--validate` scores
+both halves and names any class the bootstrap never exercised, because an
+unmeasured class is not a proven one.
 
 **A vekn event id is not proof of identity.** An organizer can submit an entry
 under an id they later abandoned, leaving ours holding the empty husk. A

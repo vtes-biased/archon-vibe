@@ -149,6 +149,29 @@ async def run_tournament_sync() -> None:
         record_error("tournament_sync", str(e))
 
 
+async def run_twda_sync() -> None:
+    """TWDA reconciliation with status recording (vekn_status).
+
+    On its own schedule, not chained inside the VEKN sync: static.krcg.org is a
+    different upstream that outlives the VEKN API, and with the archive becoming
+    the sole source of the historic Hall of Fame, a persistent failure here must
+    be visible on the status page rather than only in the log.
+    """
+    from .vekn_status import record_error, record_success
+
+    try:
+        from .twda_import import run_twda_sync as sync_twda
+
+        logger.info("Starting TWDA sync")
+        record_success("twda_sync", await sync_twda())
+    except TimeoutError:
+        logger.error("TWDA sync timed out")
+        record_error("twda_sync", "timed out")
+    except Exception as e:
+        logger.error(f"Error during TWDA sync: {e}", exc_info=True)
+        record_error("twda_sync", str(e))
+
+
 async def run_vekn_sync() -> None:
     """Full scheduled chain: members → tournaments → TWDA → ratings → snapshot."""
     if not _sync_service:
@@ -157,15 +180,9 @@ async def run_vekn_sync() -> None:
     await run_member_sync()
     # Tournament sync runs after member sync (needs user UIDs).
     await run_tournament_sync()
-
-    try:
-        from .twda_import import import_twda_decks
-
-        logger.info("Starting TWDA deck import")
-        stats = await import_twda_decks()
-        logger.info(f"TWDA deck import: {stats}")
-    except Exception as e:
-        logger.error(f"Error during TWDA deck import: {e}", exc_info=True)
+    # Still in the chain, still after the tournament sync — a reconstruction must
+    # not race the vekn-linked copy of the same event into the corpus.
+    await run_twda_sync()
 
     # Ratings and snapshot both need tournaments up to date, hence run last.
     await run_rating_recompute()
