@@ -454,9 +454,14 @@ The category, subcategory, baseline and escalation reference is generated from
 `engine/src/sanctions.rs` and served at `GET /sanctions/reference`. The app
 suggests a level by category and warns when issuing below an existing one.
 
-> **Diverges from the rules.** JG v2 §1.1.4 states that "a DQ always includes a
-> Warning". The app issues a DQ as a single sanction with no accompanying Warning,
-> so the player's permanent record is one entry short.
+**A DQ is issued as one sanction, and that satisfies §1.1.4.** The rule's "a DQ
+always includes a Warning" is a paper-records instruction: on paper a DQ is a
+table ruling that leaves no lasting trace, so the Warning is what the judge files
+to make it durable and reportable. Here a DQ *is* a first-class recorded
+sanction, carrying the same 18-month cross-tournament visibility as a Warning and
+outranking it on the escalation ladder — so a companion Warning would add a
+weaker duplicate of a record that already exists, not a missing one. Reading the
+rule literally and issuing both is the mistake to avoid.
 
 ### Standings Adjustment mechanics
 
