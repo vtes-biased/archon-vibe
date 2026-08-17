@@ -24,6 +24,7 @@ from .db import (
     soft_delete_user,
 )
 from .models import AuthMethod, DeckObject, ObjectType, SanctionLevel, User
+from .ratings import recompute_wins
 
 
 async def reassign_auth_methods(from_user_uid: str, to_user_uid: str) -> int:
@@ -171,6 +172,13 @@ async def merge_users(
     broadcasts = [merged_bd]
     broadcasts += await reassign_sanctions(delete_uid, keep_uid)
     broadcasts += await reassign_decks(delete_uid, keep_uid)
+    # The reassigned deck may be the winning deck of a tournament the survivor
+    # already won, which is a Hall of Fame place: the derived count follows the
+    # deck. Their rating does not move — no result changed hands, only ownership.
+    # Rebind `merged`, or the route answers with the pre-recompute win list.
+    for recomputed, bd in await recompute_wins({keep_uid}):
+        merged = recomputed
+        broadcasts.append(bd)
     broadcasts += await reassign_coopted_by_references(delete_uid, keep_uid)
     deleted = await soft_delete_user(delete_uid)
     if deleted:

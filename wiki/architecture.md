@@ -566,9 +566,11 @@ ratings, wins, cooptation — stays attached. Only the account *without* the
 
 **Merge** (`POST /admin/users/merge`, IC only): the VEKN-bearing uid is always the
 survivor. Auth methods, sanctions, decks and `coopted_by` migrate from the dying
-uid, which is then soft-deleted; ratings, wins, roles and `local_modifications` are
-consolidated by union. The merge unions both accounts' roles without consulting
-the appointment matrix. The route separately remaps `promo_ledger` holder
+uid, which is then soft-deleted; roles and `local_modifications` are consolidated
+by union, without consulting the appointment matrix. Ratings and wins are derived,
+not merged: the survivor's Hall of Fame count is recomputed on the spot, because a
+reassigned deck can complete a win they already held, while their rating waits for
+the nightly pass — no result changed hands, only ownership. The route separately remaps `promo_ledger` holder
 references onto the survivor and triggers a full promo stock recompute.
 
 **Detach** splits one account in two: the VEKN record keeps its uid and all keyed

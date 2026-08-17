@@ -113,8 +113,10 @@ async def test_merge_preserves_unlisted_field_and_identity(test_db):
     """The latent bug: rebuilding User(...) from scratch dropped unlisted fields.
 
     msgspec.structs.replace(keep_user, …) must carry every field NOT explicitly
-    overridden — here `wins` — through the merge, while identity stays with the
-    survivor and contact info prefers the dying (claiming) account.
+    overridden — here `github_login` — through the merge, while identity stays with
+    the survivor and contact info prefers the dying (claiming) account. `wins` is
+    the one exception, and not a carried field at all: it is derived, and the merge
+    recomputes it because a reassigned deck can complete a win.
     """
     keep = User(
         uid=str(uuid7()),
@@ -123,6 +125,7 @@ async def test_merge_preserves_unlisted_field_and_identity(test_db):
         vekn_id="1234567",
         roles=[Role.PRINCE],
         contact_email="keep@example.com",
+        github_login="keep-gh",
         wins=["tourn-1"],
     )
     delete = User(
@@ -140,10 +143,13 @@ async def test_merge_preserves_unlisted_field_and_identity(test_db):
 
     assert result is not None
     merged, broadcasts = result
-    # The survivor's update + the dying account's soft-delete are surfaced so
-    # the route can push them to other clients' caches live.
-    assert len(broadcasts) == 2
-    assert merged.wins == ["tourn-1"]
+    # The survivor's update, the win recompute and the dying account's soft-delete
+    # are surfaced so the route can push them to other clients' caches live.
+    assert len(broadcasts) == 3
+    assert merged.github_login == "keep-gh"
+    # Recomputed, not carried: no tournament backs the seeded value. `merged` must
+    # hold the recomputed list, or the route answers with a stale Hall of Fame.
+    assert merged.wins == []
     assert merged.uid == keep.uid
     assert merged.name == "Keep Name"
     assert merged.vekn_id == "1234567"
