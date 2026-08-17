@@ -953,15 +953,19 @@ keys the branch and file on the vekn event id (`twda.py:71-72`,
 `archon/{id}` + `decks/{id}.txt`) and `maybe_submit_twda` skips with
 `no_vekn_event`. Decision 4 commits us to keeping the archive updated after
 decommission, so this closes the read/write loop the ticket is about and belongs
-here rather than in `#579`. Two small changes:
+here rather than in `#579`.
+
+**Item 2 waits on the short event code**, which is its own board line and owns the
+replacement key. Item 1 does not, and can land now.
 
 1. Pass `https://archon.vekn.net/tournaments/{uid}` as `tournament_url` to
    `export_twda` instead of `""` (`routes/tournaments.py:357`). krcg derives the
    entry `id` from that link, so this is what makes Phase 0's first matcher tier
    useful — today we would be building a reader for a link we never write.
-2. Rename `submit_twda_pr`'s `vekn_event_id` parameter to `event_key` and pass
-   `tournament.external_ids.get("vekn") or tournament.uid`, then drop the
-   `no_vekn_event` skip (`routes/tournaments.py:438`).
+2. Rename `submit_twda_pr`'s `vekn_event_id` parameter to `event_key` and fall back
+   to the short event code, then drop the `no_vekn_event` skip
+   (`routes/tournaments.py:438`). **Never the uuid** — the key becomes a permanent
+   filename in a public archive.
 
 **The naming convention needs no negotiation — precedent already exists
 upstream.** Verified 2026-08-14 against `GiottoVerducci/TWD`: the `decks/`
@@ -973,6 +977,9 @@ our uid post-decommission is a continuation, not a new convention. Worth telling
 the maintainer, not asking permission. The only genuine defect is that that
 file's header URL is the dead `display.html` form — our emitted URL must be the
 live route.
+
+That precedent settles that a **non-numeric** key is accepted; it is not an argument
+for the uuid itself, which is unsayable and uncitable — hence the short code.
 
 Deliverable 4 from the original ticket — archive-vs-pushed tracking beyond
 per-tournament `twda_status` — is a genuinely separate feature; file it as a

@@ -1,7 +1,6 @@
 > Elaborated context for a line in `BOARD.md`. Deleted with the line.
 
-Doc-impact: `wiki/architecture.md`, `wiki/sync.md`, `wiki/vekn.md`, and the
-TWDA-submission deferred item in `wiki/vekn-decommission.md`.
+Doc-impact: `wiki/architecture.md`, `wiki/sync.md`, `wiki/vekn.md`.
 
 # A short event id
 
@@ -12,9 +11,11 @@ VEKN event id. `12794` names the TWDA file (`decks/12794.txt`), the forum post
 and the `vekn.net/event/12794` URL. The decommission retires it, and nothing
 replaces it — a `Tournament.uid` is 36 characters and unsayable.
 
-The deferred *TWDA submission continuity* ask in `wiki/vekn-decommission.md` will
-pick a replacement key for the branch and file names. Whatever it picks becomes a
-permanent external record in a public archive. So this must land first, or we
+TWDA submission continuity is part of this line rather than a separate ask: the
+branch and file names key on the vekn event id and `maybe_submit_twda` skips
+outright without one, so the decommission silently ends archive submissions unless
+this replaces the key. Whatever key it picks becomes a permanent external record in
+a public archive, which is why the two cannot be sequenced apart — a stopgap would
 spend the archive's future on uuids.
 
 Evidence that uuids do not survive in external records: of the three TWDA entries

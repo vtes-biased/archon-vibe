@@ -5,9 +5,11 @@ evidence that cannot be reconstructed afterwards. The board holds no waiting
 state: each item below is a real, completable ask parked on a named trigger — a
 condition someone could observe firing. `/upkeep` re-checks the triggers each
 pass; a fired trigger sends its item back through `/intake` as an ordinary board
-line. The decommission decision itself — which syncs retire and when — is an
-active board line, and its outcome must name the matching condition on every item
-here.
+line.
+
+Two of the three triggers are the retirement stages in
+[vekn](vekn.md#decommission), which is where what retires and in what order is
+settled. The third comes first, and is a window rather than a stage.
 
 While the tournament and member syncs are upstreams, anything deleted or diverged
 locally is re-created on their next run — that is what makes each of these
@@ -37,7 +39,7 @@ Doing it *before* the greenlight would be work at risk: the greenlight may not
 come, and a table pulled early goes stale against every calendar sync that runs
 between then and the retirement it feeds.
 
-## Trigger: the VEKN tournament sync retires
+## Trigger: stage 1 — the tournament calendar sync retires
 
 ### Duplicate tournament cleanup
 
@@ -331,16 +333,7 @@ to: 3 of 1156 names mapped to two members, and these are the two that are not
 genuine homonyms. The third — two live members both named `Pedro Paulo`, in
 Fortaleza and Campina Grande — is a real homonym and needs nothing.
 
-## Trigger: the VEKN API decommission scope is decided
-
-### TWDA submission continuity
-
-**Deferred ask** — keep TWDA submission alive after the VEKN API decommission:
-the branch and file names key on the vekn event id and the submitter skips
-outright without one, so decommissioning silently ends archive submissions. Done
-when a finished tournament with no vekn event id still reaches the TWDA.
-
-## Trigger: the VEKN API is decommissioned and the record settled
+## Trigger: stage 2 — the member roster sync retires
 
 ### Prince / NC divergence — legacy archon vs the app
 

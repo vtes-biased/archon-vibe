@@ -1,8 +1,9 @@
 # VEKN integration
 
 How the app talks to vekn.net, to the TWDA, and to the legacy archon database. The
-organization and its rules are [domain](domain/vekn.md); this is the plumbing.
-Work deferred until these syncs retire: [vekn-decommission](vekn-decommission.md).
+organization and its rules are [domain](domain/vekn.md); this is the plumbing. What
+retiring these syncs means is [below](#decommission); the work waiting on it is
+[vekn-decommission](vekn-decommission.md).
 
 ## Feature flags
 
@@ -423,3 +424,62 @@ Other invariants: deterministic deck uids (uuid5 of tournament + user + round); 
 pre-run `pg_dump` for recovery; merge writes are **not** live-broadcast over SSE,
 so clients catch up on their next reconnect; and `vekn_pushed_at` is stamped on
 merged finished tournaments so the batch never re-uploads them.
+
+## Decommission
+
+**Not scheduled, and not ours to schedule** — VEKN greenlights it. Everything above
+runs as described until then. This is the settled shape, written down so the work
+waiting on it names a real condition.
+
+The end state is **archon as the system of record** for members, events and results,
+with vekn.net frozen as a historical archive.
+
+**Push is not a third direction to decide — it *is* API calls**, so each direction's
+push dies with the read it accompanies. There is no write-only period: the results
+push is write-once, so a transition that kept pushing would accumulate divergence
+into a system we no longer read, with no repair path and `vekn_results_stale` stuck
+on forever.
+
+**Neither stage is a config flip.** `VEKN_SYNC_ENABLED` gates both inbound syncs
+together and `VEKN_PUSH` gates all outbound push together, and `batch_push` is a
+single hourly job draining members, events and results in sequence. Splitting them
+along the tournament/member seam is the work of stage 1.
+
+### Stage 1 — the tournament calendar retires, on the greenlight
+
+`sync_all_tournaments` stops, and with it event creation and results upload. The
+hourly batch keeps running for members until stage 2. The app keeps computing its
+own ratings, which it already does.
+
+This stage is what unblocks the backlog. Every item deferred against it is
+unfixable today for one reason — the sync's full-rebuild branch re-creates anything
+deleted locally and wipes anything corrected — so they all become ordinary local
+work the moment it stops.
+
+`dedup_tournaments.py --probe-vekn` loses its upstream here and cannot be run
+afterwards — it is what tells a live vekn id from a dead one, and the reconciliation
+deferred on the greenlight window exists because of that.
+
+### Stage 2 — the member roster retires, when vekn.net registration closes
+
+`VEKNSyncService` stops, along with member creation push and `audit_cities.py`,
+which reads the roster. It is sequenced second because member identity is
+load-bearing in a way the calendar is not — the engine refuses to seat a player
+without a `vekn_id` — and because only the officials review waits on it, against a
+backlog that all waits on stage 1.
+
+**The precondition is a registry precondition, not a technical one.** We already
+allocate ids ourselves — `allocate_next_vekn_id` takes the first gap in *our own*
+corpus and `push_member` tells vekn.net the number rather than asking for one — so
+the roster sync's remaining job is picking up members who registered on vekn.net
+directly. While that form is open and we are no longer reading, two registrars mint
+into one namespace and collide. Closing it is what makes the stage safe; a reserved
+range for us was the alternative and costs a negotiation plus a change to the
+allocator, for no gain once vekn.net is an archive.
+
+### What survives
+
+The TWDA sync, on its own flag and its own schedule, with no VEKN credentials — it
+is a different upstream and becomes the sole external source of historic wins.
+Submission to the archive survives too, rekeyed away from the vekn event id and
+onto the short event code.
