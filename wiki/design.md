@@ -318,3 +318,47 @@ dumping ground; every config field lives in the section its subject belongs to.
 Two components enforce the console grammar: `FoldableSection` is the one shell
 every config section uses, and `InlineNotice` is the one shape for a notice —
 two tones, chosen by what the reader must *do*, not by severity theatre.
+
+### The redesign pass
+
+**Planned, unscheduled**: a pass bringing the console back to the three rules,
+and/or a simple mode for organizers who run small events and need none of the
+apparatus. The console drifted because each feature was added where it was first
+needed, as an inline labelled button — Raffle, promo recording, Archon import,
+Share Image, Print standings. None was wrong alone; the sum is a surface where
+reference material and tools outweigh the work, worst on a phone in the Finished
+state, where six inline buttons bury a single line of content. Rule 2 is therefore
+a policy for *future* features, not only a cleanup backlog.
+
+The direction, from a phone review of a finished 8-player event (2026-08-07/08):
+the working surface starts inside the first viewport, the action bar sits **above**
+the tabs so its guidance line is visible on every tab, reference material leaves
+the masthead from check-in on, and everything rarer than the current moment sits
+one tap deep in a Tools sheet opened from the masthead — grouped and ordered
+**like the event runs** (set up · at the door · wrap up), because an event's
+chronology is fixed and muscle memory holds. The grouping axis is the moment you
+reach for a thing, not the subsystem it belongs to: promo distribution is
+end-of-event, CSV import is setup and has nothing to do with VEKN.
+
+Decisions already taken, not to be re-litigated:
+
+- **Share Image is deleted, not moved** — `backend/src/og.py` server-renders a
+  per-tournament `og:image` from the banner, so pasting the link already yields a
+  cover. The banner therefore matters *more* after the pass, and needs a real home.
+- **Go Offline stays in the masthead button row** (owner, 2026-08-08: "always
+  accessible and obvious") — state-dependent and time-critical, and the masthead is
+  the one surface present on every tab.
+- **Tab labels show the active one only.** A text-shrinking fix is fragile across
+  five locales, where the overflow is worse than English suggests.
+- **No Start Finals CTA in an empty Finals tab.** Finishing without a final is
+  legitimate ([rules §3.1.6](domain/tournament-rules.md)), so a CTA there would
+  frame finals as the expected path.
+- **The description drops out of the organizer view only** — organizers wrote it,
+  players still need it.
+
+Rejected, with the reason that killed each: **per-tab status counts** and **a
+masthead reporting live round state**, both because the action bar's guidance line
+already says it and rule 3 forbids the second voice; **a flat Tools dropdown**,
+the hamburger trap where finding anything means reading all of it; and **Tools in
+the tab row**, since it opens a sheet rather than swapping a panel and would spend
+the width the redesign just recovered.
