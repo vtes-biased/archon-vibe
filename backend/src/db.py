@@ -1191,16 +1191,19 @@ async def get_all_tournament_wins(
             result = await conn.execute(sql, tuple(params))  # ty: ignore[invalid-argument-type]
             rows = await result.fetchall()
             for uid, winner, twda_id, reported, full in rows:
-                # A TWDA entry that never carried `players_count` grandfathers
-                # past the floor: the archive accepting it is itself the
-                # attestation, and gating on the blank costs 5 genuine Hall of
-                # Fame members over a data gap in ~100 entries.
-                grandfathered = bool(twda_id) and not reported
-                if (
-                    not grandfathered
-                    and _engine.attested_player_count(full) < TWDA_MIN_PLAYERS
-                ):
-                    continue
+                if _engine.attested_player_count(full) < TWDA_MIN_PLAYERS:
+                    # A TWDA entry that never carried `players_count` grandfathers
+                    # past the floor: the archive accepting it is itself the
+                    # attestation, and gating on the blank costs 5 genuine Hall of
+                    # Fame members over a data gap in ~100 entries. Only where the
+                    # row played nothing — an event whose result sheet we hold
+                    # answers the question itself and is held to the answer.
+                    archival = bool(twda_id) and not reported
+                    if (
+                        not archival
+                        or _engine.ranking_eligibility(full) != "no_results"
+                    ):
+                        continue
                 wins.setdefault(winner, []).append(uid)
             if len(rows) < _HOF_WINS_BATCH:
                 return wins

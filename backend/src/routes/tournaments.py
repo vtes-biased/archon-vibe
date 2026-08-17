@@ -77,6 +77,9 @@ encoder = msgspec.json.Encoder()
 
 # Wire types are raw and unnormalized: list every deck-upsert alias the engine
 # accepts (UpsertDeck/UploadDeck/UpdateDeck) or omitting one skips the recompute.
+# Rating-irrelevant only. The deck actions below DO move the Hall of Fame, which
+# counts a win only while the winner's deck is on record — the caller recomputes
+# wins for them separately.
 _RATING_IRRELEVANT_ACTIONS = frozenset(
     {
         "UpsertDeck",
@@ -1640,22 +1643,30 @@ async def tournament_action(
         except Exception as e:
             logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
 
+    # `set_public` carries no player_uid and needs none: the Hall of Fame asks
+    # whether the deck exists, never whether it is publicly visible.
+    winner_deck_ops = [op for op in deck_ops if op.get("player_uid") == updated.winner]
+
     # VEKN push backgrounds (vekn.net can take 30-120s or be down; batch_push
     # retries) — TWDA submission runs inline since it's local/fast.
     if is_finished and not was_finished:
         await maybe_submit_twda(updated)
         asyncio.create_task(_maybe_push_vekn(updated))
-    elif (
-        is_finished
-        and updated.winner
-        and any(
-            op.get("op") == "upsert" and op.get("player_uid") == updated.winner
-            for op in deck_ops
-        )
-    ):
-        # Re-submit on a post-finish winner-deck edit (organizers only — players
-        # are deck-locked); the TWDA PR is idempotent, keyed on the vekn event id.
-        asyncio.create_task(maybe_submit_twda(updated))
+    elif is_finished and updated.winner and winner_deck_ops:
+        if any(op.get("op") == "upsert" for op in winner_deck_ops):
+            # Re-submit on a post-finish winner-deck edit (organizers only — players
+            # are deck-locked); the TWDA PR is idempotent, keyed on the vekn event id.
+            asyncio.create_task(maybe_submit_twda(updated))
+        # The same edit moves the Hall of Fame in both directions — the win counts
+        # only while the deck is on record — and every deck action is on
+        # `_RATING_IRRELEVANT_ACTIONS`, so the recompute above skipped it.
+        try:
+            from ..ratings import recompute_wins
+
+            for _user, bd in await recompute_wins({updated.winner}):
+                broadcast_precomputed(bd)
+        except Exception as e:
+            logger.error(f"Error recomputing wins for {uid}: {e}", exc_info=True)
 
     return Response(
         content=encoder.encode(updated),

@@ -174,8 +174,12 @@ by-product of the rating recompute — that coupling is what made membership tur
 on the unrelated coincidence of having played a rated event, so a historic winner
 was invisible. `recompute_wins` enumerates from the tournaments; its optional
 user set narrows the rewrite, never the rule. Any new path that finishes,
-un-finishes or deletes a tournament has to call it alongside the rating
-recompute, or a fresh win waits for the nightly pass.
+un-finishes or deletes a tournament has to call it alongside the rating recompute,
+or a fresh win waits for the nightly pass — **and so does any path that writes a
+deck**, which is the trap, because every deck action sits on
+`_RATING_IRRELEVANT_ACTIONS` and skips that block entirely. Rating-irrelevant is
+not Hall-of-Fame-irrelevant: uploading the winner's deck admits them and deleting
+it evicts them.
 
 `len(rounds) == 0` is not "no results", and never measures field size. Every
 pre-2014 import is rounds-less while carrying a full scored result sheet, so the

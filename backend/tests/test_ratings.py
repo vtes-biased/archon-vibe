@@ -424,6 +424,17 @@ async def test_hall_of_fame_win_rule(test_db):
             True,
             True,
         ),
+        # ...but only where the row played nothing. A result sheet of our own
+        # answers the question, so the archive's silence cannot override it.
+        (
+            "w-archival-scored",
+            {
+                "standings": [{"user_uid": f"p{i}", "vp": 1.0} for i in range(5)],
+                "external_ids": {"twda": "1999abc"},
+            },
+            True,
+            False,
+        ),
     ]
     for uid, overrides, has_deck, _ in cases:
         t = _make_tournament(uid=uid, winner="champ", **overrides)

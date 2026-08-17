@@ -50,9 +50,11 @@ soft-deleted, not online, not open-rounds or self-organized, not Limited, a
 `DeckObject` for that winner on that tournament. The floor is the submission
 floor of 10, not the rating floor of 8: the Hall of Fame is defined by deck
 submission, so it inherits the threshold that governs submission. One exception —
-an archival reconstruction whose entry never carried a player count clears the
-floor anyway, because the archive accepting the entry is itself the attestation,
-and gating on the blank costs five genuine members over a data gap.
+an archive entry that never carried a player count and holds no play data of its
+own (`no_results`) clears the floor anyway, because the archive accepting the
+entry is itself the attestation, and gating on the blank costs five genuine
+members over a data gap. An event whose result sheet we hold answers the question
+itself and is held to the answer.
 
 The criterion is the owner's to set: the VEKN rules define no Hall of Fame. Ours
 restates `vekn.fr`'s "five IRL wins posted to the forum" in terms that survive
