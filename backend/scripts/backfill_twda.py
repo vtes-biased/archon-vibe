@@ -1,5 +1,6 @@
 """One-time backfill of the historic archive: reconstruct ~1100 tournaments and
-import their winning decks, then regenerate the snapshot.
+import their winning decks, recompute the Hall of Fame, then regenerate the
+snapshot.
 
     /opt/archon/backend/.venv/bin/python \\
       /opt/archon/backend/scripts/backfill_twda.py --dry-run
@@ -36,6 +37,7 @@ if not _have_backend:
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from backend.src import db  # noqa: E402
+from backend.src.ratings import recompute_wins  # noqa: E402
 from backend.src.snapshots import generate_snapshots  # noqa: E402
 from backend.src.twda_import import (  # noqa: E402
     _fetch_twda,
@@ -73,6 +75,14 @@ async def run(args: argparse.Namespace) -> int:
 
         stats = await run_twda_sync(broadcast=False, max_creates=None)
         print(f"\n{stats}")
+
+        # The sync recomputes only the winners it touched, which is every Hall of
+        # Fame *addition* and none of its removals. Left to the nightly pass, the
+        # page would grow today and shrink tomorrow — one migration reading as two
+        # incidents. A full pass settles both directions before the snapshot.
+        print("\nRecomputing Hall of Fame wins...")
+        print(f"{len(await recompute_wins())} win lists changed")
+
         print("\nRegenerating snapshots...")
         print(await generate_snapshots())
         return 0

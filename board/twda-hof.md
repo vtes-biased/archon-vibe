@@ -900,11 +900,23 @@ seat union are not expressible in SQL without duplicating the rule there.
 paths, the archon import, the TWDA sync (after the deck pass) and the daily job;
 `recompute_ratings_for_players` no longer touches `wins`.
 
-**Item 5 is a prod step and is not done** — the diff needs the corpus. Run it
-after deploy, before the backfill, and again after. Ordering matters for a second
-reason: if the nightly recompute lands the new rule before the backfill runs, the
-page shrinks (the deck gate evicts) and then grows, which reads as two incidents
-rather than one migration. Deploy → backfill → the page settles once.
+**Item 5 is a prod step and is not done** — the diff needs the corpus. Capture
+membership before deploying and again after the backfill; both sides come from
+the shipped rule, so nothing restates it in a throwaway query:
+
+```sql
+SELECT "full"->>'name', "full"->>'vekn_id',
+       jsonb_array_length("full"->'wins') AS wins
+FROM objects
+WHERE type = 'user' AND deleted_at IS NULL
+  AND jsonb_array_length(COALESCE("full"->'wins', '[]'::jsonb)) >= 5
+ORDER BY wins DESC, 1;
+```
+
+Personal data: it stays out of the repo. `backfill_twda.py` now runs a full
+`recompute_wins()` before the snapshot so both directions settle in one pass —
+otherwise the page grows on backfill day and shrinks at the nightly, one
+migration reading as two incidents. Deploy → backfill → capture again.
 
 ## Phase 4 — Surfaces
 
