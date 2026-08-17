@@ -13,6 +13,30 @@ While the tournament and member syncs are upstreams, anything deleted or diverge
 locally is re-created on their next run — that is what makes each of these
 unfixable today.
 
+## Trigger: the decommission is greenlit, while the API still answers
+
+This trigger is a **window**, not an instant. It opens when the decommission is
+greenlit and closes when vekn.net stops answering — the work below needs both
+conditions at once, and produces nothing afterwards.
+
+### Reconcile our tournaments against the vekn.net record
+
+**Deferred ask** — reconcile app tournaments against the vekn.net API record and
+write the diff onto this page. One targeted `fetch_event` per tournament carrying
+`external_ids['vekn']`, never the bulk sweep. Read-only; deletes nothing. Done
+when a reviewed table exists with, per row, the vekn id, the app tournament, its
+state/rounds/players, and a verdict of confirmed-absent / still-live /
+unverifiable.
+
+It establishes the third population this page's cleanup sections need — events we
+hold that **no longer exist upstream** — which no local data can distinguish from
+events that are merely stale. The probe is the only evidence, and it is
+unreconstructable once the API is dark.
+
+Doing it *before* the greenlight would be work at risk: the greenlight may not
+come, and a table pulled early goes stale against every calendar sync that runs
+between then and the retirement it feeds.
+
 ## Trigger: the VEKN tournament sync retires
 
 ### Duplicate tournament cleanup
@@ -162,9 +186,9 @@ Running list of tournaments that **should not be in the record**, waiting on the
 IC cleanup capability. Distinct from its two sibling populations:
 
 - the duplicate groups above — one real event entered twice upstream;
-- the vekn.net reconciliation table (an active board line's deliverable, landing
-  on this page) — events we hold that **no longer exist upstream**, established
-  by a targeted `fetch_event` probe while the API is still live.
+- the vekn.net reconciliation table (deferred above) — events we hold that **no
+  longer exist upstream**, established by a targeted `fetch_event` probe while
+  the API is still live.
 
 This list is the third population: events that are simply **wrong** — created by
 mistake, mistyped, or never real — regardless of what vekn.net says.
