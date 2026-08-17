@@ -924,12 +924,17 @@ All five items landed, in `PlayerRecord.svelte` (mounted on `/users/[uid]` and o
 `/profile` with `self`), the rankings caption, and the tournament page header.
 Three things the build settled that the plan did not say:
 
-- **Item 3 uses `reported_player_count`, not `description`.** The plan predates
+- **Item 3 uses `attested_player_count`, not `description`.** The plan predates
   *Archival results* and proposed stamping "42 players" into free text. The count
   line it fixes renders only where `players` is present — i.e. member level, which
-  is exactly where `reported_player_count` already is. Free text would have
+  is exactly where the attested size already reaches. Free text would have
   duplicated a fact that has a structured home, in untranslatable English, on
   every reconstructed row.
+- **Both surfaces gate on `no_results`, not on the `twda` id.** The id survives
+  `_adopt_same_event`, which overwrites a reconstruction with the full VEKN result
+  set — badging that row archival would assert "the only surviving source" over a
+  VEKN record, and reading its stale archive count over the VEKN roster would
+  invert Settled decision 7.
 - **Item 4 cannot read `user.wins`.** The rule admits a win only *with* a deck, so
   the missing-decklist set is by construction disjoint from it. The prompt asks the
   local pair "you won it, no deck of yours is on it" — the same predicate

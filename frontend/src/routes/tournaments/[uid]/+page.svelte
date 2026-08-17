@@ -10,7 +10,7 @@
   import { syncManager } from "$lib/sync";
   import { getUser, getTournament, getTournamentContextSanctions, getDeviceId, getDecksByTournamentGrouped, getLeague, saveTournament } from "$lib/db";
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
-  import { initEngine, validateDeck, isOrganizer as engineIsOrganizer, type TournamentEventType, type ValidationError } from "$lib/engine";
+  import { attestedPlayerCount, initEngine, rankingEligibility, validateDeck, isOrganizer as engineIsOrganizer, type TournamentEventType, type ValidationError } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { getStateTone, translateTournamentState, rankBadgeLabel, computeStandings, type PlayerInfoMap } from "$lib/tournament-utils";
   import { zonedDate } from "$lib/utils";
@@ -126,6 +126,13 @@ import TournamentModals from "./TournamentModals.svelte";
   const showOrganizerView = $derived(isOrganizer && !viewAsPlayer);
   // Minimal view: API returned TournamentMinimal (no players array) — non-auth or non-member
   const isMinimalView = $derived(!tournament?.players);
+  // A reconstruction that still holds nothing but the archive. The `twda` key
+  // survives adoption — `_adopt_same_event` overwrites such a row with the full
+  // VEKN result set and keeps the key — so the key alone does not make a row
+  // archival, and the VEKN record must outrank the archive once it lands.
+  const archival = $derived(
+    !!tournament?.external_ids?.twda && rankingEligibility(tournament) === "no_results",
+  );
 
   let leagueName = $state<string | null>(null);
   let metaLeague = $state<{ uid: string; name: string } | null>(null);
@@ -747,7 +754,7 @@ import TournamentModals from "./TournamentModals.svelte";
             {#if tournament.proxies != null}
               <Badge>{tournament.proxies ? m.tournament_proxies_allowed() : m.tournament_proxies_not_allowed()}</Badge>
             {/if}
-            {#if tournament.external_ids?.twda}
+            {#if archival}
               <Badge title={m.tournament_archival_hint()}>{m.tournament_archival()}</Badge>
             {/if}
             {#if tournament.external_ids?.vekn}
@@ -873,16 +880,15 @@ import TournamentModals from "./TournamentModals.svelte";
             </div>
           </div>
           {#if tournament.players || standings.length}
-          {@const seated = Math.max(tournament.players?.length ?? 0, standings.length)}
           <div>
             <div class="text-ink-faint">{m.tournament_info_players()}</div>
-            <!-- Imported records: standings may exceed a partial/absent roster, and
-                 an archival reconstruction seats only its winner while the archive
-                 attests the real field — which nobody ever registered for. -->
-            {#if (tournament.reported_player_count ?? 0) > seated}
-              <div class="text-ink-bright">{m.tournament_reported_count({ count: String(tournament.reported_player_count) })}</div>
+            {#if archival}
+              <!-- Nobody registered for an event we are reconstructing decades
+                   later: the archive attests the field, the roster holds its winner. -->
+              <div class="text-ink-bright">{m.tournament_reported_count({ count: String(attestedPlayerCount(tournament)) })}</div>
             {:else}
-              <div class="text-ink-bright">{m.tournament_registered_count({ count: String(seated) })}</div>
+              <!-- Imported records: standings may exceed a partial/absent roster. -->
+              <div class="text-ink-bright">{m.tournament_registered_count({ count: String(Math.max(tournament.players?.length ?? 0, standings.length)) })}</div>
             {/if}
           </div>
           {/if}
