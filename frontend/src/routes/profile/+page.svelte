@@ -17,6 +17,7 @@
   import { User, TriangleAlert, Trophy } from "@lucide/svelte";
   import AvatarCropper from "$lib/components/AvatarCropper.svelte";
   import PlayerRatings from "$lib/components/PlayerRatings.svelte";
+  import PlayerRecord from "$lib/components/PlayerRecord.svelte";
   import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -258,6 +259,7 @@
             {/if}
           </div>
           <PlayerRatings {user} showHeading={false} />
+          <PlayerRecord {user} self />
         </div>
         <LinkedAccounts
           {hasEmail}

@@ -81,7 +81,9 @@ Champion crowning.
 a trailing 18 months, rating points in finished standings, a rankings page with
 country and date filters, and a Hall of Fame for five wins that would have made
 the TWDA with the winning deck on record
-([the rule](tournaments.md#configuration)). The formula and the
+([the rule](tournaments.md#configuration)), stated on the page. A member profile
+carries the wins behind the count and their decklists on record; your own also
+lists the events you won with no decklist attached. The formula and the
 standing warning about vekn.net's stored value are [domain](domain/vekn.md#ratings).
 
 **Live-event surfaces** — shared round timer (online only, one global clock,

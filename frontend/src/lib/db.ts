@@ -800,6 +800,12 @@ export async function getDecksByTournament(tournamentUid: string): Promise<DeckO
   return decks.filter(d => !d.deleted_at);
 }
 
+export async function getDecksByUser(userUid: string): Promise<DeckObject[]> {
+  const db = await getDB();
+  const decks = await db.getAllFromIndex('decks', 'by-user', userUid);
+  return decks.filter(d => !d.deleted_at);
+}
+
 /** Same shape as the old embedded tournament.decks, for callers that still expect it. */
 export async function getDecksByTournamentGrouped(tournamentUid: string): Promise<Record<string, DeckObject[]>> {
   const decks = await getDecksByTournament(tournamentUid);

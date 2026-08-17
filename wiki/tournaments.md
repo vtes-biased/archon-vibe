@@ -56,6 +56,13 @@ entry is itself the attestation, and gating on the blank costs five genuine
 members over a data gap. An event whose result sheet we hold answers the question
 itself and is held to the answer.
 
+The rankings page states that criterion under its Hall of Fame tab, and a member's
+profile lists the wins behind their count alongside their decklists on record, so
+the number is auditable rather than asserted. A player's own profile also gathers
+the events they won with no decklist of theirs attached — the same pair the
+tournament page nudges on, and deliberately not the Hall of Fame predicate
+inverted, which stays server-side.
+
 The criterion is the owner's to set: the VEKN rules define no Hall of Fame. Ours
 restates `vekn.fr`'s "five IRL wins posted to the forum" in terms that survive
 the vekn.net decommission, and it reads the same for both corpora, differing only
@@ -358,6 +365,12 @@ whose nightly sync would rebuild the row and silently drop the correction —
 lift that once the calendar sync retires ([vekn-decommission](vekn-decommission.md)).
 No `standings` payload: they are prelim-only by contract and an archival record has
 no prelim, so the rows stay zeroed.
+
+An archival row reads as one on the tournament page: a badge keyed on
+`external_ids['twda']`, and the player count shown as *reported* from
+`reported_player_count` wherever that exceeds the roster we hold, since a
+reconstruction seats only its winner and nobody registered for an event we are
+reconstructing decades later.
 
 ### Who may do what
 

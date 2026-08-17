@@ -747,6 +747,9 @@ import TournamentModals from "./TournamentModals.svelte";
             {#if tournament.proxies != null}
               <Badge>{tournament.proxies ? m.tournament_proxies_allowed() : m.tournament_proxies_not_allowed()}</Badge>
             {/if}
+            {#if tournament.external_ids?.twda}
+              <Badge title={m.tournament_archival_hint()}>{m.tournament_archival()}</Badge>
+            {/if}
             {#if tournament.external_ids?.vekn}
               <Badge kind="link" external
                      href="https://www.vekn.net/event-calendar/event/{tournament.external_ids.vekn}"
@@ -870,10 +873,17 @@ import TournamentModals from "./TournamentModals.svelte";
             </div>
           </div>
           {#if tournament.players || standings.length}
+          {@const seated = Math.max(tournament.players?.length ?? 0, standings.length)}
           <div>
             <div class="text-ink-faint">{m.tournament_info_players()}</div>
-            <!-- Imported records: standings may exceed a partial/absent roster. -->
-            <div class="text-ink-bright">{m.tournament_registered_count({ count: String(Math.max(tournament.players?.length ?? 0, standings.length)) })}</div>
+            <!-- Imported records: standings may exceed a partial/absent roster, and
+                 an archival reconstruction seats only its winner while the archive
+                 attests the real field — which nobody ever registered for. -->
+            {#if (tournament.reported_player_count ?? 0) > seated}
+              <div class="text-ink-bright">{m.tournament_reported_count({ count: String(tournament.reported_player_count) })}</div>
+            {:else}
+              <div class="text-ink-bright">{m.tournament_registered_count({ count: String(seated) })}</div>
+            {/if}
           </div>
           {/if}
           {#if tournament.organizers_uids?.length}

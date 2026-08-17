@@ -11,6 +11,7 @@
   import VeknManagement from "$lib/components/VeknManagement.svelte";
   import SanctionsManager from "$lib/components/SanctionsManager.svelte";
   import PlayerRatings from "$lib/components/PlayerRatings.svelte";
+  import PlayerRecord from "$lib/components/PlayerRecord.svelte";
   import { Loader2, Share2, Check } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -215,5 +216,7 @@
     <div class="mt-6">
       <PlayerRatings {user} />
     </div>
+
+    <PlayerRecord {user} />
   {/if}
 </div>

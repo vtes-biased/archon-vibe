@@ -918,7 +918,27 @@ Personal data: it stays out of the repo. `backfill_twda.py` now runs a full
 otherwise the page grows on backfill day and shrinks at the nightly, one
 migration reading as two incidents. Deploy → backfill → capture again.
 
-## Phase 4 — Surfaces
+## Phase 4 — Surfaces — **done 2026-08-17**
+
+All five items landed, in `PlayerRecord.svelte` (mounted on `/users/[uid]` and on
+`/profile` with `self`), the rankings caption, and the tournament page header.
+Three things the build settled that the plan did not say:
+
+- **Item 3 uses `reported_player_count`, not `description`.** The plan predates
+  *Archival results* and proposed stamping "42 players" into free text. The count
+  line it fixes renders only where `players` is present — i.e. member level, which
+  is exactly where `reported_player_count` already is. Free text would have
+  duplicated a fact that has a structured home, in untranslatable English, on
+  every reconstructed row.
+- **Item 4 cannot read `user.wins`.** The rule admits a win only *with* a deck, so
+  the missing-decklist set is by construction disjoint from it. The prompt asks the
+  local pair "you won it, no deck of yours is on it" — the same predicate
+  `PlayerDecksSection` already nudges on per tournament, aggregated. It is not the
+  Hall of Fame rule inverted, and deliberately does not filter on size or format:
+  claiming eligibility client-side would re-derive the rule.
+- **The deck archive renders without a `format`.** `DeckDisplay` validates against
+  current legality, and a 2005 archive deck fails it for reasons its owner cannot
+  act on.
 
 1. `/users/[uid]` (219 lines, `PlayerRatings` only) gains the player's **win
    list and deck list** — both offline-first IndexedDB reads; the decks store
