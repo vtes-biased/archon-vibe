@@ -20,8 +20,9 @@ Read its `board/<slug>.md` if it has one. Read the wiki pages the line touches, 
 `wiki/hazards.md` if it names any subsystem you are about to change.
 
 If two or three agents are working the board in parallel, say in chat which line
-you are taking and keep to your own commits. Imperfect commit isolation is
-acceptable when files overlap.
+you are taking and keep to your own commits. **Stage explicit paths — never
+`git add -A`**, which silently commits a sibling's in-flight work under your
+message. Imperfect commit isolation is acceptable when files genuinely overlap.
 
 ## 2. Confirm the contract
 
@@ -114,8 +115,15 @@ and never a board reference.
 
 ## 5. Egress
 
-Spawn the `reviewer` subagent, which has **not** seen this conversation. Give
-it exactly three things and nothing else:
+**Only a change that touches code gets a review.** A doc-only change — a wiki
+edit, a board eviction, a decision written down, a line promoted to a wiki page —
+lands on the commit and is reported to the owner directly. The reviewer guards
+code the owner is not reading line by line; prose the owner *is* reading does not
+need a second reader, and spawning one spends tokens and wall-clock to tell them
+what they can already see.
+
+Otherwise, spawn the `reviewer` subagent, which has **not** seen this
+conversation. Give it exactly three things and nothing else:
 
 - the diff (`git diff <base>..HEAD`, or the staged diff);
 - the wiki, by pointing it at `wiki/`;
