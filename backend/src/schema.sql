@@ -217,6 +217,12 @@ WHERE type = 'tournament' AND "full"->'external_ids'->>'vekn' IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_objects_tournament_twda
 ON objects(("full"->'external_ids'->>'twda'))
 WHERE type = 'tournament' AND "full"->'external_ids'->>'twda' IS NOT NULL;
+-- Hall of Fame recompute, which runs on every finish, winner-deck write and merge.
+-- Without it each one seq-scans the tournament corpus, detoasting `full` per row
+-- just to read the winner — and the whole point of `wins` is to be precomputed.
+CREATE INDEX IF NOT EXISTS idx_objects_tournament_winner
+ON objects(("full"->>'winner'))
+WHERE type = 'tournament' AND "full"->>'winner' <> '';
 -- Backs the personal-overlay organizer lookup (`organizers_uids @> [uid]`), run on every
 -- member reconnect (ungated by `since`) — else a seq-scan of all tournaments each time.
 -- jsonb_path_ops is smaller than the default opclass and supports @> (but not `?`, hence @>).

@@ -1178,36 +1178,46 @@ async def get_all_tournament_wins(
     if winners is not None and not winners:
         return {}
     wins: dict[str, list[str]] = {}
-    last_uid = ""
     async with get_connection() as conn:
+        if winners is not None:
+            # No pagination on this path, deliberately: the result is one event's
+            # players' own wins, and `idx_objects_tournament_winner` answers it
+            # directly. A keyset `ORDER BY uid LIMIT n` would invite the planner
+            # onto the primary key instead and scan the corpus per recompute.
+            result = await conn.execute(
+                _HOF_WINS_QUERY + " AND t.\"full\"->>'winner' = ANY(%s)",
+                ([*winners],),
+            )
+            _collect_wins(await result.fetchall(), wins)
+            return wins
+
+        last_uid = ""
         while True:
-            params: list = []
-            sql = _HOF_WINS_QUERY
-            if winners is not None:
-                sql += " AND t.\"full\"->>'winner' = ANY(%s)"
-                params.append(list(winners))
-            sql += " AND t.uid > %s ORDER BY t.uid LIMIT %s"
-            params += [last_uid, _HOF_WINS_BATCH]
-            result = await conn.execute(sql, tuple(params))  # ty: ignore[invalid-argument-type]
+            result = await conn.execute(
+                _HOF_WINS_QUERY + " AND t.uid > %s ORDER BY t.uid LIMIT %s",
+                (last_uid, _HOF_WINS_BATCH),
+            )
             rows = await result.fetchall()
-            for uid, winner, twda_id, reported, full in rows:
-                if _engine.attested_player_count(full) < TWDA_MIN_PLAYERS:
-                    # A TWDA entry that never carried `players_count` grandfathers
-                    # past the floor: the archive accepting it is itself the
-                    # attestation, and gating on the blank costs 5 genuine Hall of
-                    # Fame members over a data gap in ~100 entries. Only where the
-                    # row played nothing — an event whose result sheet we hold
-                    # answers the question itself and is held to the answer.
-                    archival = bool(twda_id) and not reported
-                    if (
-                        not archival
-                        or _engine.ranking_eligibility(full) != "no_results"
-                    ):
-                        continue
-                wins.setdefault(winner, []).append(uid)
+            _collect_wins(rows, wins)
             if len(rows) < _HOF_WINS_BATCH:
                 return wins
             last_uid = rows[-1][0]
+
+
+def _collect_wins(rows: list, wins: dict[str, list[str]]) -> None:
+    """The floor half of the rule, which SQL cannot express: the precedence chain
+    and the seat union live in the engine."""
+    for uid, winner, twda_id, reported, full in rows:
+        if _engine.attested_player_count(full) < TWDA_MIN_PLAYERS:
+            # A TWDA entry that never carried `players_count` grandfathers past
+            # the floor: the archive accepting it is itself the attestation, and
+            # gating on the blank costs 5 genuine Hall of Fame members over a data
+            # gap in ~100 entries. Only where the row played nothing — an event
+            # whose result sheet we hold answers the question itself.
+            archival = bool(twda_id) and not reported
+            if not archival or _engine.ranking_eligibility(full) != "no_results":
+                continue
+        wins.setdefault(winner, []).append(uid)
 
 
 async def get_user_uids_with_wins() -> set[str]:
