@@ -934,7 +934,12 @@ Three things the build settled that the plan did not say:
   `_adopt_same_event`, which overwrites a reconstruction with the full VEKN result
   set — badging that row archival would assert "the only surviving source" over a
   VEKN record, and reading its stale archive count over the VEKN roster would
-  invert Settled decision 7.
+  invert Settled decision 7. The badge takes the id *and* `no_results`; the count
+  takes `no_results` and an attestation, matching what gates the write.
+- **An unattested reconstruction shows no player count at all.** About a hundred
+  archive entries carry no `players_count`, and `attested_player_count` then falls
+  through to the winner's lone standing. "1 reported" is a worse answer than
+  silence for an event whose size nobody recorded.
 - **Item 4 cannot read `user.wins`.** The rule admits a win only *with* a deck, so
   the missing-decklist set is by construction disjoint from it. The prompt asks the
   local pair "you won it, no deck of yours is on it" — the same predicate

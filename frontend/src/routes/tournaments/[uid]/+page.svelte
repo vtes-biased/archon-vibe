@@ -126,13 +126,14 @@ import TournamentModals from "./TournamentModals.svelte";
   const showOrganizerView = $derived(isOrganizer && !viewAsPlayer);
   // Minimal view: API returned TournamentMinimal (no players array) — non-auth or non-member
   const isMinimalView = $derived(!tournament?.players);
-  // A reconstruction that still holds nothing but the archive. The `twda` key
-  // survives adoption — `_adopt_same_event` overwrites such a row with the full
-  // VEKN result set and keeps the key — so the key alone does not make a row
-  // archival, and the VEKN record must outrank the archive once it lands.
-  const archival = $derived(
-    !!tournament?.external_ids?.twda && rankingEligibility(tournament) === "no_results",
-  );
+  // No play data of its own: a reconstruction or an IC archival correction, whose
+  // roster holds the winner alone and whose field size is whatever the source
+  // attested. Same predicate that gates `SetArchivalResults` on the write side.
+  const noPlayData = $derived(!!tournament && rankingEligibility(tournament) === "no_results");
+  // The badge speaks for the archive specifically, and the `twda` key survives
+  // adoption — `_adopt_same_event` overwrites such a row with the full VEKN result
+  // set and keeps the key — so the key alone does not make a row archival.
+  const archival = $derived(!!tournament?.external_ids?.twda && noPlayData);
 
   let leagueName = $state<string | null>(null);
   let metaLeague = $state<{ uid: string; name: string } | null>(null);
@@ -880,17 +881,21 @@ import TournamentModals from "./TournamentModals.svelte";
             </div>
           </div>
           {#if tournament.players || standings.length}
+          {@const attested = noPlayData && tournament.reported_player_count ? attestedPlayerCount(tournament) : 0}
+          <!-- An archival row with nothing attested says nothing: ~100 archive
+               entries carry no player count, and the engine then falls through to
+               the winner's lone standing, which is not the size of the field. -->
+          {#if attested || !archival}
           <div>
             <div class="text-ink-faint">{m.tournament_info_players()}</div>
-            {#if archival}
-              <!-- Nobody registered for an event we are reconstructing decades
-                   later: the archive attests the field, the roster holds its winner. -->
-              <div class="text-ink-bright">{m.tournament_reported_count({ count: String(attestedPlayerCount(tournament)) })}</div>
+            {#if attested}
+              <div class="text-ink-bright">{m.tournament_reported_count({ count: String(attested) })}</div>
             {:else}
               <!-- Imported records: standings may exceed a partial/absent roster. -->
               <div class="text-ink-bright">{m.tournament_registered_count({ count: String(Math.max(tournament.players?.length ?? 0, standings.length)) })}</div>
             {/if}
           </div>
+          {/if}
           {/if}
           {#if tournament.organizers_uids?.length}
           <div>

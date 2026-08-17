@@ -366,13 +366,16 @@ lift that once the calendar sync retires ([vekn-decommission](vekn-decommission.
 No `standings` payload: they are prelim-only by contract and an archival record has
 no prelim, so the rows stay zeroed.
 
-An archival row reads as one on the tournament page: a badge, and the player count
-shown as *reported* from `attested_player_count` rather than the roster, since a
-reconstruction seats only its winner and nobody registered for an event we are
-reconstructing decades later. Both key on the row holding a `twda` id **and** no
-play data of its own (`ranking_eligibility` = `no_results`), never on the id alone:
-adoption keeps the id while overwriting the row with a full VEKN result set, and
-the VEKN record outranks the archive from that moment on.
+An archival row reads as one on the tournament page. The player count is shown as
+*reported* from `attested_player_count` rather than the roster wherever a row holds
+no play data of its own and an attestation to show — the same predicate that gates
+the write, so an IC correction lands on the page whether or not the row came from
+the archive. With no attestation the line is dropped entirely: the archive carried
+no count on about a hundred entries, and there the field size is unknown rather
+than the one seat the reconstruction holds. The *Archival* badge additionally
+requires a `twda` id, since that is what its text claims — but never the id alone,
+because adoption keeps it while overwriting the row with a full VEKN result set,
+and the VEKN record outranks the archive from that moment on.
 
 ### Who may do what
 
