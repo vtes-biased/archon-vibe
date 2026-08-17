@@ -292,6 +292,10 @@ export function playedPlayerUids(tournament: Tournament): Set<string> {
   );
 }
 
+/** Wins that make a Hall of Fame member. The list itself is server-computed
+ * (`user.wins`, member-level) — only the cutoff is applied here. */
+export const HOF_MIN_WINS = 5;
+
 export type RankedStatus =
   | { ranked: true }
   | { ranked: false; reason: "few_players" | "no_final" | "open_rounds" | "no_results" }

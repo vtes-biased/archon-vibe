@@ -41,6 +41,26 @@ that scored nothing. It is a precedence, never a maximum: our own play data, the
 `reported_player_count`, then the standings length. Both are exported over PyO3
 and WASM; nothing re-derives them.
 
+**The Hall of Fame counts wins on its own predicate**, which disagrees with
+`ranking_eligibility` by design — unifying them would silently rewrite
+membership. Five wins make a member, and a win counts when the event would have
+qualified for the TWDA *and* the winning deck is on record: finished and not
+soft-deleted, not online, not open-rounds or self-organized, not Limited, a
+`winner` set, at least `TWDA_MIN_PLAYERS` by `attested_player_count`, and a live
+`DeckObject` for that winner on that tournament. The floor is the submission
+floor of 10, not the rating floor of 8: the Hall of Fame is defined by deck
+submission, so it inherits the threshold that governs submission. One exception —
+an archival reconstruction whose entry never carried a player count clears the
+floor anyway, because the archive accepting the entry is itself the attestation,
+and gating on the blank costs five genuine members over a data gap.
+
+The criterion is the owner's to set: the VEKN rules define no Hall of Fame. Ours
+restates `vekn.fr`'s "five IRL wins posted to the forum" in terms that survive
+the vekn.net decommission, and it reads the same for both corpora, differing only
+in the evidence each supplies. `User.wins` is server-computed and
+member-projected; no `hall_of_fame` flag is ever stored, because rule 8.6 lets a
+result be invalidated and a stamped badge would outlive the correction.
+
 `UpdateConfig` is available in **any** state — mid-event typo fixes matter — with
 targeted locks instead of a state gate: `open_rounds`/`max_rounds` lock once rounds
 exist, and `rank`/`format`/`start` freeze once the event is published to VEKN,

@@ -6,6 +6,7 @@
   import DeceasedIcon from "$lib/components/DeceasedIcon.svelte";
   import Button from "$lib/components/Button.svelte";
   import type { User, RatingCategory } from "$lib/types";
+  import { HOF_MIN_WINS } from "$lib/tournament-utils";
   import { Trophy, Loader2, ChevronLeft, ChevronRight } from "@lucide/svelte";
   import { goto } from "$app/navigation";
   import { untrack } from "svelte";
@@ -49,7 +50,7 @@
   let filtered = $derived.by(() => {
     if (isHof) {
       let result = users.filter(u => {
-        if ((u.wins?.length ?? 0) < 5) return false;
+        if ((u.wins?.length ?? 0) < HOF_MIN_WINS) return false;
         if (suspendedUids.has(u.uid)) return false;
         if (selectedCountry !== "all" && u.country !== selectedCountry) return false;
         return true;

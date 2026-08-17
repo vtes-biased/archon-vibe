@@ -442,11 +442,13 @@ async def apply_archon_import(
         from .ratings import (
             rating_category_for_tournament,
             recompute_ratings_for_players,
+            recompute_wins,
         )
 
         player_uids = {p.user_uid for p in players_list if p.user_uid}
         category = rating_category_for_tournament(tournament)
         results = await recompute_ratings_for_players(player_uids, category)
+        results += await recompute_wins(player_uids)
         if broadcast_user_event:
             for _user, bd in results:
                 broadcast_user_event(bd)

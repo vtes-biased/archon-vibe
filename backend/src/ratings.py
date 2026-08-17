@@ -12,9 +12,10 @@ from archon_engine import PyEngine
 from .db import (
     BroadcastData,
     decode_json,
+    get_all_tournament_wins,
     get_finished_tournaments_for_category,
     get_sanctions_for_tournament,
-    get_tournament_wins_for_users,
+    get_user_uids_with_wins,
     get_users_by_uids,
     save_user,
     stream_objects_new,
@@ -223,8 +224,6 @@ async def recompute_ratings_for_players(
         positions_by_t[t.uid] = _final_positions(t)
     all_tournaments = eligible
 
-    # Fetch wins + the player User objects in batch (one query each, not N).
-    wins_map = await get_tournament_wins_for_users(player_uids)
     users_by_uid = await get_users_by_uids(player_uids)
 
     updated_users: list[tuple[User, BroadcastData]] = []
@@ -266,21 +265,52 @@ async def recompute_ratings_for_players(
         total = sum(e.points for e in top_entries)
 
         cat_rating = CategoryRating(total=total, tournaments=entries)
-        new_wins = sorted(wins_map.get(user_uid, []))
 
-        # No-change guard: skip the JSONB upsert + SSE delta when neither moved —
+        # No-change guard: skip the JSONB upsert + SSE delta when it didn't move —
         # keeps `modified` meaningful and avoids churning the corpus daily.
-        if cat_rating == getattr(user, category.value) and new_wins == user.wins:
+        if cat_rating == getattr(user, category.value):
             continue
 
         setattr(user, category.value, cat_rating)
-        user.wins = new_wins
         user.modified = now
 
         bd = await save_user(user)
         updated_users.append((user, bd))
 
     logger.info(f"Recomputed {len(updated_users)} ratings for {category.value}")
+    return updated_users
+
+
+async def recompute_wins(
+    user_uids: set[str] | None = None,
+) -> list[tuple[User, BroadcastData]]:
+    """Hall-of-Fame win lists, as their own pass over their own predicate.
+
+    The divergence from `ranking_eligibility` is the point, not an oversight: the
+    Hall of Fame counts a win that would have made the TWDA — 10 players and the
+    winner's deck on record — while a rating needs 8 players and no deck at all.
+    Do not unify them. `user_uids` narrows the rewrite to a finished event's
+    players; None recomputes the whole corpus.
+    """
+    wins_map = await get_all_tournament_wins(user_uids)
+    if user_uids is None:
+        user_uids = set(wins_map) | await get_user_uids_with_wins()
+    users_by_uid = await get_users_by_uids(user_uids)
+
+    now = datetime.now(UTC)
+    updated_users: list[tuple[User, BroadcastData]] = []
+    for user_uid in user_uids:
+        user = users_by_uid.get(user_uid)
+        if not user:
+            continue
+        new_wins = sorted(wins_map.get(user_uid, []))
+        if new_wins == user.wins:
+            continue
+        user.wins = new_wins
+        user.modified = now
+        updated_users.append((user, await save_user(user)))
+
+    logger.info(f"Recomputed wins for {len(updated_users)} users")
     return updated_users
 
 
@@ -314,6 +344,12 @@ async def recompute_all_ratings() -> int:
         for _user, bd in await recompute_ratings_for_players(player_uids, category):
             broadcast_precomputed(bd)
             updated += 1
+
+    # Pass 3: wins, over every tournament rather than every rated player — the
+    # only pass that can see a historic winner who never entered a rated event.
+    for _user, bd in await recompute_wins():
+        broadcast_precomputed(bd)
+        updated += 1
 
     logger.info(f"Full rating recompute: {updated} users updated")
     return updated

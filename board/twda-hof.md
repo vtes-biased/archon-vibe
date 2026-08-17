@@ -851,7 +851,7 @@ handles only the delta after that.
    Without it every `get_tournament_by_external_id('twda', …)` (`db.py:1140`)
    seq-scans ~30k tournament rows, ~2327 times.
 
-## Phase 3 — The Hall of Fame rule
+## Phase 3 — The Hall of Fame rule — **done 2026-08-17, rule live, diff owed**
 
 1. **Depends on *Archival results*** — `reported_player_count`,
    `attested_player_count()`, and the `"no_results"` eligibility guard. Without
@@ -889,6 +889,22 @@ handles only the delta after that.
 5. **Diff before flipping.** Compute new membership against the current 115 and
    review who drops out. 47 members sit at exactly 5 — 20% of the HoF is one win
    from the line, and a silent eviction is a support ticket with a name on it.
+
+### Executed, and what is still owed on prod
+
+Items 1–4 are in. `get_all_tournament_wins` (`db.py`) enumerates from the
+tournaments and carries the whole rule including the deck `EXISTS`; the floor
+runs in Python over `attested_player_count`, because the precedence chain and the
+seat union are not expressible in SQL without duplicating the rule there.
+`recompute_wins` (`ratings.py`) is its own pass, wired into the three tournament
+paths, the archon import, the TWDA sync (after the deck pass) and the daily job;
+`recompute_ratings_for_players` no longer touches `wins`.
+
+**Item 5 is a prod step and is not done** — the diff needs the corpus. Run it
+after deploy, before the backfill, and again after. Ordering matters for a second
+reason: if the nightly recompute lands the new rule before the backfill runs, the
+page shrinks (the deck gate evicts) and then grows, which reads as two incidents
+rather than one migration. Deploy → backfill → the page settles once.
 
 ## Phase 4 — Surfaces
 

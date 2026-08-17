@@ -5,6 +5,7 @@ import pytest
 from archon_engine import PyEngine
 from src import db
 from src.models import (
+    DeckObject,
     ObjectType,
     Sanction,
     Tournament,
@@ -388,19 +389,63 @@ class TestFinalistPosition:
         assert _finalist_position(t, "p3") == 0
 
 
+def _standings(n: int) -> list[dict]:
+    """A rounds-less result sheet of n players — the VEKN-import shape, which is
+    what `attested_player_count` falls back to counting."""
+    return [{"user_uid": f"p{i}"} for i in range(n)]
+
+
 @pytest.mark.asyncio
-async def test_hof_wins_exclude_online_and_house_formats(test_db):
-    """HoF convention: only finished IRL VEKN-format wins count."""
+async def test_hall_of_fame_win_rule(test_db):
+    """Every clause of the Hall of Fame rule, which is deliberately NOT
+    `ranking_eligibility`: a win counts when it would have made the TWDA and the
+    winner's deck is on record."""
     cases = [
-        ("w-irl", {}, True),
-        ("w-online", {"online": True}, False),
-        ("w-open", {"open_rounds": True}, False),
-        ("w-self", {"self_organized_rounds": True}, False),
-        ("w-running", {"state": "Playing"}, False),
+        ("w-irl", {"standings": _standings(10)}, True, True),
+        ("w-online", {"standings": _standings(10), "online": True}, True, False),
+        ("w-open", {"standings": _standings(10), "open_rounds": True}, True, False),
+        (
+            "w-self",
+            {"standings": _standings(10), "self_organized_rounds": True},
+            True,
+            False,
+        ),
+        ("w-running", {"standings": _standings(10), "state": "Playing"}, True, False),
+        # Draft and sealed decks are not archived, so they cannot be on record.
+        ("w-limited", {"standings": _standings(10), "format": "Limited"}, True, False),
+        ("w-small", {"standings": _standings(9)}, True, False),
+        # The whole point of the rule: won, but never submitted the deck.
+        ("w-no-deck", {"standings": _standings(10)}, False, False),
+        # An archive entry that never carried `players_count` grandfathers past
+        # the floor — its acceptance upstream is the attestation.
+        (
+            "w-archival",
+            {"standings": _standings(1), "external_ids": {"twda": "1998xyz"}},
+            True,
+            True,
+        ),
     ]
-    for uid, overrides, _ in cases:
+    for uid, overrides, has_deck, _ in cases:
         t = _make_tournament(uid=uid, winner="champ", **overrides)
         await db.save_object_from_model(ObjectType.TOURNAMENT, t)
+        if has_deck:
+            await db.save_object_from_model(
+                ObjectType.DECK,
+                msgspec.convert(
+                    {
+                        "uid": f"d-{uid}",
+                        "modified": "2026-01-01T00:00:00",
+                        "tournament_uid": uid,
+                        "user_uid": "champ",
+                    },
+                    DeckObject,
+                ),
+            )
 
-    wins = await db.get_tournament_wins_for_users({"champ"})
-    assert set(wins.get("champ", [])) == {uid for uid, _, counts in cases if counts}
+    expected = {uid for uid, _, _, counts in cases if counts}
+    assert set((await db.get_all_tournament_wins()).get("champ", [])) == expected
+    # The winner filter narrows the rewrite, never the rule.
+    assert (
+        set((await db.get_all_tournament_wins({"champ"})).get("champ", [])) == expected
+    )
+    assert await db.get_all_tournament_wins({"nobody"}) == {}

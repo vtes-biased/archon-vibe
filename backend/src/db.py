@@ -14,6 +14,7 @@ from typing import NamedTuple
 
 import msgspec
 import psycopg
+from archon_engine import PyEngine
 from psycopg_pool import AsyncConnectionPool
 
 from .geonames import country_key
@@ -30,6 +31,8 @@ from .models import (
     Tournament,
     User,
 )
+
+_engine = PyEngine()
 
 
 @dataclass(slots=True)
@@ -1129,32 +1132,91 @@ async def find_both_vekn_tournament_groups() -> list[dict]:
         ]
 
 
-async def get_tournament_wins_for_users(user_uids: set[str]) -> dict[str, list[str]]:
-    """Get all-time IRL tournament win UIDs for multiple users at once."""
-    if not user_uids:
+# An event needs this many players to reach the TWDA, and a win counts toward the
+# Hall of Fame only where it would have qualified. Deliberately not the 8-player
+# rating floor in `ranking_eligibility` — the two are meant to disagree.
+TWDA_MIN_PLAYERS = 10
+
+_HOF_WINS_QUERY = """
+    SELECT t.uid,
+           t."full"->>'winner',
+           t."full"->'external_ids'->>'twda',
+           COALESCE((t."full"->>'reported_player_count')::int, 0),
+           t."full"::text
+    FROM objects t
+    WHERE t.type = 'tournament'
+      AND t.deleted_at IS NULL
+      AND t."full"->>'state' = 'Finished'
+      AND COALESCE(t."full"->>'winner', '') <> ''
+      AND (t."full"->>'online') IS DISTINCT FROM 'true'
+      AND (t."full"->>'open_rounds') IS DISTINCT FROM 'true'
+      AND (t."full"->>'self_organized_rounds') IS DISTINCT FROM 'true'
+      AND (t."full"->>'format') IS DISTINCT FROM 'Limited'
+      AND EXISTS (
+          SELECT 1 FROM objects d
+          WHERE d.type = 'deck'
+            AND d.deleted_at IS NULL
+            AND d."full"->>'tournament_uid' = t.uid
+            AND d."full"->>'user_uid' = t."full"->>'winner'
+      )
+"""
+_HOF_WINS_BATCH = 500
+
+
+async def get_all_tournament_wins(
+    winners: set[str] | None = None,
+) -> dict[str, list[str]]:
+    """Hall-of-Fame win uids per winner, enumerated from the tournaments.
+
+    Never from a user list: a historic winner who played no rated event appears
+    in no player set, which is exactly how half the Hall of Fame went missing.
+    `winners` narrows what a targeted recompute rewrites, never what qualifies.
+
+    The floor reads `attested_player_count`, not the seated count — a rounds-less
+    VEKN import and an archival reconstruction both seat nobody and would read 0.
+    """
+    if winners is not None and not winners:
         return {}
+    wins: dict[str, list[str]] = {}
+    last_uid = ""
     async with get_connection() as conn:
-        placeholders = ", ".join(["%s"] * len(user_uids))
+        while True:
+            params: list = []
+            sql = _HOF_WINS_QUERY
+            if winners is not None:
+                sql += " AND t.\"full\"->>'winner' = ANY(%s)"
+                params.append(list(winners))
+            sql += " AND t.uid > %s ORDER BY t.uid LIMIT %s"
+            params += [last_uid, _HOF_WINS_BATCH]
+            result = await conn.execute(sql, tuple(params))  # ty: ignore[invalid-argument-type]
+            rows = await result.fetchall()
+            for uid, winner, twda_id, reported, full in rows:
+                # A TWDA entry that never carried `players_count` grandfathers
+                # past the floor: the archive accepting it is itself the
+                # attestation, and gating on the blank costs 5 genuine Hall of
+                # Fame members over a data gap in ~100 entries.
+                grandfathered = bool(twda_id) and not reported
+                if (
+                    not grandfathered
+                    and _engine.attested_player_count(full) < TWDA_MIN_PLAYERS
+                ):
+                    continue
+                wins.setdefault(winner, []).append(uid)
+            if len(rows) < _HOF_WINS_BATCH:
+                return wins
+            last_uid = rows[-1][0]
+
+
+async def get_user_uids_with_wins() -> set[str]:
+    """Users whose stored win list is non-empty — the clear side of the recompute.
+    A deleted tournament, a corrected winner or a withdrawn deck leaves no
+    tournament row naming them, so enumeration alone would never zero them."""
+    async with get_connection() as conn:
         result = await conn.execute(
-            f"SELECT uid, \"full\"->>'winner' AS winner FROM objects "  # ty: ignore[invalid-argument-type]
-            f"WHERE type = 'tournament' "
-            f"AND \"full\"->>'state' = 'Finished' "
-            f"AND \"full\"->>'winner' IN ({placeholders}) "
-            # Non-VEKN house format: open-rounds / self-organized wins don't count
-            # toward the Hall of Fame (mirrors their exclusion from ratings/push).
-            f"AND (\"full\"->>'open_rounds') IS DISTINCT FROM 'true' "
-            f"AND (\"full\"->>'self_organized_rounds') IS DISTINCT FROM 'true' "
-            # Official VEKN HoF convention counts IRL wins only.
-            f"AND (\"full\"->>'online') IS DISTINCT FROM 'true' "
-            f"AND deleted_at IS NULL",
-            tuple(user_uids),
+            "SELECT uid FROM objects WHERE type = 'user' AND deleted_at IS NULL "
+            "AND jsonb_array_length(COALESCE(\"full\"->'wins', '[]'::jsonb)) > 0"
         )
-        rows = await result.fetchall()
-        wins: dict[str, list[str]] = {}
-        for row in rows:
-            t_uid, winner = row[0], row[1]
-            wins.setdefault(winner, []).append(t_uid)
-        return wins
+        return {row[0] for row in await result.fetchall()}
 
 
 async def get_finished_tournaments_for_category(

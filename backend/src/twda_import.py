@@ -32,6 +32,7 @@ from .models import (
     TournamentFormat,
     TournamentState,
 )
+from .ratings import recompute_wins
 
 logger = logging.getLogger(__name__)
 
@@ -321,10 +322,18 @@ async def run_twda_sync(
             f"archive entry, left alone for review: {orphaned[:20]}"
         )
 
-    stats["decks_created"], stale = await _import_decks(
+    stats["decks_created"], stale, deck_winners = await _import_decks(
         entries, resolved, now, broadcast
     )
     stats["stale_targets"] = len(stale)
+
+    # A reconstruction only enters the Hall of Fame once its winner's deck lands,
+    # so this has to follow the deck pass. The backfill relies on it running here
+    # too — it regenerates the snapshot straight after, and a win list computed
+    # later would miss that snapshot and wait for the nightly pass.
+    for _user, bd in await recompute_wins(deck_winners):
+        if broadcast:
+            broadcast_precomputed(bd)
     if stale:
         # The decisions file names uids; one that moved since it was written
         # attaches nothing. Silent, and the whole file degrades this way.
@@ -341,8 +350,8 @@ async def _import_decks(
     resolved: dict[str, tuple[str, str]],
     now: datetime,
     broadcast: bool,
-) -> tuple[int, list[str]]:
-    """(decks created, decisions whose target we no longer hold).
+) -> tuple[int, list[str], set[str]]:
+    """(decks created, decisions whose target we no longer hold, winners touched).
 
     One winner decklist per resolved event that does not already have one.
     `DeckObject.user_uid` is required and load-bearing in three indexes, so an
@@ -354,6 +363,7 @@ async def _import_decks(
     existing = await _deck_owners_by_tournament(uids)
     created = 0
     stale: list[str] = []
+    touched: set[str] = set()
     for entry in entries:
         entry_id = str(entry.get("id", ""))
         target = resolved.get(entry_id)
@@ -387,7 +397,8 @@ async def _import_decks(
         if broadcast:
             broadcast_precomputed(bd)
         created += 1
-    return created, stale
+        touched.add(winner_uid)
+    return created, stale, touched
 
 
 async def _fetch_twda() -> list[dict]:

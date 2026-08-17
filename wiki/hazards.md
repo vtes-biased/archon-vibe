@@ -161,8 +161,21 @@ not in them. Two readings in `backend/src/routes/tournaments.py` stay divergent:
 `_played_player_count`, gating the TWDA floor, is seats only with no standings
 fallback — so 0 for a rounds-less import — and it *subtracts* non-competing
 proxies; and `GET /{uid}/report` sends `len(tournament.players)`, the registered
-roster including no-shows. Neither is the rule. Share the constant with the TWDA
-gate, never the function.
+roster including no-shows. Neither is the rule. `TWDA_MIN_PLAYERS` lives in
+`db.py` and is shared by both floors that use it; the *function* is not — the
+Hall of Fame reads `attested_player_count`, because `_played_player_count` would
+score every rounds-less import and every reconstruction at 0 and empty the page.
+
+**The Hall of Fame predicate and `ranking_eligibility` disagree on purpose.** 10
+players and the winner's deck on record, against 8 players and a played final:
+they are different questions and a unification "fixing" the inconsistency
+silently rewrites who is in the Hall of Fame. `user.wins` is likewise no longer a
+by-product of the rating recompute — that coupling is what made membership turn
+on the unrelated coincidence of having played a rated event, so a historic winner
+was invisible. `recompute_wins` enumerates from the tournaments; its optional
+user set narrows the rewrite, never the rule. Any new path that finishes,
+un-finishes or deletes a tournament has to call it alongside the rating
+recompute, or a fresh win waits for the nightly pass.
 
 `len(rounds) == 0` is not "no results", and never measures field size. Every
 pre-2014 import is rounds-less while carrying a full scored result sheet, so the

@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from src.db import TWDA_MIN_PLAYERS
 from src.models import (
     DeckObject,
     Seat,
@@ -21,7 +22,7 @@ from src.models import (
     TwdaOutcome,
     User,
 )
-from src.routes.tournaments import TWDA_MIN_PLAYERS, maybe_submit_twda
+from src.routes.tournaments import maybe_submit_twda
 
 
 def _user(uid: str, name: str, vekn_id: str = "") -> User:

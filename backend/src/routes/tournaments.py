@@ -21,6 +21,7 @@ from ..broadcast import (
 )
 from ..card_data import cards_json_text
 from ..db import (
+    TWDA_MIN_PLAYERS,
     BroadcastData,
     allocate_next_vekn_id,
     compute_access_version,
@@ -328,11 +329,6 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
         len(tournament.players),
         player_name,
     )
-
-
-# TWDA-eligible only with >=10 players who actually played (seated, not
-# merely registered) — smaller sanctioned events don't qualify.
-TWDA_MIN_PLAYERS = 10
 
 
 def _played_player_count(tournament: Tournament) -> int:
@@ -1051,11 +1047,14 @@ async def delete_tournament_endpoint(
             from ..ratings import (
                 rating_category_for_tournament,
                 recompute_ratings_for_players,
+                recompute_wins,
             )
 
             player_uids = {p.user_uid for p in tournament.players if p.user_uid}
             category = rating_category_for_tournament(tournament)
             for _user, bd in await recompute_ratings_for_players(player_uids, category):
+                broadcast_precomputed(bd)
+            for _user, bd in await recompute_wins(player_uids):
                 broadcast_precomputed(bd)
         except Exception as e:
             logger.error(
@@ -1621,11 +1620,13 @@ async def tournament_action(
             from ..ratings import (
                 rating_category_for_tournament,
                 recompute_ratings_for_players,
+                recompute_wins,
             )
 
             player_uids = {p.user_uid for p in updated.players if p.user_uid}
             category = rating_category_for_tournament(updated)
             results = await recompute_ratings_for_players(player_uids, category)
+            results += await recompute_wins(player_uids)
             for _user, bd in results:
                 broadcast_precomputed(bd)
             # If category changed (format/online toggle), also recompute old category
@@ -2521,11 +2522,13 @@ async def go_online(
             from ..ratings import (
                 rating_category_for_tournament,
                 recompute_ratings_for_players,
+                recompute_wins,
             )
 
             player_uids = {p.user_uid for p in updated.players if p.user_uid}
             category = rating_category_for_tournament(updated)
             results = await recompute_ratings_for_players(player_uids, category)
+            results += await recompute_wins(player_uids)
             for _user, bd in results:
                 broadcast_precomputed(bd)
         except Exception as e:

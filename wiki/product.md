@@ -79,7 +79,9 @@ Champion crowning.
 
 **Ratings and Hall of Fame** — server-side rating from the best 8 tournaments in
 a trailing 18 months, rating points in finished standings, a rankings page with
-country and date filters, and a Hall of Fame for 5+ wins. The formula and the
+country and date filters, and a Hall of Fame for five wins that would have made
+the TWDA with the winning deck on record
+([the rule](tournaments.md#configuration)). The formula and the
 standing warning about vekn.net's stored value are [domain](domain/vekn.md#ratings).
 
 **Live-event surfaces** — shared round timer (online only, one global clock,

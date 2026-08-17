@@ -596,7 +596,7 @@ rounds, tables, seating, scores and players, matching players by VEKN ID.
 | VEKN push batch | hourly, configurable | `vekn_push.py` |
 | Legacy-archon merge | daily, systemd timer | `scripts/migrate_from_archon.py --merge` |
 | Sanction cleanup | daily | `db.py` |
-| Rating recompute | daily | `ratings.py` |
+| Rating recompute (ratings, then Hall of Fame wins) | daily | `ratings.py` |
 | Promo stock recompute | daily | `promo_stock.py` |
 | OAuth cleanup | hourly | `db_oauth.py` |
 | Snapshot generation | every 15 min | `snapshots.py` |

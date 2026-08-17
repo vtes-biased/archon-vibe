@@ -272,7 +272,12 @@ a record we hold.
 `twda_import.py` reads `static.krcg.org/data/twda.json` and does two things:
 reconstructs the historic events the archive is the only record of, and gives every
 resolved winner their decklist (`attribution="twda"`, `public=True`, only where the
-winner has none for that tournament). It runs on `twda_sync`, **its own job under
+winner has none for that tournament). Then it recomputes those winners' Hall of
+Fame lists, which is why that step follows the deck pass rather than preceding it:
+a reconstruction only counts once its deck is on record
+([the rule](tournaments.md#configuration)). The backfill depends on the ordering
+too — it regenerates the snapshot immediately afterwards, and a win list computed
+later would miss it. It runs on `twda_sync`, **its own job under
 its own flag** and recorded on the vekn-status panel: a different upstream, no VEKN
 credentials, that has to outlive the VEKN API rather than be deleted along with the
 chain. Nothing sequences it against the tournament sync, so the two can both reach

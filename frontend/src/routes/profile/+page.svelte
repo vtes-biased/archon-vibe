@@ -8,6 +8,7 @@
     requestMagicLink,
   } from "$lib/stores/auth.svelte";
   import { canManageOauthClients, canRunAdminSync } from "$lib/engine";
+  import { HOF_MIN_WINS } from "$lib/tournament-utils";
   import { registerPasskey } from "$lib/stores/passkeys.svelte";
   import { syncManager } from "$lib/sync";
   import { claimVeknId, abandonVeknId, uploadAvatar } from "$lib/api";
@@ -249,7 +250,7 @@
         <div class="p-6 border-t border-line space-y-4">
           <div class="flex items-center justify-between gap-3 flex-wrap">
             <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.user_detail_ratings()}</h3>
-            {#if (user.wins?.length ?? 0) >= 5}
+            {#if (user.wins?.length ?? 0) >= HOF_MIN_WINS}
               <Badge kind="link" tone="highlight" href="/rankings?tab=halloffame">
                 <Trophy class="w-3 h-3" aria-hidden="true" />
                 {m.profile_hof_member({ wins: String(user.wins?.length ?? 0) })}
