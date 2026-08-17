@@ -479,10 +479,14 @@ has not yet played contributes nothing until they do. The UI auto-computes the
 round; there is no free round picker, so a later round starting cannot migrate an
 existing SA.
 
-> **Diverges from the rules.** JG v2 §1.1.3's third case — an SA issued **before
-> round 1 pairings are announced** applies to round 1 — is unimplemented: the
-> backend requires an existing round, so such an SA cannot be issued at all. This
-> is the one case where the guide does park a penalty on a future round.
+> **Diverges from the rules, deliberately.** JG v2 §1.1.3's third case — an SA
+> issued **before round 1 pairings are announced** applies to round 1 — is not
+> implemented, and will not be: the backend requires an existing round, so the
+> judge issues the SA once round 1 is seated instead. The outcome is identical,
+> because round targeting picks the highest round the player is seated in and
+> that is round 1. Building it would mean a penalty parked on a round that does
+> not exist yet — the one case where the guide does that — with a migration path
+> to write and a state to reason about, to save a judge a few minutes' wait.
 
 **Finals-round SA** penalizes the finals result rather than the preliminary totals:
 prelim standings exclude finals-round SAs from their VP penalty, and the −1 VP
