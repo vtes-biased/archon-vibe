@@ -1,9 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 
-// The dev-server e2e never loads the built artifact, so prod-only asset-pipeline
-// breaks ship green; this boots the build the way prod serves it. '/' is
-// prerendered, the deep route hits the 200.html SPA fallback — the combination
-// an asset-path regression breaks but the dev server hides.
+// The dev-server e2e never loads the built artifact, so a prod-only asset-path
+// break ships green. '/' is prerendered and the deep route hits the 200.html
+// SPA fallback — the combination the dev server hides.
 const ROUTES = ['/', '/tournaments/0190aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee'];
 
 // With no backend, API/SSE calls 503 — the only legitimate console errors.

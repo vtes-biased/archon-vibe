@@ -247,10 +247,8 @@ export type SyncToken =
   | { kind: "downgrade" }
   | { kind: "retry" };
 
-/**
- * Refresh on demand so we never open a connection with a stale access token (the
- * proactive timer dies under tab-suspend/device-sleep).
- */
+// Refresh on demand: the proactive timer dies under tab-suspend and device-sleep,
+// so a connection would otherwise open on a stale access token.
 export async function ensureSyncToken(): Promise<SyncToken> {
   const token = getAccessToken();
   if (!token) return { kind: "anonymous" };

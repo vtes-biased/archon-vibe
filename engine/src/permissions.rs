@@ -206,10 +206,9 @@ impl Capability {
     }
 }
 
-/// One row of the capability table: who holds this authority, and in what scope.
-///
-/// The grants are OR-ed — the actor needs one of them. An empty list or a false
-/// flag grants nothing, so a row that lists nothing denies everyone.
+/// One row of the capability table: who holds this authority, in what scope.
+/// Grants are OR-ed, and an empty list or a false flag grants nothing — a row
+/// that lists nothing denies everyone.
 pub struct Rule {
     pub capability: Capability,
     /// Wire name, used by the PyO3/WASM `check_permission` entry point.

@@ -225,10 +225,9 @@ async def audit(emit_path: str | None, probe: bool) -> int:
             double_rated += 1
         if not copies:
             continue
-        # An archive reconstruction is a one-player row, so `richness` always ranks
-        # it last. That is right for a true duplicate and destructive for a false
-        # pair thrown up by a generic event name, and the script cannot tell them
-        # apart. Report, never propose: this one is a human's call.
+        # `richness` always ranks a one-player archive reconstruction last: right
+        # for a true duplicate, destructive for a false pair off a generic event
+        # name, and the script cannot tell them apart. Report, never propose.
         if any(t.external_ids.get("twda") for t in copies):
             twda_groups += 1
             print("    → no proposal: an archive reconstruction is in this group")

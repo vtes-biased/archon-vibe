@@ -172,10 +172,8 @@ async def merge_users(
     broadcasts = [merged_bd]
     broadcasts += await reassign_sanctions(delete_uid, keep_uid)
     broadcasts += await reassign_decks(delete_uid, keep_uid)
-    # The reassigned deck may be the winning deck of a tournament the survivor
-    # already won, which is a Hall of Fame place: the derived count follows the
-    # deck. Their rating does not move — no result changed hands, only ownership.
-    # Rebind `merged`, or the route answers with the pre-recompute win list.
+    # A reassigned deck can carry a Hall of Fame place, so the derived win count
+    # follows it. Rebind `merged`, or the route answers the pre-recompute list.
     for recomputed, bd in await recompute_wins({keep_uid}):
         merged = recomputed
         broadcasts.append(bd)

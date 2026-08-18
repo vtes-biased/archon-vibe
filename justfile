@@ -156,17 +156,25 @@ lint-check:
     uv run ruff format --check .
     (cd engine && cargo fmt --check && cargo clippy --all-targets --all-features -- -D warnings)
     just permission-drift
+    just comment-blocks
 
 # Fail when a role literal is used for gating outside the engine's capability
 # table — the drift this repo's permission model keeps re-growing without it.
 permission-drift:
     uv run python3 scripts/check_permission_drift.py
 
+# Fail on a contiguous inline comment block over three lines — the bloat a
+# review pass keeps having to delete by hand.
+comment-blocks:
+    uv run python3 scripts/check_comment_blocks.py
+
 # Lint and auto-fix all code
 lint:
     uv run ruff check --fix . && uv run ruff format .
     (cd engine && cargo fmt && cargo clippy --all-targets --all-features -- -D warnings)
     @just _backup-drift
+    just permission-drift
+    just comment-blocks
 
 # Warn (never fail) when the hand-synced backup scripts drift from server-setup's
 # copies (script headers document the contract). Comment wording and the

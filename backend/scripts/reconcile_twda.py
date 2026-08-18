@@ -265,12 +265,9 @@ class Roster:
         if len(subset) == 1:
             return "member-subset", subset
 
-        # Everything below rests on "same surname, given names correspond". On a
-        # crowded surname that is not evidence: the given name is carrying the
-        # whole claim against dozens of candidates, and that is exactly where the
-        # bootstrap's one wrong match sits ("Matheus Oliveira" -> "Matheus Rocha
-        # de Oliveira", 55 Oliveiras, truth "Matheus Kurtz"). Refuse, and let it
-        # go to review and come back as a ruling.
+        # Everything below rests on "same surname, given names correspond", which
+        # on a crowded surname is not evidence — that is where the bootstrap's one
+        # wrong match sat. Refuse, and let review turn it into a ruling.
         pool = self.by_surname.get(surname, [])
         if not pool:
             return "no surname", []
@@ -318,9 +315,8 @@ class Roster:
             return []  # two equally good — ambiguous, refuse
         best = scored[0][1]
         # A whole-name ratio clears the floor on given name and length alone
-        # ("David Magri" against "David Martin"), so demand that the surnames
-        # correspond, or that the member's name is contained in the archive's.
-        # The counterpart may sit mid-name: Spanish double surnames put it there.
+        # ("David Magri" against "David Martin"), so demand a corresponding
+        # surname — Spanish double surnames put it mid-name — or containment.
         surname_ok = max(_similar(name.split()[-1], t) for t in best.split()) >= 0.75
         if not (surname_ok or set(best.split()) <= set(name.split())):
             return []

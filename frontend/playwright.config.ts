@@ -1,15 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
 
-/**
- * Playwright configuration for E2E tests.
- * 
- * Environment variables:
- * - BASE_URL: Override the frontend URL (default: http://localhost:5173)
- * - CI: Set in CI environments for stricter behavior
- * 
- * See https://playwright.dev/docs/test-configuration.
- */
-
 const baseURL = process.env.BASE_URL || 'http://localhost:5173';
 
 export default defineConfig({

@@ -2523,11 +2523,9 @@ fn apply_event(
             let ordered = std::iter::once(winner)
                 .chain(players.iter().filter(|p| *p != winner))
                 .collect::<Vec<_>>();
-            // A native event finished from Waiting also reaches here, and its rows
-            // may carry a display name and a real payment status. Nothing else on
-            // them survives — the results are what this event replaces. A name-only
-            // player has no uid the payload could name, so they are carried through
-            // rather than deleted by an event that cannot address them.
+            // A native event finished from Waiting also reaches here: a name-only
+            // player has no uid the payload could name, so they are carried
+            // through rather than deleted by an event that cannot address them.
             let existing = tournament["players"].clone();
             let nameless: Vec<JsonValue> = existing
                 .members()

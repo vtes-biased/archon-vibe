@@ -338,10 +338,9 @@ async def _adopt_same_event(tournament: Tournament, event_id: Any) -> Tournament
         return None
 
     adopted = candidates[0]
-    # A TWDA reconstruction has exactly this shape — a winner-only roster and no
-    # rounds — so the guard below would decline it and mint a duplicate of an
-    # event we already hold. Adopt instead: a full VEKN result set is strictly
-    # richer than a one-player reconstruction, and overwriting it is the point.
+    # A TWDA reconstruction has exactly this shape — winner-only roster, no
+    # rounds — so the guard below would decline it and mint a duplicate. Adopt
+    # instead: the full VEKN result set is strictly richer.
     if adopted.players and not adopted.rounds and not adopted.external_ids.get("twda"):
         logger.warning(
             f"VEKN event {event_id} '{tournament.name}': same-day copy {adopted.uid} "
@@ -523,9 +522,8 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                                 map_url=tournament.map_url,
                                 proxies=tournament.proxies,
                                 # Merged, not replaced: the incoming map holds
-                                # only `vekn`, and a round-less vekn-origin row is
-                                # exactly the class the archive links to, so a
-                                # replace drops its `twda` key on every rebuild.
+                                # only `vekn`, and a replace drops the `twda`
+                                # key the archive links a round-less row by.
                                 external_ids={
                                     **existing.external_ids,
                                     **tournament.external_ids,

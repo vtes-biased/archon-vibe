@@ -253,9 +253,8 @@
     </div>
 
     <!-- Sticky resolves against the scrollport, not the shell's padding box: on
-         the page it must clear the bottom nav itself (z-40) or the nav paints
-         over it; in a sheet the scrollport already covers the nav, so clearing
-         there would strand the chip. -->
+         the page it must clear the bottom nav (z-40) or the nav paints over it,
+         while in a sheet the same clearance strands the chip. -->
     {#if saving || savedFlash}
       <div class="sticky {inSheet ? 'bottom-4' : 'bottom-[calc(1rem+var(--spacing-navbar))] sm:bottom-[calc(1rem+var(--spacing-safe-b))]'} flex justify-end pointer-events-none">
         <div class="bg-surface-card border border-line rounded-full shadow px-3 py-1.5 text-xs text-ink-muted flex items-center gap-1.5">

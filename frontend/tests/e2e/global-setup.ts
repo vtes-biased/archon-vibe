@@ -1,9 +1,3 @@
-/**
- * Playwright global setup: read seed data from shared volume, login organizer, store state.
- *
- * In Docker: populate-db writes seed JSON to E2E_SEED_FILE (/shared/e2e-seed.json).
- * Locally:   run `uv run python backend/scripts/seed_e2e.py` from repo root first.
- */
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';

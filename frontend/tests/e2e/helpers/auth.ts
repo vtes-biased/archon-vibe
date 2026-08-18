@@ -29,10 +29,7 @@ export function getE2EState(): E2EState {
   return _cached!;
 }
 
-/**
- * Set real auth tokens in localStorage so the app recognizes the organizer.
- * Must be called after page.goto() — needs a page context for localStorage.
- */
+// Call after page.goto(): localStorage needs a page context.
 export async function loginAsOrganizer(page: Page) {
   await expect(
     page.locator('[data-sync-state="synced"]').first(),
@@ -58,11 +55,8 @@ export async function loginAsOrganizer(page: Page) {
   );
 }
 
-/**
- * Registers tokens via addInitScript so they exist before page scripts run —
- * call before the first page.goto(). Needed for tests relying on full-level
- * IDB data (e.g. player search over all users).
- */
+// Call before the first page.goto(): the tokens must exist when page scripts
+// run, or the first sync lands without full-level data.
 export async function setupAuthBeforeNavigation(page: Page) {
   const state = getE2EState();
   await page.addInitScript(

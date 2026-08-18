@@ -52,9 +52,12 @@ standing traps are catalogued in [hazards](hazards.md).
 **Comments are for traps only.** The wiki holds the why, the code shows the how.
 A comment is justified only by a subtle non-local constraint invisible at the
 point of reading. No narration, no changelogs, no TODOs — discovered work goes
-through ingress or gets done now. A comment past ~2 lines is usually narrating.
-Code never references the wiki: a trap comment states its constraint and stands
-alone; the wiki points at code, never the reverse.
+through ingress or gets done now. A comment past ~2 lines is usually narrating,
+and a contiguous block over three fails `just lint` in any comment syntax
+([dev](dev.md#lint-gates)) —
+a rationale that needs more room is a wiki page in the wrong file. Code never
+references the wiki: a trap comment states its constraint and stands alone; the
+wiki points at code, never the reverse.
 
 **Component splitting.** A Svelte page past ~1000 lines gets its sections
 extracted into child components: props down, state ownership stays in the parent.
@@ -86,6 +89,18 @@ refactors.
   `vekn_id`.
 
 Mechanics, layers and known fixture traps: [testing](testing.md).
+
+## Review
+
+**Every review finding is addressed.** Egress classifies a finding blocking or
+advisory; advisory means it does not stop the landing, never that it may be
+dropped — it is fixed in the same change, or becomes a board line through
+ingress. The counterweight is a reviewer with no quota: "looks good" is a common
+verdict, and report-everything must not become find-something.
+
+Egress runs a named **comment pass** over every diff that touches code, deleting
+any comment the wiki, another comment, or the code itself already states. The
+three-line ceiling above catches the bulk; the pass catches the duplication.
 
 ## Product
 

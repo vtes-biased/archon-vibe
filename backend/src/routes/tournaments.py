@@ -77,11 +77,9 @@ router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 
-# Wire types are raw and unnormalized: list every deck-upsert alias the engine
-# accepts (UpsertDeck/UploadDeck/UpdateDeck) or omitting one skips the recompute.
-# Rating-irrelevant only. The deck actions below DO move the Hall of Fame, which
-# counts a win only while the winner's deck is on record — the caller recomputes
-# wins for them separately.
+# Wire types are raw: list every deck-upsert alias the engine accepts or the one
+# omitted skips the recompute. Rating-irrelevant only — the deck actions below do
+# move the Hall of Fame, and the caller recomputes wins for them separately.
 _RATING_IRRELEVANT_ACTIONS = frozenset(
     {
         "UpsertDeck",

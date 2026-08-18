@@ -31,11 +31,9 @@ pub fn compute_rating_points(
     base as i32 + (finalist_bonus * coef).round() as i32
 }
 
-/// Ranking-eligibility gate (VEKN 3.1/3.1.6): >= 8 played players AND a played final,
-/// never for open-rounds/self-organized. Single source — ratings.py and the frontend badge read this, don't re-derive.
-///
-/// Returns "eligible" or the blocking reason, first match wins:
-/// "open_rounds" | "no_results" | "few_players" | "no_final".
+/// Ranking-eligibility gate (VEKN 3.1/3.1.6), returning "eligible" or the first
+/// blocking reason. The single source: ratings.py and the frontend badge read
+/// it, and must never re-derive it.
 pub fn ranking_eligibility(t: &json::JsonValue) -> &'static str {
     if t["open_rounds"].as_bool().unwrap_or(false)
         || t["self_organized_rounds"].as_bool().unwrap_or(false)
@@ -93,15 +91,9 @@ pub(crate) fn players_with_rounds(t: &json::JsonValue) -> usize {
         .count()
 }
 
-/// How big the field was — for the rating coefficient and the win floors. Not
-/// "who played" (`players_with_rounds`): a seat that scored nothing still made
-/// the event that size.
-///
-/// A precedence, never a maximum: our own play data, then an attestation, then
-/// the imported result sheet. The attestation is only ever written where
-/// `players_with_rounds` is 0, so it can never contradict a VEKN record — and it
-/// has to outrank the sheet, because a TWDA reconstruction's standings hold the
-/// winner alone.
+/// How big the field was, not who played (`players_with_rounds`): a seat that
+/// scored nothing still made the event that size. A precedence, never a maximum
+/// — the attestation outranks a reconstruction's winner-only standings.
 pub fn attested_player_count(t: &json::JsonValue) -> usize {
     if !t["rounds"].is_empty() {
         return players_with_rounds(t);

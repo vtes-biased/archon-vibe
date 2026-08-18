@@ -2,11 +2,6 @@ import { test, expect } from '@playwright/test';
 import { setupAuthBeforeNavigation } from './helpers/auth';
 import { waitForSync } from './helpers/wait';
 
-/**
- * League lifecycle: an IC creates a league through the form and it shows up
- * on the detail page and in the list. Reads come from IndexedDB
- * (offline-first); creation is a real API call.
- */
 test.describe('League lifecycle', () => {
   test('create a league, see it on detail and list pages', async ({ page }) => {
     await setupAuthBeforeNavigation(page);

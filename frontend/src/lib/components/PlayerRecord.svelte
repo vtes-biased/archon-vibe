@@ -32,9 +32,7 @@
     )).sort((a, b) => day(b.tournament).localeCompare(day(a.tournament)));
 
     // Not the Hall of Fame rule inverted — that is server-side and stays there.
-    // This asks only "you won it and no deck of yours is on it", the same pair the
-    // tournament page already nudges on, gathered where a player can act on all of
-    // them at once.
+    // This asks only "you won it and no deck of yours is on it".
     if (!withMissing) {
       undocumented = [];
       return;

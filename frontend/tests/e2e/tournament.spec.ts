@@ -5,17 +5,6 @@ import { fileURLToPath } from 'url';
 import { loginAsOrganizer, getE2EState } from './helpers/auth';
 import { waitForSync } from './helpers/wait';
 
-/**
- * Full nominal tournament arc, all through the real UI (no API shortcuts):
- * create → register 8 players → check-in → 2 rounds scored via the VP
- * dropdowns → random toss (sweep scoring guarantees ties at the finals
- * cutoff) → finals → winner banner → rating points visible on /rankings.
- *
- * Mutations are optimistic (WASM) but server POSTs are serialized per
- * tournament, so chaining UI steps is ordering-safe; we only await the
- * server response where the next step depends on a server-side effect.
- */
-
 /** The action bar's primary CTA — exact match avoids the sticky strip's
  *  duplicate "<action> — <state>" button once the bar scrolls off screen. */
 function cta(page: Page, name: string) {

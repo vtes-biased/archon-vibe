@@ -1262,10 +1262,9 @@ async def get_all_tournament_wins(
     wins: dict[str, list[str]] = {}
     async with get_connection() as conn:
         if winners is not None:
-            # No pagination on this path, deliberately: the result is one event's
-            # players' own wins, and `idx_objects_tournament_winner` answers it
-            # directly. A keyset `ORDER BY uid LIMIT n` would invite the planner
-            # onto the primary key instead and scan the corpus per recompute.
+            # Deliberately unpaginated: `idx_objects_tournament_winner` answers
+            # this directly, while a keyset `ORDER BY uid LIMIT n` invites the
+            # planner onto the primary key and scans the corpus per recompute.
             result = await conn.execute(
                 _HOF_WINS_QUERY + " AND t.\"full\"->>'winner' = ANY(%s)",
                 ([*winners],),
@@ -1291,11 +1290,9 @@ def _collect_wins(rows: list, wins: dict[str, list[str]]) -> None:
     and the seat union live in the engine."""
     for uid, winner, twda_id, reported, full in rows:
         if _engine.attested_player_count(full) < TWDA_MIN_PLAYERS:
-            # A TWDA entry that never carried `players_count` grandfathers past
-            # the floor: the archive accepting it is itself the attestation, and
-            # gating on the blank costs 5 genuine Hall of Fame members over a data
-            # gap in ~100 entries. Only where the row played nothing — an event
-            # whose result sheet we hold answers the question itself.
+            # A TWDA entry with no `players_count` grandfathers past the floor:
+            # the archive accepting it is the attestation. Only where the row
+            # played nothing — a result sheet we hold answers the question.
             archival = bool(twda_id) and not reported
             if not archival or _engine.ranking_eligibility(full) != "no_results":
                 continue
@@ -1319,10 +1316,9 @@ async def get_finished_tournaments_for_category(
 ) -> list[Tournament]:
     """Get all live FINISHED tournaments matching format/online within date window."""
     async with get_connection() as conn:
-        # finish is optional (the engine never stamps it on FinishTournament/
-        # FinishFinals) — fall back to start then modified, mirroring ratings.py.
-        # deleted_at IS NULL: a soft-deleted tournament keeps state='Finished' and
-        # would otherwise still feed ratings.
+        # finish is optional (the engine never stamps it) — fall back to start
+        # then modified, mirroring ratings.py. A soft-deleted tournament keeps
+        # state='Finished', hence deleted_at IS NULL.
         result = await conn.execute(
             """SELECT "full" FROM objects
             WHERE type = 'tournament'

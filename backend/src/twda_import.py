@@ -37,10 +37,9 @@ from .ratings import recompute_wins
 logger = logging.getLogger(__name__)
 
 TWDA_URL = "https://static.krcg.org/data/twda.json"
-# The scheduled task handles a delta. More than this many reconstructions in one
-# run means it is standing in for the initial backfill, which belongs in
-# `backend/scripts/backfill_twda.py` — a thousand saves here is a thousand SSE
-# frames at every connected client.
+# The scheduled task handles a delta: more than this many reconstructions means
+# it is standing in for `backend/scripts/backfill_twda.py`, and a thousand saves
+# here is a thousand SSE frames at every connected client.
 MAX_CREATES_PER_RUN = 25
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -331,10 +330,9 @@ async def run_twda_sync(
     )
     stats["stale_targets"] = len(stale)
 
-    # A reconstruction only enters the Hall of Fame once its winner's deck lands,
-    # so this has to follow the deck pass. The backfill relies on it running here
-    # too — it regenerates the snapshot straight after, and a win list computed
-    # later would miss that snapshot and wait for the nightly pass.
+    # A reconstruction enters the Hall of Fame only once its winner's deck lands,
+    # so this follows the deck pass — and stays here, ahead of the backfill
+    # regenerating the snapshot a later win list would miss.
     for _user, bd in await recompute_wins(deck_winners):
         if broadcast:
             broadcast_precomputed(bd)

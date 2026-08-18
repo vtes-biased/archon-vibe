@@ -164,10 +164,9 @@
     const lastRoundIdx = tournament.rounds.length - 1;
     return tournament.rounds
       .map((round, r) => ({ round, r }))
-      // Editable until the round closes (a later round exists, or finals/finish)
-      // — not until every table reads Finished. The engine permits this: a
-      // player-scored table carries no judge_uid, so SetScore is allowed while
-      // Playing.
+      // Editable until the round closes, not until every table reads Finished:
+      // a player-scored table carries no judge_uid, so the engine allows
+      // SetScore while Playing.
       .filter(({ round, r }) => r === lastRoundIdx || round.some(t => t.state !== "Finished"))
       .map(({ round, r }) => {
         const tIdx = round.findIndex(t => t.seating.some(s => s.player_uid === userUid));

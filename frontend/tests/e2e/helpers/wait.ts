@@ -1,9 +1,3 @@
-/**
- * Sync wait helpers for E2E tests.
- *
- * The test DB only contains ~10 mock users (VEKN sync disabled for E2E),
- * so the SSE sync should complete in well under 5s.
- */
 import { expect, type Page } from '@playwright/test';
 
 const DEFAULT_SYNC_TIMEOUT = 8_000;

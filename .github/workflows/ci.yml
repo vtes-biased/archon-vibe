@@ -36,9 +36,11 @@ jobs:
         run: |
           uv run ruff check .
           uv run ruff format --check .
-      # Cheap grep, no engine needed — rides the lint job rather than its own.
+      # Cheap greps, no engine needed — they ride the lint job rather than their own.
       - name: permission drift (role literals outside the engine)
         run: uv run python3 scripts/check_permission_drift.py
+      - name: comment blocks (over three contiguous lines)
+        run: uv run python3 scripts/check_comment_blocks.py
 
   # `just lint-check` (rust half) + engine unit tests. fmt/clippy/test share one
   # toolchain + cache, so they live together rather than fanning out further.

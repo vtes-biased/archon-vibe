@@ -11,10 +11,8 @@ export function getCountries(): Record<string, Country> {
     return countriesData as Record<string, Country>;
 }
 
-/**
- * Get all countries sorted by display name — the order every dropdown wants
- * (the raw record is keyed by ISO code, which sorts by native name, not label).
- */
+// Sorted by display name: the raw record is keyed by ISO code, which sorts by
+// native name rather than by the label a dropdown shows.
 let sortedCountriesCache: Country[] | null = null;
 export function getSortedCountries(): Country[] {
     sortedCountriesCache ??= Object.values(getCountries()).sort((a, b) =>

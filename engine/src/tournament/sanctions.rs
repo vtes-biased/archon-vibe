@@ -22,11 +22,9 @@ pub(super) fn get_sa_sanctions(sanctions: &JsonValue) -> Vec<(String, usize)> {
     result
 }
 
-/// Resolves each active SA to the round its `-1` VP actually lands on (JG v2
-/// §1.1.3): honors the stored `round_number` if the player was seated there,
-/// else redirects to the most-recently-seated round (finals = sentinel index
-/// `nrounds`). Stacks to `-2` for two SAs on one player — do not dedup. Shared
-/// by `table_sa_adjustments` and `sa_vp_penalty` so GW/TP and VP agree.
+/// Resolves each active SA to the round its `-1` VP lands on (JG v2 §1.1.3):
+/// the stored `round_number` if the player was seated there, else the
+/// most-recently-seated round (finals = sentinel `nrounds`). Stacks; never dedup.
 pub(super) fn resolve_sa_effective_rounds(
     tournament: &JsonValue,
     sanctions: &JsonValue,

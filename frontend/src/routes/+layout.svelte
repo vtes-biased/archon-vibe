@@ -186,10 +186,9 @@
     {@render children()}
   </main>
 
-  <!-- Icon-only: labels truncate to ambiguity in longer locales (es/pt), so the
-       destination name lives in aria-label/title instead. -->
-  <!-- h-navbar is declared, not emergent, or a gap shows between the CTA and the
-       nav; transform-gpu is a scroll-compositing win only, not a WebKit 297779 fix. -->
+  <!-- Icon-only: labels truncate to ambiguity in longer locales (es/pt), so the destination name lives in aria-label/title. -->
+  <!-- h-navbar is declared, not emergent, or a gap shows between the CTA and the nav; transform-gpu is a scroll-compositing win only, not a WebKit 297779 fix. -->
+
   <nav class="fixed bottom-0 left-0 right-0 z-40 h-navbar pb-safe-b transform-gpu bg-surface-card border-t border-line sm:hidden">
     <div class="flex h-full justify-around">
       {#each navItems as item}

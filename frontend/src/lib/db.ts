@@ -660,10 +660,8 @@ function todayCutoff(): string {
 
 const tournamentDate = (t: Tournament) => t.start || t.modified;
 
-/**
- * "Upcoming" = not Finished and dated today or later — plus actually-running
- * events (Playing/Waiting) from an earlier date, which belong with the live ones.
- */
+// "Upcoming" = not Finished and dated today or later, plus a Playing/Waiting
+// event from an earlier date, which belongs with the live ones.
 function isUpcoming(t: Tournament, cutoff: string): boolean {
   return (
     t.state !== 'Finished' &&

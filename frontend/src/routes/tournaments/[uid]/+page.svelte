@@ -452,10 +452,9 @@ import TournamentModals from "./TournamentModals.svelte";
     }
   }
 
-  // Returns the user-facing error message on failure (null on success) so a
-  // caller with its own inline surface (e.g. the self-organize dialog) can show
-  // it in place; `silent` skips the top-of-page banner, which is likely
-  // scrolled out of view from where the action was triggered.
+  // Returns the user-facing error on failure (null on success) so a caller with
+  // its own inline surface can show it in place; `silent` skips the top-of-page
+  // banner, likely scrolled out of view from where the action fired.
   async function doAction(action: TournamentEventType, data?: Record<string, unknown>, opts?: { silent?: boolean }): Promise<string | null> {
     actionLoading = true;
     try {
@@ -590,10 +589,9 @@ import TournamentModals from "./TournamentModals.svelte";
     await doAction("DropOut", { player_uid: playerUid });
   }
 
-  // QR self-check-in (?checkin=CODE): stash the code and strip it from the
-  // address bar/history immediately, so it's never retrievable via copy-link,
-  // share sheet, or back-history. Anonymous visitors keep the stash and it's
-  // consumed on login-return.
+  // QR self-check-in (?checkin=CODE): strip the code from the address bar and
+  // history at once, or copy-link, the share sheet and back-history leak it. An
+  // anonymous visitor's stash is consumed on login-return.
   const QR_STASH_KEY = "archon-qr-checkin";
   $effect(() => {
     const code = $page.url.searchParams.get("checkin");
@@ -968,9 +966,8 @@ import TournamentModals from "./TournamentModals.svelte";
           />
 
           <!-- Four labelled tabs don't fit 360px in English, worse in the other
-               locales ("Jugadores/Rondas/Finales"); only the active tab spells
-               itself out, the rest show icon-only. The accessible name stays
-               the full label at every width. -->
+               locales, so only the active tab spells itself out. The accessible
+               name stays the full label at every width. -->
           <div class="flex border-b border-line overflow-x-auto">
             {#each tabs as tab}
               {@const TabIcon = tab.icon}

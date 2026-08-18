@@ -118,9 +118,8 @@
     createLoading = true;
     try {
       // A typed VEKN ID that already belongs to someone was never a create:
-      // go-online matches on vekn_id first and never re-checks the name
-      // (_resolve_or_create_offline_player), so a transposed digit would
-      // silently bind the seat, results and ratings to a different member.
+      // go-online matches on vekn_id first and never re-checks the name, so a
+      // transposed digit binds seat, results and ratings to another member.
       const typedVekn = createVeknId.trim();
       if (typedVekn) {
         const holder = (await getFilteredUsers(undefined, undefined, typedVekn))
@@ -128,10 +127,9 @@
         if (holder) { chooseCandidate(holder); return; }
       }
 
-      // Dedup gate: surface same-country look-alikes before minting (email
-      // dedup is the server's job). Runs offline too — go-online matches on
-      // email alone in batch, so an unreviewed offline create can mint a
-      // duplicate account.
+      // Dedup gate: surface same-country look-alikes before minting. Runs
+      // offline too — go-online matches on email alone in batch, so an
+      // unreviewed offline create mints a duplicate account.
       if (createCandidates.length === 0) {
         const country = createCountry || tournament.country || '';
         const registered = new Set(tournament.players?.map(p => p.user_uid) ?? []);

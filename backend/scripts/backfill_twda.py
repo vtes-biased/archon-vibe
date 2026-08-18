@@ -77,10 +77,8 @@ async def run(args: argparse.Namespace) -> int:
         stats = await run_twda_sync(broadcast=False, max_creates=None)
         print(f"\n{stats}")
 
-        # The sync recomputes only the winners it touched, which is every Hall of
-        # Fame *addition* and none of its removals. Left to the nightly pass, the
-        # page would grow today and shrink tomorrow — one migration reading as two
-        # incidents. A full pass settles both directions before the snapshot.
+        # The sync recomputes only the winners it touched — every Hall of Fame
+        # addition, no removal. A full pass settles both before the snapshot.
         print("\nRecomputing Hall of Fame wins...")
         print(f"{len(await recompute_wins())} win lists changed")
 

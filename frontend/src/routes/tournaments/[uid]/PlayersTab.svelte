@@ -340,10 +340,9 @@
 
   async function addPlayerByUser(user: User) {
     if (!user.vekn_id && "vekn_id" in user) {
-      // Empty vekn_id at a level that shows it means genuinely unsponsored; a
-      // missing key means the field is hidden (public-level co-organizer) —
-      // fall through, since the server injects the authoritative vekn_id on
-      // AddPlayer.
+      // An empty vekn_id means unsponsored; a missing key means the field is
+      // hidden from this level — fall through, since the server injects the
+      // authoritative vekn_id on AddPlayer.
       sponsorTarget = user;
       return;
     }

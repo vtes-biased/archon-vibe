@@ -133,13 +133,16 @@ Do not include your reasoning, your plan, or a summary of what you meant to do. 
 review is worthless if it reads the diff through your explanation of it.
 
 Its findings come back **blocking** (a charter violation) or **advisory**
-(recorded, non-gating).
+(non-gating). **Every finding is addressed.** Advisory means it does not stop the
+landing, never that it may be dropped.
 
 - Blocking findings get fixed, and the reviewer runs again on the new diff.
-- Advisory findings are reported to the owner and dropped, unless the owner wants
-  one on the board — that goes through `/intake`.
+- Advisory findings are fixed in this same change, unless the fix is genuinely
+  separable — then it goes through `/intake` and rides this commit as a board
+  line. Nothing leaves this loop unresolved.
+- A finding you believe is wrong is escalated to the owner, not dropped.
 - Expect **"looks good"** to be a common verdict. It is not the reviewer's job to
-  find something.
+  find something, and report-everything must not become find-something.
 
 **After two rejection rounds, stop and escalate to the owner**, compressed to the
 inflexion point: the one disagreement the rounds turn on, each side in a sentence,
@@ -151,5 +154,5 @@ exceptional; if it happens, that is an escalation, not a third round.
 
 ## 6. Report
 
-Tell the owner what shipped, which wiki pages moved, which line is gone, and any
-advisory findings. Short.
+Tell the owner what shipped, which wiki pages moved, which line is gone, and what
+became of each finding — fixed here, or a new board line. Short.

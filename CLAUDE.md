@@ -52,7 +52,8 @@ check against that page. The ones that bite most often:
 
 - **Comments are for traps only.** The wiki holds the why, the code shows the how.
   No narration, no changelogs, **no TODOs** — discovered work goes through ingress
-  or gets done now. Code never references the wiki.
+  or gets done now. Code never references the wiki. `just lint` fails on a
+  comment block over three lines, and egress deletes what the wiki already says.
 - **Locality over DRY.** Explicit greppable local code over clever wrappers.
   Similar-looking but causally unrelated code stays repeated.
 - **No red builds.** Never report done over a failing build, test or lint.

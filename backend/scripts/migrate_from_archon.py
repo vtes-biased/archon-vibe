@@ -582,10 +582,9 @@ async def merge_member(user: db.User, discord: dict, stats: Stats) -> str:
     for field in ARCHON_USER_FIELDS:
         if field in live.local_modifications:
             continue
-        # coopted_by is a member→member reference written EXCLUSIVELY by
-        # remap_coopted_by, once the full member_uid_map is known: writing the
-        # un-remapped old-archon sponsor uid here would flip-flop daily against
-        # that remap (the live account already holds the remapped uid).
+        # coopted_by is written EXCLUSIVELY by remap_coopted_by, once the full
+        # member_uid_map is known: an un-remapped old-archon sponsor uid here
+        # flip-flops daily against that remap.
         if field == "coopted_by":
             continue
         value = getattr(user, field)
@@ -1020,10 +1019,9 @@ def build_tournament(
         description = ("[Originally Draft format] " + description).strip()
 
     league_ref = d.get("league") or {}
-    # old archon's extra.vekn_id maps onto external_ids["vekn"] here so the VEKN
-    # tournament sync matches instead of duplicating; "archon" is recorded when
-    # the rich payload merged into a vekn-created copy, so a later run finds it
-    # by marker instead of mistaking its own merge for a both-rich conflict.
+    # extra.vekn_id maps onto external_ids["vekn"] so the VEKN tournament sync
+    # matches instead of duplicating; the "archon" marker keeps a later run from
+    # mistaking its own merge into a vekn-created copy for a both-rich conflict.
     old_uid = str(d.get("uid") or target_uid)
     extra = d.get("extra") or {}
     external_ids: dict[str, str] = dict(existing.external_ids) if existing else {}
@@ -1180,10 +1178,9 @@ async def process_tournament_row(
     d = dict(row["data"] or {})
     old_uid = str(row["uid"])
     d["uid"] = old_uid  # build_tournament reads it for the external_ids marker
-    # #216: strip VEKN-less orphan participants (registration artifacts, no
-    # seating) and a real account's redundant no-show registration that a remap
-    # would otherwise duplicate. Every dropped uid is verified 0-seating, so only
-    # the players dict needs editing — rounds/standings carry no ref to them.
+    # #216: strip VEKN-less orphan participants and the redundant no-show
+    # registration a remap would duplicate. Every dropped uid is verified
+    # 0-seating, so rounds and standings carry no ref to them.
     players_in = d.get("players") or {}
     drop = {
         k
@@ -1341,9 +1338,8 @@ async def process_tournament_row(
                 stats.bump("decks_public")
 
     # Invariant: at most one live tournament per vekn event id. The archon-first
-    # interleave creates a second holder (this sync inserts rich pre-push, the
-    # VEKN sync creates a round-less copy before the rich one gains the id):
-    # the rich copy wins, the round-less one is tombstoned.
+    # interleave creates a second holder — the rich copy wins, the round-less
+    # one is tombstoned.
     if merge and t.external_ids.get("vekn"):
         for other in await other_live_vekn_holders(t.external_ids["vekn"], target_uid):
             if other.rounds:

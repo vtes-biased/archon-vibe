@@ -66,10 +66,8 @@ def test_import_populates_round_count():
 
 
 def test_import_stores_naive_wall_clock_paired_with_timezone():
-    # start/finish are stored NAIVE, paired with `timezone` — readers
-    # (calendar._as_utc, frontend zonedDate) anchor them in that zone.
-    # Converting VEKN's venue wall clock to UTC here shifted it twice (09:00
-    # Madrid read back as 07:00).
+    # start/finish are stored NAIVE, paired with `timezone`; converting VEKN's
+    # venue wall clock to UTC here shifted it twice (09:00 Madrid read 07:00).
     event = _planned_event() | {"venue_country": "ES", "event_starttime": "09:00:00"}
     t = _map_vekn_to_tournament(event, {})
     assert t is not None

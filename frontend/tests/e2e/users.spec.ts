@@ -2,20 +2,6 @@ import { test, expect, type Page } from '@playwright/test';
 import { loginAsOrganizer, getE2EState, setupAuthBeforeNavigation } from './helpers/auth';
 import { waitForUsers, waitForSync } from './helpers/wait';
 
-/**
- * E2E tests for the Archon app.
- * Tests run against the dev server with real backend SSE data.
- *
- * The /users page is now "Community" with two tabs:
- * - "Community" (default): officials directory
- * - "Members": full user list with search/filters
- *
- * Timeout policy:
- * - Optimistic (WASM) UI changes: 2s max
- * - SSE sync: handled by waitForSync/waitForUsers
- * - Route mocks (login error, forgot password): 2s
- */
-
 test.describe('App loads correctly', () => {
   test('redirects / to /tournaments', async ({ page }) => {
     await page.goto('/');

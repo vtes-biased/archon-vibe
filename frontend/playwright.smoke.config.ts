@@ -1,10 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
-/**
- * Separate from the e2e config because the smoke needs no backend/seed/login: it
- * serves the static `build/` artifact and asserts the pipeline boots — the blind
- * spot the dev-server e2e never exercises. Run via npm run test:smoke.
- */
+// Separate from the e2e config: the smoke needs no backend, seed or login — it
+// serves the static `build/` artifact and asserts the pipeline boots.
 const PORT = 4173;
 
 export default defineConfig({

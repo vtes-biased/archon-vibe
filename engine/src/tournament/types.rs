@@ -226,10 +226,9 @@ pub enum TournamentEvent {
         config: JsonValue,
     },
 
-    /// IC correction of an event we hold no play data for. Replaces the roster
-    /// and the winner wholesale — on such a row there is nothing else to keep.
-    /// No `standings` payload: they are prelim-only by contract and an archival
-    /// record has no prelim, so the rows stay zeroed.
+    /// IC correction of an event we hold no play data for: replaces roster and
+    /// winner wholesale. No `standings` payload — they are prelim-only by
+    /// contract, and an archival record has no prelim, so the rows stay zeroed.
     SetArchivalResults {
         winner: String,
         players: Vec<String>,
@@ -309,10 +308,9 @@ impl ActorContext {
         })
     }
 
-    /// The permission-table view of this actor. Roles arrive as strings here;
-    /// unrecognised ones drop, same as `UserContext::from_json`. **No country** —
-    /// a tournament event carries none, so any `same_country` capability checked
-    /// through this fails closed.
+    /// The permission-table view of this actor. Roles arrive as strings and
+    /// unrecognised ones drop. **No country** — a tournament event carries none,
+    /// so any `same_country` capability checked through this fails closed.
     pub fn user_context(&self) -> crate::permissions::UserContext {
         crate::permissions::UserContext {
             roles: self
