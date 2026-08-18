@@ -55,6 +55,7 @@ field that holds a code ("Brazil", not "BR"), which an exact match would drop.
 
 import argparse
 import asyncio
+import importlib.resources
 import importlib.util
 import os
 import re
@@ -411,11 +412,23 @@ def validate_winners(bootstrap: dict, roster: Roster, rulings: dict) -> str:
     )
 
 
-def load_rulings(path: Path) -> tuple[dict, dict]:
-    """(events, winners) from the hand-authored rulings file."""
+def load_rulings(path: Path | None) -> tuple[dict, dict]:
+    """(events, winners) from the hand-authored rulings file.
+
+    The packaged copy by default: a deployed box has the scripts beside the venv
+    and no repo tree at all, so a path relative to this file resolves to nothing
+    there — which is where this is actually run.
+    """
+    text = (
+        path.read_text()
+        if path
+        else importlib.resources.files("backend.src.data")
+        .joinpath("twda_rulings.tsv")
+        .read_text()
+    )
     events: dict[str, str] = {}
     winners: dict[str, str] = {}
-    for line in path.read_text().splitlines():
+    for line in text.splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
@@ -761,8 +774,7 @@ def parse_args() -> argparse.Namespace:
         "--rulings",
         metavar="PATH",
         type=Path,
-        default=Path(__file__).parent.parent / "src" / "data" / "twda_rulings.tsv",
-        help="the hand-authored rulings file",
+        help="override the packaged hand-authored rulings file",
     )
     p.add_argument(
         "--validate",
