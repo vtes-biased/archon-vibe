@@ -336,7 +336,7 @@ otherwise), `DropOut` (preserves scores), `CheckIn`, `CheckInAll`, `ResetCheckIn
 |---|---|
 | `StartRound` | optional `seating` for deterministic forwarding |
 | `FinishRound` | any round, any order |
-| `CancelRound` | the last round is hard-removed and unrecoverable; any earlier round is soft-cancelled — tables set to `Cancelled`, the slot preserved, players released, restorable |
+| `CancelRound` | the last round is hard-removed and unrecoverable, and takes the run of fully-cancelled rounds trailing behind it; any earlier round is soft-cancelled — tables set to `Cancelled`, the slot preserved, players released, restorable until the last round is cancelled |
 | `RestoreRound` | un-voids a soft-cancelled non-last round: re-derives each table's state from retained scores and re-arms seated players. **All-or-nothing** — if any seated player can no longer be reinstated as saved (dropped, disqualified, or already at their cap via other rounds) the whole restore is rejected rather than silently dropping them |
 | `SelfOrganizeRound` | player-authorized, not organizer-gated |
 | `SwapSeats` | swap two players within a table |
@@ -346,6 +346,10 @@ otherwise), `DropOut` (preserves scores), `CheckIn`, `CheckInAll`, `ResetCheckIn
 
 A round slot is never removed mid-array: `deck.round` and
 `standings_adjustment.round_number` are index-tagged and would be corrupted.
+Removal from the tail is safe, which is why cancelling the last round sweeps the
+cancelled rounds behind it: their restore is worth less than ending at zero rounds
+whichever order the cancels came in, since cancel is offered only while `Playing`
+and a cancelled slot left stranded in `Waiting` can never be reached again.
 
 **Scoring** — `SetScore` (`{player_uid, vp}` per seat), `Override` (organizer forces
 a table Finished, comment required), `Unoverride`.

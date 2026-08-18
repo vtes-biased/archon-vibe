@@ -1098,6 +1098,21 @@ fn apply_event(
             if target_idx == len - 1 {
                 // Last round: hard-remove — no later round's index can shift.
                 tournament["rounds"].array_remove(len - 1);
+                loop {
+                    let n = tournament["rounds"].len();
+                    if n == 0 {
+                        break;
+                    }
+                    let last = &tournament["rounds"][n - 1];
+                    if last.is_empty()
+                        || !last
+                            .members()
+                            .all(|t| t["state"].as_str() == Some("Cancelled"))
+                    {
+                        break;
+                    }
+                    tournament["rounds"].array_remove(n - 1);
+                }
             } else {
                 // Soft-cancel: mark tables Cancelled, keep the slot — a mid-array removal
                 // would shift deck.round / standings_adjustment.round_number, which are index-tagged.

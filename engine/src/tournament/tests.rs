@@ -553,6 +553,63 @@ fn test_cancel_round_soft_cancels_non_last() {
     );
 }
 
+// Cancelling every round of a parallel-round event first-to-last must end at zero rounds,
+// like the last-first order does: the hard-remove takes the trailing soft-cancelled slots
+// with it, so the organizer is not left with cancelled rounds cancel can no longer reach.
+#[test]
+fn test_cancel_last_round_sweeps_trailing_cancelled_rounds() {
+    let mut t = make_tournament();
+    t["state"] = "Playing".into();
+    t["online"] = true.into();
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "p3", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "p4", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q1", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q2", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q3", state: "Playing", payment_status: "Pending", toss: 0 },
+        { user_uid: "q4", state: "Playing", payment_status: "Pending", toss: 0 },
+    ];
+    t["rounds"] = json::array![
+        [ { seating: [
+            { player_uid: "p1", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "p2", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "p3", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 0 } },
+        ], state: "In Progress" } ],
+        [ { seating: [
+            { player_uid: "q1", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "q2", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "q3", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "q4", result: { gw: 0, vp: 0.0, tp: 0 } },
+        ], state: "In Progress" } ],
+    ];
+
+    let org = make_organizer();
+    let cancelled = json::parse(
+        &run_event(&t, &json::object! { type: "CancelRound", round: 0 }, &org).expect("cancel 0"),
+    )
+    .unwrap();
+    assert_eq!(cancelled["rounds"].len(), 2, "precondition: slot preserved");
+    assert_eq!(
+        cancelled["rounds"][0][0]["state"].as_str(),
+        Some("Cancelled")
+    );
+
+    let out = json::parse(
+        &run_event(
+            &cancelled,
+            &json::object! { type: "CancelRound", round: 1 },
+            &org,
+        )
+        .expect("cancel 1"),
+    )
+    .unwrap();
+    assert_eq!(out["rounds"].len(), 0, "both rounds gone, not one");
+    assert_eq!(out["state"].as_str(), Some("Waiting"));
+}
+
 // RestoreRound un-voids a soft-cancelled non-last round: it must re-flip the table
 // back to Finished from retained scores, re-arm capped players, and leave the still-live round untouched.
 #[test]
