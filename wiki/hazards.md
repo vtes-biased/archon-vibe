@@ -70,20 +70,25 @@ to `country_key` would silently drop the `XX` rows' true matches.
 decompose to themselves, so a mark-dropping pass leaves a non-ASCII letter
 behind — `Paweł` normalizes to `pawe` where an alphanumeric filter eats it, and
 to `paweł` where one does not. Either way the accent-free `Pawel` never matches.
-The map that fixes it is `engine/src/cards.rs` `fold_ascii`, pinned by a CI guard
-asserting every shipped card name normalizes to pure ASCII, and WASM-exported as
-`foldAscii`. Fold through it, never a hand-written NFD loop: a hand-rolled one in
-`reconcile_twda.py` was silently reconstructing six Polish events as duplicates.
-`geonames.fold_ascii` is a surviving Python copy, not a second source of truth.
+The one map that fixes it is `engine/src/cards.rs` `fold_ascii`, pinned by a CI
+guard asserting every shipped card name normalizes to pure ASCII, and exported
+both ways — `foldAscii` to WASM, `PyEngine.fold_ascii` to Python. Fold through it,
+never a hand-written NFD loop: a hand-rolled one in `reconcile_twda.py` was
+silently reconstructing six Polish events as duplicates. It lowercases the letters
+it maps (`Ł` → `l`) while leaving decomposed ones cased (`É` → `E`), so callers
+comparing folded strings must lowercase after it, not rely on it.
 
 **`normalizeSearch` is synchronous but the fold is not available until the engine
 loads.** It calls `foldAscii` through the reactive accessor and falls back to a
 mark-strip while the engine is cold, so a Svelte filter self-heals when
-`engineReady` flips — but anything that *caches* normalized output does not. The
-member index (`db.ts`) and the card token map (`cards.ts`) therefore `await
-initEngine()` before building; a new cached index must do the same or it holds
-the degraded form for the session. Beyond search, the same function keys the
-venue dedup and the krcg image-filename fallback.
+`engineReady` flips — but anything that *stores* normalized output does not. The
+member index (`db.ts`) and the card token map (`cards.ts`) therefore await
+`initEngine()` before building, and `displayContext` keeps the member query raw
+rather than storing it folded; a new cached index must do the same or it holds
+the degraded form for the session. Beyond search the same function keys the venue
+dedup, and the krcg image-filename fallback in `DeckDisplay.svelte` — which runs
+in an event handler, so it is the one consumer that stays cold-wrong instead of
+self-healing.
 
 ## Two implementations of one gate
 

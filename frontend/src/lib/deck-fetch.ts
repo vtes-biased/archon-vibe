@@ -1,7 +1,7 @@
 // URL fetching routes through the backend `/fetch-deck` proxy — only the backend (via krcg) can map
 // provider-native card ids to VEKN ids (notably Amaranth's), so every url/QR import goes server-side and needs a connection. Text parsing uses the WASM engine locally, offline-capable.
 
-import { callEngine, initEngine } from './engine';
+import { callEngine, initEngine } from './engine-instance';
 
 export interface ParsedDeck {
   name: string;

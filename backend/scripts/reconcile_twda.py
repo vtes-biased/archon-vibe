@@ -73,11 +73,14 @@ if not _have_backend:
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import aiohttp  # noqa: E402
+from archon_engine import PyEngine  # noqa: E402
 
 from backend.src import db  # noqa: E402
-from backend.src.geonames import fold_ascii, normalize_country  # noqa: E402
+from backend.src.geonames import normalize_country  # noqa: E402
 from backend.src.models import ObjectType  # noqa: E402
 from backend.src.twda_import import TWDA_URL, extract_vekn_event_id  # noqa: E402
+
+_engine = PyEngine()
 
 _ARCHON_UID_RE = re.compile(
     r"archon\.vekn\.net/tournaments?/"
@@ -108,11 +111,11 @@ CORPUS_QUERY = """
 def normalize(value: str) -> str:
     """Casefold, fold to ASCII and drop punctuation — for comparing names.
 
-    The fold must go through `fold_ascii`, not a bare NFD mark-drop: ł does not
+    The fold must go through the engine, not a bare NFD mark-drop: ł does not
     decompose, so "Paweł" would keep it, the alphanumeric filter would eat it,
     and the archive's ASCII "Pawel" would never match.
     """
-    return re.sub(r"[^a-z0-9]+", " ", fold_ascii(value or "").lower()).strip()
+    return re.sub(r"[^a-z0-9]+", " ", _engine.fold_ascii(value or "").lower()).strip()
 
 
 def archon_uid(entry: dict) -> str | None:

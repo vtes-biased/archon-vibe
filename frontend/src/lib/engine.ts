@@ -1,8 +1,6 @@
 import type { DeckObject, Sanction, SanctionCategory, SanctionLevel, SanctionSubcategory, Tournament, User } from './types';
 import { getAllLeagues } from './db';
-import { callEngine, getEngineReactive, getEngineSync, initEngine, type WasmEngine } from './engine-instance';
-
-export { callEngine, initEngine };
+import { callEngine, getEngineReactive, initEngine } from './engine-instance';
 
 export function scoreSeatingSync(
   rounds: string[][][]

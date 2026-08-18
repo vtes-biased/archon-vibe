@@ -4,7 +4,7 @@
   import { openLastView } from '$lib/last-view';
   import { syncManager } from '$lib/sync';
   import { initAuth } from '$lib/stores/auth.svelte';
-  import { initEngine } from '$lib/engine';
+  import { initEngine } from '$lib/engine-instance';
   import { engineLoadFailed } from '$lib/stores/engine-ready.svelte';
   import { initServiceWorker, getUpdateAvailable, applyUpdate } from '$lib/stores/sw.svelte';
   import { initOfflineState, getOfflineTournamentUids } from '$lib/stores/offline.svelte';

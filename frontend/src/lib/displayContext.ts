@@ -40,7 +40,9 @@ class DisplayContext {
     this.filters = {
       country: country && country !== 'all' ? country : undefined,
       roles: roles && roles.length > 0 ? [...roles] : undefined, // Convert Svelte proxy
-      nameSearch: nameSearch && nameSearch.trim() ? normalizeSearch(nameSearch.trim()) : undefined,
+      // Stored raw: normalizing here would cache the fold, and a query normalized while the engine
+      // was cold never matches a name normalized after it warmed.
+      nameSearch: nameSearch?.trim() || undefined,
       hasPastSanctions: hasPastSanctions || undefined,
       currentlySanctioned: currentlySanctioned || undefined,
       sponsor: sponsor || undefined,
@@ -81,9 +83,9 @@ class DisplayContext {
     }
 
     if (nameSearch) {
-      const nameNorm = normalizeSearch(user.name);
-      const words = nameNorm.split(/\s+/);
-      const matchesName = words.some(word => word.startsWith(nameSearch));
+      const queryNorm = normalizeSearch(nameSearch);
+      const words = normalizeSearch(user.name).split(/\s+/);
+      const matchesName = words.some(word => word.startsWith(queryNorm));
       if (!matchesName) {
         return false;
       }

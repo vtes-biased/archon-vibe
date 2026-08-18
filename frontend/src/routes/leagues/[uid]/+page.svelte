@@ -10,7 +10,8 @@
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
   import { getUser } from "$lib/db";
   import type { League, Tournament, LeagueStandingsMode } from "$lib/types";
-  import { attestedPlayerCount, canEditLeague, canLinkTournamentToLeague, computeLeagueStandings, initEngine, isOrganizer as engineIsOrganizer } from "$lib/engine";
+  import { attestedPlayerCount, canEditLeague, canLinkTournamentToLeague, computeLeagueStandings, isOrganizer as engineIsOrganizer } from "$lib/engine";
+  import { initEngine } from "$lib/engine-instance";
   import { tournamentAction } from "$lib/tournament-actions";
   import { translateTournamentState, getStateTone } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";

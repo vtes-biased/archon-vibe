@@ -798,6 +798,10 @@ mod python {
             crate::sanctions::sanction_reference_json()
         }
 
+        fn fold_ascii(&self, s: &str) -> String {
+            crate::cards::fold_ascii(s)
+        }
+
         fn parse_deck(&self, text: &str, cards_json: &str) -> PyResult<String> {
             py_str(parse_deck_json(text, cards_json))
         }

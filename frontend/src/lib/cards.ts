@@ -86,8 +86,9 @@ function tokensFor(card: VtesCard): string[] {
 export async function searchCards(query: string, limit = 20): Promise<VtesCard[]> {
   if (!query || query.length < 2) return [];
   // `cardTokens` is cached for the session, so it must be folded by the engine, not by
-  // normalizeSearch's cold fallback.
-  await initEngine();
+  // normalizeSearch's cold fallback. Swallowed: a permanently failed engine leaves the
+  // degraded fold as the only fold there is, and search must still work.
+  await initEngine().catch(() => {});
   const cards = await getCards();
   const terms = searchTokens(query);
   const lead = terms[0];

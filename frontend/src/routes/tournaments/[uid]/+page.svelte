@@ -10,7 +10,8 @@
   import { syncManager } from "$lib/sync";
   import { getUser, getTournament, getTournamentContextSanctions, getDeviceId, getDecksByTournamentGrouped, getLeague, saveTournament } from "$lib/db";
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
-  import { attestedPlayerCount, finalsQualification, initEngine, rankingEligibility, validateDeck, isOrganizer as engineIsOrganizer, type TournamentEventType, type ValidationError } from "$lib/engine";
+  import { attestedPlayerCount, finalsQualification, rankingEligibility, validateDeck, isOrganizer as engineIsOrganizer, type TournamentEventType, type ValidationError } from "$lib/engine";
+  import { initEngine } from "$lib/engine-instance";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { getStateTone, translateTournamentState, rankBadgeLabel, computeStandings, eventUrl, type PlayerInfoMap } from "$lib/tournament-utils";
   import { zonedDate } from "$lib/utils";

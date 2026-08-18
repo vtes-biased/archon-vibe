@@ -2,11 +2,14 @@
 
 import json
 import re
-import unicodedata
 from enum import StrEnum
 from functools import lru_cache
 from importlib.resources import files
 from typing import TypedDict
+
+from archon_engine import PyEngine
+
+_engine = PyEngine()
 
 
 class Continent(StrEnum):
@@ -114,39 +117,6 @@ def get_countries_on_continent(country_code: str) -> list[str]:
     return [c["iso_code"] for c in countries.values() if c["continent"] == continent]
 
 
-# The letters that carry no NFD decomposition, so dropping combining marks
-# leaves them untouched. Python twin of `fold_ascii` in `engine/src/cards.rs`.
-_FOLD = {
-    "ł": "l",
-    "ø": "o",
-    "đ": "d",
-    "ð": "d",
-    "ħ": "h",
-    "ı": "i",
-    "ŧ": "t",
-    "æ": "ae",
-    "œ": "oe",
-    "þ": "th",
-    "ß": "ss",
-}
-
-
-def fold_ascii(s: str) -> str:
-    """Fold Latin letters to ASCII ('São Paulo' -> 'Sao Paulo', 'Łódź' -> 'Lodz').
-
-    NFD alone is not enough: ł, ø, æ and friends decompose to themselves, so a
-    mark-dropping pass leaves a non-ASCII letter behind and an accent-free
-    spelling of the same name never matches it.
-    """
-    out = []
-    for c in unicodedata.normalize("NFD", s):
-        if unicodedata.category(c) == "Mn":
-            continue
-        folded = _FOLD.get(c.lower())
-        out.append(c if folded is None else folded.upper() if c.isupper() else folded)
-    return "".join(out)
-
-
 # Regex to strip parenthetical suffixes: "Washington (DC)" -> "Washington"
 _PAREN_RE = re.compile(r"\s*\(.*\)\s*$")
 
@@ -192,7 +162,7 @@ def match_city(name: str, country_code: str) -> City | None:
         return city
     if city := by_ascii.get((cc, name.lower())):
         return city
-    stripped = fold_ascii(name)
+    stripped = _engine.fold_ascii(name)
     if stripped != name:
         if city := by_ascii.get((cc, stripped.lower())):
             return city

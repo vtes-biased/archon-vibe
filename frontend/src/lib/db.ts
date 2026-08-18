@@ -309,8 +309,9 @@ async function getUserIndex(): Promise<Map<string, UserIndexEntry>> {
   if (!userIndexPromise) {
     userIndexPromise = (async () => {
       // The tokens are cached for the session, so they must be folded by the engine, not by
-      // normalizeSearch's cold fallback.
-      await initEngine();
+      // normalizeSearch's cold fallback. Swallowed: a permanently failed engine leaves the
+      // degraded fold as the only fold there is, and search must still work.
+      await initEngine().catch(() => {});
       const db = await getDB();
       const all = await db.getAll('users');
       return new Map(all.map(u => [u.uid, buildEntry(u)]));

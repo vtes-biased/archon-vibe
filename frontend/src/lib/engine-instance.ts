@@ -46,13 +46,9 @@ export async function initEngine(): Promise<WasmEngine> {
   return wasmEngine!;
 }
 
-export function getEngineSync(): WasmEngine | null {
-  return wasmEngine;
-}
-
 /** `wasmEngine` is a plain module `let` Svelte can't track; reading `engineReady()` here registers
  * a reactive dependency so sync wrappers re-run once the engine loads, instead of computing once cold. */
 export function getEngineReactive(): WasmEngine | null {
   engineReady();
-  return getEngineSync();
+  return wasmEngine;
 }
