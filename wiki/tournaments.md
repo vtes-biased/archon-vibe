@@ -272,17 +272,22 @@ finals seating data.
 ## Finals
 
 Qualification follows §3.1: top 5 by GW, VP, TP, with a random toss for ties.
-Organizers must drop unavailable finalists before launching. `StartFinals` excludes
-`Disqualified` and `Finished` (withdrawn) players and auto-promotes the next-ranked
-qualifier; `Completed` players stay eligible, and non-competing proxies never enter
-the candidate pool.
+Organizers must drop unavailable finalists before launching.
 
-> **Diverges from the rules.** §3.1 resolves remaining ties **for any of the top
-> five rankings** by a fair random method; the app's toss resolves only a tie
-> straddling the top-5 cutoff and never re-orders tied players inside it. Qualifier
-> rank is not cosmetic — §3.1.3 has the **lowest** qualifier place their name card
-> first — so an unbroken tie inside the top five leaves the finals seating order
-> under-determined.
+`finals_candidates` is the one definition of who may qualify: `Disqualified` and
+`Finished` (withdrawn) players are dropped and the next-ranked qualifier promoted,
+`Completed` (capped) players stay eligible, non-competing proxies never enter.
+`RandomToss`, `StartFinals` and the frontend's finals gates all read it — a toss
+computed over raw standings orders a top five the finals never uses, and leaves a
+tie no re-run can break.
+
+`RandomToss` orders **every** tied group inside the qualifying five, not only the
+one straddling the cutoff: §3.1 resolves ties for any of the top five rankings, and
+the rank is not cosmetic — §3.1.3 has the **lowest** qualifier place their name card
+first. The span it orders is the top five extended over everyone tied with fifth.
+A group only partly tossed by hand is re-tossed whole; a group already holding
+distinct non-zero tosses is left alone. The shuffle is seeded from the tournament
+uid because the client applies the event through WASM before the server replays it.
 
 `FinishTournament` without a final sets `Finished` and preliminary standings but
 sets no winner or finalist flags, so a native no-final event awards no

@@ -11,7 +11,7 @@
   import TimerDisplay from "./TimerDisplay.svelte";
   import Button from '$lib/components/Button.svelte';
   import { ArrowRightLeft, ShieldCheck, Lock, TriangleAlert } from "@lucide/svelte";
-  import { seatDisplay as seatDisplayUtil, vpOptions, translateTableState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, finalsCandidates, vpOptions, translateTableState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -75,7 +75,8 @@
   }
 
 
-  const hasFinalsCandidate = $derived(standings.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
+  const finalsPool = $derived(finalsCandidates(tournament, standings));
+  const hasFinalsCandidate = $derived(finalsPool.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
 </script>
 
 <div class="space-y-4">

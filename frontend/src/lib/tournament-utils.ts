@@ -83,38 +83,40 @@ export function vpOptions(tableSize: number, allowImpossible: boolean): number[]
   return opts;
 }
 
-export function top5HasTies(standings: StandingEntry[]): boolean {
-  if (standings.length < 5) return false;
-  for (let i = 0; i < 5; i++) {
-    for (let j = i + 1; j < 5; j++) {
-      const a = standings[i]!, b = standings[j]!;
-      if (a.gw === b.gw && a.vp === b.vp && a.tp === b.tp && a.toss === b.toss) return true;
-    }
-  }
-  const fifth = standings[4]!;
-  for (let k = 5; k < standings.length; k++) {
-    const s = standings[k]!;
-    // DQ'd/proxy rows are parked last and never finals-eligible; they never tie for the cutoff.
-    if (!s.disqualified && !s.non_competing && s.gw === fifth.gw && s.vp === fifth.vp && s.tp === fifth.tp && s.toss === fifth.toss) return true;
-  }
-  return false;
+/** The finals candidate pool in rank order — DQ'd, proxy and withdrawn players dropped.
+ *  Twin of the engine's `finals_candidates`; every finals gate here must read it, or the
+ *  toss warning and the Start Finals prompt promise a top five StartFinals will refuse. */
+export function finalsCandidates(tournament: Tournament | null, standings: StandingEntry[]): StandingEntry[] {
+  const withdrawn = new Set(
+    (tournament?.players ?? []).filter(p => p.state === "Finished" && p.user_uid).map(p => p.user_uid!)
+  );
+  return standings.filter(s => !s.disqualified && !s.non_competing && !withdrawn.has(s.user_uid));
 }
 
-/** Check if top 5 has score ties (GW/VP/TP only, ignoring toss) — for showing toss UI */
-export function top5HasScoreTies(standings: StandingEntry[]): boolean {
-  if (standings.length < 5) return false;
+/** Takes the candidate pool. Only the five qualifying ranks must be total — two
+ *  candidates tied below fifth share no seat and never block the finals. */
+export function top5HasTies(candidates: StandingEntry[]): boolean {
+  if (candidates.length < 5) return false;
+  const tied = (a: StandingEntry, b: StandingEntry) =>
+    a.gw === b.gw && a.vp === b.vp && a.tp === b.tp && a.toss === b.toss;
   for (let i = 0; i < 5; i++) {
     for (let j = i + 1; j < 5; j++) {
-      const a = standings[i]!, b = standings[j]!;
-      if (a.gw === b.gw && a.vp === b.vp && a.tp === b.tp) return true;
+      if (tied(candidates[i]!, candidates[j]!)) return true;
     }
   }
-  const fifth = standings[4]!;
-  for (let k = 5; k < standings.length; k++) {
-    const s = standings[k]!;
-    if (!s.disqualified && !s.non_competing && s.gw === fifth.gw && s.vp === fifth.vp && s.tp === fifth.tp) return true;
+  return candidates.slice(5).some(s => tied(s, candidates[4]!));
+}
+
+/** Same span, ignoring toss: the tie the organizer is asked to break. */
+export function top5HasScoreTies(candidates: StandingEntry[]): boolean {
+  if (candidates.length < 5) return false;
+  const tied = (a: StandingEntry, b: StandingEntry) => a.gw === b.gw && a.vp === b.vp && a.tp === b.tp;
+  for (let i = 0; i < 5; i++) {
+    for (let j = i + 1; j < 5; j++) {
+      if (tied(candidates[i]!, candidates[j]!)) return true;
+    }
   }
-  return false;
+  return candidates.slice(5).some(s => tied(s, candidates[4]!));
 }
 
 /** Preliminary entries come from rounds (or synced/imported standings when there are no rounds); the

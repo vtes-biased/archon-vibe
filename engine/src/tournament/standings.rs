@@ -109,7 +109,7 @@ pub(super) fn compute_preliminary_standings(
         .collect();
 
     // user_uid is a deterministic tiebreak: without it, players tied on (gw, vp, tp,
-    // toss) come out in nondeterministic HashMap order. Toss decides the finals cutoff only.
+    // toss) come out in nondeterministic HashMap order. Toss only orders finals candidates.
     standings.sort_by(|a, b| {
         (a.disqualified || a.non_competing)
             .cmp(&(b.disqualified || b.non_competing))
@@ -326,30 +326,76 @@ pub fn compute_rating_vp_gw(
     (vp, gw)
 }
 
-/// Takes *eligible* standings (DQ'd/withdrawn already filtered) — the cutoff
-/// check must match players who actually form the finals, not raw standings.
-pub(super) fn top5_has_ties(standings: &[&Standing]) -> bool {
-    if standings.len() < 5 {
+pub(super) fn scores_tied(a: &Standing, b: &Standing) -> bool {
+    a.gw == b.gw && a.vp == b.vp && a.tp == b.tp
+}
+
+/// The finals candidate pool, in rank order. `RandomToss` and `StartFinals` must
+/// read the same list: a toss computed over raw standings orders a top five the
+/// finals never uses, and the tie it leaves standing cannot be broken by re-running.
+pub(super) fn finals_candidates<'a>(
+    tournament: &JsonValue,
+    standings: &'a [Standing],
+) -> Vec<&'a Standing> {
+    standings
+        .iter()
+        .filter(|s| {
+            // `disqualified` carries the dual DQ signal (state OR active
+            // sanction); reuse it so eligibility can't diverge. Completed
+            // (capped) stays eligible, Finished (withdrawn) is dropped.
+            let ps = tournament["players"]
+                .members()
+                .find(|p| p["user_uid"].as_str() == Some(&s.user_uid))
+                .and_then(|p| p["state"].as_str())
+                .unwrap_or("");
+            !s.disqualified && !s.non_competing && ps != "Finished"
+        })
+        .collect()
+}
+
+/// End of the span `RandomToss` must order: the top five, extended over everyone
+/// tied with fifth on score, since any of them may take the last seat.
+pub(super) fn top5_tie_zone_end(candidates: &[&Standing]) -> usize {
+    let cutoff = candidates.len().min(5);
+    let mut end = cutoff;
+    if cutoff > 0 {
+        let fifth = candidates[cutoff - 1];
+        while end < candidates.len() && scores_tied(candidates[end], fifth) {
+            end += 1;
+        }
+    }
+    end
+}
+
+/// Whether a score-tied group is already ordered — every member holding a distinct
+/// non-zero toss. A group only partly tossed is re-tossed whole: mixing a recorded
+/// coin toss with fresh values either collides or hands one side a fixed rank.
+pub(super) fn tosses_are_total(group: &[&Standing]) -> bool {
+    let mut seen: Vec<u32> = Vec::with_capacity(group.len());
+    for s in group {
+        if s.toss == 0 || seen.contains(&s.toss) {
+            return false;
+        }
+        seen.push(s.toss);
+    }
+    true
+}
+
+/// Takes the finals candidate pool. Only the five qualifying ranks must be total:
+/// two candidates tied *below* fifth share no seat and never block the finals.
+pub(super) fn top5_has_ties(candidates: &[&Standing]) -> bool {
+    if candidates.len() < 5 {
         return false;
     }
+    let tied = |a: &Standing, b: &Standing| scores_tied(a, b) && a.toss == b.toss;
     for i in 0..5 {
         for j in (i + 1)..5 {
-            let a = standings[i];
-            let b = standings[j];
-            if a.gw == b.gw && a.vp == b.vp && a.tp == b.tp && a.toss == b.toss {
+            if tied(candidates[i], candidates[j]) {
                 return true;
             }
         }
     }
-    if standings.len() > 5 {
-        let fifth = standings[4];
-        for &s in &standings[5..] {
-            if s.gw == fifth.gw && s.vp == fifth.vp && s.tp == fifth.tp && s.toss == fifth.toss {
-                return true;
-            }
-        }
-    }
-    false
+    candidates[5..].iter().any(|s| tied(s, candidates[4]))
 }
 
 #[cfg(test)]

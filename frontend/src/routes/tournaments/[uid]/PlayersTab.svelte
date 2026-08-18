@@ -16,7 +16,7 @@
   import CreateAndRegisterModal from "./CreateAndRegisterModal.svelte";
   import Button from "$lib/components/Button.svelte";
   import { validateDeck, type ValidationError, type TournamentEventType } from "$lib/engine";
-  import { top5HasScoreTies as top5HasScoreTiesFn, translatePlayerState, seatDisplay, translateStandingsMode, getRatingPts, ratingContext, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { top5HasScoreTies as top5HasScoreTiesFn, finalsCandidates, translatePlayerState, seatDisplay, translateStandingsMode, getRatingPts, ratingContext, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -243,16 +243,15 @@
   // those controls stay inline instead of one tap deep (state-owns-the-surface).
   const doorMode = $derived(isOrganizer && (tournament.state === "Registration" || (tournament.state === "Waiting" && !hasRounds)));
   const standingsMap = $derived(new Map(standings.map(s => [s.user_uid, s])));
-  // Exact-score ties involving a top-5 seat — the uids needing a toss to break
-  // the finals cutoff. Standings are sorted, so only i < 5 can pair.
+  const finalsPool = $derived(finalsCandidates(tournament, standings));
+  // Exact-score ties involving a top-5 seat — the uids needing a toss. Candidates are
+  // sorted, so only i < 5 can pair.
   const tiedUids = $derived.by(() => {
     const out = new Set<string>();
-    for (let i = 0; i < standings.length && i < 5; i++) {
-      const a = standings[i]!;
-      if (a.disqualified) continue;
-      for (let j = i + 1; j < standings.length; j++) {
-        const b = standings[j]!;
-        if (b.disqualified) continue;
+    for (let i = 0; i < finalsPool.length && i < 5; i++) {
+      const a = finalsPool[i]!;
+      for (let j = i + 1; j < finalsPool.length; j++) {
+        const b = finalsPool[j]!;
         if (a.gw === b.gw && a.vp === b.vp && a.tp === b.tp) {
           out.add(a.user_uid);
           out.add(b.user_uid);
@@ -406,7 +405,7 @@
   // for them, so drop the column rather than show a possibly-wrong number.
   const showRating = $derived(isFinished && getAuthState().isAuthenticated);
 
-  const hasFinalsCandidate = $derived(standings.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
+  const hasFinalsCandidate = $derived(finalsPool.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
   const hasFinals = $derived(standings.some(e => e.finals));
 
 </script>
@@ -525,7 +524,7 @@
       <div class="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
         <span class="min-w-0 truncate">{meta}</span>
         <span class="flex-1"></span>
-        {#if isTied && tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings) && playerSort === 'standings'}
+        {#if isTied && tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(finalsPool) && playerSort === 'standings'}
           <!-- Toss stays on the collapsed line: when it is editable it is the
                work of the moment, across several players at once. -->
           {#if editingToss && isOrganizer}
@@ -663,7 +662,7 @@
     {/if}
   </div>
 
-  {#if isOrganizer && tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings)}
+  {#if isOrganizer && tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(finalsPool)}
     <!-- Buttons only: the action bar already says to resolve ties with a toss, and
          a hint sharing this row squeezed both labels into mid-word wraps. -->
     <div class="flex flex-wrap items-center gap-2">
@@ -853,7 +852,7 @@
                 <th class="text-right py-1.5 px-2">{m.tournament_col_rating()}</th>
               {/if}
             {/if}
-            {#if tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings) && playerSort === 'standings'}
+            {#if tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(finalsPool) && playerSort === 'standings'}
               <th class="text-right py-1.5 px-2">{m.tournament_col_toss()}</th>
             {/if}
             <th class="text-left py-1.5 px-2">{m.tournament_col_status()}</th>
@@ -904,7 +903,7 @@
                   <td class="text-right py-1.5 px-2 text-ink-muted">{pts ?? "—"}</td>
                 {/if}
               {/if}
-              {#if tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(standings) && playerSort === 'standings'}
+              {#if tournament.state === "Waiting" && hasFinalsCandidate && top5HasScoreTiesFn(finalsPool) && playerSort === 'standings'}
                 <td class="text-right py-1.5 px-2">
                   {#if isTied}
                     {#if editingToss && isOrganizer}

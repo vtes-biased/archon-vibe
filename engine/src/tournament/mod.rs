@@ -25,7 +25,10 @@ use helpers::{
 };
 use raffle::{compute_deck_public, get_raffle_pool};
 use sanctions::{has_active_suspension, has_dq_sanction, table_sa_adjustments};
-use standings::{compute_preliminary_standings, top5_has_ties, update_standings};
+use standings::{
+    compute_preliminary_standings, finals_candidates, scores_tied, top5_has_ties,
+    top5_tie_zone_end, tosses_are_total, update_standings,
+};
 
 /// Shared between `UpdateConfig` and `CreateTournament`.
 fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
@@ -1900,59 +1903,41 @@ fn apply_event(
             }
 
             let standings = compute_preliminary_standings(tournament, sanctions);
+            let candidates = finals_candidates(tournament, &standings);
+            let zone_end = top5_tie_zone_end(&candidates);
 
-            let cutoff = standings.len().min(5);
-            let mut zone_end = cutoff;
-            if cutoff > 0 && standings.len() > cutoff {
-                let fifth = &standings[cutoff - 1];
-                while zone_end < standings.len() {
-                    let s = &standings[zone_end];
-                    if s.gw == fifth.gw && s.vp == fifth.vp && s.tp == fifth.tp {
-                        zone_end += 1;
-                    } else {
-                        break;
-                    }
-                }
-            }
-
-            let mut i = 0;
-            let mut toss_counter: u32 = 1;
+            // The client applies this event through WASM before the server replays it,
+            // so the shuffle must be a pure function of the tournament — an OS random
+            // source would leave the two copies seating a different top five.
             let seed: u64 = tournament["uid"]
                 .as_str()
                 .unwrap_or("")
                 .bytes()
                 .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
 
+            let mut toss_counter: u32 = 1;
+            let mut i = 0;
             while i < zone_end {
                 let mut j = i + 1;
-                while j < zone_end
-                    && standings[j].gw == standings[i].gw
-                    && standings[j].vp == standings[i].vp
-                    && standings[j].tp == standings[i].tp
-                {
+                while j < zone_end && scores_tied(candidates[j], candidates[i]) {
                     j += 1;
                 }
-                // i..j is a group of players with same scores
-                if j - i > 1 {
-                    let mut needs_toss: Vec<usize> =
-                        (i..j).filter(|&k| standings[k].toss == 0).collect();
-                    if needs_toss.len() > 1 {
-                        // Shuffle using simple Fisher-Yates with deterministic seed
-                        let mut rng = seed.wrapping_add(i as u64);
-                        for k in (1..needs_toss.len()).rev() {
-                            rng = rng
-                                .wrapping_mul(6364136223846793005)
-                                .wrapping_add(1442695040888963407);
-                            let swap_idx = (rng >> 33) as usize % (k + 1);
-                            needs_toss.swap(k, swap_idx);
+                let group = &candidates[i..j];
+                if group.len() > 1 && !tosses_are_total(group) {
+                    let mut shuffled: Vec<&standings::Standing> = group.to_vec();
+                    let mut rng = seed.wrapping_add(i as u64);
+                    for k in (1..shuffled.len()).rev() {
+                        rng = rng
+                            .wrapping_mul(6364136223846793005)
+                            .wrapping_add(1442695040888963407);
+                        let swap_idx = (rng >> 33) as usize % (k + 1);
+                        shuffled.swap(k, swap_idx);
+                    }
+                    for s in shuffled {
+                        if let Some(pi) = find_player_index(&tournament["players"], &s.user_uid) {
+                            tournament["players"][pi]["toss"] = toss_counter.into();
                         }
-                        for &idx in &needs_toss {
-                            let uid = &standings[idx].user_uid;
-                            if let Some(pi) = find_player_index(&tournament["players"], uid) {
-                                tournament["players"][pi]["toss"] = toss_counter.into();
-                                toss_counter += 1;
-                            }
-                        }
+                        toss_counter += 1;
                     }
                 }
                 i = j;
@@ -1972,21 +1957,7 @@ fn apply_event(
             }
 
             let standings = compute_preliminary_standings(tournament, sanctions);
-
-            // Completed (capped) players stay eligible; Finished (withdrawn) are
-            // dropped so the next-ranked qualifier is promoted.
-            let eligible: Vec<&standings::Standing> = standings
-                .iter()
-                .filter(|s| {
-                    let player = tournament["players"]
-                        .members()
-                        .find(|p| p["user_uid"].as_str() == Some(&s.user_uid));
-                    let ps = player.and_then(|p| p["state"].as_str()).unwrap_or("");
-                    // `disqualified` carries the dual DQ signal (state OR active sanction);
-                    // reuse it so eligibility can't diverge. Proxies are never finals-eligible.
-                    !s.disqualified && !s.non_competing && ps != "Finished"
-                })
-                .collect();
+            let eligible = finals_candidates(tournament, &standings);
 
             if eligible.len() < 5 {
                 return Err(EngineError::FinalsNotEnoughPlayers);

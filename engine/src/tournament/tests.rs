@@ -2012,6 +2012,80 @@ fn test_start_finals_includes_completed_excludes_withdrawn() {
     assert_eq!(seated.len(), 5);
 }
 
+// RandomToss must leave the finals seed order total (§3.1: any of the top five
+// rankings), so StartFinals always follows it. Two withdrawals push the qualifying
+// five past the raw top five, and one tied group is already half-tossed by hand.
+#[test]
+fn test_random_toss_orders_the_qualifying_five() {
+    let mut t = make_tournament();
+    t["state"] = "Waiting".into();
+    // Raw standings: p2(gw1 vp3) p1(gw1 vp2) p3(vp2) {p4,p6,p7}(vp1) {p5,p8}(vp0).
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Finished", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Finished", payment_status: "Pending", toss: 0 },
+        { user_uid: "p3", state: "Playing",  payment_status: "Pending", toss: 0 },
+        { user_uid: "p4", state: "Playing",  payment_status: "Pending", toss: 1 },
+        { user_uid: "p5", state: "Playing",  payment_status: "Pending", toss: 0 },
+        { user_uid: "p6", state: "Playing",  payment_status: "Pending", toss: 0 },
+        { user_uid: "p7", state: "Playing",  payment_status: "Pending", toss: 0 },
+        { user_uid: "p8", state: "Playing",  payment_status: "Pending", toss: 0 },
+    ];
+    t["rounds"] = json::array![
+        [ { seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 60 }, judge_uid: "" },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p4", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p5", result: { gw: 0, vp: 0.0, tp: 12 }, judge_uid: "" },
+        ], state: "Finished", override: json::Null } ],
+        [ { seating: [
+            { player_uid: "p2", result: { gw: 1, vp: 2.0, tp: 60 }, judge_uid: "" },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p6", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p7", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p8", result: { gw: 0, vp: 0.0, tp: 12 }, judge_uid: "" },
+        ], state: "Finished", override: json::Null } ],
+    ];
+    let org = make_organizer();
+
+    let tossed =
+        json::parse(&run_event(&t, &json::object! { type: "RandomToss" }, &org).unwrap()).unwrap();
+
+    // p1 and p2 withdrew, so the qualifying five are p3, {p4,p6,p7} and one of the
+    // {p5,p8} pair — a group the raw top-five zone never reached.
+    let toss_of = |uid: &str| {
+        tossed["players"]
+            .members()
+            .find(|p| p["user_uid"].as_str() == Some(uid))
+            .unwrap()["toss"]
+            .as_u32()
+            .unwrap()
+    };
+    for group in [["p4", "p6", "p7"].as_slice(), ["p5", "p8"].as_slice()] {
+        let tosses: std::collections::HashSet<u32> = group.iter().map(|u| toss_of(u)).collect();
+        assert_eq!(
+            tosses.len(),
+            group.len(),
+            "{group:?} must come out of the toss distinctly ordered, got {tosses:?}"
+        );
+        assert!(!tosses.contains(&0), "{group:?} left an untossed member");
+    }
+
+    let started =
+        json::parse(&run_event(&tossed, &json::object! { type: "StartFinals" }, &org).unwrap())
+            .unwrap();
+    let seated: std::collections::HashSet<&str> = started["finals"]["seating"]
+        .members()
+        .filter_map(|s| s["player_uid"].as_str())
+        .collect();
+    assert_eq!(seated.len(), 5);
+    assert!(["p3", "p4", "p6", "p7"].iter().all(|u| seated.contains(u)));
+    assert!(
+        seated.contains("p5") ^ seated.contains("p8"),
+        "the toss must seat exactly one of the tied pair, got {seated:?}"
+    );
+}
+
 // The finals/toss two-round minimum must count *played* rounds via `count_played_rounds`, not
 // `rounds.len()` — a cancelled round must not satisfy it. SetToss/RandomToss share the same helper, so this one test guards all three.
 #[test]
