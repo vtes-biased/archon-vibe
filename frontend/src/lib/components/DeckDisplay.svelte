@@ -2,6 +2,7 @@
   import { toUserMessage } from '$lib/errors';
   import type { Deck, VtesCard } from "$lib/types";
   import { getCards } from "$lib/cards";
+  import { normalizeSearch } from "$lib/utils";
   import { disciplineIcon, typeIcon } from "$lib/vtes-icons";
   import AttributionPicker from "./AttributionPicker.svelte";
   import { validateDeck, type ValidationError } from "$lib/engine";
@@ -221,7 +222,7 @@
     }
     // Fallback for stale IndexedDB card data predating the img field. krcg's image
     // filename derives from the full (group/advanced-suffixed) name, not the bare one.
-    const normalized = card.full_name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^\w\d]/g, '') + '.jpg';
+    const normalized = normalizeSearch(card.full_name).replace(/[^a-z0-9]/g, '') + '.jpg';
     cardImageUrl = `https://static.krcg.org/card/${normalized}`;
   }
 </script>

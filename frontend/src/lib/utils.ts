@@ -1,7 +1,6 @@
 import type { Sanction } from "$lib/types";
 
-/** The letters that carry no NFD decomposition, so dropping combining marks leaves them untouched.
- * Third copy of `fold_ascii` in `engine/src/cards.rs` and `geonames.fold_ascii`; all three must agree. */
+/** Third copy of `fold_ascii` in `engine/src/cards.rs` and `geonames.fold_ascii`; all three must agree. */
 const FOLD: Record<string, string> = {
   '\u0142': 'l',
   '\u00f8': 'o',
@@ -17,8 +16,7 @@ const FOLD: Record<string, string> = {
 };
 const FOLD_RE = new RegExp(`[${Object.keys(FOLD).join('')}]`, 'g');
 
-/** Normalize a string for accent-insensitive search: lowercase, strip combining marks, fold the
- * survivors to ASCII ("Pawel" finds "Pawe\u0142"). */
+/** Normalize a string for accent-insensitive search ("Pawel" finds "Pawe\u0142"). */
 export function normalizeSearch(s: string): string {
   return s
     .normalize('NFD')

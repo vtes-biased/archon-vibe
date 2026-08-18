@@ -73,11 +73,13 @@ to `paweł` where one does not. Either way the accent-free `Pawel` never matches
 The explicit map that fixes it lives three times: `engine/src/cards.rs`
 `fold_ascii`, pinned by a CI guard asserting every shipped card name normalizes
 to pure ASCII; its Python twin `geonames.fold_ascii`; and its TypeScript twin
-inside `normalizeSearch` (`frontend/src/lib/utils.ts`), which feeds the member,
-card, city and venue search indexes. The frontend keeps its own copy because the
-Rust one is private and not WASM-exported, and `normalizeSearch` runs
-synchronously in index builds and sort comparators that must work before the
-engine loads. **All three must agree** — change one, change the others. Fold
+inside `normalizeSearch` (`frontend/src/lib/utils.ts`), which every frontend
+search index runs through — plus the venue dedup key and the krcg image-filename
+fallback, which are not searches and whose output changes with the map. The
+frontend keeps its own copy because the Rust one is private and not
+WASM-exported, and `normalizeSearch` runs synchronously in index builds and sort
+comparators that must work before the engine loads. **All three must agree** —
+change one, change the others. Fold
 through the copy for your side, never a hand-written NFD loop: a hand-rolled one
 in `reconcile_twda.py` was silently reconstructing six Polish events as
 duplicates.
