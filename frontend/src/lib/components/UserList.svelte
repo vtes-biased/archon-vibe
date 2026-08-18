@@ -10,7 +10,7 @@
   import Badge, { badgeToneClass } from "$lib/components/Badge.svelte";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { isOfficial as engineIsOfficial } from "$lib/engine";
+  import { isOfficial as engineIsOfficial, canSponsorMember } from "$lib/engine";
   import { displayContext } from "$lib/displayContext";
   import type { User as UserType, Role } from "$lib/types";
   import Button from '$lib/components/Button.svelte';
@@ -69,6 +69,8 @@
   // Officials receive members' contact info (full projection), so only they can search by email/Discord
   // — advertise it in the placeholder for them alone. Identity, not authority: the search is filtered by what synced.
   const isOfficial = $derived(engineIsOfficial(getAuthState().user));
+
+  const canSponsor = $derived(canSponsorMember(getAuthState().user).allowed);
 
   const countries = getCountries();
   const sortedCountries = getSortedCountries();
@@ -355,7 +357,7 @@
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-3xl font-semibold text-accent">{m.nav_users()}</h1>
 
-        <div class="flex items-center gap-3">
+        {#if canSponsor}
           <Button
             id="new-user-button"
             variant="primary"
@@ -366,8 +368,7 @@
           >
             {showCreateForm ? m.common_cancel() : m.user_list_new_user()}
           </Button>
-
-        </div>
+        {/if}
       </div>
 
       <div class="mb-4">
@@ -496,7 +497,7 @@
       </div>
     </div>
 
-    {#if showCreateForm}
+    {#if showCreateForm && canSponsor}
       <div class="mb-6">
         <User
           mode="create"
