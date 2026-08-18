@@ -13,6 +13,71 @@ half the archive the reference counts.
 **Settled** records the owner decisions; **Plan** is the work. Everything before
 **Settled** is the analysis they rest on.
 
+## What remains — the production run
+
+**All six phases are code-complete as of 2026-08-18.** Nothing below is a code
+change; the done-condition (Watras/Izydorczyk/Pietkiewicz at 19/12/9) is reached
+by running this, and the line dies when it reads right on the live site.
+
+The env file is systemd's `EnvironmentFile` format and its values contain spaces,
+so neither `source` nor `env $(cat …)` parses it — extract the var whole, the way
+`backfill_roles_from_archon.py` documents:
+
+```sh
+sudo -u archon bash -c 'B=/etc/archon/archon-backend.env
+  export DATABASE_URL="$(sed -n "s/^DATABASE_URL=//p" $B)"
+  exec /opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/<script> …'
+```
+
+1. **Capture the Hall of Fame as it stands**, before deploying — the baseline the
+   diff is against (Phase 3 item 5). The query is below; its output holds member
+   names and VEKN ids and never enters this repo.
+2. **Deploy.** The `static_site` role carries the short-link nginx location, so
+   even the quick lane covers it.
+3. **Regenerate the decisions file against prod.** Its targets are uids and it was
+   emitted from a 2026-08-16 extract; a uid that moved since attaches nothing, or
+   reconstructs an event whose winner renders as a raw uuid. This must run on the
+   box, after the deploy — the packaged rulings file it reads is part of this
+   change:
+
+   ```sh
+   … reconcile_twda.py --emit-decisions /tmp/twda_decisions.tsv \
+       --report /tmp/twda_table.md --validate
+   ```
+
+   Review before consuming: the run prints its tier counts and the validation
+   score, and any `review` line in the emitted file is an undecided entry the
+   backfill will skip. Expect the twelve decided rows to come back decided — the
+   rulings are keyed on the stable TWDA entry id. A materially different shape
+   from the counts in Phase 0 means the corpus moved and the queue needs re-reading,
+   not overriding.
+4. **Commit it** as `backend/src/data/twda_decisions.tsv` and **deploy again**.
+   The backfill and the recurring sync both read the packaged copy, so what ran and
+   what is committed are the same file by construction — which is the reason this
+   costs a second deploy rather than a `--decisions` override.
+5. **`backfill_twda.py --dry-run`**, read the create count against Phase 0's 1130,
+   then **`--apply`**. It suppresses broadcasting, recomputes every win list in both
+   directions and regenerates the snapshot.
+6. **`backfill_event_codes.py --dry-run`**, then **`--apply`** — the other board
+   line's prod step, but it belongs **after** step 5 or the 1132 reconstructions
+   mint codes before their archive keys arrive and keep them forever.
+7. **Capture the Hall of Fame again** and diff. 47 members sit at exactly five
+   wins, so read the *departures* first: a silent eviction is a support ticket with
+   a name on it.
+
+```sql
+SELECT "full"->>'name', "full"->>'vekn_id',
+       jsonb_array_length("full"->'wins') AS wins
+FROM objects
+WHERE type = 'user' AND deleted_at IS NULL
+  AND jsonb_array_length(COALESCE("full"->'wins', '[]'::jsonb)) >= 5
+ORDER BY wins DESC, 1;
+```
+
+Still outstanding and **not** blocking: 41 unresolved winner names for the officials
+(none HoF-relevant), and the two winner disagreements recorded in
+`wiki/vekn-decommission.md` for IC curation.
+
 ## The reference is a TWDA entry count
 
 `vekn.fr/hall_of_fame.htm` states its criterion as "win a minimum of five IRL
@@ -779,10 +844,8 @@ settled that the plan did not say:
   `TWDA_SYNC_ENABLED` true in both inventories it would have run the bulk with
   broadcasting on, which is the one thing item 6 exists to prevent.
 
-**Still owed before this reaches the corpus**: regenerate
-`twda_decisions.tsv` against prod (it was generated from the 2026-08-16 extract,
-and its targets are uids), then `backfill_twda.py --apply`. The recurring task
-handles only the delta after that.
+**Still owed before this reaches the corpus**: steps 3–5 of the production run at
+the top. The recurring task handles only the delta after that.
 
 ### The plan, as executed
 
@@ -900,18 +963,9 @@ seat union are not expressible in SQL without duplicating the rule there.
 paths, the archon import, the TWDA sync (after the deck pass) and the daily job;
 `recompute_ratings_for_players` no longer touches `wins`.
 
-**Item 5 is a prod step and is not done** — the diff needs the corpus. Capture
-membership before deploying and again after the backfill; both sides come from
-the shipped rule, so nothing restates it in a throwaway query:
-
-```sql
-SELECT "full"->>'name', "full"->>'vekn_id',
-       jsonb_array_length("full"->'wins') AS wins
-FROM objects
-WHERE type = 'user' AND deleted_at IS NULL
-  AND jsonb_array_length(COALESCE("full"->'wins', '[]'::jsonb)) >= 5
-ORDER BY wins DESC, 1;
-```
+**Item 5 is a prod step and is not done** — the diff needs the corpus. It is steps
+1 and 7 of the production run at the top, and both sides come from the shipped
+rule, so nothing restates it in a throwaway query.
 
 Personal data: it stays out of the repo. `backfill_twda.py` now runs a full
 `recompute_wins()` before the snapshot so both directions settle in one pass —
