@@ -157,6 +157,7 @@ lint-check:
     (cd engine && cargo fmt --check && cargo clippy --all-targets --all-features -- -D warnings)
     just permission-drift
     just comment-blocks
+    just dark-variant
 
 # Fail when a role literal is used for gating outside the engine's capability
 # table — the drift this repo's permission model keeps re-growing without it.
@@ -168,6 +169,12 @@ permission-drift:
 comment-blocks:
     uv run python3 scripts/check_comment_blocks.py
 
+# Fail on Tailwind's `dark:` variant, which follows the OS preference rather than
+# the theme the user picked and so inverts the wrong way for anyone whose two
+# disagree.
+dark-variant:
+    uv run python3 scripts/check_dark_variant.py
+
 # Lint and auto-fix all code
 lint:
     uv run ruff check --fix . && uv run ruff format .
@@ -175,6 +182,7 @@ lint:
     @just _backup-drift
     just permission-drift
     just comment-blocks
+    just dark-variant
 
 # Warn (never fail) when the hand-synced backup scripts drift from server-setup's
 # copies (script headers document the contract). Comment wording and the
@@ -273,16 +281,30 @@ release bump:
         *) echo "usage: just release <patch|minor|major|vX.Y.Z>"; exit 1 ;;
     esac
     git rev-parse "$tag" >/dev/null 2>&1 && { echo "tag $tag already exists"; exit 1; }
-    # Nudge: discourage (but don't block) releasing on stale deps — prefer
-    # `just update` (refresh, test, commit) first. `if` keeps set -e from aborting.
-    if just deps-check 2>/dev/null; then   # 2>/dev/null: drop just's "recipe failed" wrapper line
-        prompt="Release $tag (latest is ${latest:-none})? [y/N] "
-    else
+    # Nudges: discourage (but don't block) releasing on stale deps or with no notes
+    # written. `if` keeps set -e from aborting.
+    anyway=""
+    if ! just deps-check 2>/dev/null; then   # 2>/dev/null: drop just's "recipe failed" wrapper line
         echo "⚠ Dependencies are out of date — prefer 'just update' before cutting a release."
-        prompt="Release $tag anyway, with stale deps? [y/N] "
+        anyway=" anyway"
     fi
-    read -r -p "$prompt" ans
+    if ! grep -q '^## Unreleased$' CHANGELOG.md; then
+        echo "⚠ No '## Unreleased' section in CHANGELOG.md — run /release-notes first, or this release ships unannounced."
+        anyway=" anyway"
+    fi
+    read -r -p "Release $tag${anyway} (latest is ${latest:-none})? [y/N] " ans
     [ "$ans" = y ] || [ "$ans" = Y ] || { echo "aborted"; exit 1; }
+    if grep -q '^## Unreleased$' CHANGELOG.md; then
+        stamp="## $tag — $(date +%F)"
+        # Must match ENTRY_HEADING in frontend/src/lib/changelog.ts, or the app skips the
+        # entry and shows nothing, silently — reachable via a pre-release tag like v1.2.3-rc1.
+        printf '%s' "$stamp" | grep -qE '^## v[0-9]+\.[0-9]+\.[0-9]+ — [0-9]{4}-[0-9]{2}-[0-9]{2}$' \
+            || { echo "$tag would stamp a heading the app cannot parse"; exit 1; }
+        uv run python3 -c "import pathlib, sys; p = pathlib.Path('CHANGELOG.md'); p.write_text(p.read_text().replace('## Unreleased', sys.argv[1], 1))" "$stamp"
+        git add CHANGELOG.md
+        git commit -m "Stamp $tag in the changelog"
+        git push origin HEAD
+    fi
     git tag "$tag"
     git push origin "$tag"
     echo "Pushed $tag. CI: e2e → (green) create release → artifacts. Watch the Actions tab."

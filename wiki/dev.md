@@ -27,7 +27,7 @@ just dev-reset # reset the dev database
 
 `just lint` auto-fixes formatting, then runs the checks nothing can fix for you;
 `just lint-check` is the read-only half and is what `just test` calls. Both end on
-the same two gates:
+the same three gates:
 
 - `just permission-drift` — a role literal used to gate outside the engine's
   capability table.
@@ -38,6 +38,10 @@ the same two gates:
   TypeScript's `/// <reference>`, which is compiler input rather than prose, and
   Python docstrings, which are strings. Nor does it see a block split by a blank
   line. Those are the reviewer's comment pass to delete, not the gate's.
+- `just dark-variant` — Tailwind's `dark:` variant anywhere under `frontend/`,
+  which tracks the OS preference rather than the app's theme
+  ([design](design.md#palette)). A `dark:` followed by a space is an object key
+  or a type annotation and passes.
 
 In dev only the **database** runs in Docker; backend and frontend run natively. The
 compose file is **not** production-hardened — uvicorn reload, a default password.
@@ -56,6 +60,22 @@ through `importlib.resources`**, never `Path(__file__)`
 
 Nothing auto-deploys, and there is no public version endpoint — never sniff the app
 for a version.
+
+### The release order
+
+The changeset is written **before** the tag, not after the deploy. `/release-notes`
+appends a `## Unreleased` block to `CHANGELOG.md`; `just release` rewrites that
+heading to the tag it is cutting plus today's date, commits it, pushes the branch
+and only then tags. The tag therefore contains its own entry, so the frontend
+bundle CI builds from it carries the notes for the version it *is* — that is the
+whole point, and stamping afterwards would put every entry one release behind the
+build that shows it ([architecture](architecture.md#whats-new)). A missing
+`## Unreleased` section only nudges: a release with nothing user-facing is
+legitimate.
+
+`/post-deploy` runs after the deploy and closes the feedback issues it made live.
+It holds no state — an open issue, the commit whose `Reported in #N.` names it and
+`git tag --contains` are enough to say whether a fix is live.
 
 Production nginx proxies only an allowlist of top-level path prefixes to FastAPI
 ([access](access.md#deployment-gate)), and its templates own the Open Graph
@@ -134,4 +154,6 @@ board/      elaborated context for in-flight board lines
 ```
 
 `README.md` is the public front door and `CHANGELOG.md` the human record of what
-shipped; both stay at the repository root.
+shipped; both stay at the repository root. `CHANGELOG.md` is also shipped content —
+the frontend bundles it and the app renders it
+([architecture](architecture.md#whats-new)).

@@ -1,38 +1,26 @@
 ---
 name: post-deploy
-description: Run after a successful production deploy — produce a compact changeset covering everything shipped since the last run (often several releases), and close the GitHub feedback issues those changes fixed. Use when asked to announce a deploy, write release/changelog notes for what just went live, or close issues that have now shipped.
+description: Run after a successful production deploy — tell the people who reported the bugs it fixed, and close their issues. Use when asked to follow up on user feedback after a deploy, or to close the issues a deploy has now shipped.
 ---
 
 # Post-deploy
 
-Two jobs, in order: **say what shipped**, then **tell the people who reported it**.
+One job: **tell the people who reported it**. Saying what shipped is the other
+half and happens before the tag — `/release-notes`.
 
-Both span *everything since this skill last ran* — not one release. Deploys bundle
-several tags, and a reporter doesn't care which one carried their fix.
+An issue closes when the fix **deploys** and the reporter can see it work, which
+is why commits carry a bare `Reported in #N.` and never a closing keyword
+(`wiki/dogmas.md`). This pass is what that backlink is for.
 
 **Prod only.** Beta is our testbed; the reporter is on prod. On a beta deploy,
-produce the changeset if asked and **close nothing**.
+close nothing.
 
-## State
+## No state
 
-`last-run` in this directory holds one line: the commit SHA, tag and date of the
-last point that was **announced and closed out** — which is not the same as the
-last thing deployed.
-
-```
-3fefe60 v1.0.0 2026-08-07
-```
-
-A release that shipped without ever being announced leaves the marker where it
-is, so the next run picks its changes up too. That is the normal case, not an
-error: deploys are frequent, announcements are not.
-
-Advance it **only after** the closing pass has actually run, and commit it with
-the changeset in the same commit.
-
-First run ever, or file missing: anchor on the previous release tag
-(`git tag --sort=-creatordate | sed -n 2p`) and say in your output that the range
-was guessed, so the owner can widen it.
+There is no marker file and no commit range. Every input is derivable at the
+moment you ask: an open `feedback` issue, the commit that references it, and the
+first tag containing that commit. A deploy that was never followed up is picked up
+by the next run for free, because a still-open issue is still open.
 
 ## 1. Establish what is live
 
@@ -48,63 +36,34 @@ If the deploy did not actually succeed, stop. Closing an issue on a failed deplo
 is the one unrecoverable mistake here — it tells a reporter their fix is live when
 it isn't.
 
-## 2. The changeset
+## 2. Work out what is now live
 
 ```sh
-git log <last-run-sha>..<deployed-tag> --format='%h %s%n%b'
+gh issue list --label feedback --state open --json number,title \
+  --jq '.[] | "\(.number)\t\(.title)"'
 ```
 
-**One meaningful change = one line.** The reader is a VTES player, not a
-contributor.
+For each, find its fix and the release that first carried it:
 
-| Include | Drop |
-|---|---|
-| New capability | Refactors, dead-code removal, renames |
-| Behaviour a user would notice changing | Docs, CI, deps, tests, formatting |
-| A bug someone could actually hit | Board and wiki bookkeeping |
-| Notable speed or UX change | Chrome: spacing, copy tweaks, icon swaps |
-
-- **Collapse.** Several commits for one change are one line. A fix for a bug
-  introduced in the same range is not a line at all — it never shipped broken.
-- **Product language.** No commit hashes, no file paths, no internal references, no
-  internal component names. "Ratings on a tournament page now match your profile",
-  not "bind compute_rating_vp_gw to WASM".
-- **Lead with what changed for them**, not what we did.
-- Flat list, newest-first. Only group under headings if it runs past ~15 lines.
-- Name the span at the top (`v1.0.0 → v1.0.2`).
-- If nothing user-facing shipped, say exactly that — do not pad it out.
-
-Write it to `CHANGELOG.md` at the repo root, newest entry first, directly under
-the marker comment. Heading is the version now live plus the date; add a
-`Covers <from> → <to>.` line only when the run spans more than one release:
-
-```markdown
-## v1.0.3 — 2026-08-15
-
-Covers v1.0.1 → v1.0.3.
-
-- Ratings shown on a tournament page now match the ones on your profile.
+```sh
+sha=$(git log -E --grep="#${N}([^0-9]|$)" --format=%H -1)
+[ -n "$sha" ] && git tag --contains "$sha" --sort=creatordate | head -n1
 ```
 
-Show it in chat too. That file is the record — the GitHub Releases are not one:
-`--generate-notes` lists merged PRs and this repo commits straight to main, so
-their bodies are just a compare link.
+Three outcomes, and only the first is actionable:
 
-Publishing it **anywhere else** (Discord, release notes, in-app) is the owner's
-call: draft on request, never post unasked.
+- **A containing tag at or below the deployed tag** — live. Close it.
+- **A containing tag above the deployed tag, or none** — fixed, not yet deployed.
+  Leave it; the next run takes it.
+- **No referencing commit** — either untouched, or fixed before the backlink
+  convention existed. Report, never close on a hunch: an issue closed wrongly
+  costs more than one closed late.
 
 ## 3. Close what shipped
 
-Fixing commits carry a bare `Reported in #N.` backlink and never a closing keyword
-(`wiki/dogmas.md`), so the range yields its own issue list:
+For each live issue, in order:
 
-```sh
-git log <last-run-sha>..<deployed-tag> --format='%b' | grep -oE '#[0-9]+' | sort -u
-```
-
-For each, in order:
-
-1. `gh issue view N --json number,title,labels,state` — skip unless it is **open**
+1. `gh issue view N --json number,title,labels,state` — confirm it is still open
    and carries `feedback`. A commit may reference any issue; only feedback issues
    get this treatment.
 2. Draft a reply in the **feedback-triage house voice** — see that skill's "Reply
@@ -125,25 +84,7 @@ One close per issue even when several commits reference it.
 > This is fixed and deployed — the rating on a tournament page and the one on your
 > profile are the same number now.
 
-## 4. Stragglers
+## 4. Report
 
-Fixes that landed before the backlink convention won't appear in step 3. After the
-closing pass, list open issues that look shipped but weren't matched:
-
-```sh
-gh issue list --label feedback --label tracked --state open \
-  --json number,title --jq '.[] | "\(.number)\t\(.title)"'
-```
-
-Report them with a one-line guess at status. **Don't close them on a hunch** — an
-issue closed wrongly costs more than one closed late.
-
-## 5. Finish
-
-Rewrite `last-run` with the deployed tag's SHA, tag and date, and commit it with
-the `CHANGELOG.md` entry in one commit — the file is the human record, the marker
-is the machine anchor, and the two must not drift apart. No board reference in the
-message.
-
-Report to the owner: the span covered, the changeset, which issues were closed,
-and any straggler needing a decision.
+To the owner: which issues were closed, which are fixed but waiting on a deploy,
+and which carry no referencing commit and need a decision.

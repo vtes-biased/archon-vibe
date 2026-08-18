@@ -66,6 +66,15 @@ text.
 before first paint by an inline script in `app.html` to prevent a flash. The light
 theme does one thing: `html.light { color-scheme: light }`.
 
+**Tailwind's `dark:` variant does not track the theme** and must not be used. It
+keys on `prefers-color-scheme`, so a theme the user picked against their OS leaves
+every `dark:` utility on the wrong side — most visibly `dark:prose-invert`, which
+renders dark body text on a dark card and is invisible to anyone whose OS already
+agrees with their theme. Rendered markdown takes **`doc-prose`** instead, which
+maps the `--tw-prose-*` variables onto the role tokens and so follows
+`color-scheme` like everything else. `just dark-variant` holds the ban
+([dev](dev.md#lint-gates)).
+
 ### Semantic classes
 
 Standard Tailwind status colours are **off-palette**. The app uses a tight

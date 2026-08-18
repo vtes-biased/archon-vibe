@@ -33,8 +33,9 @@ anything.
 - **`/ship`** — take the top line, execute, land the trinity, spawn the reviewer.
 - **`/upkeep`** — the maintenance pass: wiki lint, board eviction, harness ratchet.
 
-Two named ingress procedures feed them: **`/feedback-triage`** for GitHub feedback
-issues, and **`/post-deploy`** for the release changeset and issue closing.
+Three named procedures feed them: **`/feedback-triage`** for GitHub feedback
+issues, **`/release-notes`** for the changeset, before the tag is cut, and
+**`/post-deploy`** for closing the issues a deploy made live.
 
 **A unit of work lands as one change**: code changed, the wiki pages named at
 ingress updated (or their absence justified), the board line deleted. Wiki currency

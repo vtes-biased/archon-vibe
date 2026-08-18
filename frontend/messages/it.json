@@ -926,6 +926,7 @@
   "payment_summary": "{paid}/{total} pagato/i",
   "update_available": "È disponibile una nuova versione.",
   "update_refresh": "Aggiorna",
+  "whatsnew_title": "Novità",
   "offline_mode_banner": "MODALITÀ OFFLINE — Le modifiche sono salvate localmente",
   "offline_last_sync": "Ultimo salvataggio: {time}",
   "offline_not_synced": "Non ancora salvato sul server",

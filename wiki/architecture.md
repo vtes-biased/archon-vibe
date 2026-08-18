@@ -455,6 +455,35 @@ rewrite would be a notification-hijack vector. The service worker's
 `pushsubscriptionchange` handler re-subscribes locally only (it has no auth); the
 app reconciles the new endpoint server-side on next open.
 
+### What's new
+
+A dismissible modal on first load after an upgrade, listing the `CHANGELOG.md`
+entries this device has not seen. Entirely client-side — no version endpoint is
+involved, and none is wanted ([dev](dev.md#deployment)).
+
+`CHANGELOG.md` is imported raw from the repository root by
+`frontend/src/lib/changelog.ts` and parsed at load. An entry is a
+`## vX.Y.Z — YYYY-MM-DD` heading plus the markdown beneath it; `## Unreleased`
+matches nothing, so notes written before their tag is cut never reach a user. The
+newest version this device has seen lives in `localStorage.changelog-seen`, and
+everything above it is pending.
+
+**A first-ever visit shows nothing.** An absent marker baselines to the newest
+entry rather than dumping the whole history — which is also what an existing user
+gets on the release that introduces the modal. `unseenEntries()` does that write
+itself on an absent marker, so it is a query with a storage side effect; the modal
+only writes again on dismissal.
+
+The e2e image copies `CHANGELOG.md` in separately (`frontend/Dockerfile.test`),
+since the import reaches above the frontend directory the container holds.
+
+Entries stay English inside a translated shell ([i18n](i18n.md#the-changelog)).
+
+The upgrade itself needs no hook. The service worker already auto-applies a waiting
+worker at boot and reloads, so a newer bundle simply arrives carrying entries the
+device has not seen; the notes reach the build they describe because `just release`
+stamps them into the commit it tags ([dev](dev.md#the-release-order)).
+
 ### Binary assets
 
 Binary image blobs live in dedicated side tables — `avatars`, `banners`,

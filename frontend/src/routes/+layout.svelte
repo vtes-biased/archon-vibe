@@ -12,6 +12,7 @@
   import { onMount } from 'svelte';
   import { Wifi, WifiOff, RefreshCw, Download, TriangleAlert, Trophy, BarChart3, Medal, Users, User, BookOpen } from '@lucide/svelte';
   import Toast from '$lib/components/Toast.svelte';
+  import WhatsNewModal from '$lib/components/WhatsNewModal.svelte';
   import * as m from '$lib/paraglide/messages.js';
   import { getLocale } from '$lib/paraglide/runtime.js';
   import { initTheme } from '$lib/stores/theme.svelte';
@@ -256,4 +257,5 @@
   <div aria-hidden="true" class="fixed top-0 left-0 right-0 sm:left-rail h-safe-t z-[45] bg-surface pointer-events-none"></div>
 
   <Toast />
+  <WhatsNewModal />
 </div>

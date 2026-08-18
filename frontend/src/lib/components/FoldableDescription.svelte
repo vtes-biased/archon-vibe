@@ -24,7 +24,7 @@
     {m.common_description()}
   </button>
   {#if expanded}
-    <div id={bodyId} class="px-4 sm:px-6 pb-4 prose dark:prose-invert prose-sm max-w-none">{@html renderMarkdown(cleaned)}</div>
+    <div id={bodyId} class="px-4 sm:px-6 pb-4 doc-prose prose prose-sm max-w-none">{@html renderMarkdown(cleaned)}</div>
   {:else}
     <div id={bodyId} class="px-4 sm:px-6 pb-3 text-sm text-ink-muted">{excerpt.text}{#if excerpt.truncated}<span aria-hidden="true">…</span>{/if}</div>
   {/if}
