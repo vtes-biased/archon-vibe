@@ -186,13 +186,14 @@
     {@render children()}
   </main>
 
-  <!-- Icon-only: labels truncate to ambiguity in longer locales (es/pt), so the destination name lives in aria-label/title. -->
-  <!-- h-navbar is declared, not emergent, or a gap shows between the CTA and the nav; transform-gpu is a scroll-compositing win only, not a WebKit 297779 fix. -->
-
+  <!-- h-navbar is declared, not emergent, or a gap shows between the CTA and the
+       nav; transform-gpu is a scroll-compositing win, not a WebKit 297779 fix. -->
   <nav class="fixed bottom-0 left-0 right-0 z-40 h-navbar pb-safe-b transform-gpu bg-surface-card border-t border-line sm:hidden">
     <div class="flex h-full justify-around">
       {#each navItems as item}
         {@const active = isActive(item.href, $page.url.pathname)}
+        <!-- Icon-only: labels truncate to ambiguity in longer locales (es/pt),
+             so the destination name lives in aria-label/title. -->
         <a
           href={item.href}
           onclick={(e) => openLastView(e, item.href)}

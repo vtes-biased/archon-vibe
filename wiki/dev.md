@@ -33,11 +33,11 @@ the same two gates:
   capability table.
 - `just comment-blocks` — a contiguous comment block over three lines, in every
   tracked `.py`, `.rs`, `.ts` and `.svelte` file ([dogmas](dogmas.md#code)).
-  Line, block and doc syntax all count, so the ceiling cannot be sidestepped by
-  writing the narration as `/** … */`; the one exemption is TypeScript's
-  `/// <reference>`, which is compiler input rather than prose. A blank line ends
-  a block, which is why the reviewer's comment pass and not the gate is what
-  catches a rationale split into stanzas.
+  `#`, `//`, `///`, `/* … */` and `<!-- … -->` all count, so the ceiling is not a
+  question of which one the narration is written in. Two things it does not see:
+  TypeScript's `/// <reference>`, which is compiler input rather than prose, and
+  Python docstrings, which are strings. Nor does it see a block split by a blank
+  line. Those are the reviewer's comment pass to delete, not the gate's.
 
 In dev only the **database** runs in Docker; backend and frontend run natively. The
 compose file is **not** production-hardened — uvicorn reload, a default password.

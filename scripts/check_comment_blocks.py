@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """Fail the build on a contiguous comment block over three lines.
 
-A comment earns its place by stating a non-local trap. Four lines of it is a
-rationale, and rationale belongs on a wiki page. Every comment syntax counts —
-line, block and doc alike — so the ceiling cannot be sidestepped by changing
-which one you write in.
+Every comment token counts, so the ceiling is not a question of which one you
+write in. Python docstrings are strings rather than comments, and are exempt.
 
 Run: just comment-blocks
 """
