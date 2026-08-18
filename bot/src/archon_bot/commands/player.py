@@ -175,15 +175,15 @@ async def _handle_registration_pipeline(
             )
             if player_entry and player_entry.get("missing_decklist"):
                 msg += (
-                    f"\n\n**Warning:** This tournament requires a decklist. "
-                    f"Upload yours before the round starts:\n"
-                    f"{config.ARCHON_FRONTEND_URL}/tournaments/{tournament_uid}"
+                    "\n\n**Warning:** This tournament requires a decklist. "
+                    "Upload yours before the round starts:\n"
+                    + config.event_url(result.data, tournament_uid)
                 )
             elif result.data.get("decklist_required"):
                 msg += (
-                    f"\n\nThis tournament requires a decklist. "
-                    f"Don't forget to upload yours:\n"
-                    f"{config.ARCHON_FRONTEND_URL}/tournaments/{tournament_uid}"
+                    "\n\nThis tournament requires a decklist. "
+                    "Don't forget to upload yours:\n"
+                    + config.event_url(result.data, tournament_uid)
                 )
 
             await ctx.respond(msg, flags=hikari.MessageFlag.EPHEMERAL)

@@ -602,10 +602,8 @@ export async function getTournament(uid: string): Promise<Tournament | undefined
 
 export async function getTournamentByCode(code: string): Promise<Tournament | undefined> {
   const db = await getDB();
-  // An IDB index matches the stored bytes, so the case-insensitive resolve the
-  // server does in SQL becomes three exact probes here — the three shapes a code
-  // ever takes. The `by-vekn` probe covers an event whose vekn id arrived after
-  // its code was minted, and can never shadow a code: it runs only on a miss.
+  // An IDB index matches the stored bytes, so the server's case-insensitive
+  // resolve becomes three exact probes — the three shapes a code ever takes.
   for (const variant of [code, code.toUpperCase(), code.toLowerCase()]) {
     const hit = await db.getFromIndex('tournaments', 'by-code', variant);
     if (hit && !hit.deleted_at) return hit;

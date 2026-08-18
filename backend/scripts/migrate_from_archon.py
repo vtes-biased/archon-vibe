@@ -1076,6 +1076,7 @@ def build_tournament(
             or d.get("checkin_code")
             or secrets.token_urlsafe(16)
         ),
+        event_code=existing.event_code if existing else "",
         players=players,
         rounds=new_rounds,
         finals=finals,

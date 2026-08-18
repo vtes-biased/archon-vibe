@@ -19,3 +19,12 @@ TOKEN_DB_PATH = os.environ.get("TOKEN_DB_PATH", "bot_tokens.db")
 # The bot never knows who holds this: /oauth/userinfo answers that, so /sanction
 # carries no local check and just surfaces the API's refusal.
 SETUP_CAPABILITY = "create_tournament"
+
+
+def event_url(obj: dict, tournament_uid: str) -> str:
+    """Outward link to an event. The uid form stays valid forever, so the
+    fallback for a code not yet stamped is never a wait."""
+    code = obj.get("event_code")
+    if code:
+        return f"{ARCHON_FRONTEND_URL}/t/{code}"
+    return f"{ARCHON_FRONTEND_URL}/tournaments/{tournament_uid}"

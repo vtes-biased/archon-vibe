@@ -2490,10 +2490,8 @@ async def go_online(
             )
         ):
             updated.vekn_results_stale = True
-        # An event created offline reaches the corpus here, and its VEKN push is
-        # the hourly batch's — which does not run at all once pushing is off. So
-        # this ingress mints rather than waiting, and the vekn id that may arrive
-        # later is reached by the resolver's fallback instead of moving the code.
+        # Mints rather than waiting: an offline-created event's VEKN push is the
+        # hourly batch's, which stops running entirely at the decommission.
         if not updated.event_code:
             updated.event_code = await resolve_event_code(updated, tx_conn)
         tournament_bd = await save_object(

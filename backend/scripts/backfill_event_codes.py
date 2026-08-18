@@ -1,7 +1,8 @@
 """One-time backfill of the short event code across the whole corpus.
 
+    # reports what it would do; --apply is the only thing that writes
     /opt/archon/backend/.venv/bin/python \\
-      /opt/archon/backend/scripts/backfill_event_codes.py --dry-run
+      /opt/archon/backend/scripts/backfill_event_codes.py
     … backfill_event_codes.py --apply
 
 Run it **after** `backfill_twda.py`: a reconstruction takes the archive's own key
@@ -43,7 +44,23 @@ async def run(args: argparse.Namespace) -> int:
         uids = await db.tournament_uids_without_event_code()
         print(f"{len(uids)} tournaments without an event code")
         if not args.apply:
-            print("\nDry run — pass --apply to write.")
+            async with db.get_connection() as conn:
+                result = await conn.execute(
+                    """SELECT
+                       count(*) FILTER (
+                         WHERE "full"->'external_ids'->>'vekn' IS NOT NULL),
+                       count(*) FILTER (
+                         WHERE "full"->'external_ids'->>'vekn' IS NULL
+                           AND "full"->'external_ids'->>'twda' IS NOT NULL)
+                       FROM objects
+                       WHERE type = 'tournament' AND deleted_at IS NULL
+                         AND coalesce("full"->>'event_code', '') = ''"""
+                )
+                vekn, twda = await result.fetchone()
+            print(f"  {vekn} take their vekn event id")
+            print(f"  {twda} take their TWDA key")
+            print(f"  {len(uids) - vekn - twda} minted")
+            print("\nReport only — pass --apply to write.")
             return 0
 
         sources = {"vekn": 0, "twda": 0, "minted": 0}

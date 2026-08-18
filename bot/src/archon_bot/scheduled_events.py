@@ -81,7 +81,7 @@ def _build_spec(obj: dict, tournament_uid: str) -> EventSpec | None:
         return None
 
     name = (obj.get("name") or "Tournament")[:_NAME_MAX]
-    url = f"{config.ARCHON_FRONTEND_URL}/tournaments/{tournament_uid}"
+    url = config.event_url(obj, tournament_uid)
     fmt = obj.get("format")
     desc_parts = [f"{fmt} tournament." if fmt else "VTES tournament."]
     if obj.get("description"):

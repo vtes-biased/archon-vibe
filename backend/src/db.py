@@ -1066,12 +1066,8 @@ async def resolve_event_code(
 ) -> str:
     """The event's permanent public handle, decided once and never revisited.
 
-    Prefers the identifier the outside world already cites — the vekn event id,
-    then the archive's own key, which is what names the TWDA file — so a record
-    published before us keeps resolving after vekn.net is gone. A taken candidate
-    falls through to a mint rather than failing the save: the unique index is the
-    guarantee, and the 14 numeric archive keys are vekn event ids that a row we
-    already hold may carry.
+    A taken candidate falls through to a mint rather than failing the save: the
+    14 numeric archive keys are vekn event ids a row we already hold may carry.
     """
     for candidate in (
         tournament.external_ids.get("vekn"),

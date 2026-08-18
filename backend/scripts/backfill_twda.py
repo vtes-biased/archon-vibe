@@ -2,8 +2,9 @@
 import their winning decks, recompute the Hall of Fame, then regenerate the
 snapshot.
 
+    # reports what it would do; --apply is the only thing that writes
     /opt/archon/backend/.venv/bin/python \\
-      /opt/archon/backend/scripts/backfill_twda.py --dry-run
+      /opt/archon/backend/scripts/backfill_twda.py
     … backfill_twda.py --apply
 
 Not the recurring task's first run. That path broadcasts each object as it lands,

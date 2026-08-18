@@ -55,10 +55,10 @@ sudo -u archon bash -c 'B=/etc/archon/archon-backend.env
    The backfill and the recurring sync both read the packaged copy, so what ran and
    what is committed are the same file by construction — which is the reason this
    costs a second deploy rather than a `--decisions` override.
-5. **`backfill_twda.py --dry-run`**, read the create count against Phase 0's 1130,
+5. **`backfill_twda.py`** (reports), read the create count against Phase 0's 1130,
    then **`--apply`**. It suppresses broadcasting, recomputes every win list in both
    directions and regenerates the snapshot.
-6. **`backfill_event_codes.py --dry-run`**, then **`--apply`** — the other board
+6. **`backfill_event_codes.py`** (reports), then **`--apply`** — the other board
    line's prod step, but it belongs **after** step 5 or the 1132 reconstructions
    mint codes before their archive keys arrive and keep them forever.
 7. **Capture the Hall of Fame again** and diff. 47 members sit at exactly five

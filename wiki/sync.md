@@ -521,11 +521,11 @@ force-unlock is reported once, through the status codes below, not twice.
 
 **Server-managed field re-pull** — before saving the device's offline snapshot, the
 server re-stamps a fixed set of fields from the authoritative locked row:
-`banner_path`, `external_ids`, `checkin_code`, `vekn_pushed_at`,
-`vekn_results_stale`. These are never written by the WASM engine and can change
-server-side during the offline window — VEKN sync writes `external_ids` and
-`vekn_pushed_at`, a re-uploaded banner writes `banner_path`, another organizer's SA
-or DQ can flip `vekn_results_stale`. Trusting the device's stale values would
+`banner_path`, `external_ids`, `checkin_code`, `event_code`, `vekn_pushed_at`,
+`vekn_results_stale`, `twda_status`. These are never written by the WASM engine and
+can change server-side during the offline window — VEKN sync writes `external_ids`
+and `vekn_pushed_at`, a re-uploaded banner writes `banner_path`, another
+organizer's SA or DQ can flip `vekn_results_stale`. Trusting the device's stale values would
 revert them. "Server wins" for non-engine fields, same as `organizers_uids`. **Any
 new backend-only Tournament field must join this list**, or an offline round-trip
 silently reverts it; the online action path is safe because the engine preserves

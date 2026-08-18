@@ -62,7 +62,11 @@ def _tournament_to_vevent(t: Tournament, now_str: str) -> str:
         parts.append(f"({t.rank})")
     if t.venue:
         parts.append(f"\n{t.venue}")
-    url = f"{FRONTEND_URL}/tournaments/{t.uid}"
+    url = (
+        f"{FRONTEND_URL}/t/{t.event_code}"
+        if t.event_code
+        else f"{FRONTEND_URL}/tournaments/{t.uid}"
+    )
     description = _escape_ical(" ".join(parts) if parts else t.name)
 
     # venue/address render even in anonymous feeds: public-projection fields.

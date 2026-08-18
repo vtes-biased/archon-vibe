@@ -112,7 +112,7 @@ the code lands.
 ## What remains
 
 Built and green as of 2026-08-18. The line survives only for the production step:
-`backfill_event_codes.py --dry-run`, review, `--apply` — after the TWDA backfill,
+`backfill_event_codes.py` (reports), review, `--apply` — after the TWDA backfill,
 per the sequencing below. Until it runs, the corpus has no codes and the
 done-condition's "every tournament carries one" is false.
 

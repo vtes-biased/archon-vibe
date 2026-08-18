@@ -166,6 +166,13 @@ roster including no-shows. Neither is the rule. `TWDA_MIN_PLAYERS` lives in
 Hall of Fame reads `attested_player_count`, because `_played_player_count` would
 score every rounds-less import and every reconstruction at 0 and empty the page.
 
+That 0 is now load-bearing in a second, unobvious place: it is the only thing
+keeping a reconstructed row out of the TWDA submitter. Such a row's event code
+*is* the archive's own file key on 1118 of them, so a submission would open a pull
+request overwriting the very archive file it was reconstructed from. Giving
+`_played_player_count` a standings fallback would make that reachable —
+[vekn](vekn.md#outbound).
+
 **The Hall of Fame predicate and `ranking_eligibility` disagree on purpose.** 10
 players and the winner's deck on record, against 8 players and a played final:
 they are different questions and a unification "fixing" the inconsistency

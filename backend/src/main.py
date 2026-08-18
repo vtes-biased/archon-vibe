@@ -309,9 +309,7 @@ _MAX_EVENT_CODE_STAMPS = 100
 
 
 async def _stamp_missing_event_codes() -> None:
-    """A restart between a tournament's insert and the task that stamps its handle
-    would leave it with none, permanently. Capped like the TWDA reconstruction:
-    over the cap this is a corpus that needs `backfill_event_codes.py`, not a
+    """Over the cap this is a corpus that needs `backfill_event_codes.py`, not a
     startup path minting thousands of codes before the app answers."""
     from .db import ensure_event_code, tournament_uids_without_event_code
 

@@ -569,8 +569,11 @@ can never shadow a code, since a hit on the code ends the lookup.
 `/t/{code}` redirects to `/tournaments/{uid}`: the uid route reads `params.uid`
 throughout, and the uid form can never be retired anyway — it is in the TWDA, in
 push notifications, in every link shared to date, and it is the only form an
-offline-created event has before it syncs. Everything outward-facing emits the
-short form when there is one and the uid form otherwise, never a wait.
+offline-created event has before it syncs. Every link meant to leave the app emits
+the short form when there is one and the uid form otherwise, never a wait: the
+share and copy-results paths, both OG stubs, the `.ics` feed, the deck header
+submitted to the TWDA, and the Discord bot's announcements. In-app deep links —
+push notification targets — stay on the uid the router already navigates.
 
 **Open Graph stubs.** Social link-preview crawlers don't run JavaScript, so they
 would always see the static SPA shell with the site-wide `og:image`. nginx

@@ -1065,7 +1065,7 @@ async def _emit_announcements(
 
     state = obj.get("state", "")
     name = obj.get("name", "Tournament")
-    webapp_url = f"{config.ARCHON_FRONTEND_URL}/tournaments/{tournament_uid}"
+    webapp_url = config.event_url(obj, tournament_uid)
     rounds = obj.get("rounds", [])
     players = obj.get("players", [])
     round_count = len(rounds)
@@ -1216,7 +1216,7 @@ async def _announce_round_seating(
     announcement_id = int(link["announcement_channel_id"])
     judges_id = int(link["judges_channel_id"])
     name = obj.get("name", "Tournament")
-    webapp_url = f"{config.ARCHON_FRONTEND_URL}/tournaments/{tournament_uid}"
+    webapp_url = config.event_url(obj, tournament_uid)
     players = obj.get("players", [])
     organizer_uids = set(obj.get("organizers_uids", []))
     rounds = obj.get("rounds", [])
@@ -1265,7 +1265,7 @@ async def _announce_finals(
     announcement_id = int(link["announcement_channel_id"])
     judges_id = int(link["judges_channel_id"])
     name = obj.get("name", "Tournament")
-    webapp_url = f"{config.ARCHON_FRONTEND_URL}/tournaments/{tournament_uid}"
+    webapp_url = config.event_url(obj, tournament_uid)
     players = obj.get("players", [])
     organizer_uids = set(obj.get("organizers_uids", []))
     finals = obj.get("finals") or {}
