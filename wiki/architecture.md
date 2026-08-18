@@ -89,6 +89,12 @@ the engine, keeping the online (server) and offline (WASM) paths identical and t
 engine the single source of truth for state transitions. Catalog:
 [tournaments](tournaments.md#engine-event-catalog).
 
+**Read-only rules** the UI must agree with — may a finals start, is this table
+scorable, who places where — are engine exports too, called **synchronously**
+through `getEngineReactive()` and safe inside a `$derived`. A predicate
+reimplemented in TypeScript drifts from the engine and the UI ends up offering
+what the engine refuses; the fallback when WASM is not up yet fails closed.
+
 **CRUD events** — Create / Update / Delete, synchronizing DB state to clients. The
 payload is the full object including `uid` and `modified`. Flow: DB change → CRUD
 event → SSE → IndexedDB.

@@ -1,13 +1,13 @@
 <script lang="ts">
   import type { Tournament, TournamentState, DeckObject } from "$lib/types";
-  import type { TournamentEventType } from "$lib/engine";
+  import { finalsQualification, type TournamentEventType } from "$lib/engine";
   import Button from "$lib/components/Button.svelte";
   import ActionMenu from "$lib/components/ActionMenu.svelte";
   import QrCheckinDisplay from "$lib/components/QrCheckinDisplay.svelte";
   import FinishedResults from "./FinishedResults.svelte";
   import InlineNotice from "$lib/components/InlineNotice.svelte";
   import { Undo2, CheckCheck, Banknote, RotateCcw } from "@lucide/svelte";
-  import { translateTournamentState, finalsCandidates, seatDisplay, top5HasTies as top5HasTiesFn, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { translateTournamentState, seatDisplay, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
 
@@ -42,9 +42,9 @@
   const hasRounds = $derived((tournament?.rounds?.length ?? 0) > 0);
   // QR self-check-in is in-person only — online players can't scan a venue code. checkin_code is always set server-side, so gate on !online.
   const qrCheckin = $derived(!tournament?.online && !!tournament?.checkin_code);
-  const finalsPool = $derived(finalsCandidates(tournament, standings));
-  const hasFinalsCandidate = $derived(finalsPool.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
-  const finalsReady = $derived(hasFinalsCandidate && !top5HasTiesFn(finalsPool));
+  const finalsQual = $derived(finalsQualification(tournament?.players ?? [], standings));
+  const hasFinalsCandidate = $derived(finalsQual.candidates.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
+  const finalsReady = $derived(hasFinalsCandidate && !finalsQual.has_ties);
   const activeRoundIdx = $derived.by(() => {
     if (!tournament?.rounds?.length) return -1;
     const idx = tournament.rounds.findIndex(r => r.some(t => t.state !== "Finished"));
@@ -198,7 +198,7 @@
     {:else if tournament.state === "Registration"}
       {m.action_bar_registration({ count: String(registeredCount) })}
     {:else if tournament.state === "Waiting"}
-      {#if hasFinalsCandidate && top5HasTiesFn(finalsPool)}
+      {#if hasFinalsCandidate && finalsQual.has_ties}
         {m.action_bar_waiting_toss_needed({ n: String(tournament.rounds!.length) })}
       {:else if hasFinalsCandidate}
         {m.action_bar_waiting_finals_ready({ n: String(tournament.rounds!.length) })}

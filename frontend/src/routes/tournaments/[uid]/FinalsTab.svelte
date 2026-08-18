@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { previewScoresSync, checkTableVpsSync, type TournamentEventType } from "$lib/engine";
+  import { previewScoresSync, checkTableVpsSync, finalsQualification, type TournamentEventType } from "$lib/engine";
   import { vpIssueText } from "$lib/vpIssue";
   import { toUserMessage } from '$lib/errors';
   import type { Tournament, Sanction } from "$lib/types";
@@ -11,7 +11,7 @@
   import TimerDisplay from "./TimerDisplay.svelte";
   import Button from '$lib/components/Button.svelte';
   import { ArrowRightLeft, ShieldCheck, Lock, TriangleAlert } from "@lucide/svelte";
-  import { seatDisplay as seatDisplayUtil, finalsCandidates, vpOptions, translateTableState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, vpOptions, translateTableState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -75,8 +75,8 @@
   }
 
 
-  const finalsPool = $derived(finalsCandidates(tournament, standings));
-  const hasFinalsCandidate = $derived(finalsPool.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
+  const finalsQual = $derived(finalsQualification(tournament?.players ?? [], standings));
+  const hasFinalsCandidate = $derived(finalsQual.candidates.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
 </script>
 
 <div class="space-y-4">

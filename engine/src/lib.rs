@@ -263,6 +263,14 @@ mod shared {
         Ok(json::JsonValue::Array(ranked).dump())
     }
 
+    pub fn finals_qualification_json(config_json: &str) -> Result<String, EngineError> {
+        let config = json::parse(config_json)?;
+        Ok(
+            super::tournament::finals_qualification(&config["players"], &config["standings"])
+                .dump(),
+        )
+    }
+
     /// Returns `null` when the table is scorable, else `{ code, seats }` so the
     /// UI can say *why* a table won't close instead of leaving it silently unfinished.
     pub fn check_table_vps_json(config_json: &str) -> Result<String, EngineError> {
@@ -527,6 +535,14 @@ mod wasm {
         #[wasm_bindgen(js_name = computeFinalStandings)]
         pub fn compute_final_standings(&self, config_json: &str) -> Result<String, String> {
             js_str(compute_final_standings_json(config_json))
+        }
+
+        /// Every finals gate the UI draws — the candidate count, the unresolved-tie
+        /// block, the toss prompt — reads this, so the client can never offer a
+        /// finals `StartFinals` would refuse.
+        #[wasm_bindgen(js_name = finalsQualification)]
+        pub fn finals_qualification(&self, config_json: &str) -> Result<String, String> {
+            js_str(finals_qualification_json(config_json))
         }
 
         #[wasm_bindgen(js_name = checkTableVps)]

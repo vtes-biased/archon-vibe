@@ -141,14 +141,6 @@ any DQ create, lift or delete recompute standings.
 iterating standings unfiltered — league scoring and the VEKN push among them —
 leak proxy scores. Filter on `disqualified || non_competing`.
 
-**The finals candidate pool is a hand-written twin**: `finals_candidates` in
-`engine/src/tournament/standings.rs` and `finalsCandidates` in
-`tournament-utils.ts`. The frontend cannot call the engine's — the tie gates run
-inside `$derived` in a template and the WASM bridge is async — so a change to who
-may qualify has to land in both, or the UI offers a finals `StartFinals` refuses.
-Every finals gate must read the pool, never raw standings: the toss zone, the
-unresolved-tie check and the five-candidate minimum are all computed over it.
-
 **The SA −1 VP has three consumers**: preliminary standings, the rating path, and
 `SetScore`. All must share the one effective-round resolver or VP, GW and TP
 silently diverge. The resolver is Cancelled-aware — a soft-cancelled seat cannot

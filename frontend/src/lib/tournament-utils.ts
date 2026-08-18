@@ -83,42 +83,6 @@ export function vpOptions(tableSize: number, allowImpossible: boolean): number[]
   return opts;
 }
 
-/** The finals candidate pool in rank order — DQ'd, proxy and withdrawn players dropped.
- *  Twin of the engine's `finals_candidates`; every finals gate here must read it, or the
- *  toss warning and the Start Finals prompt promise a top five StartFinals will refuse. */
-export function finalsCandidates(tournament: Tournament | null, standings: StandingEntry[]): StandingEntry[] {
-  const withdrawn = new Set(
-    (tournament?.players ?? []).filter(p => p.state === "Finished" && p.user_uid).map(p => p.user_uid!)
-  );
-  return standings.filter(s => !s.disqualified && !s.non_competing && !withdrawn.has(s.user_uid));
-}
-
-/** Takes the candidate pool. Only the five qualifying ranks must be total — two
- *  candidates tied below fifth share no seat and never block the finals. */
-export function top5HasTies(candidates: StandingEntry[]): boolean {
-  if (candidates.length < 5) return false;
-  const tied = (a: StandingEntry, b: StandingEntry) =>
-    a.gw === b.gw && a.vp === b.vp && a.tp === b.tp && a.toss === b.toss;
-  for (let i = 0; i < 5; i++) {
-    for (let j = i + 1; j < 5; j++) {
-      if (tied(candidates[i]!, candidates[j]!)) return true;
-    }
-  }
-  return candidates.slice(5).some(s => tied(s, candidates[4]!));
-}
-
-/** Same span, ignoring toss: the tie the organizer is asked to break. */
-export function top5HasScoreTies(candidates: StandingEntry[]): boolean {
-  if (candidates.length < 5) return false;
-  const tied = (a: StandingEntry, b: StandingEntry) => a.gw === b.gw && a.vp === b.vp && a.tp === b.tp;
-  for (let i = 0; i < 5; i++) {
-    for (let j = i + 1; j < 5; j++) {
-      if (tied(candidates[i]!, candidates[j]!)) return true;
-    }
-  }
-  return candidates.slice(5).some(s => tied(s, candidates[4]!));
-}
-
 /** Preliminary entries come from rounds (or synced/imported standings when there are no rounds); the
  * engine assigns final placement. Pure over `tournament` — callers must re-run when WASM finishes loading. */
 export function computeStandings(tournament: Tournament | null): StandingEntry[] {

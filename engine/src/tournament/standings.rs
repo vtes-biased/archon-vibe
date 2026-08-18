@@ -108,8 +108,14 @@ pub(super) fn compute_preliminary_standings(
         })
         .collect();
 
-    // user_uid is a deterministic tiebreak: without it, players tied on (gw, vp, tp,
-    // toss) come out in nondeterministic HashMap order. Toss only orders finals candidates.
+    sort_by_rank(&mut standings);
+    standings
+}
+
+/// GW > VP > TP > toss, DQ'd and proxies parked last. user_uid is a deterministic
+/// terminal tiebreak: without it, players tied on all five come out in
+/// nondeterministic HashMap order. Toss only ever orders finals candidates.
+fn sort_by_rank(standings: &mut [Standing]) {
     standings.sort_by(|a, b| {
         (a.disqualified || a.non_competing)
             .cmp(&(b.disqualified || b.non_competing))
@@ -119,8 +125,6 @@ pub(super) fn compute_preliminary_standings(
             .then(b.toss.cmp(&a.toss))
             .then(a.user_uid.cmp(&b.user_uid))
     });
-
-    standings
 }
 
 /// Guard: skips when rounds are empty, preserving VEKN-synced standings.
@@ -334,7 +338,7 @@ pub(super) fn scores_tied(a: &Standing, b: &Standing) -> bool {
 /// read the same list: a toss computed over raw standings orders a top five the
 /// finals never uses, and the tie it leaves standing cannot be broken by re-running.
 pub(super) fn finals_candidates<'a>(
-    tournament: &JsonValue,
+    players: &JsonValue,
     standings: &'a [Standing],
 ) -> Vec<&'a Standing> {
     standings
@@ -343,7 +347,7 @@ pub(super) fn finals_candidates<'a>(
             // `disqualified` carries the dual DQ signal (state OR active
             // sanction); reuse it so eligibility can't diverge. Completed
             // (capped) stays eligible, Finished (withdrawn) is dropped.
-            let ps = tournament["players"]
+            let ps = players
                 .members()
                 .find(|p| p["user_uid"].as_str() == Some(&s.user_uid))
                 .and_then(|p| p["state"].as_str())
@@ -353,9 +357,10 @@ pub(super) fn finals_candidates<'a>(
         .collect()
 }
 
-/// End of the span `RandomToss` must order: the top five, extended over everyone
-/// tied with fifth on score, since any of them may take the last seat.
-pub(super) fn top5_tie_zone_end(candidates: &[&Standing]) -> usize {
+/// The score-tied groups `RandomToss` must order, as ranges into the candidate pool:
+/// the top five, extended over everyone tied with fifth since any of them may take
+/// the last seat.
+pub(super) fn toss_groups(candidates: &[&Standing]) -> Vec<std::ops::Range<usize>> {
     let cutoff = candidates.len().min(5);
     let mut end = cutoff;
     if cutoff > 0 {
@@ -364,7 +369,19 @@ pub(super) fn top5_tie_zone_end(candidates: &[&Standing]) -> usize {
             end += 1;
         }
     }
-    end
+    let mut groups = Vec::new();
+    let mut i = 0;
+    while i < end {
+        let mut j = i + 1;
+        while j < end && scores_tied(candidates[j], candidates[i]) {
+            j += 1;
+        }
+        if j - i > 1 {
+            groups.push(i..j);
+        }
+        i = j;
+    }
+    groups
 }
 
 /// Whether a score-tied group is already ordered — every member holding a distinct
@@ -379,6 +396,39 @@ pub(super) fn tosses_are_total(group: &[&Standing]) -> bool {
         seen.push(s.toss);
     }
     true
+}
+
+/// What a client must know before offering a finals action: who may qualify, whether
+/// a toss is still owed, and whom that toss would touch. `standings` carries the
+/// engine-computed preliminary rows, `players` supplies the state the rows do not.
+pub fn finals_qualification(players: &JsonValue, standings: &JsonValue) -> JsonValue {
+    let mut rows: Vec<Standing> = standings
+        .members()
+        .map(|s| Standing {
+            user_uid: s["user_uid"].as_str().unwrap_or("").to_string(),
+            gw: s["gw"].as_f64().unwrap_or(0.0),
+            vp: s["vp"].as_f64().unwrap_or(0.0),
+            tp: s["tp"].as_f64().unwrap_or(0.0),
+            toss: s["toss"].as_u32().unwrap_or(0),
+            finalist: s["finalist"].as_bool().unwrap_or(false),
+            disqualified: s["disqualified"].as_bool().unwrap_or(false),
+            non_competing: s["non_competing"].as_bool().unwrap_or(false),
+        })
+        .collect();
+    sort_by_rank(&mut rows);
+    let candidates = finals_candidates(players, &rows);
+
+    let tied: Vec<JsonValue> = toss_groups(&candidates)
+        .into_iter()
+        .flat_map(|g| candidates[g].iter().map(|s| s.user_uid.as_str().into()))
+        .collect();
+    json::object! {
+        candidates: JsonValue::Array(
+            candidates.iter().map(|s| s.user_uid.as_str().into()).collect()
+        ),
+        has_ties: top5_has_ties(&candidates),
+        tied_uids: JsonValue::Array(tied),
+    }
 }
 
 /// Takes the finals candidate pool. Only the five qualifying ranks must be total:

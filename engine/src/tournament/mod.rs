@@ -13,7 +13,7 @@ mod tests;
 mod types;
 
 pub use scoring::{check_table_vps, compute_gw, compute_gw_finals, compute_tp};
-pub use standings::{compute_final_standings, compute_rating_vp_gw};
+pub use standings::{compute_final_standings, compute_rating_vp_gw, finals_qualification};
 pub use types::{ActorContext, PlayerState, SeatScore, TournamentEvent, TournamentState, VpError};
 
 use crate::error::EngineError;
@@ -26,8 +26,8 @@ use helpers::{
 use raffle::{compute_deck_public, get_raffle_pool};
 use sanctions::{has_active_suspension, has_dq_sanction, table_sa_adjustments};
 use standings::{
-    compute_preliminary_standings, finals_candidates, scores_tied, top5_has_ties,
-    top5_tie_zone_end, tosses_are_total, update_standings,
+    compute_preliminary_standings, finals_candidates, top5_has_ties, toss_groups, tosses_are_total,
+    update_standings,
 };
 
 /// Shared between `UpdateConfig` and `CreateTournament`.
@@ -1903,8 +1903,7 @@ fn apply_event(
             }
 
             let standings = compute_preliminary_standings(tournament, sanctions);
-            let candidates = finals_candidates(tournament, &standings);
-            let zone_end = top5_tie_zone_end(&candidates);
+            let candidates = finals_candidates(&tournament["players"], &standings);
 
             // The client applies this event through WASM before the server replays it,
             // so the shuffle must be a pure function of the tournament — an OS random
@@ -1916,31 +1915,25 @@ fn apply_event(
                 .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
 
             let mut toss_counter: u32 = 1;
-            let mut i = 0;
-            while i < zone_end {
-                let mut j = i + 1;
-                while j < zone_end && scores_tied(candidates[j], candidates[i]) {
-                    j += 1;
+            for group in toss_groups(&candidates) {
+                let mut shuffled: Vec<&standings::Standing> = candidates[group.clone()].to_vec();
+                if tosses_are_total(&shuffled) {
+                    continue;
                 }
-                let group = &candidates[i..j];
-                if group.len() > 1 && !tosses_are_total(group) {
-                    let mut shuffled: Vec<&standings::Standing> = group.to_vec();
-                    let mut rng = seed.wrapping_add(i as u64);
-                    for k in (1..shuffled.len()).rev() {
-                        rng = rng
-                            .wrapping_mul(6364136223846793005)
-                            .wrapping_add(1442695040888963407);
-                        let swap_idx = (rng >> 33) as usize % (k + 1);
-                        shuffled.swap(k, swap_idx);
-                    }
-                    for s in shuffled {
-                        if let Some(pi) = find_player_index(&tournament["players"], &s.user_uid) {
-                            tournament["players"][pi]["toss"] = toss_counter.into();
-                        }
-                        toss_counter += 1;
-                    }
+                let mut rng = seed.wrapping_add(group.start as u64);
+                for k in (1..shuffled.len()).rev() {
+                    rng = rng
+                        .wrapping_mul(6364136223846793005)
+                        .wrapping_add(1442695040888963407);
+                    let swap_idx = (rng >> 33) as usize % (k + 1);
+                    shuffled.swap(k, swap_idx);
                 }
-                i = j;
+                for s in shuffled {
+                    if let Some(pi) = find_player_index(&tournament["players"], &s.user_uid) {
+                        tournament["players"][pi]["toss"] = toss_counter.into();
+                    }
+                    toss_counter += 1;
+                }
             }
 
             Ok(())
@@ -1957,7 +1950,7 @@ fn apply_event(
             }
 
             let standings = compute_preliminary_standings(tournament, sanctions);
-            let eligible = finals_candidates(tournament, &standings);
+            let eligible = finals_candidates(&tournament["players"], &standings);
 
             if eligible.len() < 5 {
                 return Err(EngineError::FinalsNotEnoughPlayers);

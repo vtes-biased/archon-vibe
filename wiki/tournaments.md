@@ -276,10 +276,13 @@ Organizers must drop unavailable finalists before launching.
 
 `finals_candidates` is the one definition of who may qualify: `Disqualified` and
 `Finished` (withdrawn) players are dropped and the next-ranked qualifier promoted,
-`Completed` (capped) players stay eligible, non-competing proxies never enter.
-`RandomToss`, `StartFinals` and the frontend's finals gates all read it — a toss
-computed over raw standings orders a top five the finals never uses, and leaves a
-tie no re-run can break.
+`Completed` (capped) players stay eligible, non-competing proxies never enter. A
+toss computed over raw standings instead orders a top five the finals never uses,
+and leaves a tie no re-run can break.
+
+The client reads the same pool over the `finalsQualification` WASM export, which
+answers who may qualify, whether a toss is still owed and whom it would touch —
+the three things every finals control in the UI is drawn from.
 
 `RandomToss` orders **every** tied group inside the qualifying five, not only the
 one straddling the cutoff: §3.1 resolves ties for any of the top five rankings, and
