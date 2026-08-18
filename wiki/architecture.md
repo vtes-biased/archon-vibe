@@ -371,8 +371,11 @@ remaining time; the monotonic clock serves only as a divergence watchdog.
 The rules put a **two-hour floor** on a round
 ([§3.1.1](domain/tournament-rules.md#round-structure)), and a round shorter than
 that unsanctions the event if any table ends on time being called
-([JG §5.2](domain/judging.md#event-organization-5)). The app does not check the
-configured value against that floor today.
+([JG §5.2](domain/judging.md#event-organization-5)). The floor is enforced by
+construction, not validated: the round and finals pickers offer only *no timer*
+and 2h–3h in quarter-hour steps, so a sub-floor value is unreachable from the UI.
+It is a hard block rather than a warning because a called time on a short round
+unsanctions the event outright — that is not a trade-off left to the organizer.
 
 `TimerState` is `started_at` (UTC, when started or resumed),
 `elapsed_before_pause` (seconds) and `paused`. The tournament carries
