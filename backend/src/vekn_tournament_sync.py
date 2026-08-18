@@ -35,7 +35,7 @@ from .models import (
     TournamentState,
     User,
 )
-from .vekn_api import VEKNAPIClient
+from .vekn_api import PLACEHOLDER_VENUE_ID, VEKNAPIClient
 
 logger = logging.getLogger(__name__)
 
@@ -385,6 +385,17 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
 
         try:
             venue_id = str(event_data.get("venue_id") or "")
+            # An event we filed ourselves carries the placeholder venue, which
+            # answers for no place: drop it so the app's own location stands.
+            placeholder_venue = venue_id == str(PLACEHOLDER_VENUE_ID)
+            if placeholder_venue:
+                venue_id = ""
+                event_data = {
+                    **event_data,
+                    "venue_name": "",
+                    "venue_country": "",
+                    "venue_city": "",
+                }
             if venue_id and venue_id not in venue_cache:
                 venue_cache[venue_id] = await client.fetch_venue(venue_id)
             venue_data = venue_cache.get(venue_id, {})
@@ -411,6 +422,16 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                     tx_conn,
                 ):
                     existing = existing or existing_ref  # hard-deleted between reads
+                    if placeholder_venue:
+                        tournament = msgspec.structs.replace(
+                            tournament,
+                            country=existing.country,
+                            timezone=existing.timezone,
+                            venue=existing.venue,
+                            venue_url=existing.venue_url,
+                            address=existing.address,
+                            map_url=existing.map_url,
+                        )
                     merged_organizers = list(
                         dict.fromkeys(
                             existing.organizers_uids + tournament.organizers_uids

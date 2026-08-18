@@ -47,6 +47,11 @@ VEKN_MESSAGES = {
     "PLG_API_VEKN_UNSUPPORTED_METHOD_POST": "Unsupported method,please use get method",
 }
 
+# VEKN's venue resource rejects POST, so an in-person event we create is filed
+# against this generic stand-in — a venue in AQ that describes no real place.
+PLACEHOLDER_VENUE_ID = 9999
+PLACEHOLDER_VENUE_NAME = "Check on Archon"
+
 
 class VEKNAPIError(Exception):
     """VEKN API error (default: a per-item/data error — bad VEKN id, parse error)."""
