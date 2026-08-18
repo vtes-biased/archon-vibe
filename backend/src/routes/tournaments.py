@@ -26,6 +26,7 @@ from ..db import (
     allocate_next_vekn_id,
     compute_access_version,
     delete_banner,
+    ensure_event_code,
     get_all_leagues,
     get_auth_method_by_identifier,
     get_banner,
@@ -282,6 +283,14 @@ async def _maybe_push_vekn_event(tournament: Tournament) -> None:
                 await push_tournament_event(client, tournament)
     except Exception:
         logger.exception("Failed to push VEKN event")
+    # After the attempt, never before: a successful push writes the vekn event id
+    # this event should carry as its handle, and the handle is written once.
+    try:
+        bd = await ensure_event_code(tournament.uid)
+        if bd is not None:
+            broadcast_precomputed(bd)
+    except Exception:
+        logger.exception("Failed to stamp event code")
 
 
 async def _winner_deck_twda(tournament: Tournament) -> str | None:
@@ -392,8 +401,8 @@ async def maybe_submit_twda(tournament: Tournament) -> None:
         != "eligible"
     ):
         outcome = (TwdaOutcome.SKIPPED, "unranked", "")
-    elif not tournament.external_ids.get("vekn"):
-        outcome = (TwdaOutcome.SKIPPED, "no_vekn_event", "")
+    elif not tournament.event_code:
+        outcome = (TwdaOutcome.SKIPPED, "no_event_code", "")
     elif not is_configured():
         outcome = (TwdaOutcome.SKIPPED, "not_configured", "")
     else:
@@ -403,7 +412,7 @@ async def maybe_submit_twda(tournament: Tournament) -> None:
                 outcome = (TwdaOutcome.SKIPPED, "no_deck", "")
             else:
                 pr_url = await submit_twda_pr(
-                    tournament.external_ids["vekn"], deck_text, tournament.name
+                    tournament.event_code, deck_text, tournament.name
                 )
                 if pr_url:
                     outcome = (TwdaOutcome.SUBMITTED, "", pr_url)
@@ -2544,8 +2553,8 @@ async def go_online(
                 broadcast_precomputed(bd)
         except Exception as e:
             logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
-        # Mirrors the finish action's TWDA attempt; usually skips on no_vekn_event
-        # here, and batch_push retries after it creates the event.
+        # Mirrors the finish action's TWDA attempt; skips on no_event_code only in
+        # the window before the creation path stamps one.
         asyncio.create_task(maybe_submit_twda(updated))
 
     # Outcome summary closes the loop the go-offline modal opens: each created

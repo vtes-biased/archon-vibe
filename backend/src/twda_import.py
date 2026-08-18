@@ -20,7 +20,7 @@ import aiohttp
 
 from .broadcast import broadcast_precomputed
 from .data.timezones import CITY_TZ_OVERRIDES, COUNTRY_TIMEZONE
-from .db import get_connection, save_object_from_model
+from .db import get_connection, resolve_event_code, save_object_from_model
 from .geonames import normalize_country
 from .models import (
     DeckObject,
@@ -305,7 +305,11 @@ async def run_twda_sync(
         if bulk:
             continue
         tournament = reconstructed_tournament(entry, target, now)
-        bd = await save_object_from_model(ObjectType.TOURNAMENT, tournament)
+        async with get_connection() as conn:
+            tournament.event_code = await resolve_event_code(tournament, conn)
+            bd = await save_object_from_model(
+                ObjectType.TOURNAMENT, tournament, conn=conn
+            )
         if broadcast:
             broadcast_precomputed(bd)
         resolved[entry_id] = (tournament.uid, target)

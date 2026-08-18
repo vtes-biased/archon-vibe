@@ -296,6 +296,12 @@ export function playedPlayerUids(tournament: Tournament): Set<string> {
  * (`user.wins`, member-level) — only the cutoff is applied here. */
 export const HOF_MIN_WINS = 5;
 
+/** Outward-facing link to an event. The uid form stays valid forever, so it is
+ * the fallback for the window before the code is stamped — never a wait. */
+export function eventUrl(baseUrl: string, t: { uid: string; event_code?: string }): string {
+  return t.event_code ? `${baseUrl}/t/${t.event_code}` : `${baseUrl}/tournaments/${t.uid}`;
+}
+
 export type RankedStatus =
   | { ranked: true }
   | { ranked: false; reason: "few_players" | "no_final" | "open_rounds" | "no_results" }

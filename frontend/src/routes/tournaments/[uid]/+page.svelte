@@ -12,7 +12,7 @@
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
   import { attestedPlayerCount, initEngine, rankingEligibility, validateDeck, isOrganizer as engineIsOrganizer, type TournamentEventType, type ValidationError } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
-  import { getStateTone, translateTournamentState, rankBadgeLabel, computeStandings, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { getStateTone, translateTournamentState, rankBadgeLabel, computeStandings, eventUrl, type PlayerInfoMap } from "$lib/tournament-utils";
   import { zonedDate } from "$lib/utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime, OfflineLockLostError } from "$lib/stores/offline.svelte";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
@@ -498,7 +498,7 @@ import TournamentModals from "./TournamentModals.svelte";
   }
 
   async function shareEvent() {
-    const url = `${window.location.origin}/tournaments/${uid}`;
+    const url = eventUrl(window.location.origin, { uid, event_code: tournament?.event_code });
     if (navigator.share) {
       try {
         await navigator.share({ title: tournament?.name, url });
@@ -842,6 +842,16 @@ import TournamentModals from "./TournamentModals.svelte";
                 <CalendarPlus class="w-3 h-3" aria-hidden="true" />
                 {m.tournament_add_to_calendar()}
               </a>
+            {/if}
+          </div>
+          <div>
+            <div class="text-ink-faint">{m.tournament_info_code()}</div>
+            {#if tournament.event_code}
+              <div class="text-ink-bright font-mono">{tournament.event_code}</div>
+            {:else}
+              <!-- Assigned once the VEKN push resolves, so this can linger for a
+                   minute when vekn.net is slow. Nothing waits on it. -->
+              <div class="text-ink-faint italic">{m.tournament_info_code_pending()}</div>
             {/if}
           </div>
           <div>

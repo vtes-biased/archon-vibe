@@ -305,6 +305,34 @@ async def run_oauth_cleanup() -> None:
         logger.error(f"Error during cleanup: {e}", exc_info=True)
 
 
+_MAX_EVENT_CODE_STAMPS = 100
+
+
+async def _stamp_missing_event_codes() -> None:
+    """A restart between a tournament's insert and the task that stamps its handle
+    would leave it with none, permanently. Capped like the TWDA reconstruction:
+    over the cap this is a corpus that needs `backfill_event_codes.py`, not a
+    startup path minting thousands of codes before the app answers."""
+    from .db import ensure_event_code, tournament_uids_without_event_code
+
+    try:
+        uids = await tournament_uids_without_event_code()
+        if not uids:
+            return
+        if len(uids) > _MAX_EVENT_CODE_STAMPS:
+            logger.warning(
+                f"{len(uids)} tournaments have no event code — over the "
+                f"{_MAX_EVENT_CODE_STAMPS} startup cap. Run "
+                "backend/scripts/backfill_event_codes.py"
+            )
+            return
+        for uid in uids:
+            await ensure_event_code(uid)
+        logger.info(f"Stamped event codes on {len(uids)} tournaments")
+    except Exception:
+        logger.exception("Failed to stamp missing event codes")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     global _scheduler, _sync_service, _shutdown_event
@@ -330,6 +358,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _shutdown_event = asyncio.Event()
     _install_fast_shutdown_signals()
     await init_db()
+    await _stamp_missing_event_codes()
 
     if os.getenv("DISCORD_CLIENTID"):
         try:
@@ -574,6 +603,23 @@ async def tournament_og_stub(uid: str, request: Request) -> Response:
     host = request.headers.get("host") or request.url.netloc
     pub = await get_tournament_public_projection(uid)
     html = render_og_html(f"{proto}://{host}", uid, pub)
+    return Response(content=html, media_type="text/html")
+
+
+@app.get("/t/{code}")
+async def tournament_code_og_stub(code: str, request: Request) -> Response:
+    """Same crawler-only UA-split as the uid stub, for the short link — which is
+    the form actually pasted into chat, so it is the one that needs the card."""
+    from .db import get_tournament_by_event_code
+    from .og import render_og_html
+
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("host") or request.url.netloc
+    tournament = await get_tournament_by_event_code(code)
+    pub = await get_tournament_public_projection(tournament.uid) if tournament else None
+    html = render_og_html(
+        f"{proto}://{host}", tournament.uid if tournament else "", pub
+    )
     return Response(content=html, media_type="text/html")
 
 

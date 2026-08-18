@@ -531,6 +531,45 @@ text with deck info, from the finished-tournament views. The player-facing
 copy-results action shares text plus the link only, with no image generation of
 its own — the OG stub below already turns the shared link into the picture card.
 
+### The short event code
+
+`Tournament.event_code` is the event's permanent public handle, public projection,
+resolved at `/t/{code}`. A `uid` is 36 characters and unsayable, and the identifier
+that has served that role — the VEKN event id, which names the TWDA file, the forum
+post and the vekn.net URL — dies with the
+[decommission](vekn-decommission.md).
+
+**It is the identifier the outside world already uses**, by a precedence evaluated
+**once**: `external_ids['vekn']`, then `external_ids['twda']` — the archive's own
+key, a slug like `2010czechecq` on all but 14 reconstructions, and the name of the
+file the TWDA publishes — then a minted 6-character Crockford base32 code, never
+all digits so it cannot read as a vekn id. So the numbers and slugs already cited
+by 4538 archive entries keep resolving against us.
+
+**Never rewritten.** An event that mints its own code and later gains a vekn id
+keeps the minted one: rewriting would move a published TWDA branch and break every
+link already shared. Any path that rebuilds a tournament row must carry it over
+explicitly, exactly like `checkin_code` — the VEKN sync's rebuild does.
+
+Assignment waits on the VEKN calendar push that `POST /api/tournaments` already
+fires, since a successful push is what supplies the vekn id the event should carry
+(`_maybe_push_vekn_event`). Every other ingress knows its answer at insert and
+stamps inline. A row that reaches neither — a restart in between — is swept at
+startup, capped at 100, over which it names `backfill_event_codes.py` rather than
+minting a corpus before the app answers. Uniqueness is a unique index on
+`lower(event_code)` spanning soft-deleted rows, so a code is never reissued and a
+mint collision is simply retried.
+
+Resolution is case-insensitive and falls back to `external_ids['vekn']` on a miss,
+which covers an event whose vekn id arrived after its code was minted. The fallback
+can never shadow a code, since a hit on the code ends the lookup.
+
+`/t/{code}` redirects to `/tournaments/{uid}`: the uid route reads `params.uid`
+throughout, and the uid form can never be retired anyway — it is in the TWDA, in
+push notifications, in every link shared to date, and it is the only form an
+offline-created event has before it syncs. Everything outward-facing emits the
+short form when there is one and the uid form otherwise, never a wait.
+
 **Open Graph stubs.** Social link-preview crawlers don't run JavaScript, so they
 would always see the static SPA shell with the site-wide `og:image`. nginx
 UA-splits `/tournaments/{uid}`: humans get the static SPA (SW-cacheable,
@@ -546,7 +585,8 @@ and prod both render. An unlisted crawler gets the generic site-wide card.
 
 `/tournaments/{uid}` is **not** in the proxied-prefix allowlist — it is served
 statically for humans and reaches FastAPI only through the named-location bot
-proxy.
+proxy. `/t/{code}` works the same way, and both stubs canonicalise on the short
+form where the event has one, so the two URLs do not read as two pages.
 
 ### Account surgery
 

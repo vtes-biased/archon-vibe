@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import os
+import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
@@ -1004,6 +1005,26 @@ async def soft_delete_tournament(
     return tournament, bds
 
 
+async def get_tournament_by_event_code(code: str) -> Tournament | None:
+    """Resolve a short code, then a vekn event id on a miss.
+
+    The fallback covers the events whose vekn id arrived after their code was
+    minted — a push that failed at creation and succeeded on a later batch. It
+    can never shadow a real code, since a hit on the code column ends the lookup.
+    """
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT "full" FROM objects
+            WHERE type = 'tournament' AND deleted_at IS NULL
+              AND lower("full"->>'event_code') = lower(%s) LIMIT 1""",
+            (code,),
+        )
+        row = await result.fetchone()
+        if row:
+            return decode_json(row[0], Tournament)
+    return await get_tournament_by_external_id("vekn", code)
+
+
 async def get_tournament_by_external_id(
     platform: str, ext_id: str
 ) -> Tournament | None:
@@ -1024,6 +1045,71 @@ async def get_tournament_by_external_id(
         if row:
             return decode_json(row[0], Tournament)
         return None
+
+
+# Crockford base32: no I/L/O/U, so nothing decodes two ways when read aloud.
+_EVENT_CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
+async def _event_code_taken(code: str, conn: psycopg.AsyncConnection) -> bool:
+    result = await conn.execute(
+        """SELECT 1 FROM objects
+        WHERE type = 'tournament' AND lower("full"->>'event_code') = lower(%s)
+        LIMIT 1""",
+        (code,),
+    )
+    return await result.fetchone() is not None
+
+
+async def resolve_event_code(
+    tournament: Tournament, conn: psycopg.AsyncConnection
+) -> str:
+    """The event's permanent public handle, decided once and never revisited.
+
+    Prefers the identifier the outside world already cites — the vekn event id,
+    then the archive's own key, which is what names the TWDA file — so a record
+    published before us keeps resolving after vekn.net is gone. A taken candidate
+    falls through to a mint rather than failing the save: the unique index is the
+    guarantee, and the 14 numeric archive keys are vekn event ids that a row we
+    already hold may carry.
+    """
+    for candidate in (
+        tournament.external_ids.get("vekn"),
+        tournament.external_ids.get("twda"),
+    ):
+        if candidate and not await _event_code_taken(candidate, conn):
+            return candidate
+    for _ in range(20):
+        code = "".join(secrets.choice(_EVENT_CODE_ALPHABET) for _ in range(6))
+        # An all-digit mint would read as a vekn event id it is not.
+        if code.isdigit():
+            continue
+        if not await _event_code_taken(code, conn):
+            return code
+    raise RuntimeError("event code space exhausted")
+
+
+async def ensure_event_code(uid: str) -> BroadcastData | None:
+    """Stamp the handle on a row that has none. Returns None when it already had
+    one — the code is written once, so this can never overwrite."""
+    async with tournament_transaction(uid) as (fresh, tx_conn):
+        if not fresh or fresh.event_code:
+            return None
+        fresh.event_code = await resolve_event_code(fresh, tx_conn)
+        fresh.modified = datetime.now(UTC)
+        return await save_tournament(fresh, conn=tx_conn)
+
+
+async def tournament_uids_without_event_code() -> list[str]:
+    """Live rows a creation path never got to stamp — a restart between the insert
+    and the push task. Without the sweep they would have no handle at all."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT uid FROM objects
+            WHERE type = 'tournament' AND deleted_at IS NULL
+              AND coalesce("full"->>'event_code', '') = ''"""
+        )
+        return [row[0] for row in await result.fetchall()]
 
 
 # Same-event matcher for two import paths with no shared key. Name+day is NOT

@@ -1,6 +1,6 @@
 import type { Tournament, Deck, DeckObject, VtesCard } from "$lib/types";
 import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
-import { seatDisplay } from "$lib/tournament-utils";
+import { eventUrl, seatDisplay } from "$lib/tournament-utils";
 import { formatScore } from "$lib/utils";
 import { getCountry } from "$lib/geonames";
 import { getCards } from "$lib/cards";
@@ -133,7 +133,7 @@ export async function generateResultsText(
   }
 
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://archon.vekn.net";
-  lines.push(`${baseUrl}/tournaments/${tournament.uid}`);
+  lines.push(eventUrl(baseUrl, tournament));
 
   return lines.join("\n");
 }

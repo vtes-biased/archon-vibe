@@ -18,7 +18,6 @@ interface ArchonDB extends DBSchema {
     value: User;
     indexes: {
       'by-name': string;
-      'by-country-name': [string, string];
     };
   };
   sanctions: {
@@ -37,6 +36,8 @@ interface ArchonDB extends DBSchema {
       'by-start': string;
       'by-country': string;
       'by-format': string;
+      'by-code': string;
+      'by-vekn': string;
     };
   };
   decks: {
@@ -71,7 +72,7 @@ interface ArchonDB extends DBSchema {
 
 let dbPromise: Promise<IDBPDatabase<ArchonDB>> | null = null;
 
-const DB_VERSION = 16;
+const DB_VERSION = 17;
 
 type UpgradeTx = IDBPTransaction<ArchonDB, ArrayLike<StoreNames<ArchonDB>>, 'versionchange'>;
 
@@ -195,7 +196,6 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
 
       const userStore = db.createObjectStore('users', { keyPath: 'uid' });
       userStore.createIndex('by-name', 'name');
-      userStore.createIndex('by-country-name', ['country', 'name']);
 
       const sanctionStore = db.createObjectStore('sanctions', { keyPath: 'uid' });
       sanctionStore.createIndex('by-user', 'user_uid');
@@ -206,6 +206,8 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
       tournamentStore.createIndex('by-start', 'start');
       tournamentStore.createIndex('by-country', 'country');
       tournamentStore.createIndex('by-format', 'format');
+      tournamentStore.createIndex('by-code', 'event_code');
+      tournamentStore.createIndex('by-vekn', 'external_ids.vekn');
 
       const deckStore = db.createObjectStore('decks', { keyPath: 'uid' });
       deckStore.createIndex('by-tournament', 'tournament_uid');
@@ -596,6 +598,20 @@ export async function userHasPastSanctions(userUid: string): Promise<boolean> {
 export async function getTournament(uid: string): Promise<Tournament | undefined> {
   const db = await getDB();
   return db.get('tournaments', uid);
+}
+
+export async function getTournamentByCode(code: string): Promise<Tournament | undefined> {
+  const db = await getDB();
+  // An IDB index matches the stored bytes, so the case-insensitive resolve the
+  // server does in SQL becomes three exact probes here — the three shapes a code
+  // ever takes. The `by-vekn` probe covers an event whose vekn id arrived after
+  // its code was minted, and can never shadow a code: it runs only on a miss.
+  for (const variant of [code, code.toUpperCase(), code.toLowerCase()]) {
+    const hit = await db.getFromIndex('tournaments', 'by-code', variant);
+    if (hit && !hit.deleted_at) return hit;
+  }
+  const byVekn = await db.getFromIndex('tournaments', 'by-vekn', code);
+  return byVekn && !byVekn.deleted_at ? byVekn : undefined;
 }
 
 export async function getAllTournaments(): Promise<Tournament[]> {

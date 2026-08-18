@@ -61,6 +61,9 @@ def _tournament(winner_uid: str, *, seated: int = TWDA_MIN_PLAYERS) -> Tournamen
         state=TournamentState.FINISHED,
         start=datetime(2025, 6, 1, tzinfo=UTC),
         external_ids={"vekn": "12345"},
+        # What the backfill leaves on a vekn-bearing row: the submission keys on
+        # the code, and the code of such a row is its vekn event id.
+        event_code="12345",
         winner=winner_uid,
         rounds=_finished_rounds(player_uids),
     )

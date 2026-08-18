@@ -460,18 +460,17 @@ Minimal indexes only:
 
 | Store | Indexes |
 |---|---|
-| users | `by-name`, `by-country-name` |
+| users | `by-name` |
 | sanctions | `by-user`, `by-tournament` |
-| tournaments | `by-state`, `by-start`, `by-country`, `by-format` |
+| tournaments | `by-state`, `by-start`, `by-country`, `by-format`, `by-code`, `by-vekn` |
 | decks | `by-tournament`, `by-user` |
 | leagues | `by-country`, `by-start` |
 | promos | none — small catalog |
 
-Deferred, on the trigger "next `DB_VERSION` bump": drop `users.by-country-name`,
-which has no consumers — removing an index forces a full client resync, so it
-rides a bump rather than forcing its own. `decks.by-user` is likewise unconsumed
-today; drop it in the same bump unless a consumer has appeared (the Hall of Fame
-work plans one). Update this table in the same change.
+`tournaments.by-code` and `by-vekn` resolve a [short event link](architecture.md#the-short-event-code)
+without a `getAll()` scan of the corpus, which is what the arrival path from a
+shared link would otherwise pay. `decks.by-user` earned its keep when a member
+profile started listing decklists.
 
 A generic `ObjectSpec` array (`SPECS`) handles all types uniformly in the sync
 manager, and a single `isSynced` flag tracks state.

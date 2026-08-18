@@ -116,11 +116,16 @@ def render_og_html(base_url: str, uid: str, pub: dict | None) -> str:
     """`base_url` must be absolute (scheme://host) — og:image requires it for
     crawlers. `pub` is None or deleted → site-wide card, never an error."""
     title, description, banner = SITE_TITLE, SITE_DESCRIPTION, None
+    # Both stubs canonicalise on the short form where there is one, so the two
+    # URLs for the same event do not read as two pages.
+    path = f"/tournaments/{uid}"
     if pub and not pub.get("deleted_at"):
         title = pub.get("name") or SITE_TITLE
         description = _description(pub)
         banner = pub.get("banner_path")
-    return _render_stub(base_url, f"/tournaments/{uid}", title, description, banner)
+        if pub.get("event_code"):
+            path = f"/t/{pub['event_code']}"
+    return _render_stub(base_url, path, title, description, banner)
 
 
 def render_league_og_html(

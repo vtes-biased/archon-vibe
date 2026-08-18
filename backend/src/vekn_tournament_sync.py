@@ -15,6 +15,7 @@ from .db import (
     find_same_event_tournaments,
     get_connection,
     get_tournament_by_external_id,
+    resolve_event_code,
     save_tournament,
     tournament_transaction,
 )
@@ -518,6 +519,9 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                                 # A fresh Tournament's default_factory code would
                                 # break an already-printed QR.
                                 checkin_code=existing.checkin_code,
+                                # Written once by contract: a rebuild that let it
+                                # default would orphan every published short link.
+                                event_code=existing.event_code,
                                 twda_status=existing.twda_status,  # not derivable from VEKN
                                 # archon-only knowledge — dropping it nulls the league
                                 # link on every rebuild of a round-less event.
@@ -531,6 +535,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                     broadcast_precomputed(bd)
             else:
                 async with get_connection() as conn:
+                    tournament.event_code = await resolve_event_code(tournament, conn)
                     bd = await save_tournament(tournament, conn=conn)
                 broadcast_precomputed(bd)
                 stats["created"] += 1

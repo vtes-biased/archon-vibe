@@ -230,7 +230,8 @@ Manual triggers: `POST /admin/sync-vekn` (members and tournaments),
 
 `twda.py` opens or updates a GitHub pull request against the
 [TWDA repo](https://github.com/GiottoVerducci/TWD), idempotent on branch
-`archon/{vekn_event_id}` and file `decks/{id}.txt`, create-or-update. Five triggers
+`archon/{event_code}` and file `decks/{event_code}.txt`, create-or-update, with the
+short event link in the PR body. Five triggers
 fire it: the finish action; a winner-deck upsert on an already-finished tournament,
 by an organizer or by the winner adding their *first* deck, so late uploads and
 post-event edits reach the archive; the manual organizer publish; the batch after a
@@ -243,7 +244,7 @@ Every attempt records its outcome on `Tournament.twda_status`: `submitted` with 
 PR URL, `skipped` with a reason code — no winner, Limited format (draft and sealed
 decks aren't archived), fewer than 10 players played, unranked per the engine's
 `ranking_eligibility` (the same predicate as the ranked badge — the championship
-rank axis never gates TWDA), no VEKN event id, GitHub App unconfigured, or the
+rank axis never gates TWDA), no event code yet, GitHub App unconfigured, or the
 winner has no deck — or `failed`. It is organizer/full projection only and shows as
 a status line on the finished-tournament organizer view.
 

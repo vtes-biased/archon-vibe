@@ -124,6 +124,7 @@ _TOURNAMENT_PUBLIC_FIELDS = {
     "map_url",
     "description",
     "external_ids",  # public ids only (vekn event, legacy archon uid)
+    "event_code",  # an anonymous visitor following a short URL must resolve it
     "proxies",
     "multideck",
     "decklist_required",

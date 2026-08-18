@@ -497,6 +497,10 @@ class Tournament(TournamentConfig, kw_only=True):
     # just the path.
     banner_path: str | None = None
     external_ids: dict[str, str] = msgspec.field(default_factory=dict)  # platform: id
+    # The event's permanent public handle. Written once and never rewritten: a
+    # published TWDA branch and every shared short link key on it. Not
+    # `checkin_code`, which is a capability token — publishing it grants check-in.
+    event_code: str = ""
     checkin_code: str = msgspec.field(default_factory=lambda: secrets.token_urlsafe(16))
     players: list[Player] = msgspec.field(default_factory=list)
     rounds: list[list[Table]] = msgspec.field(default_factory=list)

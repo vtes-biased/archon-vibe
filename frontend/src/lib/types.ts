@@ -338,6 +338,7 @@ export interface Tournament extends BaseObject {
 
   // Full data (varies by level)
   external_ids?: Record<string, string>;
+  event_code?: string;
   vekn_pushed_at?: string | null;
   vekn_results_stale?: boolean; // results diverged after the write-once VEKN push
   // Last TWDA auto-submission outcome (organizer projection only)

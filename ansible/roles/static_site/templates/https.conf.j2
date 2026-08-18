@@ -77,6 +77,14 @@ server {
   # Humans get the static SPA shell; social crawlers are proxied to FastAPI's
   # og stubs instead, since they don't run JS. `if`+`return` is the safe escape
   # from a location (NOT proxy_pass inside if); @og_stub does the actual proxy.
+  # The short event link — the form actually pasted into chat, so it needs the
+  # card as much as the uid form. Codes are alphanumeric, never a uuid.
+  location ~ ^/t/[0-9a-zA-Z]+$ {
+    error_page 418 = @og_stub;
+    if ($is_social_bot) { return 418; }
+    try_files $uri $uri.html /200.html;
+    add_header Cache-Control "public, must-revalidate, max-age=0";
+  }
   location ~ ^/(tournaments|leagues)/[0-9a-fA-F-]+$ {
     error_page 418 = @og_stub;
     if ($is_social_bot) { return 418; }
