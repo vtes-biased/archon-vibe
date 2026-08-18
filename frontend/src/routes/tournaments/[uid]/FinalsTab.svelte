@@ -75,8 +75,7 @@
   }
 
 
-  const finalsQual = $derived(finalsQualification(tournament?.players ?? [], standings));
-  const hasFinalsCandidate = $derived(finalsQual.candidates.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
+  const finalsQual = $derived(finalsQualification(tournament, standings));
 </script>
 
 <div class="space-y-4">
@@ -86,7 +85,7 @@
     </div>
   {/if}
 
-  {#if !hasFinalsCandidate}
+  {#if !finalsQual.possible}
     <p class="text-ink-muted">{m.finals_require_rounds()}</p>
   {:else if !tournament.finals}
     <!-- Deliberately no Start Finals button: finishing without a final is

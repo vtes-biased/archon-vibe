@@ -1,5 +1,6 @@
 use json::JsonValue;
 
+use super::helpers::count_played_rounds;
 use super::sanctions::{
     has_dq_sanction, resolve_sa_effective_rounds, sa_vp_penalty, table_sa_adjustments,
 };
@@ -334,9 +335,7 @@ pub(super) fn scores_tied(a: &Standing, b: &Standing) -> bool {
     a.gw == b.gw && a.vp == b.vp && a.tp == b.tp
 }
 
-/// The finals candidate pool, in rank order. `RandomToss` and `StartFinals` must
-/// read the same list: a toss computed over raw standings orders a top five the
-/// finals never uses, and the tie it leaves standing cannot be broken by re-running.
+/// The finals candidate pool, in rank order.
 pub(super) fn finals_candidates<'a>(
     players: &JsonValue,
     standings: &'a [Standing],
@@ -385,8 +384,7 @@ pub(super) fn toss_groups(candidates: &[&Standing]) -> Vec<std::ops::Range<usize
 }
 
 /// Whether a score-tied group is already ordered — every member holding a distinct
-/// non-zero toss. A group only partly tossed is re-tossed whole: mixing a recorded
-/// coin toss with fresh values either collides or hands one side a fixed rank.
+/// non-zero toss.
 pub(super) fn tosses_are_total(group: &[&Standing]) -> bool {
     let mut seen: Vec<u32> = Vec::with_capacity(group.len());
     for s in group {
@@ -398,10 +396,9 @@ pub(super) fn tosses_are_total(group: &[&Standing]) -> bool {
     true
 }
 
-/// What a client must know before offering a finals action: who may qualify, whether
-/// a toss is still owed, and whom that toss would touch. `standings` carries the
-/// engine-computed preliminary rows, `players` supplies the state the rows do not.
-pub fn finals_qualification(players: &JsonValue, standings: &JsonValue) -> JsonValue {
+/// `has_ties` and `tied_uids` stay empty unless `possible` holds, so a caller cannot
+/// read a toss verdict for a finals that could not be held anyway.
+pub fn finals_qualification(tournament: &JsonValue, standings: &JsonValue) -> JsonValue {
     let mut rows: Vec<Standing> = standings
         .members()
         .map(|s| Standing {
@@ -416,23 +413,28 @@ pub fn finals_qualification(players: &JsonValue, standings: &JsonValue) -> JsonV
         })
         .collect();
     sort_by_rank(&mut rows);
-    let candidates = finals_candidates(players, &rows);
+    let candidates = finals_candidates(&tournament["players"], &rows);
 
-    let tied: Vec<JsonValue> = toss_groups(&candidates)
-        .into_iter()
-        .flat_map(|g| candidates[g].iter().map(|s| s.user_uid.as_str().into()))
-        .collect();
+    let enough_rounds = count_played_rounds(tournament) >= 2;
+    let possible = enough_rounds && candidates.len() >= 5;
+    let tied: Vec<JsonValue> = if possible {
+        toss_groups(&candidates)
+            .into_iter()
+            .flat_map(|g| candidates[g].iter().map(|s| s.user_uid.as_str().into()))
+            .collect()
+    } else {
+        Vec::new()
+    };
     json::object! {
-        candidates: JsonValue::Array(
-            candidates.iter().map(|s| s.user_uid.as_str().into()).collect()
-        ),
-        has_ties: top5_has_ties(&candidates),
+        enough_rounds: enough_rounds,
+        possible: possible,
+        has_ties: possible && top5_has_ties(&candidates),
         tied_uids: JsonValue::Array(tied),
     }
 }
 
 /// Takes the finals candidate pool. Only the five qualifying ranks must be total:
-/// two candidates tied *below* fifth share no seat and never block the finals.
+/// two candidates tied *below* fifth share no seat.
 pub(super) fn top5_has_ties(candidates: &[&Standing]) -> bool {
     if candidates.len() < 5 {
         return false;

@@ -266,7 +266,7 @@ mod shared {
     pub fn finals_qualification_json(config_json: &str) -> Result<String, EngineError> {
         let config = json::parse(config_json)?;
         Ok(
-            super::tournament::finals_qualification(&config["players"], &config["standings"])
+            super::tournament::finals_qualification(&config["tournament"], &config["standings"])
                 .dump(),
         )
     }
@@ -537,9 +537,6 @@ mod wasm {
             js_str(compute_final_standings_json(config_json))
         }
 
-        /// Every finals gate the UI draws — the candidate count, the unresolved-tie
-        /// block, the toss prompt — reads this, so the client can never offer a
-        /// finals `StartFinals` would refuse.
         #[wasm_bindgen(js_name = finalsQualification)]
         pub fn finals_qualification(&self, config_json: &str) -> Result<String, String> {
             js_str(finals_qualification_json(config_json))

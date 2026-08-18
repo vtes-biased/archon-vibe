@@ -42,9 +42,8 @@
   const hasRounds = $derived((tournament?.rounds?.length ?? 0) > 0);
   // QR self-check-in is in-person only — online players can't scan a venue code. checkin_code is always set server-side, so gate on !online.
   const qrCheckin = $derived(!tournament?.online && !!tournament?.checkin_code);
-  const finalsQual = $derived(finalsQualification(tournament?.players ?? [], standings));
-  const hasFinalsCandidate = $derived(finalsQual.candidates.length >= 5 && (tournament?.rounds?.length ?? 0) >= 2);
-  const finalsReady = $derived(hasFinalsCandidate && !finalsQual.has_ties);
+  const finalsQual = $derived(finalsQualification(tournament, standings));
+  const finalsReady = $derived(finalsQual.possible && !finalsQual.has_ties);
   const activeRoundIdx = $derived.by(() => {
     if (!tournament?.rounds?.length) return -1;
     const idx = tournament.rounds.findIndex(r => r.some(t => t.state !== "Finished"));
@@ -198,9 +197,9 @@
     {:else if tournament.state === "Registration"}
       {m.action_bar_registration({ count: String(registeredCount) })}
     {:else if tournament.state === "Waiting"}
-      {#if hasFinalsCandidate && finalsQual.has_ties}
+      {#if finalsQual.possible && finalsQual.has_ties}
         {m.action_bar_waiting_toss_needed({ n: String(tournament.rounds!.length) })}
-      {:else if hasFinalsCandidate}
+      {:else if finalsQual.possible}
         {m.action_bar_waiting_finals_ready({ n: String(tournament.rounds!.length) })}
       {:else if hasRounds}
         {m.action_bar_waiting_after_round({ n: String(tournament.rounds!.length) })}
@@ -234,7 +233,7 @@
       <!-- Whichever of start-round / start-finals the primary didn't take -->
       {#if finalsReady}
         <Button variant="secondary" size="md" loading={actionLoading} disabled={checkedInCount < 4} onclick={() => doAction("StartRound")}>{nextRoundLabel}</Button>
-      {:else if hasFinalsCandidate}
+      {:else if finalsQual.possible}
         <Button variant="secondary" size="md" loading={actionLoading} disabled={!finalsReady} onclick={() => doAction("StartFinals")}>{m.overview_start_finals()}</Button>
       {/if}
       <!-- In-person first check-in: surface the QR directly (players self-check-in by scanning) instead of burying it in More -->
@@ -301,7 +300,7 @@
         <a href="/help/judges-guide#51-event-organization-unexpected-drop" class="text-link hover:text-link-soft underline">{m.overview_stagger_guide_link()}</a>
       </p>
     {/if}
-    {#if hasFinalsCandidate && hasUnequalRounds}
+    {#if finalsQual.possible && hasUnequalRounds}
       <p class="text-sm text-warn">{m.overview_stagger_finals_warning()}</p>
     {/if}
   {/if}

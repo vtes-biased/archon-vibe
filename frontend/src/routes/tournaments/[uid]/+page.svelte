@@ -10,7 +10,7 @@
   import { syncManager } from "$lib/sync";
   import { getUser, getTournament, getTournamentContextSanctions, getDeviceId, getDecksByTournamentGrouped, getLeague, saveTournament } from "$lib/db";
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
-  import { attestedPlayerCount, initEngine, rankingEligibility, validateDeck, isOrganizer as engineIsOrganizer, type TournamentEventType, type ValidationError } from "$lib/engine";
+  import { attestedPlayerCount, finalsQualification, initEngine, rankingEligibility, validateDeck, isOrganizer as engineIsOrganizer, type TournamentEventType, type ValidationError } from "$lib/engine";
   import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { getStateTone, translateTournamentState, rankBadgeLabel, computeStandings, eventUrl, type PlayerInfoMap } from "$lib/tournament-utils";
   import { zonedDate } from "$lib/utils";
@@ -200,9 +200,8 @@ import TournamentModals from "./TournamentModals.svelte";
     }
     // A finished event can legitimately end with no final (VEKN §3.1.6);
     // drop the tab rather than show an empty state explaining the absence.
-    const hasFinalsCandidate = (tournament?.rounds?.length ?? 0) >= 2;
     const finishedWithoutFinals = tournament?.state === "Finished" && !tournament?.finals;
-    if (!finishedWithoutFinals && (hasFinalsCandidate || tournament?.finals)) {
+    if (!finishedWithoutFinals && (finalsQual.enough_rounds || tournament?.finals)) {
       t.push({ id: 'finals', label: m.tournament_tab_finals(), icon: Trophy });
     }
     return t;
@@ -281,6 +280,7 @@ import TournamentModals from "./TournamentModals.svelte";
     engineReady(); // reactive dep: recompute placement once WASM finishes loading
     return computeStandings(tournament);
   });
+  const finalsQual = $derived(finalsQualification(tournament, standings));
 
 
   const isFinished = $derived(tournament?.state === "Finished");

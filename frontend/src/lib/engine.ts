@@ -1,4 +1,4 @@
-import type { DeckObject, Player, Sanction, SanctionCategory, SanctionLevel, SanctionSubcategory, Tournament, User } from './types';
+import type { DeckObject, Sanction, SanctionCategory, SanctionLevel, SanctionSubcategory, Tournament, User } from './types';
 import { getAllLeagues } from './db';
 import { engineReady, markEngineReady, markEngineLoadFailed } from './stores/engine-ready.svelte';
 import { engineErrorFromThrown } from './error-codes';
@@ -638,16 +638,14 @@ export function computeFinalStandings(
   return JSON.parse(resultJson);
 }
 
-/** Who may qualify for the finals, whether a toss is still owed and whom it would touch —
- *  the engine's own StartFinals/RandomToss rules, so the UI can never offer a finals the
- *  engine refuses. Fails closed to an empty pool while WASM is still loading. */
 export function finalsQualification(
-  players: Player[],
+  tournament: Tournament | null,
   standings: Array<{ user_uid: string; gw: number; vp: number; tp: number; toss?: number; disqualified?: boolean; non_competing?: boolean }>
-): { candidates: string[]; has_ties: boolean; tied_uids: string[] } {
+): { enough_rounds: boolean; possible: boolean; has_ties: boolean; tied_uids: string[] } {
   const engine = getEngineReactive();
-  if (!engine) return { candidates: [], has_ties: false, tied_uids: [] };
-  const resultJson = callEngine(() => engine.finalsQualification(JSON.stringify({ players, standings })));
+  const closed = { enough_rounds: false, possible: false, has_ties: false, tied_uids: [] };
+  if (!engine || !tournament) return closed;
+  const resultJson = callEngine(() => engine.finalsQualification(JSON.stringify({ tournament, standings })));
   return JSON.parse(resultJson);
 }
 
