@@ -559,6 +559,11 @@ mod wasm {
             crate::sanctions::sanction_reference_json()
         }
 
+        #[wasm_bindgen(js_name = foldAscii)]
+        pub fn fold_ascii(&self, s: &str) -> String {
+            crate::cards::fold_ascii(s)
+        }
+
         /// Offline sanction management: the device-locked client recomputes
         /// standings from IDB sanctions (mirrors PyEngine.update_standings).
         #[wasm_bindgen(js_name = updateStandings)]

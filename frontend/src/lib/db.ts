@@ -2,6 +2,7 @@ import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, type St
 import type { User, Role, Sanction, Tournament, DeckObject, League, Promo, VtesCard, OfflinePlayer } from '$lib/types';
 import { expandRolesForFilter } from './roles';
 import { normalizeSearch, searchTokens } from './utils';
+import { initEngine } from './engine-instance';
 
 export function getDeviceId(): string {
   let id = localStorage.getItem('archon_device_id');
@@ -307,6 +308,9 @@ function buildEntry(user: User): UserIndexEntry {
 async function getUserIndex(): Promise<Map<string, UserIndexEntry>> {
   if (!userIndexPromise) {
     userIndexPromise = (async () => {
+      // The tokens are cached for the session, so they must be folded by the engine, not by
+      // normalizeSearch's cold fallback.
+      await initEngine();
       const db = await getDB();
       const all = await db.getAll('users');
       return new Map(all.map(u => [u.uid, buildEntry(u)]));

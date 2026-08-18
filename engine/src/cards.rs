@@ -7,7 +7,7 @@ use unicode_normalization::UnicodeNormalization;
 
 /// NFD-decomposes (é → e + combining mark), drops combining marks, and maps the
 /// few letters that don't decompose (ł, ø, æ, …) — small on purpose, VTES names are Latin-script.
-fn fold_ascii(s: &str) -> String {
+pub fn fold_ascii(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.nfd() {
         match c {

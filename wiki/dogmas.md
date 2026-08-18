@@ -16,6 +16,14 @@ four conditions — [sync](sync.md#online-only-rest-reads).
 business logic in Python or TypeScript. Authorization predicates, scoring,
 validation, seating, ratings and the error taxonomy are all single-sourced there.
 
+**A fact the engine holds is exported, never re-typed.** Sharing one
+implementation across the frontend, the backend and the offline path is the whole
+reason the engine compiles to WASM and PyO3 — a table, a normalizer or a
+predicate copied into TypeScript or Python is drift waiting to surface as a
+user-visible wrong answer. Export it and call it. When the export is awkward
+because the engine loads asynchronously and the caller is synchronous, fix the
+call site; a copy is not the cheaper option, it is the one whose cost lands later.
+
 **Server always wins.** Mutations apply optimistically in WASM; the server's SSE
 frame is authoritative and overwrites. Apply semantics are overwrite-by-uid,
 never field-merge — a merge would preserve stale optimistic fields forever.

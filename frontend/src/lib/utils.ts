@@ -1,28 +1,13 @@
 import type { Sanction } from "$lib/types";
+import { getEngineReactive } from "$lib/engine-instance";
 
-/** Third copy of `fold_ascii` in `engine/src/cards.rs` and `geonames.fold_ascii`; all three must agree. */
-const FOLD: Record<string, string> = {
-  '\u0142': 'l',
-  '\u00f8': 'o',
-  '\u0111': 'd',
-  '\u00f0': 'd',
-  '\u0127': 'h',
-  '\u0131': 'i',
-  '\u0167': 't',
-  '\u00e6': 'ae',
-  '\u0153': 'oe',
-  '\u00fe': 'th',
-  '\u00df': 'ss',
-};
-const FOLD_RE = new RegExp(`[${Object.keys(FOLD).join('')}]`, 'g');
-
-/** Normalize a string for accent-insensitive search ("Pawel" finds "Pawe\u0142"). */
+/** Normalize a string for accent-insensitive search ("Pawel" finds "Pawe\u0142"). Cold \u2014 before the
+ * engine loads \u2014 this drops combining marks only, so callers that cache a normalized index must
+ * `await initEngine()` first or they cache the degraded form forever. */
 export function normalizeSearch(s: string): string {
-  return s
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(FOLD_RE, (c) => FOLD[c]!);
+  const engine = getEngineReactive();
+  const folded = engine ? engine.foldAscii(s) : s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return folded.toLowerCase();
 }
 
 /** Splits on any run of non-alphanumerics, applied to BOTH the indexed field and the query, so every

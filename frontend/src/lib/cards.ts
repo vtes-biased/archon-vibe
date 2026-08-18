@@ -1,6 +1,7 @@
 import type { VtesCard } from '$lib/types';
 import { getDB } from './db';
 import { normalizeSearch, searchTokens, matchesAllTerms } from './utils';
+import { initEngine } from './engine-instance';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -84,6 +85,9 @@ function tokensFor(card: VtesCard): string[] {
  * short queries mostly noise (e.g. "an" returned 856 cards, 728 of them only mid-word matches). */
 export async function searchCards(query: string, limit = 20): Promise<VtesCard[]> {
   if (!query || query.length < 2) return [];
+  // `cardTokens` is cached for the session, so it must be folded by the engine, not by
+  // normalizeSearch's cold fallback.
+  await initEngine();
   const cards = await getCards();
   const terms = searchTokens(query);
   const lead = terms[0];
