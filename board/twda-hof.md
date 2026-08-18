@@ -976,40 +976,25 @@ Three things the build settled that the plan did not say:
    surfacing is new.
 5. New/changed strings → `i18n-translator`, 5 locales.
 
-## Phase 5 — The push side (in scope here)
+## Phase 5 — The push side — **done 2026-08-18**
 
-Post-decommission **we cannot submit to the TWDA at all**: `submit_twda_pr`
-keys the branch and file on the vekn event id (`twda.py:71-72`,
-`archon/{id}` + `decks/{id}.txt`) and `maybe_submit_twda` skips with
-`no_vekn_event`. Decision 4 commits us to keeping the archive updated after
-decommission, so this closes the read/write loop the ticket is about and belongs
-here rather than in `#579`.
+Item 2 landed with the short event code line, which owns the replacement key.
+Item 1 landed here, and went one step further than the plan: the emitted header
+link is the **short form**, not the uid form, and `reconcile_twda.py` tier 1
+parses `/t/<code>` against a `by_code` index. The plan's rationale for item 1 —
+"krcg derives the entry `id` from the link" — is not quite how it works: the id is
+the *file name*, which our submissions already key on the code. What the header
+link actually buys is a second, independent anchor, and it costs nothing to make
+it the form designed to be cited.
 
-**Item 2 waits on the short event code**, which is its own board line and owns the
-replacement key. Item 1 does not, and can land now.
+Decision 4 commits us to keeping the archive updated after decommission, and that
+loop is now closed: nothing in the submission path reads a vekn event id.
 
-1. Pass `https://archon.vekn.net/tournaments/{uid}` as `tournament_url` to
-   `export_twda` instead of `""` (`routes/tournaments.py:357`). krcg derives the
-   entry `id` from that link, so this is what makes Phase 0's first matcher tier
-   useful — today we would be building a reader for a link we never write.
-2. Rename `submit_twda_pr`'s `vekn_event_id` parameter to `event_key` and fall back
-   to the short event code, then drop the `no_vekn_event` skip
-   (`routes/tournaments.py:438`). **Never the uuid** — the key becomes a permanent
-   filename in a public archive.
-
-**The naming convention needs no negotiation — precedent already exists
-upstream.** Verified 2026-08-14 against `GiottoVerducci/TWD`: the `decks/`
-directory holds `decks/0bbf344e-f63e-41bf-9b74-0fc82e91ae61.txt`, a
-**UUID-named** file among otherwise numeric vekn-event-id names, and krcg parses
-it into the archive normally (it is the Basagan ng Bungo 2025 entry). So a
-tournament-uid key is already accepted by both the repo and the parser; keying on
-our uid post-decommission is a continuation, not a new convention. Worth telling
-the maintainer, not asking permission. The only genuine defect is that that
-file's header URL is the dead `display.html` form — our emitted URL must be the
-live route.
-
-That precedent settles that a **non-numeric** key is accepted; it is not an argument
-for the uuid itself, which is unsayable and uncitable — hence the short code.
+**A non-numeric key needs no negotiation with the maintainer** — verified
+2026-08-14 against `GiottoVerducci/TWD`, whose `decks/` directory already holds
+`decks/0bbf344e-f63e-41bf-9b74-0fc82e91ae61.txt`, a UUID-named file among
+otherwise numeric ones, which krcg parses normally (the Basagan ng Bungo 2025
+entry). Worth telling him, not asking permission.
 
 Deliverable 4 from the original ticket — archive-vs-pushed tracking beyond
 per-tournament `twda_status` — is a genuinely separate feature; file it as a

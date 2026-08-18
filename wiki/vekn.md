@@ -231,14 +231,14 @@ Manual triggers: `POST /admin/sync-vekn` (members and tournaments),
 `twda.py` opens or updates a GitHub pull request against the
 [TWDA repo](https://github.com/GiottoVerducci/TWD), idempotent on branch
 `archon/{event_code}` and file `decks/{event_code}.txt`, create-or-update, with the
-short event link in the PR body. Five triggers
+short event link in the PR body and in the deck header krcg parses back as the
+entry's `event_link` — which is what makes an entry we submitted resolvable against
+its own tournament on the next archive read. Five triggers
 fire it: the finish action; a winner-deck upsert on an already-finished tournament,
 by an organizer or by the winner adding their *first* deck, so late uploads and
 post-event edits reach the archive; the manual organizer publish; the batch after a
 successful results push, covering events finished offline or whose VEKN event id
-only just arrived; and go-online for a tournament finished offline, which usually
-records an immediate skip since the event isn't pushed yet, with the batch retrying
-once it is.
+only just arrived; and go-online for a tournament finished offline.
 
 Every attempt records its outcome on `Tournament.twda_status`: `submitted` with the
 PR URL, `skipped` with a reason code — no winner, Limited format (draft and sealed

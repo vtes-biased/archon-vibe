@@ -24,7 +24,9 @@ Four tiers, strongest first:
    different id spaces — the live /tournaments/<uid> one ours, the dead legacy
    /tournament/<uid>/display.html one the uid legacy archon minted, which the
    import kept in external_ids['archon'] — so both indexes are consulted. A uid
-   neither resolves is reported, never passed down to the weaker tiers.
+   neither resolves is reported, never passed down to the weaker tiers. The
+   short /t/<code> form is the one we emit ourselves, so it is what closes the
+   round trip on everything we submit from now on.
 2. the vekn event id. NOT infallible: an organizer can submit under an event id
    they later abandoned (12797 points at a 0-player row named "delete me" while
    the real event is 12794). A disagreeing winner name alone does not unseat it —
@@ -81,6 +83,7 @@ _ARCHON_UID_RE = re.compile(
     r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
     re.I,
 )
+_ARCHON_CODE_RE = re.compile(r"archon\.vekn\.net/t/([0-9a-zA-Z]+)", re.I)
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 CORPUS_QUERY = """
@@ -92,6 +95,7 @@ CORPUS_QUERY = """
            coalesce(u."full"->>'name', ''),
            coalesce(t."full"->'external_ids'->>'vekn', ''),
            coalesce(t."full"->'external_ids'->>'archon', ''),
+           coalesce(t."full"->>'event_code', ''),
            jsonb_array_length(coalesce(t."full"->'players', '[]'::jsonb))
     FROM objects t
     LEFT JOIN objects u
@@ -115,6 +119,11 @@ def archon_uid(entry: dict) -> str | None:
     return match.group(1).lower() if match else None
 
 
+def archon_code(entry: dict) -> str | None:
+    match = _ARCHON_CODE_RE.search(entry.get("event_link", "") or "")
+    return match.group(1).lower() if match else None
+
+
 def twda_country(entry: dict) -> str | None:
     """The ISO code from a TWDA `place` ("City (STATE), Country").
 
@@ -131,6 +140,7 @@ class Corpus:
     def __init__(self, rows: list[tuple]):
         self.by_uid: dict[str, dict] = {}
         self.by_archon: dict[str, dict] = {}
+        self.by_code: dict[str, dict] = {}
         self.by_vekn: dict[str, list[dict]] = defaultdict(list)
         self.by_day: dict[str, list[dict]] = defaultdict(list)
         for (
@@ -142,6 +152,7 @@ class Corpus:
             winner_name,
             vekn,
             archon,
+            code,
             size,
         ) in rows:
             row = {
@@ -157,6 +168,8 @@ class Corpus:
             self.by_uid[uid] = row
             if archon:
                 self.by_archon[archon.lower()] = row
+            if code:
+                self.by_code[code.lower()] = row
             if vekn:
                 self.by_vekn[vekn].append(row)
             self.by_day[start[:10]].append(row)
@@ -444,6 +457,13 @@ def resolve(entry: dict, corpus: Corpus) -> tuple[str, str, str]:
     uid = archon_uid(entry)
     if uid:
         row = corpus.by_uid.get(uid) or corpus.by_archon.get(uid)
+        if row:
+            return "attach", row["uid"], "own link"
+        return "review", "", "own link resolves to nothing"
+
+    code = archon_code(entry)
+    if code:
+        row = corpus.by_code.get(code)
         if row:
             return "attach", row["uid"], "own link"
         return "review", "", "own link resolves to nothing"

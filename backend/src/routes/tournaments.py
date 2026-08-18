@@ -330,6 +330,15 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
     tournament_date = tournament.start or tournament.modified.isoformat()
     rounds_count = len(tournament.rounds)
     tournament_format = f"{rounds_count}R" + ("+F" if tournament.finals else "")
+    from ..twda import frontend_url
+
+    # The archive keeps this line forever, so it must be the citable form. Two
+    # TWDA entries already point at legacy-archon uids that resolve to nothing.
+    handle = (
+        f"/t/{tournament.event_code}"
+        if tournament.event_code
+        else f"/tournaments/{tournament.uid}"
+    )
 
     return _engine.export_twda(
         deck_json,
@@ -338,7 +347,7 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
         str(tournament_date),
         tournament.country or "",
         tournament_format,
-        "",  # tournament_url
+        f"{frontend_url()}{handle}",
         len(tournament.players),
         player_name,
     )

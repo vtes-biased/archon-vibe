@@ -22,7 +22,7 @@ TWDA_TARGET_OWNER = TWDA_TARGET_REPO.split("/")[0]  # "GiottoVerducci"
 _GH_API_VERSION = github_app.GH_API_VERSION
 
 
-def _frontend_url() -> str:
+def frontend_url() -> str:
     return os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
 
 
@@ -164,7 +164,7 @@ async def submit_twda_pr(
                     "title": f"Add TWD: {tournament_name}",
                     "body": (
                         "Automatically submitted by Archon tournament manager.\n\n"
-                        f"{_frontend_url()}/t/{event_key}"
+                        f"{frontend_url()}/t/{event_key}"
                     ),
                     "head": branch,
                     "base": "master",
