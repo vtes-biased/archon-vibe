@@ -554,7 +554,9 @@ explicitly, exactly like `checkin_code` — the VEKN sync's rebuild does.
 Assignment waits on the VEKN calendar push that `POST /api/tournaments` already
 fires, since a successful push is what supplies the vekn id the event should carry
 (`_maybe_push_vekn_event`). Every other ingress knows its answer at insert and
-stamps inline. A row that reaches neither — a restart in between — is swept at
+stamps inline, go-online included — an event created offline has only the hourly
+batch push ahead of it, and that push stops entirely at the decommission, so it
+mints rather than waits. A row that reaches neither — a restart in between — is swept at
 startup, capped at 100, over which it names `backfill_event_codes.py` rather than
 minting a corpus before the app answers. Uniqueness is a unique index on
 `lower(event_code)` spanning soft-deleted rows, so a code is never reissued and a

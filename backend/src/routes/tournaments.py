@@ -40,6 +40,7 @@ from ..db import (
     get_user_by_uid,
     get_user_by_vekn_id,
     get_users_by_uids,
+    resolve_event_code,
     save_object,
     save_object_from_model,
     save_tournament,
@@ -2422,6 +2423,7 @@ async def go_online(
             request.tournament["banner_path"] = tournament.banner_path
             request.tournament["external_ids"] = tournament.external_ids
             request.tournament["checkin_code"] = tournament.checkin_code
+            request.tournament["event_code"] = tournament.event_code
             request.tournament["vekn_pushed_at"] = (
                 tournament.vekn_pushed_at.isoformat()
                 if tournament.vekn_pushed_at
@@ -2479,6 +2481,12 @@ async def go_online(
             )
         ):
             updated.vekn_results_stale = True
+        # An event created offline reaches the corpus here, and its VEKN push is
+        # the hourly batch's — which does not run at all once pushing is off. So
+        # this ingress mints rather than waiting, and the vekn id that may arrive
+        # later is reached by the resolver's fallback instead of moving the code.
+        if not updated.event_code:
+            updated.event_code = await resolve_event_code(updated, tx_conn)
         tournament_bd = await save_object(
             ObjectType.TOURNAMENT,
             updated.uid,
@@ -2553,8 +2561,6 @@ async def go_online(
                 broadcast_precomputed(bd)
         except Exception as e:
             logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
-        # Mirrors the finish action's TWDA attempt; skips on no_event_code only in
-        # the window before the creation path stamps one.
         asyncio.create_task(maybe_submit_twda(updated))
 
     # Outcome summary closes the loop the go-offline modal opens: each created
