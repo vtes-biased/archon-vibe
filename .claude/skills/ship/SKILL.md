@@ -20,9 +20,13 @@ Read its `board/<slug>.md` if it has one. Read the wiki pages the line touches, 
 `wiki/hazards.md` if it names any subsystem you are about to change.
 
 If two or three agents are working the board in parallel, say in chat which line
-you are taking and keep to your own commits. **Stage explicit paths — never
-`git add -A`**, which silently commits a sibling's in-flight work under your
-message. Imperfect commit isolation is acceptable when files genuinely overlap.
+you are taking and keep to your own commits. **Commit explicit paths —
+`git commit -- <paths>`**, which is the only form that ignores whatever else is
+staged. Naming paths to `git add` is not enough and `git add -A` is worse: a
+plain `git commit` writes the *index*, so a sibling's staged deletion rides along
+under your message. `--amend` has the same hazard from the other end — re-read
+`git log -1` first, because the commit you meant to amend may no longer be HEAD.
+Imperfect commit isolation is acceptable when files genuinely overlap.
 
 ## 2. Confirm the contract
 
