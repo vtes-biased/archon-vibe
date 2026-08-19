@@ -79,9 +79,13 @@ build that shows it ([architecture](architecture.md#whats-new)). A missing
 `## Unreleased` section only nudges: a release with nothing user-facing is
 legitimate.
 
-`/post-deploy` runs after the deploy and closes the feedback issues it made live.
-It holds no state — an open issue, the commit whose `Reported in #N.` names it and
-`git tag --contains` are enough to say whether a fix is live.
+`/post-deploy` runs after the deploy. It first works
+[post-deploy](post-deploy.md) — the actions the deployed commits have just made
+safe, a one-time script run being the usual shape — and then closes the feedback
+issues the same deploy made live. Only the issue half holds no state: an open
+issue, the commit whose `Reported in #N.` names it and `git tag --contains` are
+enough to say whether a fix is live, while a script run leaves nothing behind to
+derive from and so has to be written down when it is written.
 
 Production nginx proxies only an allowlist of top-level path prefixes to FastAPI
 ([access](access.md#deployment-gate)), and its templates own the Open Graph

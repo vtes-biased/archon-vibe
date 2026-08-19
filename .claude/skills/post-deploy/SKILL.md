@@ -1,12 +1,13 @@
 ---
 name: post-deploy
-description: Run after a successful production deploy — tell the people who reported the bugs it fixed, and close their issues. Use when asked to follow up on user feedback after a deploy, or to close the issues a deploy has now shipped.
+description: Run after a successful production deploy — run the one-time actions the deploy just made safe (parked in wiki/post-deploy.md), then tell the people who reported the bugs it fixed and close their issues. Use when asked to follow up after a deploy, to run a pending production script or backfill, or to close the issues a deploy has now shipped.
 ---
 
 # Post-deploy
 
-One job: **tell the people who reported it**. Saying what shipped is the other
-half and happens before the tag — `/release-notes`.
+Two jobs, in order: **run what the deploy just made safe**, then **tell the people
+who reported it**. Saying what shipped is the other half and happens before the
+tag — `/release-notes`.
 
 An issue closes when the fix **deploys** and the reporter can see it work, which
 is why commits carry a bare `Reported in #N.` and never a closing keyword
@@ -15,12 +16,18 @@ is why commits carry a bare `Reported in #N.` and never a closing keyword
 **Prod only.** Beta is our testbed; the reporter is on prod. On a beta deploy,
 close nothing.
 
-## No state
+## State, and the one place it lives
 
-There is no marker file and no commit range. Every input is derivable at the
-moment you ask: an open `feedback` issue, the commit that references it, and the
-first tag containing that commit. A deploy that was never followed up is picked up
-by the next run for free, because a still-open issue is still open.
+**The issue half derives everything.** There is no marker file and no commit
+range: an open `feedback` issue, the commit that references it, and the first tag
+containing that commit are enough. A deploy that was never followed up is picked
+up by the next run for free, because a still-open issue is still open.
+
+**The action half cannot.** A script that has to run once on production leaves no
+GitHub state and no repository state behind, so nothing later can derive that it
+is owed. Those are written down when they are written, in `wiki/post-deploy.md`,
+one `##` section each, and that page is the only register — never a subsystem
+page's prose, which is where they used to get lost.
 
 ## 1. Establish what is live
 
@@ -36,7 +43,28 @@ If the deploy did not actually succeed, stop. Closing an issue on a failed deplo
 is the one unrecoverable mistake here — it tells a reporter their fix is live when
 it isn't.
 
-## 2. Work out what is now live
+## 2. Run what the deploy unlocked
+
+Read `wiki/post-deploy.md`. An empty page is the normal state; skip to step 3.
+
+Each item names the commit that gates it. It is actionable when that commit is in
+the deployed tag — the same check the issue pass uses:
+
+```sh
+git tag --contains <sha> --sort=creatordate | head -n1
+```
+
+A gating commit at or below the deployed tag means run it; above it, or in no tag
+at all, means leave the item alone and say so in the report. **Show the owner what
+you are about to run and wait** — these write to production, and several report by
+default precisely so the counts get reviewed before `--apply`.
+
+Then finish the item, all of it: the verification it names, the people it owes a
+message, and the wiki text it says dies with it. **Delete the item.** Completion is
+deletion here exactly as it is on the board; a run left on the page reads as still
+owed and gets run twice.
+
+## 3. Work out what is now live
 
 ```sh
 gh issue list --label feedback --state open --json number,title \
@@ -59,7 +87,7 @@ Three outcomes, and only the first is actionable:
   convention existed. Report, never close on a hunch: an issue closed wrongly
   costs more than one closed late.
 
-## 3. Close what shipped
+## 4. Close what shipped
 
 For each live issue, in order:
 
@@ -84,7 +112,8 @@ One close per issue even when several commits reference it.
 > This is fixed and deployed — the rating on a tournament page and the one on your
 > profile are the same number now.
 
-## 4. Report
+## 5. Report
 
-To the owner: which issues were closed, which are fixed but waiting on a deploy,
-and which carry no referencing commit and need a decision.
+To the owner: which post-deploy actions ran and what they changed, which are still
+gated on an undeployed commit, then which issues were closed, which are fixed but
+waiting on a deploy, and which carry no referencing commit and need a decision.

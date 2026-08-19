@@ -134,6 +134,15 @@ page, that is a divergence to record on the implementation page, not a domain ed
 **Board.** Delete the line. Delete its `board/<slug>.md` too. Deletion is the
 completion gesture — there is no closed state to move it to.
 
+**A production step is part of the trinity, not a note to yourself.** When the work
+leaves something that must be run or set on production once the commit is live — a
+one-time re-save, a backfill, a console setting — it goes in `wiki/post-deploy.md`
+in this same commit, naming the gating commit and why running it earlier is wrong.
+Never into a subsystem page's prose: that is where such items got lost, and the
+subsystem page holds the standing fact, not the runbook. If the remaining work
+carries judgment rather than execution — output to review, membership to diff — it
+is a board line with a production step, not a post-deploy item.
+
 **Commit.** One commit carrying all three. Reference a GitHub issue as
 `Reported in #N.` when the work fixes a user-reported one; never a closing keyword,
 and never a board reference.

@@ -77,8 +77,8 @@ line gets one of four verdicts, and no line is skipped twice:
 - **drop** — it is no longer wanted; delete it.
 
 Then check the **deferred items** parked in the wiki (`wiki/vekn-decommission.md`,
-plus the deferred notes on `dev.md` and `sync.md`): has a trigger fired? A fired
-trigger sends the item through `/intake` as an ordinary line at its ranked
+`wiki/post-deploy.md`, plus the deferred note on `dev.md`): has a trigger fired? A
+fired trigger sends the item through `/intake` as an ordinary line at its ranked
 position, which may push the list to its limit — resolve that here rather than at
 the next intake. And give each deferred item the same verdict as a line: still
 wanted, or dropped — deferral is not exemption from eviction.
@@ -88,6 +88,12 @@ one drop or promotion before any new line can land.
 
 A drop that was a promise to a person is something to **say**, not merely delete —
 if a GitHub feedback issue is tracking it, that issue needs a reply.
+
+`wiki/post-deploy.md` gets one extra check, because its items are verifiable rather
+than judged: every item's gating sha must still resolve (`git cat-file -e`), and an
+item whose sha is in the deployed tag has been owed since that deploy — say so
+rather than letting it age quietly. An item that turns out to have already been run
+is a deletion, not a verdict.
 
 ## 3. Harness ratchet
 

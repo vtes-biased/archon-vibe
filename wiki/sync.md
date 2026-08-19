@@ -52,14 +52,6 @@ rebuild the columns and bump `modified_at`, which is what forces synced clients 
 re-fetch. Reuse that pattern post-deploy for any projection change — a raw SQL
 column rewrite cannot run the Python projections and leaves clients on stale rows.
 
-`backend/scripts/normalize_countries.py` is the same pattern applied to a value
-rather than a shape: the legacy merge seeded country *names* into the `country`
-field of tournaments, users and leagues, which every consumer reads as an ISO code.
-**Trigger: the first production deploy carrying the normalising merge** — that
-merge re-saves a league or tournament on any full-struct diff, so a row swept
-before it is deployed reads back as the name within a day. One run after that
-deploy finishes the field, and this paragraph goes with it.
-
 ### Access entitlement
 
 `entitled_level(viewer, *, obj_type, uid, country, org_uids, obj_user_uid)` in

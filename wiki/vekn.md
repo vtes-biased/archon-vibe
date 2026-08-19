@@ -174,11 +174,9 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   app holds for country, timezone, venue, venue url, address and map url. Taking
   it at face value moved a Budapest national qualifier to Antarctica/UTC within
   the hour and undid the organizer's re-entry on every run (gh-9). Rows already
-  flipped hold Antarctica as their own value and preserving them is exactly what
-  stops them healing: **deferred** — once the drop is deployed, run
-  `backend/scripts/clear_placeholder_venue_location.py --apply` on production and
-  ask the 11 organizers it names to re-enter their location. Running it before
-  the deploy is undone by the next sync.
+  flipped hold Antarctica as their own value, and preserving them is exactly what
+  stops them healing — clearing those is parked in
+  [post-deploy](post-deploy.md).
 - Carries `proxies_allowed` onto `proxies`, **except under a championship rank,
   which forbids proxies by rule**. A few vekn.net championships do set the flag,
   and importing that combination would block every later config edit on engine

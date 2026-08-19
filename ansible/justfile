@@ -134,6 +134,12 @@ deploy-prod:
     if [ "${SOURCE:-}" = local ]; then just build-all; extra="$extra -e artifact_source=local"; fi
     if [ -n "${QUICK:-}" ]; then extra="$extra --tags app"; fi
     uv run --project {{repo_root}} ansible-playbook -i inventories/prod {{phase1_override}} playbooks/deploy.yml $extra
+    # grep -c exits 1 on zero matches, which set -e would take as a failed deploy.
+    pending=$(grep -c '^## ' {{repo_root}}/wiki/post-deploy.md || true)
+    if [ "$pending" -gt 0 ]; then
+        echo ""
+        echo "$pending post-deploy action(s) parked in wiki/post-deploy.md — run /post-deploy"
+    fi
 
 # No beta variant: frankfurt system updates (apt + reboots) belong to server-setup.
 # apt upgrade + (optional) reboot on prod (FULL=1 REBOOT=1)

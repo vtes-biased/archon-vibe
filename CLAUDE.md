@@ -35,7 +35,7 @@ anything.
 
 Three named procedures feed them: **`/feedback-triage`** for GitHub feedback
 issues, **`/release-notes`** for the changeset, before the tag is cut, and
-**`/post-deploy`** for closing the issues a deploy made live.
+**`/post-deploy`** for the actions a deploy unlocks and the issues it made live.
 
 **A unit of work lands as one change**: code changed, the wiki pages named at
 ingress updated (or their absence justified), the board line deleted. Wiki currency

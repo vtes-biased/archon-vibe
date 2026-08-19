@@ -59,7 +59,7 @@ Every write path normalises through `geonames.stored_country`, so a stored value
 a two-letter code, vekn.net's `XX` unknown-venue placeholder, or nothing. Rows
 written before that rule still hold a country *name*, which any exact comparison
 silently drops as if it disagreed, until the sweep parked in
-[sync](sync.md#access-levels) is run — this clause goes with it.
+[post-deploy](post-deploy.md) is run — this clause goes with it.
 The legacy dumps, vekn.net and the TWDA archive all quote country *names*, so a
 cross-corpus comparison goes through **`geonames.country_key`**, never through
 `normalize_country` directly: the resolver returns `None` for a spelling it does

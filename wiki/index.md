@@ -42,6 +42,8 @@ no code to lint against: check their sources instead.
 - [vekn](vekn.md) — push, pull, TWDA, and the legacy archon sync.
 - [vekn-decommission](vekn-decommission.md) — work deferred until the VEKN syncs
   retire, with the evidence that cannot be reconstructed afterwards.
+- [post-deploy](post-deploy.md) — the actions a production deploy unlocks, each
+  gated on the commit that makes it safe. Empty is the normal state.
 - [discord](discord.md) — Linked Roles and the tournament bot.
 - [design](design.md) — the pinned visual system.
 - [i18n](i18n.md) — the five locales, conventions and per-locale traps.
