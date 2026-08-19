@@ -31,9 +31,9 @@ pub(super) fn resolve_sa_effective_rounds(
 ) -> Vec<(String, usize)> {
     let rounds = &tournament["rounds"];
     let nrounds = rounds.len();
-    // Cancelled tables can't anchor an SA (mirrors standings skipping them) so VP
-    // and GW/TP land on the same round. Finals never lingers cancelled —
-    // CancelFinals nulls `finals` wholesale — so presence in seating is enough.
+    // An SA anchors only on a table the standings score, so the -1 VP and the GW/TP
+    // cascade land on the same round. Finals never lingers cancelled — CancelFinals
+    // nulls `finals` wholesale — so presence in seating is enough.
     let seated_in = |uid: &str, r: usize| -> bool {
         if r == nrounds {
             return tournament["finals"]["seating"]
@@ -41,7 +41,7 @@ pub(super) fn resolve_sa_effective_rounds(
                 .any(|s| s["player_uid"].as_str() == Some(uid));
         }
         rounds[r].members().any(|table| {
-            table["state"].as_str() != Some("Cancelled")
+            table["state"].as_str() == Some("Finished")
                 && table["seating"]
                     .members()
                     .any(|s| s["player_uid"].as_str() == Some(uid))

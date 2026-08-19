@@ -65,7 +65,7 @@ export type VpIssue = {
     | 'excessive_total'
     | 'redirected_vp'
     | 'impossible_oust_order'
-    | 'missing_half_vp';
+    | 'half_vp_mismatch';
   seats: number[];
 };
 

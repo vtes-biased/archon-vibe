@@ -138,11 +138,18 @@ it would verify the absence of the engine. Placement semantics belong in Rust,
 rendering belongs in Playwright, and the TypeScript in between is marshalling that
 `svelte-check` plus the E2E lifecycle spec already covers.
 
-**Fixtures can carry engine-impossible states.** Two shared tournament fixtures
-hold stored VP vectors no engine could produce; they are inert only because a
-standings recompute never re-validates them. Don't build full-standings assertions
-on their untouched tables. An unseeded mock once fabricated VEKN-less officials —
-also engine-impossible — and produced a flaky test.
+**A fixture's VP vector must be one a table could really produce**, unless the
+invalid vector *is* what the test is about. `check_table_vps` is a loose proxy —
+its ceil-sum accepts vectors no game reaches, `[2.0, 0, 0.5, 0.5]` among them, so
+passing it is not the standard. Derive the vector instead: seats sit in
+predator-prey order, ousting your prey scores 1 VP and you inherit their prey, the
+last player standing takes an extra VP for the game win, and at time-out every
+survivor takes 0.5. Four seats have 35 reachable vectors and five have 126, all of
+which `check_table_vps` accepts. Two traps sit next door: a fixture table that
+omits `state` scores nothing at all, which reads as a broken assertion rather than
+a broken fixture; and stored per-seat `gw`/`tp` are overwritten by the recompute,
+so asserting on them tests nothing. An unseeded mock once fabricated VEKN-less
+officials — also engine-impossible — and produced a flaky test.
 
 **The engine emits state strings as bare literals** while the route
 strict-converts, so a missing Python enum value 500s every action. A contract test

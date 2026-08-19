@@ -41,8 +41,9 @@ The `rounds` guard excludes round-less VEKN imports — an import carries summar
 results only, and re-pushing the source of record is pointless. Rich ETL and
 archon-merged history does have rounds, so both importers stamp `vekn_pushed_at`
 on every finished tournament they write, old archon having already pushed those
-results. The engine invariant that standings are non-empty exactly when rounds are
-is what makes this guard safe.
+results. Standings with no rounds mean a round-less import and nothing else — a
+native tournament that loses its last round has its standings cleared with it, by
+`CancelRound` — so guarding on `rounds` excludes exactly the imports.
 
 A successful results push here also retries the TWDA submission for events that
 missed it at finish — finished offline, or whose VEKN event id only arrived in the

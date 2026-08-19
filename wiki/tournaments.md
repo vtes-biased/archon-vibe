@@ -222,12 +222,22 @@ sequence around the table could produce, so seating order matters:
    is still in progress. More is invalid.
 3. Repeatedly find a seat with VP = 0, transfer −1 VP to its predator to account
    for the oust, and remove it from the ring.
-4. Remaining seats should all hold 0.5 (timeout survivors) or exactly one seat
-   holds 1.0.
+4. Close on how the game ended. A half VP anywhere on the table means it timed
+   out, so nobody was last standing and no game-win VP was awarded: every
+   remaining seat must hold exactly 0.5, and at least two must remain. With no
+   half anywhere the game was won, so exactly one seat remains and holds exactly
+   the 1.0 game-win VP.
+
+Step 4 is what makes the check exact rather than indicative: it accepts precisely
+the 35 four-seat and 126 five-seat results a game can reach, and nothing else.
+Before it closed, a single survivor could carry any surplus — `[2, 0, 0.5, 0.5]`
+passed on a table where one oust cannot fund two VPs.
 
 Failure modes: **MissingVP** (a fractional VP where an oust should have given a
-full point, e.g. a `[0.5, 0]` sequence), **MissingHalfVP** (several non-0.5 seats
-remain after all ousts), **ExcessiveTotal**, **InvalidTableSize**.
+full point, e.g. a `[0.5, 0]` sequence; also a leftover that is not the game-win
+VP), **HalfVpMismatch** (a seat's half disagrees with how the game ended — the name
+stays directionless because it is half too many as often as half too few),
+**ExcessiveTotal**, **InvalidTableSize**.
 
 Worked example, 5-player `[2, 1, 0, 0.5, 1.5]` in seating order: seat 3 (0) is
 ousted, predator seat 2 takes −1 → 0; seat 2 is ousted, seat 1 takes −1 → 1; seat 1
@@ -252,12 +262,42 @@ and re-ranks TP — the frozen seat values would otherwise go stale. The VP tota
 sums raw per-seat VP then subtracts the SA penalty, which may go negative; per-seat
 `result.vp` stays raw for display.
 
-`tournament.standings` is **prelim-only and SA-adjusted** — finals excluded. The
-engine invariant is that standings are non-empty exactly when rounds are non-empty,
-which is what makes the VEKN `rounds > 0` push guard safe.
+**Only a `Finished` table counts**, in the standings and in
+`compute_rating_vp_gw` alike. `In Progress` has no ranking to report — every seat
+ties, and the TP ladder averages to the same 36 on four seats and on five, so an
+unplayed round would otherwise credit its whole field 36 apiece; `Invalid` has no
+valid ranking; `Cancelled` did not happen. The unit is the table, not the round: a
+finished table scores as soon as it is scored, while its round is still running.
+
+**A table's state is decided where the table changes, and never re-judged
+afterwards.** `SetScore`, `Override`, `Unoverride`, `RestoreRound`, `AlterSeating`,
+`SeatPlayer` and `UnseatPlayer` each set it; the standings pass only reads it. So a
+finished table stays finished however it was reached — imported history included,
+which is the point: `migrate_from_archon.py` copies legacy per-seat VPs without
+validating them, and re-judging on recompute would silently drop tables our checker
+happens to reject.
+
+What the pass does refresh is **per-seat GW and TP**, in `refresh_round_scoring`,
+from raw VPs plus current sanctions, so a late SA cascades into the seats. On a
+table that is not `Finished` it writes zeros instead: an unscored one ties every
+seat, and the ladder average would otherwise stamp 36 TP apiece on anything reading
+the seats rather than the standings. `Cancelled` is left untouched — `RestoreRound`
+re-derives the round from those retained scores.
+
+`tournament.standings` is **prelim-only and SA-adjusted** — finals excluded. It is
+empty until some table finishes, so a live first round has rounds and no standings.
+The converse is the load-bearing one: **standings with no rounds mean a round-less
+VEKN import**, which carries a result sheet and no round detail, and which the
+`rounds`-empty guard in `update_standings` exists to protect. That guard cannot
+tell such an import from a tournament that just lost its last round, so
+`CancelRound` clears the standings itself when its hard-remove empties the array —
+otherwise the deleted rounds' sheet outlives them, and `players_with_rounds` reads
+it as a full field that played. Keeping that one case to imports is what makes the
+VEKN `rounds > 0` push guard safe.
 
 `compute_rating_vp_gw` is the single source for the backend rating and VEKN-push
-paths. It applies the same rule and additionally includes finals VP/GW; prelim
+paths. It applies the same `Finished`-only rule and additionally includes finals
+VP/GW; prelim
 comes from the rounds when present, else from the prelim-only standings row for
 round-less VEKN imports; when no `finals` object recorded the win it credits the
 tournament winner a +1 GW, covering a no-final import — a native no-final leaves

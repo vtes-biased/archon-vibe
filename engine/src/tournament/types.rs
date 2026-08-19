@@ -252,8 +252,10 @@ pub enum VpError {
     /// A valid total, but a VP sits with a Methuselah who did not make the
     /// oust — only a judge can close this table.
     RedirectedVp,
-    MissingVp(usize),          // seat index (0-based)
-    MissingHalfVp(Vec<usize>), // seat indices
+    MissingVp(usize), // seat index (0-based)
+    /// A seat's half VP disagrees with how the game ended — half too many or
+    /// half too few; the seat is at fault either way.
+    HalfVpMismatch(Vec<usize>), // seat indices
 }
 
 impl VpError {
@@ -266,7 +268,7 @@ impl VpError {
             VpError::ExcessiveTotal => ("excessive_total", vec![]),
             VpError::RedirectedVp => ("redirected_vp", vec![]),
             VpError::MissingVp(i) => ("impossible_oust_order", vec![*i]),
-            VpError::MissingHalfVp(idx) => ("missing_half_vp", idx.clone()),
+            VpError::HalfVpMismatch(idx) => ("half_vp_mismatch", idx.clone()),
         };
         json::object! { code: code, seats: seats }
     }

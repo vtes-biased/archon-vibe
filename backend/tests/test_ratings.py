@@ -51,13 +51,34 @@ def _seat(uid: str, vp: float = 0.0, gw: int = 0) -> dict:
     return {"player_uid": uid, "result": {"vp": vp, "gw": gw, "tp": 0}}
 
 
+def _table(*uids: str, vps: list[float], gws: list[int] | None = None) -> list[dict]:
+    """Seats in predator-prey order. `vps` must be a result a real table reaches:
+    the engine skips a table whose VPs it cannot read as a finished game."""
+    gws = gws or [0] * len(uids)
+    return [_seat(u, v, g) for u, v, g in zip(uids, vps, gws, strict=True)]
+
+
 class TestRatingVpGw:
     def test_prelim_only(self):
         """Player who only played prelims gets prelim VP/GW."""
         t = _make_tournament(
             rounds=[
-                [{"seating": [_seat("p1", 2.0, 1), _seat("p2", 1.0, 0)]}],
-                [{"seating": [_seat("p1", 0.5, 0), _seat("p3", 1.5, 0)]}],
+                [
+                    {
+                        "seating": _table(
+                            "p1", "p2", "p3", "p4", vps=[2.0, 1.0, 1.0, 0.0]
+                        ),
+                        "state": "Finished",
+                    }
+                ],
+                [
+                    {
+                        "seating": _table(
+                            "p1", "p2", "p3", "p4", vps=[0.5, 0.5, 0.5, 0.5]
+                        ),
+                        "state": "Finished",
+                    }
+                ],
             ],
         )
         vp, gw = _rating_vp_gw(t, "p1")
@@ -68,11 +89,27 @@ class TestRatingVpGw:
         """Finalist gets prelim + finals VP/GW combined."""
         t = _make_tournament(
             rounds=[
-                [{"seating": [_seat("p1", 2.0, 1), _seat("p2", 1.0, 0)]}],
+                [
+                    {
+                        "seating": _table(
+                            "p1", "p2", "p3", "p4", vps=[2.0, 1.0, 1.0, 0.0]
+                        ),
+                        "state": "Finished",
+                    }
+                ],
             ],
             finals={
-                "seating": [_seat("p1", 3.0, 1), _seat("p2", 0.5, 0)],
-                "seed_order": ["p1", "p2"],
+                "seating": _table(
+                    "p1",
+                    "p2",
+                    "p3",
+                    "p4",
+                    "p5",
+                    vps=[3.0, 1.0, 1.0, 0.0, 0.0],
+                    gws=[1, 0, 0, 0, 0],
+                ),
+                "seed_order": ["p1", "p2", "p3", "p4", "p5"],
+                "state": "Finished",
             },
         )
         vp, gw = _rating_vp_gw(t, "p1")
@@ -83,11 +120,27 @@ class TestRatingVpGw:
         """Player not in finals only gets prelim stats."""
         t = _make_tournament(
             rounds=[
-                [{"seating": [_seat("p3", 1.0, 0)]}],
+                [
+                    {
+                        "seating": _table(
+                            "p1", "p2", "p3", "p4", vps=[2.0, 1.0, 1.0, 0.0]
+                        ),
+                        "state": "Finished",
+                    }
+                ],
             ],
             finals={
-                "seating": [_seat("p1", 3.0, 1), _seat("p2", 0.5, 0)],
-                "seed_order": ["p1", "p2"],
+                "seating": _table(
+                    "p1",
+                    "p2",
+                    "p4",
+                    "p5",
+                    "p6",
+                    vps=[3.0, 1.0, 1.0, 0.0, 0.0],
+                    gws=[1, 0, 0, 0, 0],
+                ),
+                "seed_order": ["p1", "p2", "p4", "p5", "p6"],
+                "state": "Finished",
             },
         )
         vp, gw = _rating_vp_gw(t, "p3")
@@ -98,11 +151,27 @@ class TestRatingVpGw:
         """Winner's GW includes the finals GW."""
         t = _make_tournament(
             rounds=[
-                [{"seating": [_seat("p1", 1.0, 0), _seat("p2", 2.0, 1)]}],
+                [
+                    {
+                        "seating": _table(
+                            "p2", "p1", "p3", "p4", vps=[2.0, 1.0, 1.0, 0.0]
+                        ),
+                        "state": "Finished",
+                    }
+                ],
             ],
             finals={
-                "seating": [_seat("p1", 2.0, 1), _seat("p2", 1.0, 0)],
-                "seed_order": ["p1", "p2"],
+                "seating": _table(
+                    "p1",
+                    "p2",
+                    "p3",
+                    "p4",
+                    "p5",
+                    vps=[2.0, 2.0, 1.0, 0.0, 0.0],
+                    gws=[1, 0, 0, 0, 0],
+                ),
+                "seed_order": ["p1", "p2", "p3", "p4", "p5"],
+                "state": "Finished",
             },
             winner="p1",
         )
@@ -114,7 +183,14 @@ class TestRatingVpGw:
         """SA on a played round subtracts a full 1.0 VP (not the old overflow)."""
         t = _make_tournament(
             rounds=[
-                [{"seating": [_seat("p1", 2.0, 0), _seat("p2", 0.0, 0)]}],
+                [
+                    {
+                        "seating": _table(
+                            "p1", "p2", "p3", "p4", vps=[2.0, 0.0, 0.0, 2.0]
+                        ),
+                        "state": "Finished",
+                    }
+                ],
             ],
         )
         sanctions = [
@@ -133,7 +209,14 @@ class TestRatingVpGw:
         """SA penalty can push the rating VP below zero."""
         t = _make_tournament(
             rounds=[
-                [{"seating": [_seat("p1", 0.0, 0), _seat("p2", 0.0, 0)]}],
+                [
+                    {
+                        "seating": _table(
+                            "p1", "p2", "p3", "p4", vps=[0.0, 2.0, 1.0, 1.0]
+                        ),
+                        "state": "Finished",
+                    }
+                ],
             ],
         )
         sanctions = [
@@ -280,15 +363,20 @@ def test_dq_player_earns_no_rating_entry_co_player_unaffected_count_inclusive():
             {"user_uid": "dq_state", "state": "Disqualified"},
             {"user_uid": "dq_sanction", "state": "Finished"},
             {"user_uid": "clean", "state": "Finished"},
+            {"user_uid": "bystander", "state": "Finished"},
         ],
         rounds=[
             [
                 {
-                    "seating": [
-                        _seat("dq_state", 1.0, 0),
-                        _seat("dq_sanction", 1.0, 0),
-                        _seat("clean", 2.0, 1),
-                    ]
+                    "seating": _table(
+                        "clean",
+                        "dq_state",
+                        "dq_sanction",
+                        "bystander",
+                        vps=[2.0, 1.0, 1.0, 0.0],
+                        gws=[1, 0, 0, 0],
+                    ),
+                    "state": "Finished",
                 }
             ],
         ],
@@ -308,7 +396,7 @@ def test_dq_player_earns_no_rating_entry_co_player_unaffected_count_inclusive():
     assert clean_entry.vp == 2.0 and clean_entry.gw == 1
 
     # Head-count stays inclusive of DQ'd players (finalist-coefficient base).
-    assert _engine.attested_player_count(msgspec.json.encode(t).decode()) == 3
+    assert _engine.attested_player_count(msgspec.json.encode(t).decode()) == 4
 
 
 def test_final_positions_excludes_dq_and_proxy_rows():

@@ -853,7 +853,7 @@
   "override_error": "Falha ao substituir",
   "override_remove_error": "Falha ao remover substituição",
   "vp_blocked_oust_order": "Estes VP não descrevem uma partida possível: ninguém na mesa poderia ter eliminado o assento {seat}.",
-  "vp_blocked_missing_half": "Assento {seats}: marca meio ponto quando o tempo acaba.",
+  "vp_blocked_half_vp": "Assento {seats}: marca meio ponto quando o tempo acaba.",
   "vp_blocked_excessive": "Estes VP somam mais do que esta mesa pode atribuir ({max}).",
   "vp_blocked_redirected": "Todos os assentos estão pontuados, mas estes VP não correspondem a nenhuma ordem de eliminações.",
   "vp_blocked_table_size": "Uma mesa de {size} não pode ser pontuada: as mesas têm 4 ou 5 lugares.",

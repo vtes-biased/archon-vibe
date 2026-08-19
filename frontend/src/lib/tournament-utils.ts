@@ -114,23 +114,8 @@ export function computeStandings(tournament: Tournament | null): StandingEntry[]
     // Preliminary totals come from engine-computed standings (SA penalty applied to VP, GW/TP re-decided
     // per table). Do NOT re-sum raw seat results — SA lives only on the standings total, not per-seat.
     const map = new Map<string, { gw: number; vp: number; tp: number }>();
-    if (tournament.standings?.length) {
-      for (const s of tournament.standings) {
-        map.set(s.user_uid, { gw: s.gw ?? 0, vp: s.vp ?? 0, tp: s.tp ?? 0 });
-      }
-    } else {
-      for (const round of tournament.rounds) {
-        for (const table of round) {
-          for (const seat of table.seating) {
-            if (!seat.player_uid) continue;
-            const e = map.get(seat.player_uid) ?? { gw: 0, vp: 0, tp: 0 };
-            e.gw += seat.result.gw ?? 0;
-            e.vp += seat.result.vp ?? 0;
-            e.tp += seat.result.tp ?? 0;
-            map.set(seat.player_uid, e);
-          }
-        }
-      }
+    for (const s of tournament.standings ?? []) {
+      map.set(s.user_uid, { gw: s.gw ?? 0, vp: s.vp ?? 0, tp: s.tp ?? 0 });
     }
     const tossMap = new Map<string, number>();
     for (const p of players) {

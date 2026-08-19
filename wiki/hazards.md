@@ -148,6 +148,27 @@ any DQ create, lift or delete recompute standings.
 iterating standings unfiltered — league scoring and the VEKN push among them —
 leak proxy scores. Filter on `disqualified || non_competing`.
 
+**Standings count by table, not by round.** A finished table scores while its round
+is still running — the raffle pools depend on it, reading
+`compute_preliminary_standings` live rather than `tournament.standings` so a
+mid-round draw sees the tables already done. Anything that gates scoring on the
+round finishing breaks them.
+
+**A table's state is decided on change, never re-judged on recompute.** That is
+deliberate, not an oversight: `backend/scripts/migrate_from_archon.py` copies legacy
+per-seat VPs without validating them (only the file-import path in
+`archon_import.py` validates), so a recompute that re-ran `check_table_vps` over
+stored history would silently drop every table our checker happens to reject out of
+the standings and the rating. Anything that starts re-deriving state centrally
+inherits that, and the corpus has never been surveyed.
+
+**Scoring reads `Finished`; "who played" reads seats.** `compute_preliminary_standings`
+and `compute_rating_vp_gw` both skip a table that is not `Finished`, but
+`players_with_rounds` counts every seat in every table — a player who sat at a
+table that never finished did play, even though nothing they did scores. The two
+answer different questions and diverge on purpose; a force-finished tournament with
+an abandoned round is where you see it.
+
 **The SA −1 VP has three consumers**: preliminary standings, the rating path, and
 `SetScore`. All must share the one effective-round resolver or VP, GW and TP
 silently diverge. The resolver is Cancelled-aware — a soft-cancelled seat cannot

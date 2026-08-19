@@ -1113,6 +1113,11 @@ fn apply_event(
                     }
                     tournament["rounds"].array_remove(n - 1);
                 }
+                // update_standings keeps a rounds-less tournament's standings, for the
+                // round-less VEKN imports; a cancel must not inherit that.
+                if tournament["rounds"].is_empty() {
+                    tournament["standings"] = JsonValue::new_array();
+                }
             } else {
                 // Soft-cancel: mark tables Cancelled, keep the slot — a mid-array removal
                 // would shift deck.round / standings_adjustment.round_number, which are index-tagged.
@@ -1854,6 +1859,7 @@ fn apply_event(
             };
             t["state"] = "Finished".into();
 
+            update_standings(tournament, sanctions);
             Ok(())
         }
 
@@ -1895,6 +1901,7 @@ fn apply_event(
                 }
             }
 
+            update_standings(tournament, sanctions);
             Ok(())
         }
 

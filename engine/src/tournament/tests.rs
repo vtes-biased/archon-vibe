@@ -276,11 +276,12 @@ fn test_standings_tie_order_is_deterministic() {
     let mut tournament = make_tournament();
     tournament["rounds"] = json::array![json::array![json::object! {
         seating: [
-            { player_uid: "pc", result: { gw: 0, vp: 1.0, tp: 24 } },
-            { player_uid: "pa", result: { gw: 0, vp: 1.0, tp: 24 } },
-            { player_uid: "pd", result: { gw: 0, vp: 1.0, tp: 24 } },
-            { player_uid: "pb", result: { gw: 0, vp: 1.0, tp: 24 } },
+            { player_uid: "pc", result: { gw: 0, vp: 0.5, tp: 36 } },
+            { player_uid: "pa", result: { gw: 0, vp: 0.5, tp: 36 } },
+            { player_uid: "pd", result: { gw: 0, vp: 0.5, tp: 36 } },
+            { player_uid: "pb", result: { gw: 0, vp: 0.5, tp: 36 } },
         ],
+        state: "Finished",
     }]];
     tournament["players"] = json::array![
         { user_uid: "pa", toss: 0 },
@@ -505,10 +506,10 @@ fn test_cancel_round_soft_cancels_non_last() {
     ];
     t["rounds"] = json::array![
         [ { seating: [
-            { player_uid: "p1", result: { gw: 0, vp: 1.0, tp: 0 } },
-            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 0 } },
-            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 0 } },
-            { player_uid: "p4", result: { gw: 0, vp: 1.0, tp: 0 } },
+            { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 60 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 36 } },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 12 } },
         ], state: "Finished" } ],
         [ { seating: [
             { player_uid: "q1", result: { gw: 0, vp: 0.0, tp: 0 } },
@@ -608,6 +609,69 @@ fn test_cancel_last_round_sweeps_trailing_cancelled_rounds() {
     .unwrap();
     assert_eq!(out["rounds"].len(), 0, "both rounds gone, not one");
     assert_eq!(out["state"].as_str(), Some("Waiting"));
+    assert!(
+        out["standings"].is_empty(),
+        "the deleted rounds take their standings with them"
+    );
+}
+
+// A round nobody has played must score nothing — neither a standings row nor a TP on
+// the seats, which any consumer reading raw results would pick up.
+#[test]
+fn test_unfinished_round_contributes_no_standings() {
+    let mut t = make_tournament();
+    t["state"] = "Playing".into();
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Playing", toss: 0 },
+        { user_uid: "p2", state: "Playing", toss: 0 },
+        { user_uid: "p3", state: "Playing", toss: 0 },
+        { user_uid: "p4", state: "Playing", toss: 0 },
+        { user_uid: "q1", state: "Playing", toss: 0 },
+        { user_uid: "q2", state: "Playing", toss: 0 },
+        { user_uid: "q3", state: "Playing", toss: 0 },
+        { user_uid: "q4", state: "Playing", toss: 0 },
+        { user_uid: "q5", state: "Playing", toss: 0 },
+    ];
+    t["rounds"] = json::array![[
+        { seating: [
+            { player_uid: "p1", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "p2", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "p3", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 0 } },
+        ], state: "In Progress" },
+        { seating: [
+            { player_uid: "q1", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "q2", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "q3", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "q4", result: { gw: 0, vp: 0.0, tp: 0 } },
+            { player_uid: "q5", result: { gw: 0, vp: 0.0, tp: 0 } },
+        ], state: "In Progress" },
+    ]];
+
+    let out = json::parse(
+        &run_event(
+            &t,
+            &json::object! { type: "SwapSeats", round: 0, table1: 0, seat1: 0, table2: 0, seat2: 1 },
+            &make_organizer(),
+        )
+        .expect("swap"),
+    )
+    .unwrap();
+
+    assert!(
+        out["standings"].is_empty(),
+        "no standings row: {}",
+        out["standings"].dump()
+    );
+    let tps: Vec<f64> = out["rounds"][0]
+        .members()
+        .flat_map(|t| t["seating"].members())
+        .map(|s| s["result"]["tp"].as_f64().unwrap_or(-1.0))
+        .collect();
+    assert!(
+        tps.iter().all(|&tp| tp == 0.0),
+        "no TP on the seats either, or a raw-result reader shows 36 each: {tps:?}"
+    );
 }
 
 // RestoreRound un-voids a soft-cancelled non-last round: it must re-flip the table
@@ -1015,11 +1079,12 @@ fn test_standings_vp_under_sa_goes_negative() {
     let mut tournament = make_tournament();
     tournament["rounds"] = json::array![json::array![json::object! {
         seating: [
-            { player_uid: "p1", result: { gw: 0, vp: 2.0, tp: 48 } },
-            { player_uid: "p2", result: { gw: 0, vp: 0.0, tp: 12 } },
-            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 } },
-            { player_uid: "p4", result: { gw: 0, vp: 1.0, tp: 24 } },
+            { player_uid: "p1", result: { gw: 0, vp: 2.0, tp: 54 } },
+            { player_uid: "p2", result: { gw: 0, vp: 0.0, tp: 18 } },
+            { player_uid: "p3", result: { gw: 0, vp: 0.0, tp: 18 } },
+            { player_uid: "p4", result: { gw: 0, vp: 2.0, tp: 54 } },
         ],
+        state: "Finished",
     }]];
     tournament["players"] = json::array![
         { user_uid: "p1", toss: 0 },
@@ -1055,10 +1120,11 @@ fn test_dq_player_zeroed_and_sorted_last_opponents_unaffected() {
     tournament["rounds"] = json::array![json::array![json::object! {
         seating: [
             { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 60 } },
-            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 } },
-            { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 36 } },
-            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 36 } },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 12 } },
         ],
+        state: "Finished",
     }]];
     tournament["players"] = json::array![
         { user_uid: "p1", toss: 0 },
@@ -1115,10 +1181,11 @@ fn test_proxy_kept_not_zeroed_sorted_last_opponents_and_rating_unaffected() {
     tournament["rounds"] = json::array![json::array![json::object! {
         seating: [
             { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 60 } },
-            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 } },
-            { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 36 } },
-            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 36 } },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 12 } },
         ],
+        state: "Finished",
     }]];
     tournament["players"] = json::array![
         { user_uid: "p1", toss: 0 },
@@ -1132,7 +1199,7 @@ fn test_proxy_kept_not_zeroed_sorted_last_opponents_and_rating_unaffected() {
     assert!(p2.non_competing);
     assert_eq!(
         (p2.gw, p2.vp, p2.tp),
-        (0.0, 1.0, 48.0),
+        (0.0, 1.0, 36.0),
         "proxy KEEPS its score (unlike DQ which zeroes)"
     );
     assert_eq!(
@@ -1169,10 +1236,11 @@ fn test_rating_vp_gw_includes_finals_and_full_sa() {
             seating: [
                 { player_uid: "p1", result: { gw: 1, vp: 2.5, tp: 60 } },
                 { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 } },
-                { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 36 } },
-                { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 } },
-                { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 12 } },
+                { player_uid: "p3", result: { gw: 0, vp: 0.0, tp: 18 } },
+                { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 18 } },
+                { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 36 } },
             ],
+            state: "Finished",
         }],
         json::array![json::object! {
             seating: [
@@ -1182,15 +1250,16 @@ fn test_rating_vp_gw_includes_finals_and_full_sa() {
                 { player_uid: "p4", result: { gw: 0, vp: 1.0, tp: 36 } },
                 { player_uid: "p5", result: { gw: 0, vp: 1.0, tp: 36 } },
             ],
+            state: "Finished",
         }],
     ];
     tournament["finals"] = json::object! {
         seating: [
             { player_uid: "p1", result: { gw: 1, vp: 3.0, tp: 60 } },
-            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 } },
-            { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 36 } },
-            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 } },
-            { player_uid: "p5", result: { gw: 0, vp: 0.0, tp: 12 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 42 } },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 42 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 18 } },
+            { player_uid: "p5", result: { gw: 0, vp: 0.0, tp: 18 } },
         ],
     };
     let sanctions = json::array![
@@ -1246,12 +1315,13 @@ fn test_standings_vp_sa_ignores_lifted_redirects_unplayed_round() {
     let mut tournament = make_tournament();
     tournament["rounds"] = json::array![json::array![json::object! {
         seating: [
-            { player_uid: "p1", result: { gw: 0, vp: 1.5, tp: 36 } },
-            { player_uid: "p2", result: { gw: 0, vp: 1.5, tp: 36 } },
-            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 } },
-            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 12 } },
-            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 12 } },
+            { player_uid: "p1", result: { gw: 0, vp: 1.5, tp: 60 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 42 } },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 42 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 12 } },
+            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 24 } },
         ],
+        state: "Finished",
     }]];
     tournament["players"] = json::array![
         { user_uid: "p1", toss: 0 },
@@ -1282,18 +1352,20 @@ fn test_standings_sa_redirects_to_most_recent_seated_round() {
             seating: [
                 { player_uid: "p1", result: { gw: 1, vp: 2.5, tp: 60 } },
                 { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 } },
-                { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 24 } },
-                { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 } },
-                { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 24 } },
+                { player_uid: "p3", result: { gw: 0, vp: 0.0, tp: 18 } },
+                { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 18 } },
+                { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 36 } },
             ],
+            state: "Finished",
         }],
         json::array![json::object! {
             seating: [
-                { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 24 } },
+                { player_uid: "p2", result: { gw: 0, vp: 0.0, tp: 12 } },
                 { player_uid: "p3", result: { gw: 1, vp: 2.0, tp: 60 } },
-                { player_uid: "p4", result: { gw: 0, vp: 1.0, tp: 24 } },
-                { player_uid: "p5", result: { gw: 0, vp: 0.0, tp: 12 } },
+                { player_uid: "p4", result: { gw: 0, vp: 1.0, tp: 36 } },
+                { player_uid: "p5", result: { gw: 0, vp: 1.0, tp: 36 } },
             ],
+            state: "Finished",
         }],
     ];
     tournament["players"] = json::array![
@@ -1318,16 +1390,17 @@ fn test_standings_sa_redirects_to_most_recent_seated_round() {
 #[test]
 fn test_rating_vp_gw_finals_sa_lands_on_finals() {
     // A finals-round SA (round_number == rounds_len sentinel) sticks on the finals: prelim
-    // GW is kept (no penalty there) while -1 VP hits the rating total. VP = 2.0+3.0-1.0 = 4.0; GW = 1+1 = 2.0.
+    // GW is kept (no penalty there) while -1 VP hits the rating total. VP = 2.5+3.0-1.0 = 4.5; GW = 1+1 = 2.0.
     let mut tournament = make_tournament();
     tournament["rounds"] = json::array![json::array![json::object! {
         seating: [
-            { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 60 } },
-            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 36 } },
-            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 } },
-            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 } },
-            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 12 } },
+            { player_uid: "p1", result: { gw: 1, vp: 2.5, tp: 60 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 } },
+            { player_uid: "p3", result: { gw: 0, vp: 0.0, tp: 18 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 18 } },
+            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 36 } },
         ],
+        state: "Finished",
     }]];
     tournament["finals"] = json::object! {
         seating: [
@@ -1342,7 +1415,7 @@ fn test_rating_vp_gw_finals_sa_lands_on_finals() {
         { user_uid: "p1", level: "standings_adjustment", round_number: 1, lifted_at: json::Null, deleted_at: json::Null },
     ];
     let (vp, gw) = super::compute_rating_vp_gw(&tournament, &sanctions, "p1");
-    assert_eq!(vp, 4.0, "prelim 2.0 + finals 3.0 - 1.0 finals SA");
+    assert_eq!(vp, 4.5, "prelim 2.5 + finals 3.0 - 1.0 finals SA");
     assert_eq!(
         gw, 2.0,
         "prelim GW kept (SA no longer redirected there) + finals GW (stored)"
@@ -1356,22 +1429,23 @@ fn test_finals_sa_rescores_finals_and_rederives_winner() {
     let mut tournament = make_tournament();
     tournament["rounds"] = json::array![json::array![json::object! {
         seating: [
-            { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 60 } },
-            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 36 } },
-            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 } },
-            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 } },
-            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 12 } },
+            { player_uid: "p1", result: { gw: 1, vp: 2.5, tp: 60 } },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 } },
+            { player_uid: "p3", result: { gw: 0, vp: 0.0, tp: 18 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 18 } },
+            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 36 } },
         ],
+        state: "Finished",
     }]];
     tournament["finals"] = json::object! {
         state: "Finished",
         seed_order: ["p1", "p2", "p3", "p4", "p5"],
         seating: [
-            { player_uid: "p1", result: { gw: 1, vp: 2.5, tp: 60 } },
-            { player_uid: "p2", result: { gw: 0, vp: 2.0, tp: 48 } },
-            { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 36 } },
-            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 24 } },
-            { player_uid: "p5", result: { gw: 0, vp: 0.0, tp: 12 } },
+            { player_uid: "p1", result: { gw: 0, vp: 2.0, tp: 54 } },
+            { player_uid: "p2", result: { gw: 0, vp: 2.0, tp: 54 } },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 18 } },
+            { player_uid: "p5", result: { gw: 0, vp: 0.0, tp: 18 } },
         ],
     };
     tournament["winner"] = "p1".into();
@@ -1407,7 +1481,7 @@ fn test_finals_sa_rescores_finals_and_rederives_winner() {
         .unwrap();
     assert_eq!(
         p1["vp"].as_f64(),
-        Some(2.0),
+        Some(2.5),
         "prelim standings VP untouched by a finals-round SA"
     );
 }
@@ -1421,10 +1495,11 @@ fn test_standings_recompute_picks_up_late_sa() {
         seating: [
             { player_uid: "p1", result: { gw: 1, vp: 2.5, tp: 60 } },
             { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 } },
-            { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 24 } },
-            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 } },
-            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 24 } },
+            { player_uid: "p3", result: { gw: 0, vp: 0.0, tp: 18 } },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 18 } },
+            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 36 } },
         ],
+        state: "Finished",
     }]];
     tournament["players"] = json::array![
         { user_uid: "p1", toss: 0 },
@@ -1443,7 +1518,7 @@ fn test_standings_recompute_picks_up_late_sa() {
             .find(|s| s.user_uid == uid)
             .unwrap_or_else(|| panic!("{uid} missing"))
     };
-    // Adjusted VPs: p1=1.5, p2=1.0, p3=p4=p5=0.5.
+    // Adjusted VPs: p1=1.5, p2=1.0, p5=0.5, p3=p4=0.
     assert_eq!(
         get("p1").gw,
         0.0,
@@ -1456,8 +1531,8 @@ fn test_standings_recompute_picks_up_late_sa() {
         "p1 still ranks 1st on adjusted VP -> 60 TP"
     );
     assert_eq!(get("p2").tp, 48.0, "p2 2nd -> 48 TP");
-    // p3/p4/p5 tie 3rd-5th on adjusted 0.5 -> (36+24+12)/3 = 24 each.
-    assert_eq!(get("p3").tp, 24.0);
+    // p3/p4 tie 4th-5th on adjusted 0 -> (24+12)/2 = 18 each.
+    assert_eq!(get("p3").tp, 18.0);
 }
 
 // An SA whose stored round gets soft-cancelled must penalize VP and the GW/TP cascade on the
@@ -1466,8 +1541,9 @@ fn test_standings_recompute_picks_up_late_sa() {
 fn test_sa_on_soft_cancelled_round_penalizes_vp_and_gw_together() {
     let mut t = make_tournament();
     t["state"] = "Playing".into();
-    // Round 0 finished (later soft-cancelled), round 1 live; p1..p5 seated in both so the
+    // Round 0 finished (later soft-cancelled), round 1 finished; p1..p5 seated in both so the
     // SA tagged on round 0 has a surviving round to redirect onto. Distinct toss for deterministic ranking.
+    // Cancelling round 0 leaves every surviving table finished, so the tournament lands in Waiting.
     t["players"] = json::array![
         { user_uid: "p1", state: "Playing", payment_status: "Pending", toss: 5 },
         { user_uid: "p2", state: "Playing", payment_status: "Pending", toss: 4 },
@@ -1475,26 +1551,25 @@ fn test_sa_on_soft_cancelled_round_penalizes_vp_and_gw_together() {
         { user_uid: "p4", state: "Playing", payment_status: "Pending", toss: 2 },
         { user_uid: "p5", state: "Playing", payment_status: "Pending", toss: 1 },
     ];
-    // Both tables single-oust, VP sum == 5 (engine-valid). p1 raw 2.5 takes the GW at 0 adjustment.
     t["rounds"] = json::array![
         [ { seating: [
             { player_uid: "p1", result: { gw: 1, vp: 2.5, tp: 60 }, judge_uid: "" },
             { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 }, judge_uid: "" },
-            { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 24 }, judge_uid: "" },
-            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 }, judge_uid: "" },
-            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 24 }, judge_uid: "" },
+            { player_uid: "p3", result: { gw: 0, vp: 0.0, tp: 18 }, judge_uid: "" },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 18 }, judge_uid: "" },
+            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 36 }, judge_uid: "" },
         ], state: "Finished", override: json::Null } ],
         [ { seating: [
             { player_uid: "p1", result: { gw: 1, vp: 2.5, tp: 60 }, judge_uid: "" },
             { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 }, judge_uid: "" },
-            { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 24 }, judge_uid: "" },
-            { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 24 }, judge_uid: "" },
-            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 24 }, judge_uid: "" },
-        ], state: "In Progress", override: json::Null } ],
+            { player_uid: "p3", result: { gw: 0, vp: 0.0, tp: 18 }, judge_uid: "" },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 18 }, judge_uid: "" },
+            { player_uid: "p5", result: { gw: 0, vp: 0.5, tp: 36 }, judge_uid: "" },
+        ], state: "Finished", override: json::Null } ],
     ];
 
-    // Soft-cancel round 0 through the real engine: round 1 stays live so the tournament stays
-    // Playing, round 0's tables flip to Cancelled with their seating intact.
+    // Soft-cancel round 0 through the real engine: its tables flip to Cancelled with
+    // their seating intact.
     let cancelled = json::parse(
         &run_event(
             &t,
@@ -1509,7 +1584,7 @@ fn test_sa_on_soft_cancelled_round_penalizes_vp_and_gw_together() {
         Some("Cancelled"),
         "precondition: round 0 soft-cancelled, seating preserved"
     );
-    assert_eq!(cancelled["state"].as_str(), Some("Playing"));
+    assert_eq!(cancelled["rounds"].len(), 2, "the slot survives the cancel");
 
     // SA recorded against round 0 — the round that just got cancelled.
     let sanctions = json::array![
@@ -1805,10 +1880,10 @@ fn tournament_with_round() -> JsonValue {
         [
             {
                 seating: [
-                    { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 48 }, judge_uid: "" },
-                    { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 24 }, judge_uid: "" },
-                    { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 12 }, judge_uid: "" },
-                    { player_uid: "p4", result: { gw: 0, vp: 0.5, tp: 12 }, judge_uid: "" },
+                    { player_uid: "p1", result: { gw: 1, vp: 2.0, tp: 60 }, judge_uid: "" },
+                    { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+                    { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+                    { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 12 }, judge_uid: "" },
                 ],
                 state: "Finished",
                 override: json::Null,
@@ -3495,7 +3570,7 @@ fn test_raffle_pools_count_scores_from_round_in_progress() {
         .filter_map(|w| w.as_str())
         .collect();
     winners.sort();
-    assert_eq!(winners, vec!["p5", "p6", "p7", "p8"]);
+    assert_eq!(winners, vec!["p4", "p5", "p6", "p7", "p8"]);
 
     let event = json::object! {
         type: "RaffleDraw",
@@ -3574,6 +3649,73 @@ fn redirected_vp_reads_as_blocked_not_unfinished() {
         check_table_vps(&[3.0, 0.0, 2.5, 0.0, 0.0]),
         Some(VpError::ExcessiveTotal)
     );
+}
+
+/// `check_table_vps` must accept a table result exactly when a game can produce one.
+/// Its own oust simulation is the check; this pins it against an independent one —
+/// ousts around the table, the winner's extra VP, half a VP per survivor at time-out.
+#[test]
+fn check_table_vps_accepts_exactly_the_reachable_results() {
+    fn reachable(n: usize) -> std::collections::HashSet<Vec<u64>> {
+        fn walk(alive: &[usize], vp: &[f64], out: &mut std::collections::HashSet<Vec<u64>>) {
+            if alive.len() > 1 {
+                let mut timed = vp.to_vec();
+                for &i in alive {
+                    timed[i] += 0.5;
+                }
+                out.insert(timed.iter().map(|v| (v * 2.0) as u64).collect());
+            }
+            if alive.len() == 1 {
+                let mut won = vp.to_vec();
+                won[alive[0]] += 1.0;
+                out.insert(won.iter().map(|v| (v * 2.0) as u64).collect());
+                return;
+            }
+            for (pos, &killer) in alive.iter().enumerate() {
+                let prey = alive[(pos + 1) % alive.len()];
+                let mut nvp = vp.to_vec();
+                nvp[killer] += 1.0;
+                let rest: Vec<usize> = alive.iter().copied().filter(|&x| x != prey).collect();
+                walk(&rest, &nvp, out);
+            }
+        }
+        let mut out = std::collections::HashSet::new();
+        walk(&(0..n).collect::<Vec<_>>(), &vec![0.0; n], &mut out);
+        out
+    }
+
+    // Halves are the finest grain a VP comes in, so search in half-VP steps.
+    for n in 4..=5 {
+        let games = reachable(n);
+        let mut counters = vec![0u64; n];
+        loop {
+            let vps: Vec<f64> = counters.iter().map(|&h| h as f64 / 2.0).collect();
+            let accepted = check_table_vps(&vps).is_none();
+            assert_eq!(
+                accepted,
+                games.contains(&counters),
+                "{vps:?}: engine says {}, a real game says {}",
+                if accepted { "valid" } else { "invalid" },
+                if games.contains(&counters) {
+                    "valid"
+                } else {
+                    "invalid"
+                },
+            );
+            let mut i = 0;
+            while i < n {
+                counters[i] += 1;
+                if counters[i] <= 2 * n as u64 {
+                    break;
+                }
+                counters[i] = 0;
+                i += 1;
+            }
+            if i == n {
+                break;
+            }
+        }
+    }
 }
 
 /// The gate is the data shape, not the mode: every legacy import is rounds-less

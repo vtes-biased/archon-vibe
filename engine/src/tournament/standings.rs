@@ -33,7 +33,7 @@ pub(super) fn compute_preliminary_standings(
 
     for (round_index, round) in tournament["rounds"].members().enumerate() {
         for table in round.members() {
-            if table["state"].as_str() == Some("Cancelled") {
+            if table["state"].as_str() != Some("Finished") {
                 continue;
             }
             let seating = &table["seating"];
@@ -128,8 +128,41 @@ fn sort_by_rank(standings: &mut [Standing]) {
     });
 }
 
+/// Refresh per-seat GW/TP from raw VPs plus current sanctions, so a late SA cascades.
+/// State is set where a table changes and never re-judged here; `Cancelled` keeps its
+/// scores untouched, since `RestoreRound` re-derives the round from them.
+fn refresh_round_scoring(tournament: &mut JsonValue, sanctions: &JsonValue) {
+    let effective_sas = resolve_sa_effective_rounds(tournament, sanctions);
+    for r in 0..tournament["rounds"].len() {
+        for t in 0..tournament["rounds"][r].len() {
+            let table = &tournament["rounds"][r][t];
+            if table["state"].as_str() == Some("Cancelled") {
+                continue;
+            }
+            // Zeroed rather than derived on an unfinished table: an unscored one ties
+            // every seat, and the ladder average would stamp 36 TP apiece on anything
+            // reading the seats instead of the standings.
+            let scored = table["state"].as_str() == Some("Finished");
+            let seating = &table["seating"];
+            let vps: Vec<f64> = seating
+                .members()
+                .map(|s| s["result"]["vp"].as_f64().unwrap_or(0.0))
+                .collect();
+            let adjustments = table_sa_adjustments(seating, r, &effective_sas);
+            let gws = compute_gw(&vps, &adjustments);
+            let tps = compute_tp(vps.len(), &vps, &adjustments);
+            let table = &mut tournament["rounds"][r][t];
+            for i in 0..vps.len() {
+                table["seating"][i]["result"]["gw"] = if scored { gws[i] } else { 0.0 }.into();
+                table["seating"][i]["result"]["tp"] = if scored { tps[i] } else { 0.0 }.into();
+            }
+        }
+    }
+}
+
 /// Guard: skips when rounds are empty, preserving VEKN-synced standings.
 pub(super) fn update_standings(tournament: &mut JsonValue, sanctions: &JsonValue) {
+    refresh_round_scoring(tournament, sanctions);
     if tournament["rounds"].is_empty() {
         return;
     }
@@ -298,7 +331,7 @@ pub fn compute_rating_vp_gw(
         let effective_sas = resolve_sa_effective_rounds(tournament, sanctions);
         for (round_index, round) in tournament["rounds"].members().enumerate() {
             for table in round.members() {
-                if table["state"].as_str() == Some("Cancelled") {
+                if table["state"].as_str() != Some("Finished") {
                     continue;
                 }
                 let seating = &table["seating"];

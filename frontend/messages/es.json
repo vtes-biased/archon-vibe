@@ -853,7 +853,7 @@
   "override_error": "Error al anular",
   "override_remove_error": "Error al eliminar anulación",
   "vp_blocked_oust_order": "Estos VP no describen una partida posible: nadie en la mesa pudo eliminar al asiento {seat}.",
-  "vp_blocked_missing_half": "Asiento {seats}: se anota medio punto al agotarse el tiempo.",
+  "vp_blocked_half_vp": "Asiento {seats}: se anota medio punto al agotarse el tiempo.",
   "vp_blocked_excessive": "Estos VP suman más de lo que esta mesa puede otorgar ({max}).",
   "vp_blocked_redirected": "Todos los asientos tienen puntuación, pero estos VP no encajan con ningún orden de eliminaciones.",
   "vp_blocked_table_size": "Una mesa de {size} no se puede puntuar: las mesas son de 4 o 5.",

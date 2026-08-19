@@ -7,8 +7,8 @@ export function vpIssueText(issue: VpIssue, tableSize: number): string {
   switch (issue.code) {
     case "impossible_oust_order":
       return m.vp_blocked_oust_order({ seat: (issue.seats[0] ?? 0) + 1 });
-    case "missing_half_vp":
-      return m.vp_blocked_missing_half({
+    case "half_vp_mismatch":
+      return m.vp_blocked_half_vp({
         seats: issue.seats.map((s) => s + 1).join(", "),
       });
     case "excessive_total":
