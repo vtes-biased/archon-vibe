@@ -2,9 +2,15 @@
 
 import base64
 
+import msgspec
 import pytest
-from src.access_levels import compute_full, compute_member, compute_public
-from src.models import ObjectType
+from src.access_levels import (
+    _TOURNAMENT_MEMBER_EXCLUDE,
+    compute_full,
+    compute_member,
+    compute_public,
+)
+from src.models import ObjectType, Tournament, User
 
 
 def _make_user(**overrides) -> dict:
@@ -508,3 +514,72 @@ class TestDispatch:
             compute_member("foobar", {})
         with pytest.raises(ValueError, match="Unknown object type"):
             compute_full("foobar", {})
+
+
+# The member-visible half of the tournament projection, which the code expresses
+# only as the denylist's complement.
+_TOURNAMENT_MEMBER_VISIBLE = {
+    "uid",
+    "modified",
+    "deleted_at",
+    "name",
+    "format",
+    "rank",
+    "online",
+    "start",
+    "finish",
+    "timezone",
+    "country",
+    "league_uid",
+    "state",
+    "organizers_uids",
+    "venue",
+    "venue_url",
+    "address",
+    "map_url",
+    "proxies",
+    "multideck",
+    "decklist_required",
+    "description",
+    "standings_mode",
+    "decklists_mode",
+    "max_rounds",
+    "max_players",
+    "open_rounds",
+    "self_organized_rounds",
+    "table_rooms",
+    "round_time",
+    "finals_time",
+    "banner_path",
+    "external_ids",
+    "event_code",
+    "players",
+    "rounds",
+    "finals",
+    "winner",
+    "standings",
+    "reported_player_count",
+    "raffles",
+    "promos_distributed",
+    "promo_stock_source_uid",
+    "offline_mode",
+    "offline_device_id",
+    "offline_user_uid",
+    "offline_since",
+    "timer",
+    "table_extra_time",
+    "announcements",
+}
+
+
+class TestProjectionCompleteness:
+    def test_every_tournament_field_is_member_classified(self):
+        assert not (_TOURNAMENT_MEMBER_VISIBLE & _TOURNAMENT_MEMBER_EXCLUDE)
+        assert _TOURNAMENT_MEMBER_VISIBLE | _TOURNAMENT_MEMBER_EXCLUDE == {
+            f.name for f in msgspec.structs.fields(Tournament)
+        }
+
+    def test_user_full_withholds_only_calendar_token(self):
+        every = {f.name: None for f in msgspec.structs.fields(User)}
+        result = compute_full(ObjectType.USER, every)
+        assert set(every) - set(result) == {"calendar_token"}

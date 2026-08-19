@@ -121,6 +121,19 @@ even on a skipped-DB run. When reviewing a widened or narrowed projection, read
 that file first; if the sensitive field is already pinned there, a further
 "public ⊆ member" test is redundant — say so and add nothing.
 
+**Field-list drift is pinned in four files, and each pin is exhaustive** — a new
+model field fails one of them rather than leaking. `test_go_online.py` classifies
+every `Tournament` field as server-owned, merged, stamped or carried from the
+device's snapshot; `test_account_surgery.py` classifies every `User` field across
+the detach split; `test_access_levels.py` holds the member-visible complement of
+the tournament denylist and pins `compute_user_full` to withholding exactly
+`calendar_token`; `test_tournament_field_contracts.py` classifies every
+`TournamentActionRequest` field as truthy-only or any-value, and compares the
+engine's `CONFIG_FIELDS`, `TournamentConfig` and `CreateTournamentRequest` while
+driving a real create through the shipped engine so the create literal cannot
+forget a field. Only the half each classification's code actually uses is
+importable; the complement lives in the test, so there is one copy of each.
+
 **No test can catch a missing projection backfill, so do not propose one.** The
 access-version resync fires when a *viewer's* level changes. When the *server's
 definition* of a level changes, no viewer transitioned and no row's `modified_at`

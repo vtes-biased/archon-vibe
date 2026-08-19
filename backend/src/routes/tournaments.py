@@ -101,6 +101,18 @@ _RATING_IRRELEVANT_ACTIONS = frozenset(
 
 _engine = PyEngine()
 
+SERVER_OWNED_TOURNAMENT_FIELDS = frozenset(
+    {
+        "banner_path",
+        "external_ids",
+        "checkin_code",
+        "event_code",
+        "vekn_pushed_at",
+        "vekn_results_stale",
+        "twda_status",
+    }
+)
+
 
 def _promo_recompute_diff(old: Tournament | None, new: Tournament | None) -> None:
     """Re-derive promo stock for promos whose distribution may have changed —
@@ -814,6 +826,7 @@ class CreateTournamentRequest(BaseModel):
     max_players: int = 0
     open_rounds: bool = False
     self_organized_rounds: bool = False
+    table_rooms: list[dict] = Field(default_factory=list)
     league_uid: str | None = None
     round_time: int = 0
     finals_time: int = 0
@@ -1337,6 +1350,24 @@ class TournamentActionRequest(BaseModel):
     reported_player_count: int | None = None  # For SetArchivalResults
 
 
+# Every other field reaches the engine whenever it is not null — including the
+# empty string, which is how `winner` clears. These nine are the exceptions: an
+# empty value means "not part of this action", so it must not reach the engine.
+_ACTION_TRUTHY_ONLY = frozenset(
+    {
+        "user_uid",
+        "player_uid",
+        "display_name",
+        "scores",
+        "comment",
+        "status",
+        "seating",
+        "label",
+        "pool",
+    }
+)
+
+
 @router.post("/{uid}/action")
 async def tournament_action(
     uid: str,
@@ -1346,71 +1377,21 @@ async def tournament_action(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    event_data = {"type": request.type}
-    if request.user_uid:
-        event_data["user_uid"] = request.user_uid
-    if request.player_uid:
-        event_data["player_uid"] = request.player_uid
-    if request.display_name:
-        event_data["display_name"] = request.display_name
-    if request.round is not None:
-        event_data["round"] = request.round
-    if request.table is not None:
-        event_data["table"] = request.table
-    if request.table1 is not None:
-        event_data["table1"] = request.table1
-    if request.seat1 is not None:
-        event_data["seat1"] = request.seat1
-    if request.table2 is not None:
-        event_data["table2"] = request.table2
-    if request.seat2 is not None:
-        event_data["seat2"] = request.seat2
-    if request.seat is not None:
-        event_data["seat"] = request.seat
-    if request.scores:
-        event_data["scores"] = request.scores
-    if request.comment:
-        event_data["comment"] = request.comment
-    if request.toss is not None:
-        event_data["toss"] = request.toss
-    if request.status:
-        event_data["status"] = request.status
-    if request.non_competing is not None:
-        event_data["non_competing"] = request.non_competing
-    if request.seating:
-        event_data["seating"] = request.seating
-    if request.player_uids is not None:
-        event_data["player_uids"] = request.player_uids
-    if request.config is not None:
-        if "country" in request.config:
-            country = stored_country(request.config["country"])
-            if request.config["country"] and country is None:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Invalid country: {request.config['country']}",
-                )
-            request.config["country"] = country
-        event_data["config"] = request.config
-    if request.deck is not None:
-        event_data["deck"] = request.deck
-    if request.multideck is not None:
-        event_data["multideck"] = request.multideck
-    if request.label:
-        event_data["label"] = request.label
-    if request.pool:
-        event_data["pool"] = request.pool
-    if request.exclude_drawn is not None:
-        event_data["exclude_drawn"] = request.exclude_drawn
-    if request.count is not None:
-        event_data["count"] = request.count
-    if request.seed is not None:
-        event_data["seed"] = request.seed
-    if request.winner is not None:
-        event_data["winner"] = request.winner
-    if request.players is not None:
-        event_data["players"] = request.players
-    if request.reported_player_count is not None:
-        event_data["reported_player_count"] = request.reported_player_count
+    event_data = {"type": request.type} | {
+        name: value
+        for name, value in request.model_dump(
+            exclude_none=True, exclude={"type"}
+        ).items()
+        if value or name not in _ACTION_TRUTHY_ONLY
+    }
+    if "config" in event_data and "country" in event_data["config"]:
+        country = stored_country(event_data["config"]["country"])
+        if event_data["config"]["country"] and country is None:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid country: {event_data['config']['country']}",
+            )
+        event_data["config"]["country"] = country
 
     # SELECT FOR UPDATE: serialize concurrent writes to this tournament
     async with tournament_transaction(uid) as (tournament, tx_conn):
@@ -2240,23 +2221,10 @@ async def go_online(
             merged = list(dict.fromkeys(original_organizers + client_organizers))
             request.tournament["organizers_uids"] = merged
 
-            # Server-managed fields the offline engine never touches: re-pull from the
-            # locked row so a server-side change isn't reverted by this stale snapshot.
-            request.tournament["banner_path"] = tournament.banner_path
-            request.tournament["external_ids"] = tournament.external_ids
-            request.tournament["checkin_code"] = tournament.checkin_code
-            request.tournament["event_code"] = tournament.event_code
-            request.tournament["vekn_pushed_at"] = (
-                tournament.vekn_pushed_at.isoformat()
-                if tournament.vekn_pushed_at
-                else None
-            )
-            request.tournament["vekn_results_stale"] = tournament.vekn_results_stale
-            request.tournament["twda_status"] = (
-                msgspec.to_builtins(tournament.twda_status)
-                if tournament.twda_status
-                else None
-            )
+            for name in SERVER_OWNED_TOURNAMENT_FIELDS:
+                request.tournament[name] = msgspec.to_builtins(
+                    getattr(tournament, name)
+                )
 
         tournament_data = request.tournament
         if uid_map:

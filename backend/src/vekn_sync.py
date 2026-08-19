@@ -603,44 +603,18 @@ class VEKNSyncService:
     ) -> tuple[User, bool]:
         """Applies only actually-changed fields, skipping the write (and its SSE
         broadcast) when nothing changed."""
-        update_fields = {}
-        for field, value in vekn_data.items():
-            if field not in existing_user.local_modifications:
-                update_fields[field] = value
-
-        new_name = update_fields.get("name", existing_user.name)
-        new_country = update_fields.get("country", existing_user.country)
-        new_city = update_fields.get("city", existing_user.city)
-        new_city_geoname_id = update_fields.get(
-            "city_geoname_id", existing_user.city_geoname_id
-        )
-        new_state = update_fields.get("state", existing_user.state)
-        new_vekn_prefix = update_fields.get("vekn_prefix", existing_user.vekn_prefix)
-        new_contact_email = update_fields.get(
-            "contact_email", existing_user.contact_email
-        )
-
-        has_changes = (
-            new_name != existing_user.name
-            or new_country != existing_user.country
-            or new_city != existing_user.city
-            or new_city_geoname_id != existing_user.city_geoname_id
-            or new_state != existing_user.state
-            or new_vekn_prefix != existing_user.vekn_prefix
-            or new_contact_email != existing_user.contact_email
-        )
-
-        if not has_changes:
+        changed = {
+            field: value
+            for field, value in vekn_data.items()
+            if field not in existing_user.local_modifications
+            and getattr(existing_user, field) != value
+        }
+        if not changed:
             return existing_user, False
 
         now = datetime.now(UTC)
-        existing_user.name = new_name
-        existing_user.country = new_country
-        existing_user.city = new_city
-        existing_user.city_geoname_id = new_city_geoname_id
-        existing_user.state = new_state
-        existing_user.vekn_prefix = new_vekn_prefix
-        existing_user.contact_email = new_contact_email
+        for field, value in changed.items():
+            setattr(existing_user, field, value)
         existing_user.vekn_synced = True
         existing_user.vekn_synced_at = now
         existing_user.modified = now

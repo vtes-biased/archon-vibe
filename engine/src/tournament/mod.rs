@@ -51,6 +51,35 @@ pub fn table_label(table_rooms: &JsonValue, table_idx: usize) -> Option<String> 
     None
 }
 
+pub const CONFIG_FIELDS: [&str; 26] = [
+    "name",
+    "format",
+    "rank",
+    "online",
+    "start",
+    "finish",
+    "timezone",
+    "country",
+    "venue",
+    "venue_url",
+    "address",
+    "map_url",
+    "proxies",
+    "multideck",
+    "decklist_required",
+    "description",
+    "standings_mode",
+    "decklists_mode",
+    "max_rounds",
+    "max_players",
+    "open_rounds",
+    "self_organized_rounds",
+    "table_rooms",
+    "league_uid",
+    "round_time",
+    "finals_time",
+];
+
 /// Shared between `UpdateConfig` and `CreateTournament`.
 fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
     if let Some(f) = config["format"].as_str() {
@@ -204,6 +233,11 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
         "max_players" => config["max_players"].as_u32().unwrap_or(0),
         "open_rounds" => config["open_rounds"].as_bool().unwrap_or(false),
         "self_organized_rounds" => config["self_organized_rounds"].as_bool().unwrap_or(false),
+        "table_rooms" => if config["table_rooms"].is_array() {
+            config["table_rooms"].clone()
+        } else {
+            json::array![]
+        },
         "league_uid" => config["league_uid"].clone(),
         "round_time" => config["round_time"].as_u32().unwrap_or(0),
         "finals_time" => config["finals_time"].as_u32().unwrap_or(0),
@@ -2436,35 +2470,7 @@ fn apply_event(
                 config.has_key("decklists_mode") && state == TournamentState::Finished;
 
             // Apply config fields (key present = apply, even if null)
-            let config_fields = [
-                "name",
-                "format",
-                "rank",
-                "online",
-                "start",
-                "finish",
-                "timezone",
-                "country",
-                "venue",
-                "venue_url",
-                "address",
-                "map_url",
-                "proxies",
-                "multideck",
-                "decklist_required",
-                "description",
-                "standings_mode",
-                "decklists_mode",
-                "max_rounds",
-                "max_players",
-                "open_rounds",
-                "self_organized_rounds",
-                "table_rooms",
-                "league_uid",
-                "round_time",
-                "finals_time",
-            ];
-            for field in config_fields {
+            for field in CONFIG_FIELDS {
                 if config.has_key(field) {
                     tournament[field] = config[field].clone();
                 }

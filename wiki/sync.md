@@ -35,6 +35,8 @@ the calendar withholds it the same way.
 The tournament member projection is the mirror image, a **denylist**
 (`_TOURNAMENT_MEMBER_EXCLUDE`): any new Tournament field is member-visible by
 default, so an organizer-only secret must be added to that list or it leaks.
+`test_access_levels.py` carries the member-visible complement and asserts the two
+cover the model, so a new field has to be classified.
 
 A league's `organizers_uids` is stripped at public level because ordinary members
 have no public projection at all — a published organizer uid would resolve to
@@ -528,10 +530,11 @@ server re-stamps a fixed set of fields from the authoritative locked row:
 can change server-side during the offline window — VEKN sync writes `external_ids`
 and `vekn_pushed_at`, a re-uploaded banner writes `banner_path`, another
 organizer's SA or DQ can flip `vekn_results_stale`. Trusting the device's stale values would
-revert them. "Server wins" for non-engine fields, same as `organizers_uids`. **Any
-new backend-only Tournament field must join this list**, or an offline round-trip
-silently reverts it; the online action path is safe because the engine preserves
-unknown JSON keys.
+revert them. "Server wins" for non-engine fields, same as `organizers_uids`. The
+list is `SERVER_OWNED_TOURNAMENT_FIELDS`, and `test_go_online.py` classifies every
+`Tournament` field against it, so a new backend-only field fails a test instead of
+being silently reverted; the online action path is safe because the engine
+preserves unknown JSON keys.
 
 **Offline player resolution** — go-online resolves each `TEMP-` player by VEKN id
 first, then by email, else creates a member. The VEKN-id match never cross-checks

@@ -100,7 +100,11 @@ the one validator create and `UpdateConfig` share; written into the
 around it afterwards. The rank-legality and date-ordering checks sit outside it
 because `UpdateConfig` must pass the merged config-over-tournament view. The route
 keeps what the engine cannot decide: the REST authorization layer, country
-normalization, the league-link lookup and the `VEKN_PUSH` round bounds.
+normalization, the league-link lookup and the `VEKN_PUSH` round bounds. The
+editable set is `CONFIG_FIELDS`, which `UpdateConfig` applies and which
+`test_tournament_field_contracts.py` pins against `TournamentConfig`,
+`CreateTournamentRequest` and a real create through the engine — a field missing
+from any of them is un-editable, un-creatable, or dropped at creation.
 
 **Read-only rules** the UI must agree with — may a finals start, is this table
 scorable, who places where — are engine exports too, called **synchronously**

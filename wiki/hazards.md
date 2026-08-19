@@ -9,47 +9,19 @@ documented; this page carries the cross-cutting ones and indexes the rest.
 
 ## Fields silently dropped
 
-**Hand-rebuilt models drop new fields.** Several call sites reconstruct a `User` or
-`Sanction` from an enumerated field list rather than copying. When a model gains a
-field, every one of those constructors silently drops it. Prefer
-`msgspec.structs.replace` over hand-listing.
+**A hand-rebuilt `User` or `Sanction` drops every field its author did not
+enumerate** — prefer `msgspec.structs.replace`. Five sites carry a field list of
+their own: go-online's server-wins re-pull, the detach split's two clear-lists,
+the member projection denylist, `/action`'s copy into `event_data` and the
+tournament config set. Each derives what it can from the model it mirrors and
+asserts the judgement that remains exhaustive against the struct, so a new field
+fails a test instead of leaking — [testing](testing.md#traps) names the guards.
 
-Two rebuilds of an *existing* user sit on routine paths and are the ones that bite:
-
-- the member sync's cooptation inference, a nightly job, which already drops
-  several fields;
-- the detach path's two lists, each the inverse of the other. A new
-  personal/login field must be **added** to the **null-list** or it leaks onto the
-  abandoned VEKN record for the next claimant; a new field keyed to the uid —
-  roles, ratings, wins, community links, promo stock — must be **added** to the
-  **clear-list** on the personal account or the split hands it a copy of stock,
-  standing or reach it holds none of. Only the derived ones — ratings, wins, promo
-  stock — heal on a nightly recompute; roles and community links have no job that
-  re-derives them, so there the copy is permanent.
-
-Every other `User(...)` site is a fresh-uid create with nothing to drop.
-
-**A new backend-only Tournament field must join go-online's server-wins re-pull
-block**, or an offline round-trip silently reverts it —
-[sync](sync.md#offline-lifecycle).
-
-**A new Tournament field reaches members by default**, because the member
-projection is a denylist. An organizer-only secret must be added to it or it leaks
-— [sync](sync.md#access-levels).
-
-**A tournament config field must be added to THREE lists**: the engine's create
-literal, which is what actually produces the object and so silently drops
-anything missing from it; `CreateTournamentRequest`, or the API never accepts it;
-and `UpdateConfig`'s field array, or it can never be edited. Shared validation
-belongs in the shared validator.
-
-**`/action` has the same shape, in three places.** A key the Rust `TournamentEvent`
-consumes reaches the engine only if it is declared as a field on
-`TournamentActionRequest` **and** copied into `event_data` by the hand-written
-block below it. Pydantic defaults to `extra="ignore"`, so anything else a client
-sends vanishes with no error. `vekn_id` is **deliberately absent** from that model
-— the server injects it from the resolved user, so a client-sent id can never reach
-the engine, and adding it would reopen the fabricated-id hole.
+**`vekn_id` is deliberately absent from `TournamentActionRequest`.** `/action`
+derives `event_data` from that model, so a key reaches the Rust `TournamentEvent`
+exactly when it is declared there — Pydantic's `extra="ignore"` drops anything
+else a client sends, with no error. The server injects `vekn_id` from the
+resolved user *after* the copy; declaring it would reopen the fabricated-id hole.
 
 **A projection change only affects rows written afterwards**, and neither the
 access-version handshake nor any test can catch the missing backfill — see

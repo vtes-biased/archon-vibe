@@ -38,17 +38,7 @@ async def reassign_auth_methods(from_user_uid: str, to_user_uid: str) -> int:
         count = 0
         for row in rows:
             auth_method = decode_json(row[0], AuthMethod)
-            updated = AuthMethod(
-                uid=auth_method.uid,
-                modified=auth_method.modified,
-                user_uid=to_user_uid,
-                method_type=auth_method.method_type,
-                identifier=auth_method.identifier,
-                credential_hash=auth_method.credential_hash,
-                verified=auth_method.verified,
-                created_at=auth_method.created_at,
-                last_used_at=auth_method.last_used_at,
-            )
+            updated = msgspec.structs.replace(auth_method, user_uid=to_user_uid)
             await conn.execute(
                 "UPDATE auth_methods SET data = %s WHERE uid = %s",
                 (encode_json(updated), auth_method.uid),
@@ -198,16 +188,57 @@ async def user_has_active_suspension(user_uid: str) -> bool:
     return False
 
 
+UID_KEYED_FIELDS = frozenset(
+    {
+        "vekn_id",
+        "roles",
+        "coopted_by",
+        "coopted_at",
+        "vekn_synced",
+        "vekn_synced_at",
+        "vekn_prefix",
+        "community_links",
+        "promo_stock",
+        "constructed_online",
+        "constructed_offline",
+        "limited_online",
+        "limited_offline",
+        "wins",
+    }
+)
+PERSONAL_FIELDS = frozenset(
+    {
+        "nickname",
+        "avatar_path",
+        "contact_email",
+        "contact_discord",
+        "discord_id",
+        "contact_phone",
+        "phone_is_whatsapp",
+        "github_login",
+        "github_id",
+    }
+)
+
+
+def _defaults(names: frozenset[str]) -> dict:
+    return {
+        f.name: (
+            f.default_factory()
+            if f.default_factory is not msgspec.NODEFAULT
+            else f.default
+        )
+        for f in msgspec.structs.fields(User)
+        if f.name in names
+    }
+
+
 async def detach_user_from_vekn(
     user_uid: str,
 ) -> tuple[User, User, list[BroadcastData]] | None:
     """Split into (personal_account, vekn_record, broadcasts), or None if not found.
 
-    vekn_record keeps the uid and everything keyed to it. A new personal/login
-    field must be added to the null-list on vekn_record below, or it leaks onto
-    the record for the next claimant; a new field keyed to the uid must be added
-    to the clear-list on personal, or the split copies it onto an account that
-    holds none of it.
+    vekn_record keeps the uid and everything keyed to it.
     """
     user = await get_user_by_uid(user_uid)
     if not user:
@@ -225,22 +256,9 @@ async def detach_user_from_vekn(
         user,
         uid=new_uid,
         modified=now,
-        vekn_id=None,
-        roles=[],
-        coopted_by=None,
-        coopted_at=None,
-        vekn_synced=False,
-        vekn_synced_at=None,
-        local_modifications=set(),
-        vekn_prefix=None,
-        community_links=[],
-        promo_stock={},
         calendar_token=feed_token,
-        constructed_online=None,
-        constructed_offline=None,
-        limited_online=None,
-        limited_offline=None,
-        wins=[],
+        local_modifications=set(),
+        **_defaults(UID_KEYED_FIELDS),
     )
     personal_bd = await save_user(personal)
     await reassign_auth_methods(user_uid, new_uid)
@@ -250,17 +268,9 @@ async def detach_user_from_vekn(
     vekn_record = msgspec.structs.replace(
         user,
         modified=now,
-        nickname=None,
-        avatar_path=None,
-        contact_email=None,
-        contact_discord=None,
-        discord_id=None,
-        github_login=None,
-        github_id=None,
-        contact_phone=None,
-        phone_is_whatsapp=False,
         calendar_token=None,
         local_modifications=set(),
+        **_defaults(PERSONAL_FIELDS),
     )
     vekn_bd = await save_user(vekn_record)
 

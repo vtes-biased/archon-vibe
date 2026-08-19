@@ -869,6 +869,13 @@ mod python {
             py_str(create_tournament_json(config_json, actor_json))
         }
 
+        fn config_fields(&self) -> Vec<String> {
+            crate::tournament::CONFIG_FIELDS
+                .iter()
+                .map(|f| f.to_string())
+                .collect()
+        }
+
         fn compute_league_standings(&self, config_json: &str) -> PyResult<String> {
             py_str(compute_league_standings_json(config_json))
         }

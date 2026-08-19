@@ -244,7 +244,7 @@ feed advertises 07:00 local. `timezone` is left at its model default
 rows share it — if so that is its own ask, not a per-row fix.
 
 **Cheaper interim than waiting**: `start`, `finish` and `timezone` are all in
-the `UpdateConfig` allowlist (`engine/src/tournament/mod.rs:2646-2649`), so the
+the engine's `CONFIG_FIELDS` allowlist, so the
 organizer or an IC can correct the date in-app today with no code change and no
 deletion — which sidesteps the VEKN-footprint gate entirely. Deleting is the
 owner's call; correcting is available immediately if the row turns out to be

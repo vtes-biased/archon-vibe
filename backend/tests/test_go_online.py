@@ -15,6 +15,7 @@ import pytest
 import pytest_asyncio
 import src.db as db
 from src.models import Player, Role, Seat, Table, Tournament, TournamentState, User
+from src.routes.tournaments import SERVER_OWNED_TOURNAMENT_FIELDS
 
 from tests.conftest import make_auth_header, seed_tournament
 
@@ -480,3 +481,68 @@ async def test_sync_offline_rejects_non_organizer(test_client, test_db):
     assert resp.status_code == 403
     saved = await db.get_tournament_by_uid(uid)
     assert saved.name == "Offline T"  # snapshot untouched
+
+
+_MERGED = {"organizers_uids"}
+_STAMPED_AT_GO_ONLINE = {
+    "modified",
+    "offline_mode",
+    "offline_device_id",
+    "offline_user_uid",
+    "offline_since",
+}
+_FROM_OFFLINE_SNAPSHOT = {
+    "uid",
+    "deleted_at",
+    "name",
+    "format",
+    "rank",
+    "online",
+    "start",
+    "finish",
+    "timezone",
+    "country",
+    "league_uid",
+    "state",
+    "venue",
+    "venue_url",
+    "address",
+    "map_url",
+    "proxies",
+    "multideck",
+    "decklist_required",
+    "description",
+    "standings_mode",
+    "decklists_mode",
+    "max_rounds",
+    "max_players",
+    "open_rounds",
+    "self_organized_rounds",
+    "table_rooms",
+    "round_time",
+    "finals_time",
+    "players",
+    "rounds",
+    "finals",
+    "winner",
+    "standings",
+    "reported_player_count",
+    "raffles",
+    "promos_distributed",
+    "promo_stock_source_uid",
+    "timer",
+    "table_extra_time",
+    "announcements",
+}
+
+
+def test_every_tournament_field_has_an_offline_owner():
+    groups = [
+        SERVER_OWNED_TOURNAMENT_FIELDS,
+        _MERGED,
+        _STAMPED_AT_GO_ONLINE,
+        _FROM_OFFLINE_SNAPSHOT,
+    ]
+    classified = set().union(*groups)
+    assert classified == {f.name for f in msgspec.structs.fields(Tournament)}
+    assert len(classified) == sum(len(g) for g in groups)

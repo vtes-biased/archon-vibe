@@ -20,6 +20,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from uuid import uuid7
 
+import msgspec
 import pytest
 import src.accounts as accounts
 import src.db as db
@@ -440,3 +441,31 @@ async def test_abandon_allowed_without_active_suspension(test_client):
         # detach issued a fresh uid for the new personal account.
         assert body["user"]["uid"] != user.uid
         assert body["user"]["vekn_id"] is None
+
+
+# An unclassified personal/login field leaks onto the abandoned VEKN record for
+# the next claimant; an unclassified uid-keyed one hands the personal account
+# standing, stock or reach it holds none of.
+_SPLIT_HANDLED = {"uid", "modified", "calendar_token", "local_modifications"}
+_SPLIT_SHARED = {
+    "deleted_at",
+    "name",
+    "country",
+    "city",
+    "city_geoname_id",
+    "state",
+    "deceased_at",
+    "deceased_by_uid",
+}
+
+
+def test_every_user_field_is_classified_by_the_split():
+    groups = [
+        accounts.UID_KEYED_FIELDS,
+        accounts.PERSONAL_FIELDS,
+        _SPLIT_HANDLED,
+        _SPLIT_SHARED,
+    ]
+    classified = set().union(*groups)
+    assert classified == {f.name for f in msgspec.structs.fields(User)}
+    assert len(classified) == sum(len(g) for g in groups)
