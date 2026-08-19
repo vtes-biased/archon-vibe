@@ -21,7 +21,6 @@
     expanded: boolean;
     showLinks: boolean;
     showOfficials: boolean;
-    canModerate: boolean;
     canPromoteNational: boolean;
     canEdit: (entry: LinkEntry) => boolean;
     onToggle: () => void;
@@ -29,7 +28,7 @@
   }
   let {
     code, name, pinned, groups, officials, isOwnCountry, expanded, showLinks,
-    showOfficials, canModerate, canPromoteNational, canEdit,
+    showOfficials, canPromoteNational, canEdit,
     onToggle, onEdit,
   }: Props = $props();
 
@@ -38,8 +37,6 @@
   );
   const curatorPrompt = $derived(showLinks && canPromoteNational && pinned.length === 0 && groups.length === 0);
 
-  // The NC is who a visitor is looking for; a country's Princes are a long tail
-  // that would bury them.
   const coordinators = $derived(officials.filter(o => o.roles?.includes("NC")));
   const princes = $derived(officials.filter(o => !o.roles?.includes("NC")));
   let princesOpen = $state(false);

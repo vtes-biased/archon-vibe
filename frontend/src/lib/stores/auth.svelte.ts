@@ -143,8 +143,6 @@ async function handleCrossTabAuthChange(): Promise<void> {
   }
 }
 
-/** Adopted wholesale so no new field is dropped. `calendar_token` is carried
- * forward: no projection holds it, so the frame would wipe it. */
 function registerOwnUserSync(): void {
   if (ownUserSyncRegistered) return;
   ownUserSyncRegistered = true;

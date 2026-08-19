@@ -6,7 +6,7 @@
   import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
   import { apiRequest } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { canModerateLink, canPromoteLinkNational, canPromoteLinkGlobal, getCommunityLinkReference } from "$lib/engine";
+  import { canModerateLink, canPromoteLinkNational, getCommunityLinkReference } from "$lib/engine";
   import { getLocale } from "$lib/paraglide/runtime.js";
   import type { CommunityLink, LinkMedia, User } from "$lib/types";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
@@ -41,9 +41,7 @@
   // Reading the reactive engine accessors keeps these recomputing once WASM lands.
   const canModerate = (country: string | null) => canModerateLink(auth.user, country).allowed;
   const canPromoteNational = (country: string | null) => canPromoteLinkNational(auth.user, country).allowed;
-  const canPromoteGlobal = $derived(canPromoteLinkGlobal(auth.user).allowed);
   const isOwn = (e: LinkEntry) => e.user.uid === auth.user?.uid;
-  // Your own link, or one serving a country you curate.
   const canEdit = (e: LinkEntry) => isOwn(e) || canModerate(linkCountry(e));
 
   const pinScope = (l: CommunityLink) =>
@@ -285,7 +283,6 @@
         expanded={isExpanded(card.code)}
         {showLinks}
         {showOfficials}
-        canModerate={canModerate(card.code)}
         canPromoteNational={canPromoteNational(card.code)}
         {canEdit}
         onToggle={() => toggleCard(card.code)}

@@ -1,8 +1,4 @@
-"""The rules a community link obeys, shared by the owner's editor and a moderator's.
-
-Hidden and the two pin scopes are mutually exclusive, so they are one four-valued
-state rather than three toggles.
-"""
+"""The rules a community link obeys, shared by the owner's editor and a moderator's."""
 
 from datetime import UTC, datetime
 
@@ -19,8 +15,6 @@ from .models import (
 
 MAX_LANGUAGES = 5
 
-STATES = ("none", "hidden", "national", "global")
-
 
 def state_of(moderation: LinkModeration | None) -> str:
     if moderation is None:
@@ -31,7 +25,6 @@ def state_of(moderation: LinkModeration | None) -> str:
 def moderation_for(
     actor: User, state: str, country: str | None, current: LinkModeration | None
 ) -> LinkModeration | None:
-    """Resolve a requested state, gated by the capability that state needs."""
     if state == "global":
         allowed = permissions.can_promote_link_global(actor)
     elif state == "national":
@@ -88,13 +81,11 @@ def validated_languages(
 
 
 def validated_country(raw: str | None, fallback: str | None) -> str:
-    """Required: a national pin files a link under a country, so one without a
-    country would be pinned into a card nobody can reach."""
     country = (raw or fallback or "").upper()
     if not country:
         raise HTTPException(
             status_code=422,
-            detail="A community link needs a country — set yours on your profile",
+            detail="A community link needs a country",
         )
     if not (len(country) == 2 and country.isascii() and country.isalpha()):
         raise HTTPException(status_code=422, detail=f"Invalid country: {raw}")

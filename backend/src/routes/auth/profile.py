@@ -36,7 +36,6 @@ class CommunityLinkInput(BaseModel):
     label: str = ""
     languages: list[str] = []
     country: str | None = None
-    # "none" | "hidden" | "national" | "global"; absent leaves moderation alone.
     state: str | None = None
 
 
@@ -153,8 +152,6 @@ async def update_current_user(
             languages = validated_languages(link.languages, link_type, prior)
             country = validated_country(link.country, user.country)
             mod = prior.moderation if prior else None
-            # An official curates their own links through the ordinary
-            # country-scoped grant, not a self-service exemption.
             if link.state is not None:
                 mod = moderation_for(user, link.state, country, mod)
             links.append(

@@ -50,8 +50,6 @@
   let editContactPhone = $state(initial.contact_phone || "");
   let editPhoneIsWhatsapp = $state(initial.phone_is_whatsapp ?? false);
 
-  // Derived, never snapshotted: a moderator may edit these while the page is
-  // open, and a stale array resubmitted whole would revert them.
   const editLinks = $derived<CommunityLink[]>(user.community_links ?? []);
   let editing = $state<{ link: CommunityLink | null } | null>(null);
 
@@ -112,8 +110,6 @@
     });
   }
 
-  // The requested state rides on the edited link alone and is never stored
-  // locally: the server decides it and echoes the moderation it applied.
   function saveLinks(links: CommunityLink[], moderated?: { url: string; state: string }) {
     editing = null;
     const payload = moderated

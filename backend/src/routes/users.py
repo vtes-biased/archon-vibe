@@ -408,8 +408,7 @@ async def delete_avatar(
 class LinkEditRequest(BaseModel):
     """Curate a link on another member's profile, addressed by its URL.
 
-    The URL is the identity moderation is keyed on and is never rewritten: a
-    moderator may change what a link says, not where it goes.
+    The URL is the identity moderation is keyed on and is never rewritten.
     """
 
     url: str
@@ -426,8 +425,7 @@ async def edit_community_link(
     request: LinkEditRequest,
     current_user: CurrentUser,
 ) -> Response:
-    """Officials curate links in their own country, IC anywhere. Self-moderation
-    is allowed: officials reach their own links through the same grant."""
+    """Curate a link on another member's profile."""
     target = await get_user_by_uid(user_uid)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
@@ -436,8 +434,7 @@ async def edit_community_link(
     if prior is None:
         raise HTTPException(status_code=404, detail="Link not found on target user")
 
-    # The link's own country, not its owner's, and a move needs authority over
-    # where it lands as well as where it sits.
+    # A move needs authority over where it lands as well as where it sits.
     if not permissions.can_moderate_link(current_user, prior.country or target.country):
         raise HTTPException(
             status_code=403, detail="Can only moderate links in your country"

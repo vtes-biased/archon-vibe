@@ -552,8 +552,9 @@ row there plus a label, colour and icon in `CommunityLinkPills.svelte`.
 owner-settable — the Brazilian Discord run from Portugal. Every moderation
 decision keys off the link's country, never its owner's. It is **required**: a
 national pin files a link under a country, so one without a country would be
-pinned into a card nobody can reach. A member with no country of their own
-therefore cannot add a link until they set one.
+pinned into a card nobody can reach. The editor's country field has no empty
+choice, so a member with no country of their own picks one there rather than
+being turned away.
 
 **Placement follows the pins, not the platform**, because platform does not
 determine function: an NC's Instagram is an announcements channel and a player's
@@ -563,7 +564,9 @@ placement, a channel into its country's card and content into the pool. The page
 shows the Global card, the reader's country, a country search that materializes
 one further card, and the content pool filtered by a language multiselect —
 seeded once from the reader's locale, never re-asserted — and a media facet.
-Officials sit inside their country's card, behind sign-in. A card with nothing
+Officials sit inside their country's card, behind sign-in, the NCs open and the
+Princes folded behind their count — a visitor came for the coordinator, and a
+country with a dozen Princes buries them. A card with nothing
 pinned and no groups says so to whoever can pin there, since getting each NC to
 pin a few links is what actually launches the page. `?sponsor=1` hides every link
 section and narrows the cards to the visitor's country, falling back to every
