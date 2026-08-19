@@ -337,8 +337,6 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
         else f"/tournaments/{tournament.uid}"
     )
 
-    # The archive's `place` convention is a country NAME, and the line is
-    # permanent — publishing the stored ISO code regresses the corpus.
     named = get_country(normalize_country(tournament.country or "") or "")
 
     return _engine.export_twda(

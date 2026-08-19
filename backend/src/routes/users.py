@@ -19,6 +19,7 @@ from ..db import delete_avatar as db_delete_avatar
 from ..db import get_avatar as db_get_avatar
 from ..db import save_user as db_save_user
 from ..db import upsert_avatar as db_upsert_avatar
+from ..geonames import stored_country
 from ..middleware.auth import CurrentUser, OptionalUser
 from ..models import Role, User
 from .auth import send_invite_email
@@ -60,9 +61,9 @@ async def create_user(
     """Auto-allocates a VEKN ID. If email is provided, sends an invite email so
     the new member can log in."""
     name = body.name
-    # Normalize country casing: storage + the same-country overlay match
-    # (broadcast.py) compare exact, so a raw lower-case payload would corrupt it.
-    country = body.country.upper() if body.country else body.country
+    country = stored_country(body.country)
+    if body.country and country is None:
+        raise HTTPException(status_code=422, detail=f"Invalid country: {body.country}")
     city, city_geoname_id = body.city, body.city_geoname_id
     state, nickname, email, roles = body.state, body.nickname, body.email, body.roles
     if not current_user:
@@ -157,9 +158,9 @@ async def update_user(
     uid: str, body: UpdateUserRequest, current_user: OptionalUser = None
 ) -> Response:
     name = body.name
-    # Normalize country casing: storage + the same-country overlay match
-    # (broadcast.py) compare exact, so a raw lower-case payload would corrupt it.
-    country = body.country.upper() if body.country else body.country
+    country = stored_country(body.country)
+    if body.country and country is None:
+        raise HTTPException(status_code=422, detail=f"Invalid country: {body.country}")
     city, city_geoname_id = body.city, body.city_geoname_id
     state, nickname, roles = body.state, body.nickname, body.roles
     if not current_user:

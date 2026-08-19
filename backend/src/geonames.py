@@ -97,16 +97,13 @@ def stored_country(value: str | None) -> str | None:
     """The shape our own rows hold: an ISO code, or nothing.
 
     Clients still send country *names* — an offline snapshot of a legacy row
-    echoes one straight back — and 2-letter values pass through so vekn.net's
-    `XX` unknown-venue placeholder survives its own sync.
+    echoes one straight back. `XX` is the one non-ISO value that survives: it is
+    vekn.net's unknown-venue code, re-supplied by every tournament sync.
     """
     value = (value or "").strip()
-    resolved = normalize_country(value)
-    if resolved:
-        return resolved
-    if len(value) == 2 and value.isascii() and value.isalpha():
-        return value.upper()
-    return None
+    if value.upper() == "XX":
+        return "XX"
+    return normalize_country(value)
 
 
 def country_key(value: str) -> str:

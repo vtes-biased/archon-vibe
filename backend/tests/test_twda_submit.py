@@ -111,8 +111,6 @@ async def _published(
 
 @pytest.mark.asyncio
 async def test_place_line_spells_the_country_out(test_db):
-    """The archive's `place` convention is a name and the line is permanent —
-    the stored ISO code must be expanded before it is published."""
     async with _published(author="Winner Wendy", attribution=None) as (_t, twda):
         assert twda.splitlines()[1] == "France"
 

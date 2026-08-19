@@ -56,8 +56,11 @@ access-version handshake nor any test can catch the missing backfill — see
 
 **Our country rows are ISO codes; the corpora we compare them against are names.**
 Every write path normalises through `geonames.stored_country`, so a stored value is
-a two-letter code, vekn.net's `XX` unknown-venue placeholder, or nothing. The
-legacy dumps, vekn.net and the TWDA archive all quote country *names*, so a
+a two-letter code, vekn.net's `XX` unknown-venue placeholder, or nothing. Rows
+written before that rule still hold a country *name*, which any exact comparison
+silently drops as if it disagreed, until the sweep parked in
+[sync](sync.md#access-levels) is run — this clause goes with it.
+The legacy dumps, vekn.net and the TWDA archive all quote country *names*, so a
 cross-corpus comparison goes through **`geonames.country_key`**, never through
 `normalize_country` directly: the resolver returns `None` for a spelling it does
 not know (`Czechia`, `South Korea`, `UK`), and treating that as "no country

@@ -22,6 +22,7 @@ from ...db import (
     get_calendar_token,
     save_user,
 )
+from ...geonames import stored_country
 from ...link_preview import LinkPreviewError, fetch_link_title
 from ...middleware.auth import CurrentUser
 from ...models import CommunityLink
@@ -96,7 +97,11 @@ async def update_current_user(
         user.nickname = request.nickname if request.nickname else None
         local_mods.add("nickname")
     if request.country is not None:
-        new_country = request.country.upper() if request.country else None
+        new_country = stored_country(request.country)
+        if request.country and new_country is None:
+            raise HTTPException(
+                status_code=422, detail=f"Invalid country: {request.country}"
+            )
         # An NC/Prince can't change their own country: it scopes their FULL-data
         # overlay, so a self-edit would be an unauthorized scope change.
         if new_country != user.country and not permissions.can_change_country(

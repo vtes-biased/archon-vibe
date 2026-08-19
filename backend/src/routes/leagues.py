@@ -16,6 +16,7 @@ from ..db import (
     get_user_by_uid,
     save_league,
 )
+from ..geonames import stored_country
 from ..middleware.auth import OptionalUser
 from ..models import League, LeagueKind, LeagueStandingsMode
 
@@ -72,6 +73,10 @@ async def create_league(
     if body.kind == LeagueKind.META and body.parent_uid:
         raise HTTPException(400, "Meta-League cannot have a parent")
 
+    country = stored_country(body.country)
+    if body.country and country is None:
+        raise HTTPException(422, f"Invalid country: {body.country}")
+
     now = datetime.now(UTC)
     league = League(
         uid=str(uuid7()),
@@ -80,7 +85,7 @@ async def create_league(
         kind=body.kind,
         standings_mode=body.standings_mode,
         format=body.format,
-        country=body.country,
+        country=country,
         start=body.start,
         finish=body.finish,
         description=body.description,
@@ -116,6 +121,10 @@ async def update_league_endpoint(
         raise HTTPException(403, "Not authorized to edit this league")
 
     updates = body.model_dump(exclude_unset=True)
+    if "country" in updates:
+        updates["country"] = stored_country(updates["country"])
+        if body.country and updates["country"] is None:
+            raise HTTPException(422, f"Invalid country: {body.country}")
     if "parent_uid" in updates:
         new_parent = updates["parent_uid"]
         if league.kind == LeagueKind.META:
