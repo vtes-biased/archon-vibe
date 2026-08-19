@@ -50,7 +50,9 @@
   let editContactPhone = $state(initial.contact_phone || "");
   let editPhoneIsWhatsapp = $state(initial.phone_is_whatsapp ?? false);
 
-  let editLinks = $state<CommunityLink[]>([...(initial.community_links || [])]);
+  // Derived, never snapshotted: a moderator may edit these while the page is
+  // open, and a stale array resubmitted whole would revert them.
+  const editLinks = $derived<CommunityLink[]>(user.community_links ?? []);
   let editing = $state<{ link: CommunityLink | null } | null>(null);
 
   const defaultLanguage = $derived(COUNTRY_LANGUAGE[editCountry] || getLocale());
@@ -110,18 +112,19 @@
     });
   }
 
-  // The requested pin rides on the edited link alone and is never stored locally:
-  // the server decides it, and echoes the moderation it actually applied.
-  function saveLinks(links: CommunityLink[], pinned?: { url: string; state: string }) {
-    editLinks = links;
+  // The requested state rides on the edited link alone and is never stored
+  // locally: the server decides it and echoes the moderation it applied.
+  function saveLinks(links: CommunityLink[], moderated?: { url: string; state: string }) {
     editing = null;
-    const payload = pinned
-      ? links.map(l => (l.url === pinned.url ? { ...l, state: pinned.state } : l))
+    const payload = moderated
+      ? links.map(l => (l.url === moderated.url ? { ...l, state: moderated.state } : l))
       : links;
     saveField("community_links", payload);
   }
 
-  const editedIndex = $derived(editing?.link ? editLinks.indexOf(editing.link) : -1);
+  const editedIndex = $derived(
+    editing?.link ? editLinks.findIndex(l => l.url === editing!.link!.url) : -1
+  );
 
   async function shareProfile() {
     const url = `${window.location.origin}/users/${user.uid}`;

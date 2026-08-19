@@ -317,18 +317,19 @@ its number while `deleted_at`-filtered lookups disagree, so a seed insert can cr
 on a reserved number. Reachable on steady-state nightly merges, since an admin
 user-delete keeps the `vekn_id`.
 
-**`authState.user` does not follow SSE.** It is filled from `/auth/me` at login,
-token refresh, cross-tab adoption and after the owner's own `PATCH /auth/me` —
-never from a sync frame, because the frame cannot carry `calendar_token`, which
-no projection holds. Every other surface reads the synced IndexedDB copy, so the
-signed-in user's own row is the one place two readings of the same object can
-disagree. It bites `community_links`, now that a moderator writes fields on a
-link its owner also edits: `PATCH /auth/me` replaces the **whole array**, so an
-owner saving from a stale `authState.user` reverts a moderator's edit made since
-their last refresh. `moderation` itself survives — the owner path re-applies it
-by URL match — so a pin is never lost this way, only a label, language or type.
-Anything else that grows a second writer on a `User` field must either read the
-synced copy or accept the same last-writer-wins window.
+**`authState.user` adopts its own sync frame, minus `calendar_token`.** The
+signed-in user's row arrives over SSE like anyone else's, and every other surface
+reads that synced copy — so auth adopts it wholesale rather than merging field by
+field, and carries `calendar_token` forward because no projection holds it. **A
+second non-projected field on `User` must join that carry-forward** or it is
+wiped the first time the row syncs.
+
+The adoption is what makes a second writer on a `User` field safe: `PATCH
+/auth/me` replaces the **whole** `community_links` array, so an owner saving from
+a stale copy would silently revert a moderator's edit. For the same reason an
+editing surface must derive from the live user rather than snapshot it at mount —
+`ProfileView` does, deliberately, against the general rule that a modal captures
+its item at open time.
 
 ## Outbound fetches
 

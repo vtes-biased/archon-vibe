@@ -46,6 +46,7 @@ let authState = $state<AuthState>({
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
 let crossTabSyncRegistered = false;
+let ownUserSyncRegistered = false;
 
 export function setAuthState(updates: Partial<AuthState>) {
   authState = { ...authState, ...updates };
@@ -140,6 +141,21 @@ async function handleCrossTabAuthChange(): Promise<void> {
     setAuthState({ user: result.user, authMethods: result.auth_methods, isAuthenticated: true, isLoading: false, error: null });
     await syncManager.refresh();
   }
+}
+
+/** Adopted wholesale so no new field is dropped. `calendar_token` is carried
+ * forward: no projection holds it, so the frame would wipe it. */
+function registerOwnUserSync(): void {
+  if (ownUserSyncRegistered) return;
+  ownUserSyncRegistered = true;
+  syncManager.addEventListener((event) => {
+    if (event.type !== "user") return;
+    const synced = event.data as User | undefined;
+    const current = authState.user;
+    if (!synced || !current || synced.uid !== current.uid) return;
+    if (synced.modified === current.modified) return;
+    setAuthState({ user: { ...synced, calendar_token: current.calendar_token } });
+  });
 }
 
 function registerCrossTabAuthSync(): void {
@@ -283,6 +299,7 @@ export async function fetchCurrentUser(): Promise<MeResponse | null> {
 export async function initAuth(): Promise<void> {
   setAuthState({ isLoading: true });
   registerCrossTabAuthSync();
+  registerOwnUserSync();
 
   const token = getAccessToken();
   if (!token) {
