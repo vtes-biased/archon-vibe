@@ -37,9 +37,11 @@ block**, or an offline round-trip silently reverts it —
 projection is a denylist. An organizer-only secret must be added to it or it leaks
 — [sync](sync.md#access-levels).
 
-**A tournament config field must be added to BOTH** the create path's literal
-**and** `UpdateConfig`'s field array. Shared validation belongs in the shared
-validator.
+**A tournament config field must be added to THREE lists**: the engine's create
+literal, which is what actually produces the object and so silently drops
+anything missing from it; `CreateTournamentRequest`, or the API never accepts it;
+and `UpdateConfig`'s field array, or it can never be edited. Shared validation
+belongs in the shared validator.
 
 **`/action` has the same shape, in three places.** A key the Rust `TournamentEvent`
 consumes reaches the engine only if it is declared as a field on
@@ -94,10 +96,13 @@ comparing folded strings must lowercase after it, not rely on it.
 
 ## Two implementations of one gate
 
-**Online create bypasses the engine.** `POST /tournaments` builds the Tournament
-directly in Python with no PyO3 call, so engine create-time gates run **only** on
-the offline/WASM create path and on `UpdateConfig`. A ticket saying "enforce X at
-create in the engine" silently misses the online path.
+**A new engine create gate rejects offline tournaments already created under the
+old rule.** `create_tournament` is the sole producer on every path
+([architecture](architecture.md#event-system)), and the offline-created insert
+runs it at `go-online`/`sync-offline` — long after the device minted the row. A
+gate added today therefore wedges an event created yesterday: the organizer must
+edit the offending field offline before the sync is accepted. Gate on what a
+config edit can still fix.
 
 **Authorization runs at two layers** — the REST endpoint and the engine — with the
 decision single-sourced in Rust. Frontend wrappers are UX-only and fail closed

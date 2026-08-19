@@ -111,8 +111,8 @@ fn resolve_live_round(rounds: &JsonValue, round: Option<usize>) -> Result<usize,
 }
 
 /// Ranked events forbid proxies/multideck; only Standard/Limited can be ranked. Callers
-/// must pass the MERGED view (config over current tournament); pub(crate) for the online create route.
-pub(crate) fn validate_rank_legality(
+/// must pass the MERGED view (config over current tournament).
+fn validate_rank_legality(
     format: &str,
     rank: &str,
     proxies: bool,
@@ -135,7 +135,7 @@ pub(crate) fn validate_rank_legality(
 
 /// Naive wall-clock times share the tournament's single `timezone`, so comparing the
 /// fixed-width `YYYY-MM-DDTHH:MM` prefix orders them correctly despite minute-vs-second precision.
-pub(crate) fn validate_finish_after_start(start: &str, finish: &str) -> Result<(), EngineError> {
+fn validate_finish_after_start(start: &str, finish: &str) -> Result<(), EngineError> {
     if start.is_empty() || finish.is_empty() {
         return Ok(());
     }

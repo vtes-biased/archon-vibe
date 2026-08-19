@@ -53,18 +53,15 @@ from ..geonames import get_country, normalize_country, stored_country
 from ..middleware.auth import OptionalUser
 from ..models import (
     Announcement,
-    DeckListsMode,
     DeckObject,
     ObjectType,
     PlayerState,
     Role,
     Sanction,
     SanctionLevel,
-    StandingsMode,
     TimerState,
     Tournament,
     TournamentFormat,
-    TournamentRank,
     TournamentState,
     TwdaOutcome,
     TwdaStatus,
@@ -855,6 +852,23 @@ def _normalize_wall_clock(t: Tournament) -> None:
     t.finish = _wall_clock(t.finish, t.timezone)
 
 
+def _engine_create_tournament(config: dict, actor: User) -> str:
+    actor_json = msgspec.json.encode(
+        {
+            "uid": actor.uid,
+            "roles": [r.value for r in actor.roles],
+            "is_organizer": True,
+            "can_organize_league_uids": [],
+        }
+    ).decode()
+    try:
+        return _engine.create_tournament(
+            msgspec.json.encode(config).decode(), actor_json
+        )
+    except ValueError as e:
+        raise EngineRejection.from_engine(e) from e
+
+
 @router.post("/", status_code=201)
 async def create_tournament(
     request: CreateTournamentRequest,
@@ -868,20 +882,6 @@ async def create_tournament(
             status_code=403, detail="Only IC, NC, or Prince can create tournaments"
         )
 
-    try:
-        fmt = TournamentFormat(request.format)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid format: {request.format}"
-        ) from e
-
-    try:
-        rank = TournamentRank(request.rank)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid rank: {request.rank}"
-        ) from e
-
     # VEKN_PUSH: standard tournaments need max_rounds 2-4. Open-rounds events are
     # non-VEKN (not pushed), so max_rounds there is a free per-player cap (0 = no limit).
     vekn_push = os.getenv("VEKN_PUSH", "").lower() == "true"
@@ -891,16 +891,6 @@ async def create_tournament(
                 status_code=400,
                 detail="max_rounds must be 2, 3, or 4 when VEKN push is enabled",
             )
-
-    try:
-        standings = StandingsMode(request.standings_mode)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail="Invalid standings_mode") from e
-
-    try:
-        decklists = DeckListsMode(request.decklists_mode)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail="Invalid decklists_mode") from e
 
     country = stored_country(request.country)
     if request.country and country is None:
@@ -920,46 +910,18 @@ async def create_tournament(
                 detail="You don't have permission to attach tournaments to this league",
             )
 
-    # This route builds the Tournament in Python with no engine call — call
-    # the create-time legality gates explicitly or they're skipped for online creates.
-    try:
-        _engine.validate_rank_legality(
-            fmt.value, rank, request.proxies, request.multideck
-        )
-        _engine.validate_finish_after_start(request.start or "", request.finish or "")
-    except ValueError as e:
-        raise EngineRejection.from_engine(e) from e
-
-    now = datetime.now(UTC)
-    tournament = Tournament(
-        uid=str(uuid7()),
-        modified=now,
-        name=request.name,
-        format=fmt,
-        rank=rank,
-        online=request.online,
-        start=_wall_clock(_parse_datetime(request.start), request.timezone),
-        finish=_wall_clock(_parse_datetime(request.finish), request.timezone),
-        timezone=request.timezone,
-        country=country,
-        venue=request.venue,
-        venue_url=request.venue_url,
-        address=request.address,
-        map_url=request.map_url,
-        proxies=request.proxies,
-        multideck=request.multideck,
-        decklist_required=request.decklist_required,
-        description=request.description,
-        standings_mode=standings,
-        decklists_mode=decklists,
-        max_rounds=request.max_rounds,
-        max_players=request.max_players,
-        open_rounds=request.open_rounds,
-        self_organized_rounds=request.self_organized_rounds,
-        league_uid=request.league_uid or None,
-        organizers_uids=[current_user.uid],
-        round_time=request.round_time,
-        finals_time=request.finals_time,
+    start = _wall_clock(_parse_datetime(request.start), request.timezone)
+    finish = _wall_clock(_parse_datetime(request.finish), request.timezone)
+    config = request.model_dump() | {
+        "uid": str(uuid7()),
+        "now": datetime.now(UTC).isoformat(),
+        "country": country,
+        "start": start.isoformat() if start else None,
+        "finish": finish.isoformat() if finish else None,
+        "league_uid": request.league_uid or None,
+    }
+    tournament = msgspec.json.decode(
+        _engine_create_tournament(config, current_user), type=Tournament
     )
 
     # Fresh uuid7 — no existing row to lock, but save_tournament requires a conn.
@@ -2138,8 +2100,8 @@ def _remap_uids_in_tournament(tournament_data: dict, uid_map: dict[str, str]) ->
 async def _gate_offline_created_insert(
     current_user: User, tournament_data: dict
 ) -> None:
-    """Mirrors create_tournament's gates for a tournament the server is inserting
-    for the first time (created offline); shared by go_online and sync_offline."""
+    """Gates a tournament the server is inserting for the first time (created
+    offline); shared by go_online and sync_offline."""
     if not permissions.can_create_tournament(current_user):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can create tournaments"
@@ -2159,6 +2121,8 @@ async def _gate_offline_created_insert(
                 status_code=403,
                 detail="You don't have permission to attach tournaments to this league",
             )
+    # Run for the rejections, not the result.
+    _engine_create_tournament(tournament_data, current_user)
 
 
 @router.post("/{uid}/go-online")

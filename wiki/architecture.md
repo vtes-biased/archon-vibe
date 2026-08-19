@@ -89,6 +89,19 @@ the engine, keeping the online (server) and offline (WASM) paths identical and t
 engine the single source of truth for state transitions. Catalog:
 [tournaments](tournaments.md#engine-event-catalog).
 
+**Creating a tournament is the same shape.** `create_tournament` is the sole
+producer of a new Tournament object on every path: WASM for the offline create,
+PyO3 for `POST /tournaments`, and PyO3 again as the gate on the offline-created
+insert (`go-online`/`sync-offline`), where the result is discarded because the
+device's own state is authoritative. Both callers pass the same actor — uid and
+roles, which is all create reads. A new gate belongs in `validate_config_fields`,
+the one validator create and `UpdateConfig` share; written into the
+`create_tournament` body instead it binds creation only, and a config edit walks
+around it afterwards. The rank-legality and date-ordering checks sit outside it
+because `UpdateConfig` must pass the merged config-over-tournament view. The route
+keeps what the engine cannot decide: the REST authorization layer, country
+normalization, the league-link lookup and the `VEKN_PUSH` round bounds.
+
 **Read-only rules** the UI must agree with — may a finals start, is this table
 scorable, who places where — are engine exports too, called **synchronously**
 through `getEngine()` and safe inside a `$derived`. A predicate reimplemented in

@@ -148,6 +148,7 @@ Features:
 - **Seating integration**: Uses seating module for round generation
 
 Entry points:
+- `create_tournament(config, actor)` - The sole producer of a new tournament. A gate it must share with `UpdateConfig` goes in `validate_config_fields`, not in this function's body. WASM `createTournament`, PyO3 `create_tournament`.
 - `process_tournament_event(tournament, event, actor, sanctions, decks)` - Main event processor (returns `{tournament, deck_ops}`)
 - `compute_final_standings(standings, winner)` - Reorder preliminary standings into VEKN final placement; shared by league GP/RTP scoring and the rating path. PyO3 `compute_final_standings`.
 - `display_standings(tournament, sanctions)` - Rank a tournament's stored result sheet for display, final placement included. Exposed as WASM `displayStandings`; `sanctions` must be scoped to this tournament.

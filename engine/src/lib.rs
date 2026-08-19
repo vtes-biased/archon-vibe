@@ -693,26 +693,6 @@ mod python {
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_json()))
         }
 
-        /// VEKN legality gate for the online create route, which builds the
-        /// Tournament in Python and never runs engine create_tournament.
-        fn validate_rank_legality(
-            &self,
-            format: &str,
-            rank: &str,
-            proxies: bool,
-            multideck: bool,
-        ) -> PyResult<()> {
-            crate::tournament::validate_rank_legality(format, rank, proxies, multideck)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_json()))
-        }
-
-        /// Date-ordering gate for the online create route (same reason as
-        /// `validate_rank_legality`: that route never runs create_tournament).
-        fn validate_finish_after_start(&self, start: &str, finish: &str) -> PyResult<()> {
-            crate::tournament::validate_finish_after_start(start, finish)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_json()))
-        }
-
         fn can_link_tournament_to_league(
             &self,
             actor_json: &str,
