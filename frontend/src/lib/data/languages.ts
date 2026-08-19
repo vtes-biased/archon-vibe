@@ -1,46 +1,59 @@
-// Single point of truth for community-link languages (profile editor and filter chips both import
-// it; the backend only validates the two-letter ISO 639-1 shape, so adding one here is the whole job).
-export const LANGUAGES: { value: string; label: string }[] = [
-  { value: "en", label: "English" },
-  { value: "es", label: "Español" },
-  { value: "ca", label: "Català" },
-  { value: "fr", label: "Français" },
-  { value: "pt", label: "Português" },
-  { value: "it", label: "Italiano" },
-  { value: "de", label: "Deutsch" },
-  { value: "nl", label: "Nederlands" },
-  { value: "pl", label: "Polski" },
-  { value: "cs", label: "Čeština" },
-  { value: "sk", label: "Slovenčina" },
-  { value: "hu", label: "Magyar" },
-  { value: "ro", label: "Română" },
-  { value: "bg", label: "Български" },
-  { value: "hr", label: "Hrvatski" },
-  { value: "sr", label: "Srpski" },
-  { value: "sl", label: "Slovenščina" },
-  { value: "el", label: "Ελληνικά" },
-  { value: "fi", label: "Suomi" },
-  { value: "sv", label: "Svenska" },
-  { value: "no", label: "Norsk" },
-  { value: "da", label: "Dansk" },
-  { value: "is", label: "Íslenska" },
-  { value: "et", label: "Eesti" },
-  { value: "lv", label: "Latviešu" },
-  { value: "lt", label: "Lietuvių" },
-  { value: "ru", label: "Русский" },
-  { value: "uk", label: "Українська" },
-  { value: "tr", label: "Türkçe" },
-  { value: "he", label: "עברית" },
-  { value: "ar", label: "العربية" },
-  { value: "ja", label: "日本語" },
-  { value: "zh", label: "中文" },
-  { value: "ko", label: "한국어" },
-  { value: "th", label: "ไทย" },
-  { value: "vi", label: "Tiếng Việt" },
-  { value: "id", label: "Bahasa Indonesia" },
-  { value: "tl", label: "Filipino" },
+// Content languages: the whole of ISO 639-1, not a shortlist. A member writes in
+// whatever language they speak, and the five interface locales are a separate and
+// much smaller vocabulary. The backend validates only the two-letter shape.
+const ISO_639_1 = [
+  "aa", "ab", "ae", "af", "ak", "am", "an", "ar", "as", "av", "ay", "az",
+  "ba", "be", "bg", "bi", "bm", "bn", "bo", "br", "bs",
+  "ca", "ce", "ch", "co", "cr", "cs", "cu", "cv", "cy",
+  "da", "de", "dv", "dz",
+  "ee", "el", "en", "eo", "es", "et", "eu",
+  "fa", "ff", "fi", "fj", "fo", "fr", "fy",
+  "ga", "gd", "gl", "gn", "gu", "gv",
+  "ha", "he", "hi", "ho", "hr", "ht", "hu", "hy", "hz",
+  "ia", "id", "ie", "ig", "ii", "ik", "io", "is", "it", "iu",
+  "ja", "jv",
+  "ka", "kg", "ki", "kj", "kk", "kl", "km", "kn", "ko", "kr", "ks", "ku", "kv", "kw", "ky",
+  "la", "lb", "lg", "li", "ln", "lo", "lt", "lu", "lv",
+  "mg", "mh", "mi", "mk", "ml", "mn", "mr", "ms", "mt", "my",
+  "na", "nb", "nd", "ne", "ng", "nl", "nn", "no", "nr", "nv", "ny",
+  "oc", "oj", "om", "or", "os",
+  "pa", "pi", "pl", "ps", "pt",
+  "qu",
+  "rm", "rn", "ro", "ru", "rw",
+  "sa", "sc", "sd", "se", "sg", "si", "sk", "sl", "sm", "sn", "so", "sq", "sr",
+  "ss", "st", "su", "sv", "sw",
+  "ta", "te", "tg", "th", "ti", "tk", "tl", "tn", "to", "tr", "ts", "tt", "tw", "ty",
+  "ug", "uk", "ur", "uz",
+  "ve", "vi", "vo",
+  "wa", "wo",
+  "xh",
+  "yi", "yo",
+  "za", "zh", "zu",
 ];
 
-export const LANGUAGE_NAMES: Record<string, string> = Object.fromEntries(
-  LANGUAGES.map((l) => [l.value, l.label]),
-);
+const names = new Map<string, string>();
+
+/** A language named in itself, so a reader recognises their own at a glance. */
+export function languageName(code: string): string {
+  const cached = names.get(code);
+  if (cached) return cached;
+  let label = code;
+  try {
+    label = new Intl.DisplayNames([code], { type: "language" }).of(code) ?? code;
+  } catch {
+    label = code;
+  }
+  names.set(code, label);
+  return label;
+}
+
+let sorted: { value: string; label: string }[] | null = null;
+
+/** Every content language, endonym-sorted. Built on first use — the picker that
+ * needs it is behind a modal, and the page filter only ever names what it holds. */
+export function allLanguages(): { value: string; label: string }[] {
+  sorted ??= ISO_639_1.map((value) => ({ value, label: languageName(value) })).sort(
+    (a, b) => a.label.localeCompare(b.label),
+  );
+  return sorted;
+}

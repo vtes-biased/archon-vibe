@@ -592,9 +592,10 @@ table.
 
 ## Online-only REST reads
 
-"All UI reads come from IndexedDB" has exactly one sanctioned exception: the promo
-ledger audit view reads `GET /api/promos/ledger` directly. A surface qualifies only
-when **all four** hold:
+"All UI reads come from IndexedDB" governs the data the app **displays as
+content**. It has exactly one sanctioned exception: the promo ledger audit view
+reads `GET /api/promos/ledger` directly. A surface qualifies only when **all four**
+hold:
 
 1. **Online-only** — never needed at a venue or during an offline tournament.
 2. **Officials-only** — not player- or tournament-facing display.
@@ -604,6 +605,20 @@ when **all four** hold:
 
 A tournament- or player-facing view meets none of these. Do not cite this carve-out
 to bypass offline-first for display data.
+
+Two kinds of endpoint sit outside the rule rather than inside the carve-out, so
+counting REST reads against "exactly one" mis-counts them. **Substrate** returns a
+credential, a handshake or another system's live state, never content: the VAPID
+public key, the VEKN health probe, `GET /auth/me`. There is nothing to have synced
+and nothing to render at a venue — you cannot subscribe to push or probe a remote
+system without a network, and a stored answer would be stale-wrong rather than
+merely absent. **Account management** — your authorized OAuth apps, your OAuth
+client credentials — is content, but it is your own account's server-side state,
+its actions are all online mutations, and it is meaningless offline; it is
+user-facing, so it fails the officials-only condition above and would never pass
+the carve-out. Neither category may grow to cover anything a projection could have
+delivered: if the answer could have come from the object store, it is display data
+and the four conditions apply.
 
 Authoritative aggregates derived from carve-out data are **not** part of the
 carve-out: remaining promo stock is server-computed and streamed through the normal

@@ -2,7 +2,7 @@
   import Badge from "$lib/components/Badge.svelte";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
   import CommunityModerationActions from "./CommunityModerationActions.svelte";
-  import { LANGUAGE_NAMES } from "$lib/data/languages";
+  import { languageName } from "$lib/data/languages";
   import { getCountryFlag } from "$lib/geonames";
   import { getRoleTone, getRoleLabel } from "$lib/roles";
   import type { CommunityLink, LinkMedia, User } from "$lib/types";
@@ -59,8 +59,8 @@
   <div class="flex flex-wrap items-center gap-1.5">
     {#each selectedLanguages as code (code)}
       <span class="inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-full bg-surface-hover text-ink-bright text-xs">
-        {LANGUAGE_NAMES[code] ?? code}
-        <button type="button" aria-label={m.profile_remove_language({ lang: LANGUAGE_NAMES[code] ?? code })}
+        {languageName(code)}
+        <button type="button" aria-label={m.profile_remove_language({ lang: languageName(code) })}
           onclick={() => onToggleLanguage(code)}
           class="grid place-items-center w-6 h-6 -m-1 rounded-full text-ink-faint hover:text-link cursor-pointer">
           <X class="w-3.5 h-3.5" />
@@ -76,7 +76,7 @@
         class="px-2 py-1.5 border border-line-strong rounded bg-surface-card text-ink-muted text-xs">
         <option value="" disabled selected>+ {m.profile_add_language()}</option>
         {#each unselectedLanguages as lang}
-          <option value={lang}>{LANGUAGE_NAMES[lang] || lang}</option>
+          <option value={lang}>{languageName(lang)}</option>
         {/each}
       </select>
     {/if}

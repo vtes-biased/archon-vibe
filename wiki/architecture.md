@@ -525,7 +525,13 @@ oversight. `community_links` is a field on `User`, defaulting to `[]`.
 `CommunityLink`: `type`, `url`, `label`, `languages` (ISO 639-1, capped at 5),
 `country`, and `moderation` (`status` hidden|promoted, `by`, `at`, `scope` global
 (IC) | national (NC)). The backend validates only the two-letter shape of a
-language code; the curated list lives in `languages.ts`.
+language code.
+
+**A content language is any ISO 639-1 code**, not one of the five interface
+locales ([i18n](i18n.md)) — a member writes in the language they speak, and the
+pool grows a filter for each one that appears in it. `languages.ts` carries the
+codes and names each in itself through `Intl.DisplayNames`, so the endonyms need
+no table of ours and follow the platform's own casing conventions.
 
 `engine/src/community.rs` owns the type table: one row per platform giving its
 **placement** — `channel` (a group venue) or `content` — and, for content, its
