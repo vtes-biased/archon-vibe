@@ -14,7 +14,7 @@
   import ReopenConfirmModal from "./ReopenConfirmModal.svelte";
   import FinishConfirmModal from "./FinishConfirmModal.svelte";
   import Button from "$lib/components/Button.svelte";
-  import { copyResults } from "$lib/copy-results";
+  import { copyResults, downloadResults } from "$lib/copy-results";
   import { playedPlayerUids, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import { canSetArchivalResults } from "$lib/engine";
   import { getAuthState } from "$lib/stores/auth.svelte";
@@ -22,8 +22,6 @@
   import { ChevronDown, ChevronRight, X, Settings2, Users, Upload, CloudUpload, QrCode, Gift, Ticket, ClipboardCopy, Download, Undo2, Trash2, Image, TriangleAlert, ScrollText } from "@lucide/svelte";
   import type { DeckObject } from "$lib/types";
   import * as m from '$lib/paraglide/messages.js';
-
-  const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
   type ActionItem = { label: string; icon?: Component<any>; onclick: () => void; disabled?: boolean };
   type GroupId = "setup" | "door" | "wrapup";
@@ -93,15 +91,6 @@
     && !tournament.external_ids?.vekn
     && canSetArchivalResults(getAuthState().user).allowed
   );
-
-  function downloadEventCopy() {
-    const a = document.createElement("a");
-    a.href = `${API_BASE}/api/tournaments/${tournament.uid}/report`;
-    a.download = "";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }
 
   // Which group the current moment belongs to. Order never changes; this only
   // decides what is already unfolded when the sheet opens.
@@ -241,7 +230,7 @@
           {/if}
           {#if hasStandings}
             {@render actionRow({ label: m.tools_copy_results(), onclick: () => copyResults(tournament, playerInfo, standings) }, ClipboardCopy)}
-            {@render actionRow({ label: m.tools_download_event(), onclick: downloadEventCopy }, Download)}
+            {@render actionRow({ label: m.tools_download_event(), onclick: () => downloadResults(tournament, playerInfo, standings) }, Download)}
           {/if}
           {#if syncVeknItem?.group === "wrapup"}{@render actionRow(syncVeknItem, CloudUpload)}{/if}
           {#if canFinishEarly}

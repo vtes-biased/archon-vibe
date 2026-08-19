@@ -4,17 +4,11 @@ import { eventUrl, seatDisplay } from "$lib/tournament-utils";
 import { formatScore } from "$lib/utils";
 import { getCountry } from "$lib/geonames";
 import { getCards } from "$lib/cards";
+import { getLibraryTypeOrder } from "$lib/engine";
+import { initEngine } from "$lib/engine-instance";
 import { getDecksByTournamentGrouped } from "$lib/db";
 import { getLocale } from "$lib/paraglide/runtime.js";
 import * as m from "$lib/paraglide/messages.js";
-
-// Standard TWDA library type ordering (from krcg config, matches DeckDisplay.svelte)
-const LIBRARY_TYPE_ORDER = [
-  "Master", "Conviction", "Action", "Action/Combat", "Action/Reaction",
-  "Ally", "Equipment", "Political Action", "Retainer", "Power",
-  "Action Modifier", "Action Modifier/Combat", "Action Modifier/Reaction",
-  "Reaction", "Combat", "Combat/Reaction", "Event",
-];
 
 interface CardEntry { name: string; count: number; type: string; capacity: number }
 
@@ -50,9 +44,10 @@ function formatDeckText(deck: Deck, cardsMap: Map<number, VtesCard>): string[] {
     lines.push(`Library (${libTotal})`);
     const groups: Record<string, CardEntry[]> = {};
     for (const c of library) (groups[c.type] ??= []).push(c);
+    const order = getLibraryTypeOrder();
     const sorted = Object.entries(groups).sort(([a], [b]) => {
-      const ai = LIBRARY_TYPE_ORDER.indexOf(a);
-      const bi = LIBRARY_TYPE_ORDER.indexOf(b);
+      const ai = order.indexOf(a);
+      const bi = order.indexOf(b);
       return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
     });
     for (const [type, cards] of sorted) {
@@ -123,6 +118,9 @@ export async function generateResultsText(
       const deck = winnerDecks[winnerDecks.length - 1]!;
       if (Object.keys(deck.cards).length > 0) {
         const cardsMap = await getCards();
+        // This text is stored, not re-rendered: a cold engine would freeze a
+        // non-TWDA library order into the file.
+        await initEngine();
         const winnerName = seatDisplay(tournament.winner, playerInfo, tournament.online);
         // The decklist itself stays in TWDA English convention (card names,
         // Crypt/Library headers) — only the prose heading is localized.

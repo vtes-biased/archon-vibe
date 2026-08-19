@@ -200,11 +200,12 @@ because callers need the uids, not a number. Those are enumeration; the rule is
 not in them. Two readings in `backend/src/routes/tournaments.py` stay divergent:
 `_played_player_count`, gating the TWDA floor, is seats only with no standings
 fallback — so 0 for a rounds-less import — and it *subtracts* non-competing
-proxies; and `GET /{uid}/report` sends `len(tournament.players)`, the registered
-roster including no-shows. Neither is the rule. `TWDA_MIN_PLAYERS` lives in
-`db.py` and is shared by both floors that use it; the *function* is not — the
-Hall of Fame reads `attested_player_count`, because `_played_player_count` would
-score every rounds-less import and every reconstruction at 0 and empty the page.
+proxies; and `_winner_deck_twda` sends `len(tournament.players)`, the registered
+roster including no-shows, onto the published TWDA header line. Neither is the
+rule. `TWDA_MIN_PLAYERS` lives in `db.py` and is shared by both floors that use
+it; the *function* is not — the Hall of Fame reads `attested_player_count`,
+because `_played_player_count` would score every rounds-less import and every
+reconstruction at 0 and empty the page.
 
 That 0 is now load-bearing in a second, unobvious place: it is the only thing
 keeping a reconstructed row out of the TWDA submitter. Such a row's event code

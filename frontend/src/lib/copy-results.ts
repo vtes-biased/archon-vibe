@@ -19,3 +19,23 @@ export async function copyResults(
     showToast({ type: "error", message: m.share_results_error() });
   }
 }
+
+export async function downloadResults(
+  tournament: Tournament,
+  playerInfo: PlayerInfoMap,
+  standings: StandingEntry[],
+): Promise<void> {
+  try {
+    const text = await generateResultsText(tournament, playerInfo, standings);
+    const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${tournament.event_code || tournament.uid}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch {
+    showToast({ type: "error", message: m.share_results_error() });
+  }
+}

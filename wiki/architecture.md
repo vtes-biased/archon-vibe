@@ -175,7 +175,7 @@ rebuilds both targets; build one directly with `wasm-pack` or `maturin develop`
 | `tournament/mod.rs` | event processing, state machine, finals |
 | `tournament/standings.rs` | standings, rating VP/GW, final placement |
 | `tournament/sanctions.rs` | SA effective-round resolution (distinct from `sanctions.rs`) |
-| `deck.rs` | deck parse/validate, TWDA export |
+| `deck.rs` | deck parse/validate, TWDA export, `library_type_order_json` |
 | `ratings.rs` | rating points, `ranking_eligibility`, the two player counts |
 | `league.rs` | league standings (RTP/Score/GP) |
 | `cards.rs` | card database lookup and name normalization |
@@ -271,6 +271,12 @@ backend `GET /fetch-deck` proxy, which uses krcg providers to fetch and resolve
 provider-native card ids — notably Amaranth's own — to VEKN ids against krcg's own
 bundled card DB, independent of our `cards.json`. URL and QR import are disabled
 offline; text import is not.
+
+**Library type ordering** is `LIBRARY_TYPE_ORDER` in `engine/src/deck.rs`, exported
+as `libraryTypeOrder` and read through `getLibraryTypeOrder()`. The engine's own
+TWDA export and every frontend decklist rendering — the deck view, the event text
+record — group by it. Before WASM loads it is empty, which leaves the groups in
+encounter order rather than inventing one.
 
 Decks are not bundled into the tournament SSE event: the tournament page listens
 for `type === "deck"` events and re-queries the grouped decks.
@@ -631,11 +637,16 @@ is the join link rather than a venue website.
 
 ### Reports and social sharing
 
-`GET /api/tournaments/{uid}/report` (organizer-only) yields text (standings and
-results) or JSON (full data). Sharing produces a canvas-rendered PNG plus plain
-text with deck info, from the finished-tournament views. The player-facing
-copy-results action shares text plus the link only, with no image generation of
-its own — the OG stub below already turns the shared link into the picture card.
+**The event's text record is produced client-side**, by `generateResultsText`
+(`social-text.ts`) from the tournament, its player info and the winner's deck —
+all of which the device already holds offline. `copy-results.ts` takes that one
+render to either destination: the clipboard, or a `.txt` download named by the
+event code. There is no report endpoint; the server has no input the device
+lacks, and a download navigation cannot carry the bearer token anyway. Sharing
+also produces a canvas-rendered PNG, from the finished-tournament views. The
+player-facing copy-results action shares text plus the link only, with no image
+generation of its own — the OG stub below already turns the shared link into the
+picture card.
 
 ### The short event code
 

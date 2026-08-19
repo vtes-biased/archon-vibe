@@ -312,6 +312,16 @@ export function getCommunityLinkReference(): CommunityLinkReference | null {
   return communityLinkReference;
 }
 
+let libraryTypeOrder: string[] | null = null;
+
+export function getLibraryTypeOrder(): string[] {
+  if (libraryTypeOrder) return libraryTypeOrder;
+  const engine = getEngineReactive();
+  if (!engine) return [];
+  libraryTypeOrder = JSON.parse(callEngine(() => engine.libraryTypeOrder()));
+  return libraryTypeOrder!;
+}
+
 type UserContext = { uid: string; roles?: string[] | null; country?: string | null; vekn_id?: string | null };
 type Resource = { country?: string | null; organizers_uids?: string[] };
 

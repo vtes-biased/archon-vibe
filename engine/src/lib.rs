@@ -572,6 +572,11 @@ mod wasm {
             crate::community::community_link_reference_json()
         }
 
+        #[wasm_bindgen(js_name = libraryTypeOrder)]
+        pub fn library_type_order(&self) -> String {
+            crate::deck::library_type_order_json()
+        }
+
         #[wasm_bindgen(js_name = foldAscii)]
         pub fn fold_ascii(&self, s: &str) -> String {
             crate::cards::fold_ascii(s)

@@ -298,6 +298,12 @@ expanded: creation opens what must be filled, editing opens nothing.
 **Markdown** — never `line-clamp-N` over rendered markdown HTML; derive a
 plain-text excerpt from the source for a folded preview.
 
+**Downloads are produced on the device.** The organizer's event copy renders from
+local data and is handed over as a Blob — a plain navigation to a download
+endpoint carries no `Authorization` header, so an authenticated one answers 401 to
+every click. The account data export is the exception, because its payload is
+genuinely server-side; it passes the token in the query string.
+
 Shared helpers live in `tournament-utils.ts`; don't re-duplicate score helpers per
 file.
 

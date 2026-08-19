@@ -5,7 +5,7 @@
   import { normalizeSearch } from "$lib/utils";
   import { disciplineIcon, typeIcon } from "$lib/vtes-icons";
   import AttributionPicker from "./AttributionPicker.svelte";
-  import { validateDeck, type ValidationError } from "$lib/engine";
+  import { getLibraryTypeOrder, validateDeck, type ValidationError } from "$lib/engine";
   import CardSearch from "./CardSearch.svelte";
   import CardName from "./CardName.svelte";
   import { CircleX, TriangleAlert } from "@lucide/svelte";
@@ -193,23 +193,16 @@
   const cryptCount = $derived(cryptEntries.reduce((s, e) => s + e.count, 0));
   const libraryCount = $derived(libraryEntries.reduce((s, e) => s + e.count, 0));
 
-  // Standard TWDA library type ordering (from krcg config)
-  const LIBRARY_TYPE_ORDER = [
-    'Master', 'Conviction', 'Action', 'Action/Combat', 'Action/Reaction',
-    'Ally', 'Equipment', 'Political Action', 'Retainer', 'Power',
-    'Action Modifier', 'Action Modifier/Combat', 'Action Modifier/Reaction',
-    'Reaction', 'Combat', 'Combat/Reaction', 'Event',
-  ];
-
   const libraryByType = $derived.by(() => {
     const groups: Record<string, DisplayEntry[]> = {};
     for (const entry of libraryEntries) {
       const type = entry.card?.types[0] ?? 'Other';
       (groups[type] ??= []).push(entry);
     }
+    const order = getLibraryTypeOrder();
     return Object.entries(groups).sort(([a], [b]) => {
-      const ai = LIBRARY_TYPE_ORDER.indexOf(a);
-      const bi = LIBRARY_TYPE_ORDER.indexOf(b);
+      const ai = order.indexOf(a);
+      const bi = order.indexOf(b);
       return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
     });
   });

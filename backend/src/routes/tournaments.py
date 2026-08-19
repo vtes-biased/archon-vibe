@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import msgspec
 from archon_engine import PyEngine
-from fastapi import APIRouter, HTTPException, Query, Request, Response, UploadFile
+from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -39,7 +39,6 @@ from ..db import (
     get_tournament_by_uid,
     get_user_by_uid,
     get_user_by_vekn_id,
-    get_users_by_uids,
     resolve_event_code,
     save_object,
     save_object_from_model,
@@ -294,8 +293,7 @@ async def _maybe_push_vekn_event(tournament: Tournament) -> None:
 
 async def _winner_deck_twda(tournament: Tournament) -> str | None:
     """TWDA-formatted winner decklist (event header + deck), or None if the
-    winner has no stored deck. Shared by maybe_submit_twda and the text report
-    download."""
+    winner has no stored deck."""
     if not tournament.winner:
         return None
 
@@ -1726,162 +1724,6 @@ def _load_cards_json() -> str:
             status_code=503, detail="Cards data not available. Run: just cards"
         )
     return text
-
-
-def _format_num(x: float) -> str:
-    """Drop a trailing .0 so scores read like the frontend (1GW2.5, not 1.0GW2.5)."""
-    return str(int(x)) if float(x).is_integer() else str(x)
-
-
-def _format_score(gw: float, vp: float, tp: int) -> str:
-    """Mirror frontend formatScore (utils.ts): GW shown only when > 0."""
-    head = f"{_format_num(gw)}GW{_format_num(vp)}" if gw > 0 else f"{_format_num(vp)}VP"
-    return f"{head} {tp}TP"
-
-
-def _abbreviate_name(name: str) -> str:
-    """Mirror frontend abbreviateName: first word + initials of the rest."""
-    words = name.split()
-    if not words:
-        return ""
-    initials = "".join(w[0].upper() for w in words[1:])
-    return f"{words[0]} {initials}" if initials else words[0]
-
-
-def _seat_display(
-    uid: str,
-    users_by_uid: dict[str, User],
-    display_names: dict[str, str | None],
-    online: bool,
-) -> str:
-    """Backend mirror of frontend seatDisplay (tournament-utils.ts) — keep them
-    in sync. Online shows nickname+abbreviated name; IRL shows real name+VEKN,
-    never the nickname."""
-    user = users_by_uid.get(uid)
-    name = (user.name if user else "") or uid
-    vekn = user.vekn_id if user else None
-    if online:
-        nick = display_names.get(uid) or (user.nickname if user else None)
-        abbrev = _abbreviate_name(name) or name
-        if nick:
-            inside = " · ".join(p for p in (abbrev, vekn) if p)
-            return f"{nick} ({inside})" if inside else nick
-        return f"{abbrev} ({vekn})" if vekn else abbrev
-    return f"{name} ({vekn})" if vekn else name
-
-
-def _render_text_report(
-    tournament: Tournament,
-    users_by_uid: dict[str, User],
-    deck_text: str | None,
-) -> str:
-    """Readable standings + winner decklist (TWDA format). Honors the online/IRL
-    name-vs-nickname distinction via _seat_display."""
-    display_names = {
-        p.user_uid: p.display_name for p in tournament.players if p.user_uid
-    }
-
-    def who(uid: str) -> str:
-        return _seat_display(uid, users_by_uid, display_names, tournament.online)
-
-    lines: list[str] = [tournament.name, ""]
-
-    if tournament.winner:
-        win = next(
-            (s for s in tournament.standings if s.user_uid == tournament.winner), None
-        )
-        score = f" — {_format_score(win.gw, win.vp, win.tp)}" if win else ""
-        lines += [f"Winner: {who(tournament.winner)}{score}", ""]
-
-    lines.append("Standings:")
-    for rank, s in enumerate(tournament.standings, 1):
-        tags = []
-        if s.user_uid == tournament.winner:
-            tags.append("Winner")
-        elif s.finalist:
-            tags.append("Finalist")
-        if s.disqualified:
-            tags.append("DQ")
-        if s.non_competing:
-            tags.append("Proxy")
-        suffix = f" [{', '.join(tags)}]" if tags else ""
-        lines.append(
-            f"{rank}. {who(s.user_uid)} — {_format_score(s.gw, s.vp, s.tp)}{suffix}"
-        )
-
-    if deck_text:
-        lines += ["", "-" * 60, "", deck_text.rstrip()]
-    elif tournament.winner:
-        lines += ["", "(Winner's decklist not submitted.)"]
-
-    return "\n".join(lines) + "\n"
-
-
-@router.get("/{uid}/report")
-async def tournament_report(
-    uid: str,
-    fmt: str = Query("json", pattern="^(json|text)$"),
-    user: OptionalUser = None,
-) -> Response:
-    """fmt=json (default) returns structured data; fmt=text returns a readable
-    standings list plus the winner's TWDA decklist."""
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-
-    if tournament.state != TournamentState.FINISHED:
-        raise HTTPException(status_code=400, detail="Tournament is not finished")
-
-    if not permissions.is_organizer(user, tournament):
-        raise HTTPException(
-            status_code=403, detail="Only organizers can download reports"
-        )
-
-    if fmt == "text":
-        users_by_uid = await get_users_by_uids(
-            {s.user_uid for s in tournament.standings}
-        )
-        try:
-            deck_text = await _winner_deck_twda(tournament)
-        except Exception:
-            logger.exception("Failed to render winner deck for text report")
-            deck_text = None
-        return Response(
-            content=_render_text_report(tournament, users_by_uid, deck_text),
-            media_type="text/plain; charset=utf-8",
-            headers={"Content-Disposition": f'attachment; filename="{uid}-report.txt"'},
-        )
-
-    report = {
-        "tournament": {
-            "name": tournament.name,
-            "date": str(tournament.start or tournament.modified.isoformat()),
-            "country": tournament.country,
-            "format": tournament.format.value
-            if hasattr(tournament.format, "value")
-            else str(tournament.format),
-            "player_count": len(tournament.players),
-            "winner": tournament.winner,
-        },
-        "standings": [
-            {
-                "user_uid": s.user_uid,
-                "gw": s.gw,
-                "vp": s.vp,
-                "tp": s.tp,
-                "finalist": s.finalist,
-            }
-            for s in tournament.standings
-        ],
-    }
-    return Response(
-        content=json.dumps(report, indent=2),
-        media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{uid}-report.json"'},
-    )
 
 
 def _validate_timer_tournament(user, tournament: Tournament | None):

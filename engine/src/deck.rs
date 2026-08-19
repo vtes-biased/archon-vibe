@@ -535,6 +535,16 @@ fn library_type_index(t: &str) -> usize {
         .unwrap_or(LIBRARY_TYPE_ORDER.len())
 }
 
+pub fn library_type_order_json() -> String {
+    JsonValue::Array(
+        LIBRARY_TYPE_ORDER
+            .iter()
+            .map(|&t| JsonValue::from(t))
+            .collect(),
+    )
+    .dump()
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn export_twda(
     deck: &Deck,
