@@ -260,6 +260,7 @@ async def test_detach_vekn_record_is_immovable(test_db):
         coopted_at=coopted_at,
         vekn_prefix="NC-FR",
         community_links=[CommunityLink(type="website", url="https://example.org")],
+        promo_stock={"promo-uid-1": 12},
         constructed_online=rating,
         wins=["tourney-uid-1"],
         # PII that must walk away:
@@ -292,6 +293,7 @@ async def test_detach_vekn_record_is_immovable(test_db):
         assert vekn_record.constructed_online == rating
         assert vekn_record.wins == ["tourney-uid-1"]
         assert len(vekn_record.community_links) == 1
+        assert vekn_record.promo_stock == {"promo-uid-1": 12}
 
         assert {s.uid for s in await db.get_sanctions_for_user(user.uid)} == {
             sanction.uid
@@ -311,6 +313,7 @@ async def test_detach_vekn_record_is_immovable(test_db):
         assert personal.coopted_by is None
         assert personal.vekn_prefix is None
         assert personal.community_links == []
+        assert personal.promo_stock == {}
         assert personal.constructed_online is None
         assert personal.wins == []
         assert personal.name == "Holder"

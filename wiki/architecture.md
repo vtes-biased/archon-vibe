@@ -699,11 +699,12 @@ the nightly pass — no result changed hands, only ownership. The route separate
 references onto the survivor and triggers a full promo stock recompute.
 
 **Detach** splits one account in two: the VEKN record keeps its uid and all keyed
-data, while a fresh uid walks away with auth methods and personal/contact PII
-only. Callers are **self-abandon** (blocked while an active suspension or
-probation is held — the sanction stays with the VEKN record; admin force-abandon
-is exempt) and **admin displace**, which frees a VEKN ID before re-linking it, the
-new owner then being merged into the freed record.
+data — community links and promo stock among them, both earned by the VEKN
+identity and keyed to its uid — while a fresh uid walks away with auth methods
+and personal/contact PII only. Callers are **self-abandon** (blocked while an
+active suspension or probation is held — the sanction stays with the VEKN record;
+admin force-abandon is exempt) and **admin displace**, which frees a VEKN ID
+before re-linking it, the new owner then being merged into the freed record.
 
 Reassigning object references during merge or detach must return `BroadcastData`
 and broadcast, or other clients stay stale until the next snapshot resync.

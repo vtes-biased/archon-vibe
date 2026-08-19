@@ -205,7 +205,9 @@ async def detach_user_from_vekn(
 
     vekn_record keeps the uid and everything keyed to it. A new personal/login
     field must be added to the null-list on vekn_record below, or it leaks onto
-    the record for the next claimant.
+    the record for the next claimant; a new field keyed to the uid must be added
+    to the clear-list on personal, or the split copies it onto an account that
+    holds none of it.
     """
     user = await get_user_by_uid(user_uid)
     if not user:
@@ -232,6 +234,7 @@ async def detach_user_from_vekn(
         local_modifications=set(),
         vekn_prefix=None,
         community_links=[],
+        promo_stock={},
         calendar_token=feed_token,
         constructed_online=None,
         constructed_offline=None,

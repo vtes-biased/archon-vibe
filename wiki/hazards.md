@@ -18,9 +18,14 @@ Two rebuilds of an *existing* user sit on routine paths and are the ones that bi
 
 - the member sync's cooptation inference, a nightly job, which already drops
   several fields;
-- the detach path's **null-list**, which is the inverse trap — a new
-  personal/login field must be **added** to the null-list or it leaks onto the
-  abandoned VEKN record for the next claimant.
+- the detach path's two lists, each the inverse of the other. A new
+  personal/login field must be **added** to the **null-list** or it leaks onto the
+  abandoned VEKN record for the next claimant; a new field keyed to the uid —
+  roles, ratings, wins, community links, promo stock — must be **added** to the
+  **clear-list** on the personal account or the split hands it a copy of stock,
+  standing or reach it holds none of. Only the derived ones — ratings, wins, promo
+  stock — heal on a nightly recompute; roles and community links have no job that
+  re-derives them, so there the copy is permanent.
 
 Every other `User(...)` site is a fresh-uid create with nothing to drop.
 
