@@ -12,6 +12,7 @@ mod standings;
 mod tests;
 mod types;
 
+pub use raffle::get_raffle_pool;
 pub use scoring::{check_table_vps, compute_gw, compute_gw_finals, compute_tp};
 pub use standings::{
     compute_final_standings, compute_rating_vp_gw, display_standings, finals_qualification,
@@ -25,7 +26,7 @@ use helpers::{
     require_can_edit_results, require_organizer, require_state, require_state_or_finished,
     validate_enum,
 };
-use raffle::{compute_deck_public, get_raffle_pool};
+use raffle::compute_deck_public;
 use sanctions::{has_active_suspension, has_dq_sanction, table_sa_adjustments};
 use standings::{
     compute_preliminary_standings, finals_candidates, top5_has_ties, toss_groups, tosses_are_total,

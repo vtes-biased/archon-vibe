@@ -1592,7 +1592,6 @@
   "err_tournament_raffle_count_min": "Le nombre de tirages doit être au moins 1",
   "err_tournament_raffle_no_players": "Aucun joueur éligible dans le pool",
   "err_tournament_raffle_no_draws": "Aucun tirage au sort à annuler",
-  "err_tournament_raffle_none_played": "Aucun joueur disponible pour le tirage au sort",
   "err_tournament_raffle_wrong_state": "Le tirage nécessite un tournoi en état En attente, En cours ou Terminé",
   "err_tournament_name_required": "Le nom du tournoi ne peut pas être vide",
   "err_tournament_finish_before_start": "L'heure de fin ne peut pas être antérieure à l'heure de début",

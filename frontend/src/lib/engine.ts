@@ -1,4 +1,4 @@
-import type { CommunityLinkType, DeckObject, LinkMedia, LinkPlacement, Sanction, SanctionCategory, SanctionLevel, SanctionSubcategory, Tournament, User } from './types';
+import type { CommunityLinkType, DeckObject, LinkMedia, LinkPlacement, RafflePool, Sanction, SanctionCategory, SanctionLevel, SanctionSubcategory, Tournament, User } from './types';
 import { getAllLeagues } from './db';
 import { callEngine, getEngine, initEngine } from './engine-instance';
 
@@ -589,6 +589,19 @@ export function displayStandings(
 ): Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; rank: number; finalist: boolean; disqualified: boolean; non_competing: boolean; finals?: { gw: number; vp: number; tp: number } }> {
   const config = JSON.stringify({ tournament, sanctions: JSON.parse(buildSanctionsPayload(sanctions)) });
   return JSON.parse(callEngine(() => getEngine().displayStandings(config)));
+}
+
+/** Takes pre-serialized JSON: the picker asks once per pool and the tournament is
+ * serialized once for all of them. */
+export function rafflePool(
+  tournamentJson: string,
+  sanctionsJson: string,
+  pool: RafflePool,
+  excludeDrawn: boolean
+): string[] {
+  return JSON.parse(
+    callEngine(() => getEngine().rafflePool(tournamentJson, sanctionsJson, pool, excludeDrawn))
+  );
 }
 
 export function finalsQualification(

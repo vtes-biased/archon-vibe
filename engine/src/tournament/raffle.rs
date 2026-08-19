@@ -34,18 +34,13 @@ fn get_raffle_base_uids(tournament: &JsonValue) -> Vec<String> {
     result
 }
 
-/// NOTE: pool filtering is duplicated in frontend `RaffleSection.svelte`
-/// `eligibleForPool()` — keep both in sync.
-pub(super) fn get_raffle_pool(
+pub fn get_raffle_pool(
     tournament: &JsonValue,
     sanctions: &JsonValue,
     pool: &str,
     exclude_drawn: bool,
 ) -> Result<Vec<String>, EngineError> {
     let base = get_raffle_base_uids(tournament);
-    if base.is_empty() {
-        return Err(EngineError::RaffleNonePlayed);
-    }
 
     // Computed live, not from tournament["standings"]: that only refreshes on
     // FinishRound and would miss VP/GW from an in-progress round's SetScore.

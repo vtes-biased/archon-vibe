@@ -271,6 +271,19 @@ mod shared {
         Ok(json::JsonValue::Array(ranked).dump())
     }
 
+    pub fn raffle_pool_json(
+        tournament_json: &str,
+        sanctions_json: &str,
+        pool: &str,
+        exclude_drawn: bool,
+    ) -> Result<String, EngineError> {
+        let tournament = json::parse(tournament_json)?;
+        let sanctions = json::parse(sanctions_json)?;
+        let uids =
+            super::tournament::get_raffle_pool(&tournament, &sanctions, pool, exclude_drawn)?;
+        Ok(JsonValue::Array(uids.into_iter().map(JsonValue::from).collect()).dump())
+    }
+
     pub fn finals_qualification_json(config_json: &str) -> Result<String, EngineError> {
         let config = json::parse(config_json)?;
         Ok(
@@ -553,6 +566,22 @@ mod wasm {
         #[wasm_bindgen(js_name = displayStandings)]
         pub fn display_standings(&self, config_json: &str) -> Result<String, String> {
             js_str(display_standings_json(config_json))
+        }
+
+        #[wasm_bindgen(js_name = rafflePool)]
+        pub fn raffle_pool(
+            &self,
+            tournament_json: &str,
+            sanctions_json: &str,
+            pool: &str,
+            exclude_drawn: bool,
+        ) -> Result<String, String> {
+            js_str(raffle_pool_json(
+                tournament_json,
+                sanctions_json,
+                pool,
+                exclude_drawn,
+            ))
         }
 
         #[wasm_bindgen(js_name = finalsQualification)]

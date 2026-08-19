@@ -425,6 +425,12 @@ side effects; there are no REST deck endpoints.
 NoVictoryPoint; optional `prize_promo_uid`, display-only and never written to
 `promos_distributed`), `RaffleUndo`, `RaffleClear`.
 
+`get_raffle_pool` is the one pool definition, and the organizer's picker reads it
+over the `rafflePool` WASM export rather than counting eligibility itself — the
+count beside each pool is the set the draw will actually shuffle. It is a query,
+not a gate: an empty pool is a number the picker renders and only `RaffleDraw`
+rejects.
+
 **Promos** — `ReportPromos`, replace-the-whole-list, no state gate, since counts
 are typically entered post-finish and re-entered on correction.
 

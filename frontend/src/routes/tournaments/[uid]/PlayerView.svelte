@@ -730,6 +730,7 @@
       {tournament}
       {playerInfo}
       isOrganizer={false}
+      sanctions={[]}
     />
   </div>
 {/if}

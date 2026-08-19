@@ -3,7 +3,7 @@
   // Groups run in fixed event chronology — setup, door, wrap up — only which
   // group starts open follows tournament state.
   import type { Component } from "svelte";
-  import type { Tournament } from "$lib/types";
+  import type { Sanction, Tournament } from "$lib/types";
   import { addTournamentOrganizer, removeTournamentOrganizer } from "$lib/api";
   import TournamentDetailsForm from "./TournamentDetailsForm.svelte";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
@@ -40,6 +40,7 @@
     isOrganizer,
     playerInfo,
     standings,
+    sanctions,
     decksByUser,
     doAction,
     actionLoading = false,
@@ -57,6 +58,7 @@
     isOrganizer: boolean;
     playerInfo: PlayerInfoMap;
     standings: StandingEntry[];
+    sanctions: Sanction[];
     /** Only for the finish-confirmation modal's winner-deck warning. */
     decksByUser: Record<string, DeckObject[]>;
     doAction: (action: TournamentEventType, body?: any) => Promise<string | null>;
@@ -282,7 +284,7 @@
 {/snippet}
 
 {#snippet rafflePanel()}
-  <RaffleSection {tournament} {playerInfo} isOrganizer={true} {doAction} {actionLoading} />
+  <RaffleSection {tournament} {playerInfo} isOrganizer={true} {sanctions} {doAction} {actionLoading} />
 {/snippet}
 
 {#if showFinishConfirm}

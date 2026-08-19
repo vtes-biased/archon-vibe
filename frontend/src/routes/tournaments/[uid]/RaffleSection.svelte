@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { TournamentEventType } from "$lib/engine";
-  import type { Tournament, RafflePool, Promo } from "$lib/types";
+  import type { Tournament, RafflePool, Promo, Sanction } from "$lib/types";
+  import { buildSanctionsPayload, rafflePool } from "$lib/engine";
   import { getAllPromos } from "$lib/db";
   import { seatDisplay as seatDisplayUtil, type PlayerInfoMap } from "$lib/tournament-utils";
   import { Dices, Gift, Undo2, Trash2 } from "@lucide/svelte";
@@ -13,12 +14,16 @@
     tournament,
     playerInfo,
     isOrganizer,
+    sanctions,
     doAction,
     actionLoading,
   }: {
     tournament: Tournament;
     playerInfo: PlayerInfoMap;
     isOrganizer: boolean;
+    /** This event's own sanctions, read only by the organizer's pool counts —
+        the read-only results view renders no picker and passes `[]`. */
+    sanctions: Sanction[];
     doAction?: (action: TournamentEventType, body?: any) => Promise<string | null>;
     actionLoading?: boolean;
   } = $props();
@@ -64,79 +69,11 @@
     return seatDisplayUtil(uid, playerInfo, tournament.online);
   }
 
-  // Base: players seated in any round, plus checked-in/playing players not yet
-  // seated, so a pre-round-1 raffle still draws from check-in. Mirrors engine
-  // raffle.rs get_raffle_base_uids().
-  const baseUids = $derived.by(() => {
-    const set = new Set<string>();
-    for (const round of tournament.rounds ?? []) {
-      for (const table of round) {
-        for (const seat of table.seating) {
-          if (seat.player_uid) set.add(seat.player_uid);
-        }
-      }
-    }
-    for (const p of tournament.players ?? []) {
-      if ((p.state === "Checked-in" || p.state === "Playing") && p.user_uid) {
-        set.add(p.user_uid);
-      }
-    }
-    return set;
-  });
+  const tournamentJson = $derived(JSON.stringify(tournament));
+  const sanctionsJson = $derived(buildSanctionsPayload(sanctions));
 
-  const finalistUids = $derived.by(() => {
-    const set = new Set<string>();
-    if (tournament.finals) {
-      for (const seat of tournament.finals.seating) {
-        set.add(seat.player_uid);
-      }
-    }
-    return set;
-  });
-
-  // Live GW/VP, summed from per-seat round results — do NOT use
-  // tournament.standings, which only refreshes on FinishRound and misses the
-  // round in progress.
-  const standingsMap = $derived.by(() => {
-    const map = new Map<string, { gw: number; vp: number }>();
-    for (const round of tournament.rounds ?? []) {
-      for (const table of round) {
-        for (const seat of table.seating) {
-          if (!seat.player_uid) continue;
-          const e = map.get(seat.player_uid) ?? { gw: 0, vp: 0 };
-          e.gw += seat.result.gw ?? 0;
-          e.vp += seat.result.vp ?? 0;
-          map.set(seat.player_uid, e);
-        }
-      }
-    }
-    return map;
-  });
-
-  const drawnUids = $derived.by(() => {
-    const set = new Set<string>();
-    for (const draw of tournament.raffles ?? []) {
-      for (const w of draw.winners) set.add(w);
-    }
-    return set;
-  });
-
-  // Pool filtering logic must match engine raffle.rs get_raffle_pool()
   function eligibleForPool(p: RafflePool): number {
-    let uids: string[];
-    const base = [...baseUids];
-    switch (p) {
-      case "AllPlayers": uids = base; break;
-      case "NonFinalists": uids = base.filter(u => !finalistUids.has(u)); break;
-      case "GameWinners": uids = base.filter(u => (standingsMap.get(u)?.gw ?? 0) > 0); break;
-      case "NoGameWin": uids = base.filter(u => (standingsMap.get(u)?.gw ?? 0) === 0); break;
-      case "NoVictoryPoint": uids = base.filter(u => (standingsMap.get(u)?.vp ?? 0) === 0); break;
-      default: uids = base;
-    }
-    if (excludeDrawn) {
-      uids = uids.filter(u => !drawnUids.has(u));
-    }
-    return uids.length;
+    return rafflePool(tournamentJson, sanctionsJson, p, excludeDrawn).length;
   }
 
   const currentEligible = $derived(eligibleForPool(pool));

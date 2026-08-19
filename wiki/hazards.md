@@ -54,22 +54,28 @@ access-version handshake nor any test can catch the missing backfill — see
 [sync](sync.md#access-levels) for the re-save script and
 [testing](testing.md#traps) for why no test covers it.
 
-**`Tournament.country` is not always an ISO code.** 208 live rows store the country
-*name* — `Brazil`, `Spain`, `United States` — in a field every consumer reads as a
-two-letter code, so any exact comparison silently drops them as if they disagreed.
-Compare through **`geonames.country_key`**, never through `normalize_country`
-directly: the resolver returns `None` for a spelling it does not know (`Czechia`,
-`South Korea`, `UK`), and treating that as "no country declared" makes every
-unknown value equal to every other and **disables the caller's guard**.
-`country_key` compares such values as themselves, so an unrecognised spelling
-narrows the candidates instead. `normalize_country` is for resolving a code out of
-a name, where `None` legitimately means "says nothing" — the TWDA's `Online`, and
-the `XX` placeholder 8 live rows carry. Which function a caller wants turns on
-whether it is a **guard** or a **tie-break**: `find_same_event_tournaments` stamps a
-vekn id onto its single survivor, so an unknown spelling must narrow;
-`reconcile_twda.py` only ever breaks ties and discards a filter that would empty
-the candidate set, so there `XX` and `Online` must both stay open, and switching it
-to `country_key` would silently drop the `XX` rows' true matches.
+**Our country rows are ISO codes; the corpora we compare them against are names.**
+Every write path normalises through `geonames.stored_country`, so a stored value is
+a two-letter code, vekn.net's `XX` unknown-venue placeholder, or nothing. The
+legacy dumps, vekn.net and the TWDA archive all quote country *names*, so a
+cross-corpus comparison goes through **`geonames.country_key`**, never through
+`normalize_country` directly: the resolver returns `None` for a spelling it does
+not know (`Czechia`, `South Korea`, `UK`), and treating that as "no country
+declared" makes every unknown value equal to every other and **disables the
+caller's guard**. `country_key` compares such values as themselves, so an
+unrecognised spelling narrows the candidates instead. `normalize_country` is for
+resolving a code out of a name, where `None` legitimately means "says nothing" —
+the TWDA's `Online`. Which function a caller wants turns on whether it is a
+**guard** or a **tie-break**: `find_same_event_tournaments` stamps a vekn id onto
+its single survivor, so an unknown spelling must narrow; `reconcile_twda.py` only
+ever breaks ties and discards a filter that would empty the candidate set, so there
+`XX` and `Online` must both stay open, and switching it to `country_key` would
+silently drop the `XX` rows' true matches.
+
+**The TWDA export publishes the country as a name**, expanded back out of the
+stored code in `routes/tournaments.py`. The archive's `place` line is permanent and
+its convention is `City, Country` spelled out, so exporting the raw field would
+regress the published corpus with no way to take it back.
 
 **Dropping NFD combining marks is not an ASCII fold.** ł, ø, æ, ß and friends
 decompose to themselves, so a mark-dropping pass leaves a non-ASCII letter
@@ -97,10 +103,6 @@ decision single-sourced in Rust. Frontend wrappers are UX-only and fail closed
 **A frontend figure the backend also computes must call the same Rust binding with
 the same inputs**, and must match the backend's *inclusion filter* as well as its
 formula ([dogmas](dogmas.md#product)).
-
-**The raffle pool filter is implemented twice** — engine `get_raffle_pool` and
-`RaffleSection.svelte`'s `eligibleForPool()` compute the same eligibility;
-a change must land on both sides.
 
 **The bot's round-timer reminders duplicate the frontend countdown formula** —
 the schedule computation and `TimerDisplay.svelte` must stay in lockstep

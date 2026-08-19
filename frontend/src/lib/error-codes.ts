@@ -96,7 +96,6 @@ const ENGINE_MESSAGES: Record<string, (p: Record<string, string>) => string> = {
   'tournament.raffle_count_min': () => m.err_tournament_raffle_count_min(),
   'tournament.raffle_no_players': () => m.err_tournament_raffle_no_players(),
   'tournament.raffle_no_draws': () => m.err_tournament_raffle_no_draws(),
-  'tournament.raffle_none_played': () => m.err_tournament_raffle_none_played(),
   'tournament.raffle_wrong_state': () => m.err_tournament_raffle_wrong_state(),
   'tournament.name_required': () => m.err_tournament_name_required(),
   'tournament.finish_before_start': () => m.err_tournament_finish_before_start(),

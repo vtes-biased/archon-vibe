@@ -1592,7 +1592,6 @@
   "err_tournament_raffle_count_min": "Raffle count must be at least 1",
   "err_tournament_raffle_no_players": "No eligible players in pool",
   "err_tournament_raffle_no_draws": "No raffle draws to undo",
-  "err_tournament_raffle_none_played": "No players available to raffle yet",
   "err_tournament_raffle_wrong_state": "Raffle requires tournament in Waiting, Playing, or Finished state",
   "err_tournament_name_required": "Tournament name cannot be empty",
   "err_tournament_finish_before_start": "Finish time cannot be earlier than start time",

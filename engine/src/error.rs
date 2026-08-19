@@ -73,7 +73,6 @@ pub enum EngineError {
     RaffleCountMin,
     RaffleNoPlayers,
     RaffleNoDraws,
-    RaffleNonePlayed,
     RaffleWrongState,
     NameRequired,
     FinishBeforeStart,
@@ -176,7 +175,6 @@ impl EngineError {
             RaffleCountMin => "tournament.raffle_count_min",
             RaffleNoPlayers => "tournament.raffle_no_players",
             RaffleNoDraws => "tournament.raffle_no_draws",
-            RaffleNonePlayed => "tournament.raffle_none_played",
             RaffleWrongState => "tournament.raffle_wrong_state",
             NameRequired => "tournament.name_required",
             FinishBeforeStart => "tournament.finish_before_start",
@@ -356,7 +354,6 @@ impl fmt::Display for EngineError {
             RaffleCountMin => write!(f, "Raffle count must be at least 1"),
             RaffleNoPlayers => write!(f, "No eligible players in pool"),
             RaffleNoDraws => write!(f, "No raffle draws to undo"),
-            RaffleNonePlayed => write!(f, "No players available to raffle yet"),
             RaffleWrongState => write!(
                 f,
                 "Raffle requires tournament in Waiting, Playing, or Finished state"
