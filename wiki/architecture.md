@@ -527,11 +527,12 @@ oversight. `community_links` is a field on `User`, defaulting to `[]`.
 (IC) | national (NC)). The backend validates only the two-letter shape of a
 language code.
 
-**A content language is any ISO 639-1 code**, not one of the five interface
-locales ([i18n](i18n.md)) — a member writes in the language they speak, and the
-pool grows a filter for each one that appears in it. `languages.ts` carries the
-codes and names each in itself through `Intl.DisplayNames`, so the endonyms need
-no table of ours and follow the platform's own casing conventions.
+The curated list of content languages lives in `languages.ts`, labelled by
+endonym. It is a **separate and wider vocabulary than the five interface
+locales** ([i18n](i18n.md)) — a member writes in the language they speak — but
+deliberately curated rather than the whole of ISO 639-1: the shortlist is what
+the pool's filter has to stay legible against, and a missing language is one
+line.
 
 `engine/src/community.rs` owns the type table: one row per platform giving its
 **placement** — `channel` (a group venue) or `content` — and, for content, its

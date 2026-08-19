@@ -3,7 +3,7 @@
   import { apiRequest } from "$lib/api";
   import Button from "$lib/components/Button.svelte";
   import { LABELS } from "$lib/components/CommunityLinkPills.svelte";
-  import { allLanguages, languageName } from "$lib/data/languages";
+  import { LANGUAGES, LANGUAGE_NAMES } from "$lib/data/languages";
   import { getCommunityLinkReference } from "$lib/engine";
   import { getSortedCountries, getCountryFlag } from "$lib/geonames";
   import type { CommunityLink, CommunityLinkType } from "$lib/types";
@@ -155,8 +155,8 @@
           <div class="flex flex-wrap items-center gap-1.5">
             {#each languages as code (code)}
               <span class="inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-full bg-surface-hover text-ink-bright text-xs">
-                {languageName(code)}
-                <button type="button" aria-label={m.profile_remove_language({ lang: languageName(code) })}
+                {LANGUAGE_NAMES[code] ?? code}
+                <button type="button" aria-label={m.profile_remove_language({ lang: LANGUAGE_NAMES[code] ?? code })}
                   onclick={() => { languages = languages.filter(c => c !== code); }}
                   class="grid place-items-center w-6 h-6 -m-1 rounded-full text-ink-faint hover:text-link cursor-pointer">
                   <X class="w-3.5 h-3.5" />
@@ -171,7 +171,7 @@
                 }}
                 class="px-2 py-1.5 border border-line-strong rounded bg-surface-card text-ink-muted text-xs">
                 <option value="" disabled selected>+ {m.profile_add_language()}</option>
-                {#each allLanguages().filter(l => !languages.includes(l.value)) as language}
+                {#each LANGUAGES.filter(l => !languages.includes(l.value)) as language}
                   <option value={language.value}>{language.label}</option>
                 {/each}
               </select>
