@@ -312,6 +312,19 @@ its number while `deleted_at`-filtered lookups disagree, so a seed insert can cr
 on a reserved number. Reachable on steady-state nightly merges, since an admin
 user-delete keeps the `vekn_id`.
 
+## Outbound fetches
+
+**`GET /auth/me/link-title` fetches an address a member typed** — the only place
+the server does, every other outbound call naming a hard-coded host.
+`link_preview.py` resolves the host and refuses any non-global address before
+connecting, re-checks on each redirect hop, and caps the body at 64 KB and the
+exchange at 5 s; the route itself is member-gated and holds a per-user quota, as
+`feedback.py` does for the other member-triggered outbound call. aiohttp resolves
+a second time, so a DNS rebind between the two resolutions stays reachable; what
+keeps that acceptable is that the response is a title rather than a body.
+Anything else that comes to fetch a user-supplied URL goes through that module
+instead of growing its own guard.
+
 ## Deploy
 
 **Production nginx proxies only an allowlist of top-level prefixes.** A new route

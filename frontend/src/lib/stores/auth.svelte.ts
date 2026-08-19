@@ -424,7 +424,13 @@ export interface ProfileUpdate {
   contact_email?: string;
   contact_phone?: string;
   phone_is_whatsapp?: boolean;
-  community_links?: { type: string; url: string; label: string; languages: string[] }[];
+  community_links?: {
+    type: string;
+    url: string;
+    label: string;
+    languages?: string[];
+    country?: string | null;
+  }[];
 }
 
 export async function updateProfile(data: ProfileUpdate): Promise<boolean> {

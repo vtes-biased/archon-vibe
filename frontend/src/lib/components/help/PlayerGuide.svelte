@@ -2,7 +2,7 @@
   import { renderGuideSection } from "$lib/markdown";
   import * as m from "$lib/paraglide/messages.js";
   import ExampleBox from "./ExampleBox.svelte";
-  import { KeyRound, Mail, UserPlus, Link, Unlink, QrCode, Gavel, Calendar, Copy, RefreshCw, Trophy, Lock, Monitor, Sun, Moon, Bell, Users, ChevronDown } from "@lucide/svelte";
+  import { KeyRound, Mail, UserPlus, Link, Unlink, QrCode, Gavel, Calendar, Copy, RefreshCw, Trophy, Lock, Monitor, Sun, Moon, Bell, Users, ChevronDown, Pin } from "@lucide/svelte";
   import DiscordIcon from "$lib/components/DiscordIcon.svelte";
   import GithubIcon from "$lib/components/GithubIcon.svelte";
 </script>
@@ -287,30 +287,35 @@
 {@html renderGuideSection(m.pg_community())}
 
 <ExampleBox>
-  <div class="max-w-md space-y-3">
-    <div class="flex items-center gap-2">
-      <Users class="w-5 h-5 text-accent" />
-      <h3 class="text-lg font-medium text-ink-strong">Officials Directory</h3>
-    </div>
+  <div class="max-w-md">
     <div class="bg-surface-card rounded-lg shadow border border-line overflow-hidden">
       <button class="w-full flex items-center justify-between p-4 text-left">
         <div class="flex items-center gap-2">
           <span class="text-lg">🇫🇷</span>
           <span class="font-medium text-ink-strong">France</span>
           <span class="px-2 py-0.5 text-xs rounded bg-accent-soft/40 text-link">Your country</span>
-          <span class="text-xs text-ink-faint">(2)</span>
+          <span class="text-xs text-ink-faint">(3)</span>
         </div>
         <ChevronDown class="w-5 h-5 text-ink-faint" />
       </button>
-      <div class="border-t border-line p-4">
-        <div class="flex items-center gap-2 flex-wrap">
-          <span class="font-medium text-ink-strong">Jane Doe</span>
-          <span class="inline-flex items-center gap-1 rounded text-xs font-medium px-2 py-0.5 badge-crimson">NC</span>
+      <div class="border-t border-line divide-y divide-line/50">
+        <div class="p-4 space-y-2">
+          <h3 class="text-sm font-medium text-ink-strong">Pinned</h3>
+          <span class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium badge-amethyst">
+            <Pin class="w-3 h-3" /> VTES France
+          </span>
         </div>
-        <div class="text-sm text-ink-muted mt-0.5">Paris</div>
-        <div class="flex flex-wrap gap-3 mt-2 text-xs text-ink-muted">
-          <span class="text-link">jane.doe@example.com</span>
-          <span class="text-link">janedoe</span>
+        <div class="p-4 space-y-2">
+          <h3 class="text-sm font-medium text-ink-strong">Officials</h3>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-medium text-ink-strong">Jane Doe</span>
+            <span class="inline-flex items-center gap-1 rounded text-xs font-medium px-2 py-0.5 badge-crimson">NC</span>
+          </div>
+          <div class="text-sm text-ink-muted">Paris</div>
+          <div class="flex flex-wrap gap-3 text-xs text-ink-muted">
+            <span class="text-link">jane.doe@example.com</span>
+            <span class="text-link">janedoe</span>
+          </div>
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@
 
 import os
 import secrets
+import time
 from datetime import UTC, datetime
 
 import msgspec
@@ -15,8 +16,9 @@ from ...db import (
     get_calendar_token,
     save_user,
 )
+from ...link_preview import LinkPreviewError, fetch_link_title
 from ...middleware.auth import CurrentUser
-from ...models import CommunityLink, CommunityLinkType
+from ...models import CONTENT_LINK_TYPES, CommunityLink, CommunityLinkType
 
 router = APIRouter()
 encoder = msgspec.json.Encoder()
@@ -27,6 +29,7 @@ class CommunityLinkInput(BaseModel):
     url: str
     label: str = ""
     languages: list[str] = []
+    country: str | None = None
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -133,10 +136,7 @@ async def update_current_user(
                 detail=f"Maximum {max_links} community links allowed",
             )
         links = []
-        existing_mod: dict[str, object] = {}
-        for existing in user.community_links:
-            if existing.moderation:
-                existing_mod[existing.url] = existing.moderation
+        existing_by_url = {existing.url: existing for existing in user.community_links}
         for link in request.community_links:
             try:
                 link_type = CommunityLinkType(link.type)
@@ -156,13 +156,34 @@ async def update_current_user(
                     raise HTTPException(
                         status_code=422, detail=f"Invalid language code: {lang}"
                     )
-            mod = existing_mod.get(link.url)
+            # A language-less content link predating the rule may be resubmitted
+            # unchanged, so one legacy entry cannot block every later edit.
+            prior = existing_by_url.get(link.url)
+            grandfathered = prior is not None and prior.type == link_type
+            if (
+                link_type in CONTENT_LINK_TYPES
+                and not link.languages
+                and not grandfathered
+            ):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"A {link_type.value} link must declare a language",
+                )
+            country = (link.country or user.country or "").upper() or None
+            if country is not None and not (
+                len(country) == 2 and country.isascii() and country.isalpha()
+            ):
+                raise HTTPException(
+                    status_code=422, detail=f"Invalid country: {link.country}"
+                )
+            mod = prior.moderation if prior else None
             links.append(
                 CommunityLink(
                     type=link_type,
                     url=link.url,
                     label=link.label,
                     languages=link.languages,
+                    country=country,
                     moderation=mod,
                 )
             )
@@ -194,6 +215,46 @@ async def update_current_user(
     return Response(
         content=encoder.encode(response_data),
         media_type="application/json",
+    )
+
+
+# In-process (per-worker) quota on the one route that fetches an address a
+# member typed. Generous enough to edit a full set of links in one sitting.
+_TITLE_BURST = 10
+_TITLE_DAILY_CAP = 100
+_title_calls: dict[str, list[float]] = {}
+
+
+def _title_quota_exceeded(user_uid: str) -> bool:
+    now = time.monotonic()
+    times = [t for t in _title_calls.get(user_uid, []) if now - t < 86400]
+    exceeded = (
+        len(times) >= _TITLE_DAILY_CAP
+        or len([t for t in times if now - t < 60]) >= _TITLE_BURST
+    )
+    if not exceeded:
+        times.append(now)
+    _title_calls[user_uid] = times
+    return exceeded
+
+
+@router.get("/me/link-title")
+async def read_link_title(url: str, current_user: CurrentUser) -> Response:
+    """Suggest a label for a community link from the target's own title."""
+    if not current_user.vekn_id:
+        raise HTTPException(
+            status_code=403, detail="VEKN membership required to add community links"
+        )
+    if _title_quota_exceeded(current_user.uid):
+        raise HTTPException(
+            status_code=429, detail="Too many link lookups — try again in a minute"
+        )
+    try:
+        title = await fetch_link_title(url)
+    except LinkPreviewError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from None
+    return Response(
+        content=encoder.encode({"title": title}), media_type="application/json"
     )
 
 

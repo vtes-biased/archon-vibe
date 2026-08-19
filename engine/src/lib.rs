@@ -1,6 +1,7 @@
 use json::JsonValue;
 
 pub mod cards;
+pub mod community;
 pub mod deck;
 pub mod error;
 pub mod league;
@@ -559,6 +560,11 @@ mod wasm {
             crate::sanctions::sanction_reference_json()
         }
 
+        #[wasm_bindgen(js_name = communityLinkReference)]
+        pub fn community_link_reference(&self) -> String {
+            crate::community::community_link_reference_json()
+        }
+
         #[wasm_bindgen(js_name = foldAscii)]
         pub fn fold_ascii(&self, s: &str) -> String {
             crate::cards::fold_ascii(s)
@@ -796,6 +802,10 @@ mod python {
         /// escalation) — static data owned by engine/src/sanctions.rs.
         fn sanction_reference(&self) -> String {
             crate::sanctions::sanction_reference_json()
+        }
+
+        fn community_link_reference(&self) -> String {
+            crate::community::community_link_reference_json()
         }
 
         fn fold_ascii(&self, s: &str) -> String {

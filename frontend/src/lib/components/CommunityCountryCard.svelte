@@ -1,0 +1,162 @@
+<script lang="ts">
+  import Badge from "$lib/components/Badge.svelte";
+  import CommunityLinkPills from "./CommunityLinkPills.svelte";
+  import CommunityModerationActions from "./CommunityModerationActions.svelte";
+  import DiscordContact from "./DiscordContact.svelte";
+  import { deobfuscateContact } from "$lib/contact";
+  import { getCountryFlag } from "$lib/geonames";
+  import { getRoleTone, getRoleLabel } from "$lib/roles";
+  import type { CommunityLink, User } from "$lib/types";
+  import { ChevronDown, ChevronRight, Plus } from "@lucide/svelte";
+  import * as m from '$lib/paraglide/messages.js';
+
+  interface LinkEntry { user: User; link: CommunityLink }
+
+  interface Props {
+    code: string;
+    name: string;
+    pinned: LinkEntry[];
+    groups: LinkEntry[];
+    officials: User[];
+    isOwnCountry: boolean;
+    expanded: boolean;
+    showLinks: boolean;
+    showOfficials: boolean;
+    canModerate: boolean;
+    canPromoteNational: boolean;
+    canPromoteGlobal: boolean;
+    onToggle: () => void;
+    onModerate: (userUid: string, url: string, action: string) => void;
+    onAddLink: (() => void) | null;
+  }
+  let {
+    code, name, pinned, groups, officials, isOwnCountry, expanded, showLinks,
+    showOfficials, canModerate, canPromoteNational, canPromoteGlobal,
+    onToggle, onModerate, onAddLink,
+  }: Props = $props();
+
+  const count = $derived(
+    (showLinks ? pinned.length + groups.length : 0) + (showOfficials ? officials.length : 0)
+  );
+  const curatorPrompt = $derived(showLinks && canPromoteNational && pinned.length === 0 && groups.length === 0);
+</script>
+
+{#snippet entries(list: LinkEntry[])}
+  <div class="flex flex-wrap gap-3">
+    {#each list as { user, link } (user.uid + link.url)}
+      <div class="flex flex-col items-center gap-1">
+        <CommunityLinkPills links={[link]} />
+        <div class="flex items-center gap-2 text-xs text-ink-muted">
+          {#if user.name}
+            <a href="/users/{user.uid}" class="hover:text-link transition-colors">{user.name}</a>
+          {/if}
+          {#each user.roles.filter(r => r === "NC" || r === "Prince" || r === "IC") as role}
+            <Badge tone={getRoleTone(role)}>{getRoleLabel(role)}</Badge>
+          {/each}
+        </div>
+        {#if canModerate}
+          <CommunityModerationActions
+            userUid={user.uid}
+            {link}
+            {onModerate}
+            {canPromoteNational}
+            {canPromoteGlobal}
+          />
+        {/if}
+      </div>
+    {/each}
+  </div>
+{/snippet}
+
+<div class="bg-surface-card rounded-lg shadow border border-line overflow-hidden">
+  <button
+    onclick={onToggle}
+    class="w-full flex items-center justify-between p-4 hover:bg-surface-muted/50 transition-colors text-left"
+  >
+    <div class="flex items-center gap-2">
+      <span class="text-lg">{getCountryFlag(code)}</span>
+      <span class="font-medium text-ink-strong">{name}</span>
+      {#if isOwnCountry}
+        <span class="px-2 py-0.5 text-xs rounded bg-accent-soft/40 text-link">{m.community_your_country()}</span>
+      {/if}
+      <span class="text-xs text-ink-faint">({count})</span>
+    </div>
+    {#if expanded}
+      <ChevronDown class="w-5 h-5 text-ink-faint" />
+    {:else}
+      <ChevronRight class="w-5 h-5 text-ink-faint" />
+    {/if}
+  </button>
+
+  {#if expanded}
+    <div class="border-t border-line divide-y divide-line/50">
+      {#if showLinks && pinned.length > 0}
+        <div class="p-4 space-y-2">
+          <h3 class="text-sm font-medium text-ink-strong">{m.community_card_pinned()}</h3>
+          {@render entries(pinned)}
+        </div>
+      {/if}
+
+      {#if showLinks && groups.length > 0}
+        <div class="p-4 space-y-2">
+          <h3 class="text-sm font-medium text-ink-strong">{m.community_card_groups()}</h3>
+          {@render entries(groups)}
+        </div>
+      {/if}
+
+      {#if curatorPrompt}
+        <div class="p-4">
+          <p class="p-3 rounded border text-sm banner-info">{m.community_curator_empty_prompt({ country: name })}</p>
+        </div>
+      {/if}
+
+      {#if showOfficials && officials.length > 0}
+        <div class="p-4 space-y-2">
+          <h3 class="text-sm font-medium text-ink-strong">{m.community_card_officials()}</h3>
+          <div class="divide-y divide-line/50">
+            {#each officials as official}
+              {@const email = deobfuscateContact(official.contact_email)}
+              {@const phone = deobfuscateContact(official.contact_phone)}
+              <div class="py-3 first:pt-0 last:pb-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <a href="/users/{official.uid}" class="font-medium text-ink-strong hover:text-link transition-colors">{official.name}</a>
+                  {#each official.roles.filter(r => r === "NC" || r === "Prince") as role}
+                    <Badge tone={getRoleTone(role)}>{getRoleLabel(role)}</Badge>
+                  {/each}
+                </div>
+                {#if official.city}
+                  <div class="text-sm text-ink-muted mt-0.5">{official.city}</div>
+                {/if}
+                <div class="flex flex-wrap gap-3 mt-2 text-xs text-ink-muted">
+                  {#if email}
+                    <a href="mailto:{email}" class="text-link hover:text-link-soft">{email}</a>
+                  {/if}
+                  {#if official.discord_id}
+                    <DiscordContact discordId={official.discord_id} username={official.contact_discord} />
+                  {/if}
+                  {#if phone}
+                    {#if official.phone_is_whatsapp}
+                      <a href="https://wa.me/{phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener noreferrer" class="text-link hover:text-link-soft">WhatsApp: {phone}</a>
+                    {:else}
+                      <span>{phone}</span>
+                    {/if}
+                  {/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
+
+      {#if onAddLink}
+        <div class="p-4">
+          <button type="button" onclick={onAddLink}
+            class="flex items-center gap-1 min-h-11 text-sm text-link hover:text-link-soft transition-colors">
+            <Plus class="w-4 h-4" />
+            {m.community_add_link()}
+          </button>
+        </div>
+      {/if}
+    </div>
+  {/if}
+</div>

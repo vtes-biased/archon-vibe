@@ -355,8 +355,8 @@ pub const CAPABILITIES: &[Rule] = &[
         same_country: &[NC],
         self_service: false,
         organizer: false,
-        deny: "You don't have permission to moderate this member's links",
-        deny_scope: Some("You can only moderate links for members in your country"),
+        deny: "You don't have permission to moderate this link",
+        deny_scope: Some("You can only moderate links in your country"),
     },
     Rule {
         capability: Capability::PromoteLinkNational,
@@ -365,7 +365,7 @@ pub const CAPABILITIES: &[Rule] = &[
         same_country: &[NC],
         self_service: false,
         organizer: false,
-        deny: "Only IC, or the member's national coordinator, can promote a link nationally",
+        deny: "Only IC, or the country's national coordinator, can promote a link nationally",
         deny_scope: None,
     },
     Rule {

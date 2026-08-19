@@ -1,4 +1,4 @@
-import type { DeckObject, Sanction, SanctionCategory, SanctionLevel, SanctionSubcategory, Tournament, User } from './types';
+import type { CommunityLinkType, DeckObject, LinkMedia, LinkPlacement, Sanction, SanctionCategory, SanctionLevel, SanctionSubcategory, Tournament, User } from './types';
 import { getAllLeagues } from './db';
 import { callEngine, getEngineReactive, initEngine } from './engine-instance';
 
@@ -284,6 +284,34 @@ export function getSanctionReference(): SanctionReference | null {
   return sanctionReference;
 }
 
+export interface CommunityLinkReference {
+  types: CommunityLinkType[];
+  mediaKinds: LinkMedia[];
+  placement: Record<CommunityLinkType, LinkPlacement>;
+  media: Record<CommunityLinkType, LinkMedia | null>;
+}
+
+let communityLinkReference: CommunityLinkReference | null = null;
+
+export function getCommunityLinkReference(): CommunityLinkReference | null {
+  if (communityLinkReference) return communityLinkReference;
+  const engine = getEngineReactive();
+  if (!engine) return null;
+  const raw = JSON.parse(callEngine(() => engine.communityLinkReference()));
+  communityLinkReference = {
+    types: raw.types.map((t: any) => t.type),
+    mediaKinds: raw.media_kinds,
+    placement: Object.fromEntries(
+      raw.types.map((t: any) => [t.type, t.placement])
+    ) as Record<CommunityLinkType, LinkPlacement>,
+    media: Object.fromEntries(raw.types.map((t: any) => [t.type, t.media])) as Record<
+      CommunityLinkType,
+      LinkMedia | null
+    >,
+  };
+  return communityLinkReference;
+}
+
 type UserContext = { uid: string; roles?: string[] | null; country?: string | null; vekn_id?: string | null };
 type Resource = { country?: string | null; organizers_uids?: string[] };
 
@@ -393,15 +421,19 @@ export function canDeleteMember(actor: UserContext | null): PermissionResult {
   return checkPermission('delete_member', actor);
 }
 
-export function canModerateLink(actor: UserContext | null, target: UserContext): PermissionResult {
-  return checkPermission('moderate_link', actor, { target });
+/** Scoped to the country the link serves, which need not be its owner's. */
+export function canModerateLink(
+  actor: UserContext | null,
+  linkCountry: string | null
+): PermissionResult {
+  return checkPermission('moderate_link', actor, { targetCountry: linkCountry });
 }
 
 export function canPromoteLinkNational(
   actor: UserContext | null,
-  target: UserContext
+  linkCountry: string | null
 ): PermissionResult {
-  return checkPermission('promote_link_national', actor, { target });
+  return checkPermission('promote_link_national', actor, { targetCountry: linkCountry });
 }
 
 export function canPromoteLinkGlobal(actor: UserContext | null): PermissionResult {

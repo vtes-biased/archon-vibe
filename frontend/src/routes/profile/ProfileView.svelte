@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { User, Camera, Unlink, Share2, Check, Plus, Trash2, CloudOff, X } from "@lucide/svelte";
+  import { User, Camera, Unlink, Share2, Check, Plus, Pencil, CloudOff } from "@lucide/svelte";
   import { getSortedCountries, getCountryFlag } from "$lib/geonames";
   import CityAutocomplete from "$lib/components/CityAutocomplete.svelte";
+  import CommunityLinkEditor from "$lib/components/CommunityLinkEditor.svelte";
   import CommunityLinkPills from "$lib/components/CommunityLinkPills.svelte";
   import Button from "$lib/components/Button.svelte";
   import { updateProfile } from "$lib/stores/auth.svelte";
@@ -9,8 +10,8 @@
   import { canChangeCountry, isOfficial as engineIsOfficial } from "$lib/engine";
   import { getRoleLabel } from "$lib/roles";
   import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
-  import { LANGUAGES, LANGUAGE_NAMES } from "$lib/data/languages";
-  import type { CommunityLinkType } from "$lib/types";
+  import { getLocale } from "$lib/paraglide/runtime.js";
+  import type { CommunityLink } from "$lib/types";
   import Badge from "$lib/components/Badge.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -49,32 +50,11 @@
   let editContactPhone = $state(initial.contact_phone || "");
   let editPhoneIsWhatsapp = $state(initial.phone_is_whatsapp ?? false);
 
-  interface EditLink { type: CommunityLinkType; url: string; label: string; languages: string[] }
-  let editLinks = $state<EditLink[]>(
-    (initial.community_links || []).map((l: any) => ({ type: l.type, url: l.url, label: l.label, languages: l.languages || [] }))
-  );
+  let editLinks = $state<CommunityLink[]>([...(initial.community_links || [])]);
+  let editing = $state<{ link: CommunityLink | null } | null>(null);
 
-  const defaultLanguage = $derived(COUNTRY_LANGUAGE[editCountry] || "en");
-  const MAX_LANGUAGES = 5;
-
-  const CONTENT_TYPES = new Set(["youtube", "twitch", "blog", "website", "instagram", "other"]);
-
+  const defaultLanguage = $derived(COUNTRY_LANGUAGE[editCountry] || getLocale());
   const maxLinks = $derived(isOfficial ? 10 : 5);
-
-  const LINK_TYPES: { value: CommunityLinkType; label: string }[] = [
-    { value: "discord", label: "Discord" },
-    { value: "telegram", label: "Telegram" },
-    { value: "whatsapp", label: "WhatsApp" },
-    { value: "forum", label: "Forum" },
-    { value: "facebook", label: "Facebook" },
-    { value: "website", label: "Website" },
-    { value: "twitch", label: "Twitch" },
-    { value: "youtube", label: "YouTube" },
-    { value: "reddit", label: "Reddit" },
-    { value: "instagram", label: "Instagram" },
-    { value: "blog", label: "Blog" },
-    { value: "other", label: "Other" },
-  ];
 
   let lastSaved: Record<string, unknown> = {
     name: initial.name || "",
@@ -130,20 +110,13 @@
     });
   }
 
-  function saveLinks() {
-    const cleaned = editLinks.filter(l => l.url.trim());
-    saveField("community_links", cleaned);
+  function saveLinks(links: CommunityLink[]) {
+    editLinks = links;
+    editing = null;
+    saveField("community_links", links);
   }
 
-  function addLink() {
-    if (editLinks.length >= maxLinks) return;
-    editLinks = [...editLinks, { type: "discord", url: "", label: "", languages: [defaultLanguage] }];
-  }
-
-  function removeLink(index: number) {
-    editLinks = editLinks.filter((_, i) => i !== index);
-    saveLinks();
-  }
+  const editedIndex = $derived(editing?.link ? editLinks.indexOf(editing.link) : -1);
 
   async function shareProfile() {
     const url = `${window.location.origin}/users/${user.uid}`;
@@ -324,69 +297,44 @@
       </div>
     {/if}
 
-    <div class="space-y-3">
-      {#each editLinks as link, i}
-        <div class="border border-line-strong rounded-lg p-3 space-y-2">
-          <div class="flex items-center gap-2">
-            <select bind:value={link.type} onchange={saveLinks}
-              class="flex-1 px-2 py-2 border border-line-strong rounded bg-surface-card text-ink-bright text-sm">
-              {#each LINK_TYPES as lt}
-                <option value={lt.value}>{lt.label}</option>
-              {/each}
-            </select>
-            <button type="button" onclick={() => removeLink(i)}
-              class="p-2 text-ink-faint hover:text-link transition-colors shrink-0">
-              <Trash2 class="w-4 h-4" />
-            </button>
-          </div>
-          <input type="url" bind:value={link.url} placeholder="https://..."
-            onblur={saveLinks}
-            class="{inputClass} text-sm" />
-          <input type="text" bind:value={link.label} placeholder={m.profile_link_label_placeholder()}
-            onblur={saveLinks}
-            class="{inputClass} text-sm" />
-          {#if CONTENT_TYPES.has(link.type)}
-            <div class="flex flex-wrap items-center gap-1.5">
-              {#each link.languages as code (code)}
-                <span class="inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-full bg-surface-hover text-ink-bright text-xs">
-                  {LANGUAGE_NAMES[code] ?? code}
-                  <button type="button" aria-label={m.profile_remove_language({ lang: LANGUAGE_NAMES[code] ?? code })}
-                    onclick={() => { link.languages = link.languages.filter(c => c !== code); saveLinks(); }}
-                    class="grid place-items-center w-6 h-6 -m-1 rounded-full text-ink-faint hover:text-link cursor-pointer">
-                    <X class="w-3.5 h-3.5" />
-                  </button>
-                </span>
-              {/each}
-              {#if link.languages.length === 0}
-                <span class="text-xs text-ink-faint">{m.profile_link_all_languages()}</span>
-              {/if}
-              {#if link.languages.length < MAX_LANGUAGES}
-                <select value="" aria-label={m.profile_add_language()}
-                  onchange={(e) => {
-                    const c = e.currentTarget.value; e.currentTarget.value = "";
-                    if (c && !link.languages.includes(c)) { link.languages = [...link.languages, c]; saveLinks(); }
-                  }}
-                  class="px-2 py-1.5 border border-line-strong rounded bg-surface-card text-ink-muted text-xs">
-                  <option value="" disabled selected>+ {m.profile_add_language()}</option>
-                  {#each LANGUAGES.filter(l => !link.languages.includes(l.value)) as lang}
-                    <option value={lang.value}>{lang.label}</option>
-                  {/each}
-                </select>
-              {/if}
-            </div>
-          {/if}
+    <div class="space-y-2">
+      {#each editLinks as link (link.url + link.type)}
+        <div class="flex items-center justify-between gap-2 border border-line-strong rounded-lg p-2">
+          <CommunityLinkPills links={[link]} />
+          <button type="button" onclick={() => { editing = { link }; }}
+            aria-label={m.community_edit_link()}
+            class="grid place-items-center w-11 h-11 shrink-0 text-ink-faint hover:text-link transition-colors">
+            <Pencil class="w-4 h-4" />
+          </button>
         </div>
       {/each}
     </div>
 
     {#if editLinks.length < maxLinks}
-      <button type="button" onclick={addLink}
-        class="mt-3 flex items-center gap-1 text-sm text-link hover:text-link-soft transition-colors">
+      <button type="button" onclick={() => { editing = { link: null }; }}
+        class="mt-3 flex items-center gap-1 min-h-11 text-sm text-link hover:text-link-soft transition-colors">
         <Plus class="w-4 h-4" />
         {m.profile_add_link()}
       </button>
     {/if}
   </div>
+{/if}
+
+{#if editing}
+  <CommunityLinkEditor
+    link={editing.link}
+    ownerCountry={editCountry || null}
+    {defaultLanguage}
+    onclose={() => { editing = null; }}
+    onsave={(link) => saveLinks(
+      editedIndex >= 0
+        ? editLinks.map((l, i) => (i === editedIndex ? link : l))
+        : [...editLinks, link]
+    )}
+    ondelete={editedIndex >= 0
+      ? () => saveLinks(editLinks.filter((_, i) => i !== editedIndex))
+      : undefined}
+  />
 {/if}
 
 <!-- Sponsorship banner for non-members (not gated on country: a brand-new user

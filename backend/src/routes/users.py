@@ -422,10 +422,15 @@ async def moderate_community_link(
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
 
+    subject = next((el for el in target.community_links if el.url == request.url), None)
+    if subject is None:
+        raise HTTPException(status_code=404, detail="Link not found on target user")
+    link_country = subject.country or target.country
+
     mod: LinkModeration | None
     match request.action:
         case "hide" | "clear":
-            if not permissions.can_moderate_link(current_user, target):
+            if not permissions.can_moderate_link(current_user, link_country):
                 raise HTTPException(
                     status_code=403,
                     detail="Can only moderate links in your country",
@@ -438,7 +443,7 @@ async def moderate_community_link(
                 else None
             )
         case "promote_national":
-            if not permissions.can_promote_link_national(current_user, target):
+            if not permissions.can_promote_link_national(current_user, link_country):
                 raise HTTPException(
                     status_code=403,
                     detail="Only IC, or the country's NC, can promote nationally",
@@ -467,19 +472,12 @@ async def moderate_community_link(
                 " 'promote_global', or 'clear'",
             )
 
-    updated_links = []
-    found = False
-    for link in target.community_links:
-        if link.url == request.url:
-            found = True
-            updated_links.append(msgspec.structs.replace(link, moderation=mod))
-        else:
-            updated_links.append(link)
-
-    if not found:
-        raise HTTPException(status_code=404, detail="Link not found on target user")
-
-    target.community_links = updated_links
+    target.community_links = [
+        msgspec.structs.replace(link, moderation=mod)
+        if link.url == request.url
+        else link
+        for link in target.community_links
+    ]
     target.modified = datetime.now(UTC)
     bd = await db_save_user(target)
     broadcast_precomputed(bd)

@@ -15,7 +15,12 @@ export type Role =
   | "DEV"; // Developer (can register OAuth clients)
 
 
-export type CommunityLinkType = "discord" | "telegram" | "whatsapp" | "forum" | "facebook" | "website" | "twitch" | "youtube" | "reddit" | "instagram" | "blog" | "other";
+export type CommunityLinkType = "discord" | "telegram" | "whatsapp" | "forum" | "facebook" | "website" | "twitch" | "youtube" | "reddit" | "instagram" | "blog" | "spotify" | "x" | "bluesky" | "other";
+
+// Placement and media come from engine/src/community.rs — read them at runtime
+// via getCommunityLinkReference() in $lib/engine.
+export type LinkPlacement = "channel" | "content";
+export type LinkMedia = "video" | "podcast" | "text" | "social";
 
 export interface LinkModeration {
   status: "hidden" | "promoted";
@@ -29,6 +34,7 @@ export interface CommunityLink {
   url: string;
   label: string;
   languages?: string[]; // ISO 639-1 codes; empty/absent = shows under every filter
+  country?: string | null; // the country the link serves; absent = the owner's
   moderation?: LinkModeration | null;
 }
 
@@ -104,7 +110,6 @@ export interface User extends BaseObject {
   github_login?: string | null;
   github_id?: string | null;
 
-  // Community links (officials only)
   community_links?: CommunityLink[];
 
   coopted_by?: string | null; // user_uid of Prince/NC/IC who granted VEKN ID

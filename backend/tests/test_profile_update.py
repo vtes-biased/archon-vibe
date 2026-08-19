@@ -51,7 +51,11 @@ async def test_nc_can_set_community_links(test_client: AsyncClient, test_db):
         json={
             "community_links": [
                 {"type": "discord", "url": "https://discord.gg/vtes", "label": "VTES"},
-                {"type": "website", "url": "https://vtes.example.com"},
+                {
+                    "type": "website",
+                    "url": "https://vtes.example.com",
+                    "languages": ["fr"],
+                },
             ]
         },
         headers=make_auth_header(user.uid),
@@ -63,6 +67,23 @@ async def test_nc_can_set_community_links(test_client: AsyncClient, test_db):
     assert links[0]["type"] == "discord"
     assert links[0]["url"] == "https://discord.gg/vtes"
     assert links[1]["type"] == "website"
+    # An unstated country defaults to the owner's, which is what the page places on.
+    assert [link["country"] for link in links] == ["FR", "FR"]
+
+
+@pytest.mark.asyncio
+async def test_content_link_without_language_rejected(
+    test_client: AsyncClient, test_db
+):
+    """The content pool filters on language, so a content link must declare one."""
+    user = await _insert_user(roles=[Role.NC], vekn_id="1000005")
+    response = await test_client.patch(
+        "/auth/me",
+        json={"community_links": [{"type": "youtube", "url": "https://youtu.be/x"}]},
+        headers=make_auth_header(user.uid),
+    )
+    assert response.status_code == 422
+    assert "language" in response.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
@@ -91,6 +112,23 @@ async def test_community_links_bad_url_rejected(test_client: AsyncClient, test_d
     )
     assert response.status_code == 422
     assert "invalid url" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "url", ["http://127.0.0.1:9/", "http://169.254.169.254/latest/meta-data/"]
+)
+async def test_link_title_refuses_internal_addresses(
+    test_client: AsyncClient, test_db, url: str
+):
+    """The one place the server fetches a member-supplied address: it must not
+    be usable to read our own network."""
+    user = await _insert_user(roles=[Role.NC], vekn_id="1000006")
+    response = await test_client.get(
+        f"/auth/me/link-title?url={url}", headers=make_auth_header(user.uid)
+    )
+    assert response.status_code == 422
+    assert "not reachable" in response.json()["detail"].lower()
 
 
 @pytest.mark.asyncio

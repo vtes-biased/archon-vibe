@@ -111,14 +111,15 @@ def can_delete_member(actor: User) -> bool:
     return _check("delete_member", actor)
 
 
-def can_moderate_link(actor: User, target: User) -> bool:
-    """Hide or clear a member's community link (self-moderation included)."""
-    return _check("moderate_link", actor, target=target)
+def can_moderate_link(actor: User, link_country: str | None) -> bool:
+    """Hide or clear a community link, scoped to the country the link serves
+    (self-moderation included)."""
+    return _check("moderate_link", actor, target_country=link_country)
 
 
-def can_promote_link_national(actor: User, target: User) -> bool:
-    """Promote a link to the national listing."""
-    return _check("promote_link_national", actor, target=target)
+def can_promote_link_national(actor: User, link_country: str | None) -> bool:
+    """Promote a link to its country's national listing."""
+    return _check("promote_link_national", actor, target_country=link_country)
 
 
 def can_promote_link_global(actor: User) -> bool:

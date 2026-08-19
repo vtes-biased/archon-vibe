@@ -118,7 +118,22 @@ class CommunityLinkType(StrEnum):
     REDDIT = "reddit"
     INSTAGRAM = "instagram"
     BLOG = "blog"
+    SPOTIFY = "spotify"
+    X = "x"
+    BLUESKY = "bluesky"
     OTHER = "other"
+
+
+_LINK_PLACEMENTS: dict[CommunityLinkType, str] = {
+    CommunityLinkType(t["type"]): t["placement"]
+    for t in json.loads(PyEngine().community_link_reference())["types"]
+}
+if set(_LINK_PLACEMENTS) != set(CommunityLinkType):
+    raise RuntimeError("CommunityLinkType drifted from engine/src/community.rs")
+
+CONTENT_LINK_TYPES: frozenset[CommunityLinkType] = frozenset(
+    t for t, placement in _LINK_PLACEMENTS.items() if placement == "content"
+)
 
 
 class LinkModeration(msgspec.Struct, kw_only=True, frozen=True):
@@ -134,6 +149,8 @@ class CommunityLink(msgspec.Struct, kw_only=True, frozen=True):
     label: str = ""
     # ISO 639-1 codes; empty = shows under every filter.
     languages: list[str] = msgspec.field(default_factory=list)
+    # The country the link serves; absent falls back to the owner's.
+    country: str | None = None
     moderation: LinkModeration | None = None
 
 

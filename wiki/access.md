@@ -37,6 +37,11 @@ omitted from the rows below.
 | `record_promo_intake`, `view_full_promo_ledger` | NC — global (the inventory chain is not country-scoped) |
 | `manage_oauth_clients` | DEV — global |
 
+`moderate_link` and `promote_link_national` scope on the **link's** country, which
+a `CommunityLink` carries as a field of its own defaulting to its owner's — so an
+NC curates every link serving their country wherever its owner lives
+([architecture](architecture.md#community-links)).
+
 `set_archival_results` is IC-only rather than organizer, because the rows it
 applies to have no real organizer: a TWDA reconstruction has none at all, and an
 import's is whatever upstream claimed. Invalidation authority is IC's anyway (8.6).

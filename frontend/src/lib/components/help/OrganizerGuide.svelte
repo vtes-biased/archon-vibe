@@ -635,6 +635,8 @@
 
 {@html renderGuideSection(m.og_discord())}
 
+{@html renderGuideSection(m.og_community_curation())}
+
 {@html renderGuideSection(m.og_reference())}
 
 <div class="not-prose my-6 space-y-1">

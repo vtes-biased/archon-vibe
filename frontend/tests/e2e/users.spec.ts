@@ -43,27 +43,33 @@ test.describe('App loads correctly', () => {
 });
 
 test.describe('Community tab', () => {
-  test('shows all three sections with seeded links', async ({ page }) => {
-    // Officials Directory is gated behind sign-in, so authenticate first.
+  test('places a global pin, the reader country card and the content pool', async ({ page }) => {
+    await page.goto('/login');
+    await loginAsOrganizer(page);
+    await page.goto('/users');
+    await waitForSync(page);
+    // The seeded Discord is pinned globally, so it sits in the Global card
+    // whatever its platform; the language-tagged YouTube falls to the pool.
+    await expect(page.getByText('Global Resources')).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByRole('link', { name: /VTES Global/ })).toBeVisible();
+    await expect(page.getByText('Your country')).toBeVisible();
+    await expect(page.getByText('Content', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: /VTES Channel/ })).toBeVisible();
+  });
+
+  test('country search materializes that country card', async ({ page }) => {
     await page.goto('/login');
     await loginAsOrganizer(page);
     await page.goto('/users');
     await waitForSync(page);
     await expect(page.getByText('Global Resources')).toBeVisible({ timeout: 3_000 });
-    await expect(page.getByText('Communities', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Content', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Officials Directory')).toBeVisible();
-  });
+    await expect(page.getByRole('link', { name: /VTES Germany/ })).not.toBeVisible();
 
-  test('country search filters Communities section', async ({ page }) => {
-    await page.goto('/users');
-    await waitForSync(page);
-    const searchInput = page.getByPlaceholder('Search countries...');
-    await searchInput.fill('Germany');
-    await page.waitForTimeout(300);
-    const communitiesList = searchInput.locator('..').locator('..');
-    await expect(communitiesList.getByText('Germany').first()).toBeVisible();
-    await expect(communitiesList.getByRole('button', { name: /France/ })).not.toBeVisible();
+    await page.getByPlaceholder('Search countries...').fill('Germany');
+    await page.getByRole('button', { name: /Germany/ }).click();
+    // The German NC's unpinned Telegram is a channel, so it lands in the card.
+    await expect(page.getByRole('link', { name: /VTES Germany/ })).toBeVisible();
+    await expect(page.getByText('Officials', { exact: true })).toBeVisible();
   });
 });
 

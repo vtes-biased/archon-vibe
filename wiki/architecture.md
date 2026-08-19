@@ -522,18 +522,53 @@ Cache Storage.
 Member-contributed links to external community resources, with moderator
 oversight. `community_links` is a field on `User`, defaulting to `[]`.
 
-`CommunityLink`: `type` (Discord, Telegram, WhatsApp, Forum, Facebook, Website,
-Twitch, YouTube, Reddit, Instagram, Blog, Other), `url`, `label`, `languages`
-(ISO 639-1, capped at 5; empty shows under every filter), and `moderation`
-(`status` hidden|promoted, `by`, `at`, `scope` global (IC) | national (NC)). The
-backend validates only the two-letter shape; the curated UI list lives in the
-frontend.
+`CommunityLink`: `type`, `url`, `label`, `languages` (ISO 639-1, capped at 5),
+`country`, and `moderation` (`status` hidden|promoted, `by`, `at`, `scope` global
+(IC) | national (NC)). The backend validates only the two-letter shape of a
+language code; the curated list lives in `languages.ts`.
 
-Any user with a `vekn_id` may add, limit 5 (10 for IC/NC/Prince). On update,
-existing moderation is re-applied by URL match. Moderation actions map to the
-`moderate_link` / `promote_link_national` / `promote_link_global` capabilities —
-officials pin their own links through the same country-scoped grant, not a
-self-service exemption.
+`engine/src/community.rs` owns the type table: one row per platform giving its
+**placement** — `channel` (a group venue) or `content` — and, for content, its
+**media** kind (video, podcast, text, social). Python builds
+`CONTENT_LINK_TYPES` from it at import and raises if the enum has drifted; the
+frontend reads it through `getCommunityLinkReference()`. Adding a platform is a
+row there plus a label, colour and icon in `CommunityLinkPills.svelte`.
+
+**A link carries its own country**, defaulting to the owner's at creation and
+owner-settable — the Brazilian Discord run from Portugal. Every moderation
+decision keys off the link's country, never its owner's.
+
+**Placement follows the pins, not the platform**, because platform does not
+determine function: an NC's Instagram is an announcements channel and a player's
+is content. A global pin puts a link in the Global card and a national pin in its
+country's card whatever its platform; only an unpinned link falls back to its
+placement, a channel into its country's card and content into the pool. The page
+shows the Global card, the reader's country, a country search that materializes
+one further card, and the content pool filtered by a language multiselect —
+seeded once from the reader's locale, never re-asserted — and a media facet.
+Officials sit inside their country's card, behind sign-in. A card with nothing
+pinned and no groups says so to whoever can pin there, since getting each NC to
+pin a few links is what actually launches the page. `?sponsor=1` hides every link
+section and narrows the cards to the visitor's country, falling back to every
+country with a reachable official.
+
+A content link must declare a language, since the pool filters on one. A
+language-less link predating that rule may be resubmitted unchanged — the whole
+array goes over the wire, so one legacy entry would otherwise block every later
+edit — and shows under every filter until rewritten.
+
+Any user with a `vekn_id` may add, limit 5 (10 for IC/NC/Prince). One editor
+modal serves both the community page and the profile, sending the whole array
+through `PATCH /auth/me`. On update, existing moderation is re-applied by URL
+match, so a rewritten URL drops its pin and the editor warns before saving.
+Moderation actions map to the `moderate_link` / `promote_link_national` /
+`promote_link_global` capabilities — officials pin their own links through the
+same country-scoped grant, not a self-service exemption.
+
+`GET /auth/me/link-title` reads the target's `og:title`, else its `<title>`, to
+seed an editable label. It is the only place the server fetches an address a
+member typed, and `link_preview.py` holds the guards
+([hazards](hazards.md#outbound-fetches)).
 
 ### Calendar
 
