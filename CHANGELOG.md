@@ -10,6 +10,21 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- The location for an event declared in the app is kept (not replaced by the vekn.net Antarctica venue anymore)
+- The new-member button is offered only to the officials who can actually submit it.
+- Fixed tournament display for logged-out visitors
+- Cancelling rounds in a multiple-active-rounds tournament no longer strands rounds.
+- Fixed an issue that prevented resolving some tie situations for finals seeding.
+- Copying a tournament's results works offline.
+- The Community page has been reworked: easier to curate, clearer display for all links.
+- Search finds names with accented or crossed letters: typing "Pawel" now finds "Paweł".
+- Escape closes every dialog.
+- Fixed display issues on an installed phone app.
+- The TWDA has been fully added, and the Hall of Fame recomputed based on it.
+- Every tournament now has a short link of its own — `/t/CODE`. VEKN event IDs will outlive vekn.net this way.
+
 ## v1.0.2 — 2026-08-10
 
 Covers v1.0.0 → v1.0.2.
