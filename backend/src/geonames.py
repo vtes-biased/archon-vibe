@@ -93,6 +93,22 @@ def normalize_country(value: str) -> str | None:
     return _country_names().get(lowered) or _COUNTRY_NAME_ALIASES.get(lowered)
 
 
+def stored_country(value: str | None) -> str | None:
+    """The shape our own rows hold: an ISO code, or nothing.
+
+    Clients still send country *names* — an offline snapshot of a legacy row
+    echoes one straight back — and 2-letter values pass through so vekn.net's
+    `XX` unknown-venue placeholder survives its own sync.
+    """
+    value = (value or "").strip()
+    resolved = normalize_country(value)
+    if resolved:
+        return resolved
+    if len(value) == 2 and value.isascii() and value.isalpha():
+        return value.upper()
+    return None
+
+
 def country_key(value: str) -> str:
     """A key for comparing two country values, one of which may be a name.
 

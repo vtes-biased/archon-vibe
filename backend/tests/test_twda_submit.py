@@ -75,7 +75,7 @@ async def _published(
         rank=TournamentRank.BASIC,
         state=TournamentState.FINISHED,
         start=datetime(2025, 6, 1, tzinfo=UTC),
-        country="France",
+        country="FR",
         external_ids={"vekn": "12345"},
         # What the backfill leaves on a vekn-bearing row: the submission keys on
         # the code, and the code of such a row is its vekn event id.
@@ -107,6 +107,14 @@ async def _published(
         async with db.get_connection() as conn:
             await conn.execute("DELETE FROM objects WHERE uid = %s", (deck.uid,))
             await conn.execute("DELETE FROM objects WHERE uid = %s", (tournament.uid,))
+
+
+@pytest.mark.asyncio
+async def test_place_line_spells_the_country_out(test_db):
+    """The archive's `place` convention is a name and the line is permanent —
+    the stored ISO code must be expanded before it is published."""
+    async with _published(author="Winner Wendy", attribution=None) as (_t, twda):
+        assert twda.splitlines()[1] == "France"
 
 
 @pytest.mark.asyncio

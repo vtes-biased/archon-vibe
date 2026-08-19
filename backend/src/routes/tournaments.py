@@ -49,6 +49,7 @@ from ..db import (
     upsert_banner,
 )
 from ..engine_errors import EngineRejection
+from ..geonames import get_country, normalize_country, stored_country
 from ..middleware.auth import OptionalUser
 from ..models import (
     Announcement,
@@ -336,12 +337,16 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
         else f"/tournaments/{tournament.uid}"
     )
 
+    # The archive's `place` convention is a country NAME, and the line is
+    # permanent — publishing the stored ISO code regresses the corpus.
+    named = get_country(normalize_country(tournament.country or "") or "")
+
     return _engine.export_twda(
         deck_json,
         _load_cards_json(),
         tournament.name,
         str(tournament_date),
-        tournament.country or "",
+        named["name"] if named else (tournament.country or ""),
         tournament_format,
         f"{frontend_url()}{handle}",
         len(tournament.players),
@@ -899,6 +904,12 @@ async def create_tournament(
     except ValueError as e:
         raise HTTPException(status_code=400, detail="Invalid decklists_mode") from e
 
+    country = stored_country(request.country)
+    if request.country and country is None:
+        raise HTTPException(
+            status_code=422, detail=f"Invalid country: {request.country}"
+        )
+
     # Validate league_uid: league editors, or same-country Princes when the
     # league is open to them (rule single-sourced in the engine).
     if request.league_uid:
@@ -932,7 +943,7 @@ async def create_tournament(
         start=_wall_clock(_parse_datetime(request.start), request.timezone),
         finish=_wall_clock(_parse_datetime(request.finish), request.timezone),
         timezone=request.timezone,
-        country=request.country,
+        country=country,
         venue=request.venue,
         venue_url=request.venue_url,
         address=request.address,
@@ -1411,6 +1422,14 @@ async def tournament_action(
     if request.player_uids is not None:
         event_data["player_uids"] = request.player_uids
     if request.config is not None:
+        if "country" in request.config:
+            country = stored_country(request.config["country"])
+            if request.config["country"] and country is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Invalid country: {request.config['country']}",
+                )
+            request.config["country"] = country
         event_data["config"] = request.config
     if request.deck is not None:
         event_data["deck"] = request.deck
@@ -2158,6 +2177,9 @@ async def go_online(
     if request.tournament.get("uid") and request.tournament["uid"] != uid:
         raise HTTPException(status_code=400, detail="Tournament UID mismatch")
     request.tournament["uid"] = uid
+    # Before the player loop below, not at the convert: a minted account copies
+    # this value into its own permission-bearing country field.
+    request.tournament["country"] = stored_country(request.tournament.get("country"))
 
     # Pre-lock gate: authorize before creating any users (save_user/allocate_next_vekn_id).
     # Re-checked authoritatively under the lock below; this unlocked read only fails fast.
@@ -2513,6 +2535,7 @@ async def sync_offline(
         request.tournament["uid"] = uid
 
         tournament_data = request.tournament
+        tournament_data["country"] = stored_country(tournament_data.get("country"))
         tournament_data["offline_mode"] = True
         if tournament:
             tournament_data["offline_device_id"] = tournament.offline_device_id

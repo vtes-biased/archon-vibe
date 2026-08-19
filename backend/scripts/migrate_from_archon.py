@@ -57,6 +57,7 @@ from psycopg.conninfo import make_conninfo
 from psycopg.rows import dict_row
 
 from backend.src import db
+from backend.src.geonames import normalize_country
 from backend.src.models import (
     AuthMethod,
     AuthMethodType,
@@ -428,7 +429,7 @@ def build_user(row: dict, stats: Stats) -> tuple[db.User, dict]:
         uid=uid,
         modified=parse_dt(row["last_updated"]) or datetime.now(UTC),
         name=d.get("name") or "(unknown)",
-        country=nz(d.get("country")),
+        country=normalize_country(d.get("country") or ""),
         vekn_id=nz(row.get("vekn")) or nz(d.get("vekn")),
         city=nz(d.get("city")),
         city_geoname_id=d.get("city_geoname_id"),
@@ -750,7 +751,7 @@ async def migrate_leagues(
                 d.get("ranking"), LeagueStandingsMode.RTP
             ),
             format=(FORMAT_MAP[fmt].value if fmt in FORMAT_MAP else None),
-            country=nz(d.get("country")),
+            country=normalize_country(d.get("country") or ""),
             start=parse_dt(row["start"]),
             finish=parse_dt(row["finish"]),
             description=d.get("description") or "",
@@ -1049,7 +1050,7 @@ def build_tournament(
         start=parse_wall_dt(d.get("start"), d.get("timezone")),
         finish=parse_wall_dt(d.get("finish"), d.get("timezone")),
         timezone=d.get("timezone") or "UTC",
-        country=nz(d.get("country")),
+        country=normalize_country(d.get("country") or ""),
         league_uid=nz(league_ref.get("uid")),
         state=state,
         organizers_uids=[str(j["uid"]) for j in d.get("judges", []) if j.get("uid")],
