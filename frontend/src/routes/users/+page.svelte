@@ -4,9 +4,16 @@
   import CommunityTab from '$lib/components/CommunityTab.svelte';
   import PromosTab from '$lib/components/promos/PromosTab.svelte';
   import { getAuthState } from '$lib/stores/auth.svelte';
+  import { isOfficial } from '$lib/engine';
   import * as m from '$lib/paraglide/messages.js';
 
   const auth = $derived(getAuthState());
+  let addingLink = $state(false);
+  const canAddLink = $derived(
+    auth.isAuthenticated &&
+    !!auth.user?.vekn_id &&
+    (auth.user.community_links?.length ?? 0) < (isOfficial(auth.user) ? 10 : 5)
+  );
 
   const urlTab = $derived($page.url.searchParams.get('tab'));
   // Sponsor mode: arrived from a "get sponsored" pointer — focus the officials directory
@@ -26,7 +33,18 @@
 
 <div class="p-4 sm:p-8">
   <div class="max-w-6xl mx-auto">
-    <h1 class="text-3xl font-semibold text-accent mb-6">{m.nav_community()}</h1>
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-3xl font-semibold text-accent">{m.nav_community()}</h1>
+
+      {#if activeTab === 'community' && !sponsorMode && canAddLink}
+        <button
+          onclick={() => addingLink = true}
+          class="px-4 py-2 text-sm font-medium btn-success rounded-lg transition-colors shadow-md"
+        >
+          {m.community_add_link()}
+        </button>
+      {/if}
+    </div>
 
     <!-- Tab Toggle: equal thirds on mobile, hug content on desktop -->
     <div class="grid grid-cols-3 sm:inline-flex sm:w-fit mb-6 bg-surface-card rounded-lg border border-line p-1">
@@ -54,7 +72,7 @@
     </div>
 
     {#if activeTab === 'community'}
-      <CommunityTab {sponsorMode} />
+      <CommunityTab {sponsorMode} bind:adding={addingLink} />
     {:else if activeTab === 'promos'}
       <PromosTab />
     {:else if auth.isAuthenticated}

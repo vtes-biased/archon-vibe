@@ -7,7 +7,7 @@
   import { getCountryFlag } from "$lib/geonames";
   import { getRoleTone, getRoleLabel } from "$lib/roles";
   import type { CommunityLink, User } from "$lib/types";
-  import { ChevronDown, ChevronRight, Plus } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   interface LinkEntry { user: User; link: CommunityLink }
@@ -27,19 +27,55 @@
     canPromoteGlobal: boolean;
     onToggle: () => void;
     onModerate: (userUid: string, url: string, action: string) => void;
-    onAddLink: (() => void) | null;
   }
   let {
     code, name, pinned, groups, officials, isOwnCountry, expanded, showLinks,
     showOfficials, canModerate, canPromoteNational, canPromoteGlobal,
-    onToggle, onModerate, onAddLink,
+    onToggle, onModerate,
   }: Props = $props();
 
   const count = $derived(
     (showLinks ? pinned.length + groups.length : 0) + (showOfficials ? officials.length : 0)
   );
   const curatorPrompt = $derived(showLinks && canPromoteNational && pinned.length === 0 && groups.length === 0);
+
+  // The NC is who a visitor is looking for; a country's Princes are a long tail
+  // that would bury them.
+  const coordinators = $derived(officials.filter(o => o.roles?.includes("NC")));
+  const princes = $derived(officials.filter(o => !o.roles?.includes("NC")));
+  let princesOpen = $state(false);
 </script>
+
+{#snippet officialRow(official: User)}
+  {@const email = deobfuscateContact(official.contact_email)}
+  {@const phone = deobfuscateContact(official.contact_phone)}
+  <div class="py-3 first:pt-0 last:pb-0">
+    <div class="flex items-center gap-2 flex-wrap">
+      <a href="/users/{official.uid}" class="font-medium text-ink-strong hover:text-link transition-colors">{official.name}</a>
+      {#each official.roles.filter(r => r === "NC" || r === "Prince") as role}
+        <Badge tone={getRoleTone(role)}>{getRoleLabel(role)}</Badge>
+      {/each}
+      {#if official.city}
+        <span class="text-sm text-ink-muted">{official.city}</span>
+      {/if}
+    </div>
+    <div class="flex flex-wrap gap-3 mt-2 text-xs text-ink-muted">
+      {#if email}
+        <a href="mailto:{email}" class="text-link hover:text-link-soft">{email}</a>
+      {/if}
+      {#if official.discord_id}
+        <DiscordContact discordId={official.discord_id} username={official.contact_discord} />
+      {/if}
+      {#if phone}
+        {#if official.phone_is_whatsapp}
+          <a href="https://wa.me/{phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener noreferrer" class="text-link hover:text-link-soft">WhatsApp: {phone}</a>
+        {:else}
+          <span>{phone}</span>
+        {/if}
+      {/if}
+    </div>
+  </div>
+{/snippet}
 
 {#snippet entries(list: LinkEntry[])}
   <div class="flex flex-wrap gap-3">
@@ -113,48 +149,34 @@
       {#if showOfficials && officials.length > 0}
         <div class="p-4 space-y-2">
           <h3 class="text-sm font-medium text-ink-strong">{m.community_card_officials()}</h3>
-          <div class="divide-y divide-line/50">
-            {#each officials as official}
-              {@const email = deobfuscateContact(official.contact_email)}
-              {@const phone = deobfuscateContact(official.contact_phone)}
-              <div class="py-3 first:pt-0 last:pb-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <a href="/users/{official.uid}" class="font-medium text-ink-strong hover:text-link transition-colors">{official.name}</a>
-                  {#each official.roles.filter(r => r === "NC" || r === "Prince") as role}
-                    <Badge tone={getRoleTone(role)}>{getRoleLabel(role)}</Badge>
-                  {/each}
-                </div>
-                {#if official.city}
-                  <div class="text-sm text-ink-muted mt-0.5">{official.city}</div>
-                {/if}
-                <div class="flex flex-wrap gap-3 mt-2 text-xs text-ink-muted">
-                  {#if email}
-                    <a href="mailto:{email}" class="text-link hover:text-link-soft">{email}</a>
-                  {/if}
-                  {#if official.discord_id}
-                    <DiscordContact discordId={official.discord_id} username={official.contact_discord} />
-                  {/if}
-                  {#if phone}
-                    {#if official.phone_is_whatsapp}
-                      <a href="https://wa.me/{phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener noreferrer" class="text-link hover:text-link-soft">WhatsApp: {phone}</a>
-                    {:else}
-                      <span>{phone}</span>
-                    {/if}
-                  {/if}
-                </div>
+          {#if coordinators.length > 0}
+            <div class="divide-y divide-line/50">
+              {#each coordinators as official}
+                {@render officialRow(official)}
+              {/each}
+            </div>
+          {/if}
+          {#if princes.length > 0}
+            <button
+              onclick={() => { princesOpen = !princesOpen; }}
+              class="w-full flex items-center gap-2 min-h-11 text-left"
+            >
+              {#if princesOpen}
+                <ChevronDown class="w-4 h-4 text-ink-faint" />
+              {:else}
+                <ChevronRight class="w-4 h-4 text-ink-faint" />
+              {/if}
+              <Badge tone={getRoleTone("Prince")}>{getRoleLabel("Prince")}</Badge>
+              <span class="text-xs text-ink-faint">({princes.length})</span>
+            </button>
+            {#if princesOpen}
+              <div class="divide-y divide-line/50">
+                {#each princes as official}
+                  {@render officialRow(official)}
+                {/each}
               </div>
-            {/each}
-          </div>
-        </div>
-      {/if}
-
-      {#if onAddLink}
-        <div class="p-4">
-          <button type="button" onclick={onAddLink}
-            class="flex items-center gap-1 min-h-11 text-sm text-link hover:text-link-soft transition-colors">
-            <Plus class="w-4 h-4" />
-            {m.community_add_link()}
-          </button>
+            {/if}
+          {/if}
         </div>
       {/if}
     </div>

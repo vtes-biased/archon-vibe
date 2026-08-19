@@ -6,7 +6,7 @@
   import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
   import { apiRequest } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { canModerateLink, canPromoteLinkNational, canPromoteLinkGlobal, getCommunityLinkReference, isOfficial } from "$lib/engine";
+  import { canModerateLink, canPromoteLinkNational, canPromoteLinkGlobal, getCommunityLinkReference } from "$lib/engine";
   import { getLocale } from "$lib/paraglide/runtime.js";
   import type { CommunityLink, LinkMedia, User } from "$lib/types";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
@@ -19,7 +19,8 @@
 
   // Sponsor mode (?sponsor=1): the visitor came to find an official to sponsor them for a VEKN ID —
   // show only the officials, pre-filtered to their country, with an explicit contact CTA.
-  let { sponsorMode = false }: { sponsorMode?: boolean } = $props();
+  let { sponsorMode = false, adding = $bindable(false) }:
+    { sponsorMode?: boolean; adding?: boolean } = $props();
 
   interface LinkEntry { user: User; link: CommunityLink }
 
@@ -35,7 +36,6 @@
   let toggledCards = $state<Set<string>>(new Set());
   let selectedLanguages = $state<string[]>([]);
   let selectedMedia = $state<LinkMedia | null>(null);
-  let adding = $state(false);
 
   const reference = $derived(getCommunityLinkReference());
   // Reading the reactive engine accessors keeps these recomputing once WASM lands.
@@ -152,11 +152,6 @@
   });
 
   const ownLinks = $derived(auth.user?.community_links ?? []);
-  const canAddLinks = $derived(
-    auth.isAuthenticated &&
-    !!auth.user?.vekn_id &&
-    ownLinks.length < (isOfficial(auth.user) ? 10 : 5)
-  );
 
   async function loadData() {
     const allUsers = await getAllUsers();
@@ -199,9 +194,10 @@
     }
   }
 
-  async function saveLink(link: CommunityLink) {
+  async function saveLink(link: CommunityLink, pin: string | null) {
     adding = false;
-    if (!(await updateProfile({ community_links: [...ownLinks, link] }))) {
+    const payload = [...ownLinks, pin ? { ...link, pin } : link];
+    if (!(await updateProfile({ community_links: payload }))) {
       showToast({ type: "error", message: m.profile_save_error() });
     }
   }
@@ -288,7 +284,6 @@
         {canPromoteGlobal}
         onToggle={() => toggleCard(card.code)}
         onModerate={handleModerate}
-        onAddLink={canAddLinks && showLinks && card.code === ownCountry ? () => { adding = true; } : null}
       />
     {/each}
 
@@ -337,7 +332,6 @@
         onSelectMedia={(kind) => { selectedMedia = kind; }}
         onClearFilters={() => { selectedLanguages = []; selectedMedia = null; }}
         onModerate={handleModerate}
-        onAddLink={canAddLinks ? () => { adding = true; } : null}
       />
     </div>
   {/if}

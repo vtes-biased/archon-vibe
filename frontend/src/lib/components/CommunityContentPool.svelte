@@ -6,7 +6,7 @@
   import { getCountryFlag } from "$lib/geonames";
   import { getRoleTone, getRoleLabel } from "$lib/roles";
   import type { CommunityLink, LinkMedia, User } from "$lib/types";
-  import { Plus, X } from "@lucide/svelte";
+  import { X } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   interface LinkEntry { user: User; link: CommunityLink }
@@ -25,12 +25,11 @@
     onSelectMedia: (kind: LinkMedia | null) => void;
     onClearFilters: () => void;
     onModerate: (userUid: string, url: string, action: string) => void;
-    onAddLink: (() => void) | null;
   }
   let {
     items, languages, mediaKinds, selectedLanguages, selectedMedia, canModerate,
     canPromoteNational, canPromoteGlobal, linkCountry, onToggleLanguage,
-    onSelectMedia, onClearFilters, onModerate, onAddLink,
+    onSelectMedia, onClearFilters, onModerate,
   }: Props = $props();
 
   const filtered = $derived(selectedLanguages.length > 0 || selectedMedia !== null);
@@ -128,12 +127,4 @@
   </div>
 {:else}
   <div class="text-center py-6 text-ink-muted text-sm">{m.community_no_content()}</div>
-{/if}
-
-{#if onAddLink}
-  <button type="button" onclick={onAddLink}
-    class="mt-3 flex items-center gap-1 min-h-11 text-sm text-link hover:text-link-soft transition-colors">
-    <Plus class="w-4 h-4" />
-    {m.community_add_link()}
-  </button>
 {/if}

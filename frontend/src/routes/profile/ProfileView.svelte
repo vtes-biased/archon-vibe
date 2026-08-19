@@ -110,10 +110,15 @@
     });
   }
 
-  function saveLinks(links: CommunityLink[]) {
+  // The requested pin rides on the edited link alone and is never stored locally:
+  // the server decides it, and echoes the moderation it actually applied.
+  function saveLinks(links: CommunityLink[], pinned?: { url: string; pin: string }) {
     editLinks = links;
     editing = null;
-    saveField("community_links", links);
+    const payload = pinned
+      ? links.map(l => (l.url === pinned.url ? { ...l, pin: pinned.pin } : l))
+      : links;
+    saveField("community_links", payload);
   }
 
   const editedIndex = $derived(editing?.link ? editLinks.indexOf(editing.link) : -1);
@@ -326,10 +331,11 @@
     ownerCountry={editCountry || null}
     {defaultLanguage}
     onclose={() => { editing = null; }}
-    onsave={(link) => saveLinks(
+    onsave={(link, pin) => saveLinks(
       editedIndex >= 0
         ? editLinks.map((l, i) => (i === editedIndex ? link : l))
-        : [...editLinks, link]
+        : [...editLinks, link],
+      pin ? { url: link.url, pin } : undefined
     )}
     ondelete={editedIndex >= 0
       ? () => saveLinks(editLinks.filter((_, i) => i !== editedIndex))

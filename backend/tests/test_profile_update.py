@@ -115,6 +115,47 @@ async def test_community_links_bad_url_rejected(test_client: AsyncClient, test_d
 
 
 @pytest.mark.asyncio
+async def test_owner_pin_takes_the_capability_that_scope_needs(
+    test_client: AsyncClient, test_db
+):
+    """An owner pins their own link through the ordinary country-scoped grant,
+    so an NC may pin nationally in their country and never globally."""
+    user = await _insert_user(roles=[Role.NC], vekn_id="1000007")
+    link = {"type": "discord", "url": "https://discord.gg/fr", "pin": "national"}
+    response = await test_client.patch(
+        "/auth/me",
+        json={"community_links": [link]},
+        headers=make_auth_header(user.uid),
+    )
+    assert response.status_code == 200
+    moderation = response.json()["user"]["community_links"][0]["moderation"]
+    assert (moderation["status"], moderation["scope"]) == ("promoted", "national")
+
+    response = await test_client.patch(
+        "/auth/me",
+        json={"community_links": [{**link, "pin": "global"}]},
+        headers=make_auth_header(user.uid),
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_member_cannot_pin_their_own_link(test_client: AsyncClient, test_db):
+    """The whole point of the country-scoped grant: no self-service exemption."""
+    user = await _insert_user(roles=[], vekn_id="1000008")
+    response = await test_client.patch(
+        "/auth/me",
+        json={
+            "community_links": [
+                {"type": "discord", "url": "https://discord.gg/x", "pin": "national"}
+            ]
+        },
+        headers=make_auth_header(user.uid),
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "url", ["http://127.0.0.1:9/", "http://169.254.169.254/latest/meta-data/"]
 )

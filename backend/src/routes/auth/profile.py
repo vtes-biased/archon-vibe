@@ -18,7 +18,13 @@ from ...db import (
 )
 from ...link_preview import LinkPreviewError, fetch_link_title
 from ...middleware.auth import CurrentUser
-from ...models import CONTENT_LINK_TYPES, CommunityLink, CommunityLinkType
+from ...models import (
+    CONTENT_LINK_TYPES,
+    CommunityLink,
+    CommunityLinkType,
+    LinkModeration,
+    User,
+)
 
 router = APIRouter()
 encoder = msgspec.json.Encoder()
@@ -30,6 +36,34 @@ class CommunityLinkInput(BaseModel):
     label: str = ""
     languages: list[str] = []
     country: str | None = None
+    # "national" | "global" | "none"; absent leaves any existing moderation alone.
+    pin: str | None = None
+
+
+def _pin_moderation(
+    user: User, pin: str, country: str | None, current: LinkModeration | None
+) -> LinkModeration | None:
+    """Apply an owner-requested pin, gated by the capability that scope needs."""
+    if pin == "global":
+        allowed = permissions.can_promote_link_global(user)
+    elif pin == "national":
+        allowed = permissions.can_promote_link_national(user, country)
+    elif pin == "none":
+        allowed = permissions.can_moderate_link(user, country)
+    else:
+        raise HTTPException(status_code=422, detail=f"Invalid pin: {pin}")
+    if not allowed:
+        raise HTTPException(
+            status_code=403, detail=f"You cannot pin a link {pin} in {country}"
+        )
+    # Clearing drops a hide as well as a pin — the same authority the icons take.
+    if pin == "none":
+        return None
+    if current and current.status == "promoted" and current.scope == pin:
+        return current
+    return LinkModeration(
+        status="promoted", by=user.uid, at=datetime.now(UTC), scope=pin
+    )
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -169,14 +203,23 @@ async def update_current_user(
                     status_code=422,
                     detail=f"A {link_type.value} link must declare a language",
                 )
-            country = (link.country or user.country or "").upper() or None
-            if country is not None and not (
-                len(country) == 2 and country.isascii() and country.isalpha()
-            ):
+            # Required: a link with no country cannot be found again once an
+            # official pins it nationally, since the pin files it under one.
+            country = (link.country or user.country or "").upper()
+            if not country:
+                raise HTTPException(
+                    status_code=422,
+                    detail="A community link needs a country — set yours on your profile",
+                )
+            if not (len(country) == 2 and country.isascii() and country.isalpha()):
                 raise HTTPException(
                     status_code=422, detail=f"Invalid country: {link.country}"
                 )
             mod = prior.moderation if prior else None
+            # An official pins through the ordinary country-scoped grant, so the
+            # owner of a link may set its pin exactly when they could moderate it.
+            if link.pin is not None:
+                mod = _pin_moderation(user, link.pin, country, mod)
             links.append(
                 CommunityLink(
                     type=link_type,

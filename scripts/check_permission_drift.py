@@ -42,8 +42,7 @@ ALLOWED = {
     "frontend/src/lib/db.ts": "role filter expansion",
     "frontend/src/lib/displayContext.ts": "role filter expansion",
     "frontend/src/lib/components/CommunityTab.svelte": "official sort order + directory",
-    "frontend/src/lib/components/CommunitySocialSection.svelte": "official badges",
-    "frontend/src/lib/components/CommunityContentSection.svelte": "official badges",
+    "frontend/src/lib/components/CommunityCountryCard.svelte": "official badges + NC-before-Princes grouping",
     "frontend/src/routes/profile/ProfileView.svelte": "which contact-visibility note to show",
 }
 

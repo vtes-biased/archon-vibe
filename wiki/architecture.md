@@ -543,7 +543,10 @@ row there plus a label, colour and icon in `CommunityLinkPills.svelte`.
 
 **A link carries its own country**, defaulting to the owner's at creation and
 owner-settable — the Brazilian Discord run from Portugal. Every moderation
-decision keys off the link's country, never its owner's.
+decision keys off the link's country, never its owner's. It is **required**: a
+national pin files a link under a country, so one without a country would be
+pinned into a card nobody can reach. A member with no country of their own
+therefore cannot add a link until they set one.
 
 **Placement follows the pins, not the platform**, because platform does not
 determine function: an NC's Instagram is an announcements channel and a player's
@@ -570,7 +573,12 @@ through `PATCH /auth/me`. On update, existing moderation is re-applied by URL
 match, so a rewritten URL drops its pin and the editor warns before saving.
 Moderation actions map to the `moderate_link` / `promote_link_national` /
 `promote_link_global` capabilities — officials pin their own links through the
-same country-scoped grant, not a self-service exemption.
+same country-scoped grant, not a self-service exemption. That grant is what lets
+the editor carry the pin itself: a link input may name a `pin`, and `PATCH
+/auth/me` applies it only when the owner holds the capability that scope needs,
+so an NC files their country's Discord already pinned instead of saving it and
+hunting for the icon. An absent `pin` leaves existing moderation alone, which is
+what keeps an ordinary resubmission from clearing someone else's decision.
 
 `GET /auth/me/link-title` reads the target's `og:title`, else its `<title>`, to
 seed an editable label. It is the only place the server fetches an address a

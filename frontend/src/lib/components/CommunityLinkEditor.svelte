@@ -4,7 +4,8 @@
   import Button from "$lib/components/Button.svelte";
   import { LABELS } from "$lib/components/CommunityLinkPills.svelte";
   import { LANGUAGES, LANGUAGE_NAMES } from "$lib/data/languages";
-  import { getCommunityLinkReference } from "$lib/engine";
+  import { canPromoteLinkGlobal, canPromoteLinkNational, getCommunityLinkReference } from "$lib/engine";
+  import { getAuthState } from "$lib/stores/auth.svelte";
   import { getSortedCountries, getCountryFlag } from "$lib/geonames";
   import type { CommunityLink, CommunityLinkType } from "$lib/types";
   import { Loader2, Trash2, X } from "@lucide/svelte";
@@ -15,7 +16,7 @@
     ownerCountry: string | null;
     defaultLanguage: string;
     onclose: () => void;
-    onsave: (link: CommunityLink) => void;
+    onsave: (link: CommunityLink, pin: string | null) => void;
     ondelete?: () => void;
   }
   let { link, ownerCountry, defaultLanguage, onclose, onsave, ondelete }: Props = $props();
@@ -36,6 +37,18 @@
   let suggestion = $state("");
   let fetching = $state(false);
   let touched = $state(false);
+
+  const auth = $derived(getAuthState());
+  const currentPin =
+    original?.moderation?.status === "promoted" ? (original.moderation.scope ?? "none") : "none";
+  let pin = $state<string>(currentPin);
+  const canPinNational = $derived(canPromoteLinkNational(auth.user, country || null).allowed);
+  const canPinGlobal = $derived(canPromoteLinkGlobal(auth.user).allowed);
+  const pinChoices = $derived([
+    ...(canPinNational || canPinGlobal ? [{ value: "none", label: m.community_pin_none() }] : []),
+    ...(canPinNational ? [{ value: "national", label: m.community_moderate_promote_national() }] : []),
+    ...(canPinGlobal ? [{ value: "global", label: m.community_moderate_promote_global() }] : []),
+  ]);
 
   const reference = $derived(getCommunityLinkReference());
   const isContent = $derived(reference?.placement[type] === "content");
@@ -65,14 +78,17 @@
 
   function save() {
     touched = true;
-    if (!url.trim().startsWith("http") || needsLanguage) return;
-    onsave({
-      type,
-      url: url.trim(),
-      label: label.trim(),
-      languages: isContent ? languages : [],
-      country: country || null,
-    });
+    if (!url.trim().startsWith("http") || needsLanguage || !country) return;
+    onsave(
+      {
+        type,
+        url: url.trim(),
+        label: label.trim(),
+        languages: isContent ? languages : [],
+        country: country || null,
+      },
+      pin === currentPin ? null : pin
+    );
   }
 
   const inputClass = "w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent";
@@ -141,11 +157,14 @@
       <div>
         <label for="link-country" class="block text-sm font-medium text-ink-muted mb-1">{m.common_country()}</label>
         <select id="link-country" bind:value={country} class={inputClass}>
-          <option value="">{m.user_country_placeholder()}</option>
+          <option value="" disabled>{m.user_country_placeholder()}</option>
           {#each sortedCountries as option}
             <option value={option.iso_code}>{option.name} {getCountryFlag(option.iso_code)}</option>
           {/each}
         </select>
+        {#if touched && !country}
+          <p class="mt-1 text-xs text-link">{m.community_link_country_required()}</p>
+        {/if}
         <p class="mt-1 text-xs text-ink-faint">{m.community_link_country_hint()}</p>
       </div>
 
@@ -180,6 +199,20 @@
           {#if touched && needsLanguage}
             <p class="mt-1 text-xs text-link">{m.community_link_language_required()}</p>
           {/if}
+        </div>
+      {/if}
+
+      {#if pinChoices.length > 1}
+        <div>
+          <span class="block text-sm font-medium text-ink-muted mb-1">{m.community_card_pinned()}</span>
+          <div class="flex flex-wrap gap-2">
+            {#each pinChoices as choice}
+              <button type="button" onclick={() => { pin = choice.value; }}
+                aria-pressed={pin === choice.value}
+                class="px-3 min-h-11 rounded-full text-sm font-medium transition-colors {pin === choice.value ? 'bg-accent-strong text-white' : 'bg-surface-hover text-ink hover:bg-surface-active'}"
+              >{choice.label}</button>
+            {/each}
+          </div>
         </div>
       {/if}
 
