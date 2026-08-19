@@ -49,7 +49,12 @@ def test_start_round_numbers_each_seat_by_table_and_seat() -> None:
     body = render_payload(specs["b2"], "en")["body"]
     assert "Round 1" in body and "Table 2" in body and "seat 3" in body
 
-    t2 = _t(rounds=[*t.rounds, [Table(seating=[Seat(player_uid="c0")])]])
+    t2 = _t(
+        rounds=[
+            *t.rounds,
+            [Table(seating=[Seat(player_uid=f"c{i}") for i in range(4)])],
+        ]
+    )
     s2 = dict(build_seating_specs(t2, "StartRound"))
     assert s2["c0"]["round"] == 2
     assert s2["c0"]["tag"] == "seating-trn-1-2"
@@ -60,29 +65,30 @@ def test_self_organize_round_pushes_only_the_new_pod() -> None:
     # NOT be paged, or enumerating all rounds would page the whole field.
     t = _t(
         rounds=[
-            [Table(seating=[Seat(player_uid="old1"), Seat(player_uid="old2")])],
-            [Table(seating=[Seat(player_uid="new1"), Seat(player_uid="new2")])],
+            [Table(seating=[Seat(player_uid=f"old{i}") for i in range(4)])],
+            [Table(seating=[Seat(player_uid=f"new{i}") for i in range(4)])],
         ]
     )
     targets = build_seating_specs(t, "SelfOrganizeRound")
-    assert {uid for uid, _ in targets} == {"new1", "new2"}
+    assert {uid for uid, _ in targets} == {f"new{i}" for i in range(4)}
 
 
 def test_start_finals_reads_finals_seating_with_finals_url() -> None:
     t = _t(
-        rounds=[[Table(seating=[Seat(player_uid="x")])]],  # a prelim round exists
+        # a prelim round exists
+        rounds=[[Table(seating=[Seat(player_uid=f"x{i}") for i in range(4)])]],
         finals=FinalsTable(
-            seating=[Seat(player_uid="f1"), Seat(player_uid="f2")],
-            seed_order=["f1", "f2"],
+            seating=[Seat(player_uid=f"f{i}") for i in range(5)],
+            seed_order=[f"f{i}" for i in range(5)],
         ),
     )
     specs = dict(build_seating_specs(t, "StartFinals"))
 
-    assert set(specs) == {"f1", "f2"}  # finalists only, not the prelim seat
-    assert specs["f2"]["url"] == "/tournaments/trn-1"
-    assert specs["f2"]["tag"] == "seating-trn-1-finals"
-    assert specs["f2"]["seat"] == 2
-    assert "seat 2" in render_payload(specs["f2"], "en")["body"]
+    assert set(specs) == {f"f{i}" for i in range(5)}  # finalists only, no prelim seat
+    assert specs["f1"]["url"] == "/tournaments/trn-1"
+    assert specs["f1"]["tag"] == "seating-trn-1-finals"
+    assert specs["f1"]["seat"] == 2
+    assert "seat 2" in render_payload(specs["f1"], "en")["body"]
 
 
 def test_no_rounds_and_missing_finals_yield_nothing() -> None:
@@ -146,6 +152,7 @@ def test_room_label_replaces_table_number_in_body() -> None:
 def test_render_payload_falls_back_to_en_for_unknown_locale() -> None:
     # An unsupported/garbage locale must render (in en), never KeyError.
     spec = build_seating_specs(
-        _t(rounds=[[Table(seating=[Seat(player_uid="p")])]]), "StartRound"
+        _t(rounds=[[Table(seating=[Seat(player_uid=f"p{i}") for i in range(4)])]]),
+        "StartRound",
     )[0][1]
     assert render_payload(spec, "zz")["body"] == render_payload(spec, "en")["body"]

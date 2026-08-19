@@ -8,7 +8,7 @@ WITHOUT creating any users.
 
 import json
 from datetime import UTC, datetime
-from uuid import uuid7
+from uuid import uuid4, uuid7
 
 import msgspec
 import pytest
@@ -252,8 +252,11 @@ async def test_nested_uids_and_deck_attribution_remapped(test_client, test_db):
     await db.save_user(org)
     base_uid = await _seed(org.uid)
 
-    temp_uid = str(uuid7())  # frontend uses crypto.randomUUID()
-    temp_vekn = f"TEMP-{temp_uid[:8]}"  # vekn is the UID's 8-char prefix
+    # A four-seat table, all of it created offline: the frontend mints
+    # crypto.randomUUID() temp uids, and the vekn is the uid's 8-char prefix.
+    temp_uids = [str(uuid4()) for _ in range(4)]
+    temp_uid = temp_uids[0]
+    temp_vekn = f"TEMP-{temp_uid[:8]}"
     t = Tournament(
         uid=base_uid,
         modified=datetime.now(UTC),
@@ -262,15 +265,20 @@ async def test_nested_uids_and_deck_attribution_remapped(test_client, test_db):
         country="France",
         offline_mode=True,
         offline_device_id="devA",
-        players=[Player(user_uid=temp_uid)],
-        rounds=[[Table(seating=[Seat(player_uid=temp_uid)])]],
+        players=[Player(user_uid=u) for u in temp_uids],
+        rounds=[[Table(seating=[Seat(player_uid=u) for u in temp_uids])]],
         winner=temp_uid,
     )
     body = {
         "device_id": "devA",
         "tournament": json.loads(msgspec.json.encode(t)),
         "offline_players": [
-            {"temp_uid": temp_uid, "name": "Alice Offline", "vekn_id": temp_vekn}
+            {
+                "temp_uid": u,
+                "name": f"Player {i} Offline",
+                "vekn_id": f"TEMP-{u[:8]}",
+            }
+            for i, u in enumerate(temp_uids)
         ],
         "offline_decks": [
             {
@@ -296,8 +304,9 @@ async def test_nested_uids_and_deck_attribution_remapped(test_client, test_db):
     # Nested references all remapped; nothing temp survives anywhere in the JSON.
     assert saved.rounds[0][0].seating[0].player_uid == real_uid
     assert saved.winner == real_uid
-    assert temp_uid not in msgspec.json.encode(saved).decode()
-    assert "TEMP-" not in msgspec.json.encode(saved).decode()
+    saved_json = msgspec.json.encode(saved).decode()
+    assert not any(u in saved_json for u in temp_uids)
+    assert "TEMP-" not in saved_json
 
     # Deck owner repointed and attribution recomputed to the real vekn (not TEMP-).
     decks = await db.get_decks_for_tournament(base_uid)

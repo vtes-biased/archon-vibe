@@ -3,23 +3,20 @@ silent data corruption on the VEKN registry. Tests verify field ordering and
 edge cases (finals GW subtraction, missing users, etc.).
 """
 
+import json
 from datetime import UTC, datetime
-from unittest.mock import patch
 
+import msgspec
+from archon_engine import PyEngine
 from src.models import (
-    FinalsTable,
-    Score,
-    Seat,
-    Standing,
-    Table,
-    TableState,
     Tournament,
     TournamentFormat,
     TournamentRank,
-    TournamentState,
     User,
 )
 from src.vekn_push import generate_archondata, tournament_to_vekn_type
+
+_engine = PyEngine()
 
 
 def _user(uid: str, name: str, vekn_id: str, city: str = "") -> User:
@@ -32,41 +29,83 @@ def _user(uid: str, name: str, vekn_id: str, city: str = "") -> User:
     )
 
 
-def _make_tournament(
+def _sweep(*uids: str) -> dict:
+    """A finished table where the first seat ousts the whole pod. Seats sit in
+    predator-prey order and a sweep is a reachable oust order, so the vector
+    sums to the table size the way a real game does."""
+    vps = [float(len(uids))] + [0.0] * (len(uids) - 1)
+    return {
+        "seating": [
+            {"player_uid": u, "result": {"gw": 0, "vp": v, "tp": 0}}
+            for u, v in zip(uids, vps, strict=True)
+        ],
+        "state": "Finished",
+    }
+
+
+def _finished_tournament(
     *,
     rounds: list | None = None,
-    finals: FinalsTable | None = None,
-    standings: list[Standing] | None = None,
+    finals: dict | None = None,
     winner: str = "",
     rank: TournamentRank = TournamentRank.BASIC,
-    name: str = "Test Tournament",
+    fmt: TournamentFormat = TournamentFormat.Standard,
+    proxies: set[str] | None = None,
 ) -> Tournament:
-    return Tournament(
-        uid="t-001",
-        modified=datetime(2025, 6, 1, tzinfo=UTC),
-        name=name,
-        format=TournamentFormat.Standard,
-        rank=rank,
-        state=TournamentState.FINISHED,
-        start=datetime(2025, 6, 1, tzinfo=UTC),
-        rounds=rounds or [],
-        finals=finals,
-        standings=standings or [],
-        winner=winner,
-        organizers_uids=["org-1"],
+    """Finish a tournament through the shipped engine, so the standings sheet is
+    the engine's own — a hand-typed one drifts from what a real table produces."""
+    rounds = rounds or []
+    seated: list[str] = []
+    for rnd in rounds:
+        for table in rnd:
+            for seat in table["seating"]:
+                if seat["player_uid"] not in seated:
+                    seated.append(seat["player_uid"])
+    proxies = proxies or set()
+
+    tournament = {
+        "uid": "t-001",
+        "modified": "2025-06-01T00:00:00Z",
+        "name": "Test Tournament",
+        "format": fmt.value,
+        "rank": rank.value,
+        "state": "Playing",
+        "start": "2025-06-01T00:00:00Z",
+        "organizers_uids": ["org-1"],
+        "players": [
+            {
+                "user_uid": u,
+                "state": "Playing",
+                "payment_status": "Pending",
+                "toss": 0,
+                "non_competing": u in proxies,
+            }
+            for u in seated
+        ],
+        "rounds": rounds,
+        "finals": finals,
+        "winner": winner,
+    }
+    actor = {"uid": "org-1", "roles": ["Prince"], "is_organizer": True}
+    result = _engine.process_tournament_event(
+        json.dumps(tournament),
+        json.dumps({"type": "FinishTournament"}),
+        json.dumps(actor),
+        "[]",
+        "[]",
     )
+    return msgspec.convert(json.loads(result)["tournament"], Tournament)
 
 
-# Stub _compute_entry: only the archondata *format* is under test here.
-class FakeEntry:
-    def __init__(self, points: int = 42):
-        self.points = points
-
-
-def _fake_compute(
-    tournament, t_json, sanctions_json, user_uid, player_count, positions
-):
-    return FakeEntry(points=10)
+def _finals(uids: list[str], vps: list[float]) -> dict:
+    return {
+        "seating": [
+            {"player_uid": u, "result": {"gw": 0, "vp": v, "tp": 0}}
+            for u, v in zip(uids, vps, strict=True)
+        ],
+        "seed_order": uids,
+        "state": "Finished",
+    }
 
 
 def test_vekn_type_standard_basic():
@@ -101,249 +140,115 @@ def test_vekn_type_unmappable_is_none():
     assert tournament_to_vekn_type(TournamentFormat.V5, TournamentRank.CC) is None
 
 
-@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
-def test_archondata_basic_format(mock_compute):
-    """Verify the basic archondata format: nrounds¤rank§first§last§city§vekn§gw§vp§vpf§tp§toss§rtp§"""
-    users = {
+def _pod() -> dict[str, User]:
+    return {
         "u1": _user("u1", "Alice Smith", "1000001", city="Paris"),
         "u2": _user("u2", "Bob Jones", "1000002", city="Lyon"),
+        "u3": _user("u3", "Cara Doe", "1000003"),
+        "u4": _user("u4", "Dan Roe", "1000004"),
+        "u5": _user("u5", "Eve Poe", "1000005"),
     }
-    standings = [
-        Standing(user_uid="u1", gw=2.0, vp=8.5, tp=60, toss=3),
-        Standing(user_uid="u2", gw=1.0, vp=5.0, tp=48, toss=1),
-    ]
-    rounds = [
-        [
-            Table(
-                seating=[Seat(player_uid="u1"), Seat(player_uid="u2")],
-                state=TableState.FINISHED,
-            )
-        ],
-        [
-            Table(
-                seating=[Seat(player_uid="u1"), Seat(player_uid="u2")],
-                state=TableState.FINISHED,
-            )
-        ],
-    ]
-    t = _make_tournament(rounds=rounds, standings=standings)
-    result = generate_archondata(t, users)
 
-    # nrounds = len(rounds) + (1 if finals else 0) = 2
-    assert result.startswith("2¤")
 
-    after_nrounds = result[2:]
-    # Each player block is 11 §-terminated fields:
-    # rank§first§last§city§vekn§gw§vp§vpf§tp§toss§rtp§
-    parts = after_nrounds.split("§")
+def test_archondata_basic_format():
+    """The wire format: nrounds¤ then rank§first§last§city§vekn§gw§vp§vpf§tp§toss§rtp§"""
+    t = _finished_tournament(
+        rounds=[
+            [_sweep("u1", "u2", "u3", "u4", "u5")],
+            [_sweep("u2", "u1", "u3", "u4", "u5")],
+        ]
+    )
+    result = generate_archondata(t, _pod())
+
+    assert result.startswith("2¤")  # len(rounds) + (1 if finals else 0)
+
+    parts = result[2:].split("§")
     assert parts[0] == "1"  # rank
     assert parts[1] == "Alice"  # first name
     assert parts[2] == "Smith"  # last name
     assert parts[3] == "Paris"  # city
     assert parts[4] == "1000001"  # vekn_id
-    assert parts[5] == "2"  # gw (int)
-    assert parts[6] == "8.5"  # vp
-    assert parts[7] == "0.0"  # vpf (no finals)
-    assert parts[8] == "60"  # tp
-    assert parts[9] == "3"  # toss
-    assert parts[10] == "10"  # rating points (mocked)
+    assert parts[5] == "1"  # gw, as an int
+    assert parts[6] == "5.0"  # vp
+    assert parts[7] == "0.0"  # vpf — no finals
+    assert parts[8] == "90"  # tp
+    assert parts[9] == "0"  # toss
+    assert parts[10].isdigit()  # rtp, the engine's rating points
 
-    # Bob Jones: rank 2 (each player block is 11 fields, so Bob starts at index 11)
-    assert parts[11] == "2"  # rank
-    assert parts[12] == "Bob"  # first name
-    assert parts[13] == "Jones"  # last name
-    assert parts[14] == "Lyon"  # city
-    assert parts[15] == "1000002"  # vekn_id
-    assert parts[16] == "1"  # gw
-    assert parts[17] == "5.0"  # vp
-    assert parts[22] == ""  # trailing empty after last player
+    # Bob is rank 2, and each player block is 11 fields.
+    assert parts[11] == "2"
+    assert parts[12] == "Bob"
+    assert parts[13] == "Jones"
+    assert parts[14] == "Lyon"
+    assert parts[15] == "1000002"
+    assert len(parts) == 5 * 11 + 1  # five players, eleven fields each
+    assert parts[-1] == ""  # trailing empty after the last player
 
 
-@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
-def test_archondata_nrounds_includes_finals(mock_compute):
-    """nrounds should count finals as an extra round."""
-    users = {"u1": _user("u1", "Alice Smith", "1000001")}
-    standings = [Standing(user_uid="u1", gw=1.0, vp=4.0, tp=36)]
-    finals = FinalsTable(
-        seating=[Seat(player_uid="u1", result=Score(gw=1, vp=3.0))],
-        seed_order=["u1"],
-        state=TableState.FINISHED,
+def test_archondata_nrounds_includes_finals():
+    t = _finished_tournament(
+        rounds=[
+            [_sweep("u1", "u2", "u3", "u4", "u5")],
+            [_sweep("u1", "u2", "u3", "u4", "u5")],
+        ],
+        finals=_finals(["u1", "u2", "u3", "u4", "u5"], [3.0, 1.5, 0.5, 0.0, 0.0]),
+        winner="u1",
     )
-    rounds = [
-        [Table(seating=[Seat(player_uid="u1")], state=TableState.FINISHED)],
-        [Table(seating=[Seat(player_uid="u1")], state=TableState.FINISHED)],
-    ]
-    t = _make_tournament(rounds=rounds, finals=finals, standings=standings)
-    result = generate_archondata(t, users)
-
-    # 2 rounds + 1 finals = 3
-    assert result.startswith("3¤")
+    assert generate_archondata(t, _pod()).startswith("3¤")
 
 
-@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
-def test_archondata_winner_prelim_gw_only(mock_compute):
-    """Archondata GW should be prelim-only (standings don't include finals GW)."""
-    users = {
-        "u1": _user("u1", "Alice Smith", "1000001"),
-        "u2": _user("u2", "Bob Jones", "1000002"),
-    }
-    # Standings are prelim-only (engine compute_standings sums rounds only)
-    standings = [
-        Standing(user_uid="u1", gw=2.0, vp=10.0, tp=60),  # 2 prelim GW
-        Standing(user_uid="u2", gw=1.0, vp=4.0, tp=48),
-    ]
-    finals = FinalsTable(
-        seating=[
-            Seat(player_uid="u1", result=Score(gw=1, vp=3.0)),
-            Seat(player_uid="u2", result=Score(gw=0, vp=1.5)),
+def test_archondata_gw_is_prelim_only_and_vpf_carries_the_final():
+    """The pushed GW must be the standings' prelim-only figure — vekn.net adds the
+    finals win itself, and a finalist's finals VP travels in vpf, not vp."""
+    t = _finished_tournament(
+        rounds=[
+            [_sweep("u1", "u2", "u3", "u4", "u5")],
+            [_sweep("u1", "u2", "u3", "u4", "u5")],
         ],
-        seed_order=["u1", "u2"],
-        state=TableState.FINISHED,
+        finals=_finals(["u1", "u2", "u3", "u4", "u5"], [3.0, 1.5, 0.5, 0.0, 0.0]),
+        winner="u1",
     )
-    rounds = [
-        [
-            Table(
-                seating=[Seat(player_uid="u1"), Seat(player_uid="u2")],
-                state=TableState.FINISHED,
-            )
-        ],
-        [
-            Table(
-                seating=[Seat(player_uid="u1"), Seat(player_uid="u2")],
-                state=TableState.FINISHED,
-            )
-        ],
-    ]
-    t = _make_tournament(rounds=rounds, finals=finals, standings=standings, winner="u1")
-    result = generate_archondata(t, users)
+    parts = generate_archondata(t, _pod()).split("¤", 1)[1].split("§")
 
-    after_nrounds = result.split("¤", 1)[1]
-    parts = after_nrounds.split("§")
+    assert parts[5] == "2"  # winner: two prelim GW, no +1 for the final
+    assert parts[6] == "10.0"  # prelim VP only
+    assert parts[7] == "3.0"  # her finals VP
 
-    # Alice (winner): gw is prelim-only = 2
-    assert parts[5] == "2"  # gw
-
-    # Alice's vpf should be 3.0 (her finals VP)
-    assert parts[7] == "3.0"
-
-    # Bob (non-winner): starts at index 11 (11 fields per player block)
-    assert parts[11 + 5] == "1"  # gw unchanged
-    assert parts[11 + 7] == "1.5"  # finals VP
+    assert parts[11 + 5] == "0"  # runner-up: GW untouched, never subtracted
+    assert parts[11 + 7] == "1.5"
 
 
-@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
-def test_archondata_non_winner_gw_not_subtracted(mock_compute):
-    """Non-winner finalists should NOT have GW subtracted even with finals."""
-    users = {
-        "u1": _user("u1", "Alice Smith", "1000001"),
-        "u2": _user("u2", "Bob Jones", "1000002"),
-    }
-    standings = [
-        Standing(user_uid="u1", gw=3.0, vp=10.0, tp=60),
-        Standing(user_uid="u2", gw=2.0, vp=7.0, tp=48),
-    ]
-    finals = FinalsTable(
-        seating=[
-            Seat(player_uid="u1", result=Score(gw=1, vp=3.0)),
-            Seat(player_uid="u2", result=Score(gw=0, vp=1.5)),
-        ],
-        seed_order=["u1", "u2"],
-        state=TableState.FINISHED,
-    )
-    rounds = [
-        [
-            Table(
-                seating=[Seat(player_uid="u1"), Seat(player_uid="u2")],
-                state=TableState.FINISHED,
-            )
-        ]
-    ]
-    t = _make_tournament(rounds=rounds, finals=finals, standings=standings, winner="u1")
-    result = generate_archondata(t, users)
-    after_nrounds = result.split("¤", 1)[1]
-    parts = after_nrounds.split("§")
-
-    # Bob is at rank 2 (starts at index 11, 11 fields per player block)
-    assert parts[11 + 5] == "2"  # Bob's GW stays 2 (not subtracted)
-
-
-@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
-def test_archondata_skips_missing_users(mock_compute):
-    """Players not found in users_by_uid should be silently skipped."""
-    users = {
-        "u1": _user("u1", "Alice Smith", "1000001"),
-        # u2 is missing from users dict
-    }
-    standings = [
-        Standing(user_uid="u1", gw=2.0, vp=8.0, tp=60),
-        Standing(user_uid="u2", gw=1.0, vp=4.0, tp=48),
-    ]
-    rounds = [[Table(seating=[Seat(player_uid="u1")], state=TableState.FINISHED)]]
-    t = _make_tournament(rounds=rounds, standings=standings)
-    result = generate_archondata(t, users)
+def test_archondata_skips_missing_users():
+    """A standing whose user we can't resolve is dropped, not pushed as a blank."""
+    t = _finished_tournament(rounds=[[_sweep("u1", "u2", "u3", "u4", "u5")]])
+    result = generate_archondata(t, {"u1": _pod()["u1"]})
 
     assert "1000001" in result
-    assert "u2" not in result
+    assert "1000002" not in result
 
 
-@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
-def test_archondata_skips_non_competing(mock_compute):
-    """A proxy (non_competing) is a non-competing official stood in — never pushed to
-    VEKN as a competitor, even though their seat scored real (non-zeroed) VPs."""
-    users = {
-        "u1": _user("u1", "Alice Smith", "1000001"),
-        "u2": _user("u2", "Proxy Official", "1000002"),
-    }
-    standings = [
-        Standing(user_uid="u1", gw=2.0, vp=8.0, tp=60),
-        Standing(user_uid="u2", gw=0.0, vp=1.0, tp=48, non_competing=True),
-    ]
-    rounds = [
-        [
-            Table(
-                seating=[Seat(player_uid="u1"), Seat(player_uid="u2")],
-                state=TableState.FINISHED,
-            )
-        ]
-    ]
-    t = _make_tournament(rounds=rounds, standings=standings)
-    result = generate_archondata(t, users)
+def test_archondata_skips_non_competing():
+    """A proxy is a non-competing official stood in — never pushed to VEKN as a
+    competitor, even though their seat scored real (non-zeroed) VPs."""
+    t = _finished_tournament(
+        rounds=[[_sweep("u5", "u1", "u2", "u3", "u4")]], proxies={"u5"}
+    )
+    result = generate_archondata(t, _pod())
 
     assert "1000001" in result  # real competitor pushed
-    assert "1000002" not in result  # proxy excluded from the system of record
+    assert "1000005" not in result  # proxy excluded from the system of record
 
 
-@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
-def test_archondata_single_name_user(mock_compute):
-    """User with a single-word name should have empty last name."""
-    users = {"u1": _user("u1", "Madonna", "1000001")}
-    standings = [Standing(user_uid="u1", gw=1.0, vp=4.0, tp=36)]
-    rounds = [[Table(seating=[Seat(player_uid="u1")], state=TableState.FINISHED)]]
-    t = _make_tournament(rounds=rounds, standings=standings)
-    result = generate_archondata(t, users)
-    parts = result.split("¤", 1)[1].split("§")
+def test_archondata_single_name_user():
+    t = _finished_tournament(rounds=[[_sweep("u1", "u2", "u3", "u4", "u5")]])
+    users = _pod() | {"u1": _user("u1", "Madonna", "1000001")}
+    parts = generate_archondata(t, users).split("¤", 1)[1].split("§")
 
-    assert parts[1] == "Madonna"  # first
-    assert parts[2] == ""  # last (empty)
+    assert parts[1] == "Madonna"
+    assert parts[2] == ""  # no last name
 
 
-@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
-def test_archondata_no_finals_vpf_zero(mock_compute):
-    """Without finals, all players should have vpf=0.0."""
-    users = {"u1": _user("u1", "Alice Smith", "1000001")}
-    standings = [Standing(user_uid="u1", gw=2.0, vp=8.0, tp=60)]
-    rounds = [[Table(seating=[Seat(player_uid="u1")], state=TableState.FINISHED)]]
-    t = _make_tournament(rounds=rounds, standings=standings)
-    result = generate_archondata(t, users)
-    parts = result.split("¤", 1)[1].split("§")
-
-    assert parts[7] == "0.0"  # vpf
-
-
-@patch("src.vekn_push._compute_entry", side_effect=_fake_compute)
-def test_archondata_empty_standings(mock_compute):
-    """Empty standings should produce just the nrounds prefix."""
-    t = _make_tournament(rounds=[[Table(seating=[], state=TableState.FINISHED)]])
-    result = generate_archondata(t, {})
-
-    assert result == "1¤"
+def test_archondata_empty_standings():
+    """A tournament that never seated anyone pushes the round count and nothing else."""
+    t = _finished_tournament()
+    assert generate_archondata(t, {}) == "0¤"

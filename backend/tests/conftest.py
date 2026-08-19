@@ -19,6 +19,9 @@ _TEST_DB_URL = os.getenv(
 )
 os.environ["DATABASE_URL"] = _TEST_DB_URL
 os.environ["VEKN_SYNC_ENABLED"] = "false"
+# A two-card subset of the real card database: engine/data/cards.json is a
+# generated artifact that CI never downloads, so tests pin their own.
+os.environ["CARDS_JSON_PATH"] = str(Path(__file__).parent / "fixtures" / "cards.json")
 
 
 def _ensure_test_db_exists() -> None:

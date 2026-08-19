@@ -87,9 +87,11 @@ refactors.
   a wiki claim is evicted.
 - **Mocks are banned by default** — a mock that mirrors the code tests the code
   against itself. Use real dependencies (containers, temp files) or don't test
-  that path. The Discord bot is the one carve-out: it has no real backend or
-  Discord to talk to, so validated fakes plus a guard test proving the fake are
-  legitimate there.
+  that path. The one carve-out is a system we neither own nor can run — Discord,
+  the VEKN registry, GitHub — where a validated fake paired with a guard test
+  pinning it to the real contract is legitimate. It never reaches our own code:
+  faking the engine, the database or one of our own modules is the banned case
+  itself, not an instance of the exception.
 - Property-style tests are for genuinely hazardous invariants — parsing, money,
   concurrency — the same spots KISS flags.
 - Never encode engine-impossible states: VP sums equal table size, tables are 4–5

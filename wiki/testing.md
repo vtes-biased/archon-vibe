@@ -9,9 +9,9 @@ traps that have bitten.
 | Layer | Location | What it validates |
 |---|---|---|
 | Rust engine | inline `#[cfg(test)]` in `engine/src/` | the authoritative logic suite — seating, deck parse and validate, tournament lifecycle, ratings, permissions, league scoring |
-| Backend | `backend/tests/test_*.py` | SSE filtering, access-level projections across role permutations, offline mode, organizer access, the profile-update security boundary, ratings helpers, account surgery |
+| Backend | `backend/tests/test_*.py` | SSE filtering, access-level projections across role permutations, organizer access, the profile-update security boundary, ratings helpers, account surgery, the TWDA designer credit |
 | Frontend E2E | `frontend/tests/e2e/*.spec.ts` | full user arcs through the real UI |
-| Bot | `bot/` | validated fakes over a nonexistent backend and Discord |
+| Bot | `bot/` | validated fakes over a nonexistent backend and Discord, guarded against hikari's real signatures |
 
 There is **no frontend unit-test framework** — Playwright E2E only.
 
@@ -22,7 +22,7 @@ venv, brings the `db` container up if needed, runs pytest, then stops the DB.
 `conftest.py` points at a separate `archon_test` database on `:5433` and
 **auto-creates it**, so no manual setup is needed beyond a running `db` container
 and a built engine. Override the target with `TEST_DATABASE_URL`. Pure-unit suites
-— SSE filters, offline mode, organizer access, access levels — need no DB at all.
+— SSE filters, organizer access, access levels — need no DB at all.
 
 **Rust** — `cd engine && cargo test --lib`. `cargo` may not be on the default PATH.
 
@@ -151,6 +151,17 @@ a broken fixture; and stored per-seat `gw`/`tp` are overwritten by the recompute
 so asserting on them tests nothing. An unseeded mock once fabricated VEKN-less
 officials — also engine-impossible — and produced a flaky test.
 
+**Card data is a pinned two-card fixture** (`backend/tests/fixtures/cards.json`,
+wired by `CARDS_JSON_PATH` in `conftest.py`). `engine/data/cards.json` is generated
+by `just cards` and CI never downloads it, so a test that reads the dev tree's copy
+passes locally and fails in CI — which is what once justified mocking the loader.
+
+**A fixture must not derive anything from a uid prefix**: `uuid7` is time-ordered,
+so uids minted in the same millisecond share their leading characters. Offline
+players take a `TEMP-` vekn from the uid's first 8 chars, and a `uuid7` fixture
+collapses a whole table onto one vekn — the frontend mints `crypto.randomUUID()`,
+so `uuid4` is what models it.
+
 **The engine emits state strings as bare literals** while the route
 strict-converts, so a missing Python enum value 500s every action. A contract test
 pins the two together; keep it.
@@ -176,9 +187,15 @@ one other counts one, not two.
 is the discriminator, since `vp` doesn't move. The GW threshold is `>= 2.0`,
 inclusive. Cancel a **non-last** round to obtain a `Cancelled` table.
 
-**The bot is the one place validated fakes are legitimate** — there is no real
-backend or Discord to talk to. Pair them with a guard test proving the fake, and
-don't generalize the exemption.
+**A fake is legitimate only for a system we neither own nor can run** — Discord,
+the VEKN registry, GitHub — and only paired with a guard test pinning it to the
+real contract ([dogmas](dogmas.md#testing)). `bot/tests/test_rest_fakes_match_hikari.py`
+binds every REST call shape the bot uses against the real `RESTClientImpl` and
+against each fake, and `test_refresh_single_flight.py` proves its backend fake
+reproduces the bug it stands for. Faking our own engine, database or modules is
+the banned case itself: the TWDA credit suite runs the real route helper against
+the real DB and engine, and the archondata suite finishes a real tournament
+through the engine rather than hand-typing a standings sheet.
 
 **The bot startup smoke test earns its keep** (`bot/tests/test_startup.py`): the
 lightbulb v2→v3 `.d`/`.di` migration crash-looped 69 times in production while CI

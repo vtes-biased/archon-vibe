@@ -9,7 +9,7 @@ from uuid import uuid4, uuid7
 
 import pytest
 import src.db as db
-from src.models import Table, TableState, Tournament, TournamentState
+from src.models import Seat, Table, TableState, Tournament, TournamentState
 from src.vekn_tournament_sync import _adopt_same_event
 
 
@@ -22,7 +22,14 @@ def _tournament(name: str, start: datetime, **overrides) -> Tournament:
         state=TournamentState.FINISHED,
         # Rich copy: the rounds guard is what makes adoption safe (the sync then
         # refreshes metadata only and never overwrites play data).
-        rounds=[[Table(seating=[], state=TableState.FINISHED)]],
+        rounds=[
+            [
+                Table(
+                    seating=[Seat(player_uid=f"p{i}") for i in range(4)],
+                    state=TableState.FINISHED,
+                )
+            ]
+        ],
         **overrides,
     )
 

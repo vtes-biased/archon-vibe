@@ -34,7 +34,14 @@ def _tournament(
     self_organized_rounds: bool = False,
 ) -> Tournament:
     rounds = (
-        [[Table(seating=[Seat(player_uid="p1")], state=TableState.FINISHED)]]
+        [
+            [
+                Table(
+                    seating=[Seat(player_uid=f"p{i}") for i in range(4)],
+                    state=TableState.FINISHED,
+                )
+            ]
+        ]
         if with_rounds
         else []
     )

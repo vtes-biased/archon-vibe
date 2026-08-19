@@ -1,17 +1,23 @@
-"""TWDA submission designer credit: the generated entry must credit the deck's
+"""TWDA submission designer credit: the published entry must credit the deck's
 `attribution` field, never blindly echo `author` — an anonymous deck
-(attribution=None) must never leak a stored author name. DB/engine/network
-deps are mocked (no DB needed).
+(attribution=None) must never leak a stored author name into an archive that
+keeps it forever.
+
+Real DB, real engine, real (pinned) card data: every assertion below reads the
+TWDA text that would be published, not an intermediate the code hands a stub.
 """
 
-import json
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid7
 
 import pytest
+from src import db
 from src.db import TWDA_MIN_PLAYERS
 from src.models import (
     DeckObject,
+    ObjectType,
+    Player,
     Seat,
     Table,
     TableState,
@@ -22,7 +28,11 @@ from src.models import (
     TwdaOutcome,
     User,
 )
-from src.routes.tournaments import maybe_submit_twda
+from src.routes.tournaments import _winner_deck_twda, maybe_submit_twda
+
+from tests.conftest import seed_tournament
+
+CREDIT = "Created by: "
 
 
 def _user(uid: str, name: str, vekn_id: str = "") -> User:
@@ -34,159 +44,132 @@ def _user(uid: str, name: str, vekn_id: str = "") -> User:
     )
 
 
-def _finished_rounds(player_uids: list[str]) -> list[list[Table]]:
-    """One finished prelim round in 4–5 seat tables (10 players -> [5, 5]). The
-    TWDA participation gate reads seat identities only, so scores stay default."""
+@asynccontextmanager
+async def _published(
+    *,
+    author: str,
+    attribution: str | None,
+    designer: User | None = None,
+    winner_name: str = "Winner Wendy",
+    winner_vekn: str = "1000001",
+    seated: int = TWDA_MIN_PLAYERS,
+):
+    """Seed a finished event whose winner has a deck, and yield its TWDA text."""
+    winner = _user(str(uuid7()), winner_name, winner_vekn)
+    await db.save_user(winner)
+    if designer:
+        await db.save_user(designer)
+
+    player_uids = [winner.uid] + [str(uuid7()) for _ in range(seated - 1)]
+    for uid in player_uids[1:]:
+        await db.save_user(_user(uid, f"Player {uid[:8]}", ""))
+
     seats = [Seat(player_uid=u) for u in player_uids]
-    return [
-        [
-            Table(seating=seats[i : i + 5], state=TableState.FINISHED)
-            for i in range(0, len(seats), 5)
-        ]
-    ]
-
-
-def _tournament(winner_uid: str, *, seated: int = TWDA_MIN_PLAYERS) -> Tournament:
-    # Seat `seated` distinct players (winner included) so the participation floor
-    # is met by default; the credit tests care about the winner's deck, not counts.
-    player_uids = [winner_uid] + [f"p-{i:03d}" for i in range(seated - 1)]
-    return Tournament(
-        uid="t-001",
+    tournament = Tournament(
+        uid=str(uuid7()),
         modified=datetime(2025, 6, 1, tzinfo=UTC),
         name="Test Tournament",
         format=TournamentFormat.Standard,
-        # BASIC on purpose: rank (Basic/NC/CC championship axis) must not gate
+        # BASIC on purpose: rank (the Basic/NC/CC championship axis) must not gate
         # TWDA — the old rank!=BASIC check skipped every ordinary tournament.
         rank=TournamentRank.BASIC,
         state=TournamentState.FINISHED,
         start=datetime(2025, 6, 1, tzinfo=UTC),
+        country="France",
         external_ids={"vekn": "12345"},
         # What the backfill leaves on a vekn-bearing row: the submission keys on
         # the code, and the code of such a row is its vekn event id.
         event_code="12345",
-        winner=winner_uid,
-        rounds=_finished_rounds(player_uids),
+        winner=winner.uid,
+        players=[Player(user_uid=u) for u in player_uids],
+        rounds=[
+            [
+                Table(seating=seats[i : i + 5], state=TableState.FINISHED)
+                for i in range(0, len(seats), 5)
+            ]
+        ],
     )
-
-
-def _deck(*, author: str, attribution: str | None) -> DeckObject:
-    return DeckObject(
-        uid="d-001",
+    deck = DeckObject(
+        uid=str(uuid7()),
         modified=datetime(2025, 6, 1, tzinfo=UTC),
-        tournament_uid="t-001",
-        user_uid="w-001",
+        tournament_uid=tournament.uid,
+        user_uid=winner.uid,
         name="My Deck",
         author=author,
         attribution=attribution,
         cards={"200001": 12, "100001": 10},
     )
+    try:
+        await seed_tournament(tournament)
+        await db.save_object_from_model(ObjectType.DECK, deck)
+        yield tournament, await _winner_deck_twda(tournament)
+    finally:
+        async with db.get_connection() as conn:
+            await conn.execute("DELETE FROM objects WHERE uid = %s", (deck.uid,))
+            await conn.execute("DELETE FROM objects WHERE uid = %s", (tournament.uid,))
 
 
-async def _captured_credit(
-    *, winner: User, deck: DeckObject, designer: User | None
-) -> str:
-    """Run maybe_submit_twda with mocked deps; return the `author` (credit)
-    that was serialized into the deck_json passed to engine.export_twda."""
-    tournament = _tournament(winner.uid)
-    engine = MagicMock()
-    engine.export_twda.return_value = "TWDA TEXT"
-    engine.ranking_eligibility.return_value = "eligible"
+@pytest.mark.asyncio
+async def test_anonymous_does_not_leak_author(test_db):
+    """attribution=None means anonymous; a stale author must be suppressed."""
+    async with _published(author="Sneaky Real Name", attribution=None) as (_t, twda):
+        assert "Sneaky Real Name" not in twda
+        assert CREDIT not in twda
 
-    with (
-        patch(
-            "src.routes.tournaments.get_decks_for_tournament",
-            AsyncMock(return_value=[deck]),
-        ),
-        patch(
-            "src.routes.tournaments.get_user_by_uid",
-            AsyncMock(return_value=winner),
-        ),
-        patch(
-            "src.routes.tournaments.get_user_by_vekn_id",
-            AsyncMock(return_value=designer),
-        ),
-        patch("src.routes.tournaments._load_cards_json", lambda: "{}"),
-        patch("src.routes.tournaments._engine", engine),
-        patch("src.twda.is_configured", lambda: True),
-        patch("src.twda.submit_twda_pr", AsyncMock(return_value="http://pr")),
-        patch("src.routes.tournaments._record_twda_status", AsyncMock()),
+
+@pytest.mark.asyncio
+async def test_self_attribution_by_vekn_omits_credit(test_db):
+    """Crediting the winner as their own designer is noise in the archive."""
+    async with _published(author="Winner Wendy", attribution="1000001") as (_t, twda):
+        assert CREDIT not in twda
+
+
+@pytest.mark.asyncio
+async def test_self_attribution_by_name_omits_credit(test_db):
+    async with _published(author="Winner Wendy", attribution="Winner Wendy") as (
+        _t,
+        twda,
     ):
-        await maybe_submit_twda(tournament)
-
-    engine.export_twda.assert_called_once()
-    deck_json = engine.export_twda.call_args.args[0]
-    return json.loads(deck_json)["author"]
+        assert CREDIT not in twda
 
 
 @pytest.mark.asyncio
-async def test_anonymous_does_not_leak_author():
-    # attribution=None means anonymous; a stale author must be suppressed.
-    winner = _user("w-001", "Winner Wendy", "1000001")
-    deck = _deck(author="Sneaky Real Name", attribution=None)
-    assert await _captured_credit(winner=winner, deck=deck, designer=None) == ""
+async def test_other_designer_resolved_from_vekn(test_db):
+    """A vekn id in attribution credits that member's current name, not the
+    name the submitter typed."""
+    designer = _user(str(uuid7()), "Designer Dave", "1000002")
+    async with _published(
+        author="Stale Typed Name", attribution="1000002", designer=designer
+    ) as (_t, twda):
+        assert f"{CREDIT}Designer Dave" in twda
 
 
 @pytest.mark.asyncio
-async def test_self_attribution_by_vekn_omits_credit():
-    # Designer == player (matched by vekn): redundant with header, omit.
-    winner = _user("w-001", "Winner Wendy", "1000001")
-    deck = _deck(author="Winner Wendy", attribution="1000001")
-    assert await _captured_credit(winner=winner, deck=deck, designer=winner) == ""
-
-
-@pytest.mark.asyncio
-async def test_self_attribution_by_name_omits_credit():
-    # Player has no vekn; self-attribution falls back to their name.
-    winner = _user("w-001", "Winner Wendy", "")
-    deck = _deck(author="Winner Wendy", attribution="Winner Wendy")
-    assert await _captured_credit(winner=winner, deck=deck, designer=None) == ""
-
-
-@pytest.mark.asyncio
-async def test_other_designer_resolved_from_vekn():
-    # Different designer: credit the resolved member name, not the player.
-    winner = _user("w-001", "Winner Wendy", "1000001")
-    designer = _user("u-002", "Designer Bob", "2000002")
-    deck = _deck(author="stale", attribution="2000002")
-    credit = await _captured_credit(winner=winner, deck=deck, designer=designer)
-    assert credit == "Designer Bob"
-
-
-@pytest.mark.asyncio
-async def test_other_designer_unresolved_falls_back_to_author():
-    # Attribution is a name/unknown vekn: fall back to the stored author text.
-    winner = _user("w-001", "Winner Wendy", "1000001")
-    deck = _deck(author="Typed Designer", attribution="9999999")
-    credit = await _captured_credit(winner=winner, deck=deck, designer=None)
-    assert credit == "Typed Designer"
-
-
-@pytest.mark.asyncio
-async def test_twda_sentinel_passes_author_through():
-    # Historical TWDA import: author already holds the entry's player name.
-    winner = _user("w-001", "Winner Wendy", "1000001")
-    deck = _deck(author="Historical Player", attribution="twda")
-    credit = await _captured_credit(winner=winner, deck=deck, designer=None)
-    assert credit == "Historical Player"
-
-
-@pytest.mark.asyncio
-async def test_below_participation_floor_skips_twda():
-    """Fewer than TWDA_MIN_PLAYERS who played -> the winner's deck is NOT
-    published: small sanctioned events are valid but not TWDA-worthy."""
-    tournament = _tournament("w-001", seated=TWDA_MIN_PLAYERS - 1)
-    submit = AsyncMock(return_value="http://pr")
-    record = AsyncMock()
-    with (
-        patch(
-            "src.routes.tournaments._winner_deck_twda",
-            AsyncMock(return_value="TWDA TEXT"),
-        ),
-        patch("src.twda.is_configured", lambda: True),
-        patch("src.twda.submit_twda_pr", submit),
-        patch("src.routes.tournaments._record_twda_status", record),
+async def test_other_designer_unresolved_falls_back_to_author(test_db):
+    """An unknown vekn id still credits somebody — the typed author."""
+    async with _published(author="Offline Designer", attribution="9999999") as (
+        _t,
+        twda,
     ):
+        assert f"{CREDIT}Offline Designer" in twda
+
+
+@pytest.mark.asyncio
+async def test_twda_sentinel_passes_author_through(test_db):
+    """A reconstructed TWDA entry carries its archived author verbatim."""
+    async with _published(author="Archived Author", attribution="twda") as (_t, twda):
+        assert f"{CREDIT}Archived Author" in twda
+
+
+@pytest.mark.asyncio
+async def test_below_participation_floor_skips_twda(test_db):
+    """Under the floor the event never reaches the archive, and says why."""
+    async with _published(
+        author="Someone", attribution=None, seated=TWDA_MIN_PLAYERS - 1
+    ) as (tournament, _twda):
         await maybe_submit_twda(tournament)
-    submit.assert_not_called()
-    # The skip is not silent anymore: the reason lands on the tournament.
-    record.assert_called_once_with("t-001", TwdaOutcome.SKIPPED, "too_few_players", "")
+        stored = await db.get_tournament_by_uid(tournament.uid)
+        assert stored is not None
+        assert stored.twda_status is not None
+        assert stored.twda_status.outcome == TwdaOutcome.SKIPPED
+        assert stored.twda_status.reason == "too_few_players"

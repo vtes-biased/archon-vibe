@@ -1,0 +1,64 @@
+{
+ "200001": {
+  "id": 200001,
+  "printed_name": "Aabbt Kindred",
+  "unique_name": "Aabbt Kindred",
+  "full_name": "Aabbt Kindred (G2)",
+  "types": [
+   "Vampire"
+  ],
+  "kind": "crypt",
+  "img": "https://static.krcg.org/card/aabbtkindredg2.jpg",
+  "disciplines": [
+   "for",
+   "pre",
+   "ser"
+  ],
+  "clan": "Ministry",
+  "group": "2",
+  "capacity": 4,
+  "adv": false,
+  "v5": false,
+  "banned": "",
+  "sets": [
+   "Final Nights",
+   "Print on Demand"
+  ],
+  "name_variants": [
+   "Aabbt Kindred",
+   "Aabbt Kindred (G2)"
+  ]
+ },
+ "100001": {
+  "id": 100001,
+  "printed_name": ".44 Magnum",
+  "unique_name": ".44 Magnum",
+  "full_name": ".44 Magnum",
+  "types": [
+   "Equipment"
+  ],
+  "kind": "library",
+  "img": "https://static.krcg.org/card/44magnum.jpg",
+  "disciplines": [],
+  "clan": "",
+  "group": "",
+  "capacity": 0,
+  "adv": false,
+  "v5": true,
+  "banned": "",
+  "sets": [
+   "Jyhad",
+   "Vampire: The Eternal Struggle",
+   "Sabbat",
+   "Sabbat War",
+   "Camarilla Edition",
+   "Legacies of Blood",
+   "First Blood",
+   "Fifth Edition"
+  ],
+  "name_variants": [
+   ".44 Magnum",
+   "Magnum .44"
+  ]
+ }
+}

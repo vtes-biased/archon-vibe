@@ -15,8 +15,6 @@ from src.models import (
 )
 from src.routes.calendar import (
     FINISHED_WINDOW_DAYS,
-    _escape_ical,
-    _format_dt,
     _matches_agenda,
     _tournament_to_vevent,
     tournament_calendar,
@@ -115,41 +113,6 @@ class TestMatchesAgenda:
         assert _matches_agenda(own, "user1", "FR", [], False) is True
 
 
-class TestEscapeIcal:
-    def test_semicolons_escaped(self):
-        assert _escape_ical("a;b") == "a\\;b"
-
-    def test_commas_escaped(self):
-        assert _escape_ical("a,b") == "a\\,b"
-
-    def test_newlines_escaped(self):
-        assert _escape_ical("line1\nline2") == "line1\\nline2"
-
-    def test_backslash_escaped_first(self):
-        assert _escape_ical("a\\;b") == "a\\\\\\;b"
-
-
-class TestFormatDt:
-    def test_datetime_utc(self):
-        assert _format_dt(JUNE_15_2PM) == "20250615T140000Z"
-
-    def test_datetime_naive(self):
-        naive = datetime(2025, 6, 15, 14, 0, 0)
-        assert _format_dt(naive) == "20250615T140000Z"
-
-    def test_naive_anchored_in_tournament_timezone(self):
-        """Naive wall-clock must be anchored in the event tz, not stamped UTC."""
-        naive = datetime(2025, 6, 15, 14, 0, 0)  # CEST
-        assert _format_dt(naive, "Europe/Paris") == "20250615T120000Z"
-
-    def test_unknown_timezone_falls_back_to_utc(self):
-        naive = datetime(2025, 6, 15, 14, 0, 0)
-        assert _format_dt(naive, "Not/AZone") == "20250615T140000Z"
-
-    def test_none_returns_empty(self):
-        assert _format_dt(None) == ""
-
-
 class TestTournamentToVevent:
     def test_basic_event(self):
         t = _make_tournament(
@@ -182,6 +145,21 @@ class TestTournamentToVevent:
         result = _tournament_to_vevent(t, "20250101T000000Z")
         assert "DTSTART:20250615T080000Z" in result
         assert "DTEND:20250615T160000Z" in result
+
+    def test_unknown_timezone_falls_back_to_utc(self):
+        """A garbage tz on the row must not 500 the feed; the wall clock is UTC."""
+        t = _make_tournament(
+            start=datetime(2025, 6, 15, 10, 0, 0), timezone="Not/AZone"
+        )
+        result = _tournament_to_vevent(t, "20250101T000000Z")
+        assert "DTSTART:20250615T100000Z" in result
+
+    def test_special_characters_escaped(self):
+        """An unescaped ; , \\ or newline in a name corrupts every following line."""
+        t = _make_tournament(start=JUNE_15_10AM)
+        t.name = "Prague; Grand, Prix\\Spring"
+        result = _tournament_to_vevent(t, "20250101T000000Z")
+        assert "SUMMARY:Prague\\; Grand\\, Prix\\\\Spring" in result
 
     def test_online_location(self):
         t = _make_tournament(start=JUNE_15_10AM, online=True)

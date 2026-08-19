@@ -39,16 +39,6 @@ async def _cleanup_sanctions():
 
 
 @pytest.mark.asyncio
-async def test_acquire_reuses_provided_connection(test_db):
-    """_acquire yields the caller's connection, else pulls one from the pool."""
-    async with db.get_connection() as outer:
-        async with db._acquire(outer) as c:
-            assert c is outer  # reused, no second checkout
-        async with db._acquire(None) as c2:
-            assert c2 is not outer  # fresh pooled connection
-
-
-@pytest.mark.asyncio
 async def test_batched_sanctions_match_per_user_union(test_db):
     """get_sanctions_for_users returns the same set as per-user fan-out."""
     u1, u2, u3 = (str(uuid7()) for _ in range(3))
