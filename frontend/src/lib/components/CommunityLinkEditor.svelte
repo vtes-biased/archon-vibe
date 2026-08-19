@@ -4,7 +4,7 @@
   import Button from "$lib/components/Button.svelte";
   import { LABELS } from "$lib/components/CommunityLinkPills.svelte";
   import { LANGUAGES, LANGUAGE_NAMES } from "$lib/data/languages";
-  import { canPromoteLinkGlobal, canPromoteLinkNational, getCommunityLinkReference } from "$lib/engine";
+  import { canModerateLink, canPromoteLinkGlobal, canPromoteLinkNational, getCommunityLinkReference } from "$lib/engine";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { getSortedCountries, getCountryFlag } from "$lib/geonames";
   import type { CommunityLink, CommunityLinkType } from "$lib/types";
@@ -14,12 +14,13 @@
   interface Props {
     link: CommunityLink | null;
     ownerCountry: string | null;
+    canEditUrl?: boolean;
     defaultLanguage: string;
     onclose: () => void;
-    onsave: (link: CommunityLink, pin: string | null) => void;
+    onsave: (link: CommunityLink, state: string | null) => void;
     ondelete?: () => void;
   }
-  let { link, ownerCountry, defaultLanguage, onclose, onsave, ondelete }: Props = $props();
+  let { link, ownerCountry, canEditUrl = true, defaultLanguage, onclose, onsave, ondelete }: Props = $props();
 
   const MAX_LANGUAGES = 5;
   const sortedCountries = getSortedCountries();
@@ -39,15 +40,20 @@
   let touched = $state(false);
 
   const auth = $derived(getAuthState());
-  const currentPin =
-    original?.moderation?.status === "promoted" ? (original.moderation.scope ?? "none") : "none";
-  let pin = $state<string>(currentPin);
+  const currentModeration = !original?.moderation
+    ? "none"
+    : original.moderation.status === "hidden"
+      ? "hidden"
+      : (original.moderation.scope ?? "none");
+  let moderation = $state<string>(currentModeration);
   const canPinNational = $derived(canPromoteLinkNational(auth.user, country || null).allowed);
   const canPinGlobal = $derived(canPromoteLinkGlobal(auth.user).allowed);
-  const pinChoices = $derived([
-    ...(canPinNational || canPinGlobal ? [{ value: "none", label: m.community_pin_none() }] : []),
+  const canHide = $derived(canModerateLink(auth.user, country || null).allowed);
+  const moderationChoices = $derived([
+    ...(canHide ? [{ value: "none", label: m.community_pin_none() }] : []),
     ...(canPinNational ? [{ value: "national", label: m.community_moderate_promote_national() }] : []),
     ...(canPinGlobal ? [{ value: "global", label: m.community_moderate_promote_global() }] : []),
+    ...(canHide ? [{ value: "hidden", label: m.community_moderate_hide() }] : []),
   ]);
 
   const reference = $derived(getCommunityLinkReference());
@@ -87,7 +93,7 @@
         languages: isContent ? languages : [],
         country: country || null,
       },
-      pin === currentPin ? null : pin
+      moderation === currentModeration ? null : moderation
     );
   }
 
@@ -133,7 +139,8 @@
       <div>
         <label for="link-url" class="block text-sm font-medium text-ink-muted mb-1">{m.community_link_url()}</label>
         <div class="relative">
-          <input id="link-url" type="url" bind:value={url} onblur={suggestLabel} placeholder="https://..." class={inputClass} />
+          <input id="link-url" type="url" bind:value={url} onblur={suggestLabel} disabled={!canEditUrl}
+            placeholder="https://..." class="{inputClass} disabled:opacity-50" />
           {#if fetching}
             <Loader2 class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint animate-spin motion-reduce:animate-none" />
           {/if}
@@ -202,14 +209,14 @@
         </div>
       {/if}
 
-      {#if pinChoices.length > 1}
+      {#if moderationChoices.length > 1}
         <div>
           <span class="block text-sm font-medium text-ink-muted mb-1">{m.community_card_pinned()}</span>
           <div class="flex flex-wrap gap-2">
-            {#each pinChoices as choice}
-              <button type="button" onclick={() => { pin = choice.value; }}
-                aria-pressed={pin === choice.value}
-                class="px-3 min-h-11 rounded-full text-sm font-medium transition-colors {pin === choice.value ? 'bg-accent-strong text-white' : 'bg-surface-hover text-ink hover:bg-surface-active'}"
+            {#each moderationChoices as choice}
+              <button type="button" onclick={() => { moderation = choice.value; }}
+                aria-pressed={moderation === choice.value}
+                class="px-3 min-h-11 rounded-full text-sm font-medium transition-colors {moderation === choice.value ? 'bg-accent-strong text-white' : 'bg-surface-hover text-ink hover:bg-surface-active'}"
               >{choice.label}</button>
             {/each}
           </div>

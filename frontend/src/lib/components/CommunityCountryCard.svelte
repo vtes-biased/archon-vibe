@@ -1,13 +1,12 @@
 <script lang="ts">
   import Badge from "$lib/components/Badge.svelte";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
-  import CommunityModerationActions from "./CommunityModerationActions.svelte";
   import DiscordContact from "./DiscordContact.svelte";
   import { deobfuscateContact } from "$lib/contact";
   import { getCountryFlag } from "$lib/geonames";
   import { getRoleTone, getRoleLabel } from "$lib/roles";
   import type { CommunityLink, User } from "$lib/types";
-  import { ChevronDown, ChevronRight } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight, Pencil } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   interface LinkEntry { user: User; link: CommunityLink }
@@ -24,14 +23,14 @@
     showOfficials: boolean;
     canModerate: boolean;
     canPromoteNational: boolean;
-    canPromoteGlobal: boolean;
+    canEdit: (entry: LinkEntry) => boolean;
     onToggle: () => void;
-    onModerate: (userUid: string, url: string, action: string) => void;
+    onEdit: (entry: LinkEntry) => void;
   }
   let {
     code, name, pinned, groups, officials, isOwnCountry, expanded, showLinks,
-    showOfficials, canModerate, canPromoteNational, canPromoteGlobal,
-    onToggle, onModerate,
+    showOfficials, canModerate, canPromoteNational, canEdit,
+    onToggle, onEdit,
   }: Props = $props();
 
   const count = $derived(
@@ -78,26 +77,16 @@
 {/snippet}
 
 {#snippet entries(list: LinkEntry[])}
-  <div class="flex flex-wrap gap-3">
-    {#each list as { user, link } (user.uid + link.url)}
-      <div class="flex flex-col items-center gap-1">
-        <CommunityLinkPills links={[link]} />
-        <div class="flex items-center gap-2 text-xs text-ink-muted">
-          {#if user.name}
-            <a href="/users/{user.uid}" class="hover:text-link transition-colors">{user.name}</a>
-          {/if}
-          {#each user.roles.filter(r => r === "NC" || r === "Prince" || r === "IC") as role}
-            <Badge tone={getRoleTone(role)}>{getRoleLabel(role)}</Badge>
-          {/each}
-        </div>
-        {#if canModerate}
-          <CommunityModerationActions
-            userUid={user.uid}
-            {link}
-            {onModerate}
-            {canPromoteNational}
-            {canPromoteGlobal}
-          />
+  <div class="flex flex-wrap gap-2">
+    {#each list as entry (entry.user.uid + entry.link.url)}
+      <div class="flex items-center gap-1">
+        <CommunityLinkPills links={[entry.link]} />
+        {#if canEdit(entry)}
+          <button type="button" onclick={() => onEdit(entry)}
+            aria-label={m.community_edit_link()}
+            class="grid place-items-center w-11 h-11 shrink-0 text-ink-faint hover:text-link transition-colors">
+            <Pencil class="w-4 h-4" />
+          </button>
         {/if}
       </div>
     {/each}

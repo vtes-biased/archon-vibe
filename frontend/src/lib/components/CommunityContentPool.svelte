@@ -1,12 +1,8 @@
 <script lang="ts">
-  import Badge from "$lib/components/Badge.svelte";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
-  import CommunityModerationActions from "./CommunityModerationActions.svelte";
   import { LANGUAGE_NAMES } from "$lib/data/languages";
-  import { getCountryFlag } from "$lib/geonames";
-  import { getRoleTone, getRoleLabel } from "$lib/roles";
   import type { CommunityLink, LinkMedia, User } from "$lib/types";
-  import { X } from "@lucide/svelte";
+  import { Pencil, X } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   interface LinkEntry { user: User; link: CommunityLink }
@@ -17,19 +13,15 @@
     mediaKinds: LinkMedia[];
     selectedLanguages: string[];
     selectedMedia: LinkMedia | null;
-    canModerate: (country: string | null) => boolean;
-    canPromoteNational: (country: string | null) => boolean;
-    canPromoteGlobal: boolean;
-    linkCountry: (entry: LinkEntry) => string | null;
+    canEdit: (entry: LinkEntry) => boolean;
     onToggleLanguage: (lang: string) => void;
     onSelectMedia: (kind: LinkMedia | null) => void;
     onClearFilters: () => void;
-    onModerate: (userUid: string, url: string, action: string) => void;
+    onEdit: (entry: LinkEntry) => void;
   }
   let {
-    items, languages, mediaKinds, selectedLanguages, selectedMedia, canModerate,
-    canPromoteNational, canPromoteGlobal, linkCountry, onToggleLanguage,
-    onSelectMedia, onClearFilters, onModerate,
+    items, languages, mediaKinds, selectedLanguages, selectedMedia, canEdit,
+    onToggleLanguage, onSelectMedia, onClearFilters, onEdit,
   }: Props = $props();
 
   const filtered = $derived(selectedLanguages.length > 0 || selectedMedia !== null);
@@ -85,35 +77,16 @@
 {#if items.length > 0}
   <div class="space-y-2">
     {#each items as entry (entry.user.uid + entry.link.url)}
-      {@const { user, link } = entry}
-      <div class="bg-surface-card rounded-lg border border-line p-3 flex items-center gap-3">
+      <div class="bg-surface-card rounded-lg border border-line p-2 flex items-center gap-2">
         <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 flex-wrap mb-1">
-            <CommunityLinkPills links={[link]} />
-          </div>
-          <div class="flex items-center gap-2 text-xs text-ink-muted flex-wrap">
-            {#if user.name}
-              <a href="/users/{user.uid}" class="hover:text-link transition-colors">{user.name}</a>
-            {/if}
-            {#if linkCountry(entry)}
-              <span>{getCountryFlag(linkCountry(entry)!)}</span>
-            {/if}
-            {#each user.roles.filter(r => r === "NC" || r === "Prince" || r === "IC") as role}
-              <Badge tone={getRoleTone(role)}>{getRoleLabel(role)}</Badge>
-            {/each}
-            {#if (link.languages?.length ?? 0) > 1}
-              <span class="text-ink-faint tracking-wide">{link.languages!.map(c => c.toUpperCase()).join(" · ")}</span>
-            {/if}
-          </div>
+          <CommunityLinkPills links={[entry.link]} />
         </div>
-        {#if canModerate(linkCountry(entry))}
-          <CommunityModerationActions
-            userUid={user.uid}
-            {link}
-            {onModerate}
-            canPromoteNational={canPromoteNational(linkCountry(entry))}
-            {canPromoteGlobal}
-          />
+        {#if canEdit(entry)}
+          <button type="button" onclick={() => onEdit(entry)}
+            aria-label={m.community_edit_link()}
+            class="grid place-items-center w-11 h-11 shrink-0 text-ink-faint hover:text-link transition-colors">
+            <Pencil class="w-4 h-4" />
+          </button>
         {/if}
       </div>
     {/each}

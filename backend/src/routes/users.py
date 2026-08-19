@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from .. import permissions
+from .. import community_links, permissions
 from ..broadcast import broadcast_precomputed, broadcast_resync
 from ..db import (
     allocate_next_vekn_id,
@@ -20,7 +20,7 @@ from ..db import get_avatar as db_get_avatar
 from ..db import save_user as db_save_user
 from ..db import upsert_avatar as db_upsert_avatar
 from ..middleware.auth import CurrentUser, OptionalUser
-from ..models import LinkModeration, Role, User
+from ..models import Role, User
 from .auth import send_invite_email
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -405,78 +405,75 @@ async def delete_avatar(
     )
 
 
-class LinkModerationRequest(BaseModel):
+class LinkEditRequest(BaseModel):
+    """Curate a link on another member's profile, addressed by its URL.
+
+    The URL is the identity moderation is keyed on and is never rewritten: a
+    moderator may change what a link says, not where it goes.
+    """
+
     url: str
-    action: str  # "hide" | "promote_national" | "promote_global" | "clear"
+    type: str | None = None
+    label: str | None = None
+    languages: list[str] | None = None
+    country: str | None = None
+    state: str | None = None
 
 
 @router.patch("/{user_uid}/community-link-moderation")
-async def moderate_community_link(
+async def edit_community_link(
     user_uid: str,
-    request: LinkModerationRequest,
+    request: LinkEditRequest,
     current_user: CurrentUser,
 ) -> Response:
-    """Moderate a community link on a target user. Self-moderation is allowed:
-    officials pin their own links through the same grant."""
+    """Officials curate links in their own country, IC anywhere. Self-moderation
+    is allowed: officials reach their own links through the same grant."""
     target = await get_user_by_uid(user_uid)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
 
-    subject = next((el for el in target.community_links if el.url == request.url), None)
-    if subject is None:
+    prior = next((el for el in target.community_links if el.url == request.url), None)
+    if prior is None:
         raise HTTPException(status_code=404, detail="Link not found on target user")
-    link_country = subject.country or target.country
 
-    mod: LinkModeration | None
-    match request.action:
-        case "hide" | "clear":
-            if not permissions.can_moderate_link(current_user, link_country):
-                raise HTTPException(
-                    status_code=403,
-                    detail="Can only moderate links in your country",
-                )
-            mod = (
-                LinkModeration(
-                    status="hidden", by=current_user.uid, at=datetime.now(UTC)
-                )
-                if request.action == "hide"
-                else None
-            )
-        case "promote_national":
-            if not permissions.can_promote_link_national(current_user, link_country):
-                raise HTTPException(
-                    status_code=403,
-                    detail="Only IC, or the country's NC, can promote nationally",
-                )
-            mod = LinkModeration(
-                status="promoted",
-                by=current_user.uid,
-                at=datetime.now(UTC),
-                scope="national",
-            )
-        case "promote_global":
-            if not permissions.can_promote_link_global(current_user):
-                raise HTTPException(
-                    status_code=403, detail="Only IC can promote globally"
-                )
-            mod = LinkModeration(
-                status="promoted",
-                by=current_user.uid,
-                at=datetime.now(UTC),
-                scope="global",
-            )
-        case _:
-            raise HTTPException(
-                status_code=422,
-                detail="Action must be 'hide', 'promote_national',"
-                " 'promote_global', or 'clear'",
-            )
+    # The link's own country, not its owner's, and a move needs authority over
+    # where it lands as well as where it sits.
+    if not permissions.can_moderate_link(current_user, prior.country or target.country):
+        raise HTTPException(
+            status_code=403, detail="Can only moderate links in your country"
+        )
+    country = community_links.validated_country(
+        request.country, prior.country or target.country
+    )
+    if country != prior.country and not permissions.can_moderate_link(
+        current_user, country
+    ):
+        raise HTTPException(
+            status_code=403, detail="Can only move a link into your own country"
+        )
 
+    link_type = (
+        community_links.validated_type(request.type) if request.type else prior.type
+    )
+    languages = community_links.validated_languages(
+        prior.languages if request.languages is None else request.languages,
+        link_type,
+        prior,
+    )
+    mod = prior.moderation
+    if request.state is not None:
+        mod = community_links.moderation_for(current_user, request.state, country, mod)
+
+    edited = msgspec.structs.replace(
+        prior,
+        type=link_type,
+        label=prior.label if request.label is None else request.label,
+        languages=languages,
+        country=country,
+        moderation=mod,
+    )
     target.community_links = [
-        msgspec.structs.replace(link, moderation=mod)
-        if link.url == request.url
-        else link
-        for link in target.community_links
+        edited if link.url == request.url else link for link in target.community_links
     ]
     target.modified = datetime.now(UTC)
     bd = await db_save_user(target)

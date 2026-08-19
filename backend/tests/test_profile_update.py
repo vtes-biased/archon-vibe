@@ -121,7 +121,7 @@ async def test_owner_pin_takes_the_capability_that_scope_needs(
     """An owner pins their own link through the ordinary country-scoped grant,
     so an NC may pin nationally in their country and never globally."""
     user = await _insert_user(roles=[Role.NC], vekn_id="1000007")
-    link = {"type": "discord", "url": "https://discord.gg/fr", "pin": "national"}
+    link = {"type": "discord", "url": "https://discord.gg/fr", "state": "national"}
     response = await test_client.patch(
         "/auth/me",
         json={"community_links": [link]},
@@ -133,7 +133,7 @@ async def test_owner_pin_takes_the_capability_that_scope_needs(
 
     response = await test_client.patch(
         "/auth/me",
-        json={"community_links": [{**link, "pin": "global"}]},
+        json={"community_links": [{**link, "state": "global"}]},
         headers=make_auth_header(user.uid),
     )
     assert response.status_code == 403
@@ -147,7 +147,7 @@ async def test_member_cannot_pin_their_own_link(test_client: AsyncClient, test_d
         "/auth/me",
         json={
             "community_links": [
-                {"type": "discord", "url": "https://discord.gg/x", "pin": "national"}
+                {"type": "discord", "url": "https://discord.gg/x", "state": "national"}
             ]
         },
         headers=make_auth_header(user.uid),

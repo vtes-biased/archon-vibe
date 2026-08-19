@@ -430,7 +430,7 @@ export interface ProfileUpdate {
     label: string;
     languages?: string[];
     country?: string | null;
-    pin?: string;
+    state?: string;
   }[];
 }
 

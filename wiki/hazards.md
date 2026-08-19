@@ -317,6 +317,19 @@ its number while `deleted_at`-filtered lookups disagree, so a seed insert can cr
 on a reserved number. Reachable on steady-state nightly merges, since an admin
 user-delete keeps the `vekn_id`.
 
+**`authState.user` does not follow SSE.** It is filled from `/auth/me` at login,
+token refresh, cross-tab adoption and after the owner's own `PATCH /auth/me` —
+never from a sync frame, because the frame cannot carry `calendar_token`, which
+no projection holds. Every other surface reads the synced IndexedDB copy, so the
+signed-in user's own row is the one place two readings of the same object can
+disagree. It bites `community_links`, now that a moderator writes fields on a
+link its owner also edits: `PATCH /auth/me` replaces the **whole array**, so an
+owner saving from a stale `authState.user` reverts a moderator's edit made since
+their last refresh. `moderation` itself survives — the owner path re-applies it
+by URL match — so a pin is never lost this way, only a label, language or type.
+Anything else that grows a second writer on a `User` field must either read the
+synced copy or accept the same last-writer-wins window.
+
 ## Outbound fetches
 
 **`GET /auth/me/link-title` fetches an address a member typed** — the only place

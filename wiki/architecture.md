@@ -571,14 +571,22 @@ Any user with a `vekn_id` may add, limit 5 (10 for IC/NC/Prince). One editor
 modal serves both the community page and the profile, sending the whole array
 through `PATCH /auth/me`. On update, existing moderation is re-applied by URL
 match, so a rewritten URL drops its pin and the editor warns before saving.
-Moderation actions map to the `moderate_link` / `promote_link_national` /
-`promote_link_global` capabilities — officials pin their own links through the
-same country-scoped grant, not a self-service exemption. That grant is what lets
-the editor carry the pin itself: a link input may name a `pin`, and `PATCH
-/auth/me` applies it only when the owner holds the capability that scope needs,
-so an NC files their country's Discord already pinned instead of saving it and
-hunting for the icon. An absent `pin` leaves existing moderation alone, which is
-what keeps an ordinary resubmission from clearing someone else's decision.
+Hidden and the two pin scopes are mutually exclusive, so a link carries **one
+four-valued state** — `none` / `hidden` / `national` / `global` — and both
+editors set it through `community_links.py`, which gates each value on the
+capability it needs: `moderate_link` for none and hidden, `promote_link_national`,
+`promote_link_global`. Officials curate their own links through that same
+country-scoped grant, not a self-service exemption, which is what lets the editor
+carry the state itself: an NC files their country's Discord already pinned rather
+than saving it and hunting for an icon. An absent `state` leaves moderation
+alone, so an ordinary resubmission never clears someone else's decision.
+
+A card shows a link and, for anyone who may change it, one edit button — the
+whole surface, no inline moderation icons. `PATCH /auth/me` carries the owner's
+own edits; `PATCH /api/users/{uid}/community-link-moderation` carries a
+moderator's, and may change **every field except the URL**. The URL is the
+identity moderation is keyed on, and rewriting it would let a moderator point a
+member's link somewhere else.
 
 `GET /auth/me/link-title` reads the target's `og:title`, else its `<title>`, to
 seed an editable label. It is the only place the server fetches an address a

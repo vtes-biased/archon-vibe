@@ -112,11 +112,11 @@
 
   // The requested pin rides on the edited link alone and is never stored locally:
   // the server decides it, and echoes the moderation it actually applied.
-  function saveLinks(links: CommunityLink[], pinned?: { url: string; pin: string }) {
+  function saveLinks(links: CommunityLink[], pinned?: { url: string; state: string }) {
     editLinks = links;
     editing = null;
     const payload = pinned
-      ? links.map(l => (l.url === pinned.url ? { ...l, pin: pinned.pin } : l))
+      ? links.map(l => (l.url === pinned.url ? { ...l, state: pinned.state } : l))
       : links;
     saveField("community_links", payload);
   }
@@ -331,11 +331,11 @@
     ownerCountry={editCountry || null}
     {defaultLanguage}
     onclose={() => { editing = null; }}
-    onsave={(link, pin) => saveLinks(
+    onsave={(link, state) => saveLinks(
       editedIndex >= 0
         ? editLinks.map((l, i) => (i === editedIndex ? link : l))
         : [...editLinks, link],
-      pin ? { url: link.url, pin } : undefined
+      state ? { url: link.url, state } : undefined
     )}
     ondelete={editedIndex >= 0
       ? () => saveLinks(editLinks.filter((_, i) => i !== editedIndex))

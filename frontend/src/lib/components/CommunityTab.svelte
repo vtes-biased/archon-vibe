@@ -10,11 +10,10 @@
   import { getLocale } from "$lib/paraglide/runtime.js";
   import type { CommunityLink, LinkMedia, User } from "$lib/types";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
-  import CommunityModerationActions from "./CommunityModerationActions.svelte";
   import CommunityCountryCard from "./CommunityCountryCard.svelte";
   import CommunityContentPool from "./CommunityContentPool.svelte";
   import CommunityLinkEditor from "./CommunityLinkEditor.svelte";
-  import { Globe, Search, Users, Video } from "@lucide/svelte";
+  import { Globe, Pencil, Search, Users, Video } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   // Sponsor mode (?sponsor=1): the visitor came to find an official to sponsor them for a VEKN ID —
@@ -36,12 +35,16 @@
   let toggledCards = $state<Set<string>>(new Set());
   let selectedLanguages = $state<string[]>([]);
   let selectedMedia = $state<LinkMedia | null>(null);
+  let editing = $state<LinkEntry | null>(null);
 
   const reference = $derived(getCommunityLinkReference());
   // Reading the reactive engine accessors keeps these recomputing once WASM lands.
   const canModerate = (country: string | null) => canModerateLink(auth.user, country).allowed;
   const canPromoteNational = (country: string | null) => canPromoteLinkNational(auth.user, country).allowed;
   const canPromoteGlobal = $derived(canPromoteLinkGlobal(auth.user).allowed);
+  const isOwn = (e: LinkEntry) => e.user.uid === auth.user?.uid;
+  // Your own link, or one serving a country you curate.
+  const canEdit = (e: LinkEntry) => isOwn(e) || canModerate(linkCountry(e));
 
   const pinScope = (l: CommunityLink) =>
     l.moderation?.status === "promoted" ? l.moderation.scope : null;
@@ -182,22 +185,27 @@
       : [...selectedLanguages, lang];
   }
 
-  async function handleModerate(userUid: string, url: string, action: string) {
-    try {
-      await apiRequest(`/api/users/${userUid}/community-link-moderation`, {
-        method: "PATCH",
-        body: JSON.stringify({ url, action }),
-      });
-      await loadData();
-    } catch (e: any) {
-      showToast({ type: "error", message: e.detail || m.community_moderation_failed() });
-    }
-  }
-
-  async function saveLink(link: CommunityLink, pin: string | null) {
+  async function saveLink(link: CommunityLink, state: string | null) {
+    const entry = editing;
+    const payload = state ? { ...link, state } : link;
+    editing = null;
     adding = false;
-    const payload = [...ownLinks, pin ? { ...link, pin } : link];
-    if (!(await updateProfile({ community_links: payload }))) {
+    if (entry && !isOwn(entry)) {
+      try {
+        await apiRequest(`/api/users/${entry.user.uid}/community-link-moderation`, {
+          method: "PATCH",
+          body: JSON.stringify({ ...payload, url: entry.link.url }),
+        });
+        await loadData();
+      } catch (e: any) {
+        showToast({ type: "error", message: e.detail || m.community_moderation_failed() });
+      }
+      return;
+    }
+    const links = entry
+      ? ownLinks.map(l => (l.url === entry.link.url ? payload : l))
+      : [...ownLinks, payload];
+    if (!(await updateProfile({ community_links: links }))) {
       showToast({ type: "error", message: m.profile_save_error() });
     }
   }
@@ -252,14 +260,12 @@
         {#each globalLinks as entry (entry.user.uid + entry.link.url)}
           <div class="flex items-center gap-1">
             <CommunityLinkPills links={[entry.link]} />
-            {#if canModerate(linkCountry(entry))}
-              <CommunityModerationActions
-                userUid={entry.user.uid}
-                link={entry.link}
-                onModerate={handleModerate}
-                canPromoteNational={canPromoteNational(linkCountry(entry))}
-                {canPromoteGlobal}
-              />
+            {#if canEdit(entry)}
+              <button type="button" onclick={() => { editing = entry; }}
+                aria-label={m.community_edit_link()}
+                class="grid place-items-center w-11 h-11 shrink-0 text-ink-faint hover:text-link transition-colors">
+                <Pencil class="w-4 h-4" />
+              </button>
             {/if}
           </div>
         {/each}
@@ -281,9 +287,9 @@
         {showOfficials}
         canModerate={canModerate(card.code)}
         canPromoteNational={canPromoteNational(card.code)}
-        {canPromoteGlobal}
+        {canEdit}
         onToggle={() => toggleCard(card.code)}
-        onModerate={handleModerate}
+        onEdit={(entry) => { editing = entry; }}
       />
     {/each}
 
@@ -324,14 +330,11 @@
         mediaKinds={reference?.mediaKinds ?? []}
         {selectedLanguages}
         {selectedMedia}
-        {canModerate}
-        {canPromoteNational}
-        {canPromoteGlobal}
-        {linkCountry}
+        {canEdit}
         onToggleLanguage={toggleLanguage}
         onSelectMedia={(kind) => { selectedMedia = kind; }}
         onClearFilters={() => { selectedLanguages = []; selectedMedia = null; }}
-        onModerate={handleModerate}
+        onEdit={(entry) => { editing = entry; }}
       />
     </div>
   {/if}
@@ -344,12 +347,13 @@
     </div>
   {/if}
 
-  {#if adding}
+  {#if adding || editing}
     <CommunityLinkEditor
-      link={null}
-      ownerCountry={ownCountry}
+      link={editing?.link ?? null}
+      ownerCountry={editing ? (editing.link.country ?? editing.user.country ?? null) : ownCountry}
+      canEditUrl={!editing || isOwn(editing)}
       defaultLanguage={COUNTRY_LANGUAGE[ownCountry ?? ""] || getLocale()}
-      onclose={() => { adding = false; }}
+      onclose={() => { adding = false; editing = null; }}
       onsave={saveLink}
     />
   {/if}

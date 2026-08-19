@@ -38,42 +38,42 @@ async def _insert_user(roles: list[Role], country: str = "FR", **kwargs) -> User
     return user
 
 
-# (moderator_roles, action, target_country, expected_status)
+# (moderator_roles, state, target_country, expected_status)
 # moderator is always FR; target_country flips the same-country dimension.
 MATRIX = [
     # --- non-official is locked out of every action ---
-    ([], "hide", "FR", 403),
-    ([Role.JUDGE], "hide", "FR", 403),
+    ([], "hidden", "FR", 403),
+    ([Role.JUDGE], "hidden", "FR", 403),
     # --- hide/clear: IC anywhere, NC same-country only; never a Prince ---
-    ([Role.IC], "hide", "FR", 200),
-    ([Role.IC], "hide", "US", 200),
-    ([Role.NC], "hide", "FR", 200),
-    ([Role.NC], "hide", "US", 403),
-    ([Role.PRINCE], "clear", "FR", 403),
-    ([Role.PRINCE], "clear", "US", 403),
+    ([Role.IC], "hidden", "FR", 200),
+    ([Role.IC], "hidden", "US", 200),
+    ([Role.NC], "hidden", "FR", 200),
+    ([Role.NC], "hidden", "US", 403),
+    ([Role.PRINCE], "none", "FR", 403),
+    ([Role.PRINCE], "none", "US", 403),
     # --- promote_national: IC anywhere, NC same-country; NOT Prince ---
-    ([Role.IC], "promote_national", "US", 200),
-    ([Role.NC], "promote_national", "FR", 200),
-    ([Role.NC], "promote_national", "US", 403),
-    ([Role.PRINCE], "promote_national", "FR", 403),
+    ([Role.IC], "national", "US", 200),
+    ([Role.NC], "national", "FR", 200),
+    ([Role.NC], "national", "US", 403),
+    ([Role.PRINCE], "national", "FR", 403),
     # --- promote_global: IC only ---
-    ([Role.IC], "promote_global", "FR", 200),
-    ([Role.NC], "promote_global", "FR", 403),
-    ([Role.PRINCE], "promote_global", "FR", 403),
+    ([Role.IC], "global", "FR", 200),
+    ([Role.NC], "global", "FR", 403),
+    ([Role.PRINCE], "global", "FR", 403),
 ]
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("roles,action,target_country,expected", MATRIX)
+@pytest.mark.parametrize("roles,state,target_country,expected", MATRIX)
 async def test_moderation_permission_matrix(
-    test_client: AsyncClient, test_db, roles, action, target_country, expected
+    test_client: AsyncClient, test_db, roles, state, target_country, expected
 ):
     moderator = await _insert_user(roles=roles, country="FR", vekn_id=None)
     target = await _insert_user(roles=[], country=target_country)
 
     response = await test_client.patch(
         f"/api/users/{target.uid}/community-link-moderation",
-        json={"url": LINK_URL, "action": action},
+        json={"url": LINK_URL, "state": state},
         headers=make_auth_header(moderator.uid),
     )
     assert response.status_code == expected
@@ -90,7 +90,7 @@ async def test_promote_persists_scope(test_client: AsyncClient, test_db):
 
     r1 = await test_client.patch(
         f"/api/users/{target_nat.uid}/community-link-moderation",
-        json={"url": LINK_URL, "action": "promote_national"},
+        json={"url": LINK_URL, "state": "national"},
         headers=make_auth_header(nc.uid),
     )
     assert r1.status_code == 200
@@ -100,7 +100,7 @@ async def test_promote_persists_scope(test_client: AsyncClient, test_db):
 
     r2 = await test_client.patch(
         f"/api/users/{target_intl.uid}/community-link-moderation",
-        json={"url": LINK_URL, "action": "promote_global"},
+        json={"url": LINK_URL, "state": "global"},
         headers=make_auth_header(ic.uid),
     )
     assert r2.status_code == 200
@@ -115,7 +115,7 @@ async def test_self_moderation_allowed(test_client: AsyncClient, test_db):
     ic = await _insert_user(roles=[Role.IC], country="FR")
     response = await test_client.patch(
         f"/api/users/{ic.uid}/community-link-moderation",
-        json={"url": LINK_URL, "action": "promote_global"},
+        json={"url": LINK_URL, "state": "global"},
         headers=make_auth_header(ic.uid),
     )
     assert response.status_code == 200
