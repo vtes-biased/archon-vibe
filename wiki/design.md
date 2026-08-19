@@ -288,6 +288,13 @@ online events show the nickname, with the abbreviated real name and VEKN ID in
 parentheses. `seatDisplay`/`seatDisplayParts` in `tournament-utils.ts` own the
 rule.
 
+**Table labels** — a table is named by the sign the player walks to: `Main Hall 3`
+under a configured room, the room name alone when it holds a single table, and a
+localized `Table N` when no room covers the index. The engine's `tableLabel` is the
+only implementation; the seating grid, player view, printed seating sheet,
+judge-call banner and both Web Push bodies each render it with their own localized
+fallback, which is also what a cold WASM engine yields.
+
 **Create and edit share sections, not initial state** — a form used for both
 (TournamentFields' `mode` prop) keeps the same sections but differs in what starts
 expanded: creation opens what must be filled, editing opens nothing.

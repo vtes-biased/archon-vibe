@@ -1,16 +1,10 @@
-"""Table-label resolution (resolveTableLabelPy) and judge-call routing
-(broadcast_judge_call, only explicit organizers receive).
-"""
+"""Judge-call routing: broadcast_judge_call reaches only explicit organizers."""
 
 from datetime import UTC, datetime
 
+import pytest
 from src.broadcast import SSEConnection, broadcast_judge_call
-from src.models import (
-    Role,
-    Room,
-    User,
-)
-from src.routes.tournaments import resolveTableLabelPy
+from src.models import Role, User
 
 NOW = datetime.now(UTC)
 
@@ -32,33 +26,6 @@ def _make_user(
     )
 
 
-class TestResolveTableLabel:
-    def test_no_rooms(self):
-        assert resolveTableLabelPy([], 0) == "Table 1"
-        assert resolveTableLabelPy([], 3) == "Table 4"
-
-    def test_single_room(self):
-        rooms = [Room(name="Main Hall", count=5)]
-        assert resolveTableLabelPy(rooms, 0) == "Main Hall T1"
-        assert resolveTableLabelPy(rooms, 4) == "Main Hall T5"
-
-    def test_multiple_rooms(self):
-        rooms = [Room(name="Room A", count=3), Room(name="Room B", count=4)]
-        # Room A: indices 0,1,2
-        assert resolveTableLabelPy(rooms, 0) == "Room A T1"
-        assert resolveTableLabelPy(rooms, 2) == "Room A T3"
-        # Room B: indices 3,4,5,6
-        assert resolveTableLabelPy(rooms, 3) == "Room B T1"
-        assert resolveTableLabelPy(rooms, 6) == "Room B T4"
-
-    def test_index_beyond_rooms_falls_back(self):
-        rooms = [Room(name="Small", count=2)]
-        assert resolveTableLabelPy(rooms, 5) == "Table 6"
-
-
-import pytest
-
-
 @pytest.mark.asyncio
 async def test_judge_call_only_sent_to_explicit_organizers():
     """Judge call SSE events must only reach explicit organizers of that tournament."""
@@ -76,7 +43,7 @@ async def test_judge_call_only_sent_to_explicit_organizers():
         await broadcast_judge_call(
             tournament_uid="t1",
             table=2,
-            table_label="Room A T3",
+            table_label="Room A 3",
             player_name="Alice",
             organizer_uids=["org1"],
         )
@@ -103,7 +70,7 @@ async def test_judge_call_not_sent_to_other_tournament_organizer():
         await broadcast_judge_call(
             tournament_uid="t1",
             table=0,
-            table_label="Table 1",
+            table_label=None,
             player_name="Bob",
             organizer_uids=["org1"],
         )

@@ -231,11 +231,14 @@ async def broadcast_judge_call(
     *,
     tournament_uid: str,
     table: int,
-    table_label: str,
+    table_label: str | None,
     player_name: str,
     organizer_uids: list[str] | None = None,
 ) -> None:
-    """Broadcast judge call to explicit organizers only (they are on premises)."""
+    """Broadcast judge call to explicit organizers only (they are on premises).
+
+    `table_label` is null when no room covers the table: each reader renders its
+    own "Table N", since the SSE payload crosses locales and the Discord bot."""
     event_data = {
         "type": "judge_call",
         "data": {

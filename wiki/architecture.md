@@ -172,7 +172,7 @@ rebuilds both targets; build one directly with `wasm-pack` or `maturin develop`
 | `permissions.rs` | every authorization predicate — see [access](access.md) |
 | `sanctions.rs` | the Judges Guide v2 penalty reference (categories, labels, baselines, escalation ladder); `sanction_reference_json` |
 | `seating/` | simulated annealing + staggered seatings |
-| `tournament/mod.rs` | event processing, state machine, finals |
+| `tournament/mod.rs` | event processing, state machine, finals, `table_label` |
 | `tournament/standings.rs` | standings, rating VP/GW, final placement |
 | `tournament/sanctions.rs` | SA effective-round resolution (distinct from `sanctions.rs`) |
 | `deck.rs` | deck parse/validate, TWDA export, `library_type_order_json` |
@@ -423,7 +423,9 @@ denylist. Banners are dismissible per-device via localStorage.
 `POST /{uid}/call-judge {table}` — the caller must be authenticated and seated at
 that table in the current round, with the tournament in Playing state and not
 offline. It emits the ephemeral `judge_call` SSE event to the tournament's
-explicit organizers only — they are the ones on premises.
+explicit organizers only — they are the ones on premises. Its payload carries the
+engine-resolved room label, null when no room covers the table: the Discord bot
+reading the same stream holds no room config of its own.
 
 ### Web Push
 
@@ -456,8 +458,9 @@ RFC 8291 payload encryption and RFC 8292 VAPID signing; we own only the transpor
 | `POST /{uid}/announce` | checked-in, playing and completed participants except the poster; registered players too before round 1, since check-in-window announcements must reach the unchecked |
 | `POST /{uid}/call-judge` | the tournament's organizers except the caller |
 
-`RestoreRound` is excluded — it re-seats no one. Seating bodies resolve table-room
-labels so a push says "Main Hall 3" exactly like the app and the wall signs, and a
+`RestoreRound` is excluded — it re-seats no one. Seating and judge-call bodies
+resolve table-room labels so a push says "Main Hall 3" exactly like the app and
+the wall signs, each locale carrying its own "Table N" for an unroomed table, and a
 re-seat push reuses the round's tag to replace the player's stale assignment
 notification. The judge-call push carries `renotify: true` so a repeat call
 re-alerts. Every send is fire-and-forget and fires **after** the tournament

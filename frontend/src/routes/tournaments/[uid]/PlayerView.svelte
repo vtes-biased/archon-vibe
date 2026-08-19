@@ -1,10 +1,10 @@
 <script lang="ts">
   import type { Tournament, Player, Sanction, DeckObject } from "$lib/types";
   import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
-  import { seatDisplay as seatDisplayUtil, vpOptions, translatePlayerState, translateTableState, translateStandingsMode, resolveTableLabel, roundsPlayed, getRatingPts, ratingContext } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, vpOptions, translatePlayerState, translateTableState, translateStandingsMode, roundsPlayed, getRatingPts, ratingContext } from "$lib/tournament-utils";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { formatScore } from "$lib/utils";
-  import { previewScoresSync, type ValidationError, type TournamentEventType } from "$lib/engine";
+  import { previewScoresSync, tableLabel, type ValidationError, type TournamentEventType } from "$lib/engine";
   import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, ExternalLink, Users, Lock, ShieldCheck, Undo2 } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SelfOrganizeDialog from "./SelfOrganizeDialog.svelte";
@@ -195,7 +195,7 @@
           round: r + 1,
           roundIdx: r,
           tableIdx: tIdx,
-          tableLabel: resolveTableLabel(tournament.table_rooms, tIdx) ?? m.rounds_table_n({ n: String(tIdx + 1) }),
+          tableLabel: tableLabel(tournament.table_rooms, tIdx) ?? m.rounds_table_n({ n: String(tIdx + 1) }),
           table: round[tIdx]!,
         });
       }
@@ -504,7 +504,7 @@
           <div class="border-t border-line pt-4">
             <div class="flex items-center justify-between mb-2">
               <h3 class="text-sm font-medium text-ink-strong">
-                {#if hasParallelRounds}{m.rounds_round_n({ n: String(roundIdx + 1) })} · {/if}{m.tournament_your_table({ label: resolveTableLabel(tournament.table_rooms, myTableIdx) ?? m.rounds_table_n({ n: String(myTableIdx + 1) }) })}
+                {#if hasParallelRounds}{m.rounds_round_n({ n: String(roundIdx + 1) })} · {/if}{m.tournament_your_table({ label: tableLabel(tournament.table_rooms, myTableIdx) ?? m.rounds_table_n({ n: String(myTableIdx + 1) }) })}
               </h3>
               <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'badge-success' : myTable.state === 'Invalid' ? 'bg-accent-soft/60 text-link-soft' : 'badge-pending'}">
                 {translateTableState(myTable.state)}

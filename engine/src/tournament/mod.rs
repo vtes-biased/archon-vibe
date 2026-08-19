@@ -32,6 +32,26 @@ use standings::{
     update_standings,
 };
 
+/// Room-aware table label — the sign a player physically walks to. `None` when no
+/// rooms are configured or the index overflows them, so every caller renders its
+/// own localized "Table N" fallback rather than an English one baked in here.
+pub fn table_label(table_rooms: &JsonValue, table_idx: usize) -> Option<String> {
+    let mut offset = 0usize;
+    for room in table_rooms.members() {
+        let count = room["count"].as_usize().unwrap_or(0);
+        let name = room["name"].as_str().unwrap_or("");
+        if table_idx < offset + count {
+            return Some(if count == 1 {
+                name.to_string()
+            } else {
+                format!("{name} {}", table_idx - offset + 1)
+            });
+        }
+        offset += count;
+    }
+    None
+}
+
 /// Shared between `UpdateConfig` and `CreateTournament`.
 fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
     if let Some(f) = config["format"].as_str() {

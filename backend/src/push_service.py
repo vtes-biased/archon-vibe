@@ -12,6 +12,8 @@ import logging
 import os
 
 import aiohttp
+import msgspec
+from archon_engine import PyEngine
 from py_vapid import Vapid02
 from pywebpush import WebPushException, webpush_async
 
@@ -19,6 +21,8 @@ from . import db
 from .models import TableState, Tournament, TournamentState
 
 logger = logging.getLogger(__name__)
+
+_engine = PyEngine()
 
 # A large announcement can target hundreds of subscriptions; the box is small (DB pool
 # max_size=20), so bound concurrent push connections — total and per push host.
@@ -62,35 +66,40 @@ _PUSH_MESSAGES: dict[str, dict[str, str]] = {
         "seating_round_room": "Round {round} — you're at {table}, seat {seat}.",
         "seating_finals": "Finals — you're at the table, seat {seat}.",
         "judge_title": "Judge call",
-        "judge_body": "{player} needs a judge at {table}.",
+        "judge_body": "{player} needs a judge at Table {table}.",
+        "judge_body_room": "{player} needs a judge at {table}.",
     },
     "fr": {
         "seating_round": "Ronde {round} — vous êtes à la table {table}, siège {seat}.",
         "seating_round_room": "Ronde {round} — vous êtes à {table}, siège {seat}.",
         "seating_finals": "Finale — vous êtes à la table, siège {seat}.",
         "judge_title": "Appel d'arbitre",
-        "judge_body": "{player} demande un arbitre à {table}.",
+        "judge_body": "{player} demande un arbitre à la table {table}.",
+        "judge_body_room": "{player} demande un arbitre à {table}.",
     },
     "es": {
         "seating_round": "Ronda {round} — estás en la mesa {table}, asiento {seat}.",
         "seating_round_room": "Ronda {round} — estás en {table}, asiento {seat}.",
         "seating_finals": "Final — estás en la mesa, asiento {seat}.",
         "judge_title": "Llamada al juez",
-        "judge_body": "{player} necesita un juez en {table}.",
+        "judge_body": "{player} necesita un juez en la mesa {table}.",
+        "judge_body_room": "{player} necesita un juez en {table}.",
     },
     "pt": {
         "seating_round": "Rodada {round} — você está na mesa {table}, assento {seat}.",
         "seating_round_room": "Rodada {round} — você está em {table}, assento {seat}.",
         "seating_finals": "Final — você está na mesa, assento {seat}.",
         "judge_title": "Chamada de juiz",
-        "judge_body": "{player} precisa de um juiz em {table}.",
+        "judge_body": "{player} precisa de um juiz na mesa {table}.",
+        "judge_body_room": "{player} precisa de um juiz em {table}.",
     },
     "it": {
         "seating_round": "Round {round} — sei al tavolo {table}, posto {seat}.",
         "seating_round_room": "Round {round} — sei a {table}, posto {seat}.",
         "seating_finals": "Finale — sei al tavolo, posto {seat}.",
         "judge_title": "Chiamata giudice",
-        "judge_body": "{player} chiede un giudice a {table}.",
+        "judge_body": "{player} chiede un giudice al tavolo {table}.",
+        "judge_body_room": "{player} chiede un giudice a {table}.",
     },
 }
 
@@ -100,19 +109,6 @@ def _loc(locale: str | None) -> str:
 
 
 # --- Notification specs (pure data; localized at send time) --------------------
-
-
-def _table_label(t: Tournament, table_idx: int) -> str | None:
-    """Room-aware table label, mirroring the frontend resolveTableLabel: the app and
-    wall signs show e.g. "Main Hall 3", so pushes must not say "Table 3" there.
-    None when no rooms are configured (or the table overflows the room config)."""
-    offset = 0
-    for room in t.table_rooms:
-        if table_idx < offset + room.count:
-            local = table_idx - offset + 1
-            return room.name if room.count == 1 else f"{room.name} {local}"
-        offset += room.count
-    return None
 
 
 def _round_seat_spec(
@@ -129,7 +125,7 @@ def _round_seat_spec(
         "url": f"/tournaments/{t.uid}",
         "tag": f"seating-{t.uid}-{round_no}",
     }
-    label = _table_label(t, table_idx)
+    label = _engine.table_label(msgspec.json.encode(t.table_rooms).decode(), table_idx)
     if label:
         spec["table_label"] = label
     return spec
@@ -223,14 +219,14 @@ def build_judge_call_spec(
     tournament_uid: str,
     tournament_name: str,
     table: int,
-    table_label: str,
+    table_label: str | None,
     player_name: str,
 ) -> dict:
-    return {
+    spec = {
         "kind": "judge",
         "title": tournament_name,
         "player": player_name,
-        "table": table_label,
+        "table": table + 1,
         # ?table= mirrors the seating-push pattern; frontend deep-link
         # consumption of the param rides the notification-deep-link work.
         "url": f"/tournaments/{tournament_uid}?table={table}",
@@ -239,6 +235,9 @@ def build_judge_call_spec(
         # organizer must not miss a second player flagging the same table.
         "renotify": True,
     }
+    if table_label:
+        spec["table_label"] = table_label
+    return spec
 
 
 def render_payload(spec: dict, locale: str) -> dict:
@@ -260,7 +259,10 @@ def render_payload(spec: dict, locale: str) -> dict:
         body = m["seating_finals"].format(seat=spec["seat"])
     elif kind == "judge":
         title = f"{m['judge_title']} · {spec['title']}"
-        body = m["judge_body"].format(player=spec["player"], table=spec["table"])
+        key = "judge_body_room" if spec.get("table_label") else "judge_body"
+        body = m[key].format(
+            player=spec["player"], table=spec.get("table_label") or spec["table"]
+        )
     else:  # announcement: tournament-name title, free-text body — neither localized
         title = spec["title"]
         body = spec["body"]

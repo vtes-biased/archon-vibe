@@ -81,6 +81,22 @@ export function checkTableVpsSync(vps: number[]): VpIssue | null {
   }
 }
 
+/** Room-aware table label ("Main Hall 3"), or null when no room covers the index —
+ * the same fallback the engine returns cold, so callers always render their own
+ * localized "Table N". */
+export function tableLabel(
+  tableRooms: { name: string; count: number }[] | undefined,
+  tableIndex: number,
+): string | null {
+  const engine = getEngineReactive();
+  if (!engine) return null;
+  try {
+    return callEngine(() => engine.tableLabel(JSON.stringify(tableRooms ?? []), tableIndex)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export type TournamentEventType =
   | 'OpenRegistration'
   | 'CloseRegistration'

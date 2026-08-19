@@ -63,7 +63,7 @@
           <div>
             <span class="text-sm font-medium text-ink-strong">{m.judge_call_alert()}</span>
             <span class="text-sm text-ink ml-1">
-              {call.table_label} &mdash; {call.player_name}
+              {call.table_label ?? m.rounds_table_n({ n: String(call.table + 1) })} &mdash; {call.player_name}
             </span>
           </div>
         </div>

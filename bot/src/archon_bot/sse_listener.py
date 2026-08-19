@@ -1481,8 +1481,8 @@ async def _handle_judge_call(
         return
 
     judges_id = int(link["judges_channel_id"])
-    table = data.get("table", "?")
-    table_label = data.get("table_label", f"Table {table}")
+    table = data.get("table", 0)
+    table_label = data.get("table_label") or f"Table {table + 1}"
     player_name = data.get("player_name", "Unknown")
 
     try:

@@ -250,7 +250,7 @@ async def _maybe_push_announcement(
 async def _maybe_push_judge_call(
     tournament: Tournament,
     table: int,
-    table_label: str,
+    table_label: str | None,
     player_name: str,
     exclude_uid: str,
 ) -> None:
@@ -1961,7 +1961,9 @@ async def call_judge(
     table = current_round[request.table]
     if not any(s.player_uid == user.uid for s in table.seating):
         raise HTTPException(status_code=403, detail="You are not seated at this table")
-    table_label = resolveTableLabelPy(tournament.table_rooms, request.table)
+    table_label = _engine.table_label(
+        msgspec.json.encode(tournament.table_rooms).decode(), request.table
+    )
     # Web Push the same organizer audience as the SSE broadcast, so one away from
     # the screen is alerted too. Fire-and-forget, exclude caller.
     await broadcast_judge_call(
@@ -1977,19 +1979,6 @@ async def call_judge(
         )
     )
     return Response(status_code=204)
-
-
-def resolveTableLabelPy(rooms: list, table_idx: int) -> str:
-    """Resolve table label from rooms config (Python equivalent of frontend util)."""
-    if not rooms:
-        return f"Table {table_idx + 1}"
-    offset = 0
-    for room in rooms:
-        if table_idx < offset + room.count:
-            local = table_idx - offset + 1
-            return f"{room.name} T{local}"
-        offset += room.count
-    return f"Table {table_idx + 1}"
 
 
 class GoOfflineRequest(BaseModel):

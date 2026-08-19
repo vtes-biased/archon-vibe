@@ -59,7 +59,7 @@ type SyncEventType = 'connected' | 'user' | 'sanction' | 'tournament' | 'deck' |
 export interface JudgeCallData {
   tournament_uid: string;
   table: number;
-  table_label: string;
+  table_label: string | null;
   player_name: string;
 }
 

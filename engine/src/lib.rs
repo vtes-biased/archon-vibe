@@ -293,6 +293,18 @@ mod shared {
         })
     }
 
+    /// Room-aware table label for `table_idx`, or null when no room covers it —
+    /// the caller localizes its own "Table N".
+    pub fn table_label_json(
+        rooms_json: &str,
+        table_idx: usize,
+    ) -> Result<Option<String>, EngineError> {
+        Ok(super::tournament::table_label(
+            &json::parse(rooms_json)?,
+            table_idx,
+        ))
+    }
+
     pub fn compute_player_issues_json(config_json: &str) -> Result<String, EngineError> {
         let config = json::parse(config_json)?;
         let rounds: Vec<Vec<Vec<String>>> = config["rounds"]
@@ -553,6 +565,15 @@ mod wasm {
         #[wasm_bindgen(js_name = checkTableVps)]
         pub fn check_table_vps(&self, config_json: &str) -> Result<String, String> {
             js_str(check_table_vps_json(config_json))
+        }
+
+        #[wasm_bindgen(js_name = tableLabel)]
+        pub fn table_label(
+            &self,
+            rooms_json: &str,
+            table_idx: usize,
+        ) -> Result<Option<String>, String> {
+            table_label_json(rooms_json, table_idx).map_err(|e| e.to_json())
         }
 
         #[wasm_bindgen(js_name = computePlayerIssues)]
@@ -847,6 +868,11 @@ mod python {
 
         fn compute_final_standings(&self, config_json: &str) -> PyResult<String> {
             py_str(compute_final_standings_json(config_json))
+        }
+
+        fn table_label(&self, rooms_json: &str, table_idx: usize) -> PyResult<Option<String>> {
+            table_label_json(rooms_json, table_idx)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_json()))
         }
 
         fn compute_player_issues(&self, config_json: &str) -> PyResult<String> {

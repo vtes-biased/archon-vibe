@@ -1,6 +1,7 @@
 <script lang="ts">
   import { OctagonX, TriangleAlert, Info, ArrowRightLeft, X, RotateCcw } from "@lucide/svelte";
-  import { seatDisplay as seatDisplayUtil, resolveTableLabel } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil } from "$lib/tournament-utils";
+  import { tableLabel as tableLabelUtil } from "$lib/engine";
   import * as m from '$lib/paraglide/messages.js';
   import { tick } from 'svelte';
 
@@ -33,7 +34,7 @@
   }
 
   function tableLabel(t: number): string {
-    return resolveTableLabel(tableRooms, t) ?? m.rounds_table_n({ n: String(t + 1) });
+    return tableLabelUtil(tableRooms, t) ?? m.rounds_table_n({ n: String(t + 1) });
   }
 
   // Restore keyboard focus to the moved player's new seat after the list reflows.

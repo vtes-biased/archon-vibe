@@ -3,7 +3,7 @@
   import type { Tournament, Table, Sanction } from "$lib/types";
   import { tournamentAction } from "$lib/tournament-actions";
   import { timerAddTime } from "$lib/api";
-  import { scoreSeatingSync, computePlayerIssuesSync, previewScoresSync, checkTableVpsSync, type TournamentEventType } from "$lib/engine";
+  import { scoreSeatingSync, computePlayerIssuesSync, previewScoresSync, checkTableVpsSync, tableLabel, type TournamentEventType } from "$lib/engine";
   import { vpIssueText } from "$lib/vpIssue";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
@@ -13,7 +13,7 @@
   import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users, Settings2 } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import VpInput from "./VpInput.svelte";
-  import { seatDisplay as seatDisplayUtil, seatDisplayParts, vpOptions, translateTableState, resolveTableLabel, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, seatDisplayParts, vpOptions, translateTableState, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
   import { showToast } from "$lib/stores/toast.svelte";
 
@@ -411,7 +411,7 @@
         const bg = j % 2 === 0 ? '#f5f5f5' : 'transparent';
         rows += `<div style="padding:3px 8px 3px 12px;background:${bg};border-bottom:1px solid #ddd"><span style="display:inline-block;width:20px;text-align:right;font-weight:bold;margin-right:6px">${j + 1}.</span>${printSeatHtml(s.player_uid)}</div>`;
       }
-      tablesHtml += `<div style="break-inside:avoid;display:inline-block;width:100%;margin-bottom:16px"><div style="font-size:14pt;font-weight:bold;background:#e8e8e8;padding:4px 8px">${esc(resolveTableLabel(tournament.table_rooms, i) ?? m.rounds_table_n({ n: String(i + 1) }))}</div>${rows}</div>`;
+      tablesHtml += `<div style="break-inside:avoid;display:inline-block;width:100%;margin-bottom:16px"><div style="font-size:14pt;font-weight:bold;background:#e8e8e8;padding:4px 8px">${esc(tableLabel(tournament.table_rooms, i) ?? m.rounds_table_n({ n: String(i + 1) }))}</div>${rows}</div>`;
     }
     const css = [
       `body{font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif;font-size:12pt;color:#000;margin:0;padding:0;line-height:1.4}`,
@@ -695,7 +695,7 @@
                     {#if table.seating.length > 0 && !isCancelled}
                       {#if isScoring}<ChevronDown class="w-4 h-4 text-ink-muted group-hover:text-ink-strong shrink-0" />{:else}<ChevronRight class="w-4 h-4 text-ink-muted group-hover:text-ink-strong shrink-0" />{/if}
                     {/if}
-                    <h3 class="text-sm font-medium truncate {isCancelled ? 'text-ink-muted line-through' : 'text-ink-strong'}">{resolveTableLabel(tournament.table_rooms, i) ?? m.rounds_table_n({ n: String(i + 1) })}</h3>
+                    <h3 class="text-sm font-medium truncate {isCancelled ? 'text-ink-muted line-through' : 'text-ink-strong'}">{tableLabel(tournament.table_rooms, i) ?? m.rounds_table_n({ n: String(i + 1) })}</h3>
                     {#if !isCancelled && (table.seating.length < 4 || table.seating.length > 5)}
                       <span class="text-xs text-warn shrink-0">{m.rounds_n_players({ count: String(table.seating.length) })}</span>
                     {/if}

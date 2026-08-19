@@ -151,6 +151,7 @@ Entry points:
 - `process_tournament_event(tournament, event, actor, sanctions, decks)` - Main event processor (returns `{tournament, deck_ops}`)
 - `compute_final_standings(standings, winner)` - Reorder preliminary standings into VEKN final placement; shared by league GP/RTP scoring and the rating path. PyO3 `compute_final_standings`.
 - `display_standings(tournament, sanctions)` - Rank a tournament's stored result sheet for display, final placement included. Exposed as WASM `displayStandings`; `sanctions` must be scoped to this tournament.
+- `table_label(table_rooms, table_idx)` - Room-aware table label, or null when no room covers the index. WASM `tableLabel`, PyO3 `table_label`.
 
 The event enum lives in `tournament/types.rs`; the full catalog (with required state and permissions) is documented in [../wiki/tournaments.md](../wiki/tournaments.md).
 

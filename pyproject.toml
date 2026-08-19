@@ -76,7 +76,6 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "backend/scripts/*" = ["E402"]  # sys.path manipulation before imports
 "backend/tests/conftest.py" = ["E402"]
-"backend/tests/test_table_label_and_judge_call.py" = ["E402"]
 
 [tool.ruff.format]
 quote-style = "double"
