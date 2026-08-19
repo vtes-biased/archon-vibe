@@ -69,7 +69,7 @@ for a version.
 
 ### The release order
 
-The changeset is written **before** the tag, not after the deploy. `/release-notes`
+The changeset is written **before** the tag, not after the deploy. `/changeset`
 appends a `## Unreleased` block to `CHANGELOG.md`; `just release` rewrites that
 heading to the tag it is cutting plus today's date, commits it, pushes the branch
 and only then tags. The tag therefore contains its own entry, so the frontend

@@ -34,7 +34,7 @@ anything.
 - **`/upkeep`** — the maintenance pass: wiki lint, board eviction, harness ratchet.
 
 Three named procedures feed them: **`/feedback-triage`** for GitHub feedback
-issues, **`/release-notes`** for the changeset, before the tag is cut, and
+issues, **`/changeset`** for what is about to ship, before the tag is cut, and
 **`/post-deploy`** for the actions a deploy unlocks and the issues it made live.
 
 **A unit of work lands as one change**: code changed, the wiki pages named at

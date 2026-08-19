@@ -296,7 +296,7 @@ release bump:
         anyway=" anyway"
     fi
     if ! grep -q '^## Unreleased$' CHANGELOG.md; then
-        echo "⚠ No '## Unreleased' section in CHANGELOG.md — run /release-notes first, or this release ships unannounced."
+        echo "⚠ No '## Unreleased' section in CHANGELOG.md — run /changeset first, or this release ships unannounced."
         anyway=" anyway"
     fi
     read -r -p "Release $tag${anyway} (latest is ${latest:-none})? [y/N] " ans

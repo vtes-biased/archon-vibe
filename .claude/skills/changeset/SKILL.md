@@ -1,9 +1,9 @@
 ---
-name: release-notes
+name: changeset
 description: Write the changelog entry for what is about to ship, before `just release` cuts the tag. Use when asked to write release notes, prepare a changelog entry, or say what is going out in the next release.
 ---
 
-# Release notes
+# Changeset
 
 One job: **say what is about to ship**. Runs *before* `just release`, never after a
 deploy — the recipe stamps the entry with the tag it cuts, so the tag carries its

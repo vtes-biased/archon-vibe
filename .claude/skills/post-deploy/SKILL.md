@@ -7,7 +7,7 @@ description: Run after a successful production deploy — run the one-time actio
 
 Two jobs, in order: **run what the deploy just made safe**, then **tell the people
 who reported it**. Saying what shipped is the other half and happens before the
-tag — `/release-notes`.
+tag — `/changeset`.
 
 An issue closes when the fix **deploys** and the reporter can see it work, which
 is why commits carry a bare `Reported in #N.` and never a closing keyword
