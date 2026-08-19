@@ -214,39 +214,38 @@ sanctioned play.
 
 ### Oust-order validation
 
-`check_table_vps` refuses a VP combination that no physically possible oust
-sequence around the table could produce, so seating order matters:
+`check_table_vps` accepts a VP sheet exactly when a game could have produced it, so
+seating order matters:
 
 1. Check the table size is 4 or 5.
 2. Check the total: `sum(ceil(vp)) == table_size`. Less is insufficient — the round
-   is still in progress. More is invalid.
-3. Repeatedly find a seat with VP = 0, transfer −1 VP to its predator to account
-   for the oust, and remove it from the ring.
-4. Remaining seats should all hold 0.5 (timeout survivors) or exactly one seat
-   holds something else — the full point of whoever was left standing, or a
-   withdrawal that left before the game ended.
+   is still in progress, unless the shortfall is the one-entry Life Boon signature,
+   which reads `RedirectedVp`. More is invalid. Every legal sheet satisfies this,
+   because `ceil(0.5) = 1` makes a withdrawal account for its own seat exactly as a
+   survivor does.
+3. Decide against the results the table can actually reach. They are enumerated
+   from the scoring rules — one VP per prey ousted, half for withdrawing, half for
+   surviving the time limit, a full point for whoever is last standing — which
+   comes to 107 sheets on four seats and 546 on five, built once and cached.
+
+**The enumeration is there because a withdrawal leaves the table.** The older pass
+walked the ring, crediting each 0-VP seat's oust to its predator, and judged what
+remained; it had no way to close the ring behind a player who withdrew and read
+them as a survivor still sitting there. That refused 36 of the 107 legal four-seat
+sheets and 280 of the 546 five-seat ones — every one a withdrawal ending, and an
+organizer needed an `Override` to enter a real result. The walk survives as
+`oust_order_fault`, used only to name the seat at fault in the message.
 
 Failure modes: **MissingVP** (a fractional VP where an oust should have given a
-full point, e.g. a `[0.5, 0]` sequence), **HalfVpMismatch** (several non-0.5 seats
-remain after all ousts; the name stays directionless because such a seat is half a
-VP over as often as under), **ExcessiveTotal**, **InvalidTableSize**.
+full point, e.g. a `[0.5, 0]` sequence), **HalfVpMismatch** (the seats a legal
+sheet cannot account for; the name stays directionless because such a seat is half
+a VP over as often as under), **ExcessiveTotal**, **InvalidTableSize**.
 
-**The check is conservative, not exact, and errs towards rejecting.** Withdrawals
-are why: a withdrawing player takes half a VP and *leaves*, so the ring closes
-behind them, which the pass does not model — it reads them as a survivor still
-sitting there. Against every result the scoring rules can produce it accepts
-nothing impossible, but it refuses 36 of the 107 legal four-seat results and 280 of
-the 546 five-seat ones, all of them withdrawal endings. An organizer's `Override`
-is the way through. Tightening the tail further needs the withdrawal model first:
-reading every half as a time-out looks right and rejects `[2, 0, 0.5, 0.5]`, which
-is 1 ousting 2, both 3 and 4 withdrawing, and 1 last standing.
-
-Worked example, 5-player `[2, 1, 0, 0.5, 1.5]` in seating order: seat 3 (0) is
-ousted, predator seat 2 takes −1 → 0; seat 2 is ousted, seat 1 takes −1 → 1; seat 1
-is ousted, seat 5 takes −1 → 0.5; seats 4 and 5 remain at 0.5, a valid timeout.
-
-Because `ceil(0.5) = 1`, a withdrawal accounts for its own seat exactly as a
-survivor does, which is what keeps step 2 sound across both endings.
+Worked example, 5-player `[2, 1, 0, 0.5, 1.5]` in seating order: seat 3 is ousted by
+seat 2, seat 2 by seat 1, seat 1 by seat 5, and seats 4 and 5 take half a point each
+when time is called. `[2, 0, 0.5, 0.5]` is equally legal and looks impossible until
+you place the withdrawals: seat 1 ousts seat 2, seats 3 and 4 both withdraw, and
+seat 1 is last standing.
 
 ### Table state
 

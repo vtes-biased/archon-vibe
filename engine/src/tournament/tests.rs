@@ -3651,11 +3651,11 @@ fn redirected_vp_reads_as_blocked_not_unfinished() {
     );
 }
 
-/// A withdrawal scores half a VP (§3.7.2) and leaves the table, so a half can sit
-/// alongside the full point of whoever was left standing. Tightening the oust check
-/// to read every half as a time-out rejected those results and blocked score entry.
+/// A withdrawal scores half a VP (§3.7.2) and *leaves*, so the ring closes behind it
+/// and a half can sit beside the full point of whoever was left standing. The oust
+/// pass cannot close a ring, so it used to refuse these sheets outright.
 #[test]
-fn check_table_vps_accepts_a_withdrawal_beside_a_game_win() {
+fn check_table_vps_accepts_withdrawal_endings() {
     // 1 ousts 2, then 3 and 4 both withdraw, leaving 1 last standing.
     assert_eq!(check_table_vps(&[2.0, 0.0, 0.5, 0.5]), None);
     // 1 ousts 2 and 3, 4 withdraws, 1 last standing.
@@ -3664,6 +3664,15 @@ fn check_table_vps_accepts_a_withdrawal_beside_a_game_win() {
     assert_eq!(check_table_vps(&[2.5, 0.0, 0.0, 1.0]), None);
     // Five seats: 1 sweeps three, 5 withdraws, 1 last standing.
     assert_eq!(check_table_vps(&[4.0, 0.0, 0.0, 0.0, 0.5]), None);
+    // 1 ousts 2, 4 ousts 1, 3 withdraws, 4 last standing.
+    assert_eq!(check_table_vps(&[1.0, 0.0, 0.5, 2.0]), None);
+
+    // Still refused: three ousts leave nobody to survive against, so the fourth point
+    // is the game win, not a survivor's half.
+    assert!(check_table_vps(&[3.5, 0.0, 0.0, 0.0]).is_some());
+    // Three seats on a full point needs three ousts, which would leave nobody to take
+    // the fourth seat's survivor half.
+    assert!(check_table_vps(&[1.0, 1.0, 1.0, 0.5]).is_some());
 }
 
 /// The gate is the data shape, not the mode: every legacy import is rounds-less

@@ -154,6 +154,12 @@ is still running — the raffle pools depend on it, reading
 mid-round draw sees the tables already done. Anything that gates scoring on the
 round finishing breaks them.
 
+**A VP sheet is judged by enumeration, not by walking the ring.** The ring walk
+cannot close behind a player who withdrew, so it refuses legal withdrawal endings;
+`check_table_vps` decides on the enumerated set of reachable results and keeps the
+walk only to name the offending seat. Anything that "simplifies" the check back to
+the walk silently blocks real score entry.
+
 **A table's state is decided on change, never re-judged on recompute.** That is
 deliberate, not an oversight: `backend/scripts/migrate_from_archon.py` copies legacy
 per-seat VPs without validating them (only the file-import path in

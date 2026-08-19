@@ -28,6 +28,75 @@ pub fn check_table_vps(vps: &[f64]) -> Option<VpError> {
             VpError::IncompleteTotal
         });
     }
+    // Reachability decides. The ring walk below cannot model a withdrawal *leaving*
+    // the table — it reads the seat as a survivor still sitting there — so on its own
+    // it refuses legal sheets; it is kept to name the seat at fault.
+    if let Some(key) = half_steps(vps) {
+        if reachable_results(n).contains(&key) {
+            return None;
+        }
+    }
+    oust_order_fault(vps).or(Some(VpError::HalfVpMismatch((0..n).collect())))
+}
+
+/// VPs in half-VP steps, or `None` for a score no table can award.
+fn half_steps(vps: &[f64]) -> Option<Vec<u8>> {
+    vps.iter()
+        .map(|&v| {
+            let halves = v * 2.0;
+            ((halves - halves.round()).abs() < 1e-9 && (0.0..=5.0).contains(&v))
+                .then_some(halves.round() as u8)
+        })
+        .collect()
+}
+
+/// Every result a table of `n` can produce (tournament rules §3.7.2): one VP per prey
+/// ousted, half for withdrawing, half for surviving the time limit, and a full point
+/// for whoever is last standing.
+fn reachable_results(n: usize) -> &'static std::collections::HashSet<Vec<u8>> {
+    static FOUR: std::sync::OnceLock<std::collections::HashSet<Vec<u8>>> =
+        std::sync::OnceLock::new();
+    static FIVE: std::sync::OnceLock<std::collections::HashSet<Vec<u8>>> =
+        std::sync::OnceLock::new();
+
+    fn play(alive: &[usize], vp: &mut [u8], out: &mut std::collections::HashSet<Vec<u8>>) {
+        if alive.len() == 1 {
+            vp[alive[0]] += 2;
+            out.insert(vp.to_vec());
+            vp[alive[0]] -= 2;
+            return;
+        }
+        let mut timed = vp.to_vec();
+        for &i in alive {
+            timed[i] += 1;
+        }
+        out.insert(timed);
+        for (pos, &killer) in alive.iter().enumerate() {
+            let prey = alive[(pos + 1) % alive.len()];
+            let rest: Vec<usize> = alive.iter().copied().filter(|&x| x != prey).collect();
+            vp[killer] += 2;
+            play(&rest, vp, out);
+            vp[killer] -= 2;
+        }
+        for &quitter in alive {
+            let rest: Vec<usize> = alive.iter().copied().filter(|&x| x != quitter).collect();
+            vp[quitter] += 1;
+            play(&rest, vp, out);
+            vp[quitter] -= 1;
+        }
+    }
+
+    let cell = if n == 4 { &FOUR } else { &FIVE };
+    cell.get_or_init(|| {
+        let mut out = std::collections::HashSet::new();
+        play(&(0..n).collect::<Vec<_>>(), &mut vec![0u8; n], &mut out);
+        out
+    })
+}
+
+/// Which seat makes the oust order impossible, for the message. Never the verdict:
+/// this pass has no way to close the ring behind a withdrawal.
+fn oust_order_fault(vps: &[f64]) -> Option<VpError> {
     let mut seats: Vec<(usize, f64)> = vps.iter().enumerate().map(|(i, &v)| (i, v)).collect();
     loop {
         if seats.is_empty() {
