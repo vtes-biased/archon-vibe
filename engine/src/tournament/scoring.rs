@@ -28,10 +28,6 @@ pub fn check_table_vps(vps: &[f64]) -> Option<VpError> {
             VpError::IncompleteTotal
         });
     }
-    // A half VP is only ever earned by surviving a time-out, so one anywhere on the
-    // table means the game ran out: nobody was last standing, and the game-win VP that
-    // otherwise sits with the survivor was never awarded.
-    let timed_out = vps.iter().any(|v| (v.fract() - 0.5).abs() < 1e-9);
     let mut seats: Vec<(usize, f64)> = vps.iter().enumerate().map(|(i, &v)| (i, v)).collect();
     loop {
         if seats.is_empty() {
@@ -52,25 +48,23 @@ pub fn check_table_vps(vps: &[f64]) -> Option<VpError> {
             }
         }
         if !found_oust {
-            if timed_out {
-                let wrong: Vec<usize> = seats
-                    .iter()
-                    .filter(|(_, vp)| (*vp - 0.5).abs() > 1e-9)
-                    .map(|(i, _)| *i)
-                    .collect();
-                if !wrong.is_empty() {
-                    return Some(VpError::HalfVpMismatch(wrong));
-                }
-                // One survivor is a win, not a time-out: nobody was left to play on.
-                if seats.len() < 2 {
-                    return Some(VpError::HalfVpMismatch(
-                        seats.iter().map(|(i, _)| *i).collect(),
-                    ));
+            if seats.iter().all(|(_, vp)| (*vp - 0.5).abs() < 1e-9) {
+                if seats.len() == 1 {
+                    return Some(VpError::HalfVpMismatch(vec![seats[0].0]));
                 }
                 break;
             }
-            if seats.len() != 1 || (seats[0].1 - 1.0).abs() > 1e-9 {
-                return Some(VpError::MissingVp(seats[0].0));
+            // Exactly one odd seat is the last player standing on a full point, or a
+            // withdrawal (§3.7.2) that left the table before the game was won.
+            let remaining: Vec<(usize, f64)> = seats
+                .iter()
+                .filter(|(_, vp)| (*vp - 0.5).abs() > 1e-9)
+                .cloned()
+                .collect();
+            if remaining.len() > 1 {
+                return Some(VpError::HalfVpMismatch(
+                    remaining.iter().map(|(i, _)| *i).collect(),
+                ));
             }
             break;
         }

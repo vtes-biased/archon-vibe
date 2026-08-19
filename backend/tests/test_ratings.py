@@ -52,8 +52,8 @@ def _seat(uid: str, vp: float = 0.0, gw: int = 0) -> dict:
 
 
 def _table(*uids: str, vps: list[float], gws: list[int] | None = None) -> list[dict]:
-    """Seats in predator-prey order. `vps` must be a result a real table reaches:
-    the engine skips a table whose VPs it cannot read as a finished game."""
+    """Seats in predator-prey order, holding a result a real table reaches. The
+    caller must mark the table Finished: nothing else is scored."""
     gws = gws or [0] * len(uids)
     return [_seat(u, v, g) for u, v, g in zip(uids, vps, gws, strict=True)]
 

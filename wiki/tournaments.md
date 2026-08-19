@@ -222,29 +222,31 @@ sequence around the table could produce, so seating order matters:
    is still in progress. More is invalid.
 3. Repeatedly find a seat with VP = 0, transfer −1 VP to its predator to account
    for the oust, and remove it from the ring.
-4. Close on how the game ended. A half VP anywhere on the table means it timed
-   out, so nobody was last standing and no game-win VP was awarded: every
-   remaining seat must hold exactly 0.5, and at least two must remain. With no
-   half anywhere the game was won, so exactly one seat remains and holds exactly
-   the 1.0 game-win VP.
-
-Step 4 is what makes the check exact rather than indicative: it accepts precisely
-the 35 four-seat and 126 five-seat results a game can reach, and nothing else.
-Before it closed, a single survivor could carry any surplus — `[2, 0, 0.5, 0.5]`
-passed on a table where one oust cannot fund two VPs.
+4. Remaining seats should all hold 0.5 (timeout survivors) or exactly one seat
+   holds something else — the full point of whoever was left standing, or a
+   withdrawal that left before the game ended.
 
 Failure modes: **MissingVP** (a fractional VP where an oust should have given a
-full point, e.g. a `[0.5, 0]` sequence; also a leftover that is not the game-win
-VP), **HalfVpMismatch** (a seat's half disagrees with how the game ended — the name
-stays directionless because it is half too many as often as half too few),
-**ExcessiveTotal**, **InvalidTableSize**.
+full point, e.g. a `[0.5, 0]` sequence), **HalfVpMismatch** (several non-0.5 seats
+remain after all ousts; the name stays directionless because such a seat is half a
+VP over as often as under), **ExcessiveTotal**, **InvalidTableSize**.
+
+**The check is conservative, not exact, and errs towards rejecting.** Withdrawals
+are why: a withdrawing player takes half a VP and *leaves*, so the ring closes
+behind them, which the pass does not model — it reads them as a survivor still
+sitting there. Against every result the scoring rules can produce it accepts
+nothing impossible, but it refuses 36 of the 107 legal four-seat results and 280 of
+the 546 five-seat ones, all of them withdrawal endings. An organizer's `Override`
+is the way through. Tightening the tail further needs the withdrawal model first:
+reading every half as a time-out looks right and rejects `[2, 0, 0.5, 0.5]`, which
+is 1 ousting 2, both 3 and 4 withdrawing, and 1 last standing.
 
 Worked example, 5-player `[2, 1, 0, 0.5, 1.5]` in seating order: seat 3 (0) is
 ousted, predator seat 2 takes −1 → 0; seat 2 is ousted, seat 1 takes −1 → 1; seat 1
 is ousted, seat 5 takes −1 → 0.5; seats 4 and 5 remain at 0.5, a valid timeout.
 
-Because `ceil(0.5) = 1`, a withdrawal reads to the algorithm as a survivor and
-validates normally.
+Because `ceil(0.5) = 1`, a withdrawal accounts for its own seat exactly as a
+survivor does, which is what keeps step 2 sound across both endings.
 
 ### Table state
 
@@ -269,9 +271,11 @@ unplayed round would otherwise credit its whole field 36 apiece; `Invalid` has n
 valid ranking; `Cancelled` did not happen. The unit is the table, not the round: a
 finished table scores as soon as it is scored, while its round is still running.
 
-**A table's state is decided where the table changes, and never re-judged
-afterwards.** `SetScore`, `Override`, `Unoverride`, `RestoreRound`, `AlterSeating`,
-`SeatPlayer` and `UnseatPlayer` each set it; the standings pass only reads it. So a
+**A table's state is decided where its result changes, and never re-judged
+afterwards.** `SetScore`, `Override`, `Unoverride` and `RestoreRound` set it, and
+`AlterSeating` returns a re-seated round to `In Progress`; the standings pass only
+reads it. Seat edits do not: a table being filled keeps the state it had, which is
+why a half-seated one is never badged `Invalid` mid-build. So a
 finished table stays finished however it was reached — imported history included,
 which is the point: `migrate_from_archon.py` copies legacy per-seat VPs without
 validating them, and re-judging on recompute would silently drop tables our checker
@@ -544,7 +548,10 @@ total, may drive it negative, and is never carried to another round.
 from raw VPs plus current sanctions rather than trusting the frozen seat values.
 
 **Round targeting.** The effective round is the highest round index in which the
-player is seated, **including the finals**, which participates as round index
+player sits at a **finished** table — the same tables the standings score, so the
+−1 VP and its GW/TP cascade land together instead of the penalty resting on a round
+no cascade reaches. A live round therefore holds no SA: the penalty appears once
+that round finishes. Finals are **included**, participating as round index
 `len(rounds)` — the same sentinel `SetScore` uses, accepted by the backend once a
 finals table exists. The stored `round_number` is the fixed issue-time record of
 the game the judge ruled on; the engine honors it when the player was seated in

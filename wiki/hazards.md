@@ -171,8 +171,9 @@ an abandoned round is where you see it.
 
 **The SA −1 VP has three consumers**: preliminary standings, the rating path, and
 `SetScore`. All must share the one effective-round resolver or VP, GW and TP
-silently diverge. The resolver is Cancelled-aware — a soft-cancelled seat cannot
-anchor an SA — and its redirect can land later than the stored round.
+silently diverge. The resolver anchors only on a **finished** table — the ones the
+standings score, so a cancelled or still-live seat cannot hold an SA — and its
+redirect can land later than the stored round.
 
 **League RTP and global RTP use different bases.** League points use prelim-only
 standings VP/GW; the global rating uses totals including finals. Verify the

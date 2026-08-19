@@ -138,8 +138,8 @@ export function computeStandings(tournament: Tournament | null): StandingEntry[]
     }));
   }
 
-  // DQ'd players forfeit their own score (zeroed) and sort last; re-derived here so the seat-sum fallback
-  // stays consistent with the engine. DQ signal is live player.state OR the persisted standings flag.
+  // DQ'd players forfeit their own score (zeroed) and sort last. DQ signal is live
+  // player.state OR the persisted standings flag.
   const dqUids = new Set<string>(
     players.filter(p => p.state === "Disqualified" && p.user_uid).map(p => p.user_uid!)
   );

@@ -139,9 +139,6 @@ fn refresh_round_scoring(tournament: &mut JsonValue, sanctions: &JsonValue) {
             if table["state"].as_str() == Some("Cancelled") {
                 continue;
             }
-            // Zeroed rather than derived on an unfinished table: an unscored one ties
-            // every seat, and the ladder average would stamp 36 TP apiece on anything
-            // reading the seats instead of the standings.
             let scored = table["state"].as_str() == Some("Finished");
             let seating = &table["seating"];
             let vps: Vec<f64> = seating

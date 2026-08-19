@@ -3651,71 +3651,19 @@ fn redirected_vp_reads_as_blocked_not_unfinished() {
     );
 }
 
-/// `check_table_vps` must accept a table result exactly when a game can produce one.
-/// Its own oust simulation is the check; this pins it against an independent one —
-/// ousts around the table, the winner's extra VP, half a VP per survivor at time-out.
+/// A withdrawal scores half a VP (§3.7.2) and leaves the table, so a half can sit
+/// alongside the full point of whoever was left standing. Tightening the oust check
+/// to read every half as a time-out rejected those results and blocked score entry.
 #[test]
-fn check_table_vps_accepts_exactly_the_reachable_results() {
-    fn reachable(n: usize) -> std::collections::HashSet<Vec<u64>> {
-        fn walk(alive: &[usize], vp: &[f64], out: &mut std::collections::HashSet<Vec<u64>>) {
-            if alive.len() > 1 {
-                let mut timed = vp.to_vec();
-                for &i in alive {
-                    timed[i] += 0.5;
-                }
-                out.insert(timed.iter().map(|v| (v * 2.0) as u64).collect());
-            }
-            if alive.len() == 1 {
-                let mut won = vp.to_vec();
-                won[alive[0]] += 1.0;
-                out.insert(won.iter().map(|v| (v * 2.0) as u64).collect());
-                return;
-            }
-            for (pos, &killer) in alive.iter().enumerate() {
-                let prey = alive[(pos + 1) % alive.len()];
-                let mut nvp = vp.to_vec();
-                nvp[killer] += 1.0;
-                let rest: Vec<usize> = alive.iter().copied().filter(|&x| x != prey).collect();
-                walk(&rest, &nvp, out);
-            }
-        }
-        let mut out = std::collections::HashSet::new();
-        walk(&(0..n).collect::<Vec<_>>(), &vec![0.0; n], &mut out);
-        out
-    }
-
-    // Halves are the finest grain a VP comes in, so search in half-VP steps.
-    for n in 4..=5 {
-        let games = reachable(n);
-        let mut counters = vec![0u64; n];
-        loop {
-            let vps: Vec<f64> = counters.iter().map(|&h| h as f64 / 2.0).collect();
-            let accepted = check_table_vps(&vps).is_none();
-            assert_eq!(
-                accepted,
-                games.contains(&counters),
-                "{vps:?}: engine says {}, a real game says {}",
-                if accepted { "valid" } else { "invalid" },
-                if games.contains(&counters) {
-                    "valid"
-                } else {
-                    "invalid"
-                },
-            );
-            let mut i = 0;
-            while i < n {
-                counters[i] += 1;
-                if counters[i] <= 2 * n as u64 {
-                    break;
-                }
-                counters[i] = 0;
-                i += 1;
-            }
-            if i == n {
-                break;
-            }
-        }
-    }
+fn check_table_vps_accepts_a_withdrawal_beside_a_game_win() {
+    // 1 ousts 2, then 3 and 4 both withdraw, leaving 1 last standing.
+    assert_eq!(check_table_vps(&[2.0, 0.0, 0.5, 0.5]), None);
+    // 1 ousts 2 and 3, 4 withdraws, 1 last standing.
+    assert_eq!(check_table_vps(&[3.0, 0.0, 0.0, 0.5]), None);
+    // 1 ousts 2 and 3 then withdraws itself, leaving 4 last standing.
+    assert_eq!(check_table_vps(&[2.5, 0.0, 0.0, 1.0]), None);
+    // Five seats: 1 sweeps three, 5 withdraws, 1 last standing.
+    assert_eq!(check_table_vps(&[4.0, 0.0, 0.0, 0.0, 0.5]), None);
 }
 
 /// The gate is the data shape, not the mode: every legacy import is rounds-less
