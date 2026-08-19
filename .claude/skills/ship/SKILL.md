@@ -19,22 +19,35 @@ Take the **top** line unless the owner named a different one.
 Read its `board/<slug>.md` if it has one. Read the wiki pages the line touches, and
 `wiki/hazards.md` if it names any subsystem you are about to change.
 
-If two or three agents are working the board in parallel, say in chat which line
-you are taking and keep to your own commits. **Commit explicit paths —
-`git commit -- <paths>`**, which is the only form that ignores whatever else is
-staged. Naming paths to `git add` is not enough and `git add -A` is worse: a
-plain `git commit` writes the *index*, so a sibling's staged deletion rides along
-under your message. `--amend` has the same hazard from the other end — re-read
-`git log -1` first, because the commit you meant to amend may no longer be HEAD.
+**Assume a sibling agent is working the board beside you.** Nothing announces one:
+`git status` is how you find out, so read it when you claim the line and again
+before every commit — foreign paths mean someone is mid-line. Say in chat which
+line you are taking and keep to your own commits.
+
+**Commit explicit paths — `git commit -- <paths>`**, the only form that ignores
+whatever else is staged. Naming paths to `git add` is not enough and `git add -A`
+is worse: a plain `git commit` writes the *index*, so a sibling's staged deletion
+rides along under your message.
 
 Explicit paths still commit the **worktree** content of those paths, so a file you
 share with a sibling carries their half-finished hunks under your message — and if
-their half is what your half depends on, the commit does not run. Before
-committing, read `git diff -- <paths>` and confirm every hunk is yours. When one is
-not, stage that file as HEAD-plus-your-edits instead: reconstruct it from
-`git show HEAD:<path>`, write it with `git hash-object -w`, and place it with
+their half is what your half depends on, the commit does not run. **`BOARD.md` and
+`wiki/` are shared by construction** — every board agent edits them — so diff them
+by name and confirm every hunk is yours, however clean the code paths came back.
+When one is not, stage that file as HEAD-plus-your-edits instead: reconstruct it
+from `git show HEAD:<path>`, write it with `git hash-object -w`, and place it with
 `git update-index --cacheinfo <mode>,<sha>,<path>`. Otherwise imperfect isolation
 is acceptable when files genuinely overlap.
+
+**`--amend` carries the same hazard from the other end**: the commit you mean to
+amend may no longer be HEAD. Read `git log -1` as its own call and compare the sha
+to the one you wrote — chained onto the amend with `&&` it prints the answer
+without checking it, which is not a check. A sibling can land a commit in the gap
+between your inspection and your write, so re-read immediately before, and diff
+against what you expected after. If you do amend a sibling's commit you have
+reverted their work inside their own message: restore it index-only with
+`git read-tree <their-sha>` then a fresh `--amend`, never a `--hard` reset, which
+would take their worktree with it.
 
 ## 2. Confirm the contract
 
