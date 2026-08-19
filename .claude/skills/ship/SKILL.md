@@ -26,7 +26,15 @@ staged. Naming paths to `git add` is not enough and `git add -A` is worse: a
 plain `git commit` writes the *index*, so a sibling's staged deletion rides along
 under your message. `--amend` has the same hazard from the other end — re-read
 `git log -1` first, because the commit you meant to amend may no longer be HEAD.
-Imperfect commit isolation is acceptable when files genuinely overlap.
+
+Explicit paths still commit the **worktree** content of those paths, so a file you
+share with a sibling carries their half-finished hunks under your message — and if
+their half is what your half depends on, the commit does not run. Before
+committing, read `git diff -- <paths>` and confirm every hunk is yours. When one is
+not, stage that file as HEAD-plus-your-edits instead: reconstruct it from
+`git show HEAD:<path>`, write it with `git hash-object -w`, and place it with
+`git update-index --cacheinfo <mode>,<sha>,<path>`. Otherwise imperfect isolation
+is acceptable when files genuinely overlap.
 
 ## 2. Confirm the contract
 

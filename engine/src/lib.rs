@@ -293,8 +293,6 @@ mod shared {
         })
     }
 
-    /// Room-aware table label for `table_idx`, or null when no room covers it —
-    /// the caller localizes its own "Table N".
     pub fn table_label_json(
         rooms_json: &str,
         table_idx: usize,

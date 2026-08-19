@@ -423,9 +423,7 @@ denylist. Banners are dismissible per-device via localStorage.
 `POST /{uid}/call-judge {table}` — the caller must be authenticated and seated at
 that table in the current round, with the tournament in Playing state and not
 offline. It emits the ephemeral `judge_call` SSE event to the tournament's
-explicit organizers only — they are the ones on premises. Its payload carries the
-engine-resolved room label, null when no room covers the table: the Discord bot
-reading the same stream holds no room config of its own.
+explicit organizers only — they are the ones on premises.
 
 ### Web Push
 

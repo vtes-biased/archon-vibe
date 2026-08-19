@@ -14,6 +14,7 @@
   import TimerDisplay from "./TimerDisplay.svelte";
   import VpInput from "./VpInput.svelte";
   import { seatDisplay as seatDisplayUtil, seatDisplayParts, vpOptions, translateTableState, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { initEngine } from "$lib/engine-instance";
   import * as m from '$lib/paraglide/messages.js';
   import { showToast } from "$lib/stores/toast.svelte";
 
@@ -398,7 +399,11 @@
       : base;
   }
 
-  function printRound(r: number) {
+  async function printRound(r: number) {
+    // The window must open on the click itself — a popup opened after an await is
+    // blocked.
+    const w = window.open('', '_blank');
+    await initEngine().catch(() => {});
     const round = tournament.rounds![r]!;
     const title = esc(tournament.name || m.tournament_fallback_title());
     const roundLabel = esc(m.rounds_round_n({ n: String(r + 1) }));
@@ -426,7 +431,6 @@
       + `<div class="cols">${tablesHtml}</div>`
       + `<div class="footer">${title}</div>`
       + `<script>window.onload=()=>window.print()<\/script></body></html>`;
-    const w = window.open('', '_blank');
     if (w) { w.document.write(html); w.document.close(); }
   }
 

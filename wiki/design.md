@@ -293,7 +293,9 @@ under a configured room, the room name alone when it holds a single table, and a
 localized `Table N` when no room covers the index. The engine's `tableLabel` is the
 only implementation; the seating grid, player view, printed seating sheet,
 judge-call banner and both Web Push bodies each render it with their own localized
-fallback, which is also what a cold WASM engine yields.
+fallback. A cold engine yields that same fallback, which self-heals everywhere it
+is read reactively; the printed seating sheet awaits `initEngine()` first, because
+paper does not.
 
 **Create and edit share sections, not initial state** — a form used for both
 (TournamentFields' `mode` prop) keeps the same sections but differs in what starts

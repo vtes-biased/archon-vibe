@@ -81,9 +81,7 @@ export function checkTableVpsSync(vps: number[]): VpIssue | null {
   }
 }
 
-/** Room-aware table label ("Main Hall 3"), or null when no room covers the index —
- * the same fallback the engine returns cold, so callers always render their own
- * localized "Table N". */
+/** Room-aware table label ("Main Hall 3"), or null when no room covers the index. */
 export function tableLabel(
   tableRooms: { name: string; count: number }[] | undefined,
   tableIndex: number,
