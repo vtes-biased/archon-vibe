@@ -275,11 +275,9 @@ import TournamentModals from "./TournamentModals.svelte";
     return Object.fromEntries(uids.map((u, i) => [u, users[i]?.name || u.slice(0, 8)]));
   }
 
-  // Standings — pure computation lives in tournament-utils; read engineReady() here
-  // so placement recomputes once the WASM engine finishes loading.
   const standings = $derived.by(() => {
-    engineReady(); // reactive dep: recompute placement once WASM finishes loading
-    return computeStandings(tournament);
+    engineReady(); // reactive dep: recompute once WASM finishes loading
+    return computeStandings(tournament, tournamentSanctions.filter(s => s.tournament_uid === uid));
   });
   const finalsQual = $derived(finalsQualification(tournament, standings));
 

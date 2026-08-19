@@ -1,6 +1,6 @@
 import type { Sanction, Tournament, TournamentState, TournamentRank } from "./types";
 import type { BadgeTone } from "./components/Badge.svelte";
-import { attestedPlayerCount, computeFinalStandings, computeRatingPoints, computeRatingVpGw, rankingEligibility } from "./engine";
+import { attestedPlayerCount, computeRatingPoints, computeRatingVpGw, displayStandings, rankingEligibility } from "./engine";
 import { formatScore } from "./utils";
 import * as m from './paraglide/messages.js';
 
@@ -83,105 +83,14 @@ export function vpOptions(tableSize: number, allowImpossible: boolean): number[]
   return opts;
 }
 
-/** Preliminary entries come from rounds (or synced/imported standings when there are no rounds); the
- * engine assigns final placement. Pure over `tournament` — callers must re-run when WASM finishes loading. */
-export function computeStandings(tournament: Tournament | null): StandingEntry[] {
+export function computeStandings(tournament: Tournament | null, sanctions: Sanction[]): StandingEntry[] {
   if (!tournament) return [];
-  // Imported records can carry standings without a roster.
-  const players = tournament.players ?? [];
-
-  let prelim: Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; finalist: boolean }>;
-  let winnerUid = tournament.winner ?? "";
-  let finalsResults: Map<string, { gw: number; vp: number; tp: number }> | null = null;
-
-  if (!tournament.rounds || tournament.rounds.length < 1) {
-    // VEKN-synced / imported: standings already carry totals + finalist flags.
-    const finalistUids = new Set(
-      players.filter(p => p.finalist && p.user_uid).map(p => p.user_uid!)
-    );
-    prelim = tournament.standings?.length
-      ? tournament.standings.map(s => ({
-          user_uid: s.user_uid, gw: s.gw ?? 0, vp: s.vp ?? 0, tp: s.tp ?? 0,
-          toss: s.toss ?? 0, finalist: s.finalist ?? finalistUids.has(s.user_uid),
-        }))
-      : players
-          .filter(p => p.user_uid && p.result && (p.result.gw || p.result.vp || p.result.tp))
-          .map(p => ({
-            user_uid: p.user_uid!, gw: p.result.gw ?? 0, vp: p.result.vp ?? 0, tp: p.result.tp ?? 0,
-            toss: p.toss ?? 0, finalist: finalistUids.has(p.user_uid!),
-          }));
-  } else {
-    // Preliminary totals come from engine-computed standings (SA penalty applied to VP, GW/TP re-decided
-    // per table). Do NOT re-sum raw seat results — SA lives only on the standings total, not per-seat.
-    const map = new Map<string, { gw: number; vp: number; tp: number }>();
-    for (const s of tournament.standings ?? []) {
-      map.set(s.user_uid, { gw: s.gw ?? 0, vp: s.vp ?? 0, tp: s.tp ?? 0 });
-    }
-    const tossMap = new Map<string, number>();
-    for (const p of players) {
-      if (p.user_uid) tossMap.set(p.user_uid, p.toss ?? 0);
-    }
-    // Finals count only once finished; otherwise show live preliminary ranking.
-    let finalistUids = new Set<string>();
-    if (tournament.state === "Finished" && tournament.finals) {
-      finalistUids = new Set(tournament.finals.seating.map(s => s.player_uid));
-      finalsResults = new Map(tournament.finals.seating.map(s => [s.player_uid, s.result]));
-      if (!winnerUid) {
-        const sorted = [...tournament.finals.seating].sort((a, b) => (b.result.gw - a.result.gw) || (b.result.vp - a.result.vp));
-        winnerUid = sorted[0]?.player_uid ?? "";
-      }
-    } else {
-      winnerUid = ""; // finals not done yet → preliminary ranking only
-    }
-    prelim = [...map.entries()].map(([uid, s]) => ({
-      user_uid: uid, ...s, toss: tossMap.get(uid) ?? 0, finalist: finalistUids.has(uid),
-    }));
-  }
-
-  // DQ'd players forfeit their own score (zeroed) and sort last. DQ signal is live
-  // player.state OR the persisted standings flag.
-  const dqUids = new Set<string>(
-    players.filter(p => p.state === "Disqualified" && p.user_uid).map(p => p.user_uid!)
-  );
-  for (const s of tournament.standings ?? []) {
-    if (s.disqualified) dqUids.add(s.user_uid);
-  }
-  // Proxy (non-competing): excluded from rank like DQ, but the score is NOT zeroed. Same dual source as
-  // DQ: live player flag OR the persisted standings flag (covers synced/imported tournaments).
-  const ncUids = new Set<string>(
-    players.filter(p => p.non_competing && p.user_uid).map(p => p.user_uid!)
-  );
-  for (const s of tournament.standings ?? []) {
-    if (s.non_competing) ncUids.add(s.user_uid);
-  }
-  const prelimDq = prelim.map(e => {
-    const disqualified = dqUids.has(e.user_uid);
-    const non_competing = ncUids.has(e.user_uid);
-    return disqualified
-      ? { ...e, gw: 0, vp: 0, tp: 0, disqualified, non_competing }
-      : { ...e, disqualified, non_competing };
-  });
-
-  // The engine assumes input pre-sorted descending by preliminary score, with the
-  // non-ranked (DQ'd or proxy) parked last.
-  prelimDq.sort((a, b) => {
-    const aEx = a.disqualified || a.non_competing;
-    const bEx = b.disqualified || b.non_competing;
-    return (aEx === bEx ? 0 : aEx ? 1 : -1)
-      || b.gw - a.gw || b.vp - a.vp || b.tp - a.tp || b.toss - a.toss || a.user_uid.localeCompare(b.user_uid);
-  });
-  const ranked = computeFinalStandings(prelimDq, winnerUid);
-  if (!ranked.length) {
-    // Engine not ready (load() awaits initEngine, so this is a safety net):
-    // degrade to preliminary order so the table is never blank.
-    return prelimDq.map((e, i) => ({ ...e, rank: i + 1 }));
-  }
-  return ranked.map(e => {
+  return displayStandings(tournament, sanctions).map(e => {
     const entry: StandingEntry = {
-      user_uid: e.user_uid, gw: e.gw, vp: e.vp, tp: e.tp, toss: e.toss, rank: e.rank, finalist: e.finalist, disqualified: e.disqualified, non_competing: e.non_competing,
+      user_uid: e.user_uid, gw: e.gw, vp: e.vp, tp: e.tp, toss: e.toss, rank: e.rank,
+      finalist: e.finalist, disqualified: e.disqualified, non_competing: e.non_competing,
     };
-    const fr = finalsResults?.get(e.user_uid);
-    if (fr) entry.finals = formatScore(fr.gw, fr.vp, fr.tp);
+    if (e.finals) entry.finals = formatScore(e.finals.gw, e.finals.vp, e.finals.tp);
     return entry;
   });
 }

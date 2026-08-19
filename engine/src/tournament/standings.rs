@@ -294,6 +294,168 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
     out
 }
 
+pub fn display_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<JsonValue> {
+    let players = &tournament["players"];
+    let sheet = &tournament["standings"];
+    let rounds_less = tournament["rounds"].is_empty();
+    let finals = &tournament["finals"];
+    let use_finals =
+        !rounds_less && tournament["state"].as_str() == Some("Finished") && !finals.is_null();
+
+    let player_of = |uid: &str| {
+        players
+            .members()
+            .find(|p| p["user_uid"].as_str() == Some(uid))
+    };
+    let sheet_of = |uid: &str| {
+        sheet
+            .members()
+            .find(|s| s["user_uid"].as_str() == Some(uid))
+    };
+    let finals_seat = |uid: &str| {
+        use_finals
+            .then(|| {
+                finals["seating"]
+                    .members()
+                    .find(|s| s["player_uid"].as_str() == Some(uid))
+            })
+            .flatten()
+    };
+
+    let mut winner = if rounds_less || use_finals {
+        tournament["winner"].as_str().unwrap_or("").to_string()
+    } else {
+        String::new()
+    };
+    if use_finals && winner.is_empty() {
+        let mut best: Option<(&str, f64, f64)> = None;
+        for seat in finals["seating"].members() {
+            let gw = seat["result"]["gw"].as_f64().unwrap_or(0.0);
+            let vp = seat["result"]["vp"].as_f64().unwrap_or(0.0);
+            if best.is_none_or(|(_, bg, bv)| gw > bg || (gw == bg && vp > bv)) {
+                best = Some((seat["player_uid"].as_str().unwrap_or(""), gw, vp));
+            }
+        }
+        winner = best.map(|(uid, _, _)| uid).unwrap_or("").to_string();
+    }
+
+    let raw: Vec<(String, f64, f64, f64, u32, bool)> = if !sheet.is_empty() {
+        sheet
+            .members()
+            .map(|s| {
+                let uid = s["user_uid"].as_str().unwrap_or("").to_string();
+                let (toss, finalist) = if rounds_less {
+                    (
+                        s["toss"].as_u32().unwrap_or(0),
+                        s["finalist"].as_bool().unwrap_or_else(|| {
+                            player_of(&uid)
+                                .and_then(|p| p["finalist"].as_bool())
+                                .unwrap_or(false)
+                        }),
+                    )
+                } else {
+                    (
+                        player_of(&uid)
+                            .and_then(|p| p["toss"].as_u32())
+                            .unwrap_or(0),
+                        finals_seat(&uid).is_some(),
+                    )
+                };
+                (
+                    uid,
+                    s["gw"].as_f64().unwrap_or(0.0),
+                    s["vp"].as_f64().unwrap_or(0.0),
+                    s["tp"].as_f64().unwrap_or(0.0),
+                    toss,
+                    finalist,
+                )
+            })
+            .collect()
+    } else if rounds_less {
+        // Pre-standings imports carry the result on the roster row instead.
+        players
+            .members()
+            .filter_map(|p| {
+                let uid = p["user_uid"].as_str().unwrap_or("");
+                let gw = p["result"]["gw"].as_f64().unwrap_or(0.0);
+                let vp = p["result"]["vp"].as_f64().unwrap_or(0.0);
+                let tp = p["result"]["tp"].as_f64().unwrap_or(0.0);
+                if uid.is_empty() || (gw == 0.0 && vp == 0.0 && tp == 0.0) {
+                    return None;
+                }
+                Some((
+                    uid.to_string(),
+                    gw,
+                    vp,
+                    tp,
+                    p["toss"].as_u32().unwrap_or(0),
+                    p["finalist"].as_bool().unwrap_or(false),
+                ))
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let mut rows: Vec<Standing> = raw
+        .into_iter()
+        .map(|(uid, gw, vp, tp, toss, finalist)| {
+            let player = player_of(&uid);
+            let row = sheet_of(&uid);
+            let disqualified = player.and_then(|p| p["state"].as_str()) == Some("Disqualified")
+                || row.is_some_and(|r| r["disqualified"].as_bool().unwrap_or(false))
+                || has_dq_sanction(sanctions, &uid);
+            let non_competing = player
+                .and_then(|p| p["non_competing"].as_bool())
+                .unwrap_or(false)
+                || row.is_some_and(|r| r["non_competing"].as_bool().unwrap_or(false));
+            let (gw, vp, tp) = if disqualified {
+                (0.0, 0.0, 0.0)
+            } else {
+                (gw, vp, tp)
+            };
+            Standing {
+                user_uid: uid,
+                gw,
+                vp,
+                tp,
+                toss,
+                finalist,
+                disqualified,
+                non_competing,
+            }
+        })
+        .collect();
+
+    sort_by_rank(&mut rows);
+
+    let arr: Vec<JsonValue> = rows
+        .iter()
+        .map(|s| {
+            let mut obj = json::object! {
+                "user_uid" => s.user_uid.as_str(),
+                "gw" => s.gw,
+                "vp" => s.vp,
+                "tp" => s.tp,
+                "toss" => s.toss,
+                "finalist" => s.finalist,
+                "disqualified" => s.disqualified,
+                "non_competing" => s.non_competing,
+            };
+            if let Some(seat) = finals_seat(&s.user_uid) {
+                obj["finals"] = json::object! {
+                    "gw" => seat["result"]["gw"].as_f64().unwrap_or(0.0),
+                    "vp" => seat["result"]["vp"].as_f64().unwrap_or(0.0),
+                    "tp" => seat["result"]["tp"].as_f64().unwrap_or(0.0),
+                };
+            }
+            obj
+        })
+        .collect();
+
+    compute_final_standings(&JsonValue::Array(arr), &winner)
+}
+
 /// SA-adjusted rating VP/GW for a finished tournament, including finals VP/GW unlike
 /// preliminary standings. A win with no finals table credits +1 GW (inert when `winner == ""`).
 pub fn compute_rating_vp_gw(
@@ -612,6 +774,43 @@ mod tests {
             r.last().unwrap()["user_uid"].as_str(),
             Some("p2"),
             "DQ'd player is emitted last"
+        );
+    }
+
+    #[test]
+    fn display_standings_ranks_a_round_less_import_from_its_sheet() {
+        // The whole pre-2014 corpus: a result sheet and no rounds to recompute from.
+        // The sheet arrives unsorted, so the display path must sort and place it.
+        let t = json::parse(
+            r#"{
+            "state":"Finished","rounds":[],"finals":null,"winner":"w",
+            "players":[
+                {"user_uid":"w"},{"user_uid":"f"},{"user_uid":"a"},
+                {"user_uid":"b"},{"user_uid":"p","non_competing":true}
+            ],
+            "standings":[
+                {"user_uid":"a","gw":0.0,"vp":2.0,"tp":90,"finalist":false},
+                {"user_uid":"w","gw":1.0,"vp":5.0,"tp":150,"finalist":true},
+                {"user_uid":"p","gw":0.0,"vp":4.0,"tp":140,"finalist":false},
+                {"user_uid":"b","gw":0.0,"vp":3.0,"tp":100,"finalist":false},
+                {"user_uid":"f","gw":1.0,"vp":4.0,"tp":120,"finalist":true}
+            ]
+        }"#,
+        )
+        .unwrap();
+        let r = display_standings(&t, &JsonValue::new_array());
+        assert_eq!(rank_of(&r, "w"), 1, "the sheet's winner places first");
+        assert_eq!(rank_of(&r, "f"), 2, "the other finalist ties for 2nd");
+        assert_eq!(
+            rank_of(&r, "b"),
+            3,
+            "non-finalists rank by the sheet cascade"
+        );
+        assert_eq!(rank_of(&r, "a"), 4);
+        assert_eq!(
+            r.last().unwrap()["user_uid"].as_str(),
+            Some("p"),
+            "the proxy sorts last despite the second-best VP total"
         );
     }
 

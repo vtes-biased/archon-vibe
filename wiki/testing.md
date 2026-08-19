@@ -133,8 +133,8 @@ script. Standing up a runner, config and CI wiring for a single test is exactly
 what the policy forbids. Compounding it, `tournament-utils.ts` is **not pure**: it
 imports from `./engine`, and those helpers return an empty result when the WASM
 engine is null. Outside a browser that is always, so a Node-side test would assert
-the degrade-to-preliminary fallback and never the engine's real placement logic —
-it would verify the absence of the engine. Placement semantics belong in Rust,
+the empty answer a cold engine gives and never its real placement logic — it would
+verify the absence of the engine. Placement semantics belong in Rust,
 rendering belongs in Playwright, and the TypeScript in between is marshalling that
 `svelte-check` plus the E2E lifecycle spec already covers.
 

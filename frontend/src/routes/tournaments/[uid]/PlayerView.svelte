@@ -216,10 +216,6 @@
     return seatDisplayUtil(uid, playerInfo, tournament.online);
   }
 
-  function isPlayerDQ(userUid: string): boolean {
-    return tournament.players?.some(p => p.user_uid === userUid && p.state === "Disqualified") ?? false;
-  }
-
   function sanctionsForPlayer(uid: string): Sanction[] {
     return tournamentSanctions.filter(s => s.user_uid === uid);
   }
@@ -621,7 +617,7 @@
                   <span class="inline-flex items-center gap-1">
                     {seatDisplay(entry.user_uid)}
                     <SanctionIndicator sanctions={sanctionsForPlayer(entry.user_uid)} />
-                    {#if isPlayerDQ(entry.user_uid)}<span class="text-xs text-link">{m.tournament_disqualified()}</span>{/if}
+                    {#if entry.disqualified}<span class="text-xs text-link">{m.tournament_disqualified()}</span>{/if}
                   </span>
                 </td>
                 <td class="text-right py-1 px-2">{formatScore(entry.gw, entry.vp, entry.tp)}</td>
@@ -783,7 +779,7 @@
                     <span class="inline-flex items-center gap-1">
                       {seatDisplay(entry.user_uid)}
                       <SanctionIndicator sanctions={sanctionsForPlayer(entry.user_uid)} />
-                      {#if isPlayerDQ(entry.user_uid)}<span class="text-xs text-link">{m.tournament_disqualified()}</span>{/if}
+                      {#if entry.disqualified}<span class="text-xs text-link">{m.tournament_disqualified()}</span>{/if}
                     </span>
                   </td>
                   <td class="text-right py-1 px-2">{formatScore(entry.gw, entry.vp, entry.tp)}</td>

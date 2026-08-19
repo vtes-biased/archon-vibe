@@ -192,6 +192,13 @@ rebuilds both targets; build one directly with `wasm-pack` or `maturin develop`
 and final placement are specified on [tournaments](tournaments.md#standings); the
 engine module is `tournament/standings.rs`.
 
+**The display path computes nothing.** `displayStandings` hands back the ranked
+sheet — cascade, DQ zeroing and placement included — and
+`tournament-utils.ts`'s `computeStandings` only marshals it into the row shape the
+components render, formatting the finals score. It is the sole producer of the
+standings every tournament surface reads, so a round-less VEKN import, which no
+recompute ever reaches, is ranked by the same rule as a live event.
+
 ### Error contract
 
 `engine/src/error.rs` is the single taxonomy for every engine rejection: the

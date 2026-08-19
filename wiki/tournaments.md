@@ -312,6 +312,25 @@ finalists share rank 2, non-finalists competition-ranked from `finalist_count + 
 Whether a final happened is read from the per-player `finalist` flag, not from
 finals seating data.
 
+`display_standings` is what a client renders, exported to WASM as
+`displayStandings` and called nowhere else. It **ranks the stored sheet it is
+handed** — never `compute_preliminary_standings` — because a round-less import has
+no rounds to recompute from and a recompute would re-judge table states the corpus
+was imported with. On top of the sheet it decides the DQ/proxy flags from the
+combined signals, zeroes the DQ'd, sorts the cascade and calls
+`compute_final_standings`. A final places only once the tournament is `Finished`:
+until then the winner is dropped and the display stays on the preliminary ranking,
+and each finalist row then carries its finals `{gw, vp, tp}` for display. Toss and
+finalist are sourced apart: toss off the roster when rounds exist and off the sheet
+row when they do not, finalist off the finals seating — the roster flag serves only
+as the round-less fallback, where neither a finals table nor a roster toss exists.
+
+Its `sanctions` argument must hold **this tournament's own** sanctions and no
+others. `has_dq_sanction` matches on user and level alone — the payload carries no
+`tournament_uid` to filter on — so a list gathered for player context, as
+`getTournamentContextSanctions` gathers 18 months of it, zeroes a player here for a
+DQ they took at another event.
+
 ## Finals
 
 Qualification follows §3.1: top 5 by GW, VP, TP, with a random toss for ties.

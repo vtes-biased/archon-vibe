@@ -600,16 +600,16 @@ export async function computeLeagueStandings(
   return JSON.parse(resultJson);
 }
 
-/** Reorders standings into final placement per VEKN §3.7.5 (other finalists tie for 2nd); shared
- * source of truth with league scoring. `standings` must be pre-sorted descending by preliminary score. */
-export function computeFinalStandings(
-  standings: Array<{ user_uid: string; gw: number; vp: number; tp: number; toss?: number; finalist?: boolean; disqualified?: boolean; non_competing?: boolean }>,
-  winner: string
-): Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; finalist: boolean; rank: number; disqualified?: boolean; non_competing?: boolean }> {
+/** `sanctions` must be this tournament's own: a DQ from another event is not one here,
+ * and the payload carries no `tournament_uid` for the engine to filter on. */
+export function displayStandings(
+  tournament: Tournament,
+  sanctions: Sanction[]
+): Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; rank: number; finalist: boolean; disqualified: boolean; non_competing: boolean; finals?: { gw: number; vp: number; tp: number } }> {
   const engine = getEngineReactive();
   if (!engine) return [];
-  const resultJson = callEngine(() => engine.computeFinalStandings(JSON.stringify({ standings, winner })));
-  return JSON.parse(resultJson);
+  const config = JSON.stringify({ tournament, sanctions: JSON.parse(buildSanctionsPayload(sanctions)) });
+  return JSON.parse(callEngine(() => engine.displayStandings(config)));
 }
 
 export function finalsQualification(

@@ -264,6 +264,13 @@ mod shared {
         Ok(json::JsonValue::Array(ranked).dump())
     }
 
+    pub fn display_standings_json(config_json: &str) -> Result<String, EngineError> {
+        let config = json::parse(config_json)?;
+        let ranked =
+            super::tournament::display_standings(&config["tournament"], &config["sanctions"]);
+        Ok(json::JsonValue::Array(ranked).dump())
+    }
+
     pub fn finals_qualification_json(config_json: &str) -> Result<String, EngineError> {
         let config = json::parse(config_json)?;
         Ok(
@@ -533,9 +540,9 @@ mod wasm {
             js_str(compute_league_standings_json(config_json))
         }
 
-        #[wasm_bindgen(js_name = computeFinalStandings)]
-        pub fn compute_final_standings(&self, config_json: &str) -> Result<String, String> {
-            js_str(compute_final_standings_json(config_json))
+        #[wasm_bindgen(js_name = displayStandings)]
+        pub fn display_standings(&self, config_json: &str) -> Result<String, String> {
+            js_str(display_standings_json(config_json))
         }
 
         #[wasm_bindgen(js_name = finalsQualification)]

@@ -13,7 +13,9 @@ mod tests;
 mod types;
 
 pub use scoring::{check_table_vps, compute_gw, compute_gw_finals, compute_tp};
-pub use standings::{compute_final_standings, compute_rating_vp_gw, finals_qualification};
+pub use standings::{
+    compute_final_standings, compute_rating_vp_gw, display_standings, finals_qualification,
+};
 pub use types::{ActorContext, PlayerState, SeatScore, TournamentEvent, TournamentState, VpError};
 
 use crate::error::EngineError;
