@@ -158,6 +158,7 @@ lint-check:
     just permission-drift
     just comment-blocks
     just dark-variant
+    just locale-parity
 
 # Fail when a role literal is used for gating outside the engine's capability
 # table — the drift this repo's permission model keeps re-growing without it.
@@ -175,6 +176,11 @@ comment-blocks:
 dark-variant:
     uv run python3 scripts/check_dark_variant.py
 
+# Fail when a locale's message catalog disagrees with the base one — Paraglide
+# falls back silently, so a forgotten translation ships as English with no error.
+locale-parity:
+    uv run python3 scripts/check_locale_parity.py
+
 # Lint and auto-fix all code
 lint:
     uv run ruff check --fix . && uv run ruff format .
@@ -183,6 +189,7 @@ lint:
     just permission-drift
     just comment-blocks
     just dark-variant
+    just locale-parity
 
 # Warn (never fail) when the hand-synced backup scripts drift from server-setup's
 # copies (script headers document the contract). Comment wording and the

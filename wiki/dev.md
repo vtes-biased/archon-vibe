@@ -27,7 +27,7 @@ just dev-reset # reset the dev database
 
 `just lint` auto-fixes formatting, then runs the checks nothing can fix for you;
 `just lint-check` is the read-only half and is what `just test` calls. Both end on
-the same three gates:
+the same four gates:
 
 - `just permission-drift` — a role literal used to gate outside the engine's
   capability table.
@@ -42,6 +42,12 @@ the same three gates:
   which tracks the OS preference rather than the app's theme
   ([design](design.md#palette)). A `dark:` followed by a space is an object key
   or a type annotation and passes.
+- `just locale-parity` — a message catalog whose keys disagree with the base
+  locale's, in either direction ([i18n](i18n.md)). Paraglide resolves a missing
+  key by falling back to the base locale, so an untranslated string ships as
+  English with nothing failing; a key outliving its base entry is the same drift
+  reversed. The locale list comes from the inlang project settings, so a sixth
+  locale is covered without touching the gate.
 
 In dev only the **database** runs in Docker; backend and frontend run natively. The
 compose file is **not** production-hardened — uvicorn reload, a default password.
