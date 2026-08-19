@@ -5,7 +5,6 @@
   import { syncManager } from '$lib/sync';
   import { initAuth } from '$lib/stores/auth.svelte';
   import { initEngine } from '$lib/engine-instance';
-  import { engineLoadFailed } from '$lib/stores/engine-ready.svelte';
   import { initServiceWorker, getUpdateAvailable, applyUpdate } from '$lib/stores/sw.svelte';
   import { initOfflineState, getOfflineTournamentUids } from '$lib/stores/offline.svelte';
   import { reconcilePush } from '$lib/stores/push.svelte';
@@ -18,6 +17,9 @@
   import { initTheme } from '$lib/stores/theme.svelte';
 
   let { children } = $props();
+
+  // Not onMount: that delays the fetch by a full mount cycle.
+  const engineInit = initEngine();
 
   let isOnline = $state(navigator.onLine);
   let isSyncing = $state(true);
@@ -55,7 +57,6 @@
   onMount(() => {
     initTheme();
     initServiceWorker();
-    initEngine().catch(err => console.error('Failed to initialize engine:', err));
 
     initAuth().then(() => {
       syncManager.connect();
@@ -140,19 +141,8 @@
   <!-- Sticky stack, not overlay, so banners push content down and stack as block
        siblings; sticks at safe-t, not 0, or a stuck banner slides under the
        status bar in the installed PWA. -->
-  {#if engineLoadFailed() || !isOnline || syncError || (getUpdateAvailable() && !hasOfflineLocked)}
+  {#if !isOnline || syncError || (getUpdateAvailable() && !hasOfflineLocked)}
     <div class="sticky top-safe-t z-50">
-      <!-- Durable banner, not a toast: engine failure degrades permission checks,
-           optimistic writes and standings, and persists until reload. -->
-      {#if engineLoadFailed()}
-        <div role="alert" class="px-4 py-2 text-center text-sm bg-accent-strong text-white">
-          <span class="inline-flex items-center gap-2 flex-wrap justify-center">
-            <TriangleAlert class="w-4 h-4 shrink-0" aria-hidden="true" />
-            {m.engine_load_error()}
-            <button onclick={() => location.reload()} class="underline hover:no-underline font-medium">{m.update_refresh()}</button>
-          </span>
-        </div>
-      {/if}
       {#if !isOnline || syncError}
         <div class="px-4 py-2 text-center text-sm {!isOnline ? 'status-offline' : 'bg-accent-soft/90 text-link-soft'}">
           {#if !isOnline}
@@ -184,7 +174,17 @@
   <!-- pr-safe-r clears the notch when the phone is held camera-right; the left
        side is already cleared by the rail's width. -->
   <main class="sm:ml-rail pr-safe-r">
-    {@render children()}
+    {#await engineInit}
+      <div class="flex items-center justify-center py-24 text-sm text-ink-muted">{m.common_loading()}</div>
+    {:then}
+      {@render children()}
+    {:catch}
+      <div role="alert" class="flex flex-col items-center gap-4 py-24 px-4 text-center">
+        <TriangleAlert class="w-8 h-8 text-accent-strong" aria-hidden="true" />
+        <p class="text-sm text-ink-muted max-w-sm">{m.engine_load_error()}</p>
+        <button onclick={() => location.reload()} class="underline hover:no-underline font-medium text-link">{m.update_refresh()}</button>
+      </div>
+    {/await}
   </main>
 
   <!-- h-navbar is declared, not emergent, or a gap shows between the CTA and the

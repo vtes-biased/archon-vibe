@@ -1,12 +1,11 @@
 import type { CommunityLinkType, DeckObject, LinkMedia, LinkPlacement, Sanction, SanctionCategory, SanctionLevel, SanctionSubcategory, Tournament, User } from './types';
 import { getAllLeagues } from './db';
-import { callEngine, getEngineReactive, initEngine } from './engine-instance';
+import { callEngine, getEngine, initEngine } from './engine-instance';
 
 export function scoreSeatingSync(
   rounds: string[][][]
 ): { rules: number[]; minimums: number[]; mean_vps: number; mean_transfers: number } | null {
-  const engine = getEngineReactive();
-  if (!engine) return null;
+  const engine = getEngine();
   try {
     const resultJson = callEngine(() => engine.scoreSeating(JSON.stringify({ rounds })));
     return JSON.parse(resultJson);
@@ -32,8 +31,7 @@ export function previewScoresSync(
   table: number,
   vps: number[],
 ): { gw: number[]; tp: number[] } | null {
-  const engine = getEngineReactive();
-  if (!engine) return null;
+  const engine = getEngine();
   if (!previewCache || previewCache.tournament !== tournament || previewCache.sanctions !== sanctions) {
     previewCache = { tournament, sanctions, results: new Map() };
   }
@@ -69,16 +67,9 @@ export type VpIssue = {
   seats: number[];
 };
 
-/** Same check that decides a table's close-state server-side. Null when scorable, or when the
- * engine isn't up (callers then say nothing rather than guessing). */
+/** Same check that decides a table's close-state server-side. Null means scorable. */
 export function checkTableVpsSync(vps: number[]): VpIssue | null {
-  const engine = getEngineReactive();
-  if (!engine) return null;
-  try {
-    return JSON.parse(callEngine(() => engine.checkTableVps(JSON.stringify({ vps }))));
-  } catch {
-    return null;
-  }
+  return JSON.parse(callEngine(() => getEngine().checkTableVps(JSON.stringify({ vps }))));
 }
 
 /** Room-aware table label ("Main Hall 3"), or null when no room covers the index. */
@@ -86,13 +77,7 @@ export function tableLabel(
   tableRooms: { name: string; count: number }[] | undefined,
   tableIndex: number,
 ): string | null {
-  const engine = getEngineReactive();
-  if (!engine) return null;
-  try {
-    return callEngine(() => engine.tableLabel(JSON.stringify(tableRooms ?? []), tableIndex)) ?? null;
-  } catch {
-    return null;
-  }
+  return callEngine(() => getEngine().tableLabel(JSON.stringify(tableRooms ?? []), tableIndex)) ?? null;
 }
 
 export type TournamentEventType =
@@ -281,11 +266,9 @@ export interface SanctionReference {
 
 let sanctionReference: SanctionReference | null = null;
 
-export function getSanctionReference(): SanctionReference | null {
+export function getSanctionReference(): SanctionReference {
   if (sanctionReference) return sanctionReference;
-  const engine = getEngineReactive();
-  if (!engine) return null;
-  const raw = JSON.parse(callEngine(() => engine.sanctionReference()));
+  const raw = JSON.parse(callEngine(() => getEngine().sanctionReference()));
   sanctionReference = {
     subcategoriesByCategory: Object.fromEntries(
       raw.categories.map((c: any) => [c.key, c.subcategories.map((s: any) => s.key)])
@@ -307,11 +290,9 @@ export interface CommunityLinkReference {
 
 let communityLinkReference: CommunityLinkReference | null = null;
 
-export function getCommunityLinkReference(): CommunityLinkReference | null {
+export function getCommunityLinkReference(): CommunityLinkReference {
   if (communityLinkReference) return communityLinkReference;
-  const engine = getEngineReactive();
-  if (!engine) return null;
-  const raw = JSON.parse(callEngine(() => engine.communityLinkReference()));
+  const raw = JSON.parse(callEngine(() => getEngine().communityLinkReference()));
   communityLinkReference = {
     types: raw.types.map((t: any) => t.type),
     mediaKinds: raw.media_kinds,
@@ -330,9 +311,7 @@ let libraryTypeOrder: string[] | null = null;
 
 export function getLibraryTypeOrder(): string[] {
   if (libraryTypeOrder) return libraryTypeOrder;
-  const engine = getEngineReactive();
-  if (!engine) return [];
-  libraryTypeOrder = JSON.parse(callEngine(() => engine.libraryTypeOrder()));
+  libraryTypeOrder = JSON.parse(callEngine(() => getEngine().libraryTypeOrder()));
   return libraryTypeOrder!;
 }
 
@@ -340,15 +319,13 @@ type UserContext = { uid: string; roles?: string[] | null; country?: string | nu
 type Resource = { country?: string | null; organizers_uids?: string[] };
 
 /** Single authorization entry point: every capability check below is one call of this, naming a
- * capability from engine/src/permissions.rs. Fail-closed (null reason) until WASM loads — fill only what the capability reads. */
+ * capability from engine/src/permissions.rs. Fill only what the capability reads. */
 function checkPermission(
   capability: string,
   actor: UserContext | null,
   context: { target?: UserContext; targetCountry?: string | null; resource?: Resource } = {}
 ): PermissionResult {
   if (!actor) return { allowed: false, reason: null };
-  const engine = getEngineReactive();
-  if (!engine) return { allowed: false, reason: null };
 
   const { target, resource } = context;
   const request: Record<string, unknown> = {
@@ -368,7 +345,7 @@ function checkPermission(
       request.target_country = resource.country ?? null;
     }
   }
-  return JSON.parse(callEngine(() => engine.checkPermission(capability, JSON.stringify(request))));
+  return JSON.parse(callEngine(() => getEngine().checkPermission(capability, JSON.stringify(request))));
 }
 
 export function canChangeRole(
@@ -376,9 +353,6 @@ export function canChangeRole(
   target: UserContext,
   role: string
 ): PermissionResult {
-  const engine = getEngineReactive();
-  if (!engine) return { allowed: false, reason: null };
-
   const actorJson = JSON.stringify({ roles: actor.roles ?? [], country: actor.country });
   const targetJson = JSON.stringify({
     roles: target.roles ?? [],
@@ -386,15 +360,12 @@ export function canChangeRole(
     vekn_id: target.vekn_id ?? null,
   });
 
-  const resultJson = callEngine(() => engine.canChangeRole(actorJson, targetJson, role));
+  const resultJson = callEngine(() => getEngine().canChangeRole(actorJson, targetJson, role));
   return JSON.parse(resultJson);
 }
 
 /** For an official target this takes the authority that could change their highest official role. */
 export function canChangeCountry(actor: UserContext, target: UserContext): PermissionResult {
-  const engine = getEngineReactive();
-  if (!engine) return { allowed: false, reason: null };
-
   const actorJson = JSON.stringify({ roles: actor.roles ?? [], country: actor.country });
   const targetJson = JSON.stringify({
     roles: target.roles ?? [],
@@ -402,7 +373,7 @@ export function canChangeCountry(actor: UserContext, target: UserContext): Permi
     vekn_id: target.vekn_id ?? null,
   });
 
-  const resultJson = callEngine(() => engine.canChangeCountry(actorJson, targetJson));
+  const resultJson = callEngine(() => getEngine().canChangeCountry(actorJson, targetJson));
   return JSON.parse(resultJson);
 }
 
@@ -410,9 +381,7 @@ export function canChangeCountry(actor: UserContext, target: UserContext): Permi
  * capability the control actually needs. */
 export function isOfficial(user: UserContext | null): boolean {
   if (!user) return false;
-  const engine = getEngineReactive();
-  if (!engine) return false;
-  return callEngine(() => engine.isOfficial(JSON.stringify({ roles: user.roles ?? [] })));
+  return callEngine(() => getEngine().isOfficial(JSON.stringify({ roles: user.roles ?? [] })));
 }
 
 /** Mints a member record or issues a VEKN ID to an existing account — one authority for both,
@@ -479,15 +448,13 @@ export function canTakeTournamentOffline(
   tournament: Resource
 ): boolean {
   if (!user) return false;
-  const engine = getEngineReactive();
-  if (!engine) return false;
   const actorJson = JSON.stringify({ roles: user.roles ?? [], country: user.country ?? null });
   const tournamentJson = JSON.stringify({
     country: tournament.country ?? null,
     organizers_uids: tournament.organizers_uids ?? [],
   });
   return JSON.parse(
-    callEngine(() => engine.canTakeTournamentOffline(actorJson, user.uid, tournamentJson))
+    callEngine(() => getEngine().canTakeTournamentOffline(actorJson, user.uid, tournamentJson))
   ).allowed;
 }
 
@@ -546,15 +513,13 @@ export function canLinkTournamentToLeague(
   league: { country?: string | null; organizers_uids?: string[]; open_to_country_princes?: boolean }
 ): boolean {
   if (!user) return false;
-  const engine = getEngineReactive();
-  if (!engine) return false;
   const actorJson = JSON.stringify({ uid: user.uid, roles: user.roles ?? [], country: user.country });
   const leagueJson = JSON.stringify({
     country: league.country ?? null,
     organizers_uids: league.organizers_uids ?? [],
     open_to_country_princes: league.open_to_country_princes ?? false,
   });
-  return JSON.parse(callEngine(() => engine.canLinkTournamentToLeague(actorJson, user.uid, leagueJson))).allowed;
+  return JSON.parse(callEngine(() => getEngine().canLinkTournamentToLeague(actorJson, user.uid, leagueJson))).allowed;
 }
 
 export function computeRatingPoints(
@@ -564,39 +529,31 @@ export function computeRatingPoints(
   playerCount: number,
   rank: string
 ): number {
-  const engine = getEngineReactive();
-  if (!engine) return 0;
-  return engine.computeRatingPoints(vp, gw, finalistPosition, playerCount, rank);
+  return getEngine().computeRatingPoints(vp, gw, finalistPosition, playerCount, rank);
 }
 
 /** A player's SA-adjusted (vp, gw), finals included — the same aggregation backend
- * ratings.py stores. Null while the engine isn't loaded. */
+ * ratings.py stores. */
 export function computeRatingVpGw(
   tournamentJson: string,
   sanctionsJson: string,
   userUid: string
 ): [vp: number, gw: number] | null {
-  const engine = getEngineReactive();
-  if (!engine) return null;
   // Null rather than a fabricated 0 the caller would render as a real score.
-  const [vp, gw] = engine.computeRatingVpGw(tournamentJson, sanctionsJson, userUid);
+  const [vp, gw] = getEngine().computeRatingVpGw(tournamentJson, sanctionsJson, userUid);
   return vp === undefined || gw === undefined ? null : [vp, gw];
 }
 
 /** VEKN rules 3.1/3.1.6 ranking-eligibility gate, single-sourced with backend
  * ratings.py's inclusion filter. */
 export function rankingEligibility(tournament: unknown): string | null {
-  const engine = getEngineReactive();
-  if (!engine) return null;
-  return engine.rankingEligibility(JSON.stringify(tournament));
+  return getEngine().rankingEligibility(JSON.stringify(tournament));
 }
 
 /** How big the field was, for the coefficient and the win floors — distinct from
- * the played-player set the caller enumerates for membership. 0 until WASM loads. */
+ * the played-player set the caller enumerates for membership. */
 export function attestedPlayerCount(tournament: unknown): number {
-  const engine = getEngineReactive();
-  if (!engine) return 0;
-  return engine.attestedPlayerCount(JSON.stringify(tournament));
+  return getEngine().attestedPlayerCount(JSON.stringify(tournament));
 }
 
 export async function computeLeagueStandings(
@@ -630,30 +587,24 @@ export function displayStandings(
   tournament: Tournament,
   sanctions: Sanction[]
 ): Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; rank: number; finalist: boolean; disqualified: boolean; non_competing: boolean; finals?: { gw: number; vp: number; tp: number } }> {
-  const engine = getEngineReactive();
-  if (!engine) return [];
   const config = JSON.stringify({ tournament, sanctions: JSON.parse(buildSanctionsPayload(sanctions)) });
-  return JSON.parse(callEngine(() => engine.displayStandings(config)));
+  return JSON.parse(callEngine(() => getEngine().displayStandings(config)));
 }
 
 export function finalsQualification(
   tournament: Tournament | null,
   standings: Array<{ user_uid: string; gw: number; vp: number; tp: number; toss?: number; disqualified?: boolean; non_competing?: boolean }>
 ): { enough_rounds: boolean; possible: boolean; has_ties: boolean; tied_uids: string[] } {
-  const engine = getEngineReactive();
-  const closed = { enough_rounds: false, possible: false, has_ties: false, tied_uids: [] };
-  if (!engine || !tournament) return closed;
-  const resultJson = callEngine(() => engine.finalsQualification(JSON.stringify({ tournament, standings })));
+  if (!tournament) return { enough_rounds: false, possible: false, has_ties: false, tied_uids: [] };
+  const resultJson = callEngine(() => getEngine().finalsQualification(JSON.stringify({ tournament, standings })));
   return JSON.parse(resultJson);
 }
 
 export function computePlayerIssuesSync(
   rounds: string[][][]
 ): { rule: number; players: string[] }[] | null {
-  const engine = getEngineReactive();
-  if (!engine) return null;
   try {
-    const resultJson = callEngine(() => engine.computePlayerIssues(JSON.stringify({ rounds })));
+    const resultJson = callEngine(() => getEngine().computePlayerIssues(JSON.stringify({ rounds })));
     return JSON.parse(resultJson);
   } catch (e) {
     console.error('computePlayerIssues failed:', e);
@@ -676,9 +627,6 @@ export async function buildActorContext(
   if (!user) {
     return { uid: '', roles: [], is_organizer: false, can_organize_league_uids: [], now: new Date().toISOString() };
   }
-  // This context feeds engine action validation, so the checks must be
-  // authoritative — ensure WASM is loaded rather than fail-closed.
-  await initEngine();
   const isIC = user.roles?.includes('IC');
   let canOrganize: string[] = [];
   // IC bypasses the per-league check in the engine, so it skips this filter

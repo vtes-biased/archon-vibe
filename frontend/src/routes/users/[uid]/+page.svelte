@@ -5,7 +5,6 @@
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { canEditUser, canManageVekn, canMarkDeceased, canDeleteMember, canSponsorMember, canMergeAccounts, canIssueRestrictedSanction } from "$lib/engine";
-  import { engineReady } from "$lib/stores/engine-ready.svelte";
   import type { User } from "$lib/types";
   import UserComponent from "$lib/components/User.svelte";
   import VeknManagement from "$lib/components/VeknManagement.svelte";
@@ -40,10 +39,8 @@
   const uid = $derived($page.params.uid);
   const auth = $derived(getAuthState());
 
-  // initEngine() runs once in +layout.svelte; the permission wrappers below read
-  // engineReady() internally, so canEdit/canManage recompute when WASM lands.
   const canEdit = $derived.by(() => {
-    if (!auth.user || !user || !engineReady()) return false;
+    if (!auth.user || !user) return false;
     try {
       return canEditUser(auth.user, user).allowed;
     } catch {
@@ -61,7 +58,7 @@
   });
 
   const canManageDeceased = $derived.by(() => {
-    if (!auth.user || !user || !isOnline || !engineReady()) return false;
+    if (!auth.user || !user || !isOnline) return false;
     if (auth.user.uid === user.uid) return false;
     try {
       return canMarkDeceased(auth.user, user.country ?? null).allowed;
@@ -73,7 +70,7 @@
   // Soft-delete is IC-only; the button itself only shows for VEKN-less members
   // (handled in VeknManagement) — VEKN members are removed via deceased status.
   const canDelete = $derived.by(() => {
-    if (!auth.user || !user || !isOnline || !engineReady()) return false;
+    if (!auth.user || !user || !isOnline) return false;
     if (auth.user.uid === user.uid) return false;
     try {
       return canDeleteMember(auth.user).allowed;
@@ -85,7 +82,7 @@
   // Merging unions both accounts' roles, so it is IC-only — a narrower gate
   // than the rest of VeknManagement.
   const canMerge = $derived.by(() => {
-    if (!auth.user || !user || !isOnline || !engineReady()) return false;
+    if (!auth.user || !user || !isOnline) return false;
     return canMergeAccounts(auth.user).allowed;
   });
 

@@ -5,7 +5,6 @@ import { formatScore } from "$lib/utils";
 import { getCountry } from "$lib/geonames";
 import { getCards } from "$lib/cards";
 import { getLibraryTypeOrder } from "$lib/engine";
-import { initEngine } from "$lib/engine-instance";
 import { getDecksByTournamentGrouped } from "$lib/db";
 import { getLocale } from "$lib/paraglide/runtime.js";
 import * as m from "$lib/paraglide/messages.js";
@@ -118,9 +117,6 @@ export async function generateResultsText(
       const deck = winnerDecks[winnerDecks.length - 1]!;
       if (Object.keys(deck.cards).length > 0) {
         const cardsMap = await getCards();
-        // This text is stored, not re-rendered: a cold engine would freeze a
-        // non-TWDA library order into the file.
-        await initEngine();
         const winnerName = seatDisplay(tournament.winner, playerInfo, tournament.online);
         // The decklist itself stays in TWDA English convention (card names,
         // Crypt/Library headers) — only the prose heading is localized.

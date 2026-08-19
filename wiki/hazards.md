@@ -83,18 +83,6 @@ silently reconstructing six Polish events as duplicates. It lowercases the lette
 it maps (`Ł` → `l`) while leaving decomposed ones cased (`É` → `E`), so callers
 comparing folded strings must lowercase after it, not rely on it.
 
-**`normalizeSearch` is synchronous but the fold is not available until the engine
-loads.** It calls `foldAscii` through the reactive accessor and falls back to a
-mark-strip while the engine is cold, so a Svelte filter self-heals when
-`engineReady` flips — but anything that *stores* normalized output does not. The
-member index (`db.ts`) and the card token map (`cards.ts`) therefore await
-`initEngine()` before building, and `displayContext` keeps the member query raw
-rather than storing it folded; a new cached index must do the same or it holds
-the degraded form for the session. Beyond search the same function keys the venue
-dedup, and the krcg image-filename fallback in `DeckDisplay.svelte` — which runs
-in an event handler, so it is the one consumer that stays cold-wrong instead of
-self-healing.
-
 ## Two implementations of one gate
 
 **Online create bypasses the engine.** `POST /tournaments` builds the Tournament

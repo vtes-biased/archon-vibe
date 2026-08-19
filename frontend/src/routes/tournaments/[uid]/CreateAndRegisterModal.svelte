@@ -3,7 +3,6 @@
   import { getFilteredUsers, getUser, getRegistrationBarredUids } from "$lib/db";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { isOffline, addOfflinePlayer } from "$lib/stores/offline.svelte";
-  import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { getCountryFlag } from "$lib/geonames";
   import Button from "$lib/components/Button.svelte";
   import { TriangleAlert, Flower2, Ban } from "@lucide/svelte";
@@ -36,9 +35,6 @@
   // deliberately cross-country — the copy states the rule rather than hiding
   // the option, so an organizer who can't act knows who can.
   const canSponsor = $derived(canSponsorMember(auth.user).allowed);
-  // checkPermission fails closed before WASM loads; don't tell an official they
-  // aren't one in that window — show the form (its confirm stays disabled).
-  const eligibilityKnown = $derived(engineReady());
   // The device lock, not browser connectivity — must match the fact doAction
   // uses to skip the server POST (tournament-actions.ts), or a disconnected
   // device mints a temp player/user stub go-online will never reconcile.
@@ -212,7 +208,7 @@
       onkeydown={(e) => e.stopPropagation()}
     >
       <h3 id="sponsor-modal-title" class="text-lg font-medium text-ink-strong">{m.vekn_sponsor_to_register_title()}</h3>
-      {#if eligibilityKnown && !canSponsor}
+      {#if !canSponsor}
         <!-- Nothing to offer this organizer: state the rule and who can act,
              rather than leaving a dead confirm button on the screen. -->
         <p class="text-sm text-ink inline-flex items-start gap-1.5">
@@ -261,7 +257,7 @@
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
     >
-      {#if eligibilityKnown && !canSponsor}
+      {#if !canSponsor}
         <!-- Explain instead of offering a form that can never be submitted: a
              filled-in name and email followed by a dead button teaches nothing. -->
         <h3 id="create-modal-title" class="text-lg font-medium text-ink-strong">{m.create_and_register_title()}</h3>

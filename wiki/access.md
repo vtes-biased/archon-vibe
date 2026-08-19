@@ -8,8 +8,8 @@ Every authorization rule lives once, as data, in `engine/src/permissions.rs`:
 `CAPABILITIES` (what each authority takes) and `ROLE_APPOINTMENTS` (who may grant
 each role). **A matrix change edits a row there and nowhere else.** The backend
 (`permissions.py`, a thin marshalling adapter with no logic, each route keeping its
-own 403 detail), the frontend (`lib/engine.ts`, UX-only and failing closed to
-`false` until WASM loads) and the Discord bot are all callers. **No role literal
+own 403 detail), the frontend (`lib/engine.ts`, UX-only) and the Discord bot are
+all callers. **No role literal
 outside the engine may decide access**, and the backend remains the authoritative
 enforcement point — checks run at both layers.
 

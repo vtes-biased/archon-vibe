@@ -131,10 +131,9 @@ moved, so clients keep the old payload indefinitely. The fix is the re-save scri
 `vitest` appears nowhere in the repo — only `svelte-check`, Playwright and the smoke
 script. Standing up a runner, config and CI wiring for a single test is exactly
 what the policy forbids. Compounding it, `tournament-utils.ts` is **not pure**: it
-imports from `./engine`, and those helpers return an empty result when the WASM
-engine is null. Outside a browser that is always, so a Node-side test would assert
-the empty answer a cold engine gives and never its real placement logic — it would
-verify the absence of the engine. Placement semantics belong in Rust,
+imports from `./engine`, whose helpers read the WASM engine synchronously and
+throw when it is absent. Outside a browser that is always, so a Node-side test
+would assert the throw and never the real placement logic. Placement semantics belong in Rust,
 rendering belongs in Playwright, and the TypeScript in between is marshalling that
 `svelte-check` plus the E2E lifecycle spec already covers.
 

@@ -11,8 +11,6 @@
   import { getUser, getTournament, getTournamentContextSanctions, getDeviceId, getDecksByTournamentGrouped, getLeague, saveTournament } from "$lib/db";
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
   import { attestedPlayerCount, finalsQualification, rankingEligibility, validateDeck, isOrganizer as engineIsOrganizer, type TournamentEventType, type ValidationError } from "$lib/engine";
-  import { initEngine } from "$lib/engine-instance";
-  import { engineReady } from "$lib/stores/engine-ready.svelte";
   import { getStateTone, translateTournamentState, rankBadgeLabel, computeStandings, eventUrl, type PlayerInfoMap } from "$lib/tournament-utils";
   import { zonedDate } from "$lib/utils";
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime, OfflineLockLostError } from "$lib/stores/offline.svelte";
@@ -275,10 +273,7 @@ import TournamentModals from "./TournamentModals.svelte";
     return Object.fromEntries(uids.map((u, i) => [u, users[i]?.name || u.slice(0, 8)]));
   }
 
-  const standings = $derived.by(() => {
-    engineReady(); // reactive dep: recompute once WASM finishes loading
-    return computeStandings(tournament, tournamentSanctions.filter(s => s.tournament_uid === uid));
-  });
+  const standings = $derived(computeStandings(tournament, tournamentSanctions.filter(s => s.tournament_uid === uid)));
   const finalsQual = $derived(finalsQualification(tournament, standings));
 
 
@@ -426,7 +421,6 @@ import TournamentModals from "./TournamentModals.svelte";
     if (!tournament) loading = true;
     error = null;
     try {
-      await initEngine(); // standings ranking is engine-computed; ensure it's ready
       const t = await getTournament(uid);
       if (epoch !== loadEpoch) return; // superseded by a newer run
       if (t) {

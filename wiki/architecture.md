@@ -91,9 +91,18 @@ engine the single source of truth for state transitions. Catalog:
 
 **Read-only rules** the UI must agree with — may a finals start, is this table
 scorable, who places where — are engine exports too, called **synchronously**
-through `getEngineReactive()` and safe inside a `$derived`. A predicate
-reimplemented in TypeScript drifts from the engine and the UI ends up offering
-what the engine refuses; the fallback when WASM is not up yet fails closed.
+through `getEngine()` and safe inside a `$derived`. A predicate reimplemented in
+TypeScript drifts from the engine and the UI ends up offering what the engine
+refuses.
+
+**The root layout gates every route on `initEngine()`**, so no caller ever sees a
+cold engine and `getEngine()` throws rather than answering. There is no degraded
+mode: every fallback the gate replaced hid controls, blanked standings or reported
+a table scorable, and a red banner over that is worse than a splash. Gating is
+safe offline because the service worker precaches the wasm atomically with the
+shell (`cache.addAll`), so a servable shell implies a servable engine; the wait is
+the network, once, on a device's first visit. The error branch offers a reload,
+never a retry button — `initEngine()` latches its failure and re-throws forever.
 
 **CRUD events** — Create / Update / Delete, synchronizing DB state to clients. The
 payload is the full object including `uid` and `modified`. Flow: DB change → CRUD
@@ -275,8 +284,7 @@ offline; text import is not.
 **Library type ordering** is `LIBRARY_TYPE_ORDER` in `engine/src/deck.rs`, exported
 as `libraryTypeOrder` and read through `getLibraryTypeOrder()`. The engine's own
 TWDA export and every frontend decklist rendering — the deck view, the event text
-record — group by it. Before WASM loads it is empty, which leaves the groups in
-encounter order rather than inventing one.
+record — group by it.
 
 Decks are not bundled into the tournament SSE event: the tournament page listens
 for `type === "deck"` events and re-queries the grouped decks.

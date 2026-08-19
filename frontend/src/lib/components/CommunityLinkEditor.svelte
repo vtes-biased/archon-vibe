@@ -57,8 +57,8 @@
   ]);
 
   const reference = $derived(getCommunityLinkReference());
-  const isContent = $derived(reference?.placement[type] === "content");
-  const linkTypes = $derived(reference?.types ?? []);
+  const isContent = $derived(reference.placement[type] === "content");
+  const linkTypes = $derived(reference.types);
   const needsLanguage = $derived(isContent && languages.length === 0);
   const dropsPin = $derived(!!original?.moderation && url.trim() !== original.url);
 

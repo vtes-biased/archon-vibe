@@ -63,8 +63,8 @@
   const globalLinks = $derived(entries.filter(e => pinScope(e.link) === "global"));
   const nationalLinks = $derived(entries.filter(e => pinScope(e.link) === "national"));
   const unpinned = $derived(entries.filter(e => !pinScope(e.link)));
-  const channelLinks = $derived(unpinned.filter(e => reference?.placement[e.link.type] === "channel"));
-  const contentLinks = $derived(unpinned.filter(e => reference?.placement[e.link.type] === "content"));
+  const channelLinks = $derived(unpinned.filter(e => reference.placement[e.link.type] === "channel"));
+  const contentLinks = $derived(unpinned.filter(e => reference.placement[e.link.type] === "content"));
 
   const officialsByCountry = $derived.by(() => {
     const grouped = new Map<string, User[]>();
@@ -136,7 +136,7 @@
 
   const poolItems = $derived.by(() => {
     const items = contentLinks.filter(e => {
-      if (selectedMedia && reference?.media[e.link.type] !== selectedMedia) return false;
+      if (selectedMedia && reference.media[e.link.type] !== selectedMedia) return false;
       const languages = e.link.languages || [];
       // A language-less link predates the requirement: it shows under every filter.
       if (selectedLanguages.length && languages.length) {
@@ -324,7 +324,7 @@
       <CommunityContentPool
         items={poolItems}
         languages={poolLanguages}
-        mediaKinds={reference?.mediaKinds ?? []}
+        mediaKinds={reference.mediaKinds}
         {selectedLanguages}
         {selectedMedia}
         {canEdit}

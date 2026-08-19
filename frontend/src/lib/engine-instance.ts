@@ -1,4 +1,3 @@
-import { engineReady, markEngineReady, markEngineLoadFailed } from './stores/engine-ready.svelte';
 import { engineErrorFromThrown } from './error-codes';
 
 export type WasmEngine = import('../../../engine/pkg/archon_engine').WasmEngine;
@@ -33,10 +32,8 @@ export async function initEngine(): Promise<WasmEngine> {
         // against the current page, which 404s on deep routes (e.g. /tournaments/<uid>).
         await wasm.default({ module_or_path: new URL(wasmUrl, location.origin).href });
         wasmEngine = new wasm.WasmEngine();
-        markEngineReady();
       } catch (e) {
         initError = e instanceof Error ? e : new Error(String(e));
-        markEngineLoadFailed();
         throw initError;
       }
     })();
@@ -46,9 +43,9 @@ export async function initEngine(): Promise<WasmEngine> {
   return wasmEngine!;
 }
 
-/** `wasmEngine` is a plain module `let` Svelte can't track; reading `engineReady()` here registers
- * a reactive dependency so sync wrappers re-run once the engine loads, instead of computing once cold. */
-export function getEngineReactive(): WasmEngine | null {
-  engineReady();
+/** The root layout gates every route on `initEngine()`, so the sync wrappers can read the engine
+ * without a null arm. Throws if something outside that gate calls one. */
+export function getEngine(): WasmEngine {
+  if (!wasmEngine) throw new Error('Engine not initialized');
   return wasmEngine;
 }

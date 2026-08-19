@@ -11,7 +11,6 @@
   import { getUser } from "$lib/db";
   import type { League, Tournament, LeagueStandingsMode } from "$lib/types";
   import { attestedPlayerCount, canEditLeague, canLinkTournamentToLeague, computeLeagueStandings, isOrganizer as engineIsOrganizer } from "$lib/engine";
-  import { initEngine } from "$lib/engine-instance";
   import { tournamentAction } from "$lib/tournament-actions";
   import { translateTournamentState, getStateTone } from "$lib/tournament-utils";
   import { formatScore } from "$lib/utils";
@@ -165,9 +164,6 @@
     const finishedTournaments = leagueTournaments.filter(t => t.state === "Finished" && t.standings?.length);
     if (finishedTournaments.length > 0) {
       try {
-        // Before the map: attestedPlayerCount reads the engine synchronously and
-        // answers 0 until WASM lands, which would zero every finalist coefficient.
-        await initEngine();
         const tournamentData = finishedTournaments.map(t => ({
           uid: t.uid,
           rank: t.rank || "",

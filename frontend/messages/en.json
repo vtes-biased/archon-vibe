@@ -216,7 +216,7 @@
   "error_league_dq": "Player is disqualified from a league tournament",
   "error_action_requires_online": "This action requires an internet connection.",
   "error_network_unreachable": "Couldn't reach the server. Check your connection and try again.",
-  "engine_load_error": "Couldn't load the scoring engine. Some features are unavailable — reload to retry.",
+  "engine_load_error": "Couldn't load the scoring engine, so Archon can't start. Reload to retry.",
   "sync_error_disconnected": "Connection lost — data may be out of date.",
   "sync_reconnect": "Reconnect",
   "league_standings_error": "Couldn't compute standings.",

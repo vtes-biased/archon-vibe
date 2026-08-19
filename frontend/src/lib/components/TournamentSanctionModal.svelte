@@ -38,23 +38,21 @@
     });
   });
 
-  // Judges-Guide tables from the engine (WASM is initialized well before a
-  // judge can open this modal; null only in the engine-failed degraded state).
   const sanctionRef = getSanctionReference();
 
   const availableSubcategories = $derived(
-    sanctionRef?.subcategoriesByCategory[category] ?? []
+    sanctionRef.subcategoriesByCategory[category] ?? []
   );
 
   $effect(() => {
-    const subs = sanctionRef?.subcategoriesByCategory[category];
+    const subs = sanctionRef.subcategoriesByCategory[category];
     if (subs && subcategory && !subs.includes(subcategory)) {
       subcategory = null;
     }
   });
 
   const baselinePenalty = $derived(
-    subcategory ? (sanctionRef?.baselinePenalties[subcategory] ?? null) : null
+    subcategory ? (sanctionRef.baselinePenalties[subcategory] ?? null) : null
   );
 
   const LEVEL_SEVERITY: Record<SanctionLevel, number> = {
@@ -72,7 +70,7 @@
     subcategory ? activePrior.filter(s => s.subcategory === subcategory).length : 0
   );
   const suggestedLevel = $derived.by<SanctionLevel>(() => {
-    if (!subcategory || !sanctionRef) return "caution";
+    if (!subcategory) return "caution";
     const ladder = sanctionRef.escalationSequence;
     // A baseline outside the ladder (none today) would give indexOf -1: clamp to 0.
     const start = Math.max(0, ladder.indexOf(sanctionRef.baselinePenalties[subcategory]));

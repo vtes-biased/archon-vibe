@@ -216,7 +216,7 @@
   "error_league_dq": "O jogador está desqualificado de um torneio de liga",
   "error_action_requires_online": "Esta ação requer uma conexão com a internet.",
   "error_network_unreachable": "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.",
-  "engine_load_error": "Não foi possível carregar o motor de pontuação. Alguns recursos estão indisponíveis — recarregue para tentar novamente.",
+  "engine_load_error": "Não foi possível carregar o motor de pontuação, então o Archon não pode iniciar. Recarregue para tentar novamente.",
   "sync_error_disconnected": "Conexão perdida — os dados podem estar desatualizados.",
   "sync_reconnect": "Reconectar",
   "league_standings_error": "Não foi possível calcular a classificação.",

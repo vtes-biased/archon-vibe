@@ -216,7 +216,7 @@
   "error_league_dq": "Le joueur est disqualifié d'un tournoi de ligue",
   "error_action_requires_online": "Cette action nécessite une connexion Internet.",
   "error_network_unreachable": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
-  "engine_load_error": "Impossible de charger le moteur de score. Certaines fonctions sont indisponibles — rechargez pour réessayer.",
+  "engine_load_error": "Impossible de charger le moteur de score, Archon ne peut donc pas démarrer. Rechargez pour réessayer.",
   "sync_error_disconnected": "Connexion perdue — les données peuvent être obsolètes.",
   "sync_reconnect": "Se reconnecter",
   "league_standings_error": "Impossible de calculer le classement.",
