@@ -307,7 +307,7 @@ release bump:
         # entry and shows nothing, silently — reachable via a pre-release tag like v1.2.3-rc1.
         printf '%s' "$stamp" | grep -qE '^## v[0-9]+\.[0-9]+\.[0-9]+ — [0-9]{4}-[0-9]{2}-[0-9]{2}$' \
             || { echo "$tag would stamp a heading the app cannot parse"; exit 1; }
-        uv run python3 -c "import pathlib, sys; p = pathlib.Path('CHANGELOG.md'); p.write_text(p.read_text().replace('## Unreleased', sys.argv[1], 1))" "$stamp"
+        uv run python3 -c "import pathlib, re, sys; p = pathlib.Path('CHANGELOG.md'); p.write_text(re.sub(r'(?m)^## Unreleased$', lambda m: sys.argv[1], p.read_text(), count=1))" "$stamp"
         git add CHANGELOG.md
         git commit -m "Stamp $tag in the changelog"
         git push origin HEAD

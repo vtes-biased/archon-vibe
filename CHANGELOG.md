@@ -4,13 +4,13 @@ What changed in Archon, from a player's point of view — one line per change.
 Internals, refactors and chrome are left out on purpose.
 
 Written by the `changeset` skill before a release is cut, newest first, and
-headed `## v1.0.3 — 2026-08-19` until `just release` stamps it with the tag and the date.
+headed `## Unreleased` until `just release` stamps it with the tag and the date.
 The app bundles this file and shows each reader the entries they have not seen, so
 these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.0.3 — 2026-08-19
 
 - The location for an event declared in the app is kept (not replaced by the vekn.net Antarctica venue anymore)
 - The new-member button is offered only to the officials who can actually submit it.
