@@ -78,9 +78,6 @@ logger = logging.getLogger(__name__)
 _scheduler: AsyncIOScheduler | None = None
 _sync_service: VEKNSyncService | None = None
 
-# Held by the tournament sync and the archive sync: both mint tournaments and
-# both avoid duplicates by matching the corpus first, so a concurrent pair can
-# each read "absent" and create the same real event twice.
 _corpus_write_lock = asyncio.Lock()
 
 _shutdown_event: asyncio.Event | None = None

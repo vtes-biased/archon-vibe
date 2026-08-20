@@ -322,14 +322,14 @@ instead of growing its own guard.
 without a redeploy — and APScheduler 3.x fires an `IntervalTrigger` at start + N,
 not immediately. Registration happens seconds into startup, so systemd's kill
 always precedes the first fire of a 24-hour job: it is not a race a quieter
-restart schedule wins. Four jobs sat dead this way. What survives is a
-`CronTrigger` at a fixed hour, a period comfortably under the day, or an explicit
-`asyncio.create_task` kick at startup — so **register a daily job as a
-`CronTrigger` with an explicit `timezone`**, since nothing sets one on the servers
-and a bare `hour=` is a claim about a machine setting. A restart takes seconds and
-there is no jobstore, so the cron hour the drifting restart happens to land on
-loses that day's run; every one of these jobs is idempotent, which is why that is
-tolerable rather than something to build around.
+restart schedule wins. What survives is a `CronTrigger` at a fixed hour, a period
+comfortably under the day, or an explicit `asyncio.create_task` kick at startup —
+so **register a daily job as a `CronTrigger` with an explicit `timezone`**, since
+nothing sets one on the servers and a bare `hour=` is a claim about a machine
+setting. A restart takes seconds and there is no jobstore, so the cron hour the
+drifting restart happens to land on loses that day's run; every one of these jobs
+is idempotent, which is why that is tolerable rather than something to build
+around.
 
 **Production nginx proxies only an allowlist of top-level prefixes.** A new route
 under an existing prefix is fine; a new top-level segment 404s in production while

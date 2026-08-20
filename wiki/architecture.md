@@ -790,8 +790,17 @@ rounds, tables, seating, scores and players, matching players by VEKN ID.
 | Deleted-objects purge | daily, 01:30 UTC | `db.py` |
 | Promo stock recompute | daily, 02:00 UTC | `promo_stock.py` |
 | Rating recompute (ratings, then Hall of Fame wins) | daily, 02:30 UTC | `ratings.py` |
-| Legacy-archon merge | daily, 04:00 server time, systemd timer | `scripts/migrate_from_archon.py --merge` |
+| Legacy-archon merge | daily, 04:00 server time, systemd timer, own flag — off everywhere | `scripts/migrate_from_archon.py --merge` |
 | TWDA sync (reconstruction + winner decks) | daily, 05:00 UTC, own flag | `twda_import.py` |
+
+**Deferred: no daily job has yet been observed firing.** The conversion below is
+reasoned from the trigger semantics, not witnessed — the defect needs a live
+process and a restart cycle to show itself, so nothing in CI can stand in for it.
+**Trigger: the first beta deploy carrying `507f3c8`.** A day later the journal
+must show an execution line for each of `sanction_cleanup`, `purge_deleted`,
+`promo_stock_recompute`, `rating_recompute` and `twda_sync`, not merely the
+`Added job` lines that were all fourteen days of the previous journal held.
+Delete this paragraph once it has.
 
 **Every daily job is a `CronTrigger` at a pinned UTC hour, never an interval** —
 an interval job of a day or more can never fire here
@@ -800,11 +809,18 @@ an interval job of a day or more can never fire here
 unreachable and its daily cadence is really its startup kick; the kick is the
 mechanism, the interval is the ceiling.
 
-The tournament sync and the TWDA sync hold one lock between them. Each avoids
-duplicating a real event by matching the corpus before it creates, so only a
-concurrent pair can both read "absent" and mint the same event twice — and
-`_adopt_same_event` carves out a reconstruction explicitly, which is what makes
-either order self-heal once they are serialized.
+The tournament sync and the TWDA sync hold one lock between them, so neither
+reads the corpus as lacking an event the other is halfway through creating. That
+is all it buys: **the two are not ordered, and the two orders are not
+symmetric.** A reconstruction landing first heals, because `_adopt_same_event`
+adopts a vekn-less same-day copy and carves out a reconstruction's winner-only
+roster explicitly. The vekn copy landing first does not: the archive sync matches
+only its own `twda` external id, so a decisions file that still reads `create`
+mints a second row, and the adoption's `taken` guard then refuses a copy already
+holding a vekn id. Regenerating the decisions file against the current corpus is
+what prevents that — never the schedule. The lock is also in-process only:
+`scripts/backfill_twda.py` and the legacy-archon merge write the same corpus from
+outside it.
 
 The purge hard-deletes soft-deleted objects older than 30 days and also drops
 orphaned `avatars` / `banners` / `push_subscriptions` side-table rows — there is no
