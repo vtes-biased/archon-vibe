@@ -278,6 +278,8 @@ ansible/
 │   ├── nginx_tls/        # http vhost + certbot webroot + renewal hook
 │   ├── fastapi_backend/  # wheel install, venv, systemd (localhost only)
 │   ├── static_site/      # dist rsync, https vhost, backend proxy, SSE
-│   └── discord_bot/      # wheel install, venv, systemd, bot.<domain> vhost
+│   ├── discord_bot/      # wheel install, venv, systemd, bot.<domain> vhost
+│   ├── legacy_sync/      # daily legacy-archon merge (prod, parallel run)
+│   └── db_backup/        # daily pg_dump + weekly restore-verify (prod)
 └── build/                # fetched/built artifacts (git-ignored)
 ```

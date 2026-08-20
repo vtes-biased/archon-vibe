@@ -5,7 +5,6 @@
       - r.service_name is defined
       - r.site_root is defined
       - r.port is defined
-      - r.asgi_entrypoint is defined
       - r.python_version is defined
       - r.uv_python_install_dir is defined
       - r.user is defined
@@ -14,6 +13,9 @@
       - r.engine_wheel_src is defined
       - r.requirements_src is defined
       - r.env is defined
+      - r.officials_contacts_vault is defined
+      - r.twda_key_vault is defined
+      - r.feedback_key_vault is defined
     fail_msg: "fastapi_backend role missing required r.* inputs"
 
 - name: Set effective env_dir
@@ -22,6 +24,8 @@
     _wheels_dir: "{{ r.site_root }}/wheels"
     _venv_dir: "{{ r.site_root }}/.venv"
     _data_dir: "{{ r.data_dir | default(fastapi_data_dir_default) }}"
+    _asgi_entrypoint: "{{ r.asgi_entrypoint | default(fastapi_asgi_entrypoint_default) }}"
+    _ops_scripts_src: "{{ r.ops_scripts_src | default(fastapi_ops_scripts_src_default) }}"
 
 - name: Ensure site_root exists
   ansible.builtin.file:
@@ -43,12 +47,11 @@
 # imported by the service — just saves an on-call run a checkout on the box.
 - name: Ship backend ops scripts
   ansible.builtin.copy:
-    src: "{{ r.ops_scripts_src }}"
+    src: "{{ _ops_scripts_src }}"
     dest: "{{ r.site_root }}/scripts/"
     owner: "{{ r.user }}"
     group: "{{ r.group }}"
     mode: "0755"
-  when: r.ops_scripts_src is defined
 
 - name: Upload backend wheel
   ansible.builtin.copy:
@@ -197,7 +200,7 @@
     owner: root
     group: "{{ r.group }}"
     mode: "0640"
-  loop: "{{ query('ansible.builtin.fileglob', r.officials_contacts_vault | default('officials_contacts.json.vault')) }}"
+  loop: "{{ query('ansible.builtin.fileglob', r.officials_contacts_vault) }}"
   notify: Restart backend service
 
 # Multi-line PEM can't ride in the systemd EnvironmentFile, so it's delivered
@@ -209,7 +212,7 @@
     owner: root
     group: "{{ r.group }}"
     mode: "0640"
-  loop: "{{ query('ansible.builtin.fileglob', r.twda_key_vault | default('twda_github_app.pem.vault')) }}"
+  loop: "{{ query('ansible.builtin.fileglob', r.twda_key_vault) }}"
   notify: Restart backend service
 
 # Same out-of-band delivery as the TWDA key above; a separate App/key so the
@@ -221,7 +224,7 @@
     owner: root
     group: "{{ r.group }}"
     mode: "0640"
-  loop: "{{ query('ansible.builtin.fileglob', r.feedback_key_vault | default('feedback_github_app.pem.vault')) }}"
+  loop: "{{ query('ansible.builtin.fileglob', r.feedback_key_vault) }}"
   notify: Restart backend service
 
 - name: Render systemd unit

@@ -64,6 +64,13 @@ Because the backend ships as an installed wheel, **bundled data files must load
 through `importlib.resources`**, never `Path(__file__)`
 ([dogmas](dogmas.md#dependencies-and-data)).
 
+**A role's `defaults/main.yml` is its parameter contract.** Every `r.*` key the
+role reads is listed there, and is either required — asserted in the role, so
+omission fails the play — or carries a `*_default` that makes omission correct.
+The playbooks pass only what genuinely differs between beta and prod, so a
+parameter added to one caller and not the other can no longer be silently
+skipped on the other.
+
 Nothing auto-deploys, and there is no public version endpoint — never sniff the app
 for a version.
 

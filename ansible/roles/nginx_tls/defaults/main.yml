@@ -1,7 +1,9 @@
 ---
-# Each invocation of this role is parametrised via a single `r` dict:
-#   r.server_name     required  - FQDN to request a cert for
-#   r.contact_email   required  - email registered with Let's Encrypt
-#   r.acme_webroot    optional  - override ACME webroot (default below)
+# This file is the role's parameter contract. Every `r.*` key the tasks read is
+# listed here and is either required — asserted in tasks/main.yml, so omission
+# fails the play — or carries a `*_default` below that makes omission correct.
+# r.server_name     required  - FQDN to request a cert for
+# r.contact_email   required  - email registered with Let's Encrypt
+# r.acme_webroot    optional  - ACME webroot (default below)
 r: {}
 nginx_acme_webroot_default: /var/www/acme

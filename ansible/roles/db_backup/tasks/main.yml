@@ -2,27 +2,37 @@
 # pg_dump -F c of every non-template DB, so it covers both `archon` and legacy
 # `archondb` while the parallel run coexists, with no config change needed at
 # Phase-4 decommission.
-- name: Assert required inputs
-  ansible.builtin.assert:
-    that:
-      - r.backup_dir is defined
-      - r.retention_days is defined
-      - r.oncalendar is defined
-      - r.check_oncalendar is defined
-    fail_msg: "db_backup role missing required r.* inputs"
+- name: Set effective defaults
+  ansible.builtin.set_fact:
+    _backup_dir: "{{ r.backup_dir | default(db_backup_backup_dir_default) }}"
+    _retention_days: "{{ r.retention_days | default(db_backup_retention_days_default) }}"
+    _exclude: "{{ r.exclude | default(db_backup_exclude_default) }}"
+    _oncalendar: "{{ r.oncalendar | default(db_backup_oncalendar_default) }}"
+    _check_oncalendar: "{{ r.check_oncalendar | default(db_backup_check_oncalendar_default) }}"
+    _remote_enabled: "{{ r.remote_enabled | default(db_backup_remote_enabled_default) }}"
+    _remote_bucket: "{{ r.remote_bucket | default(db_backup_remote_bucket_default) }}"
+    _remote_endpoint: "{{ r.remote_endpoint | default(db_backup_remote_endpoint_default) }}"
+    _remote_keep_daily: "{{ r.remote_keep_daily | default(db_backup_remote_keep_daily_default) }}"
+    _remote_keep_weekly: "{{ r.remote_keep_weekly | default(db_backup_remote_keep_weekly_default) }}"
+    _remote_keep_monthly: "{{ r.remote_keep_monthly | default(db_backup_remote_keep_monthly_default) }}"
+    _remote_access_key: "{{ r.remote_access_key | default(db_backup_remote_access_key_default) }}"
+    _remote_secret_key: "{{ r.remote_secret_key | default(db_backup_remote_secret_key_default) }}"
+    _remote_restic_password: "{{ r.remote_restic_password | default(db_backup_remote_restic_password_default) }}"
+    _healthcheck_url: "{{ r.healthcheck_url | default(db_backup_healthcheck_url_default) }}"
+    _check_healthcheck_url: "{{ r.check_healthcheck_url | default(db_backup_check_healthcheck_url_default) }}"
 
 - name: Assert remote backup secrets are present
   ansible.builtin.assert:
     that:
-      - r.remote_access_key | default('') | length > 0
-      - r.remote_secret_key | default('') | length > 0
-      - r.remote_restic_password | default('') | length > 0
-      - r.remote_bucket | default('') | length > 0
+      - _remote_access_key | length > 0
+      - _remote_secret_key | length > 0
+      - _remote_restic_password | length > 0
+      - _remote_bucket | length > 0
     fail_msg: >-
       db_backup_remote_enabled=true requires vault_remote_backup_access_key,
       vault_remote_backup_secret_key and vault_remote_backup_restic_password
       in vault.yml, and db_backup_remote_bucket in inventory
-  when: r.remote_enabled | default(false) | bool
+  when: _remote_enabled | bool
 
 # rclone: pg-backup's orphan-repo scan (restic can't list bucket prefixes)
 - name: Install restic + rclone
@@ -31,11 +41,11 @@
       - restic
       - rclone
     state: present
-  when: r.remote_enabled | default(false) | bool
+  when: _remote_enabled | bool
 
 - name: Ensure backup dir exists
   ansible.builtin.file:
-    path: "{{ r.backup_dir }}"
+    path: "{{ _backup_dir }}"
     state: directory
     owner: postgres
     group: postgres
@@ -54,32 +64,32 @@
   # repo is public; scripts no-op without the file (units load it with `-`).
   ansible.builtin.copy:
     content: |
-      BACKUP_HEALTHCHECK_URL={{ r.healthcheck_url | default('') }}
-      CHECK_HEALTHCHECK_URL={{ r.check_healthcheck_url | default('') }}
+      BACKUP_HEALTHCHECK_URL={{ _healthcheck_url }}
+      CHECK_HEALTHCHECK_URL={{ _check_healthcheck_url }}
     dest: /etc/postgres-backup/healthcheck.env
     owner: root
     group: postgres
     mode: "0640"
   when: >-
-    (r.healthcheck_url | default('') | length > 0)
-    or (r.check_healthcheck_url | default('') | length > 0)
+    (_healthcheck_url | length > 0)
+    or (_check_healthcheck_url | length > 0)
   no_log: true
 
 - name: Write remote backup credentials
   ansible.builtin.copy:
     content: |
-      AWS_ACCESS_KEY_ID={{ r.remote_access_key }}
-      AWS_SECRET_ACCESS_KEY={{ r.remote_secret_key }}
-      RESTIC_PASSWORD={{ r.remote_restic_password }}
-      RESTIC_REPOSITORY_BASE=s3:{{ r.remote_endpoint }}/{{ r.remote_bucket }}
-      REMOTE_KEEP_DAILY={{ r.remote_keep_daily }}
-      REMOTE_KEEP_WEEKLY={{ r.remote_keep_weekly }}
-      REMOTE_KEEP_MONTHLY={{ r.remote_keep_monthly }}
+      AWS_ACCESS_KEY_ID={{ _remote_access_key }}
+      AWS_SECRET_ACCESS_KEY={{ _remote_secret_key }}
+      RESTIC_PASSWORD={{ _remote_restic_password }}
+      RESTIC_REPOSITORY_BASE=s3:{{ _remote_endpoint }}/{{ _remote_bucket }}
+      REMOTE_KEEP_DAILY={{ _remote_keep_daily }}
+      REMOTE_KEEP_WEEKLY={{ _remote_keep_weekly }}
+      REMOTE_KEEP_MONTHLY={{ _remote_keep_monthly }}
     dest: /etc/postgres-backup/remote.env
     owner: root
     group: postgres
     mode: "0640"
-  when: r.remote_enabled | default(false) | bool
+  when: _remote_enabled | bool
   no_log: true
 
 - name: Install pg-backup script

@@ -1,4 +1,7 @@
 ---
+# This file is the role's parameter contract. Every `r.*` key the tasks read is
+# listed here and is either required — asserted in tasks/main.yml, so omission
+# fails the play — or carries a `*_default` below that makes omission correct.
 # r.server_name      required  - FQDN (e.g. archon.krcg.org)
 # r.site_root        required  - filesystem base (dist lands at r.site_root/dist)
 # r.dist_src         required  - local path of the built frontend dir
@@ -7,7 +10,7 @@
 # r.backend_port     required  - localhost port uvicorn listens on
 # r.backend_paths    optional  - list of URL prefixes proxied to the backend
 # r.sse_path         optional  - location that needs SSE-friendly nginx knobs
-# r.client_max_body  optional  - client_max_body_size (default 10M)
+# r.client_max_body  optional  - client_max_body_size
 r: {}
 static_site_backend_paths_default:
   - /api

@@ -9,9 +9,9 @@ Type=oneshot
 User=postgres
 Group=postgres
 SyslogIdentifier=postgres-backup-check
-Environment=BACKUP_DIR={{ r.backup_dir }}
-Environment="EXCLUDE_DBS={{ r.exclude | default([]) | join(' ') }}"
-{% if r.remote_enabled | default(false) | bool %}
+Environment=BACKUP_DIR={{ _backup_dir }}
+Environment="EXCLUDE_DBS={{ _exclude | join(' ') }}"
+{% if _remote_enabled | bool %}
 EnvironmentFile=/etc/postgres-backup/remote.env
 {% endif %}
 # Dead-man's-switch ping URLs; the '-' tolerates the file being absent.

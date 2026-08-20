@@ -2,7 +2,7 @@
 Description=Scheduled restore-verify of postgres backups
 
 [Timer]
-OnCalendar={{ r.check_oncalendar }}
+OnCalendar={{ _check_oncalendar }}
 Persistent=true
 RandomizedDelaySec=30m
 Unit=postgres-backup-check.service

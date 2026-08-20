@@ -44,7 +44,6 @@
         service_name: "{{ backend_service }}"
         site_root: "{{ backend_site_root }}"
         port: "{{ backend_port }}"
-        asgi_entrypoint: "backend.src.main:app"
         python_version: "{{ python_version }}"
         uv_python_install_dir: "{{ uv_python_install_dir }}"
         user: "{{ archon_user }}"
@@ -55,7 +54,6 @@
         env: "{{ backend_env }}"
         env_dir: "{{ env_dir }}"
         data_dir: "{{ app_lib_dir }}"
-        ops_scripts_src: "{{ playbook_dir }}/../../backend/scripts/"
         officials_contacts_vault: officials_contacts.json.beta.vault
         twda_key_vault: twda_github_app.pem.beta.vault
         feedback_key_vault: feedback_github_app.pem.beta.vault

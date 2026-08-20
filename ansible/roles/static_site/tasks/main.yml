@@ -6,9 +6,8 @@
       - r.dist_src is defined
       - r.owner is defined
       - r.group is defined
-      # server_name + backend_port drive the nginx vhost — only required when this
-      # role manages nginx (prod). Beta sets manage_nginx=false and uses nginx_site.
-      - (not (r.manage_nginx | default(true))) or (r.server_name is defined and r.backend_port is defined)
+      - r.server_name is defined
+      - r.backend_port is defined
     fail_msg: "static_site role missing required r.* inputs"
 
 - name: Set effective defaults
@@ -48,5 +47,4 @@
     src: https.conf.j2
     dest: "/etc/nginx/sites-enabled/{{ r.server_name }}.https.conf"
     mode: "0644"
-  when: r.manage_nginx | default(true)
   notify: Reload nginx (static_site)

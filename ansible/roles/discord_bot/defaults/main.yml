@@ -1,4 +1,7 @@
 ---
+# This file is the role's parameter contract. Every `r.*` key the tasks read is
+# listed here and is either required — asserted in tasks/main.yml, so omission
+# fails the play — or carries a `*_default` below that makes omission correct.
 # r.service_name           required (e.g. archon-bot)
 # r.site_root              required (e.g. /opt/archon/bot)
 # r.bot_wheel_src          required (local path to the built archon_discord_bot-*.whl)
@@ -7,10 +10,14 @@
 # r.uv_python_install_dir  required (where uv stores managed Pythons)
 # r.user                   required
 # r.group                  required
-# r.port               required (localhost port for OAuth callback http server)
-# r.server_name        required (public FQDN e.g. bot.archon.krcg.org)
-# r.state_dir          required (e.g. /var/lib/archon-bot — holds tokens.db)
-# r.env                required (dict)
-# r.env_dir            optional (default: /etc/archon)
+# r.port                   required (localhost port for OAuth callback http server)
+# r.state_dir              required (e.g. /var/lib/archon-bot — holds tokens.db)
+# r.env                    required (dict)
+# r.server_name            required only when r.manage_nginx (public FQDN e.g.
+#                            bot.archon.krcg.org)
+# r.env_dir                optional (default below)
+# r.manage_nginx           optional (default below; false delegates the vhost to
+#                            server-setup's nginx_site, as beta does)
 r: {}
 discord_bot_env_dir_default: /etc/archon
+discord_bot_manage_nginx_default: true

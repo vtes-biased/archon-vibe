@@ -1,9 +1,10 @@
 ---
-# Parametrised via `r` dict (see comments in playbooks/deploy.yml).
+# This file is the role's parameter contract. Every `r.*` key the tasks read is
+# listed here and is either required — asserted in tasks/main.yml, so omission
+# fails the play — or carries a `*_default` below that makes omission correct.
 # r.service_name          required (e.g. archon-backend)
 # r.site_root             required (install dir, e.g. /opt/archon/backend)
 # r.port                  required (localhost port)
-# r.asgi_entrypoint       required (e.g. backend.src.main:app)
 # r.python_version        required (uv-managed Python, e.g. "3.14")
 # r.uv_python_install_dir required (where uv stores managed Pythons)
 # r.user                  required (runtime unix user)
@@ -12,15 +13,17 @@
 # r.engine_wheel_src      required (local path to the PyO3 engine wheel)
 # r.requirements_src      required (local path to pinned requirements.txt)
 # r.env                   required (dict of KEY: value pairs)
-# r.env_dir               optional (default: /etc/archon)
-# r.data_dir              optional (writable state dir; default: /var/lib/archon.
+# r.officials_contacts_vault required (per-env vault filename in files/, e.g.
+#                            officials_contacts.json.beta.vault)
+# r.twda_key_vault        required (per-env vault filename in files/)
+# r.feedback_key_vault    required (per-env vault filename in files/)
+# r.asgi_entrypoint       optional (default below)
+# r.env_dir               optional (default below)
+# r.data_dir              optional (writable state dir; default below.
 #                          Must exist — systemd ProtectSystem=strict + ReadWritePaths needs it.)
-# r.officials_contacts_vault optional (per-env vault filename in files/; default
-#                            officials_contacts.json.vault; e.g. ...json.beta.vault)
-# r.twda_key_vault        optional (per-env vault filename in files/; default
-#                            twda_github_app.pem.vault; e.g. ...pem.beta.vault)
-# r.feedback_key_vault    optional (per-env vault filename in files/; default
-#                            feedback_github_app.pem.vault; e.g. ...pem.beta.vault)
+# r.ops_scripts_src       optional (default below: this repo's backend/scripts/)
 r: {}
+fastapi_asgi_entrypoint_default: backend.src.main:app
 fastapi_env_dir_default: /etc/archon
 fastapi_data_dir_default: /var/lib/archon
+fastapi_ops_scripts_src_default: "{{ role_path }}/../../../backend/scripts/"

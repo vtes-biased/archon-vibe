@@ -1,5 +1,5 @@
 [Unit]
-Description=archon legacy-archon to archon-vibe merge ({{ r.service_name }})
+Description=archon legacy-archon to archon-vibe merge ({{ _service_name }})
 After=postgresql.service
 Wants=postgresql.service
 
@@ -7,7 +7,7 @@ Wants=postgresql.service
 Type=oneshot
 User={{ r.user }}
 Group={{ r.group }}
-EnvironmentFile={{ r.env_dir }}/{{ r.service_name }}.env
+EnvironmentFile={{ _env_dir }}/{{ _service_name }}.env
 # Heavy one-shot on a memory-tight box — run gently so legacy + backend stay
 # responsive (the merge spikes RAM/IO during its pg_dump + bulk upserts).
 Nice=10

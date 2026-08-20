@@ -1,0 +1,40 @@
+---
+# This file is the role's parameter contract. Every `r.*` key the tasks read is
+# listed here with a default that makes omission correct, so a caller passes only
+# what it wants to differ. The three remote credentials have no usable default:
+# they are asserted non-empty when r.remote_enabled, and unused otherwise.
+# r.backup_dir             local dump target
+# r.retention_days         local dump retention
+# r.exclude                database names to skip (list)
+# r.oncalendar             daily dump schedule
+# r.check_oncalendar       weekly restore-verify schedule
+# r.remote_enabled         push dumps off-box via restic -> S3
+# r.remote_bucket          S3 bucket (required when r.remote_enabled)
+# r.remote_endpoint        S3 endpoint
+# r.remote_keep_daily      restic forget policy
+# r.remote_keep_weekly     restic forget policy
+# r.remote_keep_monthly    restic forget policy
+# r.remote_access_key      S3 access key (required when r.remote_enabled)
+# r.remote_secret_key      S3 secret key (required when r.remote_enabled)
+# r.remote_restic_password restic repo password (required when r.remote_enabled)
+# r.healthcheck_url        dead-man's-switch ping for the dump; empty = journald only
+# r.check_healthcheck_url  dead-man's-switch ping for the restore-verify
+r: {}
+# 03:00 lands a restore point right before the 04:00 legacy merge, the riskiest
+# daily write, with no contention on the 1-vCPU box.
+db_backup_backup_dir_default: /var/backups/postgres
+db_backup_retention_days_default: 7
+db_backup_exclude_default: []
+db_backup_oncalendar_default: "*-*-* 03:00:00"
+db_backup_check_oncalendar_default: "Sun *-*-* 06:00:00"
+db_backup_remote_enabled_default: false
+db_backup_remote_bucket_default: ""
+db_backup_remote_endpoint_default: "https://s3.fr-par.scw.cloud"
+db_backup_remote_keep_daily_default: 7
+db_backup_remote_keep_weekly_default: 4
+db_backup_remote_keep_monthly_default: 12
+db_backup_remote_access_key_default: ""
+db_backup_remote_secret_key_default: ""
+db_backup_remote_restic_password_default: ""
+db_backup_healthcheck_url_default: ""
+db_backup_check_healthcheck_url_default: ""
