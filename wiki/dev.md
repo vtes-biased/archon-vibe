@@ -121,7 +121,7 @@ with `just vapid-keys`. The private key and subject are ansible-vault secrets. T
 public key is served at runtime, never baked into the build
 ([architecture](architecture.md#web-push)).
 
-**TWDA auto-PR** — `TWDA_GITHUB_APP_ID`, `TWDA_GITHUB_PRIVATE_KEY` (a file path or
+**TWDA auto-PR** — `TWDA_GITHUB_CLIENT_ID`, `TWDA_GITHUB_PRIVATE_KEY` (a file path or
 inline PEM), `TWDA_GITHUB_INSTALLATION_ID`. The GitHub App needs Contents and Pull
 requests at read-and-write, no webhook, installed on the TWD repository. With the
 variables unset the feature is silently skipped.

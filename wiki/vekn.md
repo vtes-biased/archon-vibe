@@ -20,6 +20,12 @@ retiring these syncs means is [below](#decommission); the work waiting on it is
 All directions need `VEKN_API_BASE_URL`, `VEKN_API_USERNAME`,
 `VEKN_API_PASSWORD`.
 
+**Beta runs both inbound syncs and no outbound write, by design.** `VEKN_PUSH` is
+false there, and the TWDA GitHub App variables are left unset so `is_configured()`
+is false and every archive submission skips. Neither vekn.net nor the public
+archive may take a write from a rehearsal environment — that is what makes beta
+safe to run a production script against.
+
 ## Outbound push
 
 Real-time pushes are all `asyncio.create_task` and never block a user request. The
