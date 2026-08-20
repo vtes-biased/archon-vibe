@@ -114,7 +114,7 @@ needs `DISCORD_CLIENTID`, `DISCORD_SECRET` and `DISCORD_REDIRECT_URI`, plus
 **VEKN** — `VEKN_SYNC_ENABLED`, `VEKN_SYNC_INTERVAL_HOURS`, `VEKN_API_BASE_URL`,
 `VEKN_API_USERNAME`, `VEKN_API_PASSWORD`, `VEKN_PUSH`,
 `VEKN_PUSH_INTERVAL_HOURS`, `VITE_VEKN_PUSH`, and the separately-flagged
-`TWDA_SYNC_ENABLED`, `TWDA_SYNC_INTERVAL_HOURS` ([vekn](vekn.md#feature-flags)).
+`TWDA_SYNC_ENABLED` ([vekn](vekn.md#feature-flags)).
 
 **Web Push** — `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`; generate
 with `just vapid-keys`. The private key and subject are ansible-vault secrets. The

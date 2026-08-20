@@ -71,7 +71,6 @@ backend_env:
   VEKN_SYNC_ENABLED: "true"
   VEKN_SYNC_INTERVAL_HOURS: 24
   TWDA_SYNC_ENABLED: "true"
-  TWDA_SYNC_INTERVAL_HOURS: 24
   VEKN_API_BASE_URL: "https://www.vekn.net/api"
   VEKN_API_USERNAME: "{{ vault_vekn_username }}"
   VEKN_API_PASSWORD: "{{ vault_vekn_password }}"

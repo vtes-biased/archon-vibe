@@ -782,16 +782,29 @@ rounds, tables, seating, scores and players, matching players by VEKN ID.
 
 | Job | Schedule | Module |
 |---|---|---|
-| VEKN sync (members, tournaments) | every 6h, configurable | `vekn_sync.py`, `vekn_tournament_sync.py` |
-| TWDA sync (reconstruction + winner decks) | every 24h, configurable, own flag | `twda_import.py` |
-| VEKN push batch | hourly, configurable | `vekn_push.py` |
-| Legacy-archon merge | daily, systemd timer | `scripts/migrate_from_archon.py --merge` |
-| Sanction cleanup | daily | `db.py` |
-| Rating recompute (ratings, then Hall of Fame wins) | daily | `ratings.py` |
-| Promo stock recompute | daily | `promo_stock.py` |
+| VEKN sync (members, tournaments) | at startup, then every `VEKN_SYNC_INTERVAL_HOURS` | `vekn_sync.py`, `vekn_tournament_sync.py` |
+| Snapshot generation | at startup, then every 15 min | `snapshots.py` |
 | OAuth cleanup | hourly | `db_oauth.py` |
-| Snapshot generation | every 15 min | `snapshots.py` |
-| Deleted-objects purge | daily | `db.py` |
+| VEKN push batch | hourly, configurable | `vekn_push.py` |
+| Sanction cleanup | daily, 01:00 UTC | `db.py` |
+| Deleted-objects purge | daily, 01:30 UTC | `db.py` |
+| Promo stock recompute | daily, 02:00 UTC | `promo_stock.py` |
+| Rating recompute (ratings, then Hall of Fame wins) | daily, 02:30 UTC | `ratings.py` |
+| Legacy-archon merge | daily, 04:00 server time, systemd timer | `scripts/migrate_from_archon.py --merge` |
+| TWDA sync (reconstruction + winner decks) | daily, 05:00 UTC, own flag | `twda_import.py` |
+
+**Every daily job is a `CronTrigger` at a pinned UTC hour, never an interval** —
+an interval job of a day or more can never fire here
+([hazards](hazards.md#deploy)). Both deployed environments set
+`VEKN_SYNC_INTERVAL_HOURS` to 24, so the VEKN chain's own timer is likewise
+unreachable and its daily cadence is really its startup kick; the kick is the
+mechanism, the interval is the ceiling.
+
+The tournament sync and the TWDA sync hold one lock between them. Each avoids
+duplicating a real event by matching the corpus before it creates, so only a
+concurrent pair can both read "absent" and mint the same event twice — and
+`_adopt_same_event` carves out a reconstruction explicitly, which is what makes
+either order self-heal once they are serialized.
 
 The purge hard-deletes soft-deleted objects older than 30 days and also drops
 orphaned `avatars` / `banners` / `push_subscriptions` side-table rows — there is no

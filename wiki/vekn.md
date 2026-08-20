@@ -14,7 +14,6 @@ retiring these syncs means is [below](#decommission); the work waiting on it is
 | `VEKN_SYNC_ENABLED` | backend env | enables periodic inbound member and tournament sync |
 | `VEKN_SYNC_INTERVAL_HOURS` | backend env | inbound period, default 6h |
 | `TWDA_SYNC_ENABLED` | backend env | enables the archive sync — separate from `VEKN_SYNC_ENABLED`, because it must outlive the VEKN API |
-| `TWDA_SYNC_INTERVAL_HOURS` | backend env | archive period, default 24h |
 | `VEKN_PUSH_INTERVAL_HOURS` | backend env | outbound push period, default 1h |
 
 All directions need `VEKN_API_BASE_URL`, `VEKN_API_USERNAME`,

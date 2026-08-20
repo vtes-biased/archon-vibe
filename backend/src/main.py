@@ -14,6 +14,7 @@ from typing import Annotated
 import jwt
 import msgspec
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, Request, Response
@@ -77,6 +78,11 @@ logger = logging.getLogger(__name__)
 _scheduler: AsyncIOScheduler | None = None
 _sync_service: VEKNSyncService | None = None
 
+# Held by the tournament sync and the archive sync: both mint tournaments and
+# both avoid duplicates by matching the corpus first, so a concurrent pair can
+# each read "absent" and create the same real event twice.
+_corpus_write_lock = asyncio.Lock()
+
 _shutdown_event: asyncio.Event | None = None
 
 
@@ -139,7 +145,8 @@ async def run_tournament_sync() -> None:
     try:
         from .vekn_tournament_sync import sync_all_tournaments
 
-        stats = await sync_all_tournaments(_sync_service.client)
+        async with _corpus_write_lock:
+            stats = await sync_all_tournaments(_sync_service.client)
         record_success("tournament_sync", stats if isinstance(stats, dict) else None)
     except TimeoutError:
         logger.error("VEKN tournament sync timed out")
@@ -163,7 +170,9 @@ async def run_twda_sync() -> None:
         from .twda_import import run_twda_sync as sync_twda
 
         logger.info("Starting TWDA sync")
-        record_success("twda_sync", await sync_twda())
+        async with _corpus_write_lock:
+            stats = await sync_twda()
+        record_success("twda_sync", stats)
     except TimeoutError:
         logger.error("TWDA sync timed out")
         record_error("twda_sync", "timed out")
@@ -399,44 +408,43 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # admin trigger works even with the schedule off.
     admin.set_sync_runners(twda_sync=run_twda_sync)
     if os.getenv("TWDA_SYNC_ENABLED", "false").lower() == "true":
-        twda_interval = int(os.getenv("TWDA_SYNC_INTERVAL_HOURS", "24"))
         _scheduler.add_job(
             run_twda_sync,
-            trigger=IntervalTrigger(hours=twda_interval),
+            trigger=CronTrigger(hour=5, timezone="UTC"),
             id="twda_sync",
             name="TWDA Sync",
             replace_existing=True,
         )
-        logger.info(f"TWDA sync scheduled every {twda_interval} hours")
+        logger.info("TWDA sync scheduled daily at 05:00 UTC")
     else:
         logger.info("TWDA sync is disabled")
 
     _scheduler.add_job(
         run_sanction_cleanup,
-        trigger=IntervalTrigger(hours=24),
+        trigger=CronTrigger(hour=1, timezone="UTC"),
         id="sanction_cleanup",
         name="Sanction Cleanup",
         replace_existing=True,
     )
-    logger.info("Sanction cleanup scheduled daily")
+    logger.info("Sanction cleanup scheduled daily at 01:00 UTC")
 
     _scheduler.add_job(
         run_rating_recompute,
-        trigger=IntervalTrigger(hours=24),
+        trigger=CronTrigger(hour=2, minute=30, timezone="UTC"),
         id="rating_recompute",
         name="Rating Recompute",
         replace_existing=True,
     )
-    logger.info("Rating recompute scheduled daily (initial run after VEKN sync)")
+    logger.info("Rating recompute scheduled daily at 02:30 UTC")
 
     _scheduler.add_job(
         run_promo_stock_recompute,
-        trigger=IntervalTrigger(hours=24),
+        trigger=CronTrigger(hour=2, timezone="UTC"),
         id="promo_stock_recompute",
         name="Promo Stock Recompute",
         replace_existing=True,
     )
-    logger.info("Promo stock recompute scheduled daily")
+    logger.info("Promo stock recompute scheduled daily at 02:00 UTC")
 
     if os.getenv("VEKN_PUSH", "").lower() == "true":
         push_interval = int(os.getenv("VEKN_PUSH_INTERVAL_HOURS", "1"))
@@ -469,12 +477,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     _scheduler.add_job(
         run_purge_deleted_objects,
-        trigger=IntervalTrigger(hours=24),
+        trigger=CronTrigger(hour=1, minute=30, timezone="UTC"),
         id="purge_deleted",
         name="Purge Deleted Objects",
         replace_existing=True,
     )
-    logger.info("Purge of deleted objects scheduled daily")
+    logger.info("Purge of deleted objects scheduled daily at 01:30 UTC")
 
     # Always regenerate at startup: until a file exists /snapshot 503s, blocking
     # bootstrap for the minutes the full sync chain would otherwise take.
