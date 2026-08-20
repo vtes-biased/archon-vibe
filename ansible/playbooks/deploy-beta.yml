@@ -55,6 +55,7 @@
         env: "{{ backend_env }}"
         env_dir: "{{ env_dir }}"
         data_dir: "{{ app_lib_dir }}"
+        ops_scripts_src: "{{ playbook_dir }}/../../backend/scripts/"
         officials_contacts_vault: officials_contacts.json.beta.vault
         twda_key_vault: twda_github_app.pem.beta.vault
         feedback_key_vault: feedback_github_app.pem.beta.vault
