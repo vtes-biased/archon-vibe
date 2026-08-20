@@ -1,7 +1,4 @@
 ---
-# This file is the role's parameter contract. Every `r.*` key the tasks read is
-# listed here and is either required — asserted in tasks/main.yml, so omission
-# fails the play — or carries a `*_default` below that makes omission correct.
 # r.site_root         required (backend install dir — the merge runs from its venv)
 # r.user              required (runtime unix user; peer-auths into legacy PG)
 # r.group             required (runtime unix group)
@@ -14,8 +11,7 @@
 # r.script_src        optional (default below: this repo's merge script)
 # r.env_dir           optional (default below)
 # r.merge_backup_dir  optional (default below; holds the pre-merge pg_dump)
-# r.oncalendar        optional (default below; 04:00 lands after the 03:00
-#                       db_backup run, which is this merge's restore point)
+# r.oncalendar        optional (default below)
 r: {}
 legacy_sync_service_name_default: archon-legacy-sync
 legacy_sync_script_src_default: "{{ role_path }}/../../../backend/scripts/migrate_from_archon.py"

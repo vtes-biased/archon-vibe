@@ -1,7 +1,4 @@
 ---
-# This file is the role's parameter contract. Every `r.*` key the tasks read is
-# listed here and is either required — asserted in tasks/main.yml, so omission
-# fails the play — or carries a `*_default` below that makes omission correct.
 # r.service_name           required (e.g. archon-bot)
 # r.site_root              required (e.g. /opt/archon/bot)
 # r.bot_wheel_src          required (local path to the built archon_discord_bot-*.whl)

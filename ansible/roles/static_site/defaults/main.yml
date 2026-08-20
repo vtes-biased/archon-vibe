@@ -1,7 +1,4 @@
 ---
-# This file is the role's parameter contract. Every `r.*` key the tasks read is
-# listed here and is either required — asserted in tasks/main.yml, so omission
-# fails the play — or carries a `*_default` below that makes omission correct.
 # r.server_name      required  - FQDN (e.g. archon.krcg.org)
 # r.site_root        required  - filesystem base (dist lands at r.site_root/dist)
 # r.dist_src         required  - local path of the built frontend dir

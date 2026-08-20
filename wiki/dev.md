@@ -69,7 +69,9 @@ role reads is listed there, and is either required — asserted in the role, so
 omission fails the play — or carries a `*_default` that makes omission correct.
 The playbooks pass only what genuinely differs between beta and prod, so a
 parameter added to one caller and not the other can no longer be silently
-skipped on the other.
+skipped on the other. A role resolves its defaults into `_`-prefixed facts, and
+those are host-scoped: they outlive the role that set them, so each role must set
+every `_` fact it reads rather than inherit a same-named one from an earlier role.
 
 Nothing auto-deploys, and there is no public version endpoint — never sniff the app
 for a version.

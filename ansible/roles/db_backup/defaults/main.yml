@@ -1,8 +1,4 @@
 ---
-# This file is the role's parameter contract. Every `r.*` key the tasks read is
-# listed here with a default that makes omission correct, so a caller passes only
-# what it wants to differ. The three remote credentials have no usable default:
-# they are asserted non-empty when r.remote_enabled, and unused otherwise.
 # r.backup_dir             local dump target
 # r.retention_days         local dump retention
 # r.exclude                database names to skip (list)
@@ -20,11 +16,11 @@
 # r.healthcheck_url        dead-man's-switch ping for the dump; empty = journald only
 # r.check_healthcheck_url  dead-man's-switch ping for the restore-verify
 r: {}
-# 03:00 lands a restore point right before the 04:00 legacy merge, the riskiest
-# daily write, with no contention on the 1-vCPU box.
 db_backup_backup_dir_default: /var/backups/postgres
 db_backup_retention_days_default: 7
 db_backup_exclude_default: []
+# 03:00 lands a restore point right before the 04:00 legacy_sync merge, the
+# riskiest daily write, and its 15m jitter must stay inside that gap.
 db_backup_oncalendar_default: "*-*-* 03:00:00"
 db_backup_check_oncalendar_default: "Sun *-*-* 06:00:00"
 db_backup_remote_enabled_default: false
