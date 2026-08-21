@@ -793,15 +793,6 @@ rounds, tables, seating, scores and players, matching players by VEKN ID.
 | Legacy-archon merge | daily, 04:00 server time, systemd timer, own flag — off everywhere | `scripts/migrate_from_archon.py --merge` |
 | TWDA sync (reconstruction + winner decks) | daily, 05:00 UTC, own flag | `twda_import.py` |
 
-**Deferred: no daily job has yet been observed firing.** The conversion below is
-reasoned from the trigger semantics, not witnessed — the defect needs a live
-process and a restart cycle to show itself, so nothing in CI can stand in for it.
-**Trigger: the first beta deploy carrying `507f3c8`.** A day later the journal
-must show an execution line for each of `sanction_cleanup`, `purge_deleted`,
-`promo_stock_recompute`, `rating_recompute` and `twda_sync`, not merely the
-`Added job` lines that were all fourteen days of the previous journal held.
-Delete this paragraph once it has.
-
 **Every daily job is a `CronTrigger` at a pinned UTC hour, never an interval** —
 an interval job of a day or more can never fire here
 ([hazards](hazards.md#deploy)). Both deployed environments set

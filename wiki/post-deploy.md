@@ -52,3 +52,29 @@ report, review the per-type counts with the owner, then the same with `--apply`.
 
 **Then** delete the pre-rule clause in [hazards](hazards.md) — the sentence
 beginning "Rows written before that rule".
+
+## Rebuild the stored projections widened for anonymous visitors
+
+**Gated on** `ed50d1b`. The tournament public projection gained the event-page
+fields and leagues lost `organizers_uids`, but projections are computed at write
+time, so every row stored before it keeps the narrow shape: a logged-out visitor
+reads "Proxies not allowed" on all 2378 events that allow them, and a short link
+resolves to an event with no venue, description or deck rules. No test can catch a
+missing projection backfill ([testing](testing.md)), which is why it parks here.
+
+**Run** `backend/scripts/reproject_public.py` from the deployed tree for the count,
+then the same with `--apply`. Run it **last** when the archive or event-code
+backfills run in the same window: both re-save every tournament through the same
+path, and only this one reaches leagues.
+
+**Verify** every live tournament carries `proxies` at public level and no league
+carries `organizers_uids`:
+
+```sql
+SELECT count(*) FILTER (WHERE type = 'tournament' AND public ? 'proxies'),
+       count(*) FILTER (WHERE type = 'league' AND public ? 'organizers_uids')
+FROM objects WHERE type IN ('tournament', 'league');
+```
+
+**Then** nothing to trim — [sync](sync.md#access-levels) states the re-save pattern
+for every future projection change, not this run. gh-8 is the report it answers.

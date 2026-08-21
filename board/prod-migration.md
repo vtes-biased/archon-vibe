@@ -265,3 +265,21 @@ Revised 2026-06-10 (owner):
 - [ ] Vhost swap rehearsed against the box's nginx state: no duplicate
       `server_name`, certs valid for `archon.vekn.net`/`old.`/`bot.`
 - [ ] `old.archon.vekn.net` serves read-only legacy for ~30 days post-flip
+
+## The dedup run, as beta measured it
+
+Rehearsed on beta 2026-08-20, after the archive backfill: **49 mixed-vekn groups,
+1 double-counted in ratings, and 30 holding an archive reconstruction that get no
+proposal and must be decided by hand.** Those 30 are a class the archive backfill
+*creates*: reconcile finds no candidate when a held copy's standings yield no
+winner name, so it reconstructs an event we already hold — a `players=1, decks=1`
+row beside a full vekn-linked one of the same name and date. Run the dedup after
+the backfill on prod, not before, or that class is invisible to it.
+
+Beta also holds two live Finished copies of one event under the *same* vekn id
+(`12642`), which is outside the audit's stated scope of groups where some but not
+all copies hold one. The event-code backfill gave one the code `12642` and minted
+`SCHNJG` for the other; short links survive it either way, since
+`get_tournament_by_event_code` falls back to a vekn external-id lookup. Check for
+that shape on prod before the code backfill — a duplicate arriving after the
+2026-08-17 check would land in it.

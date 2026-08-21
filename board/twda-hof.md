@@ -57,13 +57,30 @@ sudo -u archon bash -c 'B=/etc/archon/archon-backend.env
    costs a second deploy rather than a `--decisions` override.
 5. **`backfill_twda.py`** (reports), read the create count against Phase 0's 1130,
    then **`--apply`**. It suppresses broadcasting, recomputes every win list in both
-   directions and regenerates the snapshot.
+   directions and regenerates the snapshot. Rehearsed on beta 2026-08-20: 3m17s,
+   1077 created and 54 held back for winners that resolve to no member. The trailing
+   full pass printing `0 win lists changed` is the pass, not a failure — the sync
+   recomputes each winner it touches inline, and the full pass exists to catch
+   removals.
 6. **`backfill_event_codes.py`** (reports), then **`--apply`** — the other board
    line's prod step, but it belongs **after** step 5 or the 1132 reconstructions
-   mint codes before their archive keys arrive and keep them forever.
+   mint codes before their archive keys arrive and keep them forever. It took 25
+   minutes for 8513 rows on beta's larger box: run it under `tmux`, and expect
+   longer on prod's 2 GB VPS.
+   Then the reproject item in [post-deploy](../wiki/post-deploy.md) **last**, so the
+   three full-corpus rewrites cost connected clients one resync rather than three.
 7. **Capture the Hall of Fame again** and diff. 47 members sit at exactly five
    wins, so read the *departures* first: a silent eviction is a support ticket with
-   a name on it.
+   a name on it. `psql -At` delimits on `|`, so cut on that and not on the tab
+   `cut` defaults to — otherwise every member whose count merely *grew* reads as a
+   departure:
+
+   ```sh
+   comm -23 <(cut -d'|' -f1 before.tsv | sort -u) <(cut -d'|' -f1 after.tsv | sort -u)
+   ```
+
+   Beta's run went 113 -> 233 with 120 additions and zero departures, and
+   Watras/Izydorczyk/Pietkiewicz read 19/12/9.
 
 ```sql
 SELECT "full"->>'name', "full"->>'vekn_id',
