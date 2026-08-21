@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.0.7 — 2026-08-21
 
 - The seating editor can now add and remove players from the round.
 - Announcements and other notifications now read clearly on a phone.
