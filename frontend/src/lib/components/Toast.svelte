@@ -5,54 +5,25 @@
 
   const toasts = $derived(getToasts());
 
-  function getIcon(type: Toast['type']): typeof CircleCheck {
-    switch (type) {
-      case 'success':
-        return CircleCheck;
-      case 'error':
-        return CircleX;
-      case 'warning':
-        return TriangleAlert;
-      case 'info':
-        return Info;
-    }
-  }
-
-  function getStyles(type: Toast['type']): string {
-    switch (type) {
-      case 'success':
-        return 'toast-success';
-      case 'error':
-        return 'bg-accent-soft/90 border-accent-strong text-link-soft'; // crimson uses custom palette
-      case 'warning':
-        return 'toast-warn';
-      case 'info':
-        return 'bg-surface-muted/90 border-line-strong text-ink-strong';
-    }
-  }
-
-  function getIconColor(type: Toast['type']): string {
-    switch (type) {
-      case 'success':
-        return 'text-info';
-      case 'error':
-        return 'text-link';
-      case 'warning':
-        return 'text-warn';
-      case 'info':
-        return 'text-ink';
-    }
-  }
+  const variants: Record<Toast['type'], { icon: typeof CircleCheck; box: string; tint: string }> = {
+    success: { icon: CircleCheck, box: 'toast-success', tint: 'text-info' },
+    error: { icon: CircleX, box: 'toast-error', tint: 'text-link' },
+    warning: { icon: TriangleAlert, box: 'toast-warn', tint: 'text-warn' },
+    info: { icon: Info, box: 'toast-info', tint: 'text-info' },
+  };
 </script>
 
-<div class="fixed top-14 mt-safe-t right-4 mr-safe-r z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+<div
+  class="fixed top-14 mt-safe-t left-4 ml-safe-l right-4 mr-safe-r z-[100] flex flex-col items-end gap-2 pointer-events-none"
+>
   {#each toasts as toast (toast.id)}
-    {@const ToastIcon = getIcon(toast.type)}
+    {@const variant = variants[toast.type]}
+    {@const ToastIcon = variant.icon}
     <div
-      class="pointer-events-auto flex items-start gap-3 p-4 rounded-lg border shadow-lg backdrop-blur-sm animate-slide-in {getStyles(toast.type)}"
+      class="pointer-events-auto w-full max-w-sm flex items-start gap-3 p-4 rounded-lg border shadow-lg backdrop-blur-sm animate-slide-in {variant.box}"
       role="alert"
     >
-      <ToastIcon class="w-5 h-5 flex-shrink-0 mt-0.5 {getIconColor(toast.type)}" />
+      <ToastIcon class="w-5 h-5 flex-shrink-0 mt-0.5 {variant.tint}" />
       <div class="flex-1 min-w-0">
         <p class="text-sm font-medium">{toast.message}</p>
         {#if toast.action}

@@ -157,8 +157,10 @@
     color: light-dark(#86198f, #f5d0fe);
 }
 
-.toast-success { background: light-dark(#eff6ff, rgb(30 58 138 / 0.9)); border-color: light-dark(#bfdbfe, #1d4ed8); color: light-dark(#1e40af, #dbeafe); }
+.toast-success,
+.toast-info    { background: light-dark(#eff6ff, rgb(30 58 138 / 0.9)); border-color: light-dark(#bfdbfe, #1d4ed8); color: light-dark(#1e40af, #dbeafe); }
 .toast-warn    { background: light-dark(#faf5ff, rgb(88 28 135 / 0.9)); border-color: light-dark(#e9d5ff, #7e22ce); color: light-dark(#6b21a8, #f3e8ff); }
+.toast-error   { background: light-dark(#fce4e8, rgb(110 10 31 / 0.9)); border-color: light-dark(#880c26, #a40f2d); color: light-dark(#c41235, #f4a3b3); }
 
 .status-offline { background: light-dark(#6b21a8, rgb(88 28 135 / 0.9)); color: light-dark(#fff, #f3e8ff); }
 .status-update  { background: light-dark(#1e40af, rgb(30 58 138 / 0.9)); color: light-dark(#fff, #dbeafe); }
