@@ -22,9 +22,9 @@ pub use types::{ActorContext, PlayerState, SeatScore, TournamentEvent, Tournamen
 use crate::error::EngineError;
 use helpers::{
     all_rounds_finished, collect_previous_rounds, count_played_rounds, count_player_rounds_played,
-    find_player_index, is_deck_locked, player_exists, players_in_other_active_rounds,
-    require_can_edit_results, require_organizer, require_state, require_state_or_finished,
-    validate_enum,
+    demote_unseated_players, find_player_index, is_deck_locked, player_exists,
+    players_in_other_active_rounds, require_can_edit_results, require_organizer, require_state,
+    require_state_or_finished, validate_enum,
 };
 use raffle::compute_deck_public;
 use sanctions::{has_active_suspension, has_dq_sanction, table_sa_adjustments};
@@ -1476,6 +1476,20 @@ fn apply_event(
                         return Err(EngineError::InvalidTableSize { size: table.len() });
                     }
                 }
+                for uid in seating.iter().flat_map(|t| t.iter()) {
+                    if !player_exists(&tournament["players"], uid) {
+                        return Err(EngineError::PlayerNotFound);
+                    }
+                }
+
+                // Read before the rebuild: it resets reseated tables to In Progress,
+                // so a finished round would look live to the state rules below.
+                let round_is_live = tournament["rounds"][*round].members().any(|table| {
+                    !matches!(
+                        table["state"].as_str(),
+                        Some("Finished") | Some("Cancelled")
+                    )
+                });
 
                 let mut old_results: std::collections::HashMap<String, (usize, JsonValue, String)> =
                     std::collections::HashMap::new();
@@ -1493,11 +1507,6 @@ fn apply_event(
                             .to_string();
                         old_results.insert(uid, (t, result, judge));
                     }
-                }
-
-                let new_total: usize = seating.iter().map(|t| t.len()).sum();
-                if new_total != old_results.len() {
-                    return Err(EngineError::PlayerCountMismatch);
                 }
 
                 {
@@ -1524,16 +1533,11 @@ fn apply_event(
                     let new_players = &seating[t];
                     let mut new_seating = Vec::new();
                     for uid in new_players {
-                        let (old_table, old_result, old_judge) =
-                            old_results
-                                .get(uid)
-                                .ok_or_else(|| EngineError::PlayerNotInRound {
-                                    player: uid.to_string(),
-                                })?;
-                        let (result, judge) = if *old_table == t {
-                            (old_result.clone(), old_judge.as_str())
-                        } else {
-                            (json::object! { gw: 0, vp: 0.0, tp: 0 }, "")
+                        let (result, judge) = match old_results.get(uid) {
+                            Some((old_table, old_result, old_judge)) if *old_table == t => {
+                                (old_result.clone(), old_judge.as_str())
+                            }
+                            _ => (json::object! { gw: 0, vp: 0.0, tp: 0 }, ""),
                         };
                         new_seating.push(json::object! {
                             player_uid: uid.as_str(),
@@ -1562,6 +1566,32 @@ fn apply_event(
                     if round_data[t]["seating"].is_empty() {
                         round_data.array_remove(t);
                     }
+                }
+
+                if round_is_live {
+                    let new_set: std::collections::HashSet<&String> =
+                        seating.iter().flat_map(|t| t.iter()).collect();
+                    let joined: Vec<String> = new_set
+                        .iter()
+                        .filter(|uid| !old_results.contains_key(**uid))
+                        .map(|uid| (*uid).clone())
+                        .collect();
+                    let left: std::collections::HashSet<String> = old_results
+                        .keys()
+                        .filter(|uid| !new_set.contains(uid))
+                        .cloned()
+                        .collect();
+                    let joined_state = if state == TournamentState::Finished {
+                        "Finished"
+                    } else {
+                        "Playing"
+                    };
+                    for uid in joined {
+                        if let Some(idx) = find_player_index(&tournament["players"], &uid) {
+                            tournament["players"][idx]["state"] = joined_state.into();
+                        }
+                    }
+                    demote_unseated_players(tournament, &left, *round);
                 }
             }
 
@@ -1684,16 +1714,11 @@ fn apply_event(
                 });
             }
 
-            // Reset player state — mirror CheckOut: Finished tournament keeps the
-            // player Finished, otherwise back to Registered.
-            if let Some(idx) = find_player_index(&tournament["players"], player_uid) {
-                tournament["players"][idx]["state"] = if state == TournamentState::Finished {
-                    "Finished"
-                } else {
-                    "Registered"
-                }
-                .into();
-            }
+            demote_unseated_players(
+                tournament,
+                &std::iter::once(player_uid.clone()).collect(),
+                last,
+            );
             update_standings(tournament, sanctions);
             Ok(())
         }

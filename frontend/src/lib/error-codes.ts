@@ -76,7 +76,6 @@ const ENGINE_MESSAGES: Record<string, (p: Record<string, string>) => string> = {
   'tournament.finals_player_count': () => m.err_tournament_finals_player_count(),
   'tournament.finals_player_set': () => m.err_tournament_finals_player_set(),
   'tournament.table_count_mismatch': () => m.err_tournament_table_count_mismatch(),
-  'tournament.player_count_mismatch': () => m.err_tournament_player_count_mismatch(),
   'tournament.seating_violates_r1': () => m.err_tournament_seating_violates_r1(),
   'tournament.player_not_in_round': (p) => m.err_tournament_player_not_in_round({ player: p.player ?? '' }),
   'tournament.table_full': () => m.err_tournament_table_full(),

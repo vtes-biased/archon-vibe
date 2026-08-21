@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { OctagonX, TriangleAlert, Info, ArrowRightLeft, X, RotateCcw } from "@lucide/svelte";
+  import { OctagonX, TriangleAlert, Info, ArrowRightLeft, X, RotateCcw, UserMinus, Plus } from "@lucide/svelte";
   import { seatDisplay as seatDisplayUtil } from "$lib/tournament-utils";
   import { tableLabel as tableLabelUtil } from "$lib/engine";
   import * as m from '$lib/paraglide/messages.js';
@@ -12,6 +12,7 @@
     isFinals = false,
     tableRooms,
     online = false,
+    pool = [],
     onchange,
   }: {
     tables: string[][];
@@ -20,8 +21,14 @@
     isFinals: boolean;
     tableRooms?: { name: string; count: number }[];
     online?: boolean;
+    pool?: { uid: string; note: string }[];
     onchange: () => void;
   } = $props();
+
+  // The finals player set is fixed by the card-drawing ritual, so the draft
+  // there rearranges only.
+  const canEditPlayerSet = $derived(!isFinals);
+  let poolTarget = $state<number | null>(null);
 
   // Tap-to-rearrange: select a seat, then tap another seat to swap (same table
   // = reorder, other table = cross-table swap) or an open seat to move. No drag.
@@ -89,6 +96,26 @@
     tables = [...tables];
     onchange();
     focusSeat(movingUid);
+  }
+
+  function unseat(t: number, s: number) {
+    snapshot();
+    const [uid] = tables[t]!.splice(s, 1);
+    selected = null;
+    tables = [...tables];
+    announce = m.rounds_seating_unseated({ name: seatDisplay(uid!) });
+    onchange();
+  }
+
+  function seatFromPool(t: number, uid: string) {
+    if (tables[t]!.length >= 5) return;
+    snapshot();
+    tables[t]!.push(uid);
+    poolTarget = null;
+    tables = [...tables];
+    announce = m.rounds_seating_seated({ name: seatDisplay(uid), table: tableLabel(t) });
+    onchange();
+    focusSeat(uid);
   }
 
   function tapOpenSeat(t: number) {
@@ -162,29 +189,42 @@
         {@const issue = playerIssues.get(uid)}
         {@const isSelected = selected?.table === t && selected?.seat === s}
         {@const isSwapTarget = selected != null && !isSelected}
-        <button
-          type="button"
-          data-seat-uid={uid}
-          onclick={() => tapSeat(t, s)}
-          aria-pressed={isSelected}
-          aria-label={m.rounds_seat_n({ n: String(s + 1), name: seatDisplay(uid) })}
-          class="w-full min-h-[44px] py-1.5 px-1 -mx-1 flex items-center gap-2 text-sm text-left rounded transition-colors
-            {isSelected ? 'ring-2 ring-select bg-select-soft/40' : isSwapTarget ? 'ring-1 ring-inset ring-select-border hover:bg-select-soft/20' : 'hover:bg-surface-hover/60'}"
-        >
-          <span class="w-5 text-center text-xs text-ink-faint tabular-nums">{s + 1}</span>
-          <span class="flex-1 text-ink">{seatDisplay(uid)}</span>
-          {#if issue}
-            {@const tier = issueTier(issue.level)}
-            {@const TierIcon = tier.Icon}
-            <span class="inline-flex items-center gap-1 {tier.color}" title={issue.message}>
-              <TierIcon class="w-4 h-4 shrink-0" aria-hidden="true" />
-              <span class="text-xs">{issue.message}</span>
-              <span class="sr-only">{tier.sr}</span>
-            </span>
-          {:else}
-            <ArrowRightLeft class="w-4 h-4 shrink-0 {isSelected ? 'text-select' : 'text-ink-faint'}" />
+        <div class="flex items-center gap-1">
+          <button
+            type="button"
+            data-seat-uid={uid}
+            onclick={() => tapSeat(t, s)}
+            aria-pressed={isSelected}
+            aria-label={m.rounds_seat_n({ n: String(s + 1), name: seatDisplay(uid) })}
+            class="flex-1 min-h-[44px] py-1.5 px-1 -mx-1 flex items-center gap-2 text-sm text-left rounded transition-colors
+              {isSelected ? 'ring-2 ring-select bg-select-soft/40' : isSwapTarget ? 'ring-1 ring-inset ring-select-border hover:bg-select-soft/20' : 'hover:bg-surface-hover/60'}"
+          >
+            <span class="w-5 text-center text-xs text-ink-faint tabular-nums">{s + 1}</span>
+            <span class="flex-1 text-ink">{seatDisplay(uid)}</span>
+            {#if issue}
+              {@const tier = issueTier(issue.level)}
+              {@const TierIcon = tier.Icon}
+              <span class="inline-flex items-center gap-1 {tier.color}" title={issue.message}>
+                <TierIcon class="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span class="text-xs">{issue.message}</span>
+                <span class="sr-only">{tier.sr}</span>
+              </span>
+            {:else}
+              <ArrowRightLeft class="w-4 h-4 shrink-0 {isSelected ? 'text-select' : 'text-ink-faint'}" />
+            {/if}
+          </button>
+          {#if canEditPlayerSet}
+            <button
+              type="button"
+              onclick={() => unseat(t, s)}
+              aria-label={m.rounds_seating_unseat({ name: seatDisplay(uid) })}
+              title={m.rounds_seating_unseat({ name: seatDisplay(uid) })}
+              class="shrink-0 min-h-[44px] px-2 flex items-center text-ink-faint hover:text-link transition-colors"
+            >
+              <UserMinus class="w-4 h-4" aria-hidden="true" />
+            </button>
           {/if}
-        </button>
+        </div>
       {/each}
       {#if !isFinals && table.length < 5}
         {@const canMoveHere = selected != null && selected.table !== t}
@@ -196,9 +236,40 @@
           >
             <ArrowRightLeft class="w-3.5 h-3.5" />{m.rounds_seating_move_here()}
           </button>
+        {:else if poolTarget === t}
+          <div class="mt-1.5 flex flex-wrap items-center gap-2">
+            {#each pool as entry (entry.uid)}
+              <button
+                type="button"
+                onclick={() => seatFromPool(t, entry.uid)}
+                class="inline-flex items-center gap-1.5 min-h-[44px] px-3 text-sm border border-select-border text-ink rounded-lg hover:bg-select-soft/30 hover:text-ink-strong transition-colors"
+              >
+                {seatDisplay(entry.uid)}
+                {#if entry.note}<span class="text-xs text-ink-faint">{entry.note}</span>{/if}
+              </button>
+            {/each}
+            <button
+              type="button"
+              onclick={() => (poolTarget = null)}
+              class="inline-flex items-center gap-1 min-h-[44px] px-2 text-sm text-ink hover:text-ink-strong"
+            >
+              <X class="w-4 h-4" aria-hidden="true" />{m.common_cancel()}
+            </button>
+          </div>
         {:else}
-          <div class="w-full py-3 min-h-[44px] flex items-center justify-center text-xs border border-dashed border-line-strong text-ink-faint rounded mt-1.5">
-            {m.rounds_seating_open_seat()}
+          <div class="w-full flex items-center gap-2 mt-1.5">
+            <div class="flex-1 py-3 min-h-[44px] flex items-center justify-center text-xs border border-dashed border-line-strong text-ink-faint rounded">
+              {m.rounds_seating_open_seat()}
+            </div>
+            {#if canEditPlayerSet && pool.length > 0}
+              <button
+                type="button"
+                onclick={() => (poolTarget = t)}
+                class="shrink-0 py-3 min-h-[44px] px-3 flex items-center gap-1.5 text-xs border border-dashed border-line-strong text-ink hover:bg-surface-hover/50 hover:text-ink-strong rounded transition-colors"
+              >
+                <Plus class="w-3.5 h-3.5" aria-hidden="true" />{m.rounds_seating_add_player({ count: String(pool.length) })}
+              </button>
+            {/if}
           </div>
         {/if}
       {/if}

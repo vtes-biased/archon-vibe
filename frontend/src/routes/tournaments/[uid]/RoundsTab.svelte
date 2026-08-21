@@ -13,7 +13,7 @@
   import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users, Settings2 } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import VpInput from "./VpInput.svelte";
-  import { seatDisplay as seatDisplayUtil, seatDisplayParts, vpOptions, translateTableState, type PlayerInfoMap } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, seatDisplayParts, vpOptions, translateTableState, translatePlayerState, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
   import { showToast } from "$lib/stores/toast.svelte";
 
@@ -221,6 +221,20 @@
         )
       : []
   );
+
+  // Alter mode refuses only the structurally impossible, so its pool is every
+  // tournament player the draft has not already seated — a wider set than the
+  // out-of-mode chips above, which still go through SeatPlayer's state guard.
+  const alterPool = $derived.by(() => {
+    if (!alterMode) return [];
+    const seated = new Set(alterTables.flat());
+    return (tournament.players ?? [])
+      .filter(p => p.user_uid && !seated.has(p.user_uid))
+      .map(p => ({
+        uid: p.user_uid!,
+        note: p.state === "Registered" || p.state === "Checked-in" ? "" : translatePlayerState(p.state),
+      }));
+  });
 
   function seatDisplay(uid: string): string {
     return seatDisplayUtil(uid, playerInfo, tournament.online);
@@ -626,11 +640,6 @@
           <div class="px-4 pb-4 space-y-3">
             {#if alterMode && r === alterRoundIdx}
               <p class="text-sm text-ink">{m.rounds_alter_hint()}</p>
-              {#if seatablePlayers.length > 0}
-                <!-- Cross-link: adding a pool player is a separate engine event
-                     (AlterSeating keeps the player set fixed), so point at it. -->
-                <p class="text-sm text-ink-muted">{m.rounds_alter_pool_hint({ count: String(seatablePlayers.length) })}</p>
-              {/if}
               {#if round.some(t => t.seating.some(s => s.result.vp > 0))}
                 <p class="text-sm text-warn">{m.rounds_alter_scores_warning()}</p>
               {/if}
@@ -651,6 +660,7 @@
                 isFinals={false}
                 tableRooms={tournament.table_rooms}
                 online={tournament.online}
+                pool={alterPool}
                 onchange={recomputeIssues}
               />
               <Button variant="secondary" size="md" onclick={addTableInAlter} disabled={actionLoading}>

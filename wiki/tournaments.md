@@ -402,9 +402,28 @@ otherwise), `DropOut` (preserves scores), `CheckIn`, `CheckInAll`, `ResetCheckIn
 | `RestoreRound` | un-voids a soft-cancelled non-last round: re-derives each table's state from retained scores and re-arms seated players. **All-or-nothing** — if any seated player can no longer be reinstated as saved (dropped, disqualified, or already at their cap via other rounds) the whole restore is rejected rather than silently dropping them |
 | `SelfOrganizeRound` | player-authorized, not organizer-gated |
 | `SwapSeats` | swap two players within a table |
-| `AlterSeating` | positional prefix match — existing tables matched by index (results preserved same-table, reset cross-table), extra payload tables appended fresh, each table seating 0/4/5 players (0 = empty draft workspace, dropped after rebuild). On finals it replaces seat order for the same player set |
-| `SeatPlayer` / `UnseatPlayer` | act on the **last** round |
+| `AlterSeating` | **the submitted seating decides who is in the round** — it is diffed against the current one and players are seated and unseated to match, in one event. Positional prefix match: existing tables matched by index (results preserved same-table, reset cross-table, fresh zeros for a player joining), extra payload tables appended, each table seating 0/4/5 players (0 = empty draft workspace, dropped after rebuild). On finals it replaces seat order for the same player set |
+| `SeatPlayer` / `UnseatPlayer` | one seat at a time, on the round named in the payload or the live one — not necessarily the last |
 | `AddTable` / `RemoveTable` | current round |
+
+**`AlterSeating` refuses only the structurally incoherent**: a uid that is not a
+tournament player, a duplicate across the payload, a table outside 0/4/5, fewer
+tables than the round has, a predator-prey repeat. It applies **no player-state
+filter** — every state such a filter could bar is reachable by seating the player
+and then changing their state, and `StartRound` already admits `Playing` players
+into a new round for parallel online play. The editor's pool therefore offers every
+tournament player not already seated in the round, each tagged with their state so
+the organizer sees what they are adding.
+
+**A live round's seating decides player state**, in one promotion and one demotion
+rule, shared by `AlterSeating` and `UnseatPlayer`. Joining a live round's seating
+makes a player `Playing`; leaving it returns them to `Registered` — but only *from*
+`Playing`, so a player who dropped out mid-round (drop never vacates a seat) stays
+`Finished` instead of being silently reinstated into finals eligibility, and only
+when they are not seated in another still-live round, so parallel rounds do not
+strand each other. A round that is over is not live: correcting its record moves
+seats and never player state, because a finished round has no player state it can
+correctly assert.
 
 A round slot is never removed mid-array: `deck.round` and
 `standings_adjustment.round_number` are index-tagged and would be corrupted.
@@ -521,8 +540,8 @@ Organizer oversight is unchanged: `FinishRound` closes any round in any order,
 
 `StartRound` withdraws `Registered` no-shows only on round 1 of a standard
 tournament; rounds 2+ and open rounds leave them untouched, and a zero-rounds
-no-show is reinstatable by `CheckIn` between rounds or `SeatPlayer` onto a live
-table.
+no-show is reinstatable by `CheckIn` between rounds, or onto a live table by
+`SeatPlayer` or the seating editor.
 
 ## Sanctions
 

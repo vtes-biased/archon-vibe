@@ -53,7 +53,6 @@ pub enum EngineError {
     FinalsPlayerCount,
     FinalsPlayerSet,
     TableCountMismatch,
-    PlayerCountMismatch,
     SeatingViolatesR1,
     PlayerNotInRound { player: String },
     TableFull,
@@ -155,7 +154,6 @@ impl EngineError {
             FinalsPlayerCount => "tournament.finals_player_count",
             FinalsPlayerSet => "tournament.finals_player_set",
             TableCountMismatch => "tournament.table_count_mismatch",
-            PlayerCountMismatch => "tournament.player_count_mismatch",
             SeatingViolatesR1 => "tournament.seating_violates_r1",
             PlayerNotInRound { .. } => "tournament.player_not_in_round",
             TableFull => "tournament.table_full",
@@ -318,7 +316,6 @@ impl fmt::Display for EngineError {
             FinalsPlayerCount => write!(f, "Finals player count mismatch"),
             FinalsPlayerSet => write!(f, "Finals player set mismatch"),
             TableCountMismatch => write!(f, "Table count mismatch"),
-            PlayerCountMismatch => write!(f, "Player count mismatch"),
             SeatingViolatesR1 => write!(f, "Seating violates R1 (predator-prey repeat)"),
             PlayerNotInRound { player } => {
                 write!(f, "Player {} not found in current round seating", player)

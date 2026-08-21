@@ -1863,6 +1863,15 @@ fn test_reopen_tournament_preserves_dq() {
 }
 
 /// Build a tournament in Playing state with one round of 2 tables of 4
+fn player_state(tournament: &JsonValue, uid: &str) -> String {
+    tournament["players"]
+        .members()
+        .find(|p| p["user_uid"].as_str() == Some(uid))
+        .and_then(|p| p["state"].as_str())
+        .unwrap_or("")
+        .to_string()
+}
+
 fn tournament_with_round() -> JsonValue {
     let mut t = make_tournament();
     t["state"] = "Playing".into();
@@ -2494,7 +2503,124 @@ fn test_alter_seating_unknown_player_fails() {
     let actor = make_organizer();
     let result = run_event(&tournament, &event, &actor);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("not found"));
+    assert!(result.unwrap_err().to_string().contains("Player not found"));
+}
+
+#[test]
+fn test_alter_seating_adds_and_removes_in_one_save() {
+    let mut tournament = tournament_with_round();
+    tournament["players"]
+        .push(json::object! { user_uid: "p9", state: "Registered", payment_status: "Pending", toss: 0 })
+        .unwrap();
+    // p1 out of table 0, p9 (never in this round) in — one payload, one event.
+    let event = json::object! {
+        type: "AlterSeating",
+        round: 0,
+        seating: [["p9", "p2", "p3", "p4"], ["p5", "p6", "p7", "p8"]],
+    };
+    let actor = make_organizer();
+    let updated = json::parse(&run_event(&tournament, &event, &actor).unwrap()).unwrap();
+
+    assert_eq!(
+        updated["rounds"][0][0]["seating"][0]["player_uid"].as_str(),
+        Some("p9")
+    );
+    assert_eq!(
+        updated["rounds"][0][0]["seating"][0]["result"]["vp"].as_f64(),
+        Some(0.0)
+    );
+    assert_eq!(
+        updated["rounds"][0][0]["seating"][1]["result"]["vp"].as_f64(),
+        Some(1.0)
+    );
+    assert_eq!(player_state(&updated, "p9"), "Playing");
+    assert_eq!(player_state(&updated, "p1"), "Registered");
+}
+
+#[test]
+fn test_alter_seating_unseating_a_dropped_player_keeps_them_finished() {
+    let mut tournament = tournament_with_round();
+    // Dropping out never vacates a seat, so p1 is seated while Finished.
+    tournament["players"][0]["state"] = "Finished".into();
+    let event = json::object! {
+        type: "AlterSeating",
+        round: 0,
+        seating: [[], ["p5", "p6", "p7", "p8"]],
+    };
+    let actor = make_organizer();
+    let updated = json::parse(&run_event(&tournament, &event, &actor).unwrap()).unwrap();
+
+    assert_eq!(player_state(&updated, "p1"), "Finished");
+    assert_eq!(player_state(&updated, "p2"), "Registered");
+}
+
+#[test]
+fn test_alter_seating_unseating_keeps_a_parallel_round_player_playing() {
+    let mut tournament = tournament_with_round();
+    // Online parallel play: p1 is also seated in a still-live round 1.
+    for uid in ["p9", "p10", "p11"] {
+        tournament["players"]
+            .push(json::object! { user_uid: uid, state: "Playing", payment_status: "Pending", toss: 0 })
+            .unwrap();
+    }
+    tournament["rounds"]
+        .push(json::array![{
+            seating: [
+                { player_uid: "p1", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+                { player_uid: "p9", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+                { player_uid: "p10", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+                { player_uid: "p11", result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+            ],
+            state: "In Progress",
+            override: json::Null,
+        }])
+        .unwrap();
+    let event = json::object! {
+        type: "AlterSeating",
+        round: 0,
+        seating: [[], ["p5", "p6", "p7", "p8"]],
+    };
+    let actor = make_organizer();
+    let updated = json::parse(&run_event(&tournament, &event, &actor).unwrap()).unwrap();
+
+    assert_eq!(player_state(&updated, "p1"), "Playing");
+    assert_eq!(player_state(&updated, "p2"), "Registered");
+}
+
+#[test]
+fn test_alter_seating_on_a_finished_round_touches_no_player_state() {
+    let mut tournament = tournament_with_round();
+    tournament["rounds"][0][1]["state"] = "Finished".into();
+    tournament["players"]
+        .push(json::object! { user_uid: "p9", state: "Registered", payment_status: "Pending", toss: 0 })
+        .unwrap();
+    // Correcting the record of a round that is over: no player state is correct
+    // for it, so none is written.
+    let event = json::object! {
+        type: "AlterSeating",
+        round: 0,
+        seating: [["p9", "p2", "p3", "p4"], ["p5", "p6", "p7", "p8"]],
+    };
+    let actor = make_organizer();
+    let updated = json::parse(&run_event(&tournament, &event, &actor).unwrap()).unwrap();
+
+    assert_eq!(
+        updated["rounds"][0][0]["seating"][0]["player_uid"].as_str(),
+        Some("p9")
+    );
+    assert_eq!(player_state(&updated, "p9"), "Registered");
+    assert_eq!(player_state(&updated, "p1"), "Playing");
+}
+
+#[test]
+fn test_unseat_player_keeps_a_dropped_player_finished() {
+    let mut tournament = tournament_with_round();
+    tournament["players"][4]["state"] = "Finished".into();
+    let event = json::object! { type: "UnseatPlayer", player_uid: "p5", round: 0 };
+    let actor = make_organizer();
+    let updated = json::parse(&run_event(&tournament, &event, &actor).unwrap()).unwrap();
+
+    assert_eq!(player_state(&updated, "p5"), "Finished");
 }
 
 #[test]

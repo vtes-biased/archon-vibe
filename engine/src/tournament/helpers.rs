@@ -147,6 +147,29 @@ pub(super) fn count_played_rounds(tournament: &JsonValue) -> usize {
         .count()
 }
 
+/// Leaving a seat returns a player to `Registered` only from `Playing`: one who
+/// dropped out mid-round stays `Finished` — `standings.rs` drops `Finished` from
+/// finals eligibility — and one still seated in another live round stays `Playing`.
+pub(super) fn demote_unseated_players(
+    tournament: &mut JsonValue,
+    unseated: &std::collections::HashSet<String>,
+    round_idx: usize,
+) {
+    let still_playing = players_in_other_active_rounds(tournament, round_idx);
+    let players = &mut tournament["players"];
+    for i in 0..players.len() {
+        let uid = players[i]["user_uid"].as_str().map(String::from);
+        if players[i]["state"].as_str() != Some("Playing") {
+            continue;
+        }
+        if let Some(uid) = uid {
+            if unseated.contains(&uid) && !still_playing.contains(&uid) {
+                players[i]["state"] = "Registered".into();
+            }
+        }
+    }
+}
+
 pub(super) fn players_in_other_active_rounds(
     tournament: &JsonValue,
     exclude_round: usize,
