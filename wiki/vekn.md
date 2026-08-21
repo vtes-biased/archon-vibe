@@ -238,7 +238,9 @@ Resolve a reported group with `backend/scripts/dedup_tournaments.py`. It reports
 the play-data metrics the choice hangs on — the vekn-linked copy is often the
 *poorer* one — then soft-deletes the losers and **transplants the vekn id onto the
 survivor**. Without that transplant the next sync finds no live holder of the event
-id and re-creates the copy just deleted. Ratings aggregate whatever is live, so a
+id and re-creates the copy just deleted. A loser's archive key travels the same way
+and always as `twda_entry`: the survivor is the event that entry describes now,
+whatever the loser was. Ratings aggregate whatever is live, so a
 group with more than one rating-eligible copy was double-counted: recompute after
 applying.
 
@@ -310,18 +312,41 @@ duplicate report, where an archive reconstruction is reported and never proposed
 for merging.
 
 **The scheduled run only ever does a delta.** More than `MAX_CREATES_PER_RUN`
-reconstructions pending means it is standing in for the initial backfill, so it
-creates none and logs an error naming `backfill_twda.py` — which lifts the cap and
+unsettled entries pending means it is standing in for the initial backfill, so it
+writes none and logs an error naming `backfill_twda.py` — which lifts the cap and
 suppresses broadcasting. Without that, the first scheduled run after a deploy *is*
-the backfill, at a thousand SSE frames per connected client. Decks still land for
-everything already resolved, so a capped run is useful rather than merely refused.
+the backfill, at four thousand SSE frames per connected client. Decks still land
+for everything already resolved, so a capped run is useful rather than refused.
 
-**It resolves nothing at runtime.** Every entry is looked up in
-`backend/src/data/twda_decisions.tsv`, a reviewed mapping shipped in the wheel:
+**It resolves nothing at runtime, and it settles what it resolves.** An entry the
+corpus already answers for is read off the corpus; only what is left is looked up
+in `backend/src/data/twda_decisions.tsv`, a reviewed mapping shipped in the wheel:
 `attach` names one of our tournaments, `create` names the winning member and asks
 for a reconstruction, and anything else is counted and skipped. A wrong
 reconstruction mints a duplicate event and credits a real person with a win they
-did not take, so the file is the gate and there is no fallback path around it.
+did not take, so the file is the gate and there is no fallback path around it. An
+applied `attach` **stamps the archive key onto the event it named**, and a settled
+row knows its own winner, so the file is never read for that entry again. It is an
+extract of uids taken on one day against one database: re-reading it forever is
+what made a target that moves under a dedup transplant or a re-migration stop
+attaching, silently and for good.
+
+**The two archive keys are not interchangeable.** `external_ids['twda']` means
+*reconstructed from the archive*, is written only by the reconstruction, and seven
+readers turn on it: the adopt carve-out [above](#matching-an-incoming-event), the
+calendar push's `UNCREATED_EVENTS_QUERY`, `resolve_event_code` and the event-code
+backfill, the Hall of Fame's no-attestation grandfather, the duplicate report's
+refusal to propose, and the tournament page's archival badge. A settled attach
+carries `external_ids['twda_entry']` instead — *this event is the one that entry
+describes* — which gates nothing but the sync's own recognition. Reusing `twda`
+would move all seven at once, most concretely admitting rounds-less imports to the
+Hall of Fame and handing them the archive's file key as their public event code.
+
+**A stale-target warning names only a decision that never applied**, since one
+that did is on the corpus and never re-read. What remains points at a tournament
+this database does not hold — a uid from another environment, or one that moved
+before it was ever read. Its mirror is the orphan warning: a row holding an
+archive key the archive no longer carries. Neither is auto-repaired.
 
 **No ETag.** There was one, and it is gone deliberately: once identities come from
 a reviewed file, *our* side moves while the archive sits still — a member is
@@ -348,6 +373,14 @@ and is **read-only** — it has no `--apply`. It writes the decisions file above
 human decisions go the other way, into `backend/src/data/twda_rulings.tsv`, which
 is an *input* to it. That split is what keeps the generated file safe to
 regenerate: rulings are never re-derived and a re-run never clobbers a decision.
+
+**A ruling is checked against the database being reconciled before it is emitted.**
+Its target is a uid, which is an identity claim about one corpus; run against
+another it names nothing, and emitting it unchecked writes a decision that can
+never apply. An event ruling whose tournament this database does not hold is
+emitted as `review`; a winner ruling whose member it does not hold holds the name
+out rather than fall through to the matchers, which are what the human overruled.
+Both are counted on the run's own output.
 
 It answers two questions per entry. **Which event** — four tiers: an `archon.vekn.net` link in `event_link`; the vekn
 event id; a **name-free** match on date ± 1 day, winner name and country, with the

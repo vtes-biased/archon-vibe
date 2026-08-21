@@ -42,7 +42,9 @@ proposal ranks by play data, never by which copy holds the vekn id.
 Applying a decision soft-deletes the losing copies (cascading their decks and
 sanctions) and transplants `external_ids.vekn` onto the survivor. The transplant
 is load-bearing: without it the next VEKN sync finds no live holder of that event
-id and re-creates the copy just deleted.
+id and re-creates the copy just deleted. A loser's archive key travels the same
+way, as `external_ids.twda_entry` — the survivor is the event that entry describes
+now, and never a reconstruction, whatever the loser was.
 
 Ratings are NOT recomputed here — the rating window aggregates whatever is live,
 so if the report marks more than one copy of a group rating-eligible, both were
@@ -288,17 +290,31 @@ async def apply(path: str) -> int:
 
         # Losers first: the survivor must never be the second live holder of an
         # event id, and their id is already in hand from the decisions file.
+        archive_key = ""
         for drop_uid in [u.strip() for u in drop_csv.split(",") if u.strip()]:
             if drop_uid == keep_uid:
                 continue
             result = await db.soft_delete_tournament(drop_uid)
+            if result:
+                lost = result[0].external_ids
+                archive_key = archive_key or lost.get("twda_entry") or lost.get("twda")
             print(f"  soft-deleted {drop_uid}" if result else f"  {drop_uid} <gone>")
 
-        if vekn and keep.external_ids.get("vekn") != vekn:
+        adopted = vekn and keep.external_ids.get("vekn") != vekn
+        settles = archive_key and not (
+            keep.external_ids.keys() & {"twda", "twda_entry"}
+        )
+        if adopted:
             keep.external_ids["vekn"] = vekn
+        if settles:
+            keep.external_ids["twda_entry"] = archive_key
+        if adopted or settles:
             async with db.get_connection() as conn:
                 await db.save_tournament(keep, conn=conn)
+        if adopted:
             print(f"  {keep_uid} adopted vekn event {vekn}")
+        if settles:
+            print(f"  {keep_uid} adopted archive entry {archive_key}")
         print(f"resolved '{keep.name}' → {keep_uid}")
     return 1 if errors else 0
 

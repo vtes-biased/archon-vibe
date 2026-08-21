@@ -18,6 +18,10 @@ This script creates nothing and has no --apply: its output is a decisions file a
 human reviews, which the reconstruction then consumes. Entries left unreviewed
 are skipped by that consumer, never created.
 
+Rulings are checked against the database being reconciled before they are emitted.
+A hand-authored uid is an identity claim about one corpus; run against another it
+names nothing, and emitting it unchecked writes a decision that can never apply.
+
 Four tiers, strongest first:
 
 1. an archon.vekn.net link in `event_link`. The two url forms quote uids from two
@@ -228,11 +232,13 @@ class Roster:
         # Bucketed by the sorted letter-set of each token's first 4 characters,
         # so a transposition or a doubled letter still lands somewhere comparable.
         self.buckets: dict[str, set[str]] = defaultdict(set)
+        self.by_uid: dict[str, dict] = {}
         for uid, name in rows:
             key = normalize(name)
             if not key:
                 continue
             member = {"uid": uid, "name": name, "key": key}
+            self.by_uid[uid] = member
             self.by_name[key].append(member)
             tokens = key.split()
             self.by_surname[tokens[-1]].append(member)
@@ -336,7 +342,10 @@ def resolve_winner(name: str, roster: Roster, rulings: dict) -> tuple[str, str]:
     """
     ruled = rulings.get(name)
     if ruled:
-        return ruled, "ruling"
+        # A ruling naming a uid this roster does not hold is an answer for another
+        # database. Hold the name out rather than fall through — the matchers are
+        # exactly what the human overruled.
+        return (ruled, "ruling") if ruled in roster.by_uid else ("", "ruling not held")
     hits = roster.exact(name)
     if len(hits) == 1:
         return hits[0]["uid"], "exact"
@@ -667,6 +676,20 @@ async def run(args: argparse.Namespace) -> int:
         print(f"roster: {len(roster.by_name)} distinct member names")
         event_rulings, winner_rulings = load_rulings(args.rulings)
         print(f"rulings: {len(event_rulings)} events, {len(winner_rulings)} winners")
+        dead_events = {
+            k: v
+            for k, v in event_rulings.items()
+            if v != "create" and v not in corpus.by_uid
+        }
+        dead_winners = {
+            k: v for k, v in winner_rulings.items() if v not in roster.by_uid
+        }
+        if dead_events or dead_winners:
+            print(
+                f"  ⚠ {len(dead_events)} event and {len(dead_winners)} winner rulings "
+                f"name a uid this database does not hold — NOT applied: "
+                f"{sorted(dead_events)} {sorted(dead_winners.values())}"
+            )
 
         verdicts = []
         for entry in entries:
@@ -689,7 +712,9 @@ async def run(args: argparse.Namespace) -> int:
         # After the collision pass, so a ruling is never undone by it.
         for verdict in verdicts:
             ruled = event_rulings.get(verdict[0])
-            if ruled == "create":
+            if verdict[0] in dead_events:
+                verdict[1], verdict[2], verdict[3] = "review", ruled, "ruling not held"
+            elif ruled == "create":
                 verdict[1], verdict[2], verdict[3] = "create", "", "ruling"
             elif ruled:
                 verdict[1], verdict[2], verdict[3] = "attach", ruled, "ruling"

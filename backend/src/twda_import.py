@@ -3,7 +3,9 @@
 The archive is the only record of roughly a quarter of the events we hold wins
 for: it only began carrying vekn.net event links around 2013, so everything older
 reaches us through `backend/src/data/twda_decisions.tsv`, a reviewed mapping from
-archive entry to either one of our tournaments or a reconstruction of one.
+archive entry to either one of our tournaments or a reconstruction of one. What
+that mapping settles is written onto the corpus, so the file is only ever
+consulted for an entry nobody has settled yet.
 
 Nothing here guesses. An entry the decisions file does not resolve is counted and
 skipped — never created on a hunch, because a wrong reconstruction mints a
@@ -20,7 +22,13 @@ import aiohttp
 
 from .broadcast import broadcast_precomputed
 from .data.timezones import CITY_TZ_OVERRIDES, COUNTRY_TIMEZONE
-from .db import get_connection, resolve_event_code, save_object_from_model
+from .db import (
+    get_connection,
+    resolve_event_code,
+    save_object_from_model,
+    save_tournament,
+    tournament_transaction,
+)
 from .geonames import normalize_country
 from .models import (
     DeckObject,
@@ -37,7 +45,7 @@ from .ratings import recompute_wins
 logger = logging.getLogger(__name__)
 
 TWDA_URL = "https://static.krcg.org/data/twda.json"
-# The scheduled task handles a delta: more than this many reconstructions means
+# The scheduled task handles a delta: more than this many unsettled entries means
 # it is standing in for `backend/scripts/backfill_twda.py`, and a thousand saves
 # here is a thousand SSE frames at every connected client.
 MAX_CREATES_PER_RUN = 25
@@ -114,12 +122,20 @@ def load_decisions() -> dict[str, tuple[str, str]]:
     (target is the winning member's uid). Everything else in the file is an
     undecided line and is deliberately absent from the result, so the caller
     counts it as unresolved rather than acting on it.
+
+    An absent file is a degraded run, not a failure: every entry already settled
+    onto the corpus resolves without it, and only the ones nobody has settled yet
+    go unresolved.
     """
-    text = (
-        importlib.resources.files("backend.src.data")
-        .joinpath("twda_decisions.tsv")
-        .read_text()
-    )
+    try:
+        text = (
+            importlib.resources.files("backend.src.data")
+            .joinpath("twda_decisions.tsv")
+            .read_text()
+        )
+    except FileNotFoundError:
+        logger.warning("TWDA sync: no decisions file — settled entries only")
+        return {}
     decisions: dict[str, tuple[str, str]] = {}
     for line in text.splitlines():
         line = line.strip()
@@ -203,18 +219,55 @@ def reconstructed_tournament(entry: dict, winner_uid: str, now: datetime) -> Tou
 
 
 async def _tournaments_by_twda_id() -> dict[str, str]:
-    """twda entry id -> our tournament uid, for everything already reconstructed."""
+    """twda entry id -> our tournament uid, for every entry the corpus has settled.
+
+    Two keys, and they are not interchangeable. `twda` says the row was
+    reconstructed from the archive and gates seven unrelated decisions;
+    `twda_entry` says an event we already held is the one this entry describes.
+    """
     async with get_connection() as conn:
         rows = await (
             await conn.execute(
-                """SELECT "full"->'external_ids'->>'twda', uid FROM objects
+                """SELECT coalesce("full"->'external_ids'->>'twda',
+                                   "full"->'external_ids'->>'twda_entry'), uid
+                FROM objects
                 WHERE type = %s
-                  AND "full"->'external_ids'->>'twda' IS NOT NULL
-                  AND deleted_at IS NULL""",
+                  AND deleted_at IS NULL
+                  AND ("full"->'external_ids'->>'twda' IS NOT NULL
+                       OR "full"->'external_ids'->>'twda_entry' IS NOT NULL)""",
                 (ObjectType.TOURNAMENT,),
             )
         ).fetchall()
     return {row[0]: row[1] for row in rows}
+
+
+async def _settle_attachment(entry_id: str, uid: str, broadcast: bool) -> bool:
+    """Stamp the archive key onto the tournament an `attach` names, so the next
+    run reads the attachment off the corpus and never consults the file for it.
+
+    Never under `twda`: that key means "reconstructed from the archive" and would
+    move the VEKN adopt carve-out, the calendar push, the event code, the Hall of
+    Fame floor, the duplicate report and the archival badge.
+    """
+    async with tournament_transaction(uid) as (tournament, conn):
+        if tournament is None or tournament.deleted_at:
+            return False
+        held = tournament.external_ids.get("twda_entry") or tournament.external_ids.get(
+            "twda"
+        )
+        if held:
+            if held != entry_id:
+                logger.warning(
+                    f"TWDA sync: entry {entry_id} attaches to {uid}, which already "
+                    f"holds archive entry {held} — not settling"
+                )
+            return False
+        tournament.external_ids["twda_entry"] = entry_id
+        tournament.modified = datetime.now(UTC)
+        bd = await save_tournament(tournament, conn=conn)
+    if broadcast:
+        broadcast_precomputed(bd)
+    return True
 
 
 async def _winners_by_tournament_uid(uids: list[str]) -> dict[str, tuple[str, list]]:
@@ -237,8 +290,9 @@ async def _winners_by_tournament_uid(uids: list[str]) -> dict[str, tuple[str, li
 async def run_twda_sync(
     *, broadcast: bool = True, max_creates: int | None = MAX_CREATES_PER_RUN
 ) -> dict[str, int]:
-    """Reconcile the whole archive against our corpus: reconstruct what the
-    decisions file says we lack, then give every resolved winner their decklist.
+    """Reconcile the whole archive against our corpus: settle every entry onto
+    the event it belongs to — reconstructing the ones we lack — then give every
+    resolved winner their decklist.
 
     Deliberately no ETag. Once identities are attached from a reviewed file, OUR
     side moves while the archive sits still — a member is created, renamed, or
@@ -260,6 +314,7 @@ async def run_twda_sync(
     stats = {
         "entries": len(entries),
         "created": 0,
+        "settled": 0,
         "unresolved": 0,
         "stale_targets": 0,
         "orphaned": 0,
@@ -272,34 +327,39 @@ async def run_twda_sync(
     pending = sum(
         1
         for entry in entries
-        if decisions.get(str(entry.get("id", "")), ("", ""))[0] == "create"
-        and str(entry.get("id", "")) not in known
+        if str(entry.get("id", "")) not in known
+        and decisions.get(str(entry.get("id", "")), ("", ""))[0] in ("attach", "create")
     )
     # A run this size is the initial backfill, not a delta, whatever invoked it.
-    # Reconstruct nothing and say so: the decks below still land for everything
-    # already resolved, so a capped run is useful rather than merely refused.
+    # Write nothing and say so: the decks below still land for everything already
+    # resolved, so a capped run is useful rather than merely refused.
     bulk = max_creates is not None and pending > max_creates
     if bulk:
         stats["deferred_to_backfill"] = pending
         logger.error(
-            f"TWDA sync: {pending} entries await reconstruction, over the "
-            f"{max_creates} delta cap — creating none. Run "
+            f"TWDA sync: {pending} entries await settling, over the "
+            f"{max_creates} delta cap — writing none. Run "
             f"backend/scripts/backfill_twda.py --apply, which suppresses "
             f"broadcasting and regenerates the snapshot."
         )
 
     for entry in entries:
         entry_id = str(entry.get("id", ""))
+        # The corpus answers first, and a settled row knows its own winner. The
+        # file is a 2026 extract of uids: consulting it for an entry somebody has
+        # already settled is what makes a transplanted target attach nothing.
+        existing = known.get(entry_id)
+        if existing:
+            resolved[entry_id] = (existing, "")
+            continue
         action, target = decisions.get(entry_id, ("", ""))
         if not action:
             stats["unresolved"] += 1
             continue
         if action == "attach":
             resolved[entry_id] = (target, "")
-            continue
-        existing = known.get(entry_id)
-        if existing:
-            resolved[entry_id] = (existing, target)
+            if not bulk and await _settle_attachment(entry_id, target, broadcast):
+                stats["settled"] += 1
             continue
         if bulk:
             continue
@@ -314,15 +374,15 @@ async def run_twda_sync(
         resolved[entry_id] = (tournament.uid, target)
         stats["created"] += 1
 
-    # A `twda` row whose entry left the archive — renamed upstream, or withdrawn.
-    # Never auto-deleted: the row may hold a corrected result or a deck, and only
+    # A settled row whose entry left the archive — renamed upstream, or withdrawn.
+    # Never auto-repaired: the row may hold a corrected result or a deck, and only
     # a human can tell a rename from a retraction.
     orphaned = sorted(set(known) - {str(e.get("id", "")) for e in entries})
     stats["orphaned"] = len(orphaned)
     if orphaned:
         logger.warning(
-            f"TWDA sync: {len(orphaned)} reconstructed rows no longer have an "
-            f"archive entry, left alone for review: {orphaned[:20]}"
+            f"TWDA sync: {len(orphaned)} rows carry an archive key the archive no "
+            f"longer has, left alone for review: {orphaned[:20]}"
         )
 
     stats["decks_created"], stale, deck_winners = await _import_decks(
@@ -337,11 +397,12 @@ async def run_twda_sync(
         if broadcast:
             broadcast_precomputed(bd)
     if stale:
-        # The decisions file names uids; one that moved since it was written
-        # attaches nothing. Silent, and the whole file degrades this way.
+        # Only decisions that never applied reach here — one that did is settled
+        # on the corpus and never consulted again. A uid from another environment,
+        # or one that moved before it was ever read, stays here until reviewed.
         logger.warning(
-            f"TWDA sync: {len(stale)} decisions point at tournaments we no longer "
-            f"hold — regenerate the decisions file: {stale[:20]}"
+            f"TWDA sync: {len(stale)} decisions name tournaments we do not hold "
+            f"and have never settled — regenerate the decisions file: {stale[:20]}"
         )
     logger.info(f"TWDA sync: {stats}")
     return stats

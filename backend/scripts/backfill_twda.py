@@ -1,6 +1,7 @@
-"""One-time backfill of the historic archive: reconstruct ~1100 tournaments and
-import their winning decks, recompute the Hall of Fame, then regenerate the
-snapshot.
+"""One-time backfill of the historic archive: settle every reviewed decision onto
+the corpus — reconstructing the ~1100 tournaments we lack and stamping the archive
+key onto the ~3400 events we already hold — import their winning decks, recompute
+the Hall of Fame, then regenerate the snapshot.
 
     # reports what it would do; --apply is the only thing that writes
     /opt/archon/backend/.venv/bin/python \\
@@ -13,8 +14,9 @@ thousand — every connected client would take the lot as individual SSE frames.
 So this suppresses broadcasting and regenerates the snapshot at the end instead,
 the way the archon migration did. Clients pick the corpus up on their next resync.
 
-Idempotent: an entry already carrying a reconstruction is recognised by its
-`twda` external id and skipped, so a half-finished run is resumed by re-running.
+Idempotent: an entry the corpus already holds is recognised by its `twda` or
+`twda_entry` external id and skipped, so a half-finished run is resumed by
+re-running. From then on the decisions file is only read for what is left.
 
 **Regenerate the decisions file against this database first.** Its targets are
 uids: one that moved since the file was written attaches nothing, or reconstructs
@@ -58,18 +60,23 @@ async def run(args: argparse.Namespace) -> int:
         held = await _tournaments_by_twda_id()
         by_action: dict[str, int] = {}
         todo = 0
+        settle = 0
         for entry in entries:
             entry_id = str(entry.get("id", ""))
             action = decisions.get(entry_id, ("unresolved", ""))[0]
             by_action[action] = by_action.get(action, 0) + 1
-            if action == "create" and entry_id not in held:
+            if entry_id in held:
+                continue
+            if action == "create":
                 todo += 1
+            elif action == "attach":
+                settle += 1
 
         print(f"archive:  {len(entries)} entries")
         for action, count in sorted(by_action.items()):
             print(f"  {count:6d}  {action}")
-        print(f"already reconstructed: {len(held)}")
-        print(f"\nwould create {todo} tournaments")
+        print(f"already settled on the corpus: {len(held)}")
+        print(f"\nwould create {todo} tournaments and settle {settle} attachments")
         if not args.apply:
             print("\nDry run — pass --apply to write.")
             return 0

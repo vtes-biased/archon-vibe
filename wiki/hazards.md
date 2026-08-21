@@ -205,6 +205,11 @@ rounds-less branch of `players_with_rounds` already returns a real number for th
 whole historic corpus. Measuring `len(rounds)` and reading it as a count has
 already produced one confidently wrong conclusion about the archive.
 
+**`external_ids['twda']` means *reconstructed from the archive*, not *linked to
+it*.** Seven unrelated decisions read it that way, from the VEKN adopt carve-out to
+the public archival badge, so an event we already held that the archive also
+describes carries `twda_entry` instead — [vekn](vekn.md#inbound) enumerates them.
+
 **`player_count` is a taken name.** `engine/src/league.rs` reads
 `tournament["player_count"]` from a **caller-synthesized** summary object, not from
 the Tournament model. A `player_count` field on `Tournament` would make real
