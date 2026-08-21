@@ -1575,6 +1575,7 @@
   "err_tournament_finals_player_count": "Finals player count mismatch",
   "err_tournament_finals_player_set": "Finals player set mismatch",
   "err_tournament_table_count_mismatch": "Table count mismatch",
+  "err_tournament_empty_round": "A round must keep at least one table — cancel the round instead.",
   "err_tournament_seating_violates_r1": "Seating violates R1 (predator-prey repeat)",
   "err_tournament_player_not_in_round": "Player {player} not found in current round seating",
   "err_tournament_table_full": "Table already has 5 players",

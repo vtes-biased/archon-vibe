@@ -1575,6 +1575,7 @@
   "err_tournament_finals_player_count": "Nombre de joueurs incorrect pour la finale",
   "err_tournament_finals_player_set": "Ensemble de joueurs incorrect pour la finale",
   "err_tournament_table_count_mismatch": "Nombre de tables incorrect",
+  "err_tournament_empty_round": "Une ronde doit conserver au moins une table — annulez plutôt la ronde.",
   "err_tournament_seating_violates_r1": "Le placement viole R1 (répétition prédateur-proie)",
   "err_tournament_player_not_in_round": "Le joueur {player} n'est pas dans le placement de la ronde en cours",
   "err_tournament_table_full": "La table a déjà 5 joueurs",

@@ -408,7 +408,8 @@ otherwise), `DropOut` (preserves scores), `CheckIn`, `CheckInAll`, `ResetCheckIn
 
 **`AlterSeating` refuses only the structurally incoherent**: a uid that is not a
 tournament player, a duplicate across the payload, a table outside 0/4/5, fewer
-tables than the round has, a predator-prey repeat. It applies **no player-state
+tables than the round has, a payload that would leave the round with no table at
+all (cancel the round instead), a predator-prey repeat. It applies **no player-state
 filter** — every state such a filter could bar is reachable by seating the player
 and then changing their state, and `StartRound` already admits `Playing` players
 into a new round for parallel online play. The editor's pool therefore offers every
@@ -417,8 +418,12 @@ the organizer sees what they are adding.
 
 **A live round's seating decides player state**, in one promotion and one demotion
 rule, shared by `AlterSeating` and `UnseatPlayer`. Joining a live round's seating
-makes a player `Playing`; leaving it returns them to `Registered` — but only *from*
-`Playing`, so a player who dropped out mid-round (drop never vacates a seat) stays
+makes a player `Playing` — `Finished` if the tournament itself is, which a
+force-finish can leave holding a live round — except that a disqualified player
+keeps `Disqualified`, by state or by active sanction: seating them is allowed,
+un-disqualifying them as a side effect is not. Leaving the seating returns a
+player to `Registered` — but only *from* `Playing`, so a player who dropped out
+mid-round (drop never vacates a seat) stays
 `Finished` instead of being silently reinstated into finals eligibility, and only
 when they are not seated in another still-live round, so parallel rounds do not
 strand each other. A round that is over is not live: correcting its record moves

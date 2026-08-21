@@ -1476,6 +1476,9 @@ fn apply_event(
                         return Err(EngineError::InvalidTableSize { size: table.len() });
                     }
                 }
+                if seating.iter().all(|t| t.is_empty()) {
+                    return Err(EngineError::EmptyRound);
+                }
                 for uid in seating.iter().flat_map(|t| t.iter()) {
                     if !player_exists(&tournament["players"], uid) {
                         return Err(EngineError::PlayerNotFound);
@@ -1587,7 +1590,14 @@ fn apply_event(
                         "Playing"
                     };
                     for uid in joined {
+                        if has_dq_sanction(sanctions, &uid) {
+                            continue;
+                        }
                         if let Some(idx) = find_player_index(&tournament["players"], &uid) {
+                            if tournament["players"][idx]["state"].as_str() == Some("Disqualified")
+                            {
+                                continue;
+                            }
                             tournament["players"][idx]["state"] = joined_state.into();
                         }
                     }
@@ -1669,8 +1679,6 @@ fn apply_event(
             }
             rounds[last][*table]["seating"] = JsonValue::Array(new_seating);
 
-            // Set player state — mirror CheckOut/UnseatPlayer: a Finished tournament
-            // keeps the player Finished, otherwise they join the live round as Playing.
             tournament["players"][player_idx]["state"] = if state == TournamentState::Finished {
                 "Finished"
             } else {

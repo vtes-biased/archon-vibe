@@ -2538,6 +2538,27 @@ fn test_alter_seating_adds_and_removes_in_one_save() {
 }
 
 #[test]
+fn test_alter_seating_seating_a_disqualified_player_keeps_them_disqualified() {
+    let mut tournament = tournament_with_round();
+    tournament["players"]
+        .push(json::object! { user_uid: "p9", state: "Disqualified", payment_status: "Pending", toss: 0 })
+        .unwrap();
+    let event = json::object! {
+        type: "AlterSeating",
+        round: 0,
+        seating: [["p9", "p2", "p3", "p4"], ["p5", "p6", "p7", "p8"]],
+    };
+    let actor = make_organizer();
+    let updated = json::parse(&run_event(&tournament, &event, &actor).unwrap()).unwrap();
+
+    assert_eq!(
+        updated["rounds"][0][0]["seating"][0]["player_uid"].as_str(),
+        Some("p9")
+    );
+    assert_eq!(player_state(&updated, "p9"), "Disqualified");
+}
+
+#[test]
 fn test_alter_seating_unseating_a_dropped_player_keeps_them_finished() {
     let mut tournament = tournament_with_round();
     // Dropping out never vacates a seat, so p1 is seated while Finished.

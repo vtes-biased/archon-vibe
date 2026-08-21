@@ -121,6 +121,7 @@ export function translatePlayerState(state: string): string {
     case "Playing": return m.state_playing();
     case "Completed": return m.player_state_completed();
     case "Finished": return m.state_finished();
+    case "Disqualified": return m.player_state_disqualified();
     default: return state;
   }
 }

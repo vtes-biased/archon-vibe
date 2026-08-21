@@ -1575,6 +1575,7 @@
   "err_tournament_finals_player_count": "Número de jogadores incorreto para as finais",
   "err_tournament_finals_player_set": "Conjunto de jogadores incorreto para as finais",
   "err_tournament_table_count_mismatch": "Número de mesas incorreto",
+  "err_tournament_empty_round": "Uma rodada deve manter ao menos uma mesa — cancele a rodada em vez disso.",
   "err_tournament_seating_violates_r1": "Os assentos violam R1 (repetição predador-presa)",
   "err_tournament_player_not_in_round": "O jogador {player} não está nos assentos da rodada atual",
   "err_tournament_table_full": "A mesa já tem 5 jogadores",

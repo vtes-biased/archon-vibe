@@ -25,8 +25,6 @@
     onchange: () => void;
   } = $props();
 
-  // The finals player set is fixed by the card-drawing ritual, so the draft
-  // there rearranges only.
   const canEditPlayerSet = $derived(!isFinals);
   let poolTarget = $state<number | null>(null);
 
