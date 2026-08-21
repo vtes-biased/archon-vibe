@@ -171,6 +171,18 @@ dry-deploy-beta: galaxy
     if [ "${SOURCE:-}" = local ]; then just build-all; extra="$extra -e artifact_source=local"; fi
     uv run --project {{repo_root}} ansible-playbook -i inventories/beta playbooks/deploy-beta.yml --check --diff $extra
 
+# `dry-prod` below runs site.yml, whose bootstrap and database plays fail check
+# mode on the shared legacy VPS before ever reaching these roles.
+# Dry-run (check mode) of `deploy-prod` — the pre-flight that fires the roles' parameter asserts (RELEASE_TAG=… / SOURCE=local)
+dry-deploy-prod: galaxy
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}"
+    extra=""
+    if [ -n "${RELEASE_TAG:-}" ]; then extra="-e release_tag=${RELEASE_TAG}"; fi
+    if [ "${SOURCE:-}" = local ]; then just build-all; extra="$extra -e artifact_source=local"; fi
+    uv run --project {{repo_root}} ansible-playbook -i inventories/prod {{phase1_override}} playbooks/deploy.yml --check --diff $extra
+
 # Dry-run (check mode) of site.yml against prod
 dry-prod: galaxy
     ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod {{phase1_override}} playbooks/site.yml --check --diff

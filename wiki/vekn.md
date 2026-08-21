@@ -23,7 +23,9 @@ All directions need `VEKN_API_BASE_URL`, `VEKN_API_USERNAME`,
 false there, and the TWDA GitHub App variables are left unset so `is_configured()`
 is false and every archive submission skips. Neither vekn.net nor the public
 archive may take a write from a rehearsal environment — that is what makes beta
-safe to run a production script against.
+safe to run a production script against. Its corpus is **not** a mirror of
+production and answers no question about production's row counts: the scripts
+rehearsed there have been applied there.
 
 ## Outbound push
 
