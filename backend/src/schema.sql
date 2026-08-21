@@ -222,6 +222,11 @@ WHERE type = 'tournament' AND coalesce("full"->>'event_code', '') <> '';
 CREATE INDEX IF NOT EXISTS idx_objects_tournament_twda
 ON objects(("full"->'external_ids'->>'twda'))
 WHERE type = 'tournament' AND "full"->'external_ids'->>'twda' IS NOT NULL;
+-- Its twin, so the OR over both keys can BitmapOr instead of falling back to the
+-- seq scan the index above exists to prevent.
+CREATE INDEX IF NOT EXISTS idx_objects_tournament_twda_entry
+ON objects(("full"->'external_ids'->>'twda_entry'))
+WHERE type = 'tournament' AND "full"->'external_ids'->>'twda_entry' IS NOT NULL;
 -- Hall of Fame recompute, which runs on every finish, winner-deck write and merge.
 -- Without it each one seq-scans the tournament corpus, detoasting `full` per row
 -- just to read the winner — and the whole point of `wins` is to be precomputed.

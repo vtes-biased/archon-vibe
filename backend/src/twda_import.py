@@ -219,12 +219,7 @@ def reconstructed_tournament(entry: dict, winner_uid: str, now: datetime) -> Tou
 
 
 async def _tournaments_by_twda_id() -> dict[str, str]:
-    """twda entry id -> our tournament uid, for every entry the corpus has settled.
-
-    Two keys, and they are not interchangeable. `twda` says the row was
-    reconstructed from the archive and gates seven unrelated decisions;
-    `twda_entry` says an event we already held is the one this entry describes.
-    """
+    """twda entry id -> our tournament uid, for every entry the corpus has settled."""
     async with get_connection() as conn:
         rows = await (
             await conn.execute(
@@ -245,9 +240,7 @@ async def _settle_attachment(entry_id: str, uid: str, broadcast: bool) -> bool:
     """Stamp the archive key onto the tournament an `attach` names, so the next
     run reads the attachment off the corpus and never consults the file for it.
 
-    Never under `twda`: that key means "reconstructed from the archive" and would
-    move the VEKN adopt carve-out, the calendar push, the event code, the Hall of
-    Fame floor, the duplicate report and the archival badge.
+    Never under `twda`: that key means "reconstructed from the archive".
     """
     async with tournament_transaction(uid) as (tournament, conn):
         if tournament is None or tournament.deleted_at:
@@ -321,8 +314,7 @@ async def run_twda_sync(
         "decks_created": 0,
         "deferred_to_backfill": 0,
     }
-    # entry id -> (our tournament uid, winner uid or "" when the row knows its own)
-    resolved: dict[str, tuple[str, str]] = {}
+    resolved: dict[str, str] = {}
 
     pending = sum(
         1
@@ -345,19 +337,16 @@ async def run_twda_sync(
 
     for entry in entries:
         entry_id = str(entry.get("id", ""))
-        # The corpus answers first, and a settled row knows its own winner. The
-        # file is a 2026 extract of uids: consulting it for an entry somebody has
-        # already settled is what makes a transplanted target attach nothing.
         existing = known.get(entry_id)
         if existing:
-            resolved[entry_id] = (existing, "")
+            resolved[entry_id] = existing
             continue
         action, target = decisions.get(entry_id, ("", ""))
         if not action:
             stats["unresolved"] += 1
             continue
         if action == "attach":
-            resolved[entry_id] = (target, "")
+            resolved[entry_id] = target
             if not bulk and await _settle_attachment(entry_id, target, broadcast):
                 stats["settled"] += 1
             continue
@@ -371,7 +360,7 @@ async def run_twda_sync(
             )
         if broadcast:
             broadcast_precomputed(bd)
-        resolved[entry_id] = (tournament.uid, target)
+        resolved[entry_id] = tournament.uid
         stats["created"] += 1
 
     # A settled row whose entry left the archive — renamed upstream, or withdrawn.
@@ -397,9 +386,6 @@ async def run_twda_sync(
         if broadcast:
             broadcast_precomputed(bd)
     if stale:
-        # Only decisions that never applied reach here — one that did is settled
-        # on the corpus and never consulted again. A uid from another environment,
-        # or one that moved before it was ever read, stays here until reviewed.
         logger.warning(
             f"TWDA sync: {len(stale)} decisions name tournaments we do not hold "
             f"and have never settled — regenerate the decisions file: {stale[:20]}"
@@ -410,7 +396,7 @@ async def run_twda_sync(
 
 async def _import_decks(
     entries: list[dict],
-    resolved: dict[str, tuple[str, str]],
+    resolved: dict[str, str],
     now: datetime,
     broadcast: bool,
 ) -> tuple[int, list[str], set[str]]:
@@ -421,7 +407,7 @@ async def _import_decks(
     entry whose winner we could not resolve gets no deck at all rather than an
     orphan owned by nobody.
     """
-    uids = [uid for uid, _ in resolved.values()]
+    uids = list(resolved.values())
     winners = await _winners_by_tournament_uid(uids)
     existing = await _deck_owners_by_tournament(uids)
     created = 0
@@ -429,15 +415,14 @@ async def _import_decks(
     touched: set[str] = set()
     for entry in entries:
         entry_id = str(entry.get("id", ""))
-        target = resolved.get(entry_id)
-        if not target:
+        tournament_uid = resolved.get(entry_id)
+        if not tournament_uid:
             continue
-        tournament_uid, winner_uid = target
         row = winners.get(tournament_uid)
         if not row:
             stale.append(entry_id)
             continue
-        winner_uid = winner_uid or row[0]
+        winner_uid = row[0]
         cards = _flatten_twda_cards(entry)
         if not winner_uid or not cards:
             continue

@@ -342,9 +342,6 @@ def resolve_winner(name: str, roster: Roster, rulings: dict) -> tuple[str, str]:
     """
     ruled = rulings.get(name)
     if ruled:
-        # A ruling naming a uid this roster does not hold is an answer for another
-        # database. Hold the name out rather than fall through — the matchers are
-        # exactly what the human overruled.
         return (ruled, "ruling") if ruled in roster.by_uid else ("", "ruling not held")
     hits = roster.exact(name)
     if len(hits) == 1:
