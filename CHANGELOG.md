@@ -10,6 +10,15 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+Covers v1.0.4 → v1.0.6.
+
+- The seating editor can now add and remove players from the round.
+- Announcements and other notifications now read clearly on a phone.
+- Sanctions past their 18 months expire on schedule.
+- The deck archive picks up new TWDA entries daily.
+
 ## v1.0.3 — 2026-08-19
 
 - The location for an event declared in the app is kept (not replaced by the vekn.net Antarctica venue anymore)
