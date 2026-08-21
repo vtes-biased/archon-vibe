@@ -12,8 +12,6 @@ these are player-facing lines, not developer notes.
 
 ## Unreleased
 
-Covers v1.0.4 → v1.0.6.
-
 - The seating editor can now add and remove players from the round.
 - Announcements and other notifications now read clearly on a phone.
 - Sanctions past their 18 months expire on schedule.
