@@ -181,6 +181,10 @@ CREATE TABLE IF NOT EXISTS objects (
     "public" JSONB,
     "member" JSONB,
     "full" JSONB NOT NULL,
+    -- Fourth projection, for third-party API consumers only: never broadcast
+    -- over SSE and never served by /snapshot, which derives its level from
+    -- DataLevel. NULL = invisible to the API.
+    "api" JSONB,
     -- calendar_token: per-user secret for the personal .ics feed.
     -- It CANNOT live in public/member/full because all three
     -- projections are broadcast over SSE (the "full" overlay reaches
@@ -193,6 +197,7 @@ CREATE TABLE IF NOT EXISTS objects (
 );
 -- Migrate existing deployments to the dedicated column (see above).
 ALTER TABLE objects ADD COLUMN IF NOT EXISTS calendar_token TEXT;
+ALTER TABLE objects ADD COLUMN IF NOT EXISTS "api" JSONB;
 -- Composite index for SSE catch-up queries (type + modified_at + uid)
 CREATE INDEX IF NOT EXISTS idx_objects_type_modified
 ON objects(type, modified_at, uid);

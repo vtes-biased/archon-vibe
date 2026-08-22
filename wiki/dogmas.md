@@ -28,9 +28,10 @@ call site; a copy is not the cheaper option, it is the one whose cost lands late
 frame is authoritative and overwrites. Apply semantics are overwrite-by-uid,
 never field-merge — a merge would preserve stale optimistic fields forever.
 
-**One schemaless table, three pre-computed projections.** All synced objects live
-in `objects` with `public`/`member`/`full` JSONB columns written at write time.
-No ORM, no schema migrations, no read-time per-viewer filtering.
+**One schemaless table, four pre-computed projections.** All synced objects live
+in `objects` with `public`/`member`/`full` JSONB columns written at write time,
+plus `api` for the public read API. No ORM, no schema migrations, no read-time
+per-viewer filtering.
 
 **No server-side pagination** on the rare online-only REST reads. Those datasets
 are small by design; return the whole role-scoped set and filter client-side.
@@ -121,10 +122,12 @@ rules engine for play itself.
 reconciliation. If richer money handling is ever wanted, integrate a ticketing
 platform rather than building a ledger.
 
-**No public/third-party API today.** The half-built read surface was removed
-deliberately. The OAuth2 provider stays as the auth substrate. Building one is a
-real project — versioning, OpenAPI, rate limiting, scoped tokens, pagination,
-tests against a real client — and waits for an actual external consumer.
+**A public third-party read API is in scope.** External consumers now exist,
+which is the trigger the earlier "no public API today" position named. It is
+read-only, versioned, token-gated and paginated, it runs as its own process on
+its own subdomain, and the app never calls it. It publishes VEKN IDs rather than
+names: the `api` projection carries no member's name, contact or city
+([sync](sync.md#access-levels)).
 
 **IC holds every capability, everywhere.** Wherever a rule names Prince or NC, IC
 has the same or more.

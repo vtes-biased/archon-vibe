@@ -290,7 +290,12 @@ def decode_json[T](data: str | dict, type_: type[T]) -> T:
     return decoder.decode(data)
 
 
-from .access_levels import compute_full, compute_member, compute_public  # noqa: E402
+from .access_levels import (  # noqa: E402
+    compute_api,
+    compute_full,
+    compute_member,
+    compute_public,
+)
 
 
 async def get_decks_for_tournament(
@@ -315,14 +320,16 @@ async def save_object(
     deleted_at: str | None = None,
 ) -> BroadcastData:
     """Save an object to the unified objects table, computing and upserting all
-    three access-level projections.
+    four access-level projections.
     """
     pub = compute_public(obj_type, full_data)
     mem = compute_member(obj_type, full_data)
+    api = compute_api(obj_type, full_data)
     full = compute_full(obj_type, full_data)
 
     pub_json = _encoder.encode(pub).decode("utf-8") if pub is not None else None
     mem_json = _encoder.encode(mem).decode("utf-8") if mem is not None else None
+    api_json = _encoder.encode(api).decode("utf-8") if api is not None else None
     full_json = _encoder.encode(full).decode("utf-8")
 
     # calendar_token lives outside the JSONB projections and must never be
@@ -330,18 +337,28 @@ async def save_object(
     cal_token = full_data.get("calendar_token") if obj_type == ObjectType.USER else None
 
     query = """
-        INSERT INTO objects (uid, type, deleted_at, "public", "member", "full", calendar_token)
-        VALUES (%s, %s, %s::timestamp, %s::jsonb, %s::jsonb, %s::jsonb, %s)
+        INSERT INTO objects (uid, type, deleted_at, "public", "member", "api", "full", calendar_token)
+        VALUES (%s, %s, %s::timestamp, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb, %s)
         ON CONFLICT (uid) DO UPDATE SET
             type = EXCLUDED.type,
             deleted_at = EXCLUDED.deleted_at,
             "public" = EXCLUDED."public",
             "member" = EXCLUDED."member",
+            "api" = EXCLUDED."api",
             "full" = EXCLUDED."full",
             calendar_token = COALESCE(EXCLUDED.calendar_token, objects.calendar_token)
         RETURNING modified_at
     """
-    params = (uid, obj_type, deleted_at, pub_json, mem_json, full_json, cal_token)
+    params = (
+        uid,
+        obj_type,
+        deleted_at,
+        pub_json,
+        mem_json,
+        api_json,
+        full_json,
+        cal_token,
+    )
 
     if conn:
         row = await (await conn.execute(query, params)).fetchone()
@@ -507,8 +524,8 @@ async def stream_objects_new(
 async def stream_objects_snapshot(
     conn: psycopg.AsyncConnection,
     batch_size: int = 150,
-) -> AsyncIterator[list[tuple[str, str | None, str | None, str | None]]]:
-    """Stream the whole live corpus once, unordered — every type, all three
+) -> AsyncIterator[list[tuple[str, str | None, str | None, str | None, str | None]]]:
+    """Stream the whole live corpus once, unordered — every type, all four
     access levels per row.
 
     `conn` is caller-owned; drive this under `contextlib.aclosing` (or fully
@@ -516,11 +533,12 @@ async def stream_objects_snapshot(
     re-lends the connection. Plan checks must EXPLAIN the DECLARE, not the
     bare SELECT — cursor_tuple_fraction costs it differently.
 
-    Yields batches of (type, public, member, full); a None level means the
-    row has no such projection.
+    Yields batches of (type, public, member, api, full) in `snapshots._LEVELS`
+    order — the two must move together, or a level's rows land in another
+    level's file. A None level means the row has no such projection.
     """
     sql = (
-        'SELECT type, "public"::text, "member"::text, "full"::text '
+        'SELECT type, "public"::text, "member"::text, "api"::text, "full"::text '
         "FROM objects WHERE deleted_at IS NULL"
     )
     async with conn.transaction():

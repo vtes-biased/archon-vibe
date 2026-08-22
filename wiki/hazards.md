@@ -237,8 +237,10 @@ non-country, non-own-object full grant must also be added to the overlay frames,
 a resync re-delivers the lower projection ([sync](sync.md#access-entitlement)).
 
 **Adding a precomputed access column** is warranted only when projection *content*
-must vary by viewer at the same level. Otherwise collapse onto an existing column
-and shrink the lower one. The base64 contact obfuscation is a harvester speed-bump,
+must vary by **consumer class**. A new viewer level inside the app does not
+qualify — collapse onto an existing column and shrink the lower one. `api` did:
+its readers are third parties who get no app client, no SSE stream and a
+name-free row ([sync](sync.md#access-levels)). The base64 contact obfuscation is a harvester speed-bump,
 not access control.
 
 ## Concurrency and connections

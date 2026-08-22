@@ -5,12 +5,16 @@ import base64
 import msgspec
 import pytest
 from src.access_levels import (
+    _PLAYER_API_EXCLUDE,
+    _TOURNAMENT_API_EXCLUDE,
     _TOURNAMENT_MEMBER_EXCLUDE,
+    _USER_API_FIELDS,
+    compute_api,
     compute_full,
     compute_member,
     compute_public,
 )
-from src.models import ObjectType, Tournament, User
+from src.models import ObjectType, Player, Tournament, User
 
 
 def _make_user(**overrides) -> dict:
@@ -506,6 +510,94 @@ class TestLeague:
         assert mem["organizers_uids"] == ["u-nc-fr"]
 
 
+class TestUserApi:
+    def test_hidden_without_a_vekn_id(self):
+        assert compute_api(ObjectType.USER, _make_user(vekn_id=None)) is None
+        assert compute_api(ObjectType.USER, _make_user(vekn_id="")) is None
+
+    def test_vekn_id_and_ratings_only(self):
+        result = compute_api(ObjectType.USER, _make_user())
+        assert result["vekn_id"] == "1000001"
+        assert result["country"] == "FR"
+        assert result["wins"] == ["t-001"]
+        assert result["constructed_online"] == {"total": 100, "tournaments": []}
+        assert result["community_links"][0]["type"] == "discord"
+        assert set(result) <= _USER_API_FIELDS
+
+    def test_officials_keep_no_contact(self):
+        result = compute_api(ObjectType.USER, _make_user(roles=["NC"]))
+        assert result["roles"] == ["NC"]
+        assert "contact_email" not in result
+        assert "name" not in result
+
+
+class TestTournamentApi:
+    def test_strips_the_member_secrets_and_the_api_four(self):
+        t = _make_tournament(
+            announcements=[{"text": "hi"}],
+            promos_distributed=[{"promo_uid": "p-1", "qty": 2}],
+            promo_stock_source_uid="u-org1",
+        )
+        result = compute_api(ObjectType.TOURNAMENT, t)
+        assert result["name"] == "Paris Open"
+        assert result["external_ids"] == {"vekn": "12345"}
+        assert result["organizers_uids"] == ["u-org1"]
+        assert not (set(result) & _TOURNAMENT_API_EXCLUDE)
+
+    def test_player_names_and_payment_stripped(self):
+        t = _make_tournament(
+            players=[
+                {
+                    "user_uid": "u-001",
+                    "state": "Registered",
+                    "payment_status": "Paid",
+                    "toss": 0,
+                    "result": {"gw": 1, "vp": 3.0, "tp": 60},
+                    "finalist": True,
+                    "display_name": "Alice",
+                    "non_competing": False,
+                }
+            ]
+        )
+        result = compute_api(ObjectType.TOURNAMENT, t)
+        player = result["players"][0]
+        assert player["user_uid"] == "u-001"
+        assert player["finalist"] is True
+        assert player["result"] == {"gw": 1, "vp": 3.0, "tp": 60}
+        assert "display_name" not in player
+        assert "payment_status" not in player
+
+    def test_full_projection_keeps_the_player_fields_api_drops(self):
+        # The player dicts are shared across the projections of one save; an
+        # in-place strip here would empty them out of the `full` column too.
+        t = _make_tournament(players=[{"user_uid": "u-001", "display_name": "Alice"}])
+        compute_api(ObjectType.TOURNAMENT, t)
+        assert (
+            compute_full(ObjectType.TOURNAMENT, t)["players"][0]["display_name"]
+            == "Alice"
+        )
+
+
+class TestDeckLeagueSanctionPromoApi:
+    def test_public_deck_loses_its_author(self):
+        result = compute_api(ObjectType.DECK, _make_deck(public=True))
+        assert result["cards"] == {"100001": 4, "100002": 2}
+        assert result["attribution"] == "1000001"
+        assert "author" not in result
+
+    def test_private_deck_hidden(self):
+        assert compute_api(ObjectType.DECK, _make_deck(public=False)) is None
+
+    def test_league_loses_its_organizers(self):
+        result = compute_api(ObjectType.LEAGUE, _make_league())
+        assert result["name"] == "French National League"
+        assert "organizers_uids" not in result
+
+    def test_sanctions_and_promos_never_surface(self):
+        assert compute_api(ObjectType.SANCTION, _make_sanction()) is None
+        assert compute_api(ObjectType.PROMO, {"uid": "p-1", "name": "Promo"}) is None
+
+
 class TestDispatch:
     def test_unknown_type_raises(self):
         with pytest.raises(ValueError, match="Unknown object type"):
@@ -514,6 +606,8 @@ class TestDispatch:
             compute_member("foobar", {})
         with pytest.raises(ValueError, match="Unknown object type"):
             compute_full("foobar", {})
+        with pytest.raises(ValueError, match="Unknown object type"):
+            compute_api("foobar", {})
 
 
 # The member-visible half of the tournament projection, which the code expresses
@@ -572,11 +666,75 @@ _TOURNAMENT_MEMBER_VISIBLE = {
 }
 
 
+# The api-visible half of the tournament projection, the same complement the
+# member classification carries: the code states only the denylist.
+_TOURNAMENT_API_VISIBLE = _TOURNAMENT_MEMBER_VISIBLE - {
+    "announcements",
+    "raffles",
+    "promos_distributed",
+    "promo_stock_source_uid",
+}
+
+# User api is an allowlist, so its complement is what the public API withholds.
+_USER_API_WITHHELD = {
+    "name",
+    "nickname",
+    "city",
+    "city_geoname_id",
+    "state",
+    "avatar_path",
+    "promo_stock",
+    "contact_email",
+    "contact_discord",
+    "discord_id",
+    "contact_phone",
+    "phone_is_whatsapp",
+    "github_login",
+    "github_id",
+    "coopted_by",
+    "coopted_at",
+    "deceased_at",
+    "deceased_by_uid",
+    "vekn_synced",
+    "vekn_synced_at",
+    "local_modifications",
+    "vekn_prefix",
+    "calendar_token",
+}
+
+_PLAYER_API_VISIBLE = {
+    "user_uid",
+    "state",
+    "toss",
+    "result",
+    "finalist",
+    "non_competing",
+}
+
+
 class TestProjectionCompleteness:
     def test_every_tournament_field_is_member_classified(self):
         assert not (_TOURNAMENT_MEMBER_VISIBLE & _TOURNAMENT_MEMBER_EXCLUDE)
         assert _TOURNAMENT_MEMBER_VISIBLE | _TOURNAMENT_MEMBER_EXCLUDE == {
             f.name for f in msgspec.structs.fields(Tournament)
+        }
+
+    def test_every_tournament_field_is_api_classified(self):
+        assert not (_TOURNAMENT_API_VISIBLE & _TOURNAMENT_API_EXCLUDE)
+        assert _TOURNAMENT_API_VISIBLE | _TOURNAMENT_API_EXCLUDE == {
+            f.name for f in msgspec.structs.fields(Tournament)
+        }
+
+    def test_every_user_field_is_api_classified(self):
+        assert not (_USER_API_FIELDS & _USER_API_WITHHELD)
+        assert _USER_API_FIELDS | _USER_API_WITHHELD == {
+            f.name for f in msgspec.structs.fields(User)
+        }
+
+    def test_every_player_field_is_api_classified(self):
+        assert not (_PLAYER_API_VISIBLE & _PLAYER_API_EXCLUDE)
+        assert _PLAYER_API_VISIBLE | _PLAYER_API_EXCLUDE == {
+            f.name for f in msgspec.structs.fields(Player)
         }
 
     def test_user_full_withholds_only_calendar_token(self):

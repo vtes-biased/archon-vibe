@@ -48,7 +48,7 @@ async def test_snapshot_files_are_complete_wellformed_jsonl(
     # Ground truth per level: every live row whose projection for that level exists.
     ground: dict[str, set[str]] = {}
     async with db.get_connection() as conn:
-        for level in ("public", "member", "full"):
+        for level in snapshots._LEVELS:
             rows = await (
                 await conn.execute(
                     f'SELECT uid FROM objects WHERE deleted_at IS NULL AND "{level}" IS NOT NULL'  # noqa: S608
@@ -58,7 +58,7 @@ async def test_snapshot_files_are_complete_wellformed_jsonl(
     deleted_uids = {u.uid for u in populated_db[:2]}
 
     per_level: dict[str, set[str]] = {}
-    for level in ("public", "member", "full"):
+    for level in snapshots._LEVELS:
         path = snapshots.get_snapshot_path(level)
         assert path is not None, f"{level} snapshot not published"
         with gzip.open(path, "rt", encoding="utf-8") as fh:
@@ -84,3 +84,5 @@ async def test_snapshot_files_are_complete_wellformed_jsonl(
     # A narrower projection can only ever see a subset — a NULL column is skipped
     # for that file, never emitted as a null-bodied line.
     assert per_level["public"] <= per_level["member"] <= per_level["full"]
+    # The public API never sees an object a member cannot.
+    assert per_level["api"] <= per_level["member"]

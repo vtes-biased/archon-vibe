@@ -66,6 +66,24 @@ _USER_MEMBER_FIELDS = (
 )
 
 
+# VEKN-IDs-only: the public API never carries a name, a nickname, contact
+# details or a location finer than the country.
+_USER_API_FIELDS = {
+    "uid",
+    "modified",
+    "deleted_at",
+    "vekn_id",
+    "country",
+    "roles",
+    "community_links",
+    "constructed_online",
+    "constructed_offline",
+    "limited_online",
+    "limited_offline",
+    "wins",
+}
+
+
 def _pick(d: dict, keys: set[str]) -> dict:
     """Return a new dict with only the specified keys (if present in d)."""
     return {k: v for k, v in d.items() if k in keys}
@@ -95,6 +113,13 @@ def compute_user_member(d: dict) -> dict:
     if d.get("community_links"):
         return _pick(d, _USER_MEMBER_FIELDS | _USER_COMMUNITY_LINKS)
     return _pick(d, _USER_MEMBER_FIELDS)
+
+
+def compute_user_api(d: dict) -> dict | None:
+    # Matches idx_objects_user_vekn_id, which treats "" as no id.
+    if not d.get("vekn_id"):
+        return None
+    return _pick(d, _USER_API_FIELDS)
 
 
 def compute_user_full(d: dict) -> dict:
@@ -142,6 +167,15 @@ _TOURNAMENT_MEMBER_EXCLUDE = {
 }
 
 
+_TOURNAMENT_API_EXCLUDE = _TOURNAMENT_MEMBER_EXCLUDE | {
+    "announcements",
+    "raffles",
+    "promos_distributed",
+    "promo_stock_source_uid",
+}
+_PLAYER_API_EXCLUDE = {"display_name", "payment_status"}
+
+
 def compute_tournament_public(d: dict) -> dict:
     proj = _pick(d, _TOURNAMENT_PUBLIC_FIELDS)
     # Online event: venue_url is the join link, not a website — withheld same
@@ -155,21 +189,30 @@ def compute_tournament_member(d: dict) -> dict:
     return {k: v for k, v in d.items() if k not in _TOURNAMENT_MEMBER_EXCLUDE}
 
 
+def compute_tournament_api(d: dict) -> dict:
+    proj = {k: v for k, v in d.items() if k not in _TOURNAMENT_API_EXCLUDE}
+    # Rebuilt, never popped in place: the nested player dicts are the same
+    # objects the member and full projections of this save hand out.
+    proj["players"] = [
+        {k: v for k, v in player.items() if k not in _PLAYER_API_EXCLUDE}
+        for player in d["players"]
+    ]
+    return proj
+
+
 def compute_tournament_full(d: dict) -> dict:
     return dict(d)
-
-
-def compute_sanction_public(d: dict) -> None:
-    return None
-
-
-def compute_deck_public(d: dict) -> None:
-    return None
 
 
 def compute_deck_member(d: dict) -> dict | None:
     if d.get("public"):
         return dict(d)
+    return None
+
+
+def compute_deck_api(d: dict) -> dict | None:
+    if d.get("public"):
+        return {k: v for k, v in d.items() if k != "author"}
     return None
 
 
@@ -191,11 +234,15 @@ def _identity(d: dict) -> dict:
     return dict(d)
 
 
+def _invisible(d: dict) -> None:
+    return None
+
+
 _PUBLIC_DISPATCH = {
     ObjectType.USER: compute_user_public,
     ObjectType.TOURNAMENT: compute_tournament_public,
-    ObjectType.SANCTION: compute_sanction_public,
-    ObjectType.DECK: compute_deck_public,
+    ObjectType.SANCTION: _invisible,
+    ObjectType.DECK: _invisible,
     ObjectType.LEAGUE: compute_league_public,
     ObjectType.PROMO: compute_promo_public,
 }
@@ -207,6 +254,15 @@ _MEMBER_DISPATCH = {
     ObjectType.DECK: compute_deck_member,
     ObjectType.LEAGUE: _identity,
     ObjectType.PROMO: compute_promo_public,
+}
+
+_API_DISPATCH = {
+    ObjectType.USER: compute_user_api,
+    ObjectType.TOURNAMENT: compute_tournament_api,
+    ObjectType.SANCTION: _invisible,
+    ObjectType.DECK: compute_deck_api,
+    ObjectType.LEAGUE: compute_league_public,
+    ObjectType.PROMO: _invisible,
 }
 
 _FULL_DISPATCH = {
@@ -228,6 +284,13 @@ def compute_public(obj_type: str, full_dict: dict) -> dict | None:
 
 def compute_member(obj_type: str, full_dict: dict) -> dict | None:
     fn = _MEMBER_DISPATCH.get(obj_type)
+    if fn is None:
+        raise ValueError(f"Unknown object type: {obj_type}")
+    return fn(full_dict)
+
+
+def compute_api(obj_type: str, full_dict: dict) -> dict | None:
+    fn = _API_DISPATCH.get(obj_type)
     if fn is None:
         raise ValueError(f"Unknown object type: {obj_type}")
     return fn(full_dict)

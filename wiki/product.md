@@ -8,8 +8,9 @@ tool that works in venues with poor connectivity.
 internet, and results sync when connectivity returns.
 
 **Out of scope by choice**: card rulings, a rules engine for the card game
-itself, replacing the rulebook, money handling beyond a payment status, and a
-public third-party API — see [dogmas](dogmas.md#product).
+itself, replacing the rulebook, and money handling beyond a payment status — see
+[dogmas](dogmas.md#product). Organizational data is published to third parties,
+read-only and under VEKN IDs rather than names.
 
 ## Who uses it
 

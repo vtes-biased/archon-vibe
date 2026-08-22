@@ -24,7 +24,9 @@ model-specific.
 
 All synced objects live in one `objects` table with pre-computed access-level
 columns — `public` / `member` / `full` JSONB, NULL when not visible at that level,
-`full` NOT NULL — plus `type`, `modified_at`, `deleted_at` and `calendar_token`.
+`full` NOT NULL — plus `api`, the third-party read API's projection, which no app
+client is ever served ([sync](sync.md#access-levels)), plus `type`, `modified_at`,
+`deleted_at` and `calendar_token`.
 Index `(type, modified_at, uid)`. The trade-off bought: a single schemaless table
 (no migrations for schema changes), pre-computed projections (zero read-time
 filtering), fast iteration.
@@ -34,8 +36,9 @@ is static data loaded into IndexedDB. DeckObject is standalone, not embedded in
 Tournament.
 
 `calendar_token` is the one non-projected column — a per-user `.ics` feed secret
-that must never be broadcast, and every projection is broadcast (`full` reaches
-non-owners). It is a 1:1 column rather than a table to avoid a join on the hot
+that must reach nobody but its owner, and no projection is that narrow: the three
+synced ones are broadcast (`full` reaches non-owners) and `api` is published. It
+is a 1:1 column rather than a table to avoid a join on the hot
 `get_user_by_uid` path; `save_object` COALESCEs it so token-less writes preserve
 it, and `clear_calendar_token()` is the explicit drop path.
 

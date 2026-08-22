@@ -1,11 +1,14 @@
-"""Rebuild the stored public/member/full projections for tournaments and leagues.
+"""Rebuild the stored access-level projections for the types a change touched.
 
 Projections are computed at WRITE time (`db.save_object` → `access_levels`), so
-widening one only affects rows saved afterwards: tournaments gaining the
-attend-decision fields, and leagues losing `organizers_uids`, both leave every
-existing row on its old projection.
+adding or widening one only affects rows saved afterwards — every existing row
+stays on its old shape until something writes it again. `REPROJECT_TYPES` is the
+one knob: set it to the types the projection change touched and run the sweep.
+Its current value covers the four types the `api` column projects; sanctions and
+promos are permanently NULL there, so re-saving them would move `modified_at`
+for nothing.
 
-A re-save is required rather than an UPDATE of the `public` column, for two
+A re-save is required rather than an UPDATE of the projection column, for two
 reasons. The projection functions are Python, so SQL cannot reproduce them; and
 the `objects` BEFORE-UPDATE trigger stamps `modified_at = CURRENT_TIMESTAMP`,
 the cursor clients sync on. Rewriting the column alone leaves the new payload
@@ -47,7 +50,12 @@ if not _have_backend:
 from backend.src import db  # noqa: E402
 from backend.src.models import ObjectType  # noqa: E402
 
-REPROJECT_TYPES = (ObjectType.TOURNAMENT, ObjectType.LEAGUE)
+REPROJECT_TYPES = (
+    ObjectType.USER,
+    ObjectType.TOURNAMENT,
+    ObjectType.DECK,
+    ObjectType.LEAGUE,
+)
 
 UIDS_QUERY = """
     SELECT uid, type

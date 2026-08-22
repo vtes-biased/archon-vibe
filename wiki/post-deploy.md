@@ -21,3 +21,27 @@ answers whether a given deploy has made it actionable — the same check
 `/post-deploy` already runs against a feedback issue's fix. An item states what
 gates it and why, what to run, what proves it worked, and what it owes afterwards:
 people to tell, and the wiki text that dies with it.
+
+## Backfill the `api` projection
+
+**Gated on** the commit adding the fourth `api` column — a projection is computed
+at write time, so every row saved before that commit went live carries a NULL
+`api` and is invisible to the public API. `init_db` adds the column on deploy; only
+a re-save fills it.
+
+**Run** from the deployed tree, count first, then apply:
+
+```sh
+/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/reproject_public.py
+/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/reproject_public.py --apply
+```
+
+It re-saves users, tournaments, decks and leagues (sanctions and promos are
+permanently NULL at `api`). Safe against the live backend and idempotent.
+
+**Proves it worked**: `SELECT count(*) FROM objects WHERE type = 'tournament' AND
+"api" IS NULL AND deleted_at IS NULL` returns 0, and the same query for `user`
+returns exactly the count of users without a `vekn_id`.
+
+**Owes afterwards**: nothing to tell anyone — no consumer can reach the column
+until the API app ships. Delete this section.

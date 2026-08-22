@@ -1,5 +1,6 @@
 """One gzip JSONL file per access level, generated in a single unordered pass so
-each line self-describes its type. The `eof` trailer is load-bearing: a streaming
+each line self-describes its type. The `api` file is the public API's bulk
+export; no app client is ever served it. The `eof` trailer is load-bearing: a streaming
 client has already written rows by the time it could notice a truncated file."""
 
 import gzip
@@ -21,7 +22,7 @@ SNAPSHOT_DIR = Path(os.getenv("SNAPSHOT_DIR", "/tmp/archon_snapshots"))
 SNAPSHOT_FORMAT_VERSION = 2
 
 # Column order of the projections in a stream_objects_snapshot row, after `type`.
-_LEVELS = ("public", "member", "full")
+_LEVELS = ("public", "member", "api", "full")
 
 
 def _snapshot_path(level: str) -> Path:
@@ -49,7 +50,7 @@ async def generate_snapshots() -> dict[str, int]:
         gen_row = await (await conn.execute("SELECT now()::timestamp")).fetchone()
         generated_at = gen_row[0].isoformat()
 
-        # All three files come from ONE pass, so all must be open at once. Temp file +
+        # Every file comes from ONE pass, so all must be open at once. Temp file +
         # atomic rename per level: a failed generation leaves the previous snapshot in place.
         tmp_paths: dict[str, str] = {}
         writers: dict[str, io.TextIOWrapper] = {}

@@ -1,8 +1,7 @@
-# Public read-only API — shared context for the three board lines
+# Public read-only API — shared context for the two board lines
 
-Doc-impact: line 1 → `wiki/dogmas.md`, `wiki/product.md`, `wiki/sync.md`,
-`wiki/architecture.md`, `wiki/post-deploy.md`; line 2 → new `wiki/public-api.md`,
-`wiki/access.md`; line 3 → `wiki/access.md`, `wiki/dev.md`, `wiki/public-api.md`.
+Doc-impact: line 1 → new `wiki/public-api.md`, `wiki/access.md`; line 2 →
+`wiki/access.md`, `wiki/dev.md`, `wiki/public-api.md`.
 
 Owner decisions (this intake, 2026-08-22): officials' names stripped (VEKN IDs
 only), deck `author` stripped, sanctions never surfaced, auth required (no
@@ -10,41 +9,11 @@ anonymous), Archon-native rather than under the krcg umbrella — krcg stays the
 card-data authority, Archon is the system of record for organizational data; a
 static mirror of the bulk export to `static.krcg.org` stays a deferred option.
 
-This overturns the `dogmas.md` "No public/third-party API today" entry on its own
-stated trigger: an actual external consumer now exists. Related dogma scoping: "No
-server-side pagination" governs the app's role-scoped online-only reads; the
-public API is a different surface and paginates (keyset). The dogma edit rides
-line 1's commit; `access.md`'s "There is no public read API" sentence drops with
-line 2.
+Related dogma scoping: "No server-side pagination" governs the app's role-scoped
+online-only reads; the public API is a different surface and paginates (keyset).
+`access.md`'s "There is no public read API" sentence drops with line 1.
 
-## The `api` projection (line 1)
-
-Fourth write-time column on `objects`, computed in `access_levels.py` beside
-public/member/full — zero read-time filtering, same as the others. NULL = the
-type/row is invisible to the API.
-
-| Type | `api` |
-|---|---|
-| user | only rows holding a `vekn_id`; uid, modified, deleted_at, vekn_id, country, roles, the four `CategoryRating` fields + `wins`, community_links. Never: name, nickname, contact, city/state/geoname, avatar, discord/github ids |
-| tournament | member projection minus `Player.display_name`, `Player.payment_status`, `announcements`, `raffles`, `promos_distributed`, `promo_stock_source_uid` (so also minus the member-excluded four). Keeps config, event_code, external_ids, players (uid/state/result/finalist/non_competing), rounds, finals, standings, winner |
-| deck | member rule (`public == true` else NULL) minus `author` |
-| league | public rule (everything minus `organizers_uids`) |
-| sanction | NULL, permanently |
-| promo | NULL |
-
-Player/standing/winner references are uids; non-member players resolve to nothing
-in the users endpoint — that is how "non-members never surfaced" is satisfied.
-The winner-name exception costs nothing: names never appear on tournaments, and
-the TWD winner's name lives in the TWDA itself.
-
-Mechanics: extend the `test_access_levels.py` classification pattern so every
-Tournament/User field must be classified for `api` like it is for `member`; a
-backfill script re-projects the corpus (projection changes only affect rows saved
-afterwards — the `reproject_public.py` pattern), parked in `wiki/post-deploy.md`.
-Adding `"api"` to `snapshots.py` `_LEVELS` makes the bulk export one more gzip
-stream in the existing 15-minute pass.
-
-## The API app (line 2)
+## The API app (line 1)
 
 `backend/src/public_api/` (same wheel), its own FastAPI app: no engine import, no
 scheduler, no SSE, small own DB pool (separate process — cannot starve the main
@@ -73,10 +42,10 @@ helper); lint `check_public_api_isolation.py` modeled on
 `just lint` **and** `ci.yml` (two existing checks live only in the justfile;
 don't repeat that); a test asserting the route table is GET/HEAD only.
 
-Auth from day one: bearer required; before line 3 lands, existing user
+Auth from day one: bearer required; before line 2 lands, existing user
 `oauth_access` tokens suffice for local testing.
 
-## Daemon identity and deploy (line 3)
+## Daemon identity and deploy (line 2)
 
 `client_credentials` grant on the existing `/oauth/token`, gated on the client's
 existing registration (DEV/IC-managed CRUD). Issues a short-lived **stateless**
@@ -101,4 +70,4 @@ nginx vhost on `api.<domain>` with `limit_req` rate limiting, wide-open CORS
 - **krcg static mirror of the bulk export** — trigger: owner wants krcg-ecosystem
   entry point.
 - **`POST /oauth/revoke`** (RFC 7009, removed in `3abb708`) — worth restoring for
-  third parties alongside line 3 if cheap.
+  third parties alongside line 2 if cheap.
