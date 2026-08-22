@@ -25,9 +25,9 @@ reaches consumers with no code change here.
 | `/v1/tournaments/{code_or_uid}` | one tournament, by short event code (case-insensitive) or uid |
 | `/v1/leagues` | stream |
 | `/v1/leagues/{uid}` | one league |
-| `/v1/users/{vekn_id}` | one member |
+| `/v1/users/{uid_or_vekn_id}` | one member, by either identifier |
 | `/v1/decks` | stream of published decks; `tournament` |
-| `/v1/users` | stream of members, each carrying all four ratings; `country` |
+| `/v1/users` | stream of members, each carrying all four ratings; `country`, `category` |
 | `/v1/community-links` | stream, one line per link |
 | `/v1/export` | the whole corpus as the generated `api.jsonl.gz` snapshot, never more than an hour old |
 
@@ -68,6 +68,19 @@ holds one batch and no connection.
 trailer is load-bearing: a chunked response that dies mid-flight is
 indistinguishable from a short one until the trailer is missing, and the consumer
 has written rows by then.
+
+**A member is addressable by uid as well as by VEKN id**, and that is
+load-bearing rather than a convenience. A tournament's `players`, `standings` and
+`winner` carry `user_uid`, so without the uid lookup a consumer that wants to
+attribute a single result has to stream all eighteen thousand members and build
+its own map. The lookup is what makes the bulk read unnecessary, which is the
+only thing that actually discourages it.
+
+`/v1/users` therefore serves the whole membership, and `category` narrows it to
+the members carrying a rating in one, which is a few percent of the whole. That
+filter costs nothing: ordering by `uid` lets the `(type, uid)` index scan
+backwards and drop unrated rows as it goes, where the old rating-ordered endpoint
+had to sort the whole table on an unindexed expression once per batch.
 
 **Streams order by `uid` descending, not by `modified_at`**, and the two reasons
 compound. A uid is a uuid7, so descending is newest-created first, which is the
