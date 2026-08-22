@@ -27,7 +27,7 @@ reaches consumers with no code change here.
 | `/v1/leagues/{uid}` | one league |
 | `/v1/users/{uid_or_vekn_id}` | one member, by either identifier |
 | `/v1/decks` | stream of published decks; `tournament` |
-| `/v1/users` | stream of members, each carrying all four ratings; `country`, `category` |
+| `/v1/users` | stream of members, each carrying all four ratings; `country`, `category`, `tournament` |
 | `/v1/community-links` | stream, one line per link |
 | `/v1/export` | the whole corpus as the generated `api.jsonl.gz` snapshot, never more than an hour old |
 
@@ -76,11 +76,19 @@ attribute a single result has to stream all eighteen thousand members and build
 its own map. The lookup is what makes the bulk read unnecessary, which is the
 only thing that actually discourages it.
 
-`/v1/users` therefore serves the whole membership, and `category` narrows it to
-the members carrying a rating in one, which is a few percent of the whole. That
-filter costs nothing: ordering by `uid` lets the `(type, uid)` index scan
+`/v1/users` therefore serves the whole membership, and its filters exist so that
+the targeted read is always the easy one. `category` narrows to the members
+carrying a rating in it, a few percent of the whole; `tournament` narrows to the
+roster of one event, so a result set is one call rather than one per player.
+
+Neither needed an index. Ordering by `uid` lets the `(type, uid)` index scan
 backwards and drop unrated rows as it goes, where the old rating-ordered endpoint
-had to sort the whole table on an unindexed expression once per batch.
+had to sort the whole table on an unindexed expression once per batch. And
+`tournament` runs the cheap direction of the relation: one primary-key read of
+the event, then a primary-key read per player it names, about ninety buffers for
+a thirteen-player event. The expensive direction, every event a given member
+played, would need an index over each tournament's player array, and nothing
+asks for it.
 
 **Streams order by `uid` descending, not by `modified_at`**, and the two reasons
 compound. A uid is a uuid7, so descending is newest-created first, which is the

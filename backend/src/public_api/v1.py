@@ -182,13 +182,17 @@ async def get_league(uid: str) -> Response:
 
 @router.get("/users", openapi_extra=streams("User", "user"))
 async def list_users(
-    country: str | None = None, category: RatingCategory | None = None
+    country: str | None = None,
+    category: RatingCategory | None = None,
+    tournament: str | None = None,
 ) -> StreamingResponse:
     """Every member, newest first.
 
     Each line carries the member's rating in all four categories, so a ranking
     is a sort away. `country` is an ISO 3166-1 alpha-2 code. `category` narrows
     to members carrying a rating in it, which is a small fraction of the whole.
+    `tournament` is a tournament uid and narrows to the members who played in
+    it, so a result set costs one call rather than one call per player.
     """
     filters: list[str] = []
     values: list[str] = []
@@ -197,6 +201,12 @@ async def list_users(
         values.append(country)
     if category:
         filters.append(f"\"api\"->'{category.value}'->>'total' IS NOT NULL")
+    if tournament:
+        filters.append(
+            "uid IN (SELECT jsonb_array_elements(t.\"api\"->'players')->>'user_uid' "
+            "FROM objects t WHERE t.uid = %s AND t.type = 'tournament')"
+        )
+        values.append(tournament)
     return _ndjson(
         _data_lines(
             ObjectType.USER,
