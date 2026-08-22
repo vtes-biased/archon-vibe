@@ -103,12 +103,23 @@ returned.
 
 ## Auth
 
-**Bearer token required; there is no anonymous read.** Today the app accepts a
-user's `oauth_access` token, checking the `oauth_tokens` row for its `jti` so a
-revoked token dies here too — with its own SQL, since the isolation lint forbids
-the `db_oauth` import, so the storage shape is now asserted in two places
-([hazards](hazards.md#two-implementations-of-one-gate)). The `client_credentials`
-daemon grant will be accepted beside it ([access](access.md#oauth2-provider)).
+**Bearer token required; there is no anonymous read.** Two token types are
+accepted and answered identically. A third party's **daemon token** — the
+`client_credentials` grant's `oauth_client` JWT
+([access](access.md#the-daemon-grant)) — is the intended one: it carries a
+`client_id` and `api:read`, has no row anywhere, and is checked against the
+client's `active` flag, which is the whole of its revocation. A **user's
+`oauth_access` token** is accepted beside it at any scope, checked against its
+`oauth_tokens` row so a revoked token dies here too; it grants nothing extra, and
+exists so a user-facing client need not mint a second identity.
+
+Both checks run on this app's own SQL, since the isolation lint forbids the
+`db_oauth` import — so `oauth_tokens` *and* `oauth_clients` now have their storage
+shape asserted in two places
+([hazards](hazards.md#two-implementations-of-one-gate)).
+
+The token endpoint is **not on this host**: `/oauth/token` belongs to the app, and
+the reference page says so, rendering the worked `curl` against `SITE_URL_BASE`.
 
 `/docs` and `/openapi.json` are open. The owner's "no anonymous" decision was
 about the data; a reference page nobody can read before registering is a barrier
@@ -137,6 +148,54 @@ page's own introduction.
 through `compute_api` and its key set must equal the documented properties, and
 the app itself must answer `405` to every write and `401` to every `/v1` read
 without a token.
+
+## Deployment
+
+A second systemd unit off the **backend's own wheel and venv** — nothing is
+installed for it — on its own vhost at `api.<domain>`, ansible role `public_api`.
+The unit is `PartOf` the backend's, so the deploy that restarts the app for a new
+wheel restarts this process too; without that it would serve yesterday's code
+after a quick-lane deploy, and the role is untagged precisely because it needs no
+lane of its own. Its environment is derived from the app's in the inventory rather
+than repeated: one `JWT_SECRET` (or no token it is handed ever verifies), one
+`DATABASE_URL`, one `SNAPSHOT_DIR` (or `/v1/export` has no file).
+
+**Throttling lives on the vhost, never in a handler.** nginx sees the client and
+the app behind a proxy does not, and pacing a stream in Python would hold server
+resources longer to achieve what the proxy does for free.
+
+**What is throttled is repetition, not size.** One full corpus read runs at full
+speed — "stream it all again" *is* the refresh model, so slowing a single read
+punishes exactly the usage this API is designed around. There is deliberately no
+`limit_rate`. What is limited is pulling the corpus over and over in a tight
+window.
+
+| Directive | Value | Sized by |
+|---|---|---|
+| `limit_req` on the six streaming routes | `rate=20r/m burst=10 nodelay` | egress: a whole refresh is five streams and ~6.5 MB gzipped, so 20r/m is four refreshes a minute, ~3.4 Mbit/s sustained from one address. The burst must clear a whole refresh or a legitimate one breaks halfway; ten leaves room for two |
+| `limit_conn` per address | 16 | a suspended stream holds one buffered batch (~1.8 MB) and **no** connection, so concurrency queues on the pool rather than exhausting it. Sixteen is ~29 MB and a four-deep queue |
+| `limit_req` on everything else under `/v1` and on `/docs` | a separate, far more generous zone | single-row lookups; a client resolving a page of event codes bursts legitimately |
+| `limit_req_status`, `limit_conn_status` | 429 | nginx defaults to 503, which reads as "outage, retry" rather than "slow down" |
+
+The zones are `limit_req_zone`/`limit_conn_zone` and so live in a `conf.d` file —
+they are http-context directives and cannot go in the server block. The streams
+are matched **exactly**, so a single-object lookup under the same prefix falls
+through to the generous zone; **a new streaming route must be added to that list**
+or it is throttled as a lookup ([access](access.md#deployment-gate)). The vhost
+also sets `gzip_types application/x-ndjson` with `gzip_proxied any` — the streams
+are the bulk of the egress and nginx skips proxied responses by default — and
+`proxy_buffering off`, or a reader taking the first N lines waits for the whole
+corpus, which is the documented top-N idiom.
+
+Per-address is the wrong unit, and knowingly so: behind NAT several clients are
+throttled as one, and one client on several addresses is not throttled at all. The
+daemon grant makes a better key possible — `client_id` is in the token — but that
+is token-aware work in the app, not nginx config. Generous limits are the
+mitigation until a real consumer proves it needs more.
+
+The figures are sized against the corpus of the day they were set (8249
+tournaments at ~7 KB): substantial growth moves the egress budget, and the rate
+should be re-derived rather than inherited.
 
 ## Isolation
 
@@ -178,5 +237,3 @@ API process must see the same `SNAPSHOT_DIR`.
   reprojection on tournament save. Trigger: a consumer asks.
 - **A static mirror of the bulk export on `static.krcg.org`**. Trigger: the owner
   wants a krcg-ecosystem entry point.
-- **`POST /oauth/revoke`** (RFC 7009, removed in `3abb708`) — worth restoring for
-  third parties. Trigger: the daemon grant lands.

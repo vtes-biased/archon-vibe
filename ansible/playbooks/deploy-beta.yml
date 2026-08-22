@@ -31,10 +31,16 @@
         postgres_db_user: "{{ db_user }}"
         postgres_db_password: "{{ db_password }}"
 
-    # 2. TLS cert for the main domain (archon's certbot webroot role).
+    # 2. TLS certs for the main and api domains (archon's certbot webroot role).
+    #    The bot's cert comes from nginx_site below; the API vhost is ours,
+    #    because nginx_site cannot express the throttle.
     - role: nginx_tls
       r:
         server_name: "{{ domain_main }}"
+        contact_email: "{{ contact_email }}"
+    - role: nginx_tls
+      r:
+        server_name: "{{ domain_api }}"
         contact_email: "{{ contact_email }}"
 
     # 3. Backend uvicorn service (localhost only; the frontend vhost proxies to it).
@@ -58,7 +64,23 @@
         twda_key_vault: twda_github_app.pem.beta.vault
         feedback_key_vault: feedback_github_app.pem.beta.vault
 
-    # 4. Frontend dist + PWA-correct vhost (archon's own role manages this nginx).
+    # 4. Public read API: a second unit off the backend's wheel and venv, on its
+    #    own vhost. Untagged on purpose — the quick lane restarts the backend,
+    #    and this unit is PartOf it, so new code reaches both.
+    - role: public_api
+      r:
+        service_name: "{{ api_service }}"
+        backend_service: "{{ backend_service }}"
+        site_root: "{{ backend_site_root }}"
+        venv_dir: "{{ backend_site_root }}/.venv"
+        port: "{{ api_port }}"
+        user: "{{ archon_user }}"
+        group: "{{ archon_group }}"
+        server_name: "{{ domain_api }}"
+        env: "{{ public_api_env }}"
+        env_dir: "{{ env_dir }}"
+
+    # 5. Frontend dist + PWA-correct vhost (archon's own role manages this nginx).
     - role: static_site
       tags: [app]
       r:
@@ -69,7 +91,7 @@
         group: "{{ archon_group }}"
         backend_port: "{{ backend_port }}"
 
-    # 5. Bot service only — vhost delegated to nginx_site below.
+    # 6. Bot service only — vhost delegated to nginx_site below.
     - role: discord_bot
       tags: [app]
       r:
@@ -87,7 +109,7 @@
         env: "{{ bot_env }}"
         env_dir: "{{ env_dir }}"
 
-    # 6. The bot is a plain reverse proxy, so spa-mode caveats don't apply here.
+    # 7. The bot is a plain reverse proxy, so spa-mode caveats don't apply here.
     - role: lionel_panhaleux.server_setup.nginx_site
       vars:
         nginx_site_name: "{{ service_name }}_bot"

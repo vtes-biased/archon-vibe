@@ -468,6 +468,7 @@
   "developer_scopes": "Portées",
   "developer_scope_profile_read_desc": "Lire le profil de base (rôles, VEKN ID)",
   "developer_scope_impersonate_desc": "Agir au nom de l'utilisateur sur les points d'API",
+  "developer_scope_api_read_desc": "Lire l'API de données publiques en tant que démon (sans utilisateur)",
   "profile_authorized_apps_section": "Applications autorisées",
   "authorized_apps_subtitle": "Applications tierces auxquelles vous avez accordé l'accès à votre compte Archon.",
   "authorized_apps_none": "Aucune application autorisée",

@@ -1,0 +1,34 @@
+[Unit]
+Description={{ r.service_name }} (archon public read API)
+After=network-online.target postgresql.service {{ r.backend_service }}.service
+Wants=network-online.target
+# One wheel, two units: a deploy restarts the app when the wheel changes, and
+# PartOf propagates that restart here. Without it this process keeps old code.
+PartOf={{ r.backend_service }}.service
+
+[Service]
+Type=simple
+User={{ r.user }}
+Group={{ r.group }}
+WorkingDirectory={{ r.site_root }}
+EnvironmentFile={{ _env_dir }}/{{ r.service_name }}.env
+ExecStart={{ r.venv_dir }}/bin/uvicorn --host 127.0.0.1 --port {{ r.port }} --log-level info --timeout-graceful-shutdown 5 backend.src.public_api.main:app
+Restart=always
+RestartSec=3
+TimeoutStartSec=30
+TimeoutStopSec=15
+KillMode=mixed
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths={{ r.site_root }}
+
+[Install]
+WantedBy=multi-user.target

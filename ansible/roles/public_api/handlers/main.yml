@@ -1,0 +1,12 @@
+---
+- name: Restart public API service
+  ansible.builtin.systemd:
+    name: "{{ r.service_name }}"
+    state: restarted
+    daemon_reload: true
+    enabled: true
+
+- name: Reload nginx (public_api)
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded

@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -9,6 +10,8 @@ from scalar_fastapi import get_scalar_api_reference
 from .db import close_pool, open_pool
 from .schemas import COMPONENTS
 from .v1 import router
+
+SITE_URL = os.getenv("SITE_URL_BASE", "http://localhost:8000")
 
 DESCRIPTION = """
 Read-only access to Archon's organizational data: tournaments, leagues, published
@@ -35,7 +38,21 @@ Only live, visible objects are ever served: nothing deleted, nothing unpublished
 and no way to ask what changed since when. This API is for building something new
 on top of the data, not for keeping a copy of it in step — read what you need when
 you need it, or take `/v1/export` for the whole corpus in one gzipped pass.
-""".strip()
+
+## Getting a token
+
+Ask an Archon developer for a client carrying the `api:read` scope, then exchange
+its credentials on the **main site** — the token endpoint is not on this host:
+
+```
+curl -X POST {site}/oauth/token -H 'Content-Type: application/json' \\
+  -d '{"grant_type":"client_credentials","client_id":"…","client_secret":"…"}'
+```
+
+The body is JSON, not the form encoding RFC 6749 asks for. The token lasts an hour
+and comes with no refresh token — mint another. Send it as
+`Authorization: Bearer <token>`; it is accepted here and refused everywhere else.
+""".strip().replace("{site}", SITE_URL)
 
 
 @asynccontextmanager

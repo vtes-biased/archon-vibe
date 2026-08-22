@@ -609,6 +609,7 @@ class Promo(BaseObject, kw_only=True):
 class OAuthScope(StrEnum):
     PROFILE_READ = "profile:read"
     USER_IMPERSONATE = "user:impersonate"
+    API_READ = "api:read"
 
 
 class OAuthClient(BaseObject, kw_only=True):

@@ -63,6 +63,7 @@ RequireOauthAdmin = Depends(
 ph = PasswordHasher()
 
 ACCESS_TOKEN_LIFETIME = timedelta(hours=1)
+CLIENT_TOKEN_LIFETIME = timedelta(hours=1)
 REFRESH_TOKEN_LIFETIME = timedelta(days=30)
 AUTH_CODE_LIFETIME = timedelta(seconds=60)
 
@@ -151,6 +152,8 @@ async def authorize_get(
     for s in requested_scopes:
         if s not in client.scopes:
             raise HTTPException(400, f"Scope {s} not allowed for this client")
+    if OAuthScope.API_READ in requested_scopes:
+        raise HTTPException(400, "api:read is a client_credentials scope")
 
     consent = await get_oauth_consent(user.uid, client_id)
     if consent and set(requested_scopes).issubset(set(consent.scopes)):
@@ -219,6 +222,8 @@ async def authorize_post(user: CurrentUser, body: AuthorizeApprovalRequest):
         raise HTTPException(400, "Invalid redirect_uri")
 
     requested_scopes = _parse_scopes(scope)
+    if OAuthScope.API_READ in requested_scopes:
+        raise HTTPException(400, "api:read is a client_credentials scope")
 
     if not approved:
         params = {"error": "access_denied"}
@@ -273,6 +278,7 @@ class TokenRequest(BaseModel):
     redirect_uri: str = ""
     code_verifier: str = ""
     refresh_token: str = ""
+    scope: str = ""
 
 
 @router.post("/token")
@@ -296,6 +302,8 @@ async def token_endpoint(body: TokenRequest):
         return await _handle_authorization_code(body, client)
     elif grant_type == "refresh_token":
         return await _handle_refresh_token(body, client)
+    elif grant_type == "client_credentials":
+        return await _handle_client_credentials(body, client)
     else:
         raise HTTPException(400, "Unsupported grant_type")
 
@@ -415,6 +423,35 @@ async def _handle_refresh_token(body: TokenRequest, client: OAuthClient) -> dict
         scopes=scopes,
         parent_token_uid=parent,
     )
+
+
+async def _handle_client_credentials(body: TokenRequest, client: OAuthClient) -> dict:
+    """Stateless on purpose: no `oauth_tokens` row, because that record is keyed on
+    a user and a daemon has none. Revocation is the client's `active` flag, which
+    the public API checks for itself."""
+    if OAuthScope.API_READ not in client.scopes:
+        raise HTTPException(400, "Client is not allowed the api:read scope")
+    if body.scope and _parse_scopes(body.scope) != [OAuthScope.API_READ]:
+        raise HTTPException(400, "client_credentials grants api:read and nothing else")
+
+    now = datetime.now(UTC)
+    token = jwt.encode(
+        {
+            "type": "oauth_client",
+            "client_id": client.client_id,
+            "scope": OAuthScope.API_READ.value,
+            "iat": now,
+            "exp": now + CLIENT_TOKEN_LIFETIME,
+        },
+        JWT_SECRET,
+        algorithm=JWT_ALGORITHM,
+    )
+    return {
+        "access_token": token,
+        "token_type": "Bearer",
+        "expires_in": int(CLIENT_TOKEN_LIFETIME.total_seconds()),
+        "scope": OAuthScope.API_READ.value,
+    }
 
 
 async def _issue_token_pair(
@@ -547,15 +584,16 @@ async def register_client(
 
     if not name:
         raise HTTPException(400, "Client name is required")
-    if not redirect_uris:
-        raise HTTPException(400, "At least one redirect_uri is required")
 
     scopes = []
-    for s in scope_strs:
+    for scope_str in scope_strs:
         try:
-            scopes.append(OAuthScope(s))
+            scopes.append(OAuthScope(scope_str))
         except ValueError:
-            raise HTTPException(400, f"Invalid scope: {s}") from None
+            raise HTTPException(400, f"Invalid scope: {scope_str}") from None
+
+    if not redirect_uris and set(scopes) != {OAuthScope.API_READ}:
+        raise HTTPException(400, "At least one redirect_uri is required")
 
     client_id = _generate_client_id()
     client_secret = _generate_client_secret()

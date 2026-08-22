@@ -36,6 +36,8 @@
 
   let confirmAction = $state<{ clientId: string; action: string } | null>(null);
 
+  const daemonOnly = $derived(newScopes.length === 1 && newScopes[0] === "api:read");
+
   async function loadClients() {
     loading = true;
     try {
@@ -53,7 +55,7 @@
   }
 
   async function handleRegister() {
-    if (!newName.trim() || !newRedirectUris.trim()) return;
+    if (!newName.trim() || (!daemonOnly && !newRedirectUris.trim())) return;
     registering = true;
     try {
       const uris = newRedirectUris.split("\n").map((u) => u.trim()).filter(Boolean);
@@ -198,11 +200,19 @@
                     <span class="text-ink-faint text-xs ml-1">— {m.developer_scope_impersonate_desc()}</span>
                   </div>
                 </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={newScopes.includes("api:read")} onchange={() => toggleScope("api:read")}
+                    class="w-3.5 h-3.5 rounded border-line-strong bg-surface-muted text-accent focus:ring-accent-strong-hover" />
+                  <div>
+                    <span class="text-ink-strong text-xs">api:read</span>
+                    <span class="text-ink-faint text-xs ml-1">— {m.developer_scope_api_read_desc()}</span>
+                  </div>
+                </label>
               </div>
             </div>
             <div class="flex gap-2">
               <Button type="button" variant="secondary" size="lg" class="flex-1" onclick={() => (showRegister = false)}>{m.common_cancel()}</Button>
-              <Button type="submit" variant="primary" size="lg" class="flex-1" loading={registering} disabled={!newName.trim() || !newRedirectUris.trim() || newScopes.length === 0}>
+              <Button type="submit" variant="primary" size="lg" class="flex-1" loading={registering} disabled={!newName.trim() || (!daemonOnly && !newRedirectUris.trim()) || newScopes.length === 0}>
                 {m.developer_register_submit()}
               </Button>
             </div>

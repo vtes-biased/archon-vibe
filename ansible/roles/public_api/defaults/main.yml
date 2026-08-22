@@ -1,0 +1,18 @@
+---
+# r.service_name     required (e.g. archon-public-api)
+# r.backend_service  required (the app's unit)
+# r.site_root        required (the backend's install dir — same wheel, same venv)
+# r.venv_dir         required (the backend's .venv)
+# r.port             required (localhost port)
+# r.user             required
+# r.group            required
+# r.env              required (dict; JWT_SECRET and DATABASE_URL must match the
+#                      app's, and SNAPSHOT_DIR must be the directory the app
+#                      writes, or /v1/export has no file)
+# r.server_name      required only when r.manage_nginx (public FQDN, e.g.
+#                      api.archon.vekn.net)
+# r.env_dir          optional (default below)
+# r.manage_nginx     optional (default below)
+r: {}
+public_api_env_dir_default: /etc/archon
+public_api_manage_nginx_default: true

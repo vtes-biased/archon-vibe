@@ -11,6 +11,7 @@ contact_email: "lionel.panhaleux@gmail.com"
 
 domain_main: archon.krcg.org
 domain_bot: bot.archon.krcg.org
+domain_api: api.archon.krcg.org
 site_url_base: "https://{{ domain_main }}"
 
 # Canonical Terms/Privacy URLs, also set in the Discord Developer Portal
@@ -22,6 +23,7 @@ legal_privacy_url: "{{ site_url_base }}/legal/privacy"
 # beta uses the +8 pair (8008/9008); the whole 8xxx/9xxx band is otherwise free.
 backend_port: 8008
 bot_port: 9008                    # paired with backend_port at +8 for this env
+api_port: 7008                    # same +8 pairing, one band down
 
 opt_root: /opt/new_archon
 backend_site_root: "{{ opt_root }}/backend"
@@ -33,6 +35,7 @@ app_lib_dir: /var/lib/new_archon          # backend snapshots etc. (created by t
 
 backend_service: new-archon-backend
 bot_service: new-archon-bot
+api_service: new-archon-public-api
 
 # Python is managed by uv, same exact version on both envs, independent of the
 # distro. PostgreSQL comes from the server-setup foundation here (distro
@@ -95,6 +98,18 @@ backend_env:
   GITHUB_OAUTH_CLIENT_ID: "{{ vault_github_oauth_client_id | default('') }}"
   GITHUB_OAUTH_SECRET: "{{ vault_github_oauth_secret | default('') }}"
   GITHUB_OAUTH_REDIRECT_URI: "{{ site_url_base }}/auth/github/callback"
+
+# The public read API runs as a second unit off the same wheel and venv, so its
+# environment is deliberately derived from the app's: one JWT secret verifies a
+# token minted by the other, and /v1/export serves the snapshot the app writes.
+public_api_env:
+  PYTHONOPTIMIZE: 1
+  # Where the reference page sends a third party to mint a token: /oauth lives
+  # on the app, never here.
+  SITE_URL_BASE: "{{ site_url_base }}"
+  DATABASE_URL: "{{ backend_env.DATABASE_URL }}"
+  JWT_SECRET: "{{ backend_env.JWT_SECRET }}"
+  SNAPSHOT_DIR: "{{ backend_env.SNAPSHOT_DIR }}"
 
 bot_env:
   PYTHONOPTIMIZE: 1

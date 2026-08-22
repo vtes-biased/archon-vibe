@@ -76,6 +76,12 @@ skipped on the other. A role resolves its defaults into `_`-prefixed facts, and
 those are host-scoped: they outlive the role that set them, so each role must set
 every `_` fact it reads rather than inherit a same-named one from an earlier role.
 
+Three units and three vhosts per environment: the app, the Discord bot, and the
+**public read API**, which installs nothing of its own — it runs a second uvicorn
+off the backend's wheel and venv, is `PartOf` the backend unit so a wheel restart
+reaches it, and owns the only vhost carrying rate limits
+([public-api](public-api.md#deployment)).
+
 Nothing auto-deploys, and there is no public version endpoint — never sniff the app
 for a version.
 

@@ -89,15 +89,31 @@ is **first-party session only**, rejecting OAuth tokens with 403;
 `DELETE /oauth/consents/{client_id}` revokes consent and immediately revokes live
 tokens for that client.
 
-Scopes: `profile:read` (limited to `/oauth/*`) and `user:impersonate` (full API).
+Scopes: `profile:read` (limited to `/oauth/*`) and `user:impersonate` (full API)
+delegate a *user's* authority; `api:read` delegates nobody's and is refused at
+`/authorize` for that reason — it is the daemon grant's scope and only that.
 
 Security: PKCE S256 required, Argon2-hashed client secrets, refresh-token rotation
 with a revocation chain, single-use authorization codes, consent persistence, and a
 `revoked` flag on access tokens honored by the auth middleware.
 
-The **public read API** is a separate app with its own bearer gate, accepting an
-`oauth_access` token today and the `client_credentials` daemon token beside it —
-[public-api](public-api.md#auth).
+### The daemon grant
+
+`grant_type=client_credentials` on the same `/oauth/token`, for a third party with
+no user to act for. The client authenticates with its own secret and gets a
+one-hour `oauth_client` JWT carrying `client_id` and `api:read` — and **no
+`oauth_tokens` row**, deliberately: that record's `user_uid` is non-optional and
+the app's middleware unconditionally resolves a User from a token, so the type
+never touches either. The main app rejects an `oauth_client` token by
+construction — it knows two token types and this is neither — and the
+[public API](public-api.md#auth) accepts it, checking the client's `active` flag,
+which is therefore the whole of revocation. There is no refresh token: mint
+another.
+
+A client registered for `api:read` alone needs no `redirect_uri`, since it never
+sends a browser anywhere. The public API also accepts a user's `oauth_access`
+token, at any scope and with the same answer — a user token is attribution, not a
+different permission.
 
 ## VEKN identity
 
@@ -119,3 +135,7 @@ Production nginx proxies **only an allowlist of path prefixes** to FastAPI:
 `/api`, `/auth`, `/oauth`, `/vekn`, `/sanctions`, `/admin`, `/snapshot`, `/stream`.
 A new route under an existing prefix is fine; **a new top-level segment 404s in
 production while passing dev CORS and tests**.
+
+The public API's vhost is a second, tighter allowlist of the same kind, and a new
+streaming route must be named in it or it is throttled as a single-row lookup —
+[public-api](public-api.md#deployment).

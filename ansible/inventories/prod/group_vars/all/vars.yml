@@ -7,6 +7,7 @@ contact_email: "lionel.panhaleux@gmail.com"
 
 domain_main: archon.vekn.net
 domain_bot: bot.archon.vekn.net
+domain_api: api.archon.vekn.net
 site_url_base: "https://{{ domain_main }}"
 
 # Canonical Terms/Privacy URLs, also set in the Discord Developer Portal
@@ -16,6 +17,7 @@ legal_privacy_url: "{{ site_url_base }}/legal/privacy"
 
 backend_port: 8007
 bot_port: 9007
+api_port: 7007
 
 opt_root: /opt/archon
 backend_site_root: "{{ opt_root }}/backend"
@@ -26,6 +28,7 @@ env_dir: /etc/archon
 
 backend_service: archon-backend
 bot_service: archon-bot
+api_service: archon-public-api
 # Legacy archon stack sharing the vekn.net VPS during the parallel run; it
 # writes to the same PG cluster, so migrate_postgres.yml must stop/start it.
 legacy_web_service: archon_web
@@ -126,6 +129,18 @@ backend_env:
   GITHUB_OAUTH_CLIENT_ID: "{{ vault_github_oauth_client_id | default('') }}"
   GITHUB_OAUTH_SECRET: "{{ vault_github_oauth_secret | default('') }}"
   GITHUB_OAUTH_REDIRECT_URI: "{{ site_url_base }}/auth/github/callback"
+
+# The public read API runs as a second unit off the same wheel and venv, so its
+# environment is deliberately derived from the app's: one JWT secret verifies a
+# token minted by the other, and /v1/export serves the snapshot the app writes.
+public_api_env:
+  PYTHONOPTIMIZE: 1
+  # Where the reference page sends a third party to mint a token: /oauth lives
+  # on the app, never here.
+  SITE_URL_BASE: "{{ site_url_base }}"
+  DATABASE_URL: "{{ backend_env.DATABASE_URL }}"
+  JWT_SECRET: "{{ backend_env.JWT_SECRET }}"
+  SNAPSHOT_DIR: "{{ backend_env.SNAPSHOT_DIR }}"
 
 bot_env:
   PYTHONOPTIMIZE: 1

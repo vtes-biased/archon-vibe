@@ -468,6 +468,7 @@
   "developer_scopes": "Scopes",
   "developer_scope_profile_read_desc": "Read basic profile (roles, VEKN ID)",
   "developer_scope_impersonate_desc": "Act on behalf of the user on API endpoints",
+  "developer_scope_api_read_desc": "Read the public data API as a daemon (no user)",
   "profile_authorized_apps_section": "Authorized Apps",
   "authorized_apps_subtitle": "Third-party apps you've granted access to your Archon account.",
   "authorized_apps_none": "No authorized apps",
