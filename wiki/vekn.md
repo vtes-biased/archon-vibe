@@ -180,10 +180,7 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   `AQ`, which answers for no real place: the sync drops it and keeps whatever the
   app holds for country, timezone, venue, venue url, address and map url. Taking
   it at face value moved a Budapest national qualifier to Antarctica/UTC within
-  the hour and undid the organizer's re-entry on every run (gh-9). Rows already
-  flipped hold Antarctica as their own value, and preserving them is exactly what
-  stops them healing — clearing those is parked in
-  [post-deploy](post-deploy.md).
+  the hour and undid the organizer's re-entry on every run (gh-9).
 - Carries `proxies_allowed` onto `proxies`, **except under a championship rank,
   which forbids proxies by rule**. A few vekn.net championships do set the flag,
   and importing that combination would block every later config edit on engine
