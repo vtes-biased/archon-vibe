@@ -24,7 +24,7 @@ people to tell, and the wiki text that dies with it.
 
 ## Backfill the `api` projection
 
-**Gated on** `PENDING`, the last commit to change the `api` projection's shape. A
+**Gated on** `86ddcf0`, the last commit to change the `api` projection's shape. A
 projection is computed at write time, so every row saved before that commit went
 live carries a NULL or pre-narrowing `api` and is wrong for the public API.
 `init_db` adds the column on deploy; only a re-save fills it. Deploying an
