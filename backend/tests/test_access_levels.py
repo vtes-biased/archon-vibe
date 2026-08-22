@@ -581,7 +581,6 @@ class TestDeckLeagueSanctionPromoApi:
     def test_public_deck_loses_its_author(self):
         result = compute_api(ObjectType.DECK, _make_deck(public=True))
         assert result["cards"] == {"100001": 4, "100002": 2}
-        # The designer credit survives as a VEKN id; `author` is the free-text name.
         assert result["attribution"] == "1000001"
         assert "author" not in result
 
@@ -589,7 +588,6 @@ class TestDeckLeagueSanctionPromoApi:
         assert compute_api(ObjectType.DECK, _make_deck(public=False)) is None
 
     def test_league_keeps_its_organizers(self):
-        # Same call as a tournament's: both resolve to VEKN-ID-only user rows.
         result = compute_api(ObjectType.LEAGUE, _make_league())
         assert result["name"] == "French National League"
         assert result["organizers_uids"] == ["u-nc-fr"]
@@ -600,9 +598,6 @@ class TestDeckLeagueSanctionPromoApi:
 
 
 class TestApiCarriesNoSyncBookkeeping:
-    """`modified` and `deleted_at` are `objects` columns the API app reads
-    directly; no api payload duplicates them."""
-
     def test_no_type_carries_them(self):
         payloads = [
             compute_api(ObjectType.USER, _make_user()),

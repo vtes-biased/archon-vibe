@@ -24,10 +24,12 @@ people to tell, and the wiki text that dies with it.
 
 ## Backfill the `api` projection
 
-**Gated on** `36b6ab6`, which adds the fourth `api` column — a projection is computed
-at write time, so every row saved before that commit went live carries a NULL
-`api` and is invisible to the public API. `init_db` adds the column on deploy; only
-a re-save fills it.
+**Gated on** `24c6edf`, the last commit to change the `api` projection's shape. A
+projection is computed at write time, so every row saved before that commit went
+live carries a NULL or pre-narrowing `api` and is wrong for the public API.
+`init_db` adds the column on deploy; only a re-save fills it. Deploying an
+earlier commit of the series and running this then would satisfy the proof query
+below on the old shape and delete this section with nothing left to re-trigger it.
 
 **Run** from the deployed tree, count first, then apply:
 

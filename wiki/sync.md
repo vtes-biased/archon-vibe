@@ -27,7 +27,7 @@ through the separate API process.
 | user | NC/Prince with contact + community links; IC without contact; any other user with non-empty community links as a minimal no-name row (country, roles, links) | all users — no contact, no `deceased_by_uid`, no `github_login`/`github_id`; `deceased_at` included; anyone with non-empty community links gets those included | everything except `calendar_token` | only users holding a `vekn_id`: uid, the id, country, roles, the four `CategoryRating` fields, `wins`, community links — no name, nickname, contact, city or avatar |
 | tournament | the event-page fields — config, venue/address/map, description, rules flags, `banner_path`: everything an unauthenticated visitor needs to decide whether to attend | all except `checkin_code`, `vekn_pushed_at`, `vekn_results_stale`, `twda_status` | everything | the member projection minus `announcements`, `raffles`, `promos_distributed`, `promo_stock_source_uid`, `offline_device_id`, and minus each player's `display_name` and `payment_status` |
 | sanction | none | full data | full data | none, permanently |
-| deck | none | full data when `public = true`, else none | full data | the member rule minus `author`; the designer credit survives as `attribution`, a VEKN id |
+| deck | none | full data when `public = true`, else none | full data | the member rule minus `author`. `attribution` carries the designer credit: a VEKN id, the sentinel `"twda"` (credit lives in the archive, not in our `author`), or null for anonymous |
 | league | full data **except `organizers_uids`** | full data | full data | full data, organizers included — the same call as a tournament's |
 | promo | catalog only, no `holdings` | same as public | everything including `holdings` | none |
 

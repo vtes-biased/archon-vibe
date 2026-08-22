@@ -66,8 +66,6 @@ _USER_MEMBER_FIELDS = (
 )
 
 
-# The API app reads both from the `objects` columns, which the projection dicts
-# do not mirror: `modified_at` is also its keyset cursor.
 _API_SYNC_FIELDS = {"modified", "deleted_at"}
 
 _USER_API_FIELDS = {
