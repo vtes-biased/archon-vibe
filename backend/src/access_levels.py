@@ -66,8 +66,6 @@ _USER_MEMBER_FIELDS = (
 )
 
 
-# VEKN-IDs-only: the public API never carries a name, a nickname, contact
-# details or a location finer than the country.
 _USER_API_FIELDS = {
     "uid",
     "modified",

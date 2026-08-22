@@ -10,9 +10,10 @@ documented; this page carries the cross-cutting ones and indexes the rest.
 ## Fields silently dropped
 
 **A hand-rebuilt `User` or `Sanction` drops every field its author did not
-enumerate** — prefer `msgspec.structs.replace`. Five sites carry a field list of
+enumerate** — prefer `msgspec.structs.replace`. Eight sites carry a field list of
 their own: go-online's server-wins re-pull, the detach split's two clear-lists,
-the member projection denylist, `/action`'s copy into `event_data` and the
+the member projection denylist, the api projection's three (a User allowlist and
+a Tournament and a Player denylist), `/action`'s copy into `event_data` and the
 tournament config set. Each derives what it can from the model it mirrors and
 asserts the judgement that remains exhaustive against the struct, so a new field
 fails a test instead of leaking — [testing](testing.md#traps) names the guards.
@@ -240,8 +241,8 @@ a resync re-delivers the lower projection ([sync](sync.md#access-entitlement)).
 must vary by **consumer class**. A new viewer level inside the app does not
 qualify — collapse onto an existing column and shrink the lower one. `api` did:
 its readers are third parties who get no app client, no SSE stream and a
-name-free row ([sync](sync.md#access-levels)). The base64 contact obfuscation is a harvester speed-bump,
-not access control.
+name-free row ([sync](sync.md#access-levels)). The base64 contact obfuscation is
+a harvester speed-bump, not access control.
 
 ## Concurrency and connections
 

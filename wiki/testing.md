@@ -126,8 +126,10 @@ model field fails one of them rather than leaking. `test_go_online.py` classifie
 every `Tournament` field as server-owned, merged, stamped or carried from the
 device's snapshot; `test_account_surgery.py` classifies every `User` field across
 the detach split; `test_access_levels.py` holds the member-visible complement of
-the tournament denylist and pins `compute_user_full` to withholding exactly
-`calendar_token`; `test_tournament_field_contracts.py` classifies every
+the tournament denylist, the api-visible complement of the tournament and player
+api denylists and the withheld complement of the user api allowlist, and pins
+`compute_user_full` to withholding exactly `calendar_token`;
+`test_tournament_field_contracts.py` classifies every
 `TournamentActionRequest` field as truthy-only or any-value, and compares the
 engine's `CONFIG_FIELDS`, `TournamentConfig` and `CreateTournamentRequest` while
 driving a real create through the shipped engine so the create literal cannot

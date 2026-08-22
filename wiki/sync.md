@@ -162,14 +162,14 @@ and the heap holds at most one batch. The ORDER BY is load-bearing: the client's
 `since` high-water mark must advance monotonically.
 
 **`stream_objects_snapshot(conn)`** is an unordered whole-corpus scan — one pass for
-*all* types and *all three* levels, yielding `(type, public, member, full)`. A full
+*all* types and *every* level, yielding `(type, public, member, api, full)`. A full
 snapshot captures every non-deleted row and needs no ordering, so dropping the
 ORDER BY lets Postgres pick a bitmap or sequential heap scan (physical-page order,
 sequential I/O) over the index-order random I/O that punished the latency-bound
 production disk. It filters `deleted_at IS NULL` — fresh clients need no tombstones
 — and streams through a server-side cursor DECLAREd in an explicit transaction,
 since autocommit forbids a bare one. Its batch size is far below the ordered
-streamer's because each row now carries three projections.
+streamer's because each row now carries four projections.
 
 > Plan checks must `EXPLAIN` the `DECLARE … CURSOR FOR`, not the bare `SELECT`. A
 > named cursor is costed with `cursor_tuple_fraction` (default 0.1), which biases
@@ -657,8 +657,10 @@ state.
 ## Adding a new object type
 
 1. **Backend model** in `models.py`, extending `BaseObject`.
-2. **Projections** in `access_levels.py`: `compute_<type>_public/member/full()`
-   plus the dispatch dicts.
+2. **Projections** in `access_levels.py`: `compute_<type>_public/member/api/full()`
+   plus **all four** dispatch dicts. A missing `_API_DISPATCH` entry is not a
+   silent narrow projection — `compute_api` raises on every `save_object` for the
+   type. `_invisible` is the entry for a type third parties never see.
 3. **CRUD wrappers** in `db.py` — thin wrappers over `save_object_from_model` and
    `get_object_full`; populate `BroadcastData.tournament_uid` if the type belongs
    to a tournament, needed for scoped connections.

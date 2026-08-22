@@ -568,8 +568,6 @@ class TestTournamentApi:
         assert "payment_status" not in player
 
     def test_full_projection_keeps_the_player_fields_api_drops(self):
-        # The player dicts are shared across the projections of one save; an
-        # in-place strip here would empty them out of the `full` column too.
         t = _make_tournament(players=[{"user_uid": "u-001", "display_name": "Alice"}])
         compute_api(ObjectType.TOURNAMENT, t)
         assert (
