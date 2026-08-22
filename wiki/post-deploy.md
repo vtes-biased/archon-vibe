@@ -24,7 +24,7 @@ people to tell, and the wiki text that dies with it.
 
 ## Backfill the `api` projection
 
-**Gated on** the commit adding the fourth `api` column — a projection is computed
+**Gated on** `36b6ab6`, which adds the fourth `api` column — a projection is computed
 at write time, so every row saved before that commit went live carries a NULL
 `api` and is invisible to the public API. `init_db` adds the column on deploy; only
 a re-save fills it.
