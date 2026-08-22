@@ -97,6 +97,14 @@ def _openapi() -> dict:
             "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
         }
         schema["security"] = [{"bearerAuth": []}]
+        # FastAPI adds an `application/json` 200 of its own and `openapi_extra`
+        # merges beside it rather than replacing it, so a stream would advertise
+        # a JSON body it never returns — and Scalar would preview that one.
+        for methods in schema["paths"].values():
+            for operation in methods.values():
+                content = operation["responses"]["200"]["content"]
+                if len(content) > 1:
+                    content.pop("application/json", None)
         app.openapi_schema = schema
     return app.openapi_schema
 

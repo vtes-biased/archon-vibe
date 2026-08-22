@@ -139,10 +139,13 @@ payload the API never emits is a promise it does not keep.
 
 A stream's body is not one JSON document, so its response schema is a string with
 a worked example, and the line union lives beside it as a `{Name}Line` component.
-Scalar's response preview defaults its media-type selector to `application/json`
-and so shows `null` for a stream until the reader switches it to
-`application/x-ndjson` — which is why the line shape is also spelled out in the
-page's own introduction.
+**Every route ends up declaring exactly one media type**, which takes a pruning
+pass: FastAPI adds an `application/json` 200 of its own and `openapi_extra` merges
+beside it rather than replacing it, so a stream would advertise a JSON body it
+never returns — and a reader, a generator or Scalar's preview would believe it.
+The line shape is spelled out in the page's own introduction as well, because it
+is the first thing a consumer needs and the last place they should have to look
+for it is a response schema.
 
 `test_public_api.py` holds both halves: a maximal object of each type is projected
 through `compute_api` and its key set must equal the documented properties, and
