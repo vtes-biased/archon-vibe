@@ -98,15 +98,16 @@ async def _register(name: str, scopes: list[OAuthScope]) -> tuple[str, str]:
     return client_id, secret
 
 
+def _grant(client_id: str, secret: str) -> dict:
+    return {
+        "grant_type": "client_credentials",
+        "client_id": client_id,
+        "client_secret": secret,
+    }
+
+
 async def _mint(app_client, client_id: str, secret: str):
-    return await app_client.post(
-        "/oauth/token",
-        json={
-            "grant_type": "client_credentials",
-            "client_id": client_id,
-            "client_secret": secret,
-        },
-    )
+    return await app_client.post("/oauth/token", json=_grant(client_id, secret))
 
 
 class TestReadOnlyAndGated:
@@ -184,6 +185,18 @@ class TestDaemonIdentity:
         assert (
             await live_api.get("/v1/tournaments", headers=headers)
         ).status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_the_rfc_form_encoding_mints_the_same_token(
+        self, test_client, live_api
+    ):
+        client_id, secret = await _register("form", [OAuthScope.API_READ])
+        minted = await test_client.post("/oauth/token", data=_grant(client_id, secret))
+        assert minted.status_code == 200, minted.text
+        headers = {"Authorization": f"Bearer {minted.json()['access_token']}"}
+        assert (
+            await live_api.get("/v1/tournaments", headers=headers)
+        ).status_code == 200
 
     @pytest.mark.asyncio
     async def test_a_client_without_the_scope_cannot_mint(self, test_client):

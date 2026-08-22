@@ -204,6 +204,11 @@ ON objects(type, modified_at, uid);
 -- Type filter for non-deleted objects
 CREATE INDEX IF NOT EXISTS idx_objects_type
 ON objects(type) WHERE deleted_at IS NULL;
+
+-- The public API's stream order: uid is a uuid7, so DESC is newest-created
+-- first, and unlike modified_at it never moves a row mid-read.
+CREATE INDEX IF NOT EXISTS idx_objects_type_uid
+ON objects(type, uid);
 -- User-specific lookups
 CREATE UNIQUE INDEX IF NOT EXISTS idx_objects_user_vekn_id
 ON objects(("full"->>'vekn_id'))

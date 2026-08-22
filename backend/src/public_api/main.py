@@ -12,18 +12,19 @@ from .schemas import COMPONENTS
 from .v1 import router
 
 SITE_URL = os.getenv("SITE_URL_BASE", "http://localhost:8000")
+API_URL = os.getenv("PUBLIC_API_URL_BASE", "http://localhost:8001")
 
-DESCRIPTION = """
+DESCRIPTION = (
+    """
 Read-only access to Archon's organizational data: tournaments, leagues, published
 decks, member ratings and community links.
 
-Members are published by **VEKN ID, never by name** — no name, contact, city or
-avatar is served here, and a player without a VEKN ID has no row at all. Sanctions
-are never served. Card data is [krcg](https://static.krcg.org)'s, not ours.
+Members are published by **VEKN ID, never by name**. No name, contact, city or
+avatar is served here, and sanctions are never served. Card data belongs to
+[krcg](https://v4.api.krcg.org/docs), not to us.
 
-Every endpoint requires a bearer token. A single object comes back as JSON; a
-collection streams as **JSON Lines** — one object per line, opened by a `header`
-line and closed by an `eof` line whose absence means the response was cut short.
+A single object comes back as JSON. A collection comes back as **JSON Lines**:
+one object per line, opened by a `header` line and closed by an `eof` line.
 
 ```
 {"type":"header","generated_at":"2026-08-22T15:04:05.123456"}
@@ -31,28 +32,62 @@ line and closed by an `eof` line whose absence means the response was cut short.
 {"type":"eof","count":1}
 ```
 
-There is no pagination anywhere. Read as far into a stream as you want and close
-the connection; for a top-ten ranking, read ten lines.
+## Reading a list
 
-Only live, visible objects are ever served: nothing deleted, nothing unpublished,
-and no way to ask what changed since when. This API is for building something new
-on top of the data, not for keeping a copy of it in step — read what you need when
-you need it, or take `/v1/export` for the whole corpus in one gzipped pass.
+A list endpoint streams, and its response is not a JSON document: it will not
+parse as one. Read it line by line and decode each line on its own. Most clients
+have this built in and most of them do not use it by default, which for
+`/v1/tournaments` means holding tens of megabytes in memory for nothing. Ask for
+the streaming variant: `iter_lines()` on a `stream=True` request in Python's
+requests or httpx, the response body as an async iterator in Node,
+`curl --no-buffer`.
+
+Three consequences worth knowing:
+
+* **There is no pagination.** Read as far as you want, then close the
+  connection. For a top-ten ranking, read ten lines and hang up. Nothing is lost
+  and nothing needs resuming.
+* **Check for the `eof` line before you trust what came before it.** A response
+  cut short mid-flight looks exactly like a short one until the trailer is
+  missing, and by then you have already written rows.
+* **The server reads in blocks of 250 rows**, holding no database connection
+  between them, which is why a slow reader costs nothing. You never see those
+  boundaries: they are not chunks, not packets, and not something to align on.
+
+## Ordering and freshness
+
+Lists arrive **newest first**, ordered by `uid`. Uids are UUIDv7, so they sort by
+the moment a record was created, which is not the same as when the event
+happened: a decade-old tournament imported last week sorts as new. Select by
+event date with `start_after` and `start_before` instead.
+
+A record's `uid` never changes, so a record never moves while you are reading.
+It also means **there is no way to ask what changed since when**. That is
+deliberate rather than missing: deleted records are not served, so anyone
+diffing by date would accumulate rows that no longer exist. Read what you need
+when you need it, or take `/v1/export` for the whole corpus in one gzipped pass.
 
 ## Getting a token
 
-Ask an Archon developer for a client carrying the `api:read` scope, then exchange
-its credentials on the **main site** — the token endpoint is not on this host:
+You need an Archon account with your VEKN membership, plus the DEV role, which an
+IC grants. With it, open Developer in [your profile]({site}/profile), register a
+client, tick `api:read` and keep the secret: it is shown once. A client that only
+needs `api:read` has no redirect URI to declare.
+
+Exchange the secret for a token that lasts an hour:
 
 ```
-curl -X POST {site}/oauth/token -H 'Content-Type: application/json' \\
-  -d '{"grant_type":"client_credentials","client_id":"…","client_secret":"…"}'
+curl -X POST {api}/oauth/token \
+  -d grant_type=client_credentials -d client_id=... -d client_secret=...
 ```
 
-The body is JSON, not the form encoding RFC 6749 asks for. The token lasts an hour
-and comes with no refresh token — mint another. Send it as
-`Authorization: Bearer <token>`; it is accepted here and refused everywhere else.
-""".strip().replace("{site}", SITE_URL)
+Form-encoded as RFC 6749 specifies, or a JSON body with the same keys, whichever
+your client prefers. There is no refresh token: mint another when it expires.
+Send it as `Authorization: Bearer <token>` on every request.
+""".strip()
+    .replace("{site}", SITE_URL)
+    .replace("{api}", API_URL)
+)
 
 
 @asynccontextmanager

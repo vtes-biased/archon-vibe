@@ -1,10 +1,11 @@
 """OAuth 2.0 Authorization Server (RFC 6749 + RFC 7636 PKCE)."""
 
 import hashlib
+import json
 import logging
 import secrets
 from datetime import UTC, datetime, timedelta
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, urlencode
 from uuid import uuid7
 
 import jwt
@@ -267,9 +268,8 @@ async def authorize_post(user: CurrentUser, body: AuthorizeApprovalRequest):
 
 
 class TokenRequest(BaseModel):
-    """POST /token body. JSON, not RFC 6749 form encoding — deliberate first-party
-    divergence (Discord bot is the only client today). Fields default empty so a
-    missing value fails the endpoint's own 400/401s, not a 422."""
+    """POST /token body. Fields default empty so a missing value fails the
+    endpoint's own 400/401s, not a 422."""
 
     grant_type: str = ""
     client_id: str = ""
@@ -281,12 +281,47 @@ class TokenRequest(BaseModel):
     scope: str = ""
 
 
-@router.post("/token")
-async def token_endpoint(body: TokenRequest):
-    """Exchange authorization code for tokens, or refresh tokens.
+# The handler takes a raw Request to accept both encodings, so FastAPI derives
+# no request body of its own.
+_TOKEN_BODY = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            media: {"schema": TokenRequest.model_json_schema()}
+            for media in ("application/x-www-form-urlencoded", "application/json")
+        },
+    }
+}
 
-    Client authenticates via client_id + client_secret in the body.
+
+async def _token_body(request: Request) -> TokenRequest:
+    """Form-encoded as RFC 6749 requires, or JSON with the same keys."""
+    raw = await request.body()
+    if request.headers.get("content-type", "").startswith(
+        "application/x-www-form-urlencoded"
+    ):
+        fields = dict(parse_qsl(raw.decode("utf-8", "replace")))
+    else:
+        try:
+            fields = json.loads(raw or b"{}")
+        except ValueError:
+            raise HTTPException(400, "Body must be form-encoded or JSON") from None
+    if not isinstance(fields, dict):
+        raise HTTPException(400, "Body must be form-encoded or JSON")
+    known = TokenRequest.model_fields
+    return TokenRequest(
+        **{k: str(v) for k, v in fields.items() if k in known and v is not None}
+    )
+
+
+@router.post("/token", openapi_extra=_TOKEN_BODY)
+async def token_endpoint(request: Request):
+    """Exchange authorization code, refresh token or client credentials for tokens.
+
+    The client authenticates with its client_id and client_secret in the body,
+    form-encoded as RFC 6749 requires or as JSON with the same keys.
     """
+    body = await _token_body(request)
     grant_type = body.grant_type
 
     client = await get_oauth_client_by_client_id(body.client_id)

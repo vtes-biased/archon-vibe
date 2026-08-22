@@ -83,6 +83,12 @@ restrictions.
 
 A full RFC 6749 / RFC 7636 (PKCE) implementation for third-party API access.
 
+`/oauth/token` takes the RFC's `application/x-www-form-urlencoded` body or a JSON
+body with the same keys, whichever the client sends. The JSON form came first and
+the Discord bot still uses it; the form encoding is what every third-party OAuth
+library reaches for, so refusing it made the endpoint non-compliant for exactly
+the audience the daemon grant exists to serve.
+
 Endpoints `/oauth/{authorize,token,userinfo}`; client CRUD and secret regeneration
 under `/oauth/clients` (DEV role); `GET /oauth/consents` lists authorized apps and
 is **first-party session only**, rejecting OAuth tokens with 403;

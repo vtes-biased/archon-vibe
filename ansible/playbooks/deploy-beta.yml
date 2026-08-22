@@ -74,6 +74,7 @@
         site_root: "{{ backend_site_root }}"
         venv_dir: "{{ backend_site_root }}/.venv"
         port: "{{ api_port }}"
+        backend_port: "{{ backend_port }}"
         user: "{{ archon_user }}"
         group: "{{ archon_group }}"
         server_name: "{{ domain_api }}"

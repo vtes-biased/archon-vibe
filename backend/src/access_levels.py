@@ -113,11 +113,27 @@ def compute_user_member(d: dict) -> dict:
     return _pick(d, _USER_MEMBER_FIELDS)
 
 
+LINK_MODERATION_API_FIELDS = {"status", "scope"}
+
+
 def compute_user_api(d: dict) -> dict | None:
     # Matches idx_objects_user_vekn_id, which treats "" as no id.
     if not d.get("vekn_id"):
         return None
-    return _pick(d, USER_API_FIELDS)
+    proj = _pick(d, USER_API_FIELDS)
+    # Rebuilt, never popped in place: the nested link dicts are the same objects
+    # the other projections of this save hand out.
+    if proj.get("community_links"):
+        proj["community_links"] = [
+            link
+            if not link.get("moderation")
+            else {
+                **link,
+                "moderation": _pick(link["moderation"], LINK_MODERATION_API_FIELDS),
+            }
+            for link in proj["community_links"]
+        ]
+    return proj
 
 
 def compute_user_full(d: dict) -> dict:
@@ -207,7 +223,7 @@ def compute_tournament_full(d: dict) -> dict:
     return dict(d)
 
 
-DECK_API_EXCLUDE = API_SYNC_FIELDS | {"author"}
+DECK_API_EXCLUDE = API_SYNC_FIELDS | {"author", "public"}
 
 
 def compute_deck_member(d: dict) -> dict | None:

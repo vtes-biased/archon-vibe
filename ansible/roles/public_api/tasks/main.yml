@@ -7,6 +7,7 @@
       - r.site_root is defined
       - r.venv_dir is defined
       - r.port is defined
+      - r.backend_port is defined
       - r.user is defined
       - r.group is defined
       - r.env is defined

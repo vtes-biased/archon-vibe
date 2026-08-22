@@ -10,13 +10,13 @@ from ..models import ObjectType, RatingCategory
 from ..snapshots import get_snapshot_path
 from .auth import require_api_token
 from .db import get_connection
-from .schemas import NDJSON, ref, responds, streams
+from .schemas import NDJSON, responds, streams
 
 router = APIRouter(prefix="/v1", dependencies=[Depends(require_api_token)])
 
 _BATCH = 250
 _VISIBLE = '"api" IS NOT NULL AND deleted_at IS NULL'
-_BY_MODIFIED = "(modified_at, uid) > (%s::timestamp, %s)"
+_BY_UID = "uid < %s"
 
 
 def _json(body: str) -> Response:
@@ -95,27 +95,33 @@ def _object_batches(
 ) -> AsyncIterator[list[tuple]]:
     match = " AND ".join([_VISIBLE, *filters])
     return _batches(
-        f'SELECT modified_at::text, uid, "api"::text FROM objects '
+        f'SELECT uid, "api"::text FROM objects '
         f"WHERE type = %s AND {match} AND ({{keyset}}) "
-        "ORDER BY modified_at, uid LIMIT %s",
+        "ORDER BY uid DESC LIMIT %s",
         (obj_type, *values),
-        _BY_MODIFIED,
-        2,
+        _BY_UID,
+        1,
     )
 
 
 @router.get("/tournaments", openapi_extra=streams("Tournament", "tournament"))
-async def stream_tournaments(
+async def list_tournaments(
     country: str | None = None,
     format: str | None = None,
     state: str | None = None,
     start_after: str | None = None,
     start_before: str | None = None,
 ) -> StreamingResponse:
-    """Every tournament, oldest change first.
+    """Every tournament, newest first.
 
-    `start_after` / `start_before` compare ISO-8601 wall-clock text, so a bare
-    date bounds at its midnight.
+    `country` is an ISO 3166-1 alpha-2 code. `format` is `Standard`, `Limited`
+    or `V5`. `state` is `Planned`, `Registration`, `Waiting`, `Playing` or
+    `Finished`.
+
+    `start_after` and `start_before` are ISO-8601 dates or datetimes carrying no
+    timezone. Each tournament is compared in its own local time, so
+    `start_after=2026-01-01` means the first of January wherever the event is
+    held. A bare date bounds at midnight.
     """
     filters: list[str] = []
     values: list[str] = []
@@ -138,7 +144,7 @@ async def stream_tournaments(
     )
 
 
-@router.get("/tournaments/{code_or_uid}", openapi_extra=responds(ref("Tournament")))
+@router.get("/tournaments/{code_or_uid}", openapi_extra=responds("Tournament"))
 async def get_tournament(code_or_uid: str) -> Response:
     """A tournament by its short event code (case-insensitive) or its uid."""
     row = await _one(
@@ -152,8 +158,8 @@ async def get_tournament(code_or_uid: str) -> Response:
 
 
 @router.get("/leagues", openapi_extra=streams("League", "league"))
-async def stream_leagues() -> StreamingResponse:
-    """Every league, oldest change first."""
+async def list_leagues() -> StreamingResponse:
+    """Every league, newest first."""
     return _ndjson(
         _data_lines(
             ObjectType.LEAGUE,
@@ -163,7 +169,7 @@ async def stream_leagues() -> StreamingResponse:
     )
 
 
-@router.get("/leagues/{uid}", openapi_extra=responds(ref("League")))
+@router.get("/leagues/{uid}", openapi_extra=responds("League"))
 async def get_league(uid: str) -> Response:
     row = await _one(
         f'SELECT "api"::text FROM objects WHERE uid = %s AND type = %s AND {_VISIBLE}',
@@ -174,10 +180,9 @@ async def get_league(uid: str) -> Response:
     return _json(row[0])
 
 
-@router.get("/users/{vekn_id}", openapi_extra=responds(ref("User")))
+@router.get("/users/{vekn_id}", openapi_extra=responds("User"))
 async def get_user(vekn_id: str) -> Response:
-    """A member by VEKN ID. Nobody else is addressable: a user without one has no
-    `api` row at all."""
+    """A member by VEKN ID."""
     row = await _one(
         f'SELECT "api"::text FROM objects WHERE type = %s AND {_VISIBLE} '
         "AND \"full\"->>'vekn_id' = %s",
@@ -189,8 +194,8 @@ async def get_user(vekn_id: str) -> Response:
 
 
 @router.get("/decks", openapi_extra=streams("DeckObject", "deck"))
-async def stream_decks(tournament: str | None = None) -> StreamingResponse:
-    """Every published deck, oldest change first."""
+async def list_decks(tournament: str | None = None) -> StreamingResponse:
+    """Every published deck, newest first. `tournament` is a tournament uid."""
     filters: list[str] = []
     values: list[str] = []
     if tournament:
@@ -206,12 +211,16 @@ async def stream_decks(tournament: str | None = None) -> StreamingResponse:
 
 
 @router.get("/rankings", openapi_extra=streams("User", "user"))
-async def stream_rankings(
+async def list_rankings(
     category: RatingCategory = RatingCategory.CONSTRUCTED_ONLINE,
     country: str | None = None,
 ) -> StreamingResponse:
     """Every rated member, highest total first. For a top-N, read N lines and
-    close the connection."""
+    close the connection.
+
+    `category` is `constructed_online`, `constructed_offline`, `limited_online`
+    or `limited_offline`. `country` is an ISO 3166-1 alpha-2 code.
+    """
     total = f"(\"api\"->'{category.value}'->>'total')::int"
     clauses = [_VISIBLE, f"{total} IS NOT NULL"]
     values: list[str] = []
@@ -241,27 +250,29 @@ async def stream_rankings(
     "/community-links",
     openapi_extra=streams("CommunityLinkEntry", "community_link"),
 )
-async def stream_community_links() -> StreamingResponse:
-    """Every member's community links, one line per link. A link a moderator hid
-    is withheld — the app's own clients filter those client-side, and a third
-    party has no way to know it should."""
+async def list_community_links() -> StreamingResponse:
+    """Every member's community links, one line per link.
+
+    Lines for one member arrive together; their order within a member carries no
+    meaning. A link a moderator has hidden is not served.
+    """
     sql = (
         "SELECT o.uid, link.idx, jsonb_build_object("
         "'vekn_id', o.\"api\"->>'vekn_id', "
-        "'country', coalesce(link.value->>'country', o.\"api\"->>'country'), "
-        "'link', link.value)::text "
+        "'link', link.value || jsonb_build_object('country', "
+        "coalesce(link.value->>'country', o.\"api\"->>'country')))::text "
         "FROM objects o CROSS JOIN LATERAL jsonb_array_elements("
         "coalesce(o.\"api\"->'community_links', '[]'::jsonb)) "
         "WITH ORDINALITY AS link(value, idx) "
         'WHERE o.type = %s AND o."api" IS NOT NULL AND o.deleted_at IS NULL '
         "AND coalesce(link.value->'moderation'->>'status', '') <> 'hidden' "
-        "AND ({keyset}) ORDER BY o.uid, link.idx LIMIT %s"
+        "AND ({keyset}) ORDER BY o.uid DESC, link.idx DESC LIMIT %s"
     )
     return _ndjson(
         _data_lines(
             "community_link",
             await _read_at(),
-            _batches(sql, (ObjectType.USER,), "(o.uid, link.idx) > (%s, %s)", 2),
+            _batches(sql, (ObjectType.USER,), "(o.uid, link.idx) < (%s, %s)", 2),
         )
     )
 
@@ -282,7 +293,8 @@ async def stream_community_links() -> StreamingResponse:
     },
 )
 async def export() -> FileResponse:
-    """The whole `api` corpus as the periodically-generated snapshot file."""
+    """The whole corpus as one gzipped JSON Lines file, never more than an hour
+    old. One request instead of five, and the cheapest way to take everything."""
     path = get_snapshot_path("api")
     if path is None:
         raise HTTPException(503, "Export not generated yet")

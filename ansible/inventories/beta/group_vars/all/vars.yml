@@ -104,9 +104,10 @@ backend_env:
 # token minted by the other, and /v1/export serves the snapshot the app writes.
 public_api_env:
   PYTHONOPTIMIZE: 1
-  # Where the reference page sends a third party to mint a token: /oauth lives
-  # on the app, never here.
+  # Both appear in the reference page: the profile link where a client is
+  # registered, and this host, whose vhost proxies /oauth/token to the app.
   SITE_URL_BASE: "{{ site_url_base }}"
+  PUBLIC_API_URL_BASE: "https://{{ domain_api }}"
   DATABASE_URL: "{{ backend_env.DATABASE_URL }}"
   JWT_SECRET: "{{ backend_env.JWT_SECRET }}"
   SNAPSHOT_DIR: "{{ backend_env.SNAPSHOT_DIR }}"

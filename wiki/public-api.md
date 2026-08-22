@@ -29,7 +29,7 @@ reaches consumers with no code change here.
 | `/v1/decks` | stream of published decks; `tournament` |
 | `/v1/rankings` | stream of rated members, highest total first; `category`, `country` |
 | `/v1/community-links` | stream, one line per link |
-| `/v1/export` | the whole corpus as the generated `api.jsonl.gz` snapshot |
+| `/v1/export` | the whole corpus as the generated `api.jsonl.gz` snapshot, never more than an hour old |
 
 ## The stream
 
@@ -68,11 +68,24 @@ trailer is load-bearing: a chunked response that dies mid-flight is
 indistinguishable from a short one until the trailer is missing, and the consumer
 has written rows by then.
 
+**Streams order by `uid` descending, not by `modified_at`**, and the two reasons
+compound. A uid is a uuid7, so descending is newest-created first, which is the
+order that makes reading the first N lines worth anything. And a uid never
+changes, so **a row cannot move while a consumer is reading it**: it is emitted
+exactly once, in a position fixed before the read began. Ordering on
+`modified_at` gave neither — a row written mid-read jumped the cursor and was
+duplicated or skipped depending on the direction.
+
+Creation order is not event order, and the doc says so: a decade-old tournament
+imported last week sorts as new. `start_after`/`start_before` are how you select
+by when the event happened.
+
 **Only live, visible objects are ever served** — nothing soft-deleted, nothing
-unpublished — and there is deliberately **no modified-date filter**. The two go
-together: a `since` parameter advertises incremental diffing, and diffing needs the
-deletions this API does not serve, so a consumer would build a copy that silently
-accumulates rows that no longer exist. Refusing the filter refuses the trap.
+unpublished — and there is deliberately **no modified-date filter**. A `since`
+parameter advertises incremental diffing, and diffing needs the deletions this
+API does not serve, so a consumer would build a copy that silently accumulates
+rows that no longer exist. Refusing the filter refuses the trap; ordering on an
+immutable key removes the last thing that made the filter look plausible.
 
 This API is not for keeping a copy of the data in step. Third parties are expected
 to build something different on top of it, not to reproduce the app: **stream it
@@ -81,21 +94,24 @@ all, and stream it all again to refresh** — that is the entire freshness model
 stable attribute (a tournament's country or dates, a deck's tournament) are fine;
 they answer a question rather than resume a sync.
 
-**A stream is not a snapshot.** Releasing the connection between batches means a
-row modified mid-stream can arrive twice, or be missed by this read and picked up
-by the next one. Nothing here promises otherwise, and the next full read settles
-it. Holding one transaction open for the length of a client read is the actual
-hazard on a four-connection pool: do not "fix" this with a held transaction.
+**A stream is still not a snapshot**, but the immutable sort key bounds what can
+go wrong: no row is ever duplicated. A row written between two batches is served
+in whichever version the batch that reaches it finds, and a row *created* mid-read
+sorts above the cursor and is simply not in this read. Holding one transaction
+open for the length of a client read is the actual hazard on a four-connection
+pool: do not "fix" this with a held transaction.
 
-`start_after`/`start_before` compare ISO-8601 wall-clock text, so a bare date
-bounds at its midnight.
+`start_after`/`start_before` compare ISO-8601 text carrying no offset, so each
+tournament is bounded in its own local time and a bare date bounds at midnight.
 
 `/v1/export` is the pre-generated snapshot file rather than a live stream, so a
 full read costs one pass and arrives gzipped — the same file the app's own
 `/snapshot` serves at its levels.
 
 Two places the response is not the column verbatim, both deliberate:
-**`community-links` withholds a link a moderator hid** — the app's own clients
+**`community-links` resolves each link's `country`** to the link's own where it
+has one and the member's otherwise, so a consumer never has to know the fallback
+rule, and **withholds a link a moderator hid** — the app's own clients
 filter those client-side and a third party has no way to know it should — and
 lookups **match on the indexed `"full"` expressions** (event code, VEKN id, a
 deck's tournament) because that is where the indexes are. Only `"api"` is ever
@@ -118,8 +134,13 @@ Both checks run on this app's own SQL, since the isolation lint forbids the
 shape asserted in two places
 ([hazards](hazards.md#two-implementations-of-one-gate)).
 
-The token endpoint is **not on this host**: `/oauth/token` belongs to the app, and
-the reference page says so, rendering the worked `curl` against `SITE_URL_BASE`.
+**A third party only ever types one hostname.** `/oauth/token` is the app's
+endpoint, but the API's vhost proxies it, and proxies the tournament banner route
+beside it. Both keep the app's own path rather than a rewritten one, so
+`banner_path` works verbatim against the API host and nothing has to be kept in
+step. The minting flow itself is a member account plus the DEV role an IC grants,
+then a self-registered client: the reference page states that rather than telling
+a reader to ask us.
 
 `/docs` and `/openapi.json` are open. The owner's "no anonymous" decision was
 about the data; a reference page nobody can read before registering is a barrier
@@ -136,6 +157,13 @@ the **real Structs**, pruned by the very field sets `access_levels` projects wit
 payload. Pruning a field can orphan the struct it referenced, so the components
 are reduced to what is reachable from the roots — publishing the schema of a
 payload the API never emits is a promise it does not keep.
+
+**Every example is a real row**, captured from the corpus and run through
+`access_levels` at capture time, because a shape full of nulls answers no
+question a consumer actually has (`examples.py`; the league is constructed, there
+being none to capture). Field documentation lives in `schemas.py` beside them and
+is keyed by component and field name, so **a projection that drops a field and
+leaves its documentation behind is a `KeyError` at import**, not a stale sentence.
 
 A stream's body is not one JSON document, so its response schema is a string with
 a worked example, and the line union lives beside it as a `{Name}Line` component.
@@ -179,6 +207,11 @@ window.
 | `limit_conn` per address | 16 | a suspended stream holds one buffered batch (~1.8 MB) and **no** connection, so concurrency queues on the pool rather than exhausting it. Sixteen is ~29 MB and a four-deep queue |
 | `limit_req` on everything else under `/v1` and on `/docs` | a separate, far more generous zone | single-row lookups; a client resolving a page of event codes bursts legitimately |
 | `limit_req_status`, `limit_conn_status` | 429 | nginx defaults to 503, which reads as "outage, retry" rather than "slow down" |
+
+Two locations are proxied to the **app** rather than the API process:
+`/oauth/token`, so minting and reading share a hostname, and the tournament
+banner path, so `banner_path` resolves. Both keep the app's path verbatim; a
+rewrite here would be a second place to change when either moves.
 
 The zones are `limit_req_zone`/`limit_conn_zone` and so live in a `conf.d` file —
 they are http-context directives and cannot go in the server block. The streams
