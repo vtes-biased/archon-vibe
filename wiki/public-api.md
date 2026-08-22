@@ -27,7 +27,7 @@ reaches consumers with no code change here.
 | `/v1/leagues/{uid}` | one league |
 | `/v1/users/{vekn_id}` | one member |
 | `/v1/decks` | stream of published decks; `tournament` |
-| `/v1/rankings` | stream of rated members, highest total first; `category`, `country` |
+| `/v1/users` | stream of members, each carrying all four ratings; `country` |
 | `/v1/community-links` | stream, one line per link |
 | `/v1/export` | the whole corpus as the generated `api.jsonl.gz` snapshot, never more than an hour old |
 
@@ -49,8 +49,9 @@ connection advances a cursor on every event, and a stream here has no cursor to
 advance at all.
 
 **No pagination** ([dogmas](dogmas.md#data-and-sync)): a consumer reads as far as
-it wants and closes the connection. That is the whole answer to "give me the top
-ten" — `/v1/rankings` is ordered, so read ten lines and hang up. Handlers batch
+it wants and closes the connection. That is the whole answer to "give me the ten
+most recent" — every stream is ordered, so read ten lines and hang up. Handlers
+batch
 internally on a keyset and release the pooled connection between batches, so a
 slow reader never pins one of four; that keyset never reaches the client. Each
 batch query is `asyncio.shield`ed, because a reader hanging up mid-stream — the
@@ -203,7 +204,7 @@ window.
 
 | Directive | Value | Sized by |
 |---|---|---|
-| `limit_req` on the six streaming routes | `rate=20r/m burst=10 nodelay` | egress: a whole refresh is five streams and ~6.5 MB gzipped, so 20r/m is four refreshes a minute, ~3.4 Mbit/s sustained from one address. The burst must clear a whole refresh or a legitimate one breaks halfway; ten leaves room for two |
+| `limit_req` on the six streaming routes | `rate=20r/m burst=10 nodelay` | egress: a whole refresh is five streams and ~7 MB gzipped (tournaments 5.3, users 1.1, decks 0.6, the rest rounding error), so 20r/m is four refreshes a minute, ~28 MB/min or 3.7 Mbit/s sustained from one address. The burst must clear a whole refresh or a legitimate one breaks halfway; ten leaves room for two |
 | `limit_conn` per address | 16 | a suspended stream holds one buffered batch (~1.8 MB) and **no** connection, so concurrency queues on the pool rather than exhausting it. Sixteen is ~29 MB and a four-deep queue |
 | `limit_req` on everything else under `/v1` and on `/docs` | a separate, far more generous zone | single-row lookups; a client resolving a page of event codes bursts legitimately |
 | `limit_req_status`, `limit_conn_status` | 429 | nginx defaults to 503, which reads as "outage, retry" rather than "slow down" |

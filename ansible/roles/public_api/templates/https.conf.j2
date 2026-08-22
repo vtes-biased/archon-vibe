@@ -74,7 +74,7 @@ server {
 
   # The streaming surface, exact-match so a single-object lookup under the same
   # prefix falls through to the generous zone below.
-{%- for path in ['/v1/tournaments', '/v1/leagues', '/v1/decks', '/v1/rankings', '/v1/community-links', '/v1/export'] %}
+{%- for path in ['/v1/tournaments', '/v1/leagues', '/v1/decks', '/v1/users', '/v1/community-links', '/v1/export'] %}
   location = {{ path }} {
     limit_req zone={{ _zone }}_stream burst=10 nodelay;
     proxy_pass http://127.0.0.1:{{ r.port }};

@@ -45,8 +45,8 @@ requests or httpx, the response body as an async iterator in Node,
 Three consequences worth knowing:
 
 * **There is no pagination.** Read as far as you want, then close the
-  connection. For a top-ten ranking, read ten lines and hang up. Nothing is lost
-  and nothing needs resuming.
+  connection. For the ten most recently created tournaments, read ten lines and
+  hang up. Nothing is lost and nothing needs resuming.
 * **Check for the `eof` line before you trust what came before it.** A response
   cut short mid-flight looks exactly like a short one until the trailer is
   missing, and by then you have already written rows.

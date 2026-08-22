@@ -29,8 +29,8 @@ Against `https://api.archon.krcg.org`, with `$ID`/`$SECRET` from step 3 and
 curl -sX POST https://archon.krcg.org/oauth/token -H 'Content-Type: application/json' \
   -d "{\"grant_type\":\"client_credentials\",\"client_id\":\"$ID\",\"client_secret\":\"$SECRET\"}"
 
-# one full refresh, unthrottled: five streams, ~6.5 MB gzipped
-for p in tournaments leagues decks rankings community-links; do
+# one full refresh, unthrottled: five streams, ~7 MB gzipped
+for p in tournaments leagues decks users community-links; do
   curl -s -o /dev/null -w "$p %{http_code} %{size_download}\n" \
     -H "Authorization: Bearer $TOKEN" --compressed "https://api.archon.krcg.org/v1/$p"
 done

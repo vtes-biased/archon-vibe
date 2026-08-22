@@ -6,7 +6,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import FileResponse, StreamingResponse
 
-from ..models import ObjectType, RatingCategory
+from ..models import ObjectType
 from ..snapshots import get_snapshot_path
 from .auth import require_api_token
 from .db import get_connection
@@ -180,6 +180,27 @@ async def get_league(uid: str) -> Response:
     return _json(row[0])
 
 
+@router.get("/users", openapi_extra=streams("User", "user"))
+async def list_users(country: str | None = None) -> StreamingResponse:
+    """Every member, newest first.
+
+    Each line carries the member's rating in all four categories, so a ranking
+    is a sort away. `country` is an ISO 3166-1 alpha-2 code.
+    """
+    filters: list[str] = []
+    values: list[str] = []
+    if country:
+        filters.append("\"api\"->>'country' = %s")
+        values.append(country)
+    return _ndjson(
+        _data_lines(
+            ObjectType.USER,
+            await _read_at(),
+            _object_batches(ObjectType.USER, filters, values),
+        )
+    )
+
+
 @router.get("/users/{vekn_id}", openapi_extra=responds("User"))
 async def get_user(vekn_id: str) -> Response:
     """A member by VEKN ID."""
@@ -206,42 +227,6 @@ async def list_decks(tournament: str | None = None) -> StreamingResponse:
             ObjectType.DECK,
             await _read_at(),
             _object_batches(ObjectType.DECK, filters, values),
-        )
-    )
-
-
-@router.get("/rankings", openapi_extra=streams("User", "user"))
-async def list_rankings(
-    category: RatingCategory = RatingCategory.CONSTRUCTED_ONLINE,
-    country: str | None = None,
-) -> StreamingResponse:
-    """Every rated member, highest total first. For a top-N, read N lines and
-    close the connection.
-
-    `category` is `constructed_online`, `constructed_offline`, `limited_online`
-    or `limited_offline`. `country` is an ISO 3166-1 alpha-2 code.
-    """
-    total = f"(\"api\"->'{category.value}'->>'total')::int"
-    clauses = [_VISIBLE, f"{total} IS NOT NULL"]
-    values: list[str] = []
-    if country:
-        clauses.append("\"api\"->>'country' = %s")
-        values.append(country)
-    sql = (
-        f'SELECT {total}, uid, "api"::text FROM objects '
-        f"WHERE type = %s AND {' AND '.join(clauses)} AND ({{keyset}}) "
-        f"ORDER BY {total} DESC, uid DESC LIMIT %s"
-    )
-    return _ndjson(
-        _data_lines(
-            ObjectType.USER,
-            await _read_at(),
-            _batches(
-                sql,
-                (ObjectType.USER, *values),
-                f"({total}, uid) < (%s, %s)",
-                2,
-            ),
         )
     )
 
