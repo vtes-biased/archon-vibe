@@ -5,6 +5,7 @@ import base64
 import msgspec
 import pytest
 from src.access_levels import (
+    _API_SYNC_FIELDS,
     _PLAYER_API_EXCLUDE,
     _TOURNAMENT_API_EXCLUDE,
     _TOURNAMENT_MEMBER_EXCLUDE,
@@ -580,20 +581,38 @@ class TestDeckLeagueSanctionPromoApi:
     def test_public_deck_loses_its_author(self):
         result = compute_api(ObjectType.DECK, _make_deck(public=True))
         assert result["cards"] == {"100001": 4, "100002": 2}
+        # The designer credit survives as a VEKN id; `author` is the free-text name.
         assert result["attribution"] == "1000001"
         assert "author" not in result
 
     def test_private_deck_hidden(self):
         assert compute_api(ObjectType.DECK, _make_deck(public=False)) is None
 
-    def test_league_loses_its_organizers(self):
+    def test_league_keeps_its_organizers(self):
+        # Same call as a tournament's: both resolve to VEKN-ID-only user rows.
         result = compute_api(ObjectType.LEAGUE, _make_league())
         assert result["name"] == "French National League"
-        assert "organizers_uids" not in result
+        assert result["organizers_uids"] == ["u-nc-fr"]
 
     def test_sanctions_and_promos_never_surface(self):
         assert compute_api(ObjectType.SANCTION, _make_sanction()) is None
         assert compute_api(ObjectType.PROMO, {"uid": "p-1", "name": "Promo"}) is None
+
+
+class TestApiCarriesNoSyncBookkeeping:
+    """`modified` and `deleted_at` are `objects` columns the API app reads
+    directly; no api payload duplicates them."""
+
+    def test_no_type_carries_them(self):
+        payloads = [
+            compute_api(ObjectType.USER, _make_user()),
+            compute_api(ObjectType.TOURNAMENT, _make_tournament()),
+            compute_api(ObjectType.DECK, _make_deck(public=True)),
+            compute_api(ObjectType.LEAGUE, _make_league()),
+        ]
+        for payload in payloads:
+            assert not (set(payload) & _API_SYNC_FIELDS)
+        assert all("uid" in payload for payload in payloads)
 
 
 class TestDispatch:
@@ -667,14 +686,19 @@ _TOURNAMENT_MEMBER_VISIBLE = {
 # The api-visible half of the tournament projection, the same complement the
 # member classification carries: the code states only the denylist.
 _TOURNAMENT_API_VISIBLE = _TOURNAMENT_MEMBER_VISIBLE - {
+    "modified",
+    "deleted_at",
     "announcements",
     "raffles",
     "promos_distributed",
     "promo_stock_source_uid",
+    "offline_device_id",
 }
 
 # User api is an allowlist, so its complement is what the public API withholds.
 _USER_API_WITHHELD = {
+    "modified",
+    "deleted_at",
     "name",
     "nickname",
     "city",

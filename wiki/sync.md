@@ -24,14 +24,17 @@ through the separate API process.
 
 | Type | `public` | `member` | `full` | `api` |
 |---|---|---|---|---|
-| user | NC/Prince with contact + community links; IC without contact; any other user with non-empty community links as a minimal no-name row (country, roles, links) | all users — no contact, no `deceased_by_uid`, no `github_login`/`github_id`; `deceased_at` included; anyone with non-empty community links gets those included | everything except `calendar_token` | only users holding a `vekn_id`: the id, country, roles, the four `CategoryRating` fields, `wins`, community links — no name, nickname, contact, city or avatar |
-| tournament | the event-page fields — config, venue/address/map, description, rules flags, `banner_path`: everything an unauthenticated visitor needs to decide whether to attend | all except `checkin_code`, `vekn_pushed_at`, `vekn_results_stale`, `twda_status` | everything | the member projection minus `announcements`, `raffles`, `promos_distributed`, `promo_stock_source_uid`, and minus each player's `display_name` and `payment_status` |
+| user | NC/Prince with contact + community links; IC without contact; any other user with non-empty community links as a minimal no-name row (country, roles, links) | all users — no contact, no `deceased_by_uid`, no `github_login`/`github_id`; `deceased_at` included; anyone with non-empty community links gets those included | everything except `calendar_token` | only users holding a `vekn_id`: uid, the id, country, roles, the four `CategoryRating` fields, `wins`, community links — no name, nickname, contact, city or avatar |
+| tournament | the event-page fields — config, venue/address/map, description, rules flags, `banner_path`: everything an unauthenticated visitor needs to decide whether to attend | all except `checkin_code`, `vekn_pushed_at`, `vekn_results_stale`, `twda_status` | everything | the member projection minus `announcements`, `raffles`, `promos_distributed`, `promo_stock_source_uid`, `offline_device_id`, and minus each player's `display_name` and `payment_status` |
 | sanction | none | full data | full data | none, permanently |
-| deck | none | full data when `public = true`, else none | full data | the member rule minus `author` |
-| league | full data **except `organizers_uids`** | full data | full data | same as `public` |
+| deck | none | full data when `public = true`, else none | full data | the member rule minus `author`; the designer credit survives as `attribution`, a VEKN id |
+| league | full data **except `organizers_uids`** | full data | full data | full data, organizers included — the same call as a tournament's |
 | promo | catalog only, no `holdings` | same as public | everything including `holdings` | none |
 
 "None" means the column is NULL and the object is invisible at that level.
+
+No api payload carries `modified` or `deleted_at`: both are `objects` columns the
+API app reads directly, and `modified_at` is also its keyset cursor.
 
 The `api` projection publishes **VEKN IDs, never names**. A tournament carries
 player, standing and winner *uids*; a non-member player holds no `api` user row,
@@ -58,7 +61,8 @@ the `full` column too.
 
 A league's `organizers_uids` is stripped at public level because ordinary members
 have no public projection at all — a published organizer uid would resolve to
-nothing client-side and render as a raw uid fragment.
+nothing client-side and render as a raw uid fragment. `api` keeps them, as it
+keeps a tournament's: there a uid resolves to a VEKN-ID-only user row.
 
 **Booleans need an explicit decision.** Omitting a field withholds it, but omitting
 a `bool` *misinforms*: after JSON, absent and `false` are indistinguishable, so the

@@ -66,10 +66,12 @@ _USER_MEMBER_FIELDS = (
 )
 
 
+# The API app reads both from the `objects` columns, which the projection dicts
+# do not mirror: `modified_at` is also its keyset cursor.
+_API_SYNC_FIELDS = {"modified", "deleted_at"}
+
 _USER_API_FIELDS = {
     "uid",
-    "modified",
-    "deleted_at",
     "vekn_id",
     "country",
     "roles",
@@ -165,12 +167,17 @@ _TOURNAMENT_MEMBER_EXCLUDE = {
 }
 
 
-_TOURNAMENT_API_EXCLUDE = _TOURNAMENT_MEMBER_EXCLUDE | {
-    "announcements",
-    "raffles",
-    "promos_distributed",
-    "promo_stock_source_uid",
-}
+_TOURNAMENT_API_EXCLUDE = (
+    _TOURNAMENT_MEMBER_EXCLUDE
+    | _API_SYNC_FIELDS
+    | {
+        "announcements",
+        "raffles",
+        "promos_distributed",
+        "promo_stock_source_uid",
+        "offline_device_id",
+    }
+)
 _PLAYER_API_EXCLUDE = {"display_name", "payment_status"}
 
 
@@ -202,6 +209,9 @@ def compute_tournament_full(d: dict) -> dict:
     return dict(d)
 
 
+_DECK_API_EXCLUDE = _API_SYNC_FIELDS | {"author"}
+
+
 def compute_deck_member(d: dict) -> dict | None:
     if d.get("public"):
         return dict(d)
@@ -210,7 +220,7 @@ def compute_deck_member(d: dict) -> dict | None:
 
 def compute_deck_api(d: dict) -> dict | None:
     if d.get("public"):
-        return {k: v for k, v in d.items() if k != "author"}
+        return {k: v for k, v in d.items() if k not in _DECK_API_EXCLUDE}
     return None
 
 
@@ -226,6 +236,10 @@ def compute_promo_public(d: dict) -> dict:
     # Not gated on `active` — retired promos must keep resolving for history
     # and raffles; the gallery UI filters client-side.
     return {k: v for k, v in d.items() if k != "holdings"}
+
+
+def compute_league_api(d: dict) -> dict:
+    return {k: v for k, v in d.items() if k not in _API_SYNC_FIELDS}
 
 
 def _identity(d: dict) -> dict:
@@ -259,7 +273,7 @@ _API_DISPATCH = {
     ObjectType.TOURNAMENT: compute_tournament_api,
     ObjectType.SANCTION: _invisible,
     ObjectType.DECK: compute_deck_api,
-    ObjectType.LEAGUE: compute_league_public,
+    ObjectType.LEAGUE: compute_league_api,
     ObjectType.PROMO: _invisible,
 }
 
