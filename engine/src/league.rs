@@ -74,6 +74,9 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
             if standing["disqualified"].as_bool().unwrap_or(false) {
                 continue;
             }
+            if crate::tournament::is_no_show(standing, winner) {
+                continue;
+            }
             let gw = standing["gw"].as_f64().unwrap_or(0.0);
             let vp = standing["vp"].as_f64().unwrap_or(0.0);
             let tp = standing["tp"].as_i32().unwrap_or(0);
@@ -464,7 +467,7 @@ mod tests {
                 ],"finals":[]},
                 {"uid":"t2","rank":"","player_count":2,"winner":"d","standings":[
                     {"user_uid":"d","gw":1.0,"vp":3.0,"tp":60,"finalist":true},
-                    {"user_uid":"e","gw":0.0,"vp":0.0,"tp":0,"finalist":false}
+                    {"user_uid":"e","gw":0.0,"vp":1.0,"tp":40,"finalist":false}
                 ],"finals":[]}
             ]
         }"#;
@@ -486,6 +489,28 @@ mod tests {
         assert_eq!(pts("b"), 15);
         assert_eq!(pts("c"), 15);
         assert_eq!(pts("e"), 15);
+    }
+
+    #[test]
+    fn no_show_earns_no_league_standing() {
+        let config = r#"{
+            "standings_mode": "GP",
+            "tournaments": [
+                {"uid":"t1","rank":"","player_count":3,"winner":"a","standings":[
+                    {"user_uid":"a","gw":2.0,"vp":6.0,"tp":120,"finalist":true},
+                    {"user_uid":"b","gw":1.0,"vp":3.0,"tp":60,"finalist":false},
+                    {"user_uid":"n","gw":0.0,"vp":0.0,"tp":0,"finalist":false}
+                ],"finals":[]}
+            ]
+        }"#;
+        let parsed = json::parse(&compute_league_standings(config).unwrap()).unwrap();
+        assert!(
+            parsed
+                .members()
+                .all(|e| e["user_uid"].as_str() != Some("n")),
+            "the no-show earns no league entry"
+        );
+        assert_eq!(parsed.len(), 2, "only the two who played stand");
     }
 
     #[test]

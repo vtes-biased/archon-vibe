@@ -120,6 +120,19 @@ any DQ create, lift or delete recompute standings.
 iterating standings unfiltered — league scoring and the VEKN push among them —
 leak proxy scores. Filter on `disqualified || non_competing`.
 
+**No-show is the third excluded class, and it is derived, not stored.**
+`compute_final_standings` stamps `no_show` from the score; nothing writes it to the
+sheet, so a consumer filtering `disqualified || non_competing` over stored rows
+never sees it. Every consumer of a **placement** must take all three:
+`_final_positions` in `ratings.py`, `final_place` in `league.rs` — where a tail rank
+*is* GP points, so league scoring skips the class outright alongside DQ and proxy —
+and the frontend, which derives them once as `StandingEntry.unplaced` in
+`computeStandings`. A rank rendered off the raw flags puts a number on a no-show.
+The same did-this-row-score atom is also `players_with_rounds`' round-less branch in
+`engine/src/ratings.rs`, with the hand-written twins named below. The two are allowed
+to disagree — a scoreless finalist places 2nd yet never counts as having played — but
+tune one and look at the other.
+
 **Standings count by table, not by round.** A finished table scores while its round
 is still running — the raffle pools depend on it, reading
 `compute_preliminary_standings` live rather than `tournament.standings` so a

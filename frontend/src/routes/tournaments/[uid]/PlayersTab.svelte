@@ -73,8 +73,7 @@
         if (e.non_competing) tags.push(m.proxy_label());
         if (e.disqualified) tags.push(m.tournament_disqualified());
         const tag = tags.length ? ` <span style="color:#888;font-size:10pt">[${tags.map(esc).join(', ')}]</span>` : '';
-        // DQ'd / proxy carry no competitive rank — mirror the on-screen "—".
-        const rankCell = e.disqualified || e.non_competing ? '—' : `${e.rank}.`;
+        const rankCell = e.unplaced ? '—' : `${e.rank}.`;
         const bg = i % 2 === 0 ? '#f5f5f5' : 'transparent';
         rows += `<tr style="background:${bg}"><td style="padding:4px 10px;text-align:right;font-weight:bold;width:36px">${rankCell}</td><td style="padding:4px 10px">${esc(seatDisplay(e.user_uid, playerInfo, tournament.online))}${tag}</td><td style="padding:4px 10px;text-align:right;white-space:nowrap">${esc(formatScore(e.gw, e.vp, e.tp))}</td></tr>`;
       });
@@ -466,9 +465,9 @@
     {@const meta = [tournament.online ? playerInfo[puid]?.nickname : null, playerInfo[puid]?.vekn ? `#${playerInfo[puid].vekn}` : null].filter(Boolean).join(" · ")}
     <div class="flex items-center gap-1.5">
       {#if playerSort === 'standings' && entry}
-        <span class="text-ink-faint text-xs font-medium shrink-0">{#if entry.disqualified || entry.non_competing}—{:else}<RankCell rank={entry.rank} finalist={entry.finalist} hash />{/if}</span>
+        <span class="text-ink-faint text-xs font-medium shrink-0">{#if entry.unplaced}—{:else}<RankCell rank={entry.rank} finalist={entry.finalist} hash />{/if}</span>
       {/if}
-      <span class="min-w-0 truncate {(entry?.disqualified || entry?.non_competing) ? 'text-ink-faint' : (isTop5 && playerSort === 'standings' ? 'text-ink-strong font-medium' : 'text-ink')} text-sm">
+      <span class="min-w-0 truncate {entry?.unplaced ? 'text-ink-faint' : (isTop5 && playerSort === 'standings' ? 'text-ink-strong font-medium' : 'text-ink')} text-sm">
         {playerInfo[puid]?.name ?? (puid || m.players_no_account())}
       </span>
       {#if player.non_competing}
@@ -858,9 +857,9 @@
             {@const standingsIdx = entry ? standings.indexOf(entry) : -1}
             {@const isTop5 = standingsIdx >= 0 && standingsIdx < 5}
             {@const isTied = entry ? tiedUids.has(entry.user_uid) : false}
-            <tr class="{(entry?.disqualified || entry?.non_competing) ? 'text-ink-faint' : (isTop5 && playerSort === 'standings' ? 'text-ink-strong font-medium' : 'text-ink')} {isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'bg-accent-soft/10' : ''} border-t border-line-strong">
+            <tr class="{entry?.unplaced ? 'text-ink-faint' : (isTop5 && playerSort === 'standings' ? 'text-ink-strong font-medium' : 'text-ink')} {isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'bg-accent-soft/10' : ''} border-t border-line-strong">
               {#if playerSort === 'standings' && standings.length > 0}
-                <td class="py-1.5 pr-2 text-ink-faint">{(entry?.disqualified || entry?.non_competing) ? "—" : (entry?.rank ?? "—")}</td>
+                <td class="py-1.5 pr-2 text-ink-faint">{entry?.unplaced ? "—" : (entry?.rank ?? "—")}</td>
               {/if}
               <td class="py-1.5 pr-2">
                 <span class="truncate flex items-center gap-1">

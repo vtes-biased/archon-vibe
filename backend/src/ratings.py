@@ -73,12 +73,14 @@ def _final_positions(t: Tournament) -> dict[str, int]:
         {"standings": t.standings, "winner": t.winner}
     ).decode()
     ranked = msgspec.json.decode(_engine.compute_final_standings(config))
-    # Drops the DQ'd/proxy tail (ranks past the whole field) using the stored
-    # standings flags, not the player-state signal callers use — absent = no placement.
+    # Drops the DQ'd/proxy/no-show tail (ranks past the whole field) using the row
+    # flags, not the player-state signal callers use — absent = no placement.
     return {
         s["user_uid"]: s["rank"]
         for s in ranked
-        if not s.get("disqualified") and not s.get("non_competing")
+        if not s.get("disqualified")
+        and not s.get("non_competing")
+        and not s.get("no_show")
     }
 
 

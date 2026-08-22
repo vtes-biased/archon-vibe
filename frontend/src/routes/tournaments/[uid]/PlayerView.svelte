@@ -612,7 +612,7 @@
           <tbody>
             {#each playerStandings as entry, idx}
               <tr class="{idx < 5 ? 'text-ink-strong' : 'text-ink-muted'} border-t border-line">
-                <td class="py-1 pr-2 text-ink-faint"><RankCell rank={entry.rank} finalist={entry.finalist} /></td>
+                <td class="py-1 pr-2 text-ink-faint">{#if entry.unplaced}—{:else}<RankCell rank={entry.rank} finalist={entry.finalist} />{/if}</td>
                 <td class="py-1 pr-2">
                   <span class="inline-flex items-center gap-1">
                     {seatDisplay(entry.user_uid)}
@@ -775,7 +775,7 @@
             <tbody>
               {#each standings as entry, idx}
                 <tr class="{idx < 5 ? 'text-ink-strong' : 'text-ink-muted'} border-t border-line">
-                  <td class="py-1 pr-2 text-ink-faint"><RankCell rank={entry.rank} finalist={entry.finalist} /></td>
+                  <td class="py-1 pr-2 text-ink-faint">{#if entry.unplaced}—{:else}<RankCell rank={entry.rank} finalist={entry.finalist} />{/if}</td>
                   <td class="py-1 pr-2">
                     <span class="inline-flex items-center gap-1">
                       {seatDisplay(entry.user_uid)}

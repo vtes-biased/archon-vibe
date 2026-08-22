@@ -312,6 +312,16 @@ finalists share rank 2, non-finalists competition-ranked from `finalist_count + 
 Whether a final happened is read from the per-player `finalist` flag, not from
 finals seating data.
 
+**A scoreless sheet row is a no-show and holds no placement.** An import writes a
+standings row for every name on the registration sheet, so a player who never sat
+arrives at 0/0/0; ranked as a competitor they tie for a real place among the last of
+the field. `compute_final_standings` stamps `no_show` on such a row and appends it
+with the DQ'd and the proxies — the row and the name stay, the rank does not. The
+winner and the finalists are exempt, having sat by definition, and a DQ'd row is
+stored zeroed so its own flag decides first. The flag is **derived at placement, not
+stored**: `compute_preliminary_standings` only ever sees players who sat at a
+finished table, so the class exists solely in an imported sheet.
+
 `display_standings` is what a client renders, exported to WASM as
 `displayStandings` and called nowhere else. It **ranks the stored sheet it is
 handed** — never `compute_preliminary_standings` — because a round-less import has

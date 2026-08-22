@@ -227,24 +227,45 @@ fn with_rank(standing: &JsonValue, rank: usize) -> JsonValue {
     obj
 }
 
+/// The DQ signal must decide first: DQ'd rows are stored zeroed, so every one of
+/// them would otherwise classify as a no-show.
+pub fn is_no_show(standing: &JsonValue, winner: &str) -> bool {
+    !standing["disqualified"].as_bool().unwrap_or(false)
+        && !standing["finalist"].as_bool().unwrap_or(false)
+        && standing["user_uid"].as_str() != Some(winner)
+        && standing["gw"].as_f64().unwrap_or(0.0) == 0.0
+        && standing["vp"].as_f64().unwrap_or(0.0) == 0.0
+        && standing["tp"].as_f64().unwrap_or(0.0) == 0.0
+}
+
 /// Reorders preliminary `standings` (must arrive sorted desc by score) into final
-/// placement per §3.7.5/§3.1: `winner` is rank 1, finalists share rank 2, DQ'd/proxy excluded and appended last.
+/// placement per §3.7.5/§3.1: `winner` is rank 1, finalists share rank 2, DQ'd/proxy/no-show excluded and appended last.
 pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonValue> {
     let winner_present = !winner.is_empty()
         && standings
             .members()
             .any(|s| s["user_uid"].as_str() == Some(winner));
 
+    let stamped: Vec<JsonValue> = standings
+        .members()
+        .map(|s| {
+            let mut row = s.clone();
+            row["no_show"] = is_no_show(s, winner).into();
+            row
+        })
+        .collect();
+
     let mut winner_entry: Option<&JsonValue> = None;
     let mut finalists: Vec<&JsonValue> = Vec::new();
     let mut non_finalists: Vec<&JsonValue> = Vec::new();
     let mut excluded: Vec<&JsonValue> = Vec::new();
-    for s in standings.members() {
+    for s in &stamped {
         if s["disqualified"].as_bool().unwrap_or(false)
             || s["non_competing"].as_bool().unwrap_or(false)
+            || s["no_show"].as_bool().unwrap_or(false)
         {
-            // DQ'd/proxy never place — excluded here so they can't tie with or displace
-            // a real competitor. UI renders their row via the flag, not the rank value.
+            // Never place — excluded here so they can't tie with or displace a real
+            // competitor. UI renders their row via the flag, not the rank value.
             excluded.push(s);
         } else if winner_present && s["user_uid"].as_str() == Some(winner) {
             winner_entry = Some(s);
@@ -775,6 +796,39 @@ mod tests {
             Some("p2"),
             "DQ'd player is emitted last"
         );
+    }
+
+    #[test]
+    fn final_standings_scoreless_rows_hold_no_placement() {
+        let standings = json::parse(
+            r#"[
+            {"user_uid":"w","gw":1.0,"vp":4.0,"tp":120,"finalist":true},
+            {"user_uid":"f","gw":0.0,"vp":0.0,"tp":0,"finalist":true},
+            {"user_uid":"a","gw":0.0,"vp":2.0,"tp":90,"finalist":false},
+            {"user_uid":"n1","gw":0.0,"vp":0.0,"tp":0,"finalist":false},
+            {"user_uid":"n2","gw":0.0,"vp":0.0,"tp":0,"finalist":false}
+        ]"#,
+        )
+        .unwrap();
+        let r = compute_final_standings(&standings, "w");
+        assert_eq!(rank_of(&r, "w"), 1);
+        assert_eq!(rank_of(&r, "f"), 2, "a scoreless finalist still places");
+        assert_eq!(
+            rank_of(&r, "a"),
+            3,
+            "the last real competitor keeps its rank"
+        );
+        for u in ["n1", "n2"] {
+            let row = r
+                .iter()
+                .find(|s| s["user_uid"].as_str() == Some(u))
+                .unwrap_or_else(|| panic!("{u} keeps its row"));
+            assert!(row["no_show"].as_bool().unwrap(), "{u} is flagged no-show");
+            assert!(
+                rank_of(&r, u) > rank_of(&r, "a"),
+                "{u} sorts past the field"
+            );
+        }
     }
 
     #[test]

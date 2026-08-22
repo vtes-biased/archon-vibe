@@ -18,6 +18,9 @@ export interface StandingEntry {
   /** Proxy: a non-competing official stood in. Excluded from rank/RTP/finals and
    *  sorted last like DQ, but the score is NOT zeroed (the seat's VPs are real). */
   non_competing?: boolean;
+  /** Holds no placement — DQ'd, proxy, or a no-show carrying an import's scoreless
+   *  row. The rank cell reads "—"; the row and the name stay. */
+  unplaced?: boolean;
 }
 
 /** Player display info keyed by user uid (built from User records + per-tournament display_name). */
@@ -89,6 +92,7 @@ export function computeStandings(tournament: Tournament | null, sanctions: Sanct
     const entry: StandingEntry = {
       user_uid: e.user_uid, gw: e.gw, vp: e.vp, tp: e.tp, toss: e.toss, rank: e.rank,
       finalist: e.finalist, disqualified: e.disqualified, non_competing: e.non_competing,
+      unplaced: e.disqualified || e.non_competing || e.no_show,
     };
     if (e.finals) entry.finals = formatScore(e.finals.gw, e.finals.vp, e.finals.tp);
     return entry;
@@ -216,7 +220,7 @@ export function getRatingPts(
   tournament: Tournament,
   ctx: RatingContext,
 ): number | null {
-  if (tournament.state !== "Finished" || entry.disqualified || entry.non_competing) return null;
+  if (tournament.state !== "Finished" || entry.unplaced) return null;
   if (!ctx.eligible || !ctx.played.has(entry.user_uid)) return null;
   const vpGw = computeRatingVpGw(ctx.tournamentJson, ctx.sanctionsJson, entry.user_uid);
   if (!vpGw) return null;

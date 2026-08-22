@@ -16,6 +16,7 @@ pub use raffle::get_raffle_pool;
 pub use scoring::{check_table_vps, compute_gw, compute_gw_finals, compute_tp};
 pub use standings::{
     compute_final_standings, compute_rating_vp_gw, display_standings, finals_qualification,
+    is_no_show,
 };
 pub use types::{ActorContext, PlayerState, SeatScore, TournamentEvent, TournamentState, VpError};
 

@@ -105,7 +105,8 @@ export async function generateResultsText(
       const name = seatDisplay(entry.user_uid, playerInfo, tournament.online);
       const score = formatScore(entry.gw, entry.vp, entry.tp);
       const finals = entry.finals ? ` [${entry.finals}]` : "";
-      lines.push(`#${entry.rank} ${name} \u2014 ${score}${finals}`);
+      const place = entry.unplaced ? "\u2014" : `#${entry.rank}`;
+      lines.push(`${place} ${name} \u2014 ${score}${finals}`);
     }
     lines.push("");
   }

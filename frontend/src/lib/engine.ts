@@ -586,7 +586,7 @@ export async function computeLeagueStandings(
 export function displayStandings(
   tournament: Tournament,
   sanctions: Sanction[]
-): Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; rank: number; finalist: boolean; disqualified: boolean; non_competing: boolean; finals?: { gw: number; vp: number; tp: number } }> {
+): Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; rank: number; finalist: boolean; disqualified: boolean; non_competing: boolean; no_show: boolean; finals?: { gw: number; vp: number; tp: number } }> {
   const config = JSON.stringify({ tournament, sanctions: JSON.parse(buildSanctionsPayload(sanctions)) });
   return JSON.parse(callEngine(() => getEngine().displayStandings(config)));
 }
