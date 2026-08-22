@@ -9,7 +9,7 @@ traps that have bitten.
 | Layer | Location | What it validates |
 |---|---|---|
 | Rust engine | inline `#[cfg(test)]` in `engine/src/` | the authoritative logic suite — seating, deck parse and validate, tournament lifecycle, ratings, permissions, league scoring |
-| Backend | `backend/tests/test_*.py` | SSE filtering, access-level projections across role permutations, organizer access, the profile-update security boundary, ratings helpers, account surgery, the TWDA designer credit |
+| Backend | `backend/tests/test_*.py` | SSE filtering, access-level projections across role permutations, organizer access, the profile-update security boundary, ratings helpers, account surgery, the TWDA designer credit, the public API's read-only gate and schema drift |
 | Frontend E2E | `frontend/tests/e2e/*.spec.ts` | full user arcs through the real UI |
 | Bot | `bot/` | validated fakes over a nonexistent backend and Discord, guarded against hikari's real signatures |
 

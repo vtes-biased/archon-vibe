@@ -43,11 +43,21 @@ dev:
 # Stop all local dev services
 dev-stop:
     #!/usr/bin/env bash
-    for port in 8000 5173; do
+    for port in 8000 8001 5173; do
         pid=$(lsof -ti :$port 2>/dev/null) && kill -9 $pid 2>/dev/null && echo "Killed process on port $port" || true
     done
     docker compose stop db 2>/dev/null || true
-    rm -f backend.log frontend.log
+    rm -f backend.log frontend.log public-api.log
+
+# Start the public read-only API against the dev database (wiki/public-api.md).
+# Its own process by design — `just dev` does not start it.
+dev-api:
+    #!/usr/bin/env bash
+    set -e
+    DATABASE_URL=postgresql://archon:archon_dev_password@localhost:5433/archon \
+    PYTHONUNBUFFERED=1 \
+    nohup uv run uvicorn backend.src.public_api.main:app --reload --reload-dir backend/src/public_api --host :: --port 8001 > public-api.log 2>&1 &
+    echo "Public API started (PID: $!) on http://localhost:8001/docs. Logs: public-api.log"
 
 # Update the toolchains AND all dependencies to latest versions. Semver-major
 # dependency bumps stay manual by design (an unreviewed major can break the
@@ -159,6 +169,7 @@ lint-check:
     just comment-blocks
     just dark-variant
     just locale-parity
+    just public-api-isolation
 
 # Fail when a role literal is used for gating outside the engine's capability
 # table — the drift this repo's permission model keeps re-growing without it.
@@ -181,6 +192,11 @@ dark-variant:
 locale-parity:
     uv run python3 scripts/check_locale_parity.py
 
+# Fail when the app names the public API, or the public API imports the app's
+# engine, scheduler, SSE or connection pool — the separation is the whole design.
+public-api-isolation:
+    uv run python3 scripts/check_public_api_isolation.py
+
 # Lint and auto-fix all code
 lint:
     uv run ruff check --fix . && uv run ruff format .
@@ -190,6 +206,7 @@ lint:
     just comment-blocks
     just dark-variant
     just locale-parity
+    just public-api-isolation
 
 # Warn (never fail) when the hand-synced backup scripts drift from server-setup's
 # copies (script headers document the contract). Comment wording and the

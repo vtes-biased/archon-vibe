@@ -5,11 +5,11 @@ import base64
 import msgspec
 import pytest
 from src.access_levels import (
-    _API_SYNC_FIELDS,
-    _PLAYER_API_EXCLUDE,
-    _TOURNAMENT_API_EXCLUDE,
     _TOURNAMENT_MEMBER_EXCLUDE,
-    _USER_API_FIELDS,
+    API_SYNC_FIELDS,
+    PLAYER_API_EXCLUDE,
+    TOURNAMENT_API_EXCLUDE,
+    USER_API_FIELDS,
     compute_api,
     compute_full,
     compute_member,
@@ -523,7 +523,7 @@ class TestUserApi:
         assert result["wins"] == ["t-001"]
         assert result["constructed_online"] == {"total": 100, "tournaments": []}
         assert result["community_links"][0]["type"] == "discord"
-        assert set(result) <= _USER_API_FIELDS
+        assert set(result) <= USER_API_FIELDS
 
     def test_officials_keep_no_contact(self):
         result = compute_api(ObjectType.USER, _make_user(roles=["NC"]))
@@ -543,7 +543,7 @@ class TestTournamentApi:
         assert result["name"] == "Paris Open"
         assert result["external_ids"] == {"vekn": "12345"}
         assert result["organizers_uids"] == ["u-org1"]
-        assert not (set(result) & _TOURNAMENT_API_EXCLUDE)
+        assert not (set(result) & TOURNAMENT_API_EXCLUDE)
 
     def test_player_names_and_payment_stripped(self):
         t = _make_tournament(
@@ -606,7 +606,7 @@ class TestApiCarriesNoSyncBookkeeping:
             compute_api(ObjectType.LEAGUE, _make_league()),
         ]
         for payload in payloads:
-            assert not (set(payload) & _API_SYNC_FIELDS)
+            assert not (set(payload) & API_SYNC_FIELDS)
         assert all("uid" in payload for payload in payloads)
 
 
@@ -737,20 +737,20 @@ class TestProjectionCompleteness:
         }
 
     def test_every_tournament_field_is_api_classified(self):
-        assert not (_TOURNAMENT_API_VISIBLE & _TOURNAMENT_API_EXCLUDE)
-        assert _TOURNAMENT_API_VISIBLE | _TOURNAMENT_API_EXCLUDE == {
+        assert not (_TOURNAMENT_API_VISIBLE & TOURNAMENT_API_EXCLUDE)
+        assert _TOURNAMENT_API_VISIBLE | TOURNAMENT_API_EXCLUDE == {
             f.name for f in msgspec.structs.fields(Tournament)
         }
 
     def test_every_user_field_is_api_classified(self):
-        assert not (_USER_API_FIELDS & _USER_API_WITHHELD)
-        assert _USER_API_FIELDS | _USER_API_WITHHELD == {
+        assert not (USER_API_FIELDS & _USER_API_WITHHELD)
+        assert USER_API_FIELDS | _USER_API_WITHHELD == {
             f.name for f in msgspec.structs.fields(User)
         }
 
     def test_every_player_field_is_api_classified(self):
-        assert not (_PLAYER_API_VISIBLE & _PLAYER_API_EXCLUDE)
-        assert _PLAYER_API_VISIBLE | _PLAYER_API_EXCLUDE == {
+        assert not (_PLAYER_API_VISIBLE & PLAYER_API_EXCLUDE)
+        assert _PLAYER_API_VISIBLE | PLAYER_API_EXCLUDE == {
             f.name for f in msgspec.structs.fields(Player)
         }
 

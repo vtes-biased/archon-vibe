@@ -95,8 +95,9 @@ Security: PKCE S256 required, Argon2-hashed client secrets, refresh-token rotati
 with a revocation chain, single-use authorization codes, consent persistence, and a
 `revoked` flag on access tokens honored by the auth middleware.
 
-There is no public read API on top of this — see
-[dogmas](dogmas.md#product).
+The **public read API** is a separate app with its own bearer gate, accepting an
+`oauth_access` token today and the `client_credentials` daemon token beside it —
+[public-api](public-api.md#auth).
 
 ## VEKN identity
 

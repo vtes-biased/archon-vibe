@@ -66,9 +66,9 @@ _USER_MEMBER_FIELDS = (
 )
 
 
-_API_SYNC_FIELDS = {"modified", "deleted_at"}
+API_SYNC_FIELDS = {"modified", "deleted_at"}
 
-_USER_API_FIELDS = {
+USER_API_FIELDS = {
     "uid",
     "vekn_id",
     "country",
@@ -117,7 +117,7 @@ def compute_user_api(d: dict) -> dict | None:
     # Matches idx_objects_user_vekn_id, which treats "" as no id.
     if not d.get("vekn_id"):
         return None
-    return _pick(d, _USER_API_FIELDS)
+    return _pick(d, USER_API_FIELDS)
 
 
 def compute_user_full(d: dict) -> dict:
@@ -165,9 +165,9 @@ _TOURNAMENT_MEMBER_EXCLUDE = {
 }
 
 
-_TOURNAMENT_API_EXCLUDE = (
+TOURNAMENT_API_EXCLUDE = (
     _TOURNAMENT_MEMBER_EXCLUDE
-    | _API_SYNC_FIELDS
+    | API_SYNC_FIELDS
     | {
         "announcements",
         "raffles",
@@ -176,7 +176,7 @@ _TOURNAMENT_API_EXCLUDE = (
         "offline_device_id",
     }
 )
-_PLAYER_API_EXCLUDE = {"display_name", "payment_status"}
+PLAYER_API_EXCLUDE = {"display_name", "payment_status"}
 
 
 def compute_tournament_public(d: dict) -> dict:
@@ -193,11 +193,11 @@ def compute_tournament_member(d: dict) -> dict:
 
 
 def compute_tournament_api(d: dict) -> dict:
-    proj = {k: v for k, v in d.items() if k not in _TOURNAMENT_API_EXCLUDE}
+    proj = {k: v for k, v in d.items() if k not in TOURNAMENT_API_EXCLUDE}
     # Rebuilt, never popped in place: the nested player dicts are the same
     # objects the member and full projections of this save hand out.
     proj["players"] = [
-        {k: v for k, v in player.items() if k not in _PLAYER_API_EXCLUDE}
+        {k: v for k, v in player.items() if k not in PLAYER_API_EXCLUDE}
         for player in d["players"]
     ]
     return proj
@@ -207,7 +207,7 @@ def compute_tournament_full(d: dict) -> dict:
     return dict(d)
 
 
-_DECK_API_EXCLUDE = _API_SYNC_FIELDS | {"author"}
+DECK_API_EXCLUDE = API_SYNC_FIELDS | {"author"}
 
 
 def compute_deck_member(d: dict) -> dict | None:
@@ -218,7 +218,7 @@ def compute_deck_member(d: dict) -> dict | None:
 
 def compute_deck_api(d: dict) -> dict | None:
     if d.get("public"):
-        return {k: v for k, v in d.items() if k not in _DECK_API_EXCLUDE}
+        return {k: v for k, v in d.items() if k not in DECK_API_EXCLUDE}
     return None
 
 
@@ -237,7 +237,7 @@ def compute_promo_public(d: dict) -> dict:
 
 
 def compute_league_api(d: dict) -> dict:
-    return {k: v for k, v in d.items() if k not in _API_SYNC_FIELDS}
+    return {k: v for k, v in d.items() if k not in API_SYNC_FIELDS}
 
 
 def _identity(d: dict) -> dict:

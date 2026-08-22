@@ -33,9 +33,15 @@ in `objects` with `public`/`member`/`full` JSONB columns written at write time,
 plus `api` for the public read API. No ORM, no schema migrations, no read-time
 per-viewer filtering.
 
-**No server-side pagination** on the rare online-only REST reads. Those datasets
-are small by design; return the whole role-scoped set and filter client-side.
-Role scoping stays server-side — it is access control, not computation.
+**No pagination. Anywhere.** No pages, no cursors, no `limit`/`offset` — a
+consumer never assembles a result from parts. The rare online-only REST reads
+return the whole role-scoped set and filter client-side; a surface that can return
+a lot of rows **streams JSON Lines** instead, and a caller who wants the first N
+reads N lines and closes the connection. Role scoping stays server-side — it is
+access control, not computation. Keyset batching inside a streaming handler is an
+implementation detail and stays invisible: the moment a cursor reaches the client
+it is pagination again.
+
 Authoritative totals everyone must agree on (ratings, stock counts) are the
 inverse: server-computed, denormalized, streamed through the normal sync. A total
 derived client-side shows different numbers to viewers with different sync state.
@@ -124,10 +130,11 @@ platform rather than building a ledger.
 
 **A public third-party read API is in scope.** External consumers now exist,
 which is the trigger the earlier "no public API today" position named. It is
-read-only, versioned, token-gated and paginated, it runs as its own process on
-its own subdomain, and the app never calls it. It publishes VEKN IDs rather than
-names: the `api` projection carries no member's name, contact or city
-([sync](sync.md#access-levels)).
+read-only, versioned and token-gated, it streams rather than paginates, it runs as
+its own process on its own subdomain, and the app never calls it
+([public-api](public-api.md)). It
+publishes VEKN IDs rather than names: the `api` projection carries no member's
+name, contact or city ([sync](sync.md#access-levels)).
 
 **IC holds every capability, everywhere.** Wherever a rule names Prince or NC, IC
 has the same or more.

@@ -63,6 +63,7 @@ engine/pkg/
 # Local dev logs
 backend.log
 frontend.log
+public-api.log
 
 # Pytest
 .pytest_cache/

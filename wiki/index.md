@@ -39,6 +39,8 @@ no code to lint against: check their sources instead.
   and the offline lifecycle.
 - [access](access.md) — capabilities, appointments, authentication, the OAuth2
   provider.
+- [public-api](public-api.md) — the read-only `/v1` API for third parties: its
+  endpoints, its JSON Lines streams, and the lint that keeps it apart from the app.
 - [vekn](vekn.md) — push, pull, TWDA, and the legacy archon sync.
 - [vekn-decommission](vekn-decommission.md) — work deferred until the VEKN syncs
   retire, with the evidence that cannot be reconstructed afterwards.

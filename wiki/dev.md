@@ -27,7 +27,7 @@ just dev-reset # reset the dev database
 
 `just lint` auto-fixes formatting, then runs the checks nothing can fix for you;
 `just lint-check` is the read-only half and is what `just test` calls. Both end on
-the same four gates:
+the same five gates:
 
 - `just permission-drift` — a role literal used to gate outside the engine's
   capability table.
@@ -48,6 +48,9 @@ the same four gates:
   English with nothing failing; a key outliving its base entry is the same drift
   reversed. The locale list comes from the inlang project settings, so a sixth
   locale is covered without touching the gate.
+- `just public-api-isolation` — the app naming the public API, or the API
+  importing the app's machinery ([public-api](public-api.md#isolation)). It runs
+  in CI too, unlike the two gates above it.
 
 In dev only the **database** runs in Docker; backend and frontend run natively. The
 compose file is **not** production-hardened — uvicorn reload, a default password.

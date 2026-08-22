@@ -86,6 +86,13 @@ formula ([dogmas](dogmas.md#product)).
 the schedule computation and `TimerDisplay.svelte` must stay in lockstep
 ([discord](discord.md#the-sse-listener)).
 
+**Token revocation is checked in two places.** The public API reads
+`oauth_tokens`' `token_jti` and `revoked` keys with its own SQL, because
+[public-api](public-api.md#isolation) forbids it the `db_oauth` import that would
+share one. A change to how a token is stored or revoked must land on
+`backend/src/public_api/auth.py` as well as `db_oauth.py` — nothing points the
+one editor at the other.
+
 **`preview_scores_json` deliberately duplicates the `SetScore` GW/TP cascade** —
 the preview runs on not-yet-persisted scores, so the two paths cannot share state.
 A cascade change must land on both sides; the single equality test
