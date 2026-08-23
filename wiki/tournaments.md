@@ -392,8 +392,9 @@ outcome read as a rule rather than a bug. It holds for an **imported** winner to
 where a file or a summary names a winner but flags no finalist, every
 `finalist_position` is 0, so the rating, league scoring and the standings screen
 decline the bonus alike. A finals-less league weights participation over winners by
-design, so crediting one there cuts against the format. The question is with the
-Rules Director.
+design, so crediting one there cuts against the format. The **+1 tournament-win GW
+is not covered by that stance** and is still credited above, which is the other half
+of the same question. Both are with the Rules Director.
 
 **A no-final finish is allowed at any size, deliberately.** §3.1.6 permits omitting
 the final only below 8 players, but force majeure cuts real events short — a venue

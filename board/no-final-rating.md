@@ -56,7 +56,7 @@ under-rated against the identical event imported from vekn.net.
 The **archon-file importer** is a third answer again: with no finals table in the
 file it stamps the top preliminary row as `winner` outright
 (`archon_import.py`, the `if not winner_uid` fallback after the standings sort).
-That winner then takes rank 1, the 90·coef bonus and a Hall-of-Fame-eligible win —
+That winner then takes rank 1 and a Hall-of-Fame-eligible win —
 a fact invented locally, where the VEKN importer at least carries one the upstream
 record states and the engine deliberately states none. `wiki/tournaments.md` does
 contemplate a no-final *import* carrying a winner, so this is not simply a bug to

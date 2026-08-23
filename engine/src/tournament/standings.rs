@@ -291,8 +291,6 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
             .members()
             .any(|s| s[standing::USER_UID].as_str() == Some(winner));
 
-    // An importer can name a winner no final produced. Such a row still places
-    // 1st, but the bonus is a credit for a final that was never played.
     let final_played = standings
         .members()
         .any(|s| s[standing::FINALIST].as_bool().unwrap_or(false));
