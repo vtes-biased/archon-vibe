@@ -182,7 +182,9 @@ apart and each was wrong on the shape the others handled: a summary import (fina
 flags, no finals table) cost its runners-up the bonus their own rating page gave
 them, and a winner carrying no finalist flag scored as an also-ran in league.
 Reaching for `tournament.finals` or the raw `finalist` flag to score a bonus
-re-opens it.
+re-opens it. Rank and position are deliberately not the same answer: a sheet naming
+a winner but flagging no finalist places that winner 1st and stamps 0, because
+nothing there evidences a final.
 
 **Standings count by table, not by round.** A finished table scores while its round
 is still running — the raffle pools depend on it, reading

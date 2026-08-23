@@ -314,6 +314,9 @@ finals seating data. It also stamps each row with `finalist_position` — 1 for 
 winner, 2 for the other finalists, 0 for everyone else — and that stamp is the one
 source of the rating formula's finalist argument: the backend rating, the standings
 screen and league scoring all read it off the row rather than each deriving it.
+When no row carries the finalist flag nothing evidences a final, so every position
+is 0 — the named winner included, who still places 1st but takes no bonus for a
+final that was not played.
 
 **A scoreless sheet row is a no-show and holds no placement.** An import writes a
 standings row for every name on the registration sheet, so a player who never sat
@@ -387,7 +390,12 @@ a game won "including a final round victory" and A.2.1 defines a finalist as one
 who advanced to a final — but vekn.net's own implementation credits a no-final top
 five exactly like a final, and our VEKN imports mirror that. Owner-approved interim
 position: the engine stays rules-literal, and the ranked/unranked badge makes the
-outcome read as a rule rather than a bug. The question is with the Rules Director.
+outcome read as a rule rather than a bug. It holds for an **imported** winner too —
+where a file or a summary names a winner but flags no finalist, every
+`finalist_position` is 0, so the rating, league scoring and the standings screen
+decline the bonus alike. A finals-less league weights participation over winners by
+design, so crediting one there cuts against the format. The question is with the
+Rules Director.
 
 **A no-final finish is allowed at any size, deliberately.** §3.1.6 permits omitting
 the final only below 8 players, but force majeure cuts real events short — a venue

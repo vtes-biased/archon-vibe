@@ -63,12 +63,14 @@ contemplate a no-final *import* carrying a winner, so this is not simply a bug t
 delete: whichever way Q1 and Q2 are answered, the three paths have to end up saying
 the same thing, and the archon importer is the one with no source to point at.
 
-On that exact shape — rounds played, `Finished`, a `winner` but no finals object —
-the standings screen and the backend now give the finalist bonus different answers:
-`display_standings` blanks the winner when no final was played, so the row is
-stamped `finalist_position` 0, while `ratings.py` hands `compute_final_standings`
-the stored winner and gets 1. The screen's answer is the rules-literal one. Fixing
-that before Q1 and Q2 are answered would be guessing the ruling, so it rides here.
+On that exact shape — a `winner` named with no row flagged a finalist — the
+owner-approved interim answer is now implemented: `compute_final_standings` stamps
+every `finalist_position` 0, so the rating, league scoring and the standings screen
+all decline the bonus, and the winner still places 1st. The reasoning is the league
+one: an event run without a final is weighting participation over winners, so
+crediting a winner there cuts against the format. **Q1 and Q2 still decide whether
+that holds** — a ruling that no-final events rate like vekn.net's would reverse it,
+and the archon importer's invented winner is the path that would then need a source.
 
 ## The evidence that vekn.net credits them
 

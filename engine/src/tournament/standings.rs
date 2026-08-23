@@ -292,12 +292,18 @@ pub fn is_no_show(standing: &JsonValue, winner: &str) -> bool {
 
 /// Reorders preliminary `standings` (must arrive sorted desc by score) into final
 /// placement per §3.7.5/§3.1: `winner` is rank 1, finalists share rank 2, DQ'd/proxy/no-show excluded and appended last.
-/// Stamps `finalist_position` on each row too.
+/// Stamps `finalist_position` too, 0 throughout when no row is flagged a finalist.
 pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonValue> {
     let winner_present = !winner.is_empty()
         && standings
             .members()
             .any(|s| s[standing::USER_UID].as_str() == Some(winner));
+
+    // An importer can name a winner no final produced. Such a row still places
+    // 1st, but the bonus is a credit for a final that was never played.
+    let final_played = standings
+        .members()
+        .any(|s| s[standing::FINALIST].as_bool().unwrap_or(false));
 
     let stamped: Vec<JsonValue> = standings
         .members()
@@ -333,7 +339,7 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
 
     let mut out: Vec<JsonValue> = Vec::new();
     if let Some(w) = winner_entry {
-        out.push(with_placement(w, 1, 1));
+        out.push(with_placement(w, 1, if final_played { 1 } else { 0 }));
     }
     for s in &finalists {
         out.push(with_placement(s, 2, 2));
@@ -810,8 +816,8 @@ mod tests {
 
     #[test]
     fn final_standings_flagless_winner_pulled_to_first() {
-        // Import artifact: finals played but no finalist flags. Winner must still
-        // be 1st; everyone else ranks from 2 by preliminary standing.
+        // Import artifact: a winner no final produced. Winner must still be 1st;
+        // everyone else ranks from 2 by preliminary standing.
         let standings = json::parse(
             r#"[
             {"user_uid":"w","gw":2.0,"vp":6.5,"tp":120,"finalist":false},
@@ -826,7 +832,7 @@ mod tests {
         assert_eq!(rank_of(&r, "x"), 2);
         assert_eq!(rank_of(&r, "y"), 2);
         assert_eq!(rank_of(&r, "z"), 4);
-        assert_eq!(fp_of(&r, "w"), 1, "a flagless winner is still the winner");
+        assert_eq!(fp_of(&r, "w"), 0, "no final played, so no winner bonus");
         assert_eq!(fp_of(&r, "x"), 0);
     }
 
