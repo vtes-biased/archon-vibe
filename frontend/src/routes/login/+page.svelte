@@ -35,6 +35,7 @@
 
   let forgotPassword = $state(false);
   let resetEmailSent = $state(false);
+  let recoverMode = $state(false);
 
   // Signup consent: ToS + Privacy + age/parental self-attestation. Gates all signup methods.
   let consentChecked = $state(false);
@@ -114,6 +115,11 @@
         : `${API_BASE}/auth/discord/authorize`;
       window.location.href = discordUrl;
       return;
+    }
+
+    if (params.get("recover")) {
+      forgotPassword = true;
+      recoverMode = true;
     }
 
     const token = params.get("token");
@@ -224,15 +230,15 @@
           </div>
           <h2 class="text-lg font-medium text-ink-strong">{m.login_check_email()}</h2>
           <p class="text-ink-muted text-sm">
-            {m.login_sent_reset_link()}<br />
+            {recoverMode ? m.login_sent_link_to() : m.login_sent_reset_link()}<br />
             <span class="text-ink-strong font-medium">{magicLinkEmail}</span>
           </p>
           <p class="text-ink-faint text-xs">
-            {m.login_click_link_reset()}<br />
+            {#if !recoverMode}{m.login_click_link_reset()}<br />{/if}
             {m.login_link_expires()}
           </p>
           <button
-            onclick={() => { resetEmailSent = false; forgotPassword = false; email = ""; }}
+            onclick={() => { resetEmailSent = false; forgotPassword = false; recoverMode = false; email = ""; }}
             class="text-sm text-link hover:text-link-soft"
           >
             {m.login_back_to_login()}
@@ -241,9 +247,9 @@
 
       {:else if forgotPassword}
         <div class="space-y-4">
-          <h2 class="text-lg font-medium text-ink-strong text-center">{m.login_reset_title()}</h2>
+          <h2 class="text-lg font-medium text-ink-strong text-center">{recoverMode ? m.login_recover_title() : m.login_reset_title()}</h2>
           <p class="text-ink-muted text-sm text-center">
-            {m.login_reset_instructions()}
+            {recoverMode ? m.login_recover_instructions() : m.login_reset_instructions()}
           </p>
 
           <form onsubmit={(e) => { e.preventDefault(); handleForgotPassword(); }} class="space-y-4">
@@ -268,12 +274,12 @@
               loading={auth.isLoading}
               disabled={!email.trim()}
             >
-              {m.login_send_reset_link()}
+              {recoverMode ? m.login_recover_send() : m.login_send_reset_link()}
             </Button>
           </form>
 
           <button
-            onclick={() => { forgotPassword = false; email = ""; }}
+            onclick={() => { forgotPassword = false; recoverMode = false; email = ""; }}
             class="w-full text-sm text-ink-muted hover:text-ink-bright"
           >
             {m.login_back_to_login()}

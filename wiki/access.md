@@ -79,6 +79,19 @@ restrictions.
 | Discord OAuth | `GET /auth/discord/authorize` with `mode=login|link` → callback; login matches by Discord ID or creates a user, link attaches the Discord ID to the authenticated user | `routes/auth.py` |
 | GitHub OAuth | **link-only**, not a login method; stores `github_login`/`github_id` on User (full-only), used to @-mention a reporter on their feedback issue | `routes/auth/github.py` |
 
+**Magic-link lifetimes are per purpose**: 15 minutes for signup and password
+reset, 7 days for an invite — its recipient did not ask for the email and has no
+reason to be watching their inbox. Clicking any of them mints a separate
+10-minute window to submit the password; the emailed link itself survives that
+window expiring.
+
+An expired or already-used link routes to `/login?recover=1`, the reset form under
+wording that fits someone who has never had a password. That is the invited
+member's way back in: a member created with an email address carries a contact
+address and no email auth method, and the `reset` purpose creates the login on
+exactly that basis. A one-click resend is not buildable — an expired transient
+token is gone from storage, so the server cannot recover the address to resend to.
+
 ## OAuth2 provider
 
 A full RFC 6749 / RFC 7636 (PKCE) implementation for third-party API access.

@@ -2,6 +2,7 @@
 
 import logging
 import os
+from datetime import timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -22,9 +23,16 @@ def _get_mail_config() -> tuple[str, int, str, str, str, bool]:
 
 
 async def send_magic_link_email(
-    to_email: str, magic_link: str, purpose: str = "signup"
+    to_email: str, magic_link: str, purpose: str, lifetime: timedelta
 ) -> bool:
     server, port, username, password, from_addr, use_tls = _get_mail_config()
+
+    if lifetime.days:
+        expiry = (
+            f"{lifetime.days} day" if lifetime.days == 1 else f"{lifetime.days} days"
+        )
+    else:
+        expiry = f"{lifetime.seconds // 60} minutes"
 
     if purpose == "reset":
         subject = "Reset your Archon password"
@@ -54,7 +62,7 @@ async def send_magic_link_email(
 
 {magic_link}
 
-This link will expire in 15 minutes.
+This link will expire in {expiry}.
 
 If you didn't request this email, you can safely ignore it.
 """
@@ -79,7 +87,7 @@ If you didn't request this email, you can safely ignore it.
             </a>
         </div>
         <p style="color: #737373; font-size: 12px; line-height: 1.5; margin: 24px 0 0 0; text-align: center;">
-            This link will expire in 15 minutes.<br>
+            This link will expire in {expiry}.<br>
             If you didn't request this email, you can safely ignore it.
         </p>
     </div>

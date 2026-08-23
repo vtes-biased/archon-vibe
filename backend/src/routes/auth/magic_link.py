@@ -34,7 +34,8 @@ router = APIRouter()
 encoder = msgspec.json.Encoder()
 ph = PasswordHasher()
 
-MAGIC_LINK_EXPIRE_MINUTES = 15
+MAGIC_LINK_LIFETIME = timedelta(minutes=15)
+INVITE_LIFETIME = timedelta(days=7)
 SET_PASSWORD_EXPIRE_MINUTES = 10
 
 
@@ -59,7 +60,7 @@ def _get_frontend_url() -> str:
 async def send_invite_email(email: str, user_uid: str, user_name: str) -> bool:
     """Send an invite email letting a newly created user set their password."""
     token = secrets.token_urlsafe(32)
-    expires_at = datetime.now(UTC) + timedelta(minutes=MAGIC_LINK_EXPIRE_MINUTES)
+    expires_at = datetime.now(UTC) + INVITE_LIFETIME
     await store_transient_token(
         f"magic:{token}",
         {
@@ -73,7 +74,9 @@ async def send_invite_email(email: str, user_uid: str, user_name: str) -> bool:
     frontend_url = _get_frontend_url()
     magic_link = f"{frontend_url}/verify-email?token={token}"
 
-    sent = await send_magic_link_email(email, magic_link, purpose="invite")
+    sent = await send_magic_link_email(
+        email, magic_link, purpose="invite", lifetime=INVITE_LIFETIME
+    )
     if not sent:
         await delete_transient_token(f"magic:{token}")
         raise RuntimeError(f"Failed to send invite email to {email}")
@@ -120,7 +123,7 @@ async def request_magic_link(
             )
 
     token = secrets.token_urlsafe(32)
-    expires_at = datetime.now(UTC) + timedelta(minutes=MAGIC_LINK_EXPIRE_MINUTES)
+    expires_at = datetime.now(UTC) + MAGIC_LINK_LIFETIME
     await store_transient_token(
         f"magic:{token}",
         {
@@ -135,7 +138,9 @@ async def request_magic_link(
     frontend_url = _get_frontend_url()
     magic_link = f"{frontend_url}/verify-email?token={token}"
 
-    sent = await send_magic_link_email(email, magic_link, purpose=purpose)
+    sent = await send_magic_link_email(
+        email, magic_link, purpose=purpose, lifetime=MAGIC_LINK_LIFETIME
+    )
     if not sent:
         await delete_transient_token(f"magic:{token}")
         raise HTTPException(status_code=500, detail="Failed to send email")

@@ -60,13 +60,13 @@
     }
   }
 
-  const isSignup = $derived(verifyResult?.purpose === "signup");
-  const heading = $derived(isSignup ? m.auth_verify_set_password() : m.auth_verify_reset_password());
-  const buttonText = $derived(isSignup ? m.auth_verify_create_account() : m.auth_verify_reset_btn());
+  const isReset = $derived(verifyResult?.purpose === "reset");
+  const heading = $derived(isReset ? m.auth_verify_reset_password() : m.auth_verify_set_password());
+  const buttonText = $derived(isReset ? m.auth_verify_reset_btn() : m.auth_verify_create_account());
 </script>
 
 <svelte:head>
-  <title>{isSignup ? m.auth_verify_title_signup() : m.auth_verify_title_reset()} - Archon</title>
+  <title>{isReset ? m.auth_verify_title_reset() : m.auth_verify_title_signup()} - Archon</title>
 </svelte:head>
 
 <div class="min-h-shell flex items-center justify-center p-4">
@@ -97,9 +97,12 @@
             {m.auth_verify_link_expired_msg()}
           </p>
           <a
-            href="/login"
+            href="/login?recover=1"
             class="inline-block mt-4 px-6 py-2 bg-accent-strong hover:bg-accent-strong-hover text-white rounded-lg font-medium transition-colors"
           >
+            {m.auth_verify_get_new_link()}
+          </a>
+          <a href="/login" class="block text-sm text-ink-muted hover:text-ink-bright">
             {m.auth_verify_back_to_login()}
           </a>
         </div>
@@ -110,6 +113,9 @@
             {#if passwordError}
             <div class="p-3 banner-error border rounded-lg text-sm">
               {passwordError}
+              <a href="/login?recover=1" class="block mt-2 underline">
+                {m.auth_verify_get_new_link()}
+              </a>
             </div>
           {/if}
 
