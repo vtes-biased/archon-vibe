@@ -95,6 +95,10 @@ Because the backend ships as an installed wheel, **bundled data files must load
 through `importlib.resources`**, never `Path(__file__)`
 ([dogmas](dogmas.md#dependencies-and-data)).
 
+Vault secrets are edited in place — `just vault-edit-beta` / `just vault-edit-prod`
+from `ansible/`, committing the re-encrypted file. The per-env password files are
+gitignored; an admin decrypts them from `ansible/secrets/<env>.vault-pass.age`.
+
 **A role's `defaults/main.yml` is its parameter contract.** Every `r.*` key the
 role reads is listed there, and is either required — asserted in the role, so
 omission fails the play — or carries a `*_default` that makes omission correct.

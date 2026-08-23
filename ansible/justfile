@@ -7,7 +7,7 @@ repo_root := parent_directory(justfile_directory())
 build_dir := justfile_directory() / "build"
 manylinux := "quay.io/pypa/manylinux_2_28_x86_64"
 
-# Deploy/provision recipes default ANSIBLE_VAULT_PASSWORD_FILE to these when
+# Recipes that reach the vault default ANSIBLE_VAULT_PASSWORD_FILE to these when
 # not already set. lint/build recipes are left out so they run with no password.
 vault_pass_beta := justfile_directory() / ".beta.vault_pass"
 vault_pass_prod := justfile_directory() / ".prod.vault_pass"
@@ -155,6 +155,14 @@ upgrade-prod:
 # One-shot PG16 -> PG17 migration on prod (requires confirmation)
 migrate-postgres-prod:
     ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/migrate_postgres.yml
+
+# Edit beta's vault in $EDITOR (default vi); commit the re-encrypted file
+vault-edit-beta:
+    ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_beta}}}" uv run --project {{repo_root}} ansible-vault edit inventories/beta/group_vars/all/vault.yml
+
+# Edit prod's vault in $EDITOR (default vi); commit the re-encrypted file
+vault-edit-prod:
+    ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-vault edit inventories/prod/group_vars/all/vault.yml
 
 # yamllint + ansible-lint on the ansible tree
 lint: galaxy
