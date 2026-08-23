@@ -1,6 +1,8 @@
 //! VEKN Judges Guide v2 penalty reference — the single source of truth; a
 //! revision applied here propagates to the backend, frontend and Discord bot.
 
+use crate::model::arg;
+
 /// (key, English label, baseline level).
 pub type SubcategoryDef = (&'static str, &'static str, &'static str);
 /// (key, English label, subcategories).
@@ -137,24 +139,24 @@ pub fn sanction_reference_json() -> String {
         let mut sub_arr = json::JsonValue::new_array();
         for (skey, slabel, baseline) in *subs {
             sub_arr
-                .push(json::object! { key: *skey, label: *slabel, baseline: *baseline })
+                .push(json::object! { arg::KEY => *skey, arg::LABEL => *slabel, arg::BASELINE => *baseline })
                 .unwrap();
         }
         categories
-            .push(json::object! { key: *key, label: *label, subcategories: sub_arr })
+            .push(json::object! { arg::KEY => *key, arg::LABEL => *label, arg::SUBCATEGORIES => sub_arr })
             .unwrap();
     }
     let mut levels = json::JsonValue::new_array();
     for (key, label) in LEVELS {
         levels
-            .push(json::object! { key: *key, label: *label })
+            .push(json::object! { arg::KEY => *key, arg::LABEL => *label })
             .unwrap();
     }
     let mut escalation = json::JsonValue::new_array();
     for level in ESCALATION {
         escalation.push(*level).unwrap();
     }
-    json::object! { categories: categories, levels: levels, escalation: escalation }.dump()
+    json::object! { arg::CATEGORIES => categories, arg::LEVELS => levels, arg::ESCALATION => escalation }.dump()
 }
 
 #[cfg(test)]

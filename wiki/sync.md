@@ -708,6 +708,10 @@ state.
 7. **IndexedDB store** in `db.ts` — bump the version, which triggers a full clear.
 8. **Add to `SPECS`** in `sync.ts`.
 
+A field the engine reads or writes is declared once more, in `engine/src/model.rs`,
+under the module named for its model; `just model-drift` fails on a field name
+written any other way outside the engine's test modules ([dev](dev.md#lint-gates)).
+
 A backend-first deploy is safe: a snapshot line whose type isn't in `SPECS` yet is
 counted toward the `eof` total and then ignored, so an older bundle still
 bootstraps. **Do not "fix" that by counting only recognised types** — that turns

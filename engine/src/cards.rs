@@ -1,6 +1,7 @@
 //! Card database: load from JSON, lookup by ID or name.
 
 use crate::error::EngineError;
+use crate::model::arg;
 use json::JsonValue;
 use std::collections::HashMap;
 use unicode_normalization::UnicodeNormalization;
@@ -100,7 +101,7 @@ impl CardMap {
                 normalize_name(&card.unique_name),
                 normalize_name(&card.full_name),
             ];
-            if let JsonValue::Array(ref variants) = value["name_variants"] {
+            if let JsonValue::Array(ref variants) = value[arg::NAME_VARIANTS] {
                 for v in variants {
                     if let Some(s) = v.as_str() {
                         keys.push(normalize_name(s));
@@ -205,40 +206,40 @@ fn name_pref(card: &Card) -> (u8, u32) {
 }
 
 fn parse_card(id: u32, value: &JsonValue) -> Result<Card, EngineError> {
-    let kind = match value["kind"].as_str().unwrap_or("library") {
+    let kind = match value[arg::KIND].as_str().unwrap_or("library") {
         "crypt" => CardKind::Crypt,
         _ => CardKind::Library,
     };
 
-    let types: Vec<String> = value["types"]
+    let types: Vec<String> = value[arg::TYPES]
         .members()
         .filter_map(|v| v.as_str().map(String::from))
         .collect();
 
-    let disciplines: Vec<String> = value["disciplines"]
+    let disciplines: Vec<String> = value[arg::DISCIPLINES]
         .members()
         .filter_map(|v| v.as_str().map(String::from))
         .collect();
 
-    let sets: Vec<String> = value["sets"]
+    let sets: Vec<String> = value[arg::SETS]
         .members()
         .filter_map(|v| v.as_str().map(String::from))
         .collect();
 
     Ok(Card {
         id,
-        printed_name: value["printed_name"].as_str().unwrap_or("").to_string(),
-        unique_name: value["unique_name"].as_str().unwrap_or("").to_string(),
-        full_name: value["full_name"].as_str().unwrap_or("").to_string(),
+        printed_name: value[arg::PRINTED_NAME].as_str().unwrap_or("").to_string(),
+        unique_name: value[arg::UNIQUE_NAME].as_str().unwrap_or("").to_string(),
+        full_name: value[arg::FULL_NAME].as_str().unwrap_or("").to_string(),
         kind,
         types,
         disciplines,
-        clan: value["clan"].as_str().unwrap_or("").to_string(),
-        group: value["group"].as_str().unwrap_or("").to_string(),
-        capacity: value["capacity"].as_u32().unwrap_or(0),
-        adv: value["adv"].as_bool().unwrap_or(false),
-        v5: value["v5"].as_bool().unwrap_or(false),
-        banned: value["banned"].as_str().unwrap_or("").to_string(),
+        clan: value[arg::CLAN].as_str().unwrap_or("").to_string(),
+        group: value[arg::GROUP].as_str().unwrap_or("").to_string(),
+        capacity: value[arg::CAPACITY].as_u32().unwrap_or(0),
+        adv: value[arg::ADV].as_bool().unwrap_or(false),
+        v5: value[arg::V5].as_bool().unwrap_or(false),
+        banned: value[arg::BANNED].as_str().unwrap_or("").to_string(),
         sets,
     })
 }

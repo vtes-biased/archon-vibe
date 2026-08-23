@@ -1,3 +1,5 @@
+use crate::model::{finals_table, seat, standing, table, tournament};
+
 /// Rating points computation shared between frontend (WASM) and backend (PyO3).
 /// `finalist_position`: 0=none, 1=winner, 2=runner-up; `rank` is "", "National Championship" or "Continental Championship".
 pub fn compute_rating_points(
@@ -35,8 +37,10 @@ pub fn compute_rating_points(
 /// blocking reason. The single source: ratings.py and the frontend badge read
 /// it, and must never re-derive it.
 pub fn ranking_eligibility(t: &json::JsonValue) -> &'static str {
-    if t["open_rounds"].as_bool().unwrap_or(false)
-        || t["self_organized_rounds"].as_bool().unwrap_or(false)
+    if t[tournament::OPEN_ROUNDS].as_bool().unwrap_or(false)
+        || t[tournament::SELF_ORGANIZED_ROUNDS]
+            .as_bool()
+            .unwrap_or(false)
     {
         return "open_rounds";
     }
@@ -51,7 +55,8 @@ pub fn ranking_eligibility(t: &json::JsonValue) -> &'static str {
         return "few_players";
     }
     // A reconstructed VEKN import carries a winner but no finals object.
-    let has_final = !t["finals"].is_null() || !t["winner"].as_str().unwrap_or("").is_empty();
+    let has_final = !t[tournament::FINALS].is_null()
+        || !t[tournament::WINNER].as_str().unwrap_or("").is_empty();
     if !has_final {
         return "no_final";
     }
@@ -62,31 +67,31 @@ pub fn ranking_eligibility(t: &json::JsonValue) -> &'static str {
 /// (rounds-less VEKN import) standings rows carrying any score. DQ'd players count (A.2).
 pub(crate) fn players_with_rounds(t: &json::JsonValue) -> usize {
     let mut played = std::collections::HashSet::new();
-    if !t["rounds"].is_empty() {
-        for round in t["rounds"].members() {
+    if !t[tournament::ROUNDS].is_empty() {
+        for round in t[tournament::ROUNDS].members() {
             for table in round.members() {
-                for seat in table["seating"].members() {
-                    match seat["player_uid"].as_str() {
+                for seat in table[table::SEATING].members() {
+                    match seat[seat::PLAYER_UID].as_str() {
                         Some(uid) if !uid.is_empty() => played.insert(uid),
                         _ => false,
                     };
                 }
             }
         }
-        for seat in t["finals"]["seating"].members() {
-            match seat["player_uid"].as_str() {
+        for seat in t[tournament::FINALS][finals_table::SEATING].members() {
+            match seat[seat::PLAYER_UID].as_str() {
                 Some(uid) if !uid.is_empty() => played.insert(uid),
                 _ => false,
             };
         }
         return played.len();
     }
-    t["standings"]
+    t[tournament::STANDINGS]
         .members()
         .filter(|s| {
-            s["gw"].as_f64().unwrap_or(0.0) != 0.0
-                || s["vp"].as_f64().unwrap_or(0.0) != 0.0
-                || s["tp"].as_f64().unwrap_or(0.0) != 0.0
+            s[standing::GW].as_f64().unwrap_or(0.0) != 0.0
+                || s[standing::VP].as_f64().unwrap_or(0.0) != 0.0
+                || s[standing::TP].as_f64().unwrap_or(0.0) != 0.0
         })
         .count()
 }
@@ -95,14 +100,14 @@ pub(crate) fn players_with_rounds(t: &json::JsonValue) -> usize {
 /// scored nothing still made the event that size. A precedence, never a maximum
 /// — the attestation outranks a reconstruction's winner-only standings.
 pub fn attested_player_count(t: &json::JsonValue) -> usize {
-    if !t["rounds"].is_empty() {
+    if !t[tournament::ROUNDS].is_empty() {
         return players_with_rounds(t);
     }
-    let reported = t["reported_player_count"].as_usize().unwrap_or(0);
+    let reported = t[tournament::REPORTED_PLAYER_COUNT].as_usize().unwrap_or(0);
     if reported > 0 {
         return reported;
     }
-    t["standings"].len()
+    t[tournament::STANDINGS].len()
 }
 
 /// Returns one of: "constructed_online", "constructed_offline", "limited_online", "limited_offline"

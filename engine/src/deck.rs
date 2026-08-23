@@ -3,6 +3,7 @@
 
 use crate::cards::{Card, CardKind, CardMap};
 use crate::error::EngineError;
+use crate::model::{arg, deck_object};
 use json::JsonValue;
 use std::collections::HashMap;
 
@@ -52,10 +53,10 @@ impl Deck {
             cards[id.to_string()] = count.into();
         }
         json::object! {
-            name: self.name.as_str(),
-            author: self.author.as_str(),
-            comments: self.comments.as_str(),
-            cards: cards
+            deck_object::NAME => self.name.as_str(),
+            deck_object::AUTHOR => self.author.as_str(),
+            deck_object::COMMENTS => self.comments.as_str(),
+            deck_object::CARDS => cards
         }
     }
 }
@@ -399,11 +400,11 @@ pub enum Severity {
 impl ValidationError {
     pub fn to_json(&self) -> JsonValue {
         json::object! {
-            severity: match self.severity {
+            arg::SEVERITY => match self.severity {
                 Severity::Error => "error",
                 Severity::Warning => "warning",
             },
-            message: self.message.as_str()
+            arg::MESSAGE => self.message.as_str()
         }
     }
 }

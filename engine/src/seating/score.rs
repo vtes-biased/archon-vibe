@@ -3,6 +3,7 @@
 
 use super::measure::{build_mapping, measure_round, Measure};
 use crate::error::EngineError;
+use crate::model::arg;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct LexScore(pub [f64; 9]);
@@ -52,9 +53,9 @@ pub struct SeatingScore {
 impl SeatingScore {
     pub fn to_json(&self) -> json::JsonValue {
         json::object! {
-            rules: self.rules.iter().map(|&x| x.into()).collect::<Vec<json::JsonValue>>(),
-            mean_vps: self.mean_vps,
-            mean_transfers: self.mean_transfers,
+            arg::RULES => self.rules.iter().map(|&x| x.into()).collect::<Vec<json::JsonValue>>(),
+            arg::MEAN_VPS => self.mean_vps,
+            arg::MEAN_TRANSFERS => self.mean_transfers,
         }
     }
 
@@ -205,8 +206,8 @@ pub struct SeatingIssue {
 impl SeatingIssue {
     pub fn to_json(&self) -> json::JsonValue {
         json::object! {
-            rule: self.rule,
-            players: self.players.iter().map(|p| p.as_str().into()).collect::<Vec<json::JsonValue>>(),
+            arg::RULE => self.rule,
+            arg::PLAYERS => self.players.iter().map(|p| p.as_str().into()).collect::<Vec<json::JsonValue>>(),
         }
     }
 }

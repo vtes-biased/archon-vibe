@@ -1,4 +1,5 @@
 use crate::error::EngineError;
+use crate::model::arg;
 use json::JsonValue;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -270,7 +271,7 @@ impl VpError {
             VpError::MissingVp(i) => ("impossible_oust_order", vec![*i]),
             VpError::HalfVpMismatch(idx) => ("half_vp_mismatch", idx.clone()),
         };
-        json::object! { code: code, seats: seats }
+        json::object! { arg::CODE => code, arg::SEATS => seats }
     }
 }
 
@@ -287,20 +288,20 @@ pub struct ActorContext {
 
 impl ActorContext {
     pub fn from_json(value: &JsonValue) -> Result<Self, EngineError> {
-        let uid = value["uid"]
+        let uid = value[arg::UID]
             .as_str()
             .ok_or("actor uid required")?
             .to_string();
-        let roles: Vec<String> = value["roles"]
+        let roles: Vec<String> = value[arg::ROLES]
             .members()
             .filter_map(|r| r.as_str().map(|s| s.to_string()))
             .collect();
-        let is_organizer = value["is_organizer"].as_bool().unwrap_or(false);
-        let can_organize_league_uids: Vec<String> = value["can_organize_league_uids"]
+        let is_organizer = value[arg::IS_ORGANIZER].as_bool().unwrap_or(false);
+        let can_organize_league_uids: Vec<String> = value[arg::CAN_ORGANIZE_LEAGUE_UIDS]
             .members()
             .filter_map(|v| v.as_str().map(|s| s.to_string()))
             .collect();
-        let now = value["now"].as_str().unwrap_or("").to_string();
+        let now = value[arg::NOW].as_str().unwrap_or("").to_string();
         Ok(Self {
             uid,
             roles,

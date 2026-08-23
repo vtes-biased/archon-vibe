@@ -1,5 +1,7 @@
 //! The community-link type table: `(type, placement, media)`.
 
+use crate::model::arg;
+
 /// `placement` is where an *unpinned* link lands — a `channel` in its country
 /// card, `content` in the pool. `media` facets the pool, empty for a channel.
 pub const LINK_TYPES: &[(&str, &str, &str)] = &[
@@ -31,14 +33,14 @@ pub fn community_link_reference_json() -> String {
             json::JsonValue::from(*media)
         };
         types
-            .push(json::object! { type: *link_type, placement: *placement, media: media })
+            .push(json::object! { arg::TYPE => *link_type, arg::PLACEMENT => *placement, arg::MEDIA => media })
             .unwrap();
     }
     let mut kinds = json::JsonValue::new_array();
     for kind in MEDIA_KINDS {
         kinds.push(*kind).unwrap();
     }
-    json::object! { types: types, media_kinds: kinds }.dump()
+    json::object! { arg::TYPES => types, arg::MEDIA_KINDS => kinds }.dump()
 }
 
 #[cfg(test)]

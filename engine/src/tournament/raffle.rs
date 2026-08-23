@@ -2,16 +2,17 @@
 
 use super::standings::compute_preliminary_standings;
 use crate::error::EngineError;
+use crate::model::{finals_table, player, raffle_draw, seat, table, tournament};
 use json::JsonValue;
 
 /// Raffle-eligible: seated so far, plus checked-in/playing players not yet seated —
 /// so a pre-round-1 raffle still draws from check-in. Sorted for determinism.
 fn get_raffle_base_uids(tournament: &JsonValue) -> Vec<String> {
     let mut base = std::collections::HashSet::new();
-    for round in tournament["rounds"].members() {
+    for round in tournament[tournament::ROUNDS].members() {
         for table in round.members() {
-            for seat in table["seating"].members() {
-                if let Some(uid) = seat["player_uid"].as_str() {
+            for seat in table[table::SEATING].members() {
+                if let Some(uid) = seat[seat::PLAYER_UID].as_str() {
                     if !uid.is_empty() {
                         base.insert(uid.to_string());
                     }
@@ -19,10 +20,10 @@ fn get_raffle_base_uids(tournament: &JsonValue) -> Vec<String> {
             }
         }
     }
-    for p in tournament["players"].members() {
-        let s = p["state"].as_str();
+    for p in tournament[tournament::PLAYERS].members() {
+        let s = p[player::STATE].as_str();
         if s == Some("Checked-in") || s == Some("Playing") {
-            if let Some(uid) = p["user_uid"].as_str() {
+            if let Some(uid) = p[player::USER_UID].as_str() {
                 if !uid.is_empty() {
                     base.insert(uid.to_string());
                 }
@@ -50,10 +51,11 @@ pub fn get_raffle_pool(
             .map(|s| (s.user_uid, (s.gw, s.vp)))
             .collect();
 
-    let finalists: std::collections::HashSet<String> = if !tournament["finals"].is_null() {
-        tournament["finals"]["seating"]
+    let finalists: std::collections::HashSet<String> = if !tournament[tournament::FINALS].is_null()
+    {
+        tournament[tournament::FINALS][finals_table::SEATING]
             .members()
-            .filter_map(|s| s["player_uid"].as_str().map(|u| u.to_string()))
+            .filter_map(|s| s[seat::PLAYER_UID].as_str().map(|u| u.to_string()))
             .collect()
     } else {
         std::collections::HashSet::new()
@@ -85,9 +87,9 @@ pub fn get_raffle_pool(
     };
 
     if exclude_drawn {
-        let drawn: std::collections::HashSet<String> = tournament["raffles"]
+        let drawn: std::collections::HashSet<String> = tournament[tournament::RAFFLES]
             .members()
-            .flat_map(|d| d["winners"].members())
+            .flat_map(|d| d[raffle_draw::WINNERS].members())
             .filter_map(|w| w.as_str().map(|s| s.to_string()))
             .collect();
         eligible.retain(|uid| !drawn.contains(uid));
@@ -97,20 +99,22 @@ pub fn get_raffle_pool(
 }
 
 pub(super) fn compute_deck_public(tournament: &JsonValue, player_uid: &str) -> bool {
-    let state = tournament["state"].as_str().unwrap_or("");
+    let state = tournament[tournament::STATE].as_str().unwrap_or("");
     if state != "Finished" {
         return false;
     }
-    let mode = tournament["decklists_mode"].as_str().unwrap_or("Winner");
+    let mode = tournament[tournament::DECKLISTS_MODE]
+        .as_str()
+        .unwrap_or("Winner");
     match mode {
         "All" => true,
         "Finalists" => {
-            tournament["winner"].as_str() == Some(player_uid)
-                || tournament["players"].members().any(|p| {
-                    p["user_uid"].as_str() == Some(player_uid)
-                        && p["finalist"].as_bool().unwrap_or(false)
+            tournament[tournament::WINNER].as_str() == Some(player_uid)
+                || tournament[tournament::PLAYERS].members().any(|p| {
+                    p[player::USER_UID].as_str() == Some(player_uid)
+                        && p[player::FINALIST].as_bool().unwrap_or(false)
                 })
         }
-        _ => tournament["winner"].as_str() == Some(player_uid),
+        _ => tournament[tournament::WINNER].as_str() == Some(player_uid),
     }
 }

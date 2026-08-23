@@ -1,6 +1,7 @@
 //! The permission matrix as data ([`CAPABILITIES`], [`ROLE_APPOINTMENTS`]), the evaluator ([`check`]), and resolvers for preconditions the table can't express.
 
 use crate::error::EngineError;
+use crate::model::arg;
 use json::JsonValue;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,13 +78,13 @@ pub struct UserContext {
 
 impl UserContext {
     pub fn from_json(value: &JsonValue) -> Result<Self, EngineError> {
-        let roles: Vec<Role> = value["roles"]
+        let roles: Vec<Role> = value[arg::ROLES]
             .members()
             .filter_map(|r| r.as_str().and_then(Role::from_str))
             .collect();
 
-        let country = value["country"].as_str().map(|s| s.to_string());
-        let vekn_id = value["vekn_id"].as_str().map(|s| s.to_string());
+        let country = value[arg::COUNTRY].as_str().map(|s| s.to_string());
+        let vekn_id = value[arg::VEKN_ID].as_str().map(|s| s.to_string());
 
         Ok(UserContext {
             roles,
@@ -124,8 +125,8 @@ impl PermissionResult {
 
     pub fn to_json(&self) -> JsonValue {
         json::object! {
-            allowed: self.allowed,
-            reason: self.reason.clone()
+            arg::ALLOWED => self.allowed,
+            arg::REASON => self.reason.clone()
         }
     }
 }
@@ -144,12 +145,14 @@ pub struct OwnedResource {
 impl OwnedResource {
     pub fn from_json(value: &JsonValue) -> Self {
         OwnedResource {
-            country: value["country"].as_str().map(|s| s.to_string()),
-            organizers_uids: value["organizers_uids"]
+            country: value[arg::COUNTRY].as_str().map(|s| s.to_string()),
+            organizers_uids: value[arg::ORGANIZERS_UIDS]
                 .members()
                 .filter_map(|v| v.as_str().map(|s| s.to_string()))
                 .collect(),
-            open_to_country_princes: value["open_to_country_princes"].as_bool().unwrap_or(false),
+            open_to_country_princes: value[arg::OPEN_TO_COUNTRY_PRINCES]
+                .as_bool()
+                .unwrap_or(false),
         }
     }
 
@@ -808,14 +811,19 @@ pub struct SanctionContext {
 impl SanctionContext {
     pub fn from_json(value: &JsonValue) -> Self {
         SanctionContext {
-            level: value["level"].as_str().unwrap_or("").to_string(),
-            tournament_country: value["tournament_country"].as_str().map(|s| s.to_string()),
-            tournament_state: value["tournament_state"].as_str().unwrap_or("").to_string(),
-            tournament_organizers_uids: value["tournament_organizers_uids"]
+            level: value[arg::LEVEL].as_str().unwrap_or("").to_string(),
+            tournament_country: value[arg::TOURNAMENT_COUNTRY]
+                .as_str()
+                .map(|s| s.to_string()),
+            tournament_state: value[arg::TOURNAMENT_STATE]
+                .as_str()
+                .unwrap_or("")
+                .to_string(),
+            tournament_organizers_uids: value[arg::TOURNAMENT_ORGANIZERS_UIDS]
                 .members()
                 .filter_map(|v| v.as_str().map(|s| s.to_string()))
                 .collect(),
-            league_organizers_uids: value["league_organizers_uids"]
+            league_organizers_uids: value[arg::LEAGUE_ORGANIZERS_UIDS]
                 .members()
                 .filter_map(|v| v.as_str().map(|s| s.to_string()))
                 .collect(),

@@ -1,3 +1,4 @@
+use crate::model::{player, seat, table, tournament};
 use json::JsonValue;
 
 use super::types::{ActorContext, TournamentState};
@@ -6,15 +7,15 @@ use crate::error::EngineError;
 /// Number of rounds in which `user_uid` is seated. Per-player (not tournament-wide):
 /// under open rounds players play different subsets, so this is the player's own round count.
 pub(super) fn count_player_rounds_played(tournament: &JsonValue, user_uid: &str) -> usize {
-    tournament["rounds"]
+    tournament[tournament::ROUNDS]
         .members()
         .filter(|round| {
             round.members().any(|table| {
                 // A soft-cancelled round doesn't count toward the per-player cap.
-                table["state"].as_str() != Some("Cancelled")
-                    && table["seating"]
+                table[table::STATE].as_str() != Some("Cancelled")
+                    && table[table::SEATING]
                         .members()
-                        .any(|seat| seat["player_uid"].as_str() == Some(user_uid))
+                        .any(|seat| seat[seat::PLAYER_UID].as_str() == Some(user_uid))
             })
         })
         .count()
@@ -81,13 +82,13 @@ pub(super) fn require_can_edit_results(
 pub(super) fn player_exists(players: &JsonValue, user_uid: &str) -> bool {
     players
         .members()
-        .any(|p| p["user_uid"].as_str() == Some(user_uid))
+        .any(|p| p[player::USER_UID].as_str() == Some(user_uid))
 }
 
 pub(super) fn find_player_index(players: &JsonValue, user_uid: &str) -> Option<usize> {
     players
         .members()
-        .position(|p| p["user_uid"].as_str() == Some(user_uid))
+        .position(|p| p[player::USER_UID].as_str() == Some(user_uid))
 }
 
 pub(super) fn validate_enum(value: &str, valid: &[&str], field: &str) -> Result<(), EngineError> {
@@ -101,13 +102,13 @@ pub(super) fn validate_enum(value: &str, valid: &[&str], field: &str) -> Result<
 }
 
 pub(super) fn all_rounds_finished(tournament: &JsonValue) -> bool {
-    let rounds = &tournament["rounds"];
+    let rounds = &tournament[tournament::ROUNDS];
     !rounds.is_empty()
         && rounds.members().all(|round| {
             // Cancelled tables are terminal too — a soft-cancelled round is not "in progress".
             round.members().all(|table| {
                 matches!(
-                    table["state"].as_str(),
+                    table[table::STATE].as_str(),
                     Some("Finished") | Some("Cancelled")
                 )
             })
@@ -117,16 +118,16 @@ pub(super) fn all_rounds_finished(tournament: &JsonValue) -> bool {
 /// Skips `Cancelled` tables — a soft-cancelled round did not really happen, so it
 /// must not constrain future seatings (predator/prey).
 pub(super) fn collect_previous_rounds(tournament: &JsonValue) -> Vec<Vec<Vec<String>>> {
-    tournament["rounds"]
+    tournament[tournament::ROUNDS]
         .members()
         .map(|round| {
             round
                 .members()
-                .filter(|table| table["state"].as_str() != Some("Cancelled"))
+                .filter(|table| table[table::STATE].as_str() != Some("Cancelled"))
                 .map(|table| {
-                    table["seating"]
+                    table[table::SEATING]
                         .members()
-                        .filter_map(|seat| seat["player_uid"].as_str().map(|s| s.to_string()))
+                        .filter_map(|seat| seat[seat::PLAYER_UID].as_str().map(|s| s.to_string()))
                         .collect()
                 })
                 .collect()
@@ -137,12 +138,12 @@ pub(super) fn collect_previous_rounds(tournament: &JsonValue) -> Vec<Vec<Vec<Str
 /// A round counts only while it has a non-`Cancelled` table. Mirrors the filter in
 /// `collect_previous_rounds`, so `rounds.len()` can't be gamed by a voided round.
 pub(super) fn count_played_rounds(tournament: &JsonValue) -> usize {
-    tournament["rounds"]
+    tournament[tournament::ROUNDS]
         .members()
         .filter(|round| {
             round
                 .members()
-                .any(|table| table["state"].as_str() != Some("Cancelled"))
+                .any(|table| table[table::STATE].as_str() != Some("Cancelled"))
         })
         .count()
 }
@@ -153,15 +154,15 @@ pub(super) fn demote_unseated_players(
     round_idx: usize,
 ) {
     let still_playing = players_in_other_active_rounds(tournament, round_idx);
-    let players = &mut tournament["players"];
+    let players = &mut tournament[tournament::PLAYERS];
     for i in 0..players.len() {
-        let uid = players[i]["user_uid"].as_str().map(String::from);
-        if players[i]["state"].as_str() != Some("Playing") {
+        let uid = players[i][player::USER_UID].as_str().map(String::from);
+        if players[i][player::STATE].as_str() != Some("Playing") {
             continue;
         }
         if let Some(uid) = uid {
             if unseated.contains(&uid) && !still_playing.contains(&uid) {
-                players[i]["state"] = "Registered".into();
+                players[i][player::STATE] = "Registered".into();
             }
         }
     }
@@ -171,18 +172,18 @@ pub(super) fn players_in_other_active_rounds(
     tournament: &JsonValue,
     exclude_round: usize,
 ) -> std::collections::HashSet<String> {
-    tournament["rounds"]
+    tournament[tournament::ROUNDS]
         .members()
         .enumerate()
         .filter(|(i, _)| *i != exclude_round)
         .flat_map(|(_, round)| round.members())
         .filter(|table| {
             !matches!(
-                table["state"].as_str(),
+                table[table::STATE].as_str(),
                 Some("Finished") | Some("Cancelled")
             )
         })
-        .flat_map(|table| table["seating"].members())
-        .filter_map(|seat| seat["player_uid"].as_str().map(|s| s.to_string()))
+        .flat_map(|table| table[table::SEATING].members())
+        .filter_map(|seat| seat[seat::PLAYER_UID].as_str().map(|s| s.to_string()))
         .collect()
 }

@@ -1,3 +1,5 @@
+pub mod model;
+use crate::model::arg;
 use json::JsonValue;
 
 pub mod cards;
@@ -49,13 +51,13 @@ mod shared {
         let capability = Capability::from_str(capability)
             .ok_or_else(|| EngineError::internal(format!("Unknown capability: {}", capability)))?;
         let value = json::parse(request_json)?;
-        let actor = UserContext::from_json(&value["actor"])?;
-        let resource = value["resource"]
+        let actor = UserContext::from_json(&value[arg::ACTOR])?;
+        let resource = value[arg::RESOURCE]
             .is_object()
-            .then(|| OwnedResource::from_json(&value["resource"]));
-        let mut request = Request::new(&actor, value["actor_uid"].as_str().unwrap_or(""));
-        request.target_uid = value["target_uid"].as_str();
-        request.target_country = value["target_country"].as_str();
+            .then(|| OwnedResource::from_json(&value[arg::RESOURCE]));
+        let mut request = Request::new(&actor, value[arg::ACTOR_UID].as_str().unwrap_or(""));
+        request.target_uid = value[arg::TARGET_UID].as_str();
+        request.target_country = value[arg::TARGET_COUNTRY].as_str();
         request.resource = resource.as_ref();
         Ok(check(capability, &request).to_json().dump())
     }
@@ -145,7 +147,7 @@ mod shared {
 
     pub fn score_seating_json(config_json: &str) -> Result<String, EngineError> {
         let config = json::parse(config_json)?;
-        let rounds: Vec<Vec<Vec<String>>> = config["rounds"]
+        let rounds: Vec<Vec<Vec<String>>> = config[arg::ROUNDS]
             .members()
             .map(|r| {
                 r.members()
@@ -160,7 +162,7 @@ mod shared {
         let score = seating::score_rounds(&rounds)?;
         let minimums = seating::compute_minimum_violations(&rounds);
         let mut result = score.to_json();
-        result["minimums"] = JsonValue::Array(minimums.iter().map(|&x| x.into()).collect());
+        result[arg::MINIMUMS] = JsonValue::Array(minimums.iter().map(|&x| x.into()).collect());
         Ok(result.dump())
     }
 
@@ -170,12 +172,12 @@ mod shared {
         with_metadata: bool,
     ) -> Result<deck::Deck, EngineError> {
         let mut d = deck::Deck::new();
-        d.name = value["name"].as_str().unwrap_or("").to_string();
+        d.name = value[arg::NAME].as_str().unwrap_or("").to_string();
         if with_metadata {
-            d.author = value["author"].as_str().unwrap_or("").to_string();
-            d.comments = value["comments"].as_str().unwrap_or("").to_string();
+            d.author = value[arg::AUTHOR].as_str().unwrap_or("").to_string();
+            d.comments = value[arg::COMMENTS].as_str().unwrap_or("").to_string();
         }
-        for (id_str, count_val) in value["cards"].entries() {
+        for (id_str, count_val) in value[arg::CARDS].entries() {
             let id: u32 = id_str
                 .parse()
                 .map_err(|_| EngineError::internal(format!("Invalid card ID: {id_str}")))?;
@@ -206,7 +208,7 @@ mod shared {
                 .iter()
                 .map(|l| l.as_str().into())
                 .collect();
-            json["unrecognized_lines"] = JsonValue::Array(lines);
+            json[arg::UNRECOGNIZED_LINES] = JsonValue::Array(lines);
         }
         Ok(json.dump())
     }
@@ -270,15 +272,15 @@ mod shared {
     /// finalists tied for 2nd, then non-finalists), tagging each with `rank`.
     pub fn compute_final_standings_json(config_json: &str) -> Result<String, EngineError> {
         let config = json::parse(config_json)?;
-        let winner = config["winner"].as_str().unwrap_or("");
-        let ranked = super::tournament::compute_final_standings(&config["standings"], winner);
+        let winner = config[arg::WINNER].as_str().unwrap_or("");
+        let ranked = super::tournament::compute_final_standings(&config[arg::STANDINGS], winner);
         Ok(json::JsonValue::Array(ranked).dump())
     }
 
     pub fn display_standings_json(config_json: &str) -> Result<String, EngineError> {
         let config = json::parse(config_json)?;
         let ranked =
-            super::tournament::display_standings(&config["tournament"], &config["sanctions"]);
+            super::tournament::display_standings(&config[arg::TOURNAMENT], &config[arg::SANCTIONS]);
         Ok(json::JsonValue::Array(ranked).dump())
     }
 
@@ -297,17 +299,18 @@ mod shared {
 
     pub fn finals_qualification_json(config_json: &str) -> Result<String, EngineError> {
         let config = json::parse(config_json)?;
-        Ok(
-            super::tournament::finals_qualification(&config["tournament"], &config["standings"])
-                .dump(),
+        Ok(super::tournament::finals_qualification(
+            &config[arg::TOURNAMENT],
+            &config[arg::STANDINGS],
         )
+        .dump())
     }
 
     /// Returns `null` when the table is scorable, else `{ code, seats }` so the
     /// UI can say *why* a table won't close instead of leaving it silently unfinished.
     pub fn check_table_vps_json(config_json: &str) -> Result<String, EngineError> {
         let config = json::parse(config_json)?;
-        let vps: Vec<f64> = config["vps"]
+        let vps: Vec<f64> = config[arg::VPS]
             .members()
             .map(|v| v.as_f64().unwrap_or(0.0))
             .collect();
@@ -329,7 +332,7 @@ mod shared {
 
     pub fn compute_player_issues_json(config_json: &str) -> Result<String, EngineError> {
         let config = json::parse(config_json)?;
-        let rounds: Vec<Vec<Vec<String>>> = config["rounds"]
+        let rounds: Vec<Vec<Vec<String>>> = config[arg::ROUNDS]
             .members()
             .map(|r| {
                 r.members()

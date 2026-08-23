@@ -51,14 +51,25 @@ the same six gates:
 - `just public-api-isolation` — the app naming the public API, or the API
   importing the app's machinery ([public-api](public-api.md#isolation)). It runs
   in CI too, unlike the two gates above it.
-- `just model-drift` — `models.py` and `types.ts` disagreeing on a field name or
-  an enum value ([sync](sync.md#adding-a-new-object-type)). Nothing generates one
-  from the other. It compares names and values, not types: `datetime` is `string`
-  over the wire and every optional spelling differs, so types would be noise. A
-  shape that genuinely belongs to one side is listed in the script with its
-  reason, which is also what keeps a parse that stopped matching from passing
-  everything in silence. In CI it rides the backend job, not the lint one:
-  `models.py` instantiates `PyEngine` at import, so it needs the built engine.
+- `just model-drift` — `models.py`, `types.ts` and the engine disagreeing on a
+  field name or an enum value ([sync](sync.md#adding-a-new-object-type)). Nothing
+  generates one from another. It compares names and values, not types: `datetime`
+  is `string` over the wire and every optional spelling differs, so types would be
+  noise. A shape that genuinely belongs to one side is listed in the script with
+  its reason, which is also what keeps a parse that stopped matching from passing
+  everything in silence. The engine leg reads `engine/src/model.rs`, where every
+  stored field name the engine touches is a const in a module named for its model,
+  so `player::STATE` is checked against `Player` alone — a rename is caught even
+  when the old name survives on another model. It then parses the engine with
+  tree-sitter and fails on a field name written any other way: indexed by literal,
+  an object-literal key in either the `"k" =>` or the bare `k:` form, a `has_key`
+  or `remove` argument, or an entry in a list a loop then indexes by — the shapes
+  that let a key hide, since a macro body is one token tree and `has_key` is a
+  call. It reads each `field == "literal"` against the enum the field's type
+  names, including `matches!` arms and the allowed-values list `validate_enum`
+  takes. Test modules are outside the sweep, so `tests.rs` keeps raw keys. In CI
+  it rides the backend job, not the lint one: `models.py` instantiates `PyEngine`
+  at import, so it needs the built engine.
 
 In dev only the **database** runs in Docker; backend and frontend run natively. The
 compose file is **not** production-hardened — uvicorn reload, a default password.

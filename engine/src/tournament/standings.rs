@@ -1,3 +1,6 @@
+use crate::model::{
+    arg, finals_table, player, score, seat, standing, standing_row, table, tournament,
+};
 use json::JsonValue;
 
 use super::helpers::count_played_rounds;
@@ -31,21 +34,21 @@ pub(super) fn compute_preliminary_standings(
         std::collections::HashMap::new();
     let effective_sas = resolve_sa_effective_rounds(tournament, sanctions);
 
-    for (round_index, round) in tournament["rounds"].members().enumerate() {
+    for (round_index, round) in tournament[tournament::ROUNDS].members().enumerate() {
         for table in round.members() {
-            if table["state"].as_str() != Some("Finished") {
+            if table[table::STATE].as_str() != Some("Finished") {
                 continue;
             }
-            let seating = &table["seating"];
+            let seating = &table[table::SEATING];
             let vps: Vec<f64> = seating
                 .members()
-                .map(|s| s["result"]["vp"].as_f64().unwrap_or(0.0))
+                .map(|s| s[seat::RESULT][score::VP].as_f64().unwrap_or(0.0))
                 .collect();
             let adjustments = table_sa_adjustments(seating, round_index, &effective_sas);
             let gws = compute_gw(&vps, &adjustments);
             let tps = compute_tp(vps.len(), &vps, &adjustments);
             for (i, seat) in seating.members().enumerate() {
-                let uid = seat["player_uid"].as_str().unwrap_or("").to_string();
+                let uid = seat[seat::PLAYER_UID].as_str().unwrap_or("").to_string();
                 if uid.is_empty() {
                     continue;
                 }
@@ -59,7 +62,7 @@ pub(super) fn compute_preliminary_standings(
 
     // -1.0 per resolved SA (JG v2 §1.1.3), applied only here. Finals-round SAs
     // (index nrounds) are excluded: they penalize the finals result instead.
-    let nrounds = tournament["rounds"].len();
+    let nrounds = tournament[tournament::ROUNDS].len();
     let prelim_sas: Vec<(String, usize)> = effective_sas
         .iter()
         .filter(|(_, r)| *r < nrounds)
@@ -77,19 +80,20 @@ pub(super) fn compute_preliminary_standings(
     let mut standings: Vec<Standing> = map
         .into_iter()
         .map(|(uid, (gw, vp, tp))| {
-            let player = tournament["players"]
+            let player = tournament[tournament::PLAYERS]
                 .members()
-                .find(|p| p["user_uid"].as_str() == Some(&uid));
-            let toss = player.and_then(|p| p["toss"].as_u32()).unwrap_or(0);
+                .find(|p| p[player::USER_UID].as_str() == Some(&uid));
+            let toss = player.and_then(|p| p[player::TOSS].as_u32()).unwrap_or(0);
             let finalist = player
-                .and_then(|p| p["finalist"].as_bool())
+                .and_then(|p| p[player::FINALIST].as_bool())
                 .unwrap_or(false);
             // DQ signal is state=="Disqualified" OR an active DQ sanction — the same
             // combined signal used elsewhere; forfeits the player's own score only.
-            let disqualified = player.and_then(|p| p["state"].as_str()) == Some("Disqualified")
+            let disqualified = player.and_then(|p| p[player::STATE].as_str())
+                == Some("Disqualified")
                 || has_dq_sanction(sanctions, &uid);
             let non_competing = player
-                .and_then(|p| p["non_competing"].as_bool())
+                .and_then(|p| p[player::NON_COMPETING].as_bool())
                 .unwrap_or(false);
             let (gw, vp, tp) = if disqualified {
                 (0.0, 0.0, 0.0)
@@ -133,25 +137,27 @@ fn sort_by_rank(standings: &mut [Standing]) {
 /// scores untouched, since `RestoreRound` re-derives the round from them.
 fn refresh_round_scoring(tournament: &mut JsonValue, sanctions: &JsonValue) {
     let effective_sas = resolve_sa_effective_rounds(tournament, sanctions);
-    for r in 0..tournament["rounds"].len() {
-        for t in 0..tournament["rounds"][r].len() {
-            let table = &tournament["rounds"][r][t];
-            if table["state"].as_str() == Some("Cancelled") {
+    for r in 0..tournament[tournament::ROUNDS].len() {
+        for t in 0..tournament[tournament::ROUNDS][r].len() {
+            let table = &tournament[tournament::ROUNDS][r][t];
+            if table[table::STATE].as_str() == Some("Cancelled") {
                 continue;
             }
-            let scored = table["state"].as_str() == Some("Finished");
-            let seating = &table["seating"];
+            let scored = table[table::STATE].as_str() == Some("Finished");
+            let seating = &table[table::SEATING];
             let vps: Vec<f64> = seating
                 .members()
-                .map(|s| s["result"]["vp"].as_f64().unwrap_or(0.0))
+                .map(|s| s[seat::RESULT][score::VP].as_f64().unwrap_or(0.0))
                 .collect();
             let adjustments = table_sa_adjustments(seating, r, &effective_sas);
             let gws = compute_gw(&vps, &adjustments);
             let tps = compute_tp(vps.len(), &vps, &adjustments);
-            let table = &mut tournament["rounds"][r][t];
+            let table = &mut tournament[tournament::ROUNDS][r][t];
             for i in 0..vps.len() {
-                table["seating"][i]["result"]["gw"] = if scored { gws[i] } else { 0.0 }.into();
-                table["seating"][i]["result"]["tp"] = if scored { tps[i] } else { 0.0 }.into();
+                table[table::SEATING][i][seat::RESULT][score::GW] =
+                    if scored { gws[i] } else { 0.0 }.into();
+                table[table::SEATING][i][seat::RESULT][score::TP] =
+                    if scored { tps[i] } else { 0.0 }.into();
             }
         }
     }
@@ -160,7 +166,7 @@ fn refresh_round_scoring(tournament: &mut JsonValue, sanctions: &JsonValue) {
 /// Guard: skips when rounds are empty, preserving VEKN-synced standings.
 pub(super) fn update_standings(tournament: &mut JsonValue, sanctions: &JsonValue) {
     refresh_round_scoring(tournament, sanctions);
-    if tournament["rounds"].is_empty() {
+    if tournament[tournament::ROUNDS].is_empty() {
         return;
     }
     let standings = compute_preliminary_standings(tournament, sanctions);
@@ -168,74 +174,80 @@ pub(super) fn update_standings(tournament: &mut JsonValue, sanctions: &JsonValue
         .into_iter()
         .map(|s| {
             json::object! {
-                "user_uid" => s.user_uid,
-                "gw" => s.gw,
-                "vp" => s.vp,
-                "tp" => s.tp,
-                "toss" => s.toss,
-                "finalist" => s.finalist,
-                "disqualified" => s.disqualified,
-                "non_competing" => s.non_competing,
+                standing::USER_UID => s.user_uid,
+                standing::GW => s.gw,
+                standing::VP => s.vp,
+                standing::TP => s.tp,
+                standing::TOSS => s.toss,
+                standing::FINALIST => s.finalist,
+                standing::DISQUALIFIED => s.disqualified,
+                standing::NON_COMPETING => s.non_competing,
             }
         })
         .collect();
-    tournament["standings"] = JsonValue::Array(arr);
+    tournament[tournament::STANDINGS] = JsonValue::Array(arr);
     refresh_finals_scoring(tournament, sanctions);
 }
 
 /// Re-score a Finished finals table from raw VPs + current sanctions and re-derive
 /// `winner` when already set, using the same [`compute_gw_finals`] call SetScore/FinishFinals use.
 fn refresh_finals_scoring(tournament: &mut JsonValue, sanctions: &JsonValue) {
-    if tournament["finals"]["state"].as_str() != Some("Finished") {
+    if tournament[tournament::FINALS][finals_table::STATE].as_str() != Some("Finished") {
         return;
     }
-    let finals_round = tournament["rounds"].len();
+    let finals_round = tournament[tournament::ROUNDS].len();
     let effective_sas = resolve_sa_effective_rounds(tournament, sanctions);
-    let seating = &tournament["finals"]["seating"];
+    let seating = &tournament[tournament::FINALS][finals_table::SEATING];
     let vps: Vec<f64> = seating
         .members()
-        .map(|s| s["result"]["vp"].as_f64().unwrap_or(0.0))
+        .map(|s| s[seat::RESULT][score::VP].as_f64().unwrap_or(0.0))
         .collect();
     let seating_uids: Vec<String> = seating
         .members()
-        .map(|s| s["player_uid"].as_str().unwrap_or("").to_string())
+        .map(|s| s[seat::PLAYER_UID].as_str().unwrap_or("").to_string())
         .collect();
     let uid_refs: Vec<&str> = seating_uids.iter().map(String::as_str).collect();
     let adjustments = table_sa_adjustments(seating, finals_round, &effective_sas);
-    let seed_order: Vec<String> = tournament["finals"]["seed_order"]
+    let seed_order: Vec<String> = tournament[tournament::FINALS][finals_table::SEED_ORDER]
         .members()
         .filter_map(|s| s.as_str().map(String::from))
         .collect();
     let gws = compute_gw_finals(&vps, &adjustments, &uid_refs, &seed_order);
     let tps = compute_tp(vps.len(), &vps, &adjustments);
     for i in 0..vps.len() {
-        tournament["finals"]["seating"][i]["result"]["gw"] = gws[i].into();
-        tournament["finals"]["seating"][i]["result"]["tp"] = tps[i].into();
+        tournament[tournament::FINALS][finals_table::SEATING][i][seat::RESULT][score::GW] =
+            gws[i].into();
+        tournament[tournament::FINALS][finals_table::SEATING][i][seat::RESULT][score::TP] =
+            tps[i].into();
     }
     // Re-derive the winner only once FinishFinals set one (never crown early),
     // and never blank it (an empty derivation means an empty table).
-    if !tournament["winner"].as_str().unwrap_or("").is_empty() {
+    if !tournament[tournament::WINNER]
+        .as_str()
+        .unwrap_or("")
+        .is_empty()
+    {
         if let Some(w) = gws.iter().position(|&g| g == 1.0) {
-            tournament["winner"] = uid_refs[w].into();
+            tournament[tournament::WINNER] = uid_refs[w].into();
         }
     }
 }
 
 fn with_rank(standing: &JsonValue, rank: usize) -> JsonValue {
     let mut obj = standing.clone();
-    obj["rank"] = (rank as i32).into();
+    obj[arg::RANK] = (rank as i32).into();
     obj
 }
 
 /// The DQ signal must decide first: DQ'd rows are stored zeroed, so every one of
 /// them would otherwise classify as a no-show.
 pub fn is_no_show(standing: &JsonValue, winner: &str) -> bool {
-    !standing["disqualified"].as_bool().unwrap_or(false)
-        && !standing["finalist"].as_bool().unwrap_or(false)
-        && standing["user_uid"].as_str() != Some(winner)
-        && standing["gw"].as_f64().unwrap_or(0.0) == 0.0
-        && standing["vp"].as_f64().unwrap_or(0.0) == 0.0
-        && standing["tp"].as_f64().unwrap_or(0.0) == 0.0
+    !standing[standing::DISQUALIFIED].as_bool().unwrap_or(false)
+        && !standing[standing::FINALIST].as_bool().unwrap_or(false)
+        && standing[standing::USER_UID].as_str() != Some(winner)
+        && standing[standing::GW].as_f64().unwrap_or(0.0) == 0.0
+        && standing[standing::VP].as_f64().unwrap_or(0.0) == 0.0
+        && standing[standing::TP].as_f64().unwrap_or(0.0) == 0.0
 }
 
 /// Reorders preliminary `standings` (must arrive sorted desc by score) into final
@@ -244,13 +256,13 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
     let winner_present = !winner.is_empty()
         && standings
             .members()
-            .any(|s| s["user_uid"].as_str() == Some(winner));
+            .any(|s| s[standing::USER_UID].as_str() == Some(winner));
 
     let stamped: Vec<JsonValue> = standings
         .members()
         .map(|s| {
             let mut row = s.clone();
-            row["no_show"] = is_no_show(s, winner).into();
+            row[standing_row::NO_SHOW] = is_no_show(s, winner).into();
             row
         })
         .collect();
@@ -260,16 +272,16 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
     let mut non_finalists: Vec<&JsonValue> = Vec::new();
     let mut excluded: Vec<&JsonValue> = Vec::new();
     for s in &stamped {
-        if s["disqualified"].as_bool().unwrap_or(false)
-            || s["non_competing"].as_bool().unwrap_or(false)
-            || s["no_show"].as_bool().unwrap_or(false)
+        if s[standing::DISQUALIFIED].as_bool().unwrap_or(false)
+            || s[standing::NON_COMPETING].as_bool().unwrap_or(false)
+            || s[standing_row::NO_SHOW].as_bool().unwrap_or(false)
         {
             // Never place — excluded here so they can't tie with or displace a real
             // competitor. UI renders their row via the flag, not the rank value.
             excluded.push(s);
-        } else if winner_present && s["user_uid"].as_str() == Some(winner) {
+        } else if winner_present && s[standing::USER_UID].as_str() == Some(winner) {
             winner_entry = Some(s);
-        } else if s["finalist"].as_bool().unwrap_or(false) {
+        } else if s[standing::FINALIST].as_bool().unwrap_or(false) {
             finalists.push(s);
         } else {
             non_finalists.push(s);
@@ -295,9 +307,9 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
     let mut prev_key: Option<(i64, i64, i64)> = None;
     for (idx, s) in non_finalists.iter().enumerate() {
         let key = (
-            (s["gw"].as_f64().unwrap_or(0.0) * 10.0) as i64,
-            (s["vp"].as_f64().unwrap_or(0.0) * 10.0) as i64,
-            s["tp"].as_i32().unwrap_or(0) as i64,
+            (s[standing::GW].as_f64().unwrap_or(0.0) * 10.0) as i64,
+            (s[standing::VP].as_f64().unwrap_or(0.0) * 10.0) as i64,
+            s[standing::TP].as_i32().unwrap_or(0) as i64,
         );
         if prev_key != Some(key) {
             rank = start + idx;
@@ -316,45 +328,49 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
 }
 
 pub fn display_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<JsonValue> {
-    let players = &tournament["players"];
-    let sheet = &tournament["standings"];
-    let rounds_less = tournament["rounds"].is_empty();
-    let finals = &tournament["finals"];
-    let use_finals =
-        !rounds_less && tournament["state"].as_str() == Some("Finished") && !finals.is_null();
+    let players = &tournament[tournament::PLAYERS];
+    let sheet = &tournament[tournament::STANDINGS];
+    let rounds_less = tournament[tournament::ROUNDS].is_empty();
+    let finals = &tournament[tournament::FINALS];
+    let use_finals = !rounds_less
+        && tournament[tournament::STATE].as_str() == Some("Finished")
+        && !finals.is_null();
 
     let player_of = |uid: &str| {
         players
             .members()
-            .find(|p| p["user_uid"].as_str() == Some(uid))
+            .find(|p| p[player::USER_UID].as_str() == Some(uid))
     };
     let sheet_of = |uid: &str| {
         sheet
             .members()
-            .find(|s| s["user_uid"].as_str() == Some(uid))
+            .find(|s| s[standing::USER_UID].as_str() == Some(uid))
     };
     let finals_seat = |uid: &str| {
         use_finals
             .then(|| {
-                finals["seating"]
+                finals[finals_table::SEATING]
                     .members()
-                    .find(|s| s["player_uid"].as_str() == Some(uid))
+                    .find(|s| s[seat::PLAYER_UID].as_str() == Some(uid))
             })
             .flatten()
     };
 
     let mut winner = if rounds_less || use_finals {
-        tournament["winner"].as_str().unwrap_or("").to_string()
+        tournament[tournament::WINNER]
+            .as_str()
+            .unwrap_or("")
+            .to_string()
     } else {
         String::new()
     };
     if use_finals && winner.is_empty() {
         let mut best: Option<(&str, f64, f64)> = None;
-        for seat in finals["seating"].members() {
-            let gw = seat["result"]["gw"].as_f64().unwrap_or(0.0);
-            let vp = seat["result"]["vp"].as_f64().unwrap_or(0.0);
+        for seat in finals[finals_table::SEATING].members() {
+            let gw = seat[seat::RESULT][score::GW].as_f64().unwrap_or(0.0);
+            let vp = seat[seat::RESULT][score::VP].as_f64().unwrap_or(0.0);
             if best.is_none_or(|(_, bg, bv)| gw > bg || (gw == bg && vp > bv)) {
-                best = Some((seat["player_uid"].as_str().unwrap_or(""), gw, vp));
+                best = Some((seat[seat::PLAYER_UID].as_str().unwrap_or(""), gw, vp));
             }
         }
         winner = best.map(|(uid, _, _)| uid).unwrap_or("").to_string();
@@ -364,29 +380,29 @@ pub fn display_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<J
         sheet
             .members()
             .map(|s| {
-                let uid = s["user_uid"].as_str().unwrap_or("").to_string();
+                let uid = s[standing::USER_UID].as_str().unwrap_or("").to_string();
                 let (toss, finalist) = if rounds_less {
                     (
-                        s["toss"].as_u32().unwrap_or(0),
-                        s["finalist"].as_bool().unwrap_or_else(|| {
+                        s[standing::TOSS].as_u32().unwrap_or(0),
+                        s[standing::FINALIST].as_bool().unwrap_or_else(|| {
                             player_of(&uid)
-                                .and_then(|p| p["finalist"].as_bool())
+                                .and_then(|p| p[player::FINALIST].as_bool())
                                 .unwrap_or(false)
                         }),
                     )
                 } else {
                     (
                         player_of(&uid)
-                            .and_then(|p| p["toss"].as_u32())
+                            .and_then(|p| p[player::TOSS].as_u32())
                             .unwrap_or(0),
                         finals_seat(&uid).is_some(),
                     )
                 };
                 (
                     uid,
-                    s["gw"].as_f64().unwrap_or(0.0),
-                    s["vp"].as_f64().unwrap_or(0.0),
-                    s["tp"].as_f64().unwrap_or(0.0),
+                    s[standing::GW].as_f64().unwrap_or(0.0),
+                    s[standing::VP].as_f64().unwrap_or(0.0),
+                    s[standing::TP].as_f64().unwrap_or(0.0),
                     toss,
                     finalist,
                 )
@@ -397,10 +413,10 @@ pub fn display_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<J
         players
             .members()
             .filter_map(|p| {
-                let uid = p["user_uid"].as_str().unwrap_or("");
-                let gw = p["result"]["gw"].as_f64().unwrap_or(0.0);
-                let vp = p["result"]["vp"].as_f64().unwrap_or(0.0);
-                let tp = p["result"]["tp"].as_f64().unwrap_or(0.0);
+                let uid = p[player::USER_UID].as_str().unwrap_or("");
+                let gw = p[player::RESULT][score::GW].as_f64().unwrap_or(0.0);
+                let vp = p[player::RESULT][score::VP].as_f64().unwrap_or(0.0);
+                let tp = p[player::RESULT][score::TP].as_f64().unwrap_or(0.0);
                 if uid.is_empty() || (gw == 0.0 && vp == 0.0 && tp == 0.0) {
                     return None;
                 }
@@ -409,8 +425,8 @@ pub fn display_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<J
                     gw,
                     vp,
                     tp,
-                    p["toss"].as_u32().unwrap_or(0),
-                    p["finalist"].as_bool().unwrap_or(false),
+                    p[player::TOSS].as_u32().unwrap_or(0),
+                    p[player::FINALIST].as_bool().unwrap_or(false),
                 ))
             })
             .collect()
@@ -423,13 +439,14 @@ pub fn display_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<J
         .map(|(uid, gw, vp, tp, toss, finalist)| {
             let player = player_of(&uid);
             let row = sheet_of(&uid);
-            let disqualified = player.and_then(|p| p["state"].as_str()) == Some("Disqualified")
-                || row.is_some_and(|r| r["disqualified"].as_bool().unwrap_or(false))
+            let disqualified = player.and_then(|p| p[player::STATE].as_str())
+                == Some("Disqualified")
+                || row.is_some_and(|r| r[standing::DISQUALIFIED].as_bool().unwrap_or(false))
                 || has_dq_sanction(sanctions, &uid);
             let non_competing = player
-                .and_then(|p| p["non_competing"].as_bool())
+                .and_then(|p| p[player::NON_COMPETING].as_bool())
                 .unwrap_or(false)
-                || row.is_some_and(|r| r["non_competing"].as_bool().unwrap_or(false));
+                || row.is_some_and(|r| r[standing::NON_COMPETING].as_bool().unwrap_or(false));
             let (gw, vp, tp) = if disqualified {
                 (0.0, 0.0, 0.0)
             } else {
@@ -454,20 +471,20 @@ pub fn display_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<J
         .iter()
         .map(|s| {
             let mut obj = json::object! {
-                "user_uid" => s.user_uid.as_str(),
-                "gw" => s.gw,
-                "vp" => s.vp,
-                "tp" => s.tp,
-                "toss" => s.toss,
-                "finalist" => s.finalist,
-                "disqualified" => s.disqualified,
-                "non_competing" => s.non_competing,
+                standing::USER_UID => s.user_uid.as_str(),
+                standing::GW => s.gw,
+                standing::VP => s.vp,
+                standing::TP => s.tp,
+                standing::TOSS => s.toss,
+                standing::FINALIST => s.finalist,
+                standing::DISQUALIFIED => s.disqualified,
+                standing::NON_COMPETING => s.non_competing,
             };
             if let Some(seat) = finals_seat(&s.user_uid) {
-                obj["finals"] = json::object! {
-                    "gw" => seat["result"]["gw"].as_f64().unwrap_or(0.0),
-                    "vp" => seat["result"]["vp"].as_f64().unwrap_or(0.0),
-                    "tp" => seat["result"]["tp"].as_f64().unwrap_or(0.0),
+                obj[arg::FINALS] = json::object! {
+                    score::GW => seat[seat::RESULT][score::GW].as_f64().unwrap_or(0.0),
+                    score::VP => seat[seat::RESULT][score::VP].as_f64().unwrap_or(0.0),
+                    score::TP => seat[seat::RESULT][score::TP].as_f64().unwrap_or(0.0),
                 };
             }
             obj
@@ -486,12 +503,14 @@ pub fn compute_rating_vp_gw(
 ) -> (f64, f64) {
     // DQ'd players earn no rating: forfeit their rating VP/GW too (the participation
     // base + finalist bonus are suppressed upstream in the rating-entry builder).
-    let disqualified = tournament["players"].members().any(|p| {
-        p["user_uid"].as_str() == Some(user_uid) && p["state"].as_str() == Some("Disqualified")
+    let disqualified = tournament[tournament::PLAYERS].members().any(|p| {
+        p[player::USER_UID].as_str() == Some(user_uid)
+            && p[player::STATE].as_str() == Some("Disqualified")
     }) || has_dq_sanction(sanctions, user_uid);
     // Proxies earn no rating either (non-competing official stood in for the player).
-    let non_competing = tournament["players"].members().any(|p| {
-        p["user_uid"].as_str() == Some(user_uid) && p["non_competing"].as_bool() == Some(true)
+    let non_competing = tournament[tournament::PLAYERS].members().any(|p| {
+        p[player::USER_UID].as_str() == Some(user_uid)
+            && p[player::NON_COMPETING].as_bool() == Some(true)
     });
     if disqualified || non_competing {
         return (0.0, 0.0);
@@ -499,31 +518,31 @@ pub fn compute_rating_vp_gw(
 
     let mut vp = 0.0;
     let mut gw = 0.0;
-    if tournament["rounds"].is_empty() {
-        for s in tournament["standings"].members() {
-            if s["user_uid"].as_str() == Some(user_uid) {
-                vp += s["vp"].as_f64().unwrap_or(0.0);
-                gw += s["gw"].as_f64().unwrap_or(0.0);
+    if tournament[tournament::ROUNDS].is_empty() {
+        for s in tournament[tournament::STANDINGS].members() {
+            if s[standing::USER_UID].as_str() == Some(user_uid) {
+                vp += s[standing::VP].as_f64().unwrap_or(0.0);
+                gw += s[standing::GW].as_f64().unwrap_or(0.0);
                 break;
             }
         }
     } else {
         let effective_sas = resolve_sa_effective_rounds(tournament, sanctions);
-        for (round_index, round) in tournament["rounds"].members().enumerate() {
+        for (round_index, round) in tournament[tournament::ROUNDS].members().enumerate() {
             for table in round.members() {
-                if table["state"].as_str() != Some("Finished") {
+                if table[table::STATE].as_str() != Some("Finished") {
                     continue;
                 }
-                let seating = &table["seating"];
+                let seating = &table[table::SEATING];
                 let Some(i) = seating
                     .members()
-                    .position(|s| s["player_uid"].as_str() == Some(user_uid))
+                    .position(|s| s[seat::PLAYER_UID].as_str() == Some(user_uid))
                 else {
                     continue;
                 };
                 let vps: Vec<f64> = seating
                     .members()
-                    .map(|s| s["result"]["vp"].as_f64().unwrap_or(0.0))
+                    .map(|s| s[seat::RESULT][score::VP].as_f64().unwrap_or(0.0))
                     .collect();
                 let adjustments = table_sa_adjustments(seating, round_index, &effective_sas);
                 vp += vps[i];
@@ -532,13 +551,15 @@ pub fn compute_rating_vp_gw(
         }
         vp -= sa_vp_penalty(&effective_sas, user_uid);
     }
-    for seat in tournament["finals"]["seating"].members() {
-        if seat["player_uid"].as_str() == Some(user_uid) {
-            vp += seat["result"]["vp"].as_f64().unwrap_or(0.0);
-            gw += seat["result"]["gw"].as_f64().unwrap_or(0.0);
+    for seat in tournament[tournament::FINALS][finals_table::SEATING].members() {
+        if seat[seat::PLAYER_UID].as_str() == Some(user_uid) {
+            vp += seat[seat::RESULT][score::VP].as_f64().unwrap_or(0.0);
+            gw += seat[seat::RESULT][score::GW].as_f64().unwrap_or(0.0);
         }
     }
-    if tournament["finals"].is_null() && tournament["winner"].as_str() == Some(user_uid) {
+    if tournament[tournament::FINALS].is_null()
+        && tournament[tournament::WINNER].as_str() == Some(user_uid)
+    {
         gw += 1.0;
     }
     (vp, gw)
@@ -561,8 +582,8 @@ pub(super) fn finals_candidates<'a>(
             // (capped) stays eligible, Finished (withdrawn) is dropped.
             let ps = players
                 .members()
-                .find(|p| p["user_uid"].as_str() == Some(&s.user_uid))
-                .and_then(|p| p["state"].as_str())
+                .find(|p| p[player::USER_UID].as_str() == Some(&s.user_uid))
+                .and_then(|p| p[player::STATE].as_str())
                 .unwrap_or("");
             !s.disqualified && !s.non_competing && ps != "Finished"
         })
@@ -615,18 +636,18 @@ pub fn finals_qualification(tournament: &JsonValue, standings: &JsonValue) -> Js
     let mut rows: Vec<Standing> = standings
         .members()
         .map(|s| Standing {
-            user_uid: s["user_uid"].as_str().unwrap_or("").to_string(),
-            gw: s["gw"].as_f64().unwrap_or(0.0),
-            vp: s["vp"].as_f64().unwrap_or(0.0),
-            tp: s["tp"].as_f64().unwrap_or(0.0),
-            toss: s["toss"].as_u32().unwrap_or(0),
-            finalist: s["finalist"].as_bool().unwrap_or(false),
-            disqualified: s["disqualified"].as_bool().unwrap_or(false),
-            non_competing: s["non_competing"].as_bool().unwrap_or(false),
+            user_uid: s[standing::USER_UID].as_str().unwrap_or("").to_string(),
+            gw: s[standing::GW].as_f64().unwrap_or(0.0),
+            vp: s[standing::VP].as_f64().unwrap_or(0.0),
+            tp: s[standing::TP].as_f64().unwrap_or(0.0),
+            toss: s[standing::TOSS].as_u32().unwrap_or(0),
+            finalist: s[standing::FINALIST].as_bool().unwrap_or(false),
+            disqualified: s[standing::DISQUALIFIED].as_bool().unwrap_or(false),
+            non_competing: s[standing::NON_COMPETING].as_bool().unwrap_or(false),
         })
         .collect();
     sort_by_rank(&mut rows);
-    let candidates = finals_candidates(&tournament["players"], &rows);
+    let candidates = finals_candidates(&tournament[tournament::PLAYERS], &rows);
 
     let enough_rounds = count_played_rounds(tournament) >= 2;
     let possible = enough_rounds && candidates.len() >= 5;
@@ -639,10 +660,10 @@ pub fn finals_qualification(tournament: &JsonValue, standings: &JsonValue) -> Js
         Vec::new()
     };
     json::object! {
-        enough_rounds: enough_rounds,
-        possible: possible,
-        has_ties: possible && top5_has_ties(&candidates),
-        tied_uids: JsonValue::Array(tied),
+        arg::ENOUGH_ROUNDS => enough_rounds,
+        arg::POSSIBLE => possible,
+        arg::HAS_TIES => possible && top5_has_ties(&candidates),
+        arg::TIED_UIDS => JsonValue::Array(tied),
     }
 }
 

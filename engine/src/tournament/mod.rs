@@ -1,3 +1,7 @@
+use crate::model::{
+    arg, deck_object, finals_table, player, raffle_draw, room, score, score_override, seat,
+    standing, table, tournament, tournament_config,
+};
 use json::JsonValue;
 
 use crate::seating;
@@ -38,8 +42,8 @@ use standings::{
 pub fn table_label(table_rooms: &JsonValue, table_idx: usize) -> Option<String> {
     let mut offset = 0usize;
     for room in table_rooms.members() {
-        let count = room["count"].as_usize().unwrap_or(0);
-        let name = room["name"].as_str().unwrap_or("");
+        let count = room[room::COUNT].as_usize().unwrap_or(0);
+        let name = room[room::NAME].as_str().unwrap_or("");
         if table_idx < offset + count {
             return Some(if count == 1 {
                 name.to_string()
@@ -53,58 +57,62 @@ pub fn table_label(table_rooms: &JsonValue, table_idx: usize) -> Option<String> 
 }
 
 pub const CONFIG_FIELDS: [&str; 26] = [
-    "name",
-    "format",
-    "rank",
-    "online",
-    "start",
-    "finish",
-    "timezone",
-    "country",
-    "venue",
-    "venue_url",
-    "address",
-    "map_url",
-    "proxies",
-    "multideck",
-    "decklist_required",
-    "description",
-    "standings_mode",
-    "decklists_mode",
-    "max_rounds",
-    "max_players",
-    "open_rounds",
-    "self_organized_rounds",
-    "table_rooms",
-    "league_uid",
-    "round_time",
-    "finals_time",
+    tournament_config::NAME,
+    tournament_config::FORMAT,
+    tournament_config::RANK,
+    tournament_config::ONLINE,
+    tournament_config::START,
+    tournament_config::FINISH,
+    tournament_config::TIMEZONE,
+    tournament_config::COUNTRY,
+    tournament_config::VENUE,
+    tournament_config::VENUE_URL,
+    tournament_config::ADDRESS,
+    tournament_config::MAP_URL,
+    tournament_config::PROXIES,
+    tournament_config::MULTIDECK,
+    tournament_config::DECKLIST_REQUIRED,
+    tournament_config::DESCRIPTION,
+    tournament_config::STANDINGS_MODE,
+    tournament_config::DECKLISTS_MODE,
+    tournament_config::MAX_ROUNDS,
+    tournament_config::MAX_PLAYERS,
+    tournament_config::OPEN_ROUNDS,
+    tournament_config::SELF_ORGANIZED_ROUNDS,
+    tournament_config::TABLE_ROOMS,
+    tournament_config::LEAGUE_UID,
+    tournament_config::ROUND_TIME,
+    tournament_config::FINALS_TIME,
 ];
 
 /// Shared between `UpdateConfig` and `CreateTournament`.
 fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
-    if let Some(f) = config["format"].as_str() {
-        validate_enum(f, &["Standard", "V5", "Limited"], "format")?;
+    if let Some(f) = config[tournament_config::FORMAT].as_str() {
+        validate_enum(f, &["Standard", "V5", "Limited"], tournament_config::FORMAT)?;
     }
-    if let Some(r) = config["rank"].as_str() {
+    if let Some(r) = config[tournament_config::RANK].as_str() {
         validate_enum(
             r,
             &["", "National Championship", "Continental Championship"],
-            "rank",
+            tournament_config::RANK,
         )?;
     }
-    if let Some(s) = config["standings_mode"].as_str() {
+    if let Some(s) = config[tournament_config::STANDINGS_MODE].as_str() {
         validate_enum(
             s,
             &["Private", "Cutoff", "Top 10", "Public"],
-            "standings_mode",
+            tournament_config::STANDINGS_MODE,
         )?;
     }
-    if let Some(d) = config["decklists_mode"].as_str() {
-        validate_enum(d, &["Winner", "Finalists", "All"], "decklists_mode")?;
+    if let Some(d) = config[tournament_config::DECKLISTS_MODE].as_str() {
+        validate_enum(
+            d,
+            &["Winner", "Finalists", "All"],
+            tournament_config::DECKLISTS_MODE,
+        )?;
     }
-    if config.has_key("name") {
-        if let Some(n) = config["name"].as_str() {
+    if config.has_key(tournament_config::NAME) {
+        if let Some(n) = config[tournament_config::NAME].as_str() {
             if n.trim().is_empty() {
                 return Err(EngineError::NameRequired);
             }
@@ -112,9 +120,9 @@ fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
     }
     // self_organized_rounds implies open_rounds; reject the combo here so the
     // invariant is enforced by the engine, not just the UI form.
-    if config["self_organized_rounds"].as_bool() == Some(true)
-        && config.has_key("open_rounds")
-        && config["open_rounds"].as_bool() == Some(false)
+    if config[tournament_config::SELF_ORGANIZED_ROUNDS].as_bool() == Some(true)
+        && config.has_key(tournament_config::OPEN_ROUNDS)
+        && config[tournament_config::OPEN_ROUNDS].as_bool() == Some(false)
     {
         return Err(EngineError::SelfOrganizeNotOpenRounds);
     }
@@ -130,9 +138,12 @@ fn resolve_live_round(rounds: &JsonValue, round: Option<usize>) -> Result<usize,
         return Err(EngineError::InvalidRound);
     }
     if target != last {
-        let live = rounds[target]
-            .members()
-            .any(|t| !matches!(t["state"].as_str().unwrap_or(""), "Finished" | "Cancelled"));
+        let live = rounds[target].members().any(|t| {
+            !matches!(
+                t[table::STATE].as_str().unwrap_or(""),
+                "Finished" | "Cancelled"
+            )
+        });
         if !live {
             return Err(EngineError::RoundNotLive);
         }
@@ -188,65 +199,74 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
 
     validate_config_fields(&config)?;
     validate_rank_legality(
-        config["format"].as_str().unwrap_or(""),
-        config["rank"].as_str().unwrap_or(""),
-        config["proxies"].as_bool().unwrap_or(false),
-        config["multideck"].as_bool().unwrap_or(false),
+        config[tournament_config::FORMAT].as_str().unwrap_or(""),
+        config[tournament_config::RANK].as_str().unwrap_or(""),
+        config[tournament_config::PROXIES]
+            .as_bool()
+            .unwrap_or(false),
+        config[tournament_config::MULTIDECK]
+            .as_bool()
+            .unwrap_or(false),
     )?;
     validate_finish_after_start(
-        config["start"].as_str().unwrap_or(""),
-        config["finish"].as_str().unwrap_or(""),
+        config[tournament_config::START].as_str().unwrap_or(""),
+        config[tournament_config::FINISH].as_str().unwrap_or(""),
     )?;
 
-    let name = config["name"].as_str().ok_or("name is required")?;
+    let name = config[tournament_config::NAME]
+        .as_str()
+        .ok_or("name is required")?;
     if name.trim().is_empty() {
         return Err(EngineError::NameRequired);
     }
 
-    let uid = config["uid"].as_str().unwrap_or("").to_string();
-    let now = config["now"].as_str().unwrap_or("").to_string();
+    let uid = config[tournament_config::UID]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    let now = config[arg::NOW].as_str().unwrap_or("").to_string();
 
     let tournament = json::object! {
-        "uid" => if uid.is_empty() { json::JsonValue::Null } else { uid.into() },
-        "modified" => if now.is_empty() { json::JsonValue::Null } else { now.clone().into() },
-        "name" => name,
-        "format" => config["format"].as_str().unwrap_or("Standard"),
-        "rank" => config["rank"].as_str().unwrap_or(""),
-        "online" => config["online"].as_bool().unwrap_or(false),
-        "start" => config["start"].clone(),
-        "finish" => config["finish"].clone(),
-        "timezone" => config["timezone"].as_str().unwrap_or(""),
-        "country" => config["country"].clone(),
-        "state" => "Planned",
-        "organizers_uids" => json::array![actor.uid.clone()],
-        "venue" => config["venue"].as_str().unwrap_or(""),
-        "venue_url" => config["venue_url"].as_str().unwrap_or(""),
-        "address" => config["address"].as_str().unwrap_or(""),
-        "map_url" => config["map_url"].as_str().unwrap_or(""),
-        "proxies" => config["proxies"].as_bool().unwrap_or(false),
-        "multideck" => config["multideck"].as_bool().unwrap_or(false),
-        "decklist_required" => config["decklist_required"].as_bool().unwrap_or(false),
-        "description" => config["description"].as_str().unwrap_or(""),
-        "standings_mode" => config["standings_mode"].as_str().unwrap_or("Private"),
-        "decklists_mode" => config["decklists_mode"].as_str().unwrap_or("Winner"),
-        "max_rounds" => config["max_rounds"].as_u32().unwrap_or(0),
+        tournament::UID => if uid.is_empty() { json::JsonValue::Null } else { uid.into() },
+        tournament::MODIFIED => if now.is_empty() { json::JsonValue::Null } else { now.clone().into() },
+        tournament::NAME => name,
+        tournament::FORMAT => config[tournament_config::FORMAT].as_str().unwrap_or("Standard"),
+        tournament::RANK => config[tournament_config::RANK].as_str().unwrap_or(""),
+        tournament::ONLINE => config[tournament_config::ONLINE].as_bool().unwrap_or(false),
+        tournament::START => config[tournament_config::START].clone(),
+        tournament::FINISH => config[tournament_config::FINISH].clone(),
+        tournament::TIMEZONE => config[tournament_config::TIMEZONE].as_str().unwrap_or(""),
+        tournament::COUNTRY => config[tournament_config::COUNTRY].clone(),
+        tournament::STATE => "Planned",
+        tournament::ORGANIZERS_UIDS => json::array![actor.uid.clone()],
+        tournament::VENUE => config[tournament_config::VENUE].as_str().unwrap_or(""),
+        tournament::VENUE_URL => config[tournament_config::VENUE_URL].as_str().unwrap_or(""),
+        tournament::ADDRESS => config[tournament_config::ADDRESS].as_str().unwrap_or(""),
+        tournament::MAP_URL => config[tournament_config::MAP_URL].as_str().unwrap_or(""),
+        tournament::PROXIES => config[tournament_config::PROXIES].as_bool().unwrap_or(false),
+        tournament::MULTIDECK => config[tournament_config::MULTIDECK].as_bool().unwrap_or(false),
+        tournament::DECKLIST_REQUIRED => config[tournament_config::DECKLIST_REQUIRED].as_bool().unwrap_or(false),
+        tournament::DESCRIPTION => config[tournament_config::DESCRIPTION].as_str().unwrap_or(""),
+        tournament::STANDINGS_MODE => config[tournament_config::STANDINGS_MODE].as_str().unwrap_or("Private"),
+        tournament::DECKLISTS_MODE => config[tournament_config::DECKLISTS_MODE].as_str().unwrap_or("Winner"),
+        tournament::MAX_ROUNDS => config[tournament_config::MAX_ROUNDS].as_u32().unwrap_or(0),
         // Soft cap: UI-side warnings only (0 = none). Registration is never blocked.
-        "max_players" => config["max_players"].as_u32().unwrap_or(0),
-        "open_rounds" => config["open_rounds"].as_bool().unwrap_or(false),
-        "self_organized_rounds" => config["self_organized_rounds"].as_bool().unwrap_or(false),
-        "table_rooms" => if config["table_rooms"].is_array() {
-            config["table_rooms"].clone()
+        tournament::MAX_PLAYERS => config[tournament_config::MAX_PLAYERS].as_u32().unwrap_or(0),
+        tournament::OPEN_ROUNDS => config[tournament_config::OPEN_ROUNDS].as_bool().unwrap_or(false),
+        tournament::SELF_ORGANIZED_ROUNDS => config[tournament_config::SELF_ORGANIZED_ROUNDS].as_bool().unwrap_or(false),
+        tournament::TABLE_ROOMS => if config[tournament_config::TABLE_ROOMS].is_array() {
+            config[tournament_config::TABLE_ROOMS].clone()
         } else {
             json::array![]
         },
-        "league_uid" => config["league_uid"].clone(),
-        "round_time" => config["round_time"].as_u32().unwrap_or(0),
-        "finals_time" => config["finals_time"].as_u32().unwrap_or(0),
-        "players" => json::array![],
-        "rounds" => json::array![],
-        "finals" => json::JsonValue::Null,
-        "winner" => "",
-        "standings" => json::array![],
+        tournament::LEAGUE_UID => config[tournament_config::LEAGUE_UID].clone(),
+        tournament::ROUND_TIME => config[tournament_config::ROUND_TIME].as_u32().unwrap_or(0),
+        tournament::FINALS_TIME => config[tournament_config::FINALS_TIME].as_u32().unwrap_or(0),
+        tournament::PLAYERS => json::array![],
+        tournament::ROUNDS => json::array![],
+        tournament::FINALS => json::JsonValue::Null,
+        tournament::WINNER => "",
+        tournament::STANDINGS => json::array![],
     };
 
     Ok(tournament.dump())
@@ -279,8 +299,8 @@ pub fn process_tournament_event(
     )?;
 
     let result = json::object! {
-        "tournament" => tournament,
-        "deck_ops" => deck_ops,
+        arg::TOURNAMENT => tournament,
+        arg::DECK_OPS => deck_ops,
     };
     Ok(result.dump())
 }
@@ -301,23 +321,23 @@ pub fn update_standings_json(
 /// persisted results. `round == rounds.len()` is the finals sentinel (`table` ignored).
 pub fn preview_scores_json(config_json: &str) -> Result<String, EngineError> {
     let config = json::parse(config_json)?;
-    let tournament = &config["tournament"];
-    let sanctions = &config["sanctions"];
-    let round = config["round"]
+    let tournament = &config[arg::TOURNAMENT];
+    let sanctions = &config[arg::SANCTIONS];
+    let round = config[arg::ROUND]
         .as_usize()
         .ok_or_else(|| EngineError::internal("round required"))?;
-    let rounds_len = tournament["rounds"].len();
+    let rounds_len = tournament[tournament::ROUNDS].len();
     let is_finals = round >= rounds_len;
     let table = if is_finals {
-        &tournament["finals"]
+        &tournament[tournament::FINALS]
     } else {
-        let table_idx = config["table"]
+        let table_idx = config[arg::TABLE]
             .as_usize()
             .ok_or_else(|| EngineError::internal("table required"))?;
-        &tournament["rounds"][round][table_idx]
+        &tournament[tournament::ROUNDS][round][table_idx]
     };
-    let seating = &table["seating"];
-    let vps: Vec<f64> = config["vps"]
+    let seating = &table[table::SEATING];
+    let vps: Vec<f64> = config[arg::VPS]
         .members()
         .map(|v| v.as_f64().unwrap_or(0.0))
         .collect();
@@ -329,9 +349,9 @@ pub fn preview_scores_json(config_json: &str) -> Result<String, EngineError> {
     let gws = if is_finals {
         let seating_uids: Vec<&str> = seating
             .members()
-            .map(|s| s["player_uid"].as_str().unwrap_or(""))
+            .map(|s| s[seat::PLAYER_UID].as_str().unwrap_or(""))
             .collect();
-        let seed_order: Vec<String> = table["seed_order"]
+        let seed_order: Vec<String> = table[finals_table::SEED_ORDER]
             .members()
             .filter_map(|s| s.as_str().map(|v| v.to_string()))
             .collect();
@@ -341,8 +361,8 @@ pub fn preview_scores_json(config_json: &str) -> Result<String, EngineError> {
     };
     let tps = compute_tp(seating.len(), &vps, &adjustments);
     Ok(json::object! {
-        "gw" => JsonValue::Array(gws.into_iter().map(Into::into).collect()),
-        "tp" => JsonValue::Array(tps.into_iter().map(Into::into).collect()),
+        score::GW => JsonValue::Array(gws.into_iter().map(Into::into).collect()),
+        score::TP => JsonValue::Array(tps.into_iter().map(Into::into).collect()),
     }
     .dump())
 }
@@ -355,39 +375,40 @@ fn apply_event(
     decks: &JsonValue,
     deck_ops: &mut JsonValue,
 ) -> Result<(), EngineError> {
-    let state = TournamentState::from_str(tournament["state"].as_str().unwrap_or("Planned"))
-        .ok_or("Invalid tournament state")?;
+    let state =
+        TournamentState::from_str(tournament[tournament::STATE].as_str().unwrap_or("Planned"))
+            .ok_or("Invalid tournament state")?;
 
     match event {
         TournamentEvent::OpenRegistration => {
             require_organizer(actor)?;
             require_state(state, TournamentState::Planned)?;
-            tournament["state"] = "Registration".into();
+            tournament[tournament::STATE] = "Registration".into();
             Ok(())
         }
 
         TournamentEvent::CloseRegistration => {
             require_organizer(actor)?;
             require_state(state, TournamentState::Registration)?;
-            tournament["state"] = "Waiting".into();
+            tournament[tournament::STATE] = "Waiting".into();
             Ok(())
         }
 
         TournamentEvent::CancelRegistration => {
             require_organizer(actor)?;
             require_state(state, TournamentState::Registration)?;
-            tournament["state"] = "Planned".into();
+            tournament[tournament::STATE] = "Planned".into();
             Ok(())
         }
 
         TournamentEvent::ReopenRegistration => {
             require_organizer(actor)?;
             require_state(state, TournamentState::Waiting)?;
-            tournament["state"] = "Registration".into();
-            let players = &mut tournament["players"];
+            tournament[tournament::STATE] = "Registration".into();
+            let players = &mut tournament[tournament::PLAYERS];
             for i in 0..players.len() {
-                if players[i]["state"].as_str() == Some("Checked-in") {
-                    players[i]["state"] = "Registered".into();
+                if players[i][player::STATE].as_str() == Some("Checked-in") {
+                    players[i][player::STATE] = "Registered".into();
                 }
             }
             Ok(())
@@ -396,27 +417,27 @@ fn apply_event(
         TournamentEvent::ReopenTournament => {
             require_organizer(actor)?;
             require_state(state, TournamentState::Finished)?;
-            tournament["state"] = "Waiting".into();
+            tournament[tournament::STATE] = "Waiting".into();
             // winner is "" (not null): the backend Tournament model types it `str`
             // (""=no winner), so a null fails msgspec validation and 500s the action.
-            tournament["finals"] = json::Null;
-            tournament["winner"] = "".into();
-            let players = &mut tournament["players"];
+            tournament[tournament::FINALS] = json::Null;
+            tournament[tournament::WINNER] = "".into();
+            let players = &mut tournament[tournament::PLAYERS];
             for i in 0..players.len() {
-                if players[i]["state"].as_str() == Some("Finished") {
-                    players[i]["state"] = "Checked-in".into();
+                if players[i][player::STATE].as_str() == Some("Finished") {
+                    players[i][player::STATE] = "Checked-in".into();
                 }
-                players[i]["finalist"] = false.into();
+                players[i][player::FINALIST] = false.into();
                 // Disqualified players stay Disqualified (no reset)
             }
             update_standings(tournament, sanctions);
             for d in decks.members() {
-                let deck_uid = d["uid"].as_str().unwrap_or("");
+                let deck_uid = d[deck_object::UID].as_str().unwrap_or("");
                 if !deck_uid.is_empty() {
                     let op = json::object! {
-                        "op" => "set_public",
-                        "deck_uid" => deck_uid,
-                        "public" => false,
+                        arg::OP => "set_public",
+                        arg::DECK_UID => deck_uid,
+                        arg::PUBLIC => false,
                     };
                     let _ = deck_ops.push(op);
                 }
@@ -435,7 +456,7 @@ fn apply_event(
                 return Err(EngineError::VeknIdRequired);
             }
 
-            if player_exists(&tournament["players"], user_uid) {
+            if player_exists(&tournament[tournament::PLAYERS], user_uid) {
                 return Err(EngineError::AlreadyRegistered);
             }
 
@@ -447,20 +468,20 @@ fn apply_event(
             }
 
             let mut player = json::object! {
-                user_uid: user_uid.as_str(),
-                state: "Registered",
-                payment_status: "Pending",
-                toss: 0,
-                result: { gw: 0, vp: 0.0, tp: 0 },
-                finalist: false,
-                non_competing: false,
+                player::USER_UID => user_uid.as_str(),
+                player::STATE => "Registered",
+                player::PAYMENT_STATUS => "Pending",
+                player::TOSS => 0,
+                player::RESULT => json::object!{ score::GW => 0, score::VP => 0.0, score::TP => 0 },
+                player::FINALIST => false,
+                player::NON_COMPETING => false,
             };
             if let Some(dn) = display_name {
                 if !dn.is_empty() {
-                    player["display_name"] = dn.as_str().into();
+                    player[player::DISPLAY_NAME] = dn.as_str().into();
                 }
             }
-            tournament["players"].push(player)?;
+            tournament[tournament::PLAYERS].push(player)?;
             Ok(())
         }
 
@@ -471,7 +492,7 @@ fn apply_event(
                 return Err(EngineError::UnregisterOnlySelf);
             }
 
-            let players = &mut tournament["players"];
+            let players = &mut tournament[tournament::PLAYERS];
             let idx = find_player_index(players, user_uid).ok_or(EngineError::PlayerNotFound)?;
             players.array_remove(idx);
             Ok(())
@@ -496,7 +517,7 @@ fn apply_event(
                 return Err(EngineError::VeknIdRequired);
             }
 
-            if player_exists(&tournament["players"], user_uid) {
+            if player_exists(&tournament[tournament::PLAYERS], user_uid) {
                 return Err(EngineError::AlreadyRegistered);
             }
 
@@ -514,28 +535,30 @@ fn apply_event(
                 "Registered"
             };
             let mut player = json::object! {
-                user_uid: user_uid.as_str(),
-                state: player_state,
-                payment_status: "Pending",
-                toss: 0,
-                result: { gw: 0, vp: 0.0, tp: 0 },
-                finalist: false,
-                non_competing: false,
+                player::USER_UID => user_uid.as_str(),
+                player::STATE => player_state,
+                player::PAYMENT_STATUS => "Pending",
+                player::TOSS => 0,
+                player::RESULT => json::object!{ score::GW => 0, score::VP => 0.0, score::TP => 0 },
+                player::FINALIST => false,
+                player::NON_COMPETING => false,
             };
             if let Some(dn) = display_name {
                 if !dn.is_empty() {
-                    player["display_name"] = dn.as_str().into();
+                    player[player::DISPLAY_NAME] = dn.as_str().into();
                 }
             }
             if auto_checkin
-                && tournament["decklist_required"].as_bool().unwrap_or(false)
+                && tournament[tournament::DECKLIST_REQUIRED]
+                    .as_bool()
+                    .unwrap_or(false)
                 && !decks
                     .members()
-                    .any(|d| d["user_uid"].as_str() == Some(user_uid.as_str()))
+                    .any(|d| d[deck_object::USER_UID].as_str() == Some(user_uid.as_str()))
             {
-                player["missing_decklist"] = true.into();
+                player[player::MISSING_DECKLIST] = true.into();
             }
-            tournament["players"].push(player)?;
+            tournament[tournament::PLAYERS].push(player)?;
             Ok(())
         }
 
@@ -548,11 +571,11 @@ fn apply_event(
             {
                 return Err(EngineError::CannotRemovePlayers);
             }
-            if !tournament["rounds"].is_empty() {
+            if !tournament[tournament::ROUNDS].is_empty() {
                 return Err(EngineError::UseDropOut);
             }
 
-            let players = &mut tournament["players"];
+            let players = &mut tournament[tournament::PLAYERS];
             let idx = find_player_index(players, user_uid).ok_or(EngineError::PlayerNotFound)?;
             players.array_remove(idx);
             Ok(())
@@ -563,10 +586,11 @@ fn apply_event(
                 return Err(EngineError::CannotDropOut);
             }
 
-            let players = &mut tournament["players"];
+            let players = &mut tournament[tournament::PLAYERS];
             let idx = find_player_index(players, player_uid).ok_or(EngineError::PlayerNotFound)?;
-            let player_state = PlayerState::from_str(players[idx]["state"].as_str().unwrap_or(""))
-                .ok_or("Invalid player state")?;
+            let player_state =
+                PlayerState::from_str(players[idx][player::STATE].as_str().unwrap_or(""))
+                    .ok_or("Invalid player state")?;
 
             if player_state == PlayerState::Finished {
                 return Err(EngineError::PlayerAlreadyFinished);
@@ -576,7 +600,7 @@ fn apply_event(
                 return Err(EngineError::DropOutForbidden);
             }
 
-            players[idx]["state"] = "Finished".into();
+            players[idx][player::STATE] = "Finished".into();
             Ok(())
         }
 
@@ -601,7 +625,7 @@ fn apply_event(
                 return Err(EngineError::CheckInForbidden);
             }
 
-            let idx = match find_player_index(&tournament["players"], player_uid) {
+            let idx = match find_player_index(&tournament[tournament::PLAYERS], player_uid) {
                 Some(idx) => idx,
                 None => {
                     if state != TournamentState::Waiting && state != TournamentState::Playing {
@@ -617,25 +641,26 @@ fn apply_event(
                         return Err(EngineError::PlayerSuspended);
                     }
                     let mut player = json::object! {
-                        user_uid: player_uid.as_str(),
-                        state: "Registered",
-                        payment_status: "Pending",
-                        toss: 0,
-                        result: { gw: 0, vp: 0.0, tp: 0 },
-                        finalist: false,
-                        non_competing: false,
+                        player::USER_UID => player_uid.as_str(),
+                        player::STATE => "Registered",
+                        player::PAYMENT_STATUS => "Pending",
+                        player::TOSS => 0,
+                        player::RESULT => json::object!{ score::GW => 0, score::VP => 0.0, score::TP => 0 },
+                        player::FINALIST => false,
+                        player::NON_COMPETING => false,
                     };
                     if let Some(dn) = display_name {
                         if !dn.is_empty() {
-                            player["display_name"] = dn.as_str().into();
+                            player[player::DISPLAY_NAME] = dn.as_str().into();
                         }
                     }
-                    tournament["players"].push(player)?;
-                    tournament["players"].len() - 1
+                    tournament[tournament::PLAYERS].push(player)?;
+                    tournament[tournament::PLAYERS].len() - 1
                 }
             };
 
-            if tournament["players"][idx]["state"].as_str() == Some("Disqualified") {
+            if tournament[tournament::PLAYERS][idx][player::STATE].as_str() == Some("Disqualified")
+            {
                 return Err(EngineError::PlayerDisqualified);
             }
 
@@ -650,14 +675,15 @@ fn apply_event(
             // player already on the roster doesn't keep a stale registered name.
             if let Some(dn) = display_name {
                 if !dn.is_empty() {
-                    tournament["players"][idx]["display_name"] = dn.as_str().into();
+                    tournament[tournament::PLAYERS][idx][player::DISPLAY_NAME] = dn.as_str().into();
                 }
             }
 
             // Open rounds: a player at their per-player cap can't check in for a new round — but a
             // capped DROP-OUT being reinstated returns to Completed (finals-eligible), not rejected.
-            let was_finished = tournament["players"][idx]["state"].as_str() == Some("Finished");
-            let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
+            let was_finished =
+                tournament[tournament::PLAYERS][idx][player::STATE].as_str() == Some("Finished");
+            let max_rounds = tournament[tournament::MAX_ROUNDS].as_usize().unwrap_or(0);
             let at_cap =
                 max_rounds > 0 && count_player_rounds_played(tournament, player_uid) >= max_rounds;
             if at_cap && !was_finished {
@@ -665,32 +691,37 @@ fn apply_event(
             }
             if at_cap {
                 // Reinstating a capped drop-out: done with prelims, finals-eligible, no new round.
-                tournament["players"][idx]["state"] = "Completed".into();
+                tournament[tournament::PLAYERS][idx][player::STATE] = "Completed".into();
                 return Ok(());
             }
 
-            let missing_decklist = tournament["decklist_required"].as_bool().unwrap_or(false) && {
-                let pk = player_uid.as_str();
-                !decks.members().any(|d| d["user_uid"].as_str() == Some(pk))
-            };
+            let missing_decklist = tournament[tournament::DECKLIST_REQUIRED]
+                .as_bool()
+                .unwrap_or(false)
+                && {
+                    let pk = player_uid.as_str();
+                    !decks
+                        .members()
+                        .any(|d| d[deck_object::USER_UID].as_str() == Some(pk))
+                };
 
             // A drop-out reinstated mid-round keeps the seat they never left.
-            let seated_live = tournament["rounds"].members().any(|round| {
+            let seated_live = tournament[tournament::ROUNDS].members().any(|round| {
                 round.members().any(|t| {
-                    t["state"].as_str() != Some("Finished")
-                        && t["seating"]
+                    t[table::STATE].as_str() != Some("Finished")
+                        && t[table::SEATING]
                             .members()
-                            .any(|s| s["player_uid"].as_str() == Some(player_uid.as_str()))
+                            .any(|s| s[seat::PLAYER_UID].as_str() == Some(player_uid.as_str()))
                 })
             });
-            tournament["players"][idx]["state"] = if was_finished && seated_live {
+            tournament[tournament::PLAYERS][idx][player::STATE] = if was_finished && seated_live {
                 "Playing"
             } else {
                 "Checked-in"
             }
             .into();
             if missing_decklist {
-                tournament["players"][idx]["missing_decklist"] = true.into();
+                tournament[tournament::PLAYERS][idx][player::MISSING_DECKLIST] = true.into();
             }
 
             Ok(())
@@ -700,19 +731,20 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Waiting)?;
 
-            let idx = find_player_index(&tournament["players"], player_uid)
+            let idx = find_player_index(&tournament[tournament::PLAYERS], player_uid)
                 .ok_or(EngineError::PlayerNotFound)?;
 
-            if tournament["players"][idx]["state"].as_str() != Some("Checked-in") {
+            if tournament[tournament::PLAYERS][idx][player::STATE].as_str() != Some("Checked-in") {
                 return Err(EngineError::PlayerNotCheckedIn);
             }
 
-            tournament["players"][idx]["state"] = if state == TournamentState::Finished {
-                "Finished"
-            } else {
-                "Registered"
-            }
-            .into();
+            tournament[tournament::PLAYERS][idx][player::STATE] =
+                if state == TournamentState::Finished {
+                    "Finished"
+                } else {
+                    "Registered"
+                }
+                .into();
             Ok(())
         }
 
@@ -722,23 +754,23 @@ fn apply_event(
 
             // Never re-arm a player already at their per-player cap —
             // Registered/Finished-at-cap can arise after a reopen or a post-cap drop-out.
-            let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
+            let max_rounds = tournament[tournament::MAX_ROUNDS].as_usize().unwrap_or(0);
             let capped: std::collections::HashSet<String> = if max_rounds > 0 {
-                tournament["players"]
+                tournament[tournament::PLAYERS]
                     .members()
-                    .filter_map(|p| p["user_uid"].as_str().map(String::from))
+                    .filter_map(|p| p[player::USER_UID].as_str().map(String::from))
                     .filter(|uid| count_player_rounds_played(tournament, uid) >= max_rounds)
                     .collect()
             } else {
                 std::collections::HashSet::new()
             };
-            let players = &mut tournament["players"];
+            let players = &mut tournament[tournament::PLAYERS];
             for i in 0..players.len() {
-                let ps = players[i]["state"].as_str().unwrap_or("");
+                let ps = players[i][player::STATE].as_str().unwrap_or("");
                 if ps == "Disqualified" {
                     continue;
                 }
-                let uid = players[i]["user_uid"].as_str().unwrap_or("");
+                let uid = players[i][player::USER_UID].as_str().unwrap_or("");
                 if has_dq_sanction(sanctions, uid)
                     || has_active_suspension(sanctions, uid, &actor.now)
                 {
@@ -748,7 +780,7 @@ fn apply_event(
                     continue;
                 }
                 if ps == "Registered" || (state == TournamentState::Finished && ps == "Finished") {
-                    players[i]["state"] = "Checked-in".into();
+                    players[i][player::STATE] = "Checked-in".into();
                 }
             }
             Ok(())
@@ -758,10 +790,10 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Waiting)?;
 
-            let players = &mut tournament["players"];
+            let players = &mut tournament[tournament::PLAYERS];
             for i in 0..players.len() {
-                if players[i]["state"].as_str() == Some("Checked-in") {
-                    players[i]["state"] = if state == TournamentState::Finished {
+                if players[i][player::STATE].as_str() == Some("Checked-in") {
+                    players[i][player::STATE] = if state == TournamentState::Finished {
                         "Finished"
                     } else {
                         "Registered"
@@ -783,9 +815,9 @@ fn apply_event(
                     )))
                 }
             }
-            let idx = find_player_index(&tournament["players"], player_uid)
+            let idx = find_player_index(&tournament[tournament::PLAYERS], player_uid)
                 .ok_or(EngineError::PlayerNotFound)?;
-            tournament["players"][idx]["payment_status"] = status.as_str().into();
+            tournament[tournament::PLAYERS][idx][player::PAYMENT_STATUS] = status.as_str().into();
             Ok(())
         }
 
@@ -796,22 +828,22 @@ fn apply_event(
             require_organizer(actor)?;
             // Blocked after finals are seeded or the tournament is finished, so a
             // proxied↔competing flip can't rewrite a concluded result; mid-prelim toggling is the use case.
-            if !tournament["finals"].is_null() || state == TournamentState::Finished {
+            if !tournament[tournament::FINALS].is_null() || state == TournamentState::Finished {
                 return Err(EngineError::CannotSetNonCompeting);
             }
-            let idx = find_player_index(&tournament["players"], player_uid)
+            let idx = find_player_index(&tournament[tournament::PLAYERS], player_uid)
                 .ok_or(EngineError::PlayerNotFound)?;
-            tournament["players"][idx]["non_competing"] = (*non_competing).into();
+            tournament[tournament::PLAYERS][idx][player::NON_COMPETING] = (*non_competing).into();
             update_standings(tournament, sanctions);
             Ok(())
         }
 
         TournamentEvent::MarkAllPaid => {
             require_organizer(actor)?;
-            let players = &mut tournament["players"];
+            let players = &mut tournament[tournament::PLAYERS];
             for i in 0..players.len() {
-                if players[i]["payment_status"].as_str() == Some("Pending") {
-                    players[i]["payment_status"] = "Paid".into();
+                if players[i][player::PAYMENT_STATUS].as_str() == Some("Pending") {
+                    players[i][player::PAYMENT_STATUS] = "Paid".into();
                 }
             }
             Ok(())
@@ -821,7 +853,7 @@ fn apply_event(
             seating: submitted_seating,
         } => {
             require_organizer(actor)?;
-            let is_online = tournament["online"].as_bool().unwrap_or(false);
+            let is_online = tournament[tournament::ONLINE].as_bool().unwrap_or(false);
             if is_online {
                 // Online: allow starting a round while Playing (parallel rounds)
                 if state != TournamentState::Waiting
@@ -837,22 +869,22 @@ fn apply_event(
                 require_state_or_finished(state, TournamentState::Waiting)?;
             }
 
-            if !tournament["finals"].is_null() {
+            if !tournament[tournament::FINALS].is_null() {
                 return Err(EngineError::PrelimAfterFinals);
             }
 
             // max_rounds is a per-player cap, not tournament-wide — more rounds may
             // run for players who haven't hit it yet.
-            let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
+            let max_rounds = tournament[tournament::MAX_ROUNDS].as_usize().unwrap_or(0);
 
             // Playing counts too, for online parallel rounds.
-            let checked_in: Vec<String> = tournament["players"]
+            let checked_in: Vec<String> = tournament[tournament::PLAYERS]
                 .members()
                 .filter(|p| {
-                    let s = p["state"].as_str();
+                    let s = p[player::STATE].as_str();
                     s == Some("Checked-in") || (is_online && s == Some("Playing"))
                 })
-                .filter_map(|p| p["user_uid"].as_str().map(|s| s.to_string()))
+                .filter_map(|p| p[player::USER_UID].as_str().map(|s| s.to_string()))
                 .filter(|uid| {
                     max_rounds == 0 || count_player_rounds_played(tournament, uid) < max_rounds
                 })
@@ -893,7 +925,7 @@ fn apply_event(
                 submitted.clone()
             } else {
                 let seed = seating::seed_for_round(
-                    tournament["uid"].as_str().unwrap_or(""),
+                    tournament[tournament::UID].as_str().unwrap_or(""),
                     previous_rounds.len(),
                 );
                 let (computed, _score) =
@@ -908,23 +940,23 @@ fn apply_event(
                         .iter()
                         .map(|player_uid| {
                             json::object! {
-                                player_uid: player_uid.as_str(),
-                                result: { gw: 0, vp: 0.0, tp: 0 },
-                                judge_uid: "",
+                                seat::PLAYER_UID => player_uid.as_str(),
+                                seat::RESULT => json::object!{ score::GW => 0, score::VP => 0.0, score::TP => 0 },
+                                seat::JUDGE_UID => "",
                             }
                         })
                         .collect();
                     json::object! {
-                        seating: seating,
-                        state: "In Progress",
-                        override: json::Null,
+                        table::SEATING => seating,
+                        table::STATE => "In Progress",
+                        table::OVERRIDE => json::Null,
                     }
                 })
                 .collect();
 
-            tournament["rounds"].push(JsonValue::Array(tables))?;
+            tournament[tournament::ROUNDS].push(JsonValue::Array(tables))?;
             if state != TournamentState::Finished {
-                tournament["state"] = "Playing".into();
+                tournament[tournament::STATE] = "Playing".into();
             }
 
             let seated_uids: std::collections::HashSet<String> = new_round
@@ -934,27 +966,31 @@ fn apply_event(
 
             // Only round 1 of a standard tournament withdraws no-show Registered players
             // (reinstatable via CheckIn/SeatPlayer); later and open rounds leave them untouched.
-            let prior_real_rounds = (0..tournament["rounds"].len().saturating_sub(1))
+            let prior_real_rounds = (0..tournament[tournament::ROUNDS].len().saturating_sub(1))
                 .filter(|&r| {
-                    tournament["rounds"][r]
+                    tournament[tournament::ROUNDS][r]
                         .members()
-                        .any(|t| t["state"].as_str() != Some("Cancelled"))
+                        .any(|t| t[table::STATE].as_str() != Some("Cancelled"))
                 })
                 .count();
-            let open_rounds = tournament["open_rounds"].as_bool().unwrap_or(false);
+            let open_rounds = tournament[tournament::OPEN_ROUNDS]
+                .as_bool()
+                .unwrap_or(false);
             let drop_no_shows = prior_real_rounds == 0 && !open_rounds;
 
-            let players = &mut tournament["players"];
+            let players = &mut tournament[tournament::PLAYERS];
             for i in 0..players.len() {
-                match players[i]["state"].as_str() {
+                match players[i][player::STATE].as_str() {
                     Some("Checked-in") => {
-                        if let Some(uid) = players[i]["user_uid"].as_str() {
+                        if let Some(uid) = players[i][player::USER_UID].as_str() {
                             if seated_uids.contains(uid) {
-                                players[i]["state"] = "Playing".into();
+                                players[i][player::STATE] = "Playing".into();
                             }
                         }
                     }
-                    Some("Registered") if drop_no_shows => players[i]["state"] = "Finished".into(),
+                    Some("Registered") if drop_no_shows => {
+                        players[i][player::STATE] = "Finished".into()
+                    }
                     _ => {}
                 }
             }
@@ -965,14 +1001,14 @@ fn apply_event(
         TournamentEvent::SelfOrganizeRound { player_uids } => {
             // NOT organizer-gated: integrity gate is registration only — collusion risk
             // accepted, mitigated by organizer veto (FinishRound/CancelRound/Override).
-            if !tournament["self_organized_rounds"]
+            if !tournament[tournament::SELF_ORGANIZED_ROUNDS]
                 .as_bool()
                 .unwrap_or(false)
             {
                 return Err(EngineError::SelfOrganizeDisabled);
             }
             // 0 == no per-player cap; only enforced below when a cap is set.
-            let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
+            let max_rounds = tournament[tournament::MAX_ROUNDS].as_usize().unwrap_or(0);
             // Same state rule as an online parallel StartRound: seat while Waiting/Playing.
             if state != TournamentState::Waiting && state != TournamentState::Playing {
                 return Err(EngineError::WrongState {
@@ -980,7 +1016,7 @@ fn apply_event(
                     current: state.as_str().to_string(),
                 });
             }
-            if !tournament["finals"].is_null() {
+            if !tournament[tournament::FINALS].is_null() {
                 return Err(EngineError::PrelimAfterFinals);
             }
             if player_uids.len() < 4 || player_uids.len() > 5 {
@@ -1000,11 +1036,11 @@ fn apply_event(
             // Reject Playing (already in a concurrent pod), Completed/Finished,
             // Disqualified, and at-cap players.
             for uid in player_uids {
-                let p = tournament["players"]
+                let p = tournament[tournament::PLAYERS]
                     .members()
-                    .find(|p| p["user_uid"].as_str() == Some(uid.as_str()))
+                    .find(|p| p[player::USER_UID].as_str() == Some(uid.as_str()))
                     .ok_or(EngineError::NotRegistered)?;
-                let pstate = p["state"].as_str().unwrap_or("");
+                let pstate = p[player::STATE].as_str().unwrap_or("");
                 if pstate == "Disqualified" {
                     return Err(EngineError::PlayerDisqualified);
                 }
@@ -1019,7 +1055,7 @@ fn apply_event(
             }
             let previous_rounds = collect_previous_rounds(tournament);
             let seed = seating::seed_for_round(
-                tournament["uid"].as_str().unwrap_or(""),
+                tournament[tournament::UID].as_str().unwrap_or(""),
                 previous_rounds.len(),
             );
             let (computed, _score) =
@@ -1032,31 +1068,31 @@ fn apply_event(
                         .iter()
                         .map(|player_uid| {
                             json::object! {
-                                player_uid: player_uid.as_str(),
-                                result: { gw: 0, vp: 0.0, tp: 0 },
-                                judge_uid: "",
+                                seat::PLAYER_UID => player_uid.as_str(),
+                                seat::RESULT => json::object!{ score::GW => 0, score::VP => 0.0, score::TP => 0 },
+                                seat::JUDGE_UID => "",
                             }
                         })
                         .collect();
                     json::object! {
-                        seating: seating,
-                        state: "In Progress",
-                        override: json::Null,
-                        organized_by: actor.uid.as_str(),
+                        table::SEATING => seating,
+                        table::STATE => "In Progress",
+                        table::OVERRIDE => json::Null,
+                        table::ORGANIZED_BY => actor.uid.as_str(),
                     }
                 })
                 .collect();
-            tournament["rounds"].push(JsonValue::Array(tables))?;
-            tournament["state"] = "Playing".into();
+            tournament[tournament::ROUNDS].push(JsonValue::Array(tables))?;
+            tournament[tournament::STATE] = "Playing".into();
             // Seat ONLY the chosen players; every other Registered player stays available
             // (unlike StartRound, which withdraws unseated Registered players).
             let seated: std::collections::HashSet<&str> =
                 player_uids.iter().map(|s| s.as_str()).collect();
-            let players = &mut tournament["players"];
+            let players = &mut tournament[tournament::PLAYERS];
             for i in 0..players.len() {
-                if let Some(uid) = players[i]["user_uid"].as_str() {
+                if let Some(uid) = players[i][player::USER_UID].as_str() {
                     if seated.contains(uid) {
-                        players[i]["state"] = "Playing".into();
+                        players[i][player::STATE] = "Playing".into();
                     }
                 }
             }
@@ -1067,7 +1103,7 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
-            let rounds = &tournament["rounds"];
+            let rounds = &tournament[tournament::ROUNDS];
             if rounds.is_empty() {
                 return Err(EngineError::NoRoundToFinish);
             }
@@ -1082,7 +1118,7 @@ fn apply_event(
             let unfinished: Vec<usize> = target_round
                 .members()
                 .enumerate()
-                .filter(|(_, t)| t["state"].as_str() != Some("Finished"))
+                .filter(|(_, t)| t[table::STATE].as_str() != Some("Finished"))
                 .map(|(i, _)| i)
                 .collect();
 
@@ -1104,23 +1140,23 @@ fn apply_event(
             let still_playing = players_in_other_active_rounds(tournament, target_round_idx);
             // A player who just reached their per-player cap retires to Completed
             // instead of being re-armed as Checked-in.
-            let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
+            let max_rounds = tournament[tournament::MAX_ROUNDS].as_usize().unwrap_or(0);
             let maxed: std::collections::HashSet<String> =
                 if max_rounds > 0 && state != TournamentState::Finished {
-                    tournament["players"]
+                    tournament[tournament::PLAYERS]
                         .members()
-                        .filter_map(|p| p["user_uid"].as_str().map(String::from))
+                        .filter_map(|p| p[player::USER_UID].as_str().map(String::from))
                         .filter(|uid| count_player_rounds_played(tournament, uid) >= max_rounds)
                         .collect()
                 } else {
                     std::collections::HashSet::new()
                 };
-            let players = &mut tournament["players"];
+            let players = &mut tournament[tournament::PLAYERS];
             for i in 0..players.len() {
-                if players[i]["state"].as_str() == Some("Playing") {
-                    if let Some(uid) = players[i]["user_uid"].as_str() {
+                if players[i][player::STATE].as_str() == Some("Playing") {
+                    if let Some(uid) = players[i][player::USER_UID].as_str() {
                         if !still_playing.contains(uid) {
-                            players[i]["state"] = if maxed.contains(uid) {
+                            players[i][player::STATE] = if maxed.contains(uid) {
                                 "Completed"
                             } else {
                                 target_state
@@ -1132,7 +1168,7 @@ fn apply_event(
             }
 
             if state != TournamentState::Finished && all_rounds_finished(tournament) {
-                tournament["state"] = "Waiting".into();
+                tournament[tournament::STATE] = "Waiting".into();
             }
             update_standings(tournament, sanctions);
             Ok(())
@@ -1142,7 +1178,7 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
-            let len = tournament["rounds"].len();
+            let len = tournament[tournament::ROUNDS].len();
             if len == 0 {
                 return Err(EngineError::NoRoundToCancel);
             }
@@ -1153,33 +1189,33 @@ fn apply_event(
 
             if target_idx == len - 1 {
                 // Last round: hard-remove — no later round's index can shift.
-                tournament["rounds"].array_remove(len - 1);
+                tournament[tournament::ROUNDS].array_remove(len - 1);
                 loop {
-                    let n = tournament["rounds"].len();
+                    let n = tournament[tournament::ROUNDS].len();
                     if n == 0 {
                         break;
                     }
-                    let last = &tournament["rounds"][n - 1];
+                    let last = &tournament[tournament::ROUNDS][n - 1];
                     if last.is_empty()
                         || !last
                             .members()
-                            .all(|t| t["state"].as_str() == Some("Cancelled"))
+                            .all(|t| t[table::STATE].as_str() == Some("Cancelled"))
                     {
                         break;
                     }
-                    tournament["rounds"].array_remove(n - 1);
+                    tournament[tournament::ROUNDS].array_remove(n - 1);
                 }
                 // update_standings keeps a rounds-less tournament's standings, for the
                 // round-less VEKN imports; a cancel must not inherit that.
-                if tournament["rounds"].is_empty() {
-                    tournament["standings"] = JsonValue::new_array();
+                if tournament[tournament::ROUNDS].is_empty() {
+                    tournament[tournament::STANDINGS] = JsonValue::new_array();
                 }
             } else {
                 // Soft-cancel: mark tables Cancelled, keep the slot — a mid-array removal
                 // would shift deck.round / standings_adjustment.round_number, which are index-tagged.
-                let r = &mut tournament["rounds"][target_idx];
+                let r = &mut tournament[tournament::ROUNDS][target_idx];
                 for i in 0..r.len() {
-                    r[i]["state"] = "Cancelled".into();
+                    r[i][table::STATE] = "Cancelled".into();
                 }
             }
 
@@ -1193,41 +1229,41 @@ fn apply_event(
             let still_playing = players_in_other_active_rounds(tournament, target_idx);
             // Cancelling a round lowers per-player counts; re-arm any Completed (capped)
             // player now back under their cap so they aren't stranded.
-            let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
+            let max_rounds = tournament[tournament::MAX_ROUNDS].as_usize().unwrap_or(0);
             let rearm: std::collections::HashSet<String> =
                 if max_rounds > 0 && state != TournamentState::Finished {
-                    tournament["players"]
+                    tournament[tournament::PLAYERS]
                         .members()
-                        .filter(|p| p["state"].as_str() == Some("Completed"))
-                        .filter_map(|p| p["user_uid"].as_str().map(String::from))
+                        .filter(|p| p[player::STATE].as_str() == Some("Completed"))
+                        .filter_map(|p| p[player::USER_UID].as_str().map(String::from))
                         .filter(|uid| count_player_rounds_played(tournament, uid) < max_rounds)
                         .collect()
                 } else {
                     std::collections::HashSet::new()
                 };
-            let players = &mut tournament["players"];
+            let players = &mut tournament[tournament::PLAYERS];
             for i in 0..players.len() {
-                let st = players[i]["state"].as_str();
-                let uid = players[i]["user_uid"].as_str().map(String::from);
+                let st = players[i][player::STATE].as_str();
+                let uid = players[i][player::USER_UID].as_str().map(String::from);
                 if st == Some("Playing") {
                     if let Some(uid) = uid {
                         if !still_playing.contains(&uid) {
-                            players[i]["state"] = target_state.into();
+                            players[i][player::STATE] = target_state.into();
                         }
                     }
                 } else if st == Some("Completed") {
                     if let Some(uid) = uid {
                         if rearm.contains(&uid) {
-                            players[i]["state"] = target_state.into();
+                            players[i][player::STATE] = target_state.into();
                         }
                     }
                 }
             }
 
             if state != TournamentState::Finished
-                && (all_rounds_finished(tournament) || tournament["rounds"].is_empty())
+                && (all_rounds_finished(tournament) || tournament[tournament::ROUNDS].is_empty())
             {
-                tournament["state"] = "Waiting".into();
+                tournament[tournament::STATE] = "Waiting".into();
             }
             // else: stay Playing (other rounds still in progress)
             update_standings(tournament, sanctions);
@@ -1244,39 +1280,40 @@ fn apply_event(
                     current: state.as_str().to_string(),
                 });
             }
-            if !tournament["finals"].is_null() {
+            if !tournament[tournament::FINALS].is_null() {
                 return Err(EngineError::PrelimAfterFinals);
             }
 
-            let len = tournament["rounds"].len();
+            let len = tournament[tournament::ROUNDS].len();
             let target_idx = round.ok_or(EngineError::InvalidRound)?;
             if target_idx >= len {
                 return Err(EngineError::InvalidRound);
             }
             // Only a fully-Cancelled round is restorable (the last round is hard-
             // removed on cancel, so any Cancelled round is a non-last soft-cancel).
-            if tournament["rounds"][target_idx].is_empty()
-                || !tournament["rounds"][target_idx]
+            if tournament[tournament::ROUNDS][target_idx].is_empty()
+                || !tournament[tournament::ROUNDS][target_idx]
                     .members()
-                    .all(|t| t["state"].as_str() == Some("Cancelled"))
+                    .all(|t| t[table::STATE].as_str() == Some("Cancelled"))
             {
                 return Err(EngineError::RoundNotCancelled);
             }
 
-            let seated: std::collections::HashSet<String> = tournament["rounds"][target_idx]
+            let seated: std::collections::HashSet<String> = tournament[tournament::ROUNDS]
+                [target_idx]
                 .members()
-                .flat_map(|t| t["seating"].members())
-                .filter_map(|s| s["player_uid"].as_str().map(String::from))
+                .flat_map(|t| t[table::SEATING].members())
+                .filter_map(|s| s[seat::PLAYER_UID].as_str().map(String::from))
                 .collect();
 
             // All-or-nothing: reject the whole restore if any seated player can no longer
             // be reinstated. Runs before any mutation; the cap check sees this round still Cancelled.
-            let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
+            let max_rounds = tournament[tournament::MAX_ROUNDS].as_usize().unwrap_or(0);
             for uid in &seated {
-                let pstate = tournament["players"]
+                let pstate = tournament[tournament::PLAYERS]
                     .members()
-                    .find(|p| p["user_uid"].as_str() == Some(uid.as_str()))
-                    .and_then(|p| p["state"].as_str());
+                    .find(|p| p[player::USER_UID].as_str() == Some(uid.as_str()))
+                    .and_then(|p| p[player::STATE].as_str());
                 if matches!(pstate, Some("Disqualified") | Some("Finished")) {
                     return Err(EngineError::CannotRestoreRound);
                 }
@@ -1289,14 +1326,18 @@ fn apply_event(
             // check_table_vps maps complete+valid -> Finished, partial -> In Progress, else Invalid.
             let mut round_is_live = false;
             {
-                let r = &mut tournament["rounds"][target_idx];
+                let r = &mut tournament[tournament::ROUNDS][target_idx];
                 for i in 0..r.len() {
-                    let new_state = if !r[i]["override"].is_null() {
+                    let new_state = if !r[i][table::OVERRIDE].is_null() {
                         "Finished"
                     } else {
-                        let size = r[i]["seating"].len();
+                        let size = r[i][table::SEATING].len();
                         let vps: Vec<f64> = (0..size)
-                            .map(|j| r[i]["seating"][j]["result"]["vp"].as_f64().unwrap_or(0.0))
+                            .map(|j| {
+                                r[i][table::SEATING][j][seat::RESULT][score::VP]
+                                    .as_f64()
+                                    .unwrap_or(0.0)
+                            })
                             .collect();
                         match check_table_vps(&vps) {
                             Some(VpError::IncompleteTotal) => "In Progress",
@@ -1307,7 +1348,7 @@ fn apply_event(
                     if new_state != "Finished" {
                         round_is_live = true;
                     }
-                    r[i]["state"] = new_state.into();
+                    r[i][table::STATE] = new_state.into();
                 }
             }
 
@@ -1325,19 +1366,19 @@ fn apply_event(
 
             // Validation above guarantees every seat is reinstatable; the only one left
             // untouched is a player already Playing in another live round.
-            let players = &mut tournament["players"];
+            let players = &mut tournament[tournament::PLAYERS];
             for i in 0..players.len() {
-                let uid = match players[i]["user_uid"].as_str() {
+                let uid = match players[i][player::USER_UID].as_str() {
                     Some(u) => u.to_string(),
                     None => continue,
                 };
                 if !seated.contains(&uid) {
                     continue;
                 }
-                if players[i]["state"].as_str() == Some("Playing") {
+                if players[i][player::STATE].as_str() == Some("Playing") {
                     continue;
                 }
-                players[i]["state"] = if round_is_live {
+                players[i][player::STATE] = if round_is_live {
                     "Playing"
                 } else if capped.contains(&uid) {
                     "Completed"
@@ -1348,9 +1389,9 @@ fn apply_event(
             }
 
             if round_is_live {
-                tournament["state"] = "Playing".into();
+                tournament[tournament::STATE] = "Playing".into();
             } else if all_rounds_finished(tournament) {
-                tournament["state"] = "Waiting".into();
+                tournament[tournament::STATE] = "Waiting".into();
             }
             update_standings(tournament, sanctions);
             Ok(())
@@ -1367,28 +1408,28 @@ fn apply_event(
             require_state_or_finished(state, TournamentState::Playing)?;
 
             // Finals sentinel: round == rounds.len() && table1 == 0 && table2 == 0
-            let is_finals = *round == tournament["rounds"].len()
-                && !tournament["finals"].is_null()
+            let is_finals = *round == tournament[tournament::ROUNDS].len()
+                && !tournament[tournament::FINALS].is_null()
                 && *table1 == 0
                 && *table2 == 0;
 
             if is_finals {
-                let seating = &mut tournament["finals"]["seating"];
+                let seating = &mut tournament[tournament::FINALS][finals_table::SEATING];
                 if *seat1 >= seating.len() || *seat2 >= seating.len() {
                     return Err(EngineError::InvalidSeat);
                 }
-                let uid1 = seating[*seat1]["player_uid"]
+                let uid1 = seating[*seat1][seat::PLAYER_UID]
                     .as_str()
                     .ok_or(EngineError::InvalidSeat)?
                     .to_string();
-                let uid2 = seating[*seat2]["player_uid"]
+                let uid2 = seating[*seat2][seat::PLAYER_UID]
                     .as_str()
                     .ok_or(EngineError::InvalidSeat)?
                     .to_string();
-                seating[*seat1]["player_uid"] = uid2.as_str().into();
-                seating[*seat2]["player_uid"] = uid1.as_str().into();
+                seating[*seat1][seat::PLAYER_UID] = uid2.as_str().into();
+                seating[*seat2][seat::PLAYER_UID] = uid1.as_str().into();
             } else {
-                let rounds = &mut tournament["rounds"];
+                let rounds = &mut tournament[tournament::ROUNDS];
                 if *round >= rounds.len() {
                     return Err(EngineError::InvalidRound);
                 }
@@ -1396,21 +1437,23 @@ fn apply_event(
                 if *table1 >= round_tables.len() || *table2 >= round_tables.len() {
                     return Err(EngineError::InvalidTable);
                 }
-                if *seat1 >= round_tables[*table1]["seating"].len()
-                    || *seat2 >= round_tables[*table2]["seating"].len()
+                if *seat1 >= round_tables[*table1][table::SEATING].len()
+                    || *seat2 >= round_tables[*table2][table::SEATING].len()
                 {
                     return Err(EngineError::InvalidSeat);
                 }
-                let uid1 = round_tables[*table1]["seating"][*seat1]["player_uid"]
+                let uid1 = round_tables[*table1][table::SEATING][*seat1][seat::PLAYER_UID]
                     .as_str()
                     .ok_or(EngineError::InvalidSeat)?
                     .to_string();
-                let uid2 = round_tables[*table2]["seating"][*seat2]["player_uid"]
+                let uid2 = round_tables[*table2][table::SEATING][*seat2][seat::PLAYER_UID]
                     .as_str()
                     .ok_or(EngineError::InvalidSeat)?
                     .to_string();
-                round_tables[*table1]["seating"][*seat1]["player_uid"] = uid2.as_str().into();
-                round_tables[*table2]["seating"][*seat2]["player_uid"] = uid1.as_str().into();
+                round_tables[*table1][table::SEATING][*seat1][seat::PLAYER_UID] =
+                    uid2.as_str().into();
+                round_tables[*table2][table::SEATING][*seat2][seat::PLAYER_UID] =
+                    uid1.as_str().into();
             }
 
             // Recompute: no later FinishRound refreshes this in Finished state. No-op
@@ -1428,8 +1471,8 @@ fn apply_event(
                 return Err(EngineError::CannotAlterSeating);
             }
 
-            let rounds_len = tournament["rounds"].len();
-            let is_finals = *round == rounds_len && !tournament["finals"].is_null();
+            let rounds_len = tournament[tournament::ROUNDS].len();
+            let is_finals = *round == rounds_len && !tournament[tournament::FINALS].is_null();
 
             {
                 let all_uids: Vec<&String> = seating.iter().flat_map(|t| t.iter()).collect();
@@ -1440,7 +1483,7 @@ fn apply_event(
             }
 
             if is_finals {
-                let finals = &mut tournament["finals"]["seating"];
+                let finals = &mut tournament[tournament::FINALS][finals_table::SEATING];
                 if seating.len() != 1 {
                     return Err(EngineError::FinalsOneTable);
                 }
@@ -1449,7 +1492,12 @@ fn apply_event(
                     return Err(EngineError::FinalsPlayerCount);
                 }
                 let old_set: std::collections::HashSet<String> = (0..finals.len())
-                    .map(|i| finals[i]["player_uid"].as_str().unwrap_or("").to_string())
+                    .map(|i| {
+                        finals[i][seat::PLAYER_UID]
+                            .as_str()
+                            .unwrap_or("")
+                            .to_string()
+                    })
                     .collect();
                 let new_set: std::collections::HashSet<&String> = new_players.iter().collect();
                 if old_set.len() != new_set.len()
@@ -1458,7 +1506,7 @@ fn apply_event(
                     return Err(EngineError::FinalsPlayerSet);
                 }
                 for (i, uid) in new_players.iter().enumerate() {
-                    finals[i]["player_uid"] = uid.as_str().into();
+                    finals[i][seat::PLAYER_UID] = uid.as_str().into();
                 }
             } else {
                 if *round >= rounds_len {
@@ -1468,7 +1516,7 @@ fn apply_event(
                 // Positional: tables 0..table_count match existing by index (results
                 // preserved per index); extras appended; empty tables are draft
                 // workspaces, dropped after rebuild.
-                let table_count = tournament["rounds"][*round].len();
+                let table_count = tournament[tournament::ROUNDS][*round].len();
                 if seating.len() < table_count {
                     return Err(EngineError::TableCountMismatch);
                 }
@@ -1481,31 +1529,36 @@ fn apply_event(
                     return Err(EngineError::EmptyRound);
                 }
                 for uid in seating.iter().flat_map(|t| t.iter()) {
-                    if !player_exists(&tournament["players"], uid) {
+                    if !player_exists(&tournament[tournament::PLAYERS], uid) {
                         return Err(EngineError::PlayerNotFound);
                     }
                 }
 
                 // Read before the rebuild: it resets reseated tables to In Progress,
                 // so a finished round would look live to the state rules below.
-                let round_is_live = tournament["rounds"][*round].members().any(|table| {
-                    !matches!(
-                        table["state"].as_str(),
-                        Some("Finished") | Some("Cancelled")
-                    )
-                });
+                let round_is_live = tournament[tournament::ROUNDS][*round]
+                    .members()
+                    .any(|table| {
+                        !matches!(
+                            table[table::STATE].as_str(),
+                            Some("Finished") | Some("Cancelled")
+                        )
+                    });
 
                 let mut old_results: std::collections::HashMap<String, (usize, JsonValue, String)> =
                     std::collections::HashMap::new();
                 for t in 0..table_count {
-                    for s in 0..tournament["rounds"][*round][t]["seating"].len() {
-                        let uid = tournament["rounds"][*round][t]["seating"][s]["player_uid"]
+                    for s in 0..tournament[tournament::ROUNDS][*round][t][table::SEATING].len() {
+                        let uid = tournament[tournament::ROUNDS][*round][t][table::SEATING][s]
+                            [seat::PLAYER_UID]
                             .as_str()
                             .unwrap_or("")
                             .to_string();
-                        let result =
-                            tournament["rounds"][*round][t]["seating"][s]["result"].clone();
-                        let judge = tournament["rounds"][*round][t]["seating"][s]["judge_uid"]
+                        let result = tournament[tournament::ROUNDS][*round][t][table::SEATING][s]
+                            [seat::RESULT]
+                            .clone();
+                        let judge = tournament[tournament::ROUNDS][*round][t][table::SEATING][s]
+                            [seat::JUDGE_UID]
                             .as_str()
                             .unwrap_or("")
                             .to_string();
@@ -1524,14 +1577,14 @@ fn apply_event(
                     }
                 }
 
-                let round_data = &mut tournament["rounds"][*round];
+                let round_data = &mut tournament[tournament::ROUNDS][*round];
 
                 for t in 0..seating.len() {
                     if t >= round_data.len() {
                         round_data.push(json::object! {
-                            seating: [],
-                            state: "In Progress",
-                            override: json::Null,
+                            table::SEATING => json::array![],
+                            table::STATE => "In Progress",
+                            table::OVERRIDE => json::Null,
                         })?;
                     }
                     let new_players = &seating[t];
@@ -1541,33 +1594,36 @@ fn apply_event(
                             Some((old_table, old_result, old_judge)) if *old_table == t => {
                                 (old_result.clone(), old_judge.as_str())
                             }
-                            _ => (json::object! { gw: 0, vp: 0.0, tp: 0 }, ""),
+                            _ => (
+                                json::object! { score::GW => 0, score::VP => 0.0, score::TP => 0 },
+                                "",
+                            ),
                         };
                         new_seating.push(json::object! {
-                            player_uid: uid.as_str(),
-                            result: result,
-                            judge_uid: judge,
+                            seat::PLAYER_UID => uid.as_str(),
+                            seat::RESULT => result,
+                            seat::JUDGE_UID => judge,
                         });
                     }
-                    round_data[t]["seating"] = JsonValue::Array(new_seating);
+                    round_data[t][table::SEATING] = JsonValue::Array(new_seating);
 
-                    let vps: Vec<f64> = (0..round_data[t]["seating"].len())
+                    let vps: Vec<f64> = (0..round_data[t][table::SEATING].len())
                         .map(|s| {
-                            round_data[t]["seating"][s]["result"]["vp"]
+                            round_data[t][table::SEATING][s][seat::RESULT][score::VP]
                                 .as_f64()
                                 .unwrap_or(0.0)
                         })
                         .collect();
-                    if round_data[t]["override"].is_null() {
+                    if round_data[t][table::OVERRIDE].is_null() {
                         let all_zero = vps.iter().all(|&v| v == 0.0);
                         if all_zero {
-                            round_data[t]["state"] = "In Progress".into();
+                            round_data[t][table::STATE] = "In Progress".into();
                         }
                     }
                 }
 
                 for t in (0..round_data.len()).rev() {
-                    if round_data[t]["seating"].is_empty() {
+                    if round_data[t][table::SEATING].is_empty() {
                         round_data.array_remove(t);
                     }
                 }
@@ -1594,12 +1650,15 @@ fn apply_event(
                         if has_dq_sanction(sanctions, &uid) {
                             continue;
                         }
-                        if let Some(idx) = find_player_index(&tournament["players"], &uid) {
-                            if tournament["players"][idx]["state"].as_str() == Some("Disqualified")
+                        if let Some(idx) = find_player_index(&tournament[tournament::PLAYERS], &uid)
+                        {
+                            if tournament[tournament::PLAYERS][idx][player::STATE].as_str()
+                                == Some("Disqualified")
                             {
                                 continue;
                             }
-                            tournament["players"][idx]["state"] = joined_state.into();
+                            tournament[tournament::PLAYERS][idx][player::STATE] =
+                                joined_state.into();
                         }
                     }
                     demote_unseated_players(tournament, &left, *round);
@@ -1623,9 +1682,9 @@ fn apply_event(
 
             // Registered/Checked-in are unseated-and-present; a Finished player with
             // ZERO rounds played is a no-show reinstated by seating them.
-            let player_idx = find_player_index(&tournament["players"], player_uid)
+            let player_idx = find_player_index(&tournament[tournament::PLAYERS], player_uid)
                 .ok_or(EngineError::PlayerNotFound)?;
-            let player_state = tournament["players"][player_idx]["state"]
+            let player_state = tournament[tournament::PLAYERS][player_idx][player::STATE]
                 .as_str()
                 .unwrap_or("");
             let reinstatable_no_show = player_state == "Finished"
@@ -1642,7 +1701,7 @@ fn apply_event(
 
             // An earlier round may take a substitute too, but only while it is
             // live (see resolve_live_round).
-            let rounds = &mut tournament["rounds"];
+            let rounds = &mut tournament[tournament::ROUNDS];
             if rounds.is_empty() {
                 return Err(EngineError::NoRoundInProgress);
             }
@@ -1651,7 +1710,7 @@ fn apply_event(
                 return Err(EngineError::InvalidTable);
             }
 
-            let seating = &mut rounds[last][*table]["seating"];
+            let seating = &mut rounds[last][*table][table::SEATING];
             let seating_len = seating.len();
             if seating_len >= 5 {
                 return Err(EngineError::TableFull);
@@ -1663,9 +1722,9 @@ fn apply_event(
             };
 
             let seat_entry = json::object! {
-                player_uid: player_uid.as_str(),
-                result: { gw: 0, vp: 0.0, tp: 0 },
-                judge_uid: "",
+                seat::PLAYER_UID => player_uid.as_str(),
+                seat::RESULT => json::object!{ score::GW => 0, score::VP => 0.0, score::TP => 0 },
+                seat::JUDGE_UID => "",
             };
 
             let mut new_seating = Vec::new();
@@ -1678,14 +1737,15 @@ fn apply_event(
             if insert_pos >= seating_len {
                 new_seating.push(seat_entry);
             }
-            rounds[last][*table]["seating"] = JsonValue::Array(new_seating);
+            rounds[last][*table][table::SEATING] = JsonValue::Array(new_seating);
 
-            tournament["players"][player_idx]["state"] = if state == TournamentState::Finished {
-                "Finished"
-            } else {
-                "Playing"
-            }
-            .into();
+            tournament[tournament::PLAYERS][player_idx][player::STATE] =
+                if state == TournamentState::Finished {
+                    "Finished"
+                } else {
+                    "Playing"
+                }
+                .into();
             update_standings(tournament, sanctions);
             Ok(())
         }
@@ -1694,7 +1754,7 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
-            let rounds = &mut tournament["rounds"];
+            let rounds = &mut tournament[tournament::ROUNDS];
             if rounds.is_empty() {
                 return Err(EngineError::NoRoundInProgress);
             }
@@ -1702,16 +1762,16 @@ fn apply_event(
 
             let mut found = false;
             for t in 0..rounds[last].len() {
-                let seating = &rounds[last][t]["seating"];
+                let seating = &rounds[last][t][table::SEATING];
                 let mut seat_idx = None;
                 for s in 0..seating.len() {
-                    if seating[s]["player_uid"].as_str() == Some(player_uid) {
+                    if seating[s][seat::PLAYER_UID].as_str() == Some(player_uid) {
                         seat_idx = Some(s);
                         break;
                     }
                 }
                 if let Some(s) = seat_idx {
-                    rounds[last][t]["seating"].array_remove(s);
+                    rounds[last][t][table::SEATING].array_remove(s);
                     found = true;
                     break;
                 }
@@ -1736,16 +1796,16 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
-            let rounds = &mut tournament["rounds"];
+            let rounds = &mut tournament[tournament::ROUNDS];
             if rounds.is_empty() {
                 return Err(EngineError::NoRoundInProgress);
             }
             let last = rounds.len() - 1;
 
             let empty_table = json::object! {
-                seating: [],
-                state: "In Progress",
-                override: json::Null,
+                table::SEATING => json::array![],
+                table::STATE => "In Progress",
+                table::OVERRIDE => json::Null,
             };
             rounds[last].push(empty_table)?;
             Ok(())
@@ -1755,7 +1815,7 @@ fn apply_event(
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
 
-            let rounds = &mut tournament["rounds"];
+            let rounds = &mut tournament[tournament::ROUNDS];
             if rounds.is_empty() {
                 return Err(EngineError::NoRoundInProgress);
             }
@@ -1763,7 +1823,7 @@ fn apply_event(
             if *table >= rounds[last].len() {
                 return Err(EngineError::InvalidTable);
             }
-            if !rounds[last][*table]["seating"].is_empty() {
+            if !rounds[last][*table][table::SEATING].is_empty() {
                 return Err(EngineError::TableNotEmpty);
             }
             rounds[last].array_remove(*table);
@@ -1777,48 +1837,49 @@ fn apply_event(
         } => {
             require_can_edit_results(actor, state)?;
 
-            let rounds_len = tournament["rounds"].len();
-            let is_finals = *round == rounds_len && !tournament["finals"].is_null() && *table == 0;
+            let rounds_len = tournament[tournament::ROUNDS].len();
+            let is_finals =
+                *round == rounds_len && !tournament[tournament::FINALS].is_null() && *table == 0;
 
             // Resolved before the mutable borrow of `t` below: scores don't move
             // seats, so this ordering is equivalent and avoids a borrow conflict.
             let effective_sas = sanctions::resolve_sa_effective_rounds(tournament, sanctions);
 
             let t = if is_finals {
-                &mut tournament["finals"]
+                &mut tournament[tournament::FINALS]
             } else {
-                let rounds = &tournament["rounds"];
+                let rounds = &tournament[tournament::ROUNDS];
                 if *round >= rounds.len() {
                     return Err(EngineError::InvalidRound);
                 }
                 if *table >= rounds[*round].len() {
                     return Err(EngineError::InvalidTable);
                 }
-                &mut tournament["rounds"][*round][*table]
+                &mut tournament[tournament::ROUNDS][*round][*table]
             };
 
-            let is_at_table = t["seating"]
+            let is_at_table = t[table::SEATING]
                 .members()
-                .any(|s| s["player_uid"].as_str() == Some(&actor.uid));
+                .any(|s| s[seat::PLAYER_UID].as_str() == Some(&actor.uid));
 
             if !actor.is_organizer && !is_at_table {
                 return Err(EngineError::ScoreForbidden);
             }
 
-            if !t["override"].is_null() && !actor.is_organizer {
+            if !t[table::OVERRIDE].is_null() && !actor.is_organizer {
                 return Err(EngineError::ScoreLocked);
             }
 
             if !actor.is_organizer {
-                let has_judge_score = t["seating"]
+                let has_judge_score = t[table::SEATING]
                     .members()
-                    .any(|s| !s["judge_uid"].as_str().unwrap_or("").is_empty());
+                    .any(|s| !s[seat::JUDGE_UID].as_str().unwrap_or("").is_empty());
                 if has_judge_score {
                     return Err(EngineError::ScoreSetByOrganizer);
                 }
             }
 
-            let table_size = t["seating"].len();
+            let table_size = t[table::SEATING].len();
 
             for score in scores.iter() {
                 let vp = score.vp;
@@ -1845,24 +1906,32 @@ fn apply_event(
             // Gathered in seating order (predator-prey order), for oust-order validation.
             let mut vps: Vec<f64> = Vec::with_capacity(table_size);
             for i in 0..table_size {
-                let player_uid = t["seating"][i]["player_uid"].as_str().unwrap_or("");
-                let vp = vp_map
-                    .get(player_uid)
-                    .copied()
-                    .unwrap_or(t["seating"][i]["result"]["vp"].as_f64().unwrap_or(0.0));
+                let player_uid = t[table::SEATING][i][seat::PLAYER_UID]
+                    .as_str()
+                    .unwrap_or("");
+                let vp = vp_map.get(player_uid).copied().unwrap_or(
+                    t[table::SEATING][i][seat::RESULT][score::VP]
+                        .as_f64()
+                        .unwrap_or(0.0),
+                );
                 vps.push(vp);
             }
 
             // Per-seat SA adjustments (-1.0 VP per SA on this round). Same helper the
             // standings/rating recompute uses, so GW/TP stay consistent everywhere.
             let current_round = if is_finals { rounds_len } else { *round };
-            let adjustments = table_sa_adjustments(&t["seating"], current_round, &effective_sas);
+            let adjustments =
+                table_sa_adjustments(&t[table::SEATING], current_round, &effective_sas);
 
             let gws = if is_finals {
                 let seating_uids: Vec<&str> = (0..table_size)
-                    .map(|i| t["seating"][i]["player_uid"].as_str().unwrap_or(""))
+                    .map(|i| {
+                        t[table::SEATING][i][seat::PLAYER_UID]
+                            .as_str()
+                            .unwrap_or("")
+                    })
                     .collect();
-                let seed_order: Vec<String> = t["seed_order"]
+                let seed_order: Vec<String> = t[finals_table::SEED_ORDER]
                     .members()
                     .filter_map(|s| s.as_str().map(|v| v.to_string()))
                     .collect();
@@ -1873,41 +1942,41 @@ fn apply_event(
             let tps = compute_tp(table_size, &vps, &adjustments);
 
             for i in 0..table_size {
-                let player_uid = t["seating"][i]["player_uid"]
+                let player_uid = t[table::SEATING][i][seat::PLAYER_UID]
                     .as_str()
                     .unwrap_or("")
                     .to_string();
                 if vp_map.contains_key(player_uid.as_str()) {
-                    t["seating"][i]["result"]["vp"] = vps[i].into();
-                    t["seating"][i]["result"]["gw"] = gws[i].into();
-                    t["seating"][i]["result"]["tp"] = tps[i].into();
+                    t[table::SEATING][i][seat::RESULT][score::VP] = vps[i].into();
+                    t[table::SEATING][i][seat::RESULT][score::GW] = gws[i].into();
+                    t[table::SEATING][i][seat::RESULT][score::TP] = tps[i].into();
                     // A seated organizer plays, not adjudicates: stamping would lock
                     // their own tablemates out. Override still locks a table you sit at.
                     if actor.is_organizer && !is_at_table {
-                        t["seating"][i]["judge_uid"] = actor.uid.as_str().into();
+                        t[table::SEATING][i][seat::JUDGE_UID] = actor.uid.as_str().into();
                     }
                 }
             }
 
-            if t["override"].is_null() {
+            if t[table::OVERRIDE].is_null() {
                 let vp_err = check_table_vps(&vps);
                 match vp_err {
                     Some(VpError::IncompleteTotal) => {
-                        t["state"] = "In Progress".into();
+                        t[table::STATE] = "In Progress".into();
                     }
                     Some(VpError::RedirectedVp) => {
                         // Previously read as a half-filled table and accepted; keep
                         // accepting, but flag what it is — only a judge can close it.
-                        t["state"] = "Invalid".into();
+                        t[table::STATE] = "Invalid".into();
                     }
                     Some(_) => {
                         if !actor.is_organizer {
                             return Err(EngineError::InvalidScore);
                         }
-                        t["state"] = "Invalid".into();
+                        t[table::STATE] = "Invalid".into();
                     }
                     None => {
-                        t["state"] = "Finished".into();
+                        t[table::STATE] = "Finished".into();
                     }
                 }
             }
@@ -1927,26 +1996,26 @@ fn apply_event(
             require_organizer(actor)?;
             require_can_edit_results(actor, state)?;
 
-            let is_finals = *round == tournament["rounds"].len()
-                && !tournament["finals"].is_null()
+            let is_finals = *round == tournament[tournament::ROUNDS].len()
+                && !tournament[tournament::FINALS].is_null()
                 && *table == 0;
             let t = if is_finals {
-                &mut tournament["finals"]
+                &mut tournament[tournament::FINALS]
             } else {
-                let rounds = &tournament["rounds"];
+                let rounds = &tournament[tournament::ROUNDS];
                 if *round >= rounds.len() {
                     return Err(EngineError::InvalidRound);
                 }
                 if *table >= rounds[*round].len() {
                     return Err(EngineError::InvalidTable);
                 }
-                &mut tournament["rounds"][*round][*table]
+                &mut tournament[tournament::ROUNDS][*round][*table]
             };
-            t["override"] = json::object! {
-                judge_uid: actor.uid.as_str(),
-                comment: comment.as_str(),
+            t[table::OVERRIDE] = json::object! {
+                score_override::JUDGE_UID => actor.uid.as_str(),
+                score_override::COMMENT => comment.as_str(),
             };
-            t["state"] = "Finished".into();
+            t[table::STATE] = "Finished".into();
 
             update_standings(tournament, sanctions);
             Ok(())
@@ -1956,37 +2025,41 @@ fn apply_event(
             require_organizer(actor)?;
             require_can_edit_results(actor, state)?;
 
-            let is_finals = *round == tournament["rounds"].len()
-                && !tournament["finals"].is_null()
+            let is_finals = *round == tournament[tournament::ROUNDS].len()
+                && !tournament[tournament::FINALS].is_null()
                 && *table == 0;
             let t = if is_finals {
-                &mut tournament["finals"]
+                &mut tournament[tournament::FINALS]
             } else {
-                let rounds = &tournament["rounds"];
+                let rounds = &tournament[tournament::ROUNDS];
                 if *round >= rounds.len() {
                     return Err(EngineError::InvalidRound);
                 }
                 if *table >= rounds[*round].len() {
                     return Err(EngineError::InvalidTable);
                 }
-                &mut tournament["rounds"][*round][*table]
+                &mut tournament[tournament::ROUNDS][*round][*table]
             };
-            t["override"] = json::Null;
+            t[table::OVERRIDE] = json::Null;
 
-            let table_size = t["seating"].len();
+            let table_size = t[table::SEATING].len();
             let vps: Vec<f64> = (0..table_size)
-                .map(|i| t["seating"][i]["result"]["vp"].as_f64().unwrap_or(0.0))
+                .map(|i| {
+                    t[table::SEATING][i][seat::RESULT][score::VP]
+                        .as_f64()
+                        .unwrap_or(0.0)
+                })
                 .collect();
             let vp_err = check_table_vps(&vps);
             match vp_err {
                 Some(VpError::IncompleteTotal) => {
-                    t["state"] = "In Progress".into();
+                    t[table::STATE] = "In Progress".into();
                 }
                 Some(_) => {
-                    t["state"] = "Invalid".into();
+                    t[table::STATE] = "Invalid".into();
                 }
                 None => {
-                    t["state"] = "Finished".into();
+                    t[table::STATE] = "Finished".into();
                 }
             }
 
@@ -2000,9 +2073,9 @@ fn apply_event(
             if count_played_rounds(tournament) < 2 {
                 return Err(EngineError::TossMinRounds);
             }
-            let idx = find_player_index(&tournament["players"], player_uid)
+            let idx = find_player_index(&tournament[tournament::PLAYERS], player_uid)
                 .ok_or(EngineError::PlayerNotFound)?;
-            tournament["players"][idx]["toss"] = (*toss).into();
+            tournament[tournament::PLAYERS][idx][player::TOSS] = (*toss).into();
             Ok(())
         }
 
@@ -2014,12 +2087,12 @@ fn apply_event(
             }
 
             let standings = compute_preliminary_standings(tournament, sanctions);
-            let candidates = finals_candidates(&tournament["players"], &standings);
+            let candidates = finals_candidates(&tournament[tournament::PLAYERS], &standings);
 
             // The client applies this event through WASM before the server replays it,
             // so the shuffle must be a pure function of the tournament — an OS random
             // source would leave the two copies seating a different top five.
-            let seed: u64 = tournament["uid"]
+            let seed: u64 = tournament[tournament::UID]
                 .as_str()
                 .unwrap_or("")
                 .bytes()
@@ -2040,8 +2113,10 @@ fn apply_event(
                     shuffled.swap(k, swap_idx);
                 }
                 for s in shuffled {
-                    if let Some(pi) = find_player_index(&tournament["players"], &s.user_uid) {
-                        tournament["players"][pi]["toss"] = toss_counter.into();
+                    if let Some(pi) =
+                        find_player_index(&tournament[tournament::PLAYERS], &s.user_uid)
+                    {
+                        tournament[tournament::PLAYERS][pi][player::TOSS] = toss_counter.into();
                     }
                     toss_counter += 1;
                 }
@@ -2056,12 +2131,12 @@ fn apply_event(
             if count_played_rounds(tournament) < 2 {
                 return Err(EngineError::FinalsMinRounds);
             }
-            if !tournament["finals"].is_null() {
+            if !tournament[tournament::FINALS].is_null() {
                 return Err(EngineError::FinalsAlreadyStarted);
             }
 
             let standings = compute_preliminary_standings(tournament, sanctions);
-            let eligible = finals_candidates(&tournament["players"], &standings);
+            let eligible = finals_candidates(&tournament[tournament::PLAYERS], &standings);
 
             if eligible.len() < 5 {
                 return Err(EngineError::FinalsNotEnoughPlayers);
@@ -2077,29 +2152,30 @@ fn apply_event(
                 .iter()
                 .map(|s| {
                     json::object! {
-                        player_uid: s.user_uid.as_str(),
-                        result: { gw: 0, vp: 0.0, tp: 0 },
-                        judge_uid: "",
+                        seat::PLAYER_UID => s.user_uid.as_str(),
+                        seat::RESULT => json::object!{ score::GW => 0, score::VP => 0.0, score::TP => 0 },
+                        seat::JUDGE_UID => "",
                     }
                 })
                 .collect();
 
-            tournament["finals"] = json::object! {
-                seating: JsonValue::Array(seating),
-                state: "In Progress",
-                override: json::Null,
-                seed_order: JsonValue::Array(seed_order),
+            tournament[tournament::FINALS] = json::object! {
+                finals_table::SEATING => JsonValue::Array(seating),
+                finals_table::STATE => "In Progress",
+                finals_table::OVERRIDE => json::Null,
+                finals_table::SEED_ORDER => JsonValue::Array(seed_order),
             };
 
             for s in &top5 {
-                if let Some(idx) = find_player_index(&tournament["players"], &s.user_uid) {
-                    tournament["players"][idx]["state"] = "Playing".into();
-                    tournament["players"][idx]["finalist"] = true.into();
+                if let Some(idx) = find_player_index(&tournament[tournament::PLAYERS], &s.user_uid)
+                {
+                    tournament[tournament::PLAYERS][idx][player::STATE] = "Playing".into();
+                    tournament[tournament::PLAYERS][idx][player::FINALIST] = true.into();
                 }
             }
 
             if state != TournamentState::Finished {
-                tournament["state"] = "Playing".into();
+                tournament[tournament::STATE] = "Playing".into();
             }
             Ok(())
         }
@@ -2107,11 +2183,13 @@ fn apply_event(
         TournamentEvent::FinishFinals => {
             require_organizer(actor)?;
             require_state_or_finished(state, TournamentState::Playing)?;
-            if tournament["finals"].is_null() {
+            if tournament[tournament::FINALS].is_null() {
                 return Err(EngineError::NoFinalsInProgress);
             }
 
-            let finals_state = tournament["finals"]["state"].as_str().unwrap_or("");
+            let finals_state = tournament[tournament::FINALS][finals_table::STATE]
+                .as_str()
+                .unwrap_or("");
             if finals_state != "Finished" {
                 return Err(EngineError::FinalsTableUnfinished);
             }
@@ -2119,18 +2197,18 @@ fn apply_event(
             // compute_gw_finals is the single source of finals-winner derivation — the same
             // call SetScore and update_standings use, so the winner can never diverge from the scored GW.
             let effective_sas = sanctions::resolve_sa_effective_rounds(tournament, sanctions);
-            let finals_round = tournament["rounds"].len();
-            let seating = &tournament["finals"]["seating"];
+            let finals_round = tournament[tournament::ROUNDS].len();
+            let seating = &tournament[tournament::FINALS][finals_table::SEATING];
             let vps: Vec<f64> = seating
                 .members()
-                .map(|s| s["result"]["vp"].as_f64().unwrap_or(0.0))
+                .map(|s| s[seat::RESULT][score::VP].as_f64().unwrap_or(0.0))
                 .collect();
             let seating_uids: Vec<&str> = seating
                 .members()
-                .map(|s| s["player_uid"].as_str().unwrap_or(""))
+                .map(|s| s[seat::PLAYER_UID].as_str().unwrap_or(""))
                 .collect();
             let adjustments = table_sa_adjustments(seating, finals_round, &effective_sas);
-            let seed_order: Vec<String> = tournament["finals"]["seed_order"]
+            let seed_order: Vec<String> = tournament[tournament::FINALS][finals_table::SEED_ORDER]
                 .members()
                 .filter_map(|s| s.as_str().map(|v| v.to_string()))
                 .collect();
@@ -2141,15 +2219,15 @@ fn apply_event(
                 .map(|i| seating_uids[i].to_string())
                 .unwrap_or_default();
 
-            tournament["winner"] = winner.as_str().into();
+            tournament[tournament::WINNER] = winner.as_str().into();
             if state != TournamentState::Finished {
-                tournament["state"] = "Finished".into();
+                tournament[tournament::STATE] = "Finished".into();
             }
 
-            let players = &mut tournament["players"];
+            let players = &mut tournament[tournament::PLAYERS];
             for i in 0..players.len() {
-                if players[i]["state"].as_str() != Some("Disqualified") {
-                    players[i]["state"] = "Finished".into();
+                if players[i][player::STATE].as_str() != Some("Disqualified") {
+                    players[i][player::STATE] = "Finished".into();
                 }
             }
 
@@ -2163,28 +2241,31 @@ fn apply_event(
             // no-show and re-run StartFinals, which promotes the next qualifier.
             require_organizer(actor)?;
             require_state(state, TournamentState::Playing)?;
-            if tournament["finals"].is_null() {
+            if tournament[tournament::FINALS].is_null() {
                 return Err(EngineError::NoFinalsInProgress);
             }
 
             // Capped (open-rounds) finalists return to Completed; the rest to Checked-in.
-            let max_rounds = tournament["max_rounds"].as_usize().unwrap_or(0);
+            let max_rounds = tournament[tournament::MAX_ROUNDS].as_usize().unwrap_or(0);
             let capped: std::collections::HashSet<String> = if max_rounds > 0 {
-                tournament["players"]
+                tournament[tournament::PLAYERS]
                     .members()
-                    .filter(|p| p["finalist"].as_bool().unwrap_or(false))
-                    .filter_map(|p| p["user_uid"].as_str().map(String::from))
+                    .filter(|p| p[player::FINALIST].as_bool().unwrap_or(false))
+                    .filter_map(|p| p[player::USER_UID].as_str().map(String::from))
                     .filter(|uid| count_player_rounds_played(tournament, uid) >= max_rounds)
                     .collect()
             } else {
                 std::collections::HashSet::new()
             };
-            let players = &mut tournament["players"];
+            let players = &mut tournament[tournament::PLAYERS];
             for i in 0..players.len() {
-                if players[i]["finalist"].as_bool().unwrap_or(false) {
-                    let uid = players[i]["user_uid"].as_str().unwrap_or("").to_string();
-                    players[i]["finalist"] = false.into();
-                    players[i]["state"] = if capped.contains(&uid) {
+                if players[i][player::FINALIST].as_bool().unwrap_or(false) {
+                    let uid = players[i][player::USER_UID]
+                        .as_str()
+                        .unwrap_or("")
+                        .to_string();
+                    players[i][player::FINALIST] = false.into();
+                    players[i][player::STATE] = if capped.contains(&uid) {
                         "Completed"
                     } else {
                         "Checked-in"
@@ -2193,8 +2274,8 @@ fn apply_event(
                 }
             }
 
-            tournament["finals"] = json::Null;
-            tournament["state"] = "Waiting".into();
+            tournament[tournament::FINALS] = json::Null;
+            tournament[tournament::STATE] = "Waiting".into();
             update_standings(tournament, sanctions);
             Ok(())
         }
@@ -2208,28 +2289,28 @@ fn apply_event(
                 return Err(EngineError::CannotFinish);
             }
 
-            tournament["state"] = "Finished".into();
+            tournament[tournament::STATE] = "Finished".into();
 
-            let players = &mut tournament["players"];
+            let players = &mut tournament[tournament::PLAYERS];
             for i in 0..players.len() {
-                if players[i]["state"].as_str() != Some("Disqualified") {
-                    players[i]["state"] = "Finished".into();
+                if players[i][player::STATE].as_str() != Some("Disqualified") {
+                    players[i][player::STATE] = "Finished".into();
                 }
             }
 
             update_standings(tournament, sanctions);
 
             for d in decks.members() {
-                let user_uid = d["user_uid"].as_str().unwrap_or("");
+                let user_uid = d[deck_object::USER_UID].as_str().unwrap_or("");
                 if user_uid.is_empty() {
                     continue;
                 }
                 let is_public = compute_deck_public(tournament, user_uid);
                 if is_public {
                     let op = json::object! {
-                        "op" => "set_public",
-                        "deck_uid" => d["uid"].as_str().unwrap_or(""),
-                        "public" => true,
+                        arg::OP => "set_public",
+                        arg::DECK_UID => d[deck_object::UID].as_str().unwrap_or(""),
+                        arg::PUBLIC => true,
                     };
                     let _ = deck_ops.push(op);
                 }
@@ -2245,16 +2326,16 @@ fn apply_event(
             if !actor.is_organizer && actor.uid != *player_uid {
                 return Err(EngineError::DeckUploadForbidden);
             }
-            let is_registered = tournament["players"]
+            let is_registered = tournament[tournament::PLAYERS]
                 .members()
-                .any(|p| p["user_uid"].as_str() == Some(player_uid.as_str()));
+                .any(|p| p[player::USER_UID].as_str() == Some(player_uid.as_str()));
             if !is_registered {
                 return Err(EngineError::NotRegistered);
             }
             if !actor.is_organizer {
                 let existing_count = decks
                     .members()
-                    .filter(|d| d["user_uid"].as_str() == Some(player_uid.as_str()))
+                    .filter(|d| d[deck_object::USER_UID].as_str() == Some(player_uid.as_str()))
                     .count();
                 match state {
                     TournamentState::Playing => {
@@ -2274,12 +2355,12 @@ fn apply_event(
             }
             let is_public = compute_deck_public(tournament, player_uid);
             let mut deck_data = deck.clone();
-            deck_data["public"] = is_public.into();
+            deck_data[deck_object::PUBLIC] = is_public.into();
             let op = json::object! {
-                "op" => "upsert",
-                "player_uid" => player_uid.as_str(),
-                "deck" => deck_data,
-                "multideck" => *multideck,
+                arg::OP => "upsert",
+                arg::PLAYER_UID => player_uid.as_str(),
+                arg::DECK => deck_data,
+                arg::MULTIDECK => *multideck,
             };
             let _ = deck_ops.push(op);
             Ok(())
@@ -2317,10 +2398,10 @@ fn apply_event(
                 }
             }
             let op = json::object! {
-                "op" => "delete",
-                "player_uid" => player_uid.as_str(),
-                "deck_index" => match deck_index { Some(i) => JsonValue::from(*i), None => JsonValue::Null },
-                "multideck" => *multideck,
+                arg::OP => "delete",
+                arg::PLAYER_UID => player_uid.as_str(),
+                arg::DECK_INDEX => match deck_index { Some(i) => JsonValue::from(*i), None => JsonValue::Null },
+                arg::MULTIDECK => *multideck,
             };
             let _ = deck_ops.push(op);
             Ok(())
@@ -2363,33 +2444,35 @@ fn apply_event(
                 .map(|uid| uid.into())
                 .collect();
             let mut draw = json::object! {
-                "label" => label.as_str(),
-                "pool" => pool.as_str(),
-                "winners" => JsonValue::Array(winners),
+                raffle_draw::LABEL => label.as_str(),
+                raffle_draw::POOL => pool.as_str(),
+                raffle_draw::WINNERS => JsonValue::Array(winners),
             };
             if let Some(promo_uid) = prize_promo_uid {
-                draw["prize_promo_uid"] = promo_uid.as_str().into();
+                draw[raffle_draw::PRIZE_PROMO_UID] = promo_uid.as_str().into();
             }
-            if tournament["raffles"].is_null() {
-                tournament["raffles"] = JsonValue::new_array();
+            if tournament[tournament::RAFFLES].is_null() {
+                tournament[tournament::RAFFLES] = JsonValue::new_array();
             }
-            tournament["raffles"].push(draw)?;
+            tournament[tournament::RAFFLES].push(draw)?;
             Ok(())
         }
 
         TournamentEvent::RaffleUndo => {
             require_organizer(actor)?;
-            if tournament["raffles"].is_null() || tournament["raffles"].is_empty() {
+            if tournament[tournament::RAFFLES].is_null()
+                || tournament[tournament::RAFFLES].is_empty()
+            {
                 return Err(EngineError::RaffleNoDraws);
             }
-            let last = tournament["raffles"].len() - 1;
-            tournament["raffles"].array_remove(last);
+            let last = tournament[tournament::RAFFLES].len() - 1;
+            tournament[tournament::RAFFLES].array_remove(last);
             Ok(())
         }
 
         TournamentEvent::RaffleClear => {
             require_organizer(actor)?;
-            tournament["raffles"] = JsonValue::new_array();
+            tournament[tournament::RAFFLES] = JsonValue::new_array();
             Ok(())
         }
 
@@ -2400,11 +2483,11 @@ fn apply_event(
             require_organizer(actor)?;
             // No state gate: usually entered at/after finish, and corrections
             // to an already-submitted report are first-class.
-            tournament["promos_distributed"] = promos.clone();
+            tournament[tournament::PROMOS_DISTRIBUTED] = promos.clone();
             let source = stock_source_uid
                 .clone()
                 .unwrap_or_else(|| actor.uid.clone());
-            tournament["promo_stock_source_uid"] = source.into();
+            tournament[tournament::PROMO_STOCK_SOURCE_UID] = source.into();
             Ok(())
         }
 
@@ -2415,9 +2498,15 @@ fn apply_event(
 
             // rank/format/start freeze once VEKN-published: calendar create and results
             // push are both write-once, so a later edit would silently diverge from vekn.net.
-            let vekn_id = tournament["external_ids"]["vekn"].as_str().unwrap_or("");
+            let vekn_id = tournament[tournament::EXTERNAL_IDS][arg::VEKN]
+                .as_str()
+                .unwrap_or("");
             if !vekn_id.is_empty() {
-                for field in ["rank", "format", "start"] {
+                for field in [
+                    tournament_config::RANK,
+                    tournament_config::FORMAT,
+                    tournament_config::START,
+                ] {
                     // String compare with null ≡ "" (the form posts "" for "no rank")
                     if config.has_key(field)
                         && config[field].as_str().unwrap_or("")
@@ -2432,10 +2521,10 @@ fn apply_event(
 
             // Only when the edit touches one of the four keys, on the merged view — an
             // already-illegal stored combo (legacy import) must not block unrelated edits.
-            if config.has_key("rank")
-                || config.has_key("format")
-                || config.has_key("proxies")
-                || config.has_key("multideck")
+            if config.has_key(tournament_config::RANK)
+                || config.has_key(tournament_config::FORMAT)
+                || config.has_key(tournament_config::PROXIES)
+                || config.has_key(tournament_config::MULTIDECK)
             {
                 let merged_str = |field: &str| -> String {
                     if config.has_key(field) {
@@ -2461,7 +2550,8 @@ fn apply_event(
 
             // Date ordering on the merged view: a partial update can carry `finish` while
             // `start` still lives on the stored tournament, so a config-only check would see half the pair.
-            if config.has_key("start") || config.has_key("finish") {
+            if config.has_key(tournament_config::START) || config.has_key(tournament_config::FINISH)
+            {
                 let merged_date = |field: &str| -> String {
                     let src = if config.has_key(field) {
                         &config[field]
@@ -2473,12 +2563,12 @@ fn apply_event(
                 validate_finish_after_start(&merged_date("start"), &merged_date("finish"))?;
             }
 
-            if let Some(mr) = config["max_rounds"].as_usize() {
+            if let Some(mr) = config[tournament_config::MAX_ROUNDS].as_usize() {
                 if mr != 0 {
                     // Per-player cap: can't drop below what any single player has already played.
-                    let completed = tournament["players"]
+                    let completed = tournament[tournament::PLAYERS]
                         .members()
-                        .filter_map(|p| p["user_uid"].as_str())
+                        .filter_map(|p| p[player::USER_UID].as_str())
                         .map(|uid| count_player_rounds_played(tournament, uid))
                         .max()
                         .unwrap_or(0);
@@ -2488,8 +2578,10 @@ fn apply_event(
                 }
             }
             // Validate league_uid: only league organizers (or IC) can link
-            if config.has_key("league_uid") && !config["league_uid"].is_null() {
-                let league_uid = config["league_uid"].as_str().unwrap_or("");
+            if config.has_key(tournament_config::LEAGUE_UID)
+                && !config[tournament_config::LEAGUE_UID].is_null()
+            {
+                let league_uid = config[tournament_config::LEAGUE_UID].as_str().unwrap_or("");
                 if !league_uid.is_empty()
                     && !actor.roles.contains(&"IC".to_string())
                     && !actor
@@ -2500,8 +2592,8 @@ fn apply_event(
                 }
             }
 
-            let decklists_mode_changing =
-                config.has_key("decklists_mode") && state == TournamentState::Finished;
+            let decklists_mode_changing = config.has_key(tournament_config::DECKLISTS_MODE)
+                && state == TournamentState::Finished;
 
             // Apply config fields (key present = apply, even if null)
             for field in CONFIG_FIELDS {
@@ -2512,16 +2604,16 @@ fn apply_event(
 
             if decklists_mode_changing {
                 for d in decks.members() {
-                    let user_uid = d["user_uid"].as_str().unwrap_or("");
-                    let deck_uid = d["uid"].as_str().unwrap_or("");
+                    let user_uid = d[deck_object::USER_UID].as_str().unwrap_or("");
+                    let deck_uid = d[deck_object::UID].as_str().unwrap_or("");
                     if user_uid.is_empty() || deck_uid.is_empty() {
                         continue;
                     }
                     let is_public = compute_deck_public(tournament, user_uid);
                     let op = json::object! {
-                        "op" => "set_public",
-                        "deck_uid" => deck_uid,
-                        "public" => is_public,
+                        arg::OP => "set_public",
+                        arg::DECK_UID => deck_uid,
+                        arg::PUBLIC => is_public,
                     };
                     let _ = deck_ops.push(op);
                 }
@@ -2550,7 +2642,7 @@ fn apply_event(
             }
             // The nightly calendar sync rebuilds any rounds-less vekn-linked row
             // from upstream, so the correction would vanish on its next run.
-            if !tournament["external_ids"]["vekn"]
+            if !tournament[tournament::EXTERNAL_IDS][arg::VEKN]
                 .as_str()
                 .unwrap_or("")
                 .is_empty()
@@ -2573,57 +2665,57 @@ fn apply_event(
             // A native event finished from Waiting also reaches here: a name-only
             // player has no uid the payload could name, so they are carried
             // through rather than deleted by an event that cannot address them.
-            let existing = tournament["players"].clone();
+            let existing = tournament[tournament::PLAYERS].clone();
             let nameless: Vec<JsonValue> = existing
                 .members()
-                .filter(|p| p["user_uid"].as_str().unwrap_or("").is_empty())
+                .filter(|p| p[player::USER_UID].as_str().unwrap_or("").is_empty())
                 .cloned()
                 .collect();
-            tournament["players"] = JsonValue::Array(
+            tournament[tournament::PLAYERS] = JsonValue::Array(
                 ordered
                     .iter()
                     .map(|uid| {
                         let prior = existing
                             .members()
-                            .find(|p| p["user_uid"].as_str() == Some(uid.as_str()));
+                            .find(|p| p[player::USER_UID].as_str() == Some(uid.as_str()));
                         let mut player = json::object! {
-                            user_uid: uid.as_str(),
-                            state: "Finished",
-                            payment_status: prior
-                                .and_then(|p| p["payment_status"].as_str())
+                            player::USER_UID => uid.as_str(),
+                            player::STATE => "Finished",
+                            player::PAYMENT_STATUS => prior
+                                .and_then(|p| p[player::PAYMENT_STATUS].as_str())
                                 .unwrap_or("Paid"),
-                            toss: 0,
-                            result: { gw: 0, vp: 0.0, tp: 0 },
-                            finalist: *uid == winner,
-                            non_competing: false,
+                            player::TOSS => 0,
+                            player::RESULT => json::object!{ score::GW => 0, score::VP => 0.0, score::TP => 0 },
+                            player::FINALIST => *uid == winner,
+                            player::NON_COMPETING => false,
                         };
-                        if let Some(dn) = prior.and_then(|p| p["display_name"].as_str()) {
-                            player["display_name"] = dn.into();
+                        if let Some(dn) = prior.and_then(|p| p[player::DISPLAY_NAME].as_str()) {
+                            player[player::DISPLAY_NAME] = dn.into();
                         }
                         player
                     })
                     .chain(nameless)
                     .collect(),
             );
-            tournament["standings"] = JsonValue::Array(
+            tournament[tournament::STANDINGS] = JsonValue::Array(
                 ordered
                     .iter()
                     .map(|uid| {
                         json::object! {
-                            user_uid: uid.as_str(),
-                            gw: 0.0,
-                            vp: 0.0,
-                            tp: 0,
-                            toss: 0,
-                            finalist: *uid == winner,
-                            disqualified: false,
-                            non_competing: false,
+                            standing::USER_UID => uid.as_str(),
+                            standing::GW => 0.0,
+                            standing::VP => 0.0,
+                            standing::TP => 0,
+                            standing::TOSS => 0,
+                            standing::FINALIST => *uid == winner,
+                            standing::DISQUALIFIED => false,
+                            standing::NON_COMPETING => false,
                         }
                     })
                     .collect(),
             );
-            tournament["winner"] = winner.as_str().into();
-            tournament["reported_player_count"] = (*reported_player_count).into();
+            tournament[tournament::WINNER] = winner.as_str().into();
+            tournament[tournament::REPORTED_PLAYER_COUNT] = (*reported_player_count).into();
             Ok(())
         }
     }

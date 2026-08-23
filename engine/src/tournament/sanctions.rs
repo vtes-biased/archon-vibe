@@ -1,7 +1,8 @@
+use crate::model::{finals_table, sanction, seat, table, tournament};
 use json::JsonValue;
 
 pub(super) fn is_sanction_active(s: &JsonValue) -> bool {
-    s["lifted_at"].is_null() && s["deleted_at"].is_null()
+    s[sanction::LIFTED_AT].is_null() && s[sanction::DELETED_AT].is_null()
 }
 
 pub(super) fn get_sa_sanctions(sanctions: &JsonValue) -> Vec<(String, usize)> {
@@ -10,11 +11,11 @@ pub(super) fn get_sa_sanctions(sanctions: &JsonValue) -> Vec<(String, usize)> {
         if !is_sanction_active(s) {
             continue;
         }
-        if s["level"].as_str() != Some("standings_adjustment") {
+        if s[sanction::LEVEL].as_str() != Some("standings_adjustment") {
             continue;
         }
-        let uid = s["user_uid"].as_str().unwrap_or("").to_string();
-        let round = s["round_number"].as_usize().unwrap_or(0);
+        let uid = s[sanction::USER_UID].as_str().unwrap_or("").to_string();
+        let round = s[sanction::ROUND_NUMBER].as_usize().unwrap_or(0);
         if !uid.is_empty() {
             result.push((uid, round));
         }
@@ -29,22 +30,22 @@ pub(super) fn resolve_sa_effective_rounds(
     tournament: &JsonValue,
     sanctions: &JsonValue,
 ) -> Vec<(String, usize)> {
-    let rounds = &tournament["rounds"];
+    let rounds = &tournament[tournament::ROUNDS];
     let nrounds = rounds.len();
     // An SA anchors only on a table the standings score, so the -1 VP and the GW/TP
     // cascade land on the same round. Finals never lingers cancelled — CancelFinals
     // nulls `finals` wholesale — so presence in seating is enough.
     let seated_in = |uid: &str, r: usize| -> bool {
         if r == nrounds {
-            return tournament["finals"]["seating"]
+            return tournament[tournament::FINALS][finals_table::SEATING]
                 .members()
-                .any(|s| s["player_uid"].as_str() == Some(uid));
+                .any(|s| s[seat::PLAYER_UID].as_str() == Some(uid));
         }
         rounds[r].members().any(|table| {
-            table["state"].as_str() == Some("Finished")
-                && table["seating"]
+            table[table::STATE].as_str() == Some("Finished")
+                && table[table::SEATING]
                     .members()
-                    .any(|s| s["player_uid"].as_str() == Some(uid))
+                    .any(|s| s[seat::PLAYER_UID].as_str() == Some(uid))
         })
     };
     let mut out = Vec::new();
@@ -72,7 +73,7 @@ pub(super) fn table_sa_adjustments(
     seating
         .members()
         .map(|seat| {
-            let uid = seat["player_uid"].as_str().unwrap_or("");
+            let uid = seat[seat::PLAYER_UID].as_str().unwrap_or("");
             let count = effective_sas
                 .iter()
                 .filter(|(sa_uid, sa_round)| sa_uid == uid && *sa_round == round_index)
@@ -94,8 +95,8 @@ pub(super) fn sa_vp_penalty(effective_sas: &[(String, usize)], user_uid: &str) -
 pub(super) fn has_dq_sanction(sanctions: &JsonValue, player_uid: &str) -> bool {
     sanctions.members().any(|s| {
         is_sanction_active(s)
-            && s["level"].as_str() == Some("disqualification")
-            && s["user_uid"].as_str() == Some(player_uid)
+            && s[sanction::LEVEL].as_str() == Some("disqualification")
+            && s[sanction::USER_UID].as_str() == Some(player_uid)
     })
 }
 
@@ -105,8 +106,8 @@ pub(super) fn has_dq_sanction(sanctions: &JsonValue, player_uid: &str) -> bool {
 pub(super) fn has_active_suspension(sanctions: &JsonValue, player_uid: &str, now: &str) -> bool {
     sanctions.members().any(|s| {
         is_sanction_active(s)
-            && s["level"].as_str() == Some("suspension")
-            && s["user_uid"].as_str() == Some(player_uid)
+            && s[sanction::LEVEL].as_str() == Some("suspension")
+            && s[sanction::USER_UID].as_str() == Some(player_uid)
             && !suspension_expired(s, now)
     })
 }
@@ -114,7 +115,7 @@ pub(super) fn has_active_suspension(sanctions: &JsonValue, player_uid: &str, now
 /// A suspension is expired when it carries an `expires_at` at or before `now`.
 /// Absent expiry (permanent) or empty `now` (no clock) → not expired.
 fn suspension_expired(s: &JsonValue, now: &str) -> bool {
-    match s["expires_at"].as_str() {
+    match s[sanction::EXPIRES_AT].as_str() {
         Some(exp) if !now.is_empty() => exp <= now,
         _ => false,
     }

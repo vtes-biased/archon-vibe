@@ -24,6 +24,15 @@ exactly when it is declared there — Pydantic's `extra="ignore"` drops anything
 else a client sends, with no error. The server injects `vekn_id` from the
 resolved user *after* the copy; declaring it would reopen the fabricated-id hole.
 
+**The engine round-trips the whole tournament document**, so do not give it owned
+structs. `process_tournament_event` parses the JSON, mutates it in place and dumps
+all of it back, and both callers persist that output — `msgspec.convert` on the
+backend, `saveTournament` on the frontend. Anything the engine deserialized into a
+struct would lose every field the struct does not declare, and msgspec refills a
+defaulted field from its default, so the loss would be silent exactly where it is
+most likely. That is why field names are consts over `JsonValue`
+([dev](dev.md#lint-gates)) rather than serde types.
+
 **A projection change only affects rows written afterwards**, and neither the
 access-version handshake nor any test can catch the missing backfill — see
 [sync](sync.md#access-levels) for the re-save script and
@@ -125,15 +134,6 @@ their next snapshot resync. Preserve that in any new merge-like flow.
 **`finals.seed_order` holds player user_uids**, easily missed in a per-player UID
 remap. The offline remap itself uses a naive JSON string replace, whose
 substring-collision risk is mitigated only by UUID v7 length.
-
-**The engine reads its inputs untyped**, so a rename does not reach it. Every
-domain object crosses into `engine/` as a JSON string indexed by literal —
-`value["winner"]` — with no `Deserialize` for any domain type and not one `.get()`
-in the crate. serde_json yields `Null` for an absent key and the call sites take
-`.as_str().unwrap_or("")`, so renaming a field in `models.py` silently feeds the
-engine an empty value past a green build and a green test suite. `just
-model-drift` does not cover this: it compares Python to TypeScript, and the engine
-has no model to compare.
 
 **Svelte 5 `$props()`**: props must be listed in the destructure, not merely in the
 type annotation.

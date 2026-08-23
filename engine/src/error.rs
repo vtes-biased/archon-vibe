@@ -1,6 +1,7 @@
 //! Structured engine errors: the single greppable taxonomy for every engine
 //! rejection.
 
+use crate::model::arg;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -235,7 +236,7 @@ impl EngineError {
         for (k, v) in self.params() {
             params[k] = v.into();
         }
-        json::object! { code: self.code(), params: params, message: self.to_string() }.dump()
+        json::object! { arg::CODE => self.code(), arg::PARAMS => params, arg::MESSAGE => self.to_string() }.dump()
     }
 }
 

@@ -1,5 +1,6 @@
 /// League standings computation shared between frontend (WASM) and backend (PyO3).
 /// Modes: RTP (full rating total), Score (preliminary GW/VP/TP only), GP (position-based points).
+use crate::model::{arg, tournament_config};
 use json::JsonValue;
 
 use crate::error::EngineError;
@@ -20,67 +21,74 @@ struct PlayerEntry {
 /// player_count, finals}]}`. Output: entries sorted by rank, `{user_uid, gw, vp, tp, points, rank, tournaments_count}`.
 pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError> {
     let config = json::parse(config_json)?;
-    let mode = config["standings_mode"].as_str().unwrap_or("RTP");
+    let mode = config[tournament_config::STANDINGS_MODE]
+        .as_str()
+        .unwrap_or("RTP");
 
     let mut players: std::collections::HashMap<String, PlayerEntry> =
         std::collections::HashMap::new();
 
-    for tournament in config["tournaments"].members() {
-        let rank = tournament["rank"].as_str().unwrap_or("");
-        let player_count = tournament["player_count"].as_i32().unwrap_or(0);
+    for tournament in config[arg::TOURNAMENTS].members() {
+        let rank = tournament[arg::RANK].as_str().unwrap_or("");
+        let player_count = tournament[arg::PLAYER_COUNT].as_i32().unwrap_or(0);
 
         // GP and RTP score by *final* placement (winner 1st even if they did not lead
         // the preliminaries; other finalists tie for 2nd), resolved once per tournament.
-        let winner = tournament["winner"].as_str().unwrap_or("");
+        let winner = tournament[arg::WINNER].as_str().unwrap_or("");
         let final_place: std::collections::HashMap<String, usize> = if mode == "Score" {
             std::collections::HashMap::new()
         } else {
-            crate::tournament::compute_final_standings(&tournament["standings"], winner)
+            crate::tournament::compute_final_standings(&tournament[arg::STANDINGS], winner)
                 .iter()
-                .filter_map(|s| Some((s["user_uid"].as_str()?.to_string(), s["rank"].as_usize()?)))
+                .filter_map(|s| {
+                    Some((
+                        s[arg::USER_UID].as_str()?.to_string(),
+                        s[arg::RANK].as_usize()?,
+                    ))
+                })
                 .collect()
         };
 
         // Non-Score modes use the SAME per-tournament VP/GW total as the global rating
         // (compute_rating_vp_gw): prelim + finals + the no-final tournament-win GW.
-        let has_finals = !tournament["finals"].is_empty();
+        let has_finals = !tournament[arg::FINALS].is_empty();
         let finals_by_uid: std::collections::HashMap<String, (f64, f64, i32)> = tournament
-            ["finals"]
+            [arg::FINALS]
             .members()
             .filter_map(|s| {
                 Some((
-                    s["player_uid"].as_str()?.to_string(),
+                    s[arg::PLAYER_UID].as_str()?.to_string(),
                     (
-                        s["gw"].as_f64().unwrap_or(0.0),
-                        s["vp"].as_f64().unwrap_or(0.0),
-                        s["tp"].as_i32().unwrap_or(0),
+                        s[arg::GW].as_f64().unwrap_or(0.0),
+                        s[arg::VP].as_f64().unwrap_or(0.0),
+                        s[arg::TP].as_i32().unwrap_or(0),
                     ),
                 ))
             })
             .collect();
 
-        for standing in tournament["standings"].members() {
-            let uid = standing["user_uid"].as_str().unwrap_or("").to_string();
+        for standing in tournament[arg::STANDINGS].members() {
+            let uid = standing[arg::USER_UID].as_str().unwrap_or("").to_string();
             if uid.is_empty() {
                 continue;
             }
             // Proxy (non-competing official stood in): not a league participant at all
             // — exclude entirely (not just zero-scored, or they'd inflate tournaments_count).
-            if standing["non_competing"].as_bool().unwrap_or(false) {
+            if standing[arg::NON_COMPETING].as_bool().unwrap_or(false) {
                 continue;
             }
             // DQ'd: earns no league standing either (mirrors ratings.py _is_disqualified).
             // player_count is unaffected — it still counts them, lifting others' coefficient.
-            if standing["disqualified"].as_bool().unwrap_or(false) {
+            if standing[arg::DISQUALIFIED].as_bool().unwrap_or(false) {
                 continue;
             }
             if crate::tournament::is_no_show(standing, winner) {
                 continue;
             }
-            let gw = standing["gw"].as_f64().unwrap_or(0.0);
-            let vp = standing["vp"].as_f64().unwrap_or(0.0);
-            let tp = standing["tp"].as_i32().unwrap_or(0);
-            let finalist = standing["finalist"].as_bool().unwrap_or(false);
+            let gw = standing[arg::GW].as_f64().unwrap_or(0.0);
+            let vp = standing[arg::VP].as_f64().unwrap_or(0.0);
+            let tp = standing[arg::TP].as_i32().unwrap_or(0);
+            let finalist = standing[arg::FINALIST].as_bool().unwrap_or(false);
 
             let entry = players.entry(uid.clone()).or_insert_with(|| PlayerEntry {
                 user_uid: uid.clone(),
@@ -193,17 +201,17 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
         passed += 1;
 
         let mut obj = json::object! {
-            "user_uid" => entry.user_uid.as_str(),
-            "gw" => entry.gw,
-            "vp" => entry.vp,
-            "tp" => entry.tp,
-            "points" => entry.points,
-            "rank" => rank,
-            "tournaments_count" => entry.tournaments_count,
+            arg::USER_UID => entry.user_uid.as_str(),
+            arg::GW => entry.gw,
+            arg::VP => entry.vp,
+            arg::TP => entry.tp,
+            arg::POINTS => entry.points,
+            arg::RANK => rank,
+            arg::TOURNAMENTS_COUNT => entry.tournaments_count,
         };
         // For Score mode, points field is not meaningful
         if mode == "Score" {
-            obj.remove("points");
+            obj.remove(arg::POINTS);
         }
         result.push(obj)?;
     }
