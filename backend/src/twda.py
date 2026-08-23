@@ -78,8 +78,6 @@ async def submit_twda_pr(
 
     branch = f"archon/{event_key}"
     file_path = f"decks/{event_key}.txt"
-    # The archive's token has no access to the fork, so it can only reference a
-    # public head: the fork must never be flipped private.
     head = f"{TWDA_GITHUB_FORK_OWNER}:{branch}"
 
     timeout = aiohttp.ClientTimeout(total=30.0)
