@@ -172,8 +172,12 @@ Event 13385, *Fee Stake: Jyväskylä 9*, is the known case — Ari-Pekka Alestal
 the final from the fifth seat and vekn.net holds Lasse Pöyry at position 1.
 
 **Proves it worked**: every listed event shows its actual winner at position 1 on
-vekn.net.
+vekn.net, and — checked a day later, once the nightly batch has run — the rating
+points have moved with the position. Whether upstream re-derives them is
+[unestablished](domain/vekn.md#never-chase-veknnets-stored-rtp), so this half is
+verified rather than assumed.
 
-**Owes afterwards**: nothing to tell anyone — the nightly rating batch recomputes
-each player's points from the corrected position, so the ratings heal overnight
-without being touched. Delete this section.
+**Owes afterwards**: nothing to tell anyone if the points followed. If they did
+not, the winner is left holding the loser's rating on vekn.net with no API able to
+fix it, which is its own correction and its own board line. Delete this section
+either way.

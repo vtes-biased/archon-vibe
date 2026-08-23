@@ -63,11 +63,14 @@ same batch.
 ```
 
 The first field is the **final placement** — `1 | 2 | [5..P] | DQ | WD`, never a
-row number. vekn.net stores it verbatim as `veknparticipant.pos`, reads position 1
-as the tournament winner, and its nightly rating batch recomputes every player's
-points from it, discarding the `rtp` we send. So the winner takes position 1
-however low the seat they won the final from, and rows go out in placement order,
-finalists first, because vekn.net renders them in the order it receives them.
+row number. vekn.net stores it verbatim as `veknparticipant.pos` and reads position
+1 as the tournament winner. Its own uploader calls the `rtp` we send an estimate to
+be overwritten by a nightly batch (`vekn-api/doc/archon_upload.php:245`); what that
+batch actually leaves standing is
+[measured, not assumed](domain/vekn.md#never-chase-veknnets-stored-rtp). So the
+winner takes position 1 however low the seat they won the final from, and rows go
+out in placement order, finalists first, because vekn.net renders them in the order
+it receives them.
 
 The placement is the engine's `compute_final_standings`, the same rule the ratings
 and the standings screen read, with two departures the format forces:

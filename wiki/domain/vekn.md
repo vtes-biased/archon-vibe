@@ -149,6 +149,14 @@ keeps the `rtp` we push rather than re-deriving it from its own roster — verif
 on vekn event 13453, where it stored our N=20 figures against a 19-row roster of
 its own — but not universally, so do not rely on it either way.
 
+*(Measured, 2026-08.)* Event 13385 shows the other behaviour: a winner-sized 116
+sat on the top-seeded row while the player who actually won the final carried 50,
+the same figure as the fourth-placed row. Neither is what we pushed, so something
+upstream re-derived them — consistent with the uploader's own note that a nightly
+batch overwrites the estimate (`vekn-api/doc/archon_upload.php:245`). Which of the
+two an event ends up showing is unestablished, so a correction to `pos` is checked
+afterwards, never assumed to carry the points with it.
+
 **A gap between our number and vekn.net's is therefore not evidence our maths is
 wrong**, and "align with vekn.net" is not a valid reason to change the engine or
 the backend rating code. Decide against A.2 above, then check whether upstream's
