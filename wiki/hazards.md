@@ -184,7 +184,9 @@ them, and a winner carrying no finalist flag scored as an also-ran in league.
 Reaching for `tournament.finals` or the raw `finalist` flag to score a bonus
 re-opens it. Rank and position are deliberately not the same answer: a sheet naming
 a winner but flagging no finalist places that winner 1st and stamps 0, because
-nothing there evidences a final.
+nothing there evidences a final. `final_played` is that one test, and the +1
+tournament-win GW in `compute_rating_vp_gw` and `league.rs` is gated on it too —
+a winner credit is a credit either way.
 
 **Standings count by table, not by round.** A finished table scores while its round
 is still running — the raffle pools depend on it, reading

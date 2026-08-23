@@ -55,6 +55,7 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
         // Non-Score modes use the SAME per-tournament VP/GW total as the global rating
         // (compute_rating_vp_gw): prelim + finals + the no-final tournament-win GW.
         let has_finals = !tournament[arg::FINALS].is_empty();
+        let final_played = crate::tournament::final_played(&tournament[arg::STANDINGS]);
         let finals_by_uid: std::collections::HashMap<String, (f64, f64, i32)> = tournament
             [arg::FINALS]
             .members()
@@ -113,7 +114,7 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
 
             // Non-Score total = prelim + finals + the no-final tournament-win GW.
             let (fgw, fvp, ftp) = finals_by_uid.get(&uid).copied().unwrap_or((0.0, 0.0, 0));
-            let win_gw = if !has_finals && uid == winner {
+            let win_gw = if !has_finals && uid == winner && final_played {
                 1.0
             } else {
                 0.0

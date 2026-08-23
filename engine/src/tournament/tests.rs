@@ -1287,13 +1287,13 @@ fn test_rating_vp_gw_reads_standings_when_no_rounds() {
 
 #[test]
 fn test_rating_vp_gw_credits_no_final_winner() {
-    // No-final VEKN import: rounds/finals absent but `winner` is set, so the
-    // tournament-win GW (+1) is credited from the winner field, matching vekn.net.
+    // No-final VEKN import: rounds/finals absent, but the sheet flags its top five
+    // as an import does, so a final was played and the win GW (+1) is credited.
     let mut tournament = make_tournament();
     tournament["winner"] = "p1".into();
     tournament["standings"] = json::array![
-        json::object! { user_uid: "p1", gw: 1.0, vp: 3.0, tp: 90 },
-        json::object! { user_uid: "p2", gw: 0.0, vp: 2.0, tp: 60 },
+        json::object! { user_uid: "p1", gw: 1.0, vp: 3.0, tp: 90, finalist: true },
+        json::object! { user_uid: "p2", gw: 0.0, vp: 2.0, tp: 60, finalist: true },
     ];
     let empty = json::array![];
     assert_eq!(
@@ -1305,6 +1305,16 @@ fn test_rating_vp_gw_credits_no_final_winner() {
         super::compute_rating_vp_gw(&tournament, &empty, "p2"),
         (2.0, 0.0),
         "non-winner in a no-final import gets no tournament-win bonus"
+    );
+
+    tournament["standings"] = json::array![
+        json::object! { user_uid: "p1", gw: 1.0, vp: 3.0, tp: 90 },
+        json::object! { user_uid: "p2", gw: 0.0, vp: 2.0, tp: 60 },
+    ];
+    assert_eq!(
+        super::compute_rating_vp_gw(&tournament, &empty, "p1"),
+        (3.0, 1.0),
+        "a crowned top seat evidences no final, so no tournament-win GW"
     );
 }
 

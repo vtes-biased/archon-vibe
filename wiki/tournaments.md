@@ -303,8 +303,10 @@ paths. It applies the same `Finished`-only rule and additionally includes finals
 VP/GW; prelim
 comes from the rounds when present, else from the prelim-only standings row for
 round-less VEKN imports; when no `finals` object recorded the win it credits the
-tournament winner a +1 GW, covering a no-final import — a native no-final leaves
-`winner == ""`, so it stays inert there. It returns `(0, 0)` early for DQ'd and
+tournament winner a +1 GW, covering an import whose final was played but not
+recorded. That credit needs a final in evidence — some row flagged a finalist — so
+it stays inert both for a native no-final, which leaves `winner == ""`, and for an
+importer that crowned a top seat no final produced. It returns `(0, 0)` early for DQ'd and
 non-competing players.
 
 `compute_final_standings` implements §3.7.5 placement: winner rank 1, other
@@ -391,10 +393,13 @@ position: the engine stays rules-literal, and the ranked/unranked badge makes th
 outcome read as a rule rather than a bug. It holds for an **imported** winner too —
 where a file or a summary names a winner but flags no finalist, every
 `finalist_position` is 0, so the rating, league scoring and the standings screen
-decline the bonus alike. A finals-less league weights participation over winners by
-design, so crediting one there cuts against the format. The **+1 tournament-win GW
-is not covered by that stance** and is still credited above, which is the other half
-of the same question. Both are with the Rules Director.
+decline the bonus alike, and the +1 tournament-win GW goes with it — winner credit
+for a game never played is the same invention. A finals-less league weights
+participation over winners by design, so crediting one there cuts against the
+format. The stance bites only where **nothing** is flagged: `vekn_tournament_sync`
+stamps `finalist` on positions 1–5 whether or not a final was played, because the
+upstream record does not say, so a VEKN import keeps vekn.net's answer and only a
+locally crowned seat loses the credit. The question is with the Rules Director.
 
 **A no-final finish is allowed at any size, deliberately.** §3.1.6 permits omitting
 the final only below 8 players, but force majeure cuts real events short — a venue

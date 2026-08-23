@@ -65,8 +65,9 @@ the same thing, and the archon importer is the one with no source to point at.
 
 On that exact shape — a `winner` named with no row flagged a finalist — the
 owner-approved interim answer is now implemented: `compute_final_standings` stamps
-every `finalist_position` 0, so the rating, league scoring and the standings screen
-all decline the bonus, and the winner still places 1st. The reasoning is the league
+every `finalist_position` 0 and the +1 tournament-win GW is withheld, so the rating,
+league scoring and the standings screen all decline both, and the winner still
+places 1st. The reasoning is the league
 one: an event run without a final is weighting participation over winners, so
 crediting a winner there cuts against the format. **Q1 and Q2 still decide whether
 that holds** — a ruling that no-final events rate like vekn.net's would reverse it,
