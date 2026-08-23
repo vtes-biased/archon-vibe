@@ -144,3 +144,36 @@ reads `submitted` with a PR URL on `GiottoVerducci/TWD`.
 
 **Owes afterwards**: nothing to tell anyone — the organizers never saw the failure.
 Delete this section.
+
+## Correct the winners vekn.net already crowned wrong
+
+**Gated on** the commit carrying this section — *"Report the winner vekn.net crowns
+at position 1"*, findable as `git log -1 --format=%h --grep='position 1'` — which
+made the pushed placement field the final placement instead of the preliminary
+standings order. Every event finished before it goes live pushes the old order, so
+a list drawn earlier is stale by the time it is answered.
+
+**Run** on production, then hand the rows to the Rulemonger: the results upload
+refuses a second submission once an archon file is stored and offers no overwrite,
+so each one is a manual `veknparticipant.pos` fix on vekn.net.
+
+```sql
+SELECT "full"->>'uid', "full"->>'name', "full"->'external_ids'->>'vekn'
+FROM objects WHERE type='tournament' AND deleted_at IS NULL
+  AND "full"->>'state'='Finished' AND "full"->>'vekn_pushed_at' IS NOT NULL
+  AND jsonb_array_length(COALESCE("full"->'rounds', '[]'::jsonb)) > 0
+  AND COALESCE("full"->>'winner', '') <> ''
+  AND "full"->>'winner' IS DISTINCT FROM ("full"->'standings'->0->>'user_uid');
+```
+
+The rounds guard keeps out VEKN and ETL imports, which carry a push stamp they
+never earned here; the winner guard keeps out no-final events, which have none.
+Event 13385, *Fee Stake: Jyväskylä 9*, is the known case — Ari-Pekka Alestalo won
+the final from the fifth seat and vekn.net holds Lasse Pöyry at position 1.
+
+**Proves it worked**: every listed event shows its actual winner at position 1 on
+vekn.net.
+
+**Owes afterwards**: nothing to tell anyone — the nightly rating batch recomputes
+each player's points from the corrected position, so the ratings heal overnight
+without being touched. Delete this section.

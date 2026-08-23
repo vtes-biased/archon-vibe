@@ -51,6 +51,7 @@ def _finished_tournament(
     rank: TournamentRank = TournamentRank.BASIC,
     fmt: TournamentFormat = TournamentFormat.Standard,
     proxies: set[str] | None = None,
+    dq: set[str] | None = None,
 ) -> Tournament:
     """Finish a tournament through the shipped engine, so the standings sheet is
     the engine's own — a hand-typed one drifts from what a real table produces."""
@@ -62,6 +63,10 @@ def _finished_tournament(
                 if seat["player_uid"] not in seated:
                     seated.append(seat["player_uid"])
     proxies = proxies or set()
+    dq = dq or set()
+    # SeatFinals is what stamps this in the app; the fixture injects a ready-made
+    # finals table instead, and an unstamped finalist bands as a mere also-ran.
+    finalists = {s["player_uid"] for s in (finals or {}).get("seating", [])}
 
     tournament = {
         "uid": "t-001",
@@ -75,9 +80,10 @@ def _finished_tournament(
         "players": [
             {
                 "user_uid": u,
-                "state": "Playing",
+                "state": "Disqualified" if u in dq else "Playing",
                 "payment_status": "Pending",
                 "toss": 0,
+                "finalist": u in finalists,
                 "non_competing": u in proxies,
             }
             for u in seated
@@ -216,6 +222,36 @@ def test_archondata_gw_is_prelim_only_and_vpf_carries_the_final():
 
     assert parts[11 + 5] == "0"  # runner-up: GW untouched, never subtracted
     assert parts[11 + 7] == "1.5"
+
+
+def test_archondata_places_the_finals_winner_first():
+    """The placement field is the FINAL placement and vekn.net reads position 1 as
+    the tournament winner. A final won from a lower prelim seat must push that
+    player first at 1, with every other finalist at 2."""
+    t = _finished_tournament(
+        rounds=[
+            [_sweep("u1", "u2", "u3", "u4", "u5")],
+            [_sweep("u1", "u2", "u3", "u4", "u5")],
+        ],
+        finals=_finals(["u1", "u2", "u3", "u4", "u5"], [1.0, 0.0, 0.0, 0.0, 4.0]),
+        winner="u5",
+    )
+    parts = generate_archondata(t, _pod()).split("¤", 1)[1].split("§")
+
+    assert parts[0] == "1"
+    assert parts[4] == "1000005"  # the winner leads, not the top preliminary seat
+    assert [parts[11 * i] for i in range(1, 5)] == ["2", "2", "2", "2"]
+
+
+def test_archondata_flags_a_disqualification_instead_of_a_place():
+    """A DQ'd player holds no placement: the archive's own flag goes in that field,
+    where a number files them as a ranked competitor and pays them for it."""
+    t = _finished_tournament(rounds=[[_sweep("u1", "u2", "u3", "u4", "u5")]], dq={"u3"})
+    parts = generate_archondata(t, _pod()).split("¤", 1)[1].split("§")
+    placement_by_vekn_id = {parts[11 * i + 4]: parts[11 * i] for i in range(5)}
+
+    assert placement_by_vekn_id["1000003"] == "DQ"
+    assert placement_by_vekn_id["1000001"] == "1"
 
 
 def test_archondata_skips_missing_users():

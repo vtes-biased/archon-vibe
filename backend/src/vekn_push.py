@@ -25,7 +25,7 @@ from .models import (
     TournamentState,
     User,
 )
-from .ratings import _compute_entry, _engine, _final_positions
+from .ratings import _compute_entry, _engine, _final_positions, _final_standings
 from .vekn_api import (
     PLACEHOLDER_VENUE_ID,
     VEKNAPIClient,
@@ -90,17 +90,34 @@ def generate_archondata(
     player_count = _engine.attested_player_count(t_json)
     positions = _final_positions(tournament)
 
+    standings_by_uid = {s.user_uid: s for s in tournament.standings}
+
     parts: list[str] = []
-    # Iterate standings, not tournament.players — a registered no-show stays
-    # out, keeping the pushed RTP field count matched to vekn's.
-    for rank_idx, standing in enumerate(tournament.standings, 1):
+    placed = 0
+    # Emission order is the placement order: vekn.net stores the rows as it
+    # receives them and reads the first as the winner. Iterating standings, not
+    # players, also keeps the pushed field count matched to vekn's.
+    for row in _final_standings(tournament):
+        standing = standings_by_uid[row["user_uid"]]
         user = users_by_uid.get(standing.user_uid)
         if not user:
             continue
-        # Proxies never push to VEKN; they sort last in standings so skipping
-        # them doesn't disturb the leading competitors' rank_idx.
-        if standing.non_competing:
+        # Proxies never push to VEKN; they sit in the excluded tail, so dropping
+        # them cannot disturb a competitor's placement.
+        if row["non_competing"]:
             continue
+
+        if row["disqualified"]:
+            placement: str | int = "DQ"
+        elif row["no_show"]:
+            placement = "WD"
+        elif tournament.winner:
+            placement = row["rank"]
+        else:
+            # No final, so no winner and the engine ties rows at rank 1 — and
+            # vekn.net pays the winner bonus to every row it stores at position 1.
+            placed += 1
+            placement = placed
 
         name_parts = (user.name or "").split(maxsplit=1)
         first = name_parts[0] if name_parts else ""
@@ -123,7 +140,7 @@ def generate_archondata(
         rtp = entry.points
 
         parts.append(
-            f"{rank_idx}§{first}§{last}§{city}§{vekn_id}§"
+            f"{placement}§{first}§{last}§{city}§{vekn_id}§"
             f"{int(gw)}§{standing.vp}§{vpf}§{standing.tp}§{standing.toss}§{rtp}§"
         )
 

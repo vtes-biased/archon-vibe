@@ -66,18 +66,24 @@ def _players_with_rounds(t: Tournament) -> set[str]:
     return {s.user_uid for s in t.standings if s.gw or s.vp or s.tp}
 
 
-def _final_positions(t: Tournament) -> dict[str, int]:
-    """{user_uid: final placement} for one finished tournament, from the engine's
-    shared rule — computed once per tournament, never per (user, tournament)."""
+def _final_standings(t: Tournament) -> list[dict]:
+    """The engine's final placement sheet for one finished tournament: winner
+    first, then finalists, then the DQ'd/proxy/no-show tail, each row stamped with
+    its `rank` and the derived `no_show`."""
     config = msgspec.json.encode(
         {"standings": t.standings, "winner": t.winner}
     ).decode()
-    ranked = msgspec.json.decode(_engine.compute_final_standings(config))
+    return msgspec.json.decode(_engine.compute_final_standings(config))
+
+
+def _final_positions(t: Tournament) -> dict[str, int]:
+    """{user_uid: final placement} for one finished tournament, from the engine's
+    shared rule — computed once per tournament, never per (user, tournament)."""
     # Drops the DQ'd/proxy/no-show tail (ranks past the whole field) using the row
     # flags, not the player-state signal callers use — absent = no placement.
     return {
         s["user_uid"]: s["rank"]
-        for s in ranked
+        for s in _final_standings(t)
         if not s.get("disqualified")
         and not s.get("non_competing")
         and not s.get("no_show")

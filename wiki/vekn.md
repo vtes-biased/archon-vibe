@@ -59,8 +59,31 @@ same batch.
 ### archondata format
 
 ```
-{nrounds}¤{rank}§{first}§{last}§{city}§{vekn}§{gw}§{vp}§{vpf}§{tp}§{toss}§{rtp}§...
+{nrounds}¤{placement}§{first}§{last}§{city}§{vekn}§{gw}§{vp}§{vpf}§{tp}§{toss}§{rtp}§...
 ```
+
+The first field is the **final placement** — `1 | 2 | [5..P] | DQ | WD`, never a
+row number. vekn.net stores it verbatim as `veknparticipant.pos`, reads position 1
+as the tournament winner, and its nightly rating batch recomputes every player's
+points from it, discarding the `rtp` we send. So the winner takes position 1
+however low the seat they won the final from, and rows go out in placement order,
+finalists first, because vekn.net renders them in the order it receives them.
+
+The placement is the engine's `compute_final_standings`, the same rule the ratings
+and the standings screen read, with two departures the format forces:
+
+- **A player with no placement carries a flag, not a number** — `disqualified` →
+  `DQ`, the derived `no_show` → `WD`. A number would file them as a ranked
+  competitor and the rating batch would pay them for it. Proxies are dropped from
+  the push entirely.
+- **A no-final event numbers its rows 1..N by preliminary standing.** With no
+  final the engine names no winner and ties rows at rank 1, which would hand the
+  winner bonus to every one of them; the ordinal matches what vekn.net does with
+  such an event itself. What it *should* do is [open](tournaments.md).
+
+**vekn.net's importer cross-contaminates a mixed tail.** `archon_approve.php` sets
+`dq` or `wd` in a `switch` that never clears the other, so a `WD` row following a
+`DQ` row is stored as disqualified too. Nothing we can send prevents it.
 
 GW is prelim-only, with the finals GW removed for the winner, and `vp` is prelim
 with `vpf` separate — see the double-count warning in
