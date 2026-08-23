@@ -114,9 +114,17 @@ class SyncManager {
   private eventSource: EventSource | null = null;
   private listeners: SyncEventCallback[] = [];
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
+  private alertAfterAttempts = 5;
   private reconnectDelay = 1000;
   private maxReconnectDelay = 120_000;
+
+  // The server sends some frame at least every 30s once live, so silence past two windows means
+  // the socket died in a way the browser never observes. Must stay above 2x the server's cadence
+  // (backend/src/main.py) or a healthy stream reconnects on its own quiet.
+  private static readonly STREAM_STALE_MS = 75_000;
+  private static readonly WATCHDOG_TICK_MS = 15_000;
+  private lastFrameAt = 0;
+  private watchdog: ReturnType<typeof setInterval> | null = null;
 
   // Resets only on sync_complete; assumes the server always closes a catch-up stream with
   // sync_complete, else a healthy client accrues a false streak and self-throttles.
@@ -410,14 +418,17 @@ class SyncManager {
     this.eventSource = new EventSource(url);
 
     this.eventSource.onopen = () => {
-      this.reconnectAttempts = 0;
-      this.reconnectDelay = 1000;
+      this.startWatchdog();
       this.emit({ type: 'connected' });
     };
 
     this.eventSource.onmessage = async (event) => {
+      // Any frame proves the socket is alive — the watchdog wants liveness, not content.
+      this.lastFrameAt = Date.now();
       try {
         const message = JSON.parse(event.data);
+
+        if (message.type === 'heartbeat') return;
 
         if (message.type === 'resync') {
           // Clear buffers before disconnect(): its flushAllBuffers() would
@@ -444,6 +455,9 @@ class SyncManager {
 
         if (message.type === 'sync_complete') {
           this.resyncStreak = 0;
+          // Not on onopen: a cause that lets the socket open and then go silent would reset its
+          // own backoff every watchdog trip and reconnect at a fixed fast interval forever.
+          this.reconnectAttempts = 0;
           try { await this.flushAllBuffers(); } catch (e) { console.error('Flush failed:', e); }
           try { if (message.timestamp) { this.lastTimestamp = message.timestamp; await setLastSyncTimestamp(message.timestamp); } } catch (e) { console.error('Save timestamp failed:', e); }
           this.isSynced = true;
@@ -585,29 +599,49 @@ class SyncManager {
     if (decks.length > 0) await saveDecksBatch(decks);
   }
 
-  /** When any tournament is offline, or on `transient` (snapshot not generated yet — first-sync
-   * warm-up), retries indefinitely with the capped backoff instead of giving up after maxReconnectAttempts. */
-  private async handleError(transient = false): Promise<void> {
-    await this.disconnect();
-    const hasOfflineTournaments = getOfflineTournamentUids().size > 0;
-    const maxAttempts = transient || hasOfflineTournaments ? Infinity : this.maxReconnectAttempts;
+  private startWatchdog(): void {
+    this.stopWatchdog();
+    this.lastFrameAt = Date.now();
+    // Wall-clock comparison rather than a rearmed timeout: a throttled or slept tab wakes with
+    // the real gap intact, where a late-firing timeout would still look fresh.
+    this.watchdog = setInterval(() => {
+      if (Date.now() - this.lastFrameAt < SyncManager.STREAM_STALE_MS) return;
+      console.warn('SSE stream silent past the heartbeat window; reconnecting');
+      void this.handleError();
+    }, SyncManager.WATCHDOG_TICK_MS);
+  }
 
-    if (this.reconnectAttempts < maxAttempts) {
-      this.reconnectAttempts++;
-      const delay = Math.min(
-        this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1),
-        this.maxReconnectDelay,
-      );
-      setTimeout(() => { void this.connect(); }, delay);
-    } else {
-      // Terminal: reconnect budget exhausted. This is the genuine failure worth
-      // an error-level log (the per-drop onerror above stays at debug).
-      console.error(`SSE connection failed after ${this.reconnectAttempts} attempts`);
-      this.emit({ type: 'error', error: 'Failed to connect after multiple attempts' });
+  private stopWatchdog(): void {
+    if (this.watchdog !== null) {
+      clearInterval(this.watchdog);
+      this.watchdog = null;
     }
   }
 
+  /** Retries forever on the capped backoff — with a terminal state, a tab whose socket alone
+   * died stays deaf until someone reloads it. `transient` (warm-up) and an offline-locked
+   * device retry the same way but raise no banner, the wrong nudge mid-event. */
+  private async handleError(transient = false): Promise<void> {
+    await this.disconnect();
+    this.reconnectAttempts++;
+    const delay = Math.min(
+      this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1),
+      this.maxReconnectDelay,
+    );
+    const quiet = transient || getOfflineTournamentUids().size > 0;
+    // Emitted once on the crossing: nothing clears the banner until a sync_complete, which is
+    // also what resets the counter, so a repeat emit would say nothing new.
+    if (!quiet && this.reconnectAttempts === this.alertAfterAttempts) {
+      console.error(`SSE connection failed after ${this.reconnectAttempts} attempts; still retrying`);
+      this.emit({ type: 'error', error: 'Failed to connect after multiple attempts' });
+    }
+    setTimeout(() => { void this.connect(); }, delay);
+  }
+
   async disconnect(): Promise<void> {
+    // Synchronously, before the awaits below: a tick landing mid-flush would start a second
+    // backoff timer racing this one.
+    this.stopWatchdog();
     if (this.eventSource) {
       this.eventSource.close();
       this.eventSource = null;

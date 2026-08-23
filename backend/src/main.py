@@ -1251,7 +1251,10 @@ async def stream_updates(
                 except TimeoutError:
                     keepalive_counter += 1
                     if keepalive_counter >= 30:
-                        yield ": keepalive\n\n"
+                        # A real frame, not a `:` comment — EventSource drops those
+                        # undispatched. No `ts`: it would advance the client cursor
+                        # past an event already committed but not yet broadcast.
+                        yield 'data: {"type":"heartbeat"}\n\n'
                         keepalive_counter = 0
 
         except Exception as e:

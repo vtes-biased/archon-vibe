@@ -435,6 +435,8 @@ async def _dispatch_event(
 
     if msg_type == "sync_complete":
         return True
+    if msg_type == "heartbeat":
+        return synced
     if msg_type == "judge_call":
         logger.info("SSE recv judge_call for %s", key)
         await _handle_judge_call(

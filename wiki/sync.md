@@ -261,6 +261,50 @@ auto-reconnects with `?since=<cursor>` and catches up. This is deliberate: a
 dropped event must not leave a client OPEN on a queue that no longer receives
 broadcasts, silently deaf. Lossless catch-up depends on the cursor being accurate.
 
+### Liveness
+
+The queue-overflow decision reaches only the deafness the *server* can see. A
+socket that dies without either end noticing — sleep, a wifi change, a NAT
+timeout — leaves `readyState` at OPEN forever: nothing arrives and `onerror` never
+fires, so a client whose reconnect hangs off that event alone waits indefinitely.
+One waited 2h45m, straight through a backend restart whose RST went nowhere it
+could see.
+
+**The contract is that some frame arrives at least every 30 seconds once the stream
+is live.** The server emits `{"type":"heartbeat"}` after 30 idle seconds; live
+object frames reset the same counter, so a busy stream sends none. It is a real
+event rather than an SSE `: keepalive` comment because `EventSource` discards
+comment lines without dispatching anything to JS — no browser watchdog can be built
+on one. It carries **no `ts`**: a heartbeat stamped *now* would advance the client
+cursor past an event already committed but not yet broadcast.
+
+Catch-up is exempt — it streams continuously and its own flow is the liveness
+signal. The Discord bot ignores heartbeats; it bounds the same wedge with
+`sock_read` ([discord](discord.md#the-sse-listener)) and needs no watchdog.
+
+**The client reconnects when nothing has arrived for 75 seconds**, checked on a
+15-second tick against a wall clock — a throttled or slept tab wakes with the real
+gap intact, where a rearmed timeout would fire late and still look fresh. The two
+numbers are one contract across two processes: the threshold in
+`frontend/src/lib/sync.ts` must stay above twice the cadence in
+`backend/src/main.py`, or a healthy stream reconnects on its own quiet. Recovery
+goes through `handleError()` and its capped backoff like every other reconnect, per
+the loop hazard in [hazards](hazards.md#concurrency-and-connections).
+
+**Reconnection has no terminal state** — a tab that stops retrying is deaf until
+someone reloads it, and nobody reloads a tab that looks fine. Attempts continue
+indefinitely on the capped backoff, and the counter resets on `sync_complete`, not
+on `onopen`: a cause that lets the socket open and then go silent would otherwise
+reset its own backoff on every watchdog trip and reconnect at a fixed fast
+interval. Five attempts is the threshold at which the banner goes up, suppressed
+for the snapshot warm-up and for an offline-locked device, where the nudge would be
+wrong mid-event.
+
+The status chip reads stream health, never `navigator.onLine`: a dead socket under
+a live NIC is precisely the state it must not report as online. It claims online
+only between a `sync_complete` and the next failure, and only a `sync_complete`
+clears the error — an `onopen` that never delivers is the failure being reported.
+
 ### Ephemeral events
 
 Broadcast directly to specific connections, with no DB storage and no IndexedDB

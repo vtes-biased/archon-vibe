@@ -24,17 +24,12 @@
   let isOnline = $state(navigator.onLine);
   let isSyncing = $state(true);
   let syncError = $state(false);
+  // The chip's honesty: a live stream, not a live NIC. A socket can die with the network up,
+  // and reading navigator.onLine alone is what let a deaf tab keep reporting itself online.
+  let streamDown = $derived(!isOnline || syncError);
   // Suppressed while offline-locked (mid-event refresh is the wrong nudge);
   // tracked in state and refreshed on sync events since the getter isn't reactive.
   let hasOfflineLocked = $state(false);
-
-  // Manual recovery from a terminal sync failure (the auto-retry gives up after a
-  // few attempts) — the banner exposes this so the user isn't stuck on stale data.
-  function reconnectSync() {
-    syncError = false;
-    isSyncing = true;
-    syncManager.connect();
-  }
 
   const navItems = [
     { href: '/tournaments', labelFn: () => m.nav_tournaments(), icon: 'trophy' },
@@ -73,10 +68,10 @@
       hasOfflineLocked = getOfflineTournamentUids().size > 0;
       if (event.type === 'syncing') {
         isSyncing = true;
-        syncError = false;
-      } else if (event.type === 'connected') {
-        syncError = false;
       } else if (event.type === 'sync_complete') {
+        // Only a completed catch-up clears the error: an onopen that never delivers is
+        // exactly the failure being reported, and clearing there hides it again.
+        syncError = false;
         isSyncing = false;
       } else if (event.type === 'error') {
         // Keep the raw reason in the console for diagnostics; the user sees a
@@ -141,9 +136,9 @@
   <!-- Sticky stack, not overlay, so banners push content down and stack as block
        siblings; sticks at safe-t, not 0, or a stuck banner slides under the
        status bar in the installed PWA. -->
-  {#if !isOnline || syncError || (getUpdateAvailable() && !hasOfflineLocked)}
+  {#if streamDown || (getUpdateAvailable() && !hasOfflineLocked)}
     <div class="sticky top-safe-t z-50">
-      {#if !isOnline || syncError}
+      {#if streamDown}
         <div class="px-4 py-2 text-center text-sm {!isOnline ? 'status-offline' : 'bg-accent-soft/90 text-link-soft'}">
           {#if !isOnline}
             <span class="inline-flex items-center gap-2">
@@ -153,7 +148,7 @@
           {:else if syncError}
             <span class="inline-flex items-center gap-2">
               {m.sync_error_disconnected()}
-              <button onclick={reconnectSync} class="underline hover:no-underline font-medium">{m.sync_reconnect()}</button>
+              <button onclick={() => syncManager.connect()} class="underline hover:no-underline font-medium">{m.sync_reconnect()}</button>
             </span>
           {/if}
         </div>
@@ -237,16 +232,16 @@
            cue is icon + semantic color, which a design refactor can freely change). -->
       <div
         class="flex flex-col items-center gap-1"
-        data-sync-state={!isOnline ? 'offline' : isSyncing ? 'syncing' : 'synced'}
+        data-sync-state={streamDown ? 'offline' : isSyncing ? 'syncing' : 'synced'}
       >
-        {#if !isOnline}
+        {#if streamDown}
           <WifiOff class="w-4 h-4 text-link" aria-hidden="true" />
         {:else if isSyncing}
           <RefreshCw class="w-4 h-4 text-warn animate-spin motion-reduce:animate-none" aria-hidden="true" />
         {:else}
           <Wifi class="w-4 h-4 text-info" aria-hidden="true" />
         {/if}
-        <span class="text-[10px] text-ink-faint">{isOnline ? (isSyncing ? m.status_syncing() : m.status_online()) : m.status_offline()}</span>
+        <span class="text-[10px] text-ink-faint">{streamDown ? m.status_offline() : isSyncing ? m.status_syncing() : m.status_online()}</span>
       </div>
     </div>
   </nav>
