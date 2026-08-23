@@ -158,7 +158,7 @@ async def update_current_user(
             country = validated_country(link.country, user.country)
             mod = prior.moderation if prior else None
             if link.state is not None:
-                mod = moderation_for(user, link.state, country, mod, link.url)
+                mod = moderation_for(user, link.state, country, mod, user.uid, link.url)
             links.append(
                 CommunityLink(
                     type=link_type,

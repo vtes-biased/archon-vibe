@@ -25,11 +25,13 @@ people to tell, and the wiki text that dies with it.
 ## Collapse the stored link moderation
 
 **Gated on** `2d6190f`, which replaced the `{status, scope, by, at}` moderation
-record on a community link with a single value. `User` decodes strictly, so a row
-still carrying the record shape raises on every read of that member — this is a
-repair, not a tidy-up, and it runs **immediately after the deploy**, ahead of the
-`api` backfill below. Running it against the earlier build would have that build
-write the record shape straight back.
+record on a community link with a single value. Until it runs, a row still
+carrying the record shape raises on every read of that member (`User` decodes
+strictly) **and every hidden link on it is served to everyone**: both filters
+compare `moderation` against a plain string, and a record matches neither. This
+is a repair, not a tidy-up — it runs **immediately after the deploy**, ahead of
+the `api` backfill below. Running it against the earlier build would have that
+build write the record shape straight back.
 
 **Run** from the deployed tree, count first, then apply:
 
@@ -50,9 +52,9 @@ SELECT count(*) FROM objects WHERE type = 'user'
   AND jsonb_path_exists("api", '$.community_links[*].moderation.status');
 ```
 
-**Owes afterwards**: nothing to tell anyone — a member whose link was hidden or
-pinned keeps that decision, and the record it was stored in was never displayed.
-Delete this section.
+**Owes afterwards**: nothing to tell anyone — every moderation decision survives
+the collapse, and the record it was stored in was never displayed. Delete this
+section.
 
 ## Backfill the `api` projection
 

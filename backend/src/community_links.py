@@ -23,6 +23,7 @@ def moderation_for(
     state: str,
     country: str | None,
     current: LinkModeration | None,
+    target_uid: str,
     url: str,
 ) -> LinkModeration | None:
     if state == "global":
@@ -40,7 +41,7 @@ def moderation_for(
         )
     if state == (current.value if current else "none"):
         return current
-    logger.info(f"{actor.uid} moderated {url} ({country}) to {state}")
+    logger.info(f"{actor.uid} moderated {target_uid}'s {url} ({country}) to {state}")
     return None if state == "none" else LinkModeration(state)
 
 

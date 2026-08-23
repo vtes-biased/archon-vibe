@@ -22,8 +22,6 @@ export type CommunityLinkType = "discord" | "telegram" | "whatsapp" | "forum" | 
 export type LinkPlacement = "channel" | "content";
 export type LinkMedia = "video" | "podcast" | "text" | "social";
 
-// A moderator's decision: hidden, or pinned to a country card (NC) or the
-// global one (IC). Absent/null = nobody has acted.
 export type LinkModeration = "hidden" | "national" | "global";
 
 export interface CommunityLink {

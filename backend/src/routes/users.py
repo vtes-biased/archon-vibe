@@ -461,7 +461,7 @@ async def edit_community_link(
     mod = prior.moderation
     if request.state is not None:
         mod = community_links.moderation_for(
-            current_user, request.state, country, mod, request.url
+            current_user, request.state, country, mod, target.uid, request.url
         )
 
     edited = msgspec.structs.replace(
