@@ -172,11 +172,13 @@ def test_import_carries_the_disqualification_and_withdrawal_it_is_told_about():
     by_uid = {s.user_uid: s for s in t.standings}
     assert by_uid["u3"].disqualified and not by_uid["u3"].finalist
     assert (by_uid["u3"].gw, by_uid["u3"].vp, by_uid["u3"].tp) == (0.0, 0.0, 0)
-    assert by_uid["u4"].no_show and not by_uid["u4"].disqualified
-    assert not by_uid["u4"].finalist
+    # A withdrawal is an ordinary competitor here: it keeps what it earned and only
+    # loses the placement `pos` never held.
+    assert not by_uid["u4"].finalist and not by_uid["u4"].disqualified
     assert (by_uid["u4"].gw, by_uid["u4"].vp, by_uid["u4"].tp) == (0.0, 2.0, 25)
 
     states = {p.user_uid: p.state for p in t.players}
     assert states["u3"] == PlayerState.DISQUALIFIED
     assert "u3" not in {s.player_uid for s in t.finals.seating}
-    assert set([s.user_uid for s in t.standings][-2:]) == {"u3", "u4"}
+    assert "u4" not in {s.player_uid for s in t.finals.seating}
+    assert [s.user_uid for s in t.standings][-1] == "u3"

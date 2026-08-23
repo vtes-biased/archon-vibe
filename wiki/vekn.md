@@ -196,17 +196,22 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   shape of a native or ETL-imported tournament. A summary-only winner with no
   `vpf` instead gets the tournament-win GW from the engine's rating rule, with no
   finals object.
-- **A disqualification or a withdrawal arrives as a flag, not a placement.** Each
-  participant carries `dq` and `wd` beside `pos`, and vekn.net files a flagged row
-  at `pos` = field size, so the placement test alone crowns one a finalist in a
-  field of five. A `dq` row is imported zeroed and disqualified on **both** halves
-  of the signal ([hazards](hazards.md#consumers-that-must-move-together)); a `wd`
-  row is imported with its score intact and `no_show` stored on it, the flag the
-  push sends back as `WD`. It keeps the score because a withdrawal *played*: zeroing
-  it would drop the row from the field count the 8-player rating threshold is read
-  against, and one withdrawal would unrate the whole event. `dq` wins when both are
-  set: `archon_approve.php` contaminates in either direction, so no single row can
-  be read back to the truth.
+- **`dq` and `wd` say `pos` is not a placement.** Each participant carries both
+  beside `pos`, and vekn.net files a flagged row at `pos` = field size — so reading
+  it as a placement crowns that player a finalist in a field of five. Neither flag
+  may reach the finalist or winner test.
+- **A `dq` row is imported zeroed and disqualified on both halves of the signal**
+  ([hazards](hazards.md#consumers-that-must-move-together)) — the row flag for the
+  placement path and `Disqualified` for the rating path, or half the consumers stay
+  blind to it.
+- **A `wd` row is imported as an ordinary competitor**, keeping its score, its rank
+  and its rating. Withdrawing is not an excluded class in this app: a player who
+  drops mid-event stays ranked on what they earned and is barred only from the
+  final ([tournaments](tournaments.md#finals)). Excluding an imported withdrawal
+  would import a rule we do not have. A `wd` row that scored nothing is a no-show
+  by the ordinary derivation and needs no flag to become one — which is what makes
+  the round trip of our own push, where `no_show` goes out as `WD`, come back
+  unchanged.
 - Sorts the sheet with the engine's own rule, never a key of its own
   ([tournaments](tournaments.md#standings)).
 - Re-sync compares the authoritative play data so a VEKN-side score correction, and

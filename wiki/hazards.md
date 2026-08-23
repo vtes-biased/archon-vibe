@@ -164,7 +164,7 @@ on a no-show.
 The atom has two readings and they are **not** interchangeable. `players_with_rounds`'
 round-less branch in `engine/src/ratings.rs` answers *was this row in the field that
 played* — `disqualified || scored`, because a DQ'd row is stored zeroed yet counts
-toward the 8-player threshold (A.2) and toward the coefficient's own count. Its
+toward the 8-player rating threshold (A.2). Its
 hand-written twins, `_players_with_rounds` in `backend/src/ratings.py` and
 `playedPlayerUids` in `frontend/src/lib/tournament-utils.ts`, answer *did this player
 play* and stay on the score alone, since a DQ'd player earns no entry anyway. They

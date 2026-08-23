@@ -256,7 +256,6 @@ export interface Standing {
   finalist: boolean;
   disqualified?: boolean;
   non_competing?: boolean;
-  no_show?: boolean; // importer's word that the row held no placement; also derived from a scoreless row
 }
 
 export type RafflePool = "AllPlayers" | "NonFinalists" | "GameWinners" | "NoGameWin" | "NoVictoryPoint";

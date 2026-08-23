@@ -324,13 +324,11 @@ arrives at 0/0/0; ranked as a competitor they tie for a real place among the las
 the field. `compute_final_standings` stamps `no_show` on such a row and appends it
 with the DQ'd and the proxies — the row and the name stay, the rank does not. The
 winner and the finalists are exempt, having sat by definition, and a DQ'd row is
-stored zeroed so its own flag decides first. The class exists solely in an imported
-sheet — `compute_preliminary_standings` only ever sees players who sat at a finished
-table — and it is reached two ways: **derived** at placement from a scoreless row, or
-**stored** on the row by an importer told the player held no placement, which is how
-a vekn.net withdrawal arrives with its score intact ([vekn](vekn.md#tournaments)).
-A stored row keeps its score deliberately: it played, so it still counts toward the
-field the rating threshold is read against.
+stored zeroed so its own flag decides first. The flag is **derived at placement, not
+stored**: `compute_preliminary_standings` only ever sees players who sat at a
+finished table, so the class exists solely in an imported sheet. An imported
+withdrawal is not in it — it kept a score, and this app ranks a player who dropped
+([vekn](vekn.md#tournaments)).
 
 **An imported sheet arrives in the engine's own order.** Both importers sort with
 `sort_standings`, the one place the six-key rule lives — excluded rows last, then

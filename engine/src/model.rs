@@ -202,9 +202,6 @@ pub mod standing {
     pub const FINALIST: &str = "finalist";
     pub const GW: &str = "gw";
     pub const NON_COMPETING: &str = "non_competing";
-    /// Stored only by an importer told a player held no placement, and stamped
-    /// over by `compute_final_standings` for the rows it derives the class for.
-    pub const NO_SHOW: &str = "no_show";
     pub const TOSS: &str = "toss";
     pub const TP: &str = "tp";
     pub const USER_UID: &str = "user_uid";
@@ -215,6 +212,7 @@ pub mod standing {
 /// stored on a `Standing`.
 pub mod standing_row {
     pub const FINALIST_POSITION: &str = "finalist_position";
+    pub const NO_SHOW: &str = "no_show";
 }
 
 pub mod table {
