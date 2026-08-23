@@ -527,9 +527,10 @@ if os.getenv("ENVIRONMENT", "development") == "development":
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
-        # The snapshot's access-version fingerprint rides a custom response header;
-        # a cross-origin dev frontend can only read it if it's explicitly exposed.
-        expose_headers=["X-Access-Version"],
+        # Neither is CORS-safelisted, so a cross-origin dev frontend reads them only if
+        # exposed — without this the catalog's conditional request is dead in dev and
+        # live in production, which is same-origin.
+        expose_headers=["X-Access-Version", "ETag"],
     )
 
     @app.exception_handler(Exception)

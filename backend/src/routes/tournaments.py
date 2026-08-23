@@ -100,6 +100,7 @@ _RATING_IRRELEVANT_ACTIONS = frozenset(
 )
 
 _engine = PyEngine()
+_engine_cards_loaded = False
 
 SERVER_OWNED_TOURNAMENT_FIELDS = frozenset(
     {
@@ -348,9 +349,9 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
 
     named = get_country(normalize_country(tournament.country or "") or "")
 
+    _load_engine_cards()
     return _engine.export_twda(
         deck_json,
-        _load_cards_json(),
         tournament.name,
         str(tournament_date),
         named["name"] if named else (tournament.country or ""),
@@ -1676,14 +1677,18 @@ async def qr_checkin(
     )
 
 
-def _load_cards_json() -> str:
-    """Load cards.json for the Rust engine (cached in memory by card_data)."""
+def _load_engine_cards() -> None:
+    """Hand cards.json to the engine, which parses and holds it."""
+    global _engine_cards_loaded
+    if _engine_cards_loaded:
+        return
     text = cards_json_text()
     if text is None:
         raise HTTPException(
             status_code=503, detail="Cards data not available. Run: just cards"
         )
-    return text
+    _engine.load_cards(text)
+    _engine_cards_loaded = True
 
 
 def _validate_timer_tournament(user, tournament: Tournament | None):

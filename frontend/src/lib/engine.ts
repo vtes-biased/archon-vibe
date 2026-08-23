@@ -670,12 +670,11 @@ export async function validateDeck(
 ): Promise<ValidationError[] | null> {
   const engine = await initEngine();
   try {
-    const { getCardsJson } = await import('./cards');
-    const cardsJson = await getCardsJson();
-    if (!cardsJson) return null;
+    const { loadEngineCards } = await import('./cards');
+    await loadEngineCards();
 
     const deckJson = JSON.stringify({ name: deck.name || '', cards: deck.cards });
-    const resultJson = callEngine(() => engine.validateDeck(deckJson, cardsJson, format));
+    const resultJson = callEngine(() => engine.validateDeck(deckJson, format));
     return JSON.parse(resultJson);
   } catch {
     return null;

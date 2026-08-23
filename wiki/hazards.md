@@ -302,6 +302,16 @@ lookup keys, with distinct roles: printed (display), unique (text export), full
 card names ending in digits or containing a slash are the failure cases. The fix is
 exact-key gating, not a looser regex.
 
+**An argument handed to the engine permanently sizes its linear memory at roughly
+nine times the argument's JSON.** The card catalog measures 1.72MB and takes the
+WASM instance from 1.3MB to 17.4MB — 9.36× — and it stays there: WebAssembly memory
+grows and never shrinks, so replacing the catalog with a one-card one leaves the
+17.4MB. That is why the catalog is handed over once
+([architecture](architecture.md#cards-and-decks)) rather than per call, and why the
+frontend skips the hand-off when the fetched ETag matches the one it holds — an
+identical catalog re-handed still costs the growth. Any new bulk argument to the
+engine sets a high-water mark for the tab's lifetime.
+
 ## Rounds and the bot
 
 **Round lifecycle**: `RestoreRound` can re-derive to fully Finished; the finals are

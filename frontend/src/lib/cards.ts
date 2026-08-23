@@ -1,13 +1,17 @@
 import type { VtesCard } from '$lib/types';
 import { getDB } from './db';
+import { callEngine, initEngine } from './engine-instance';
 import { normalizeSearch, searchTokens, matchesAllTerms } from './utils';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+const CARDS_ETAG_KEY = 'cards_etag';
 
 let cardsMap: Map<number, VtesCard> | null = null;
 /** Word-prefix token cache, keyed by card id — see searchCards. */
 let cardTokens: Map<number, string[]> | null = null;
 let currentEtag: string | null = null;
+let engineCardsPromise: Promise<void> | null = null;
+let engineCardsFor: Map<number, VtesCard> | null = null;
 
 export async function getCards(): Promise<Map<number, VtesCard>> {
   if (cardsMap && cardsMap.size > 0) return cardsMap;
@@ -17,6 +21,7 @@ export async function getCards(): Promise<Map<number, VtesCard>> {
   if (stored.length > 0) {
     cardsMap = new Map(stored.map(c => [c.id, c]));
     cardTokens = null;
+    currentEtag = (await db.get('metadata', CARDS_ETAG_KEY)) ?? null;
     refreshCardsFromAPI().catch(() => {});
     return cardsMap;
   }
@@ -28,20 +33,35 @@ export async function getCards(): Promise<Map<number, VtesCard>> {
   return cardsMap;
 }
 
-export async function getCardsJson(): Promise<string> {
+/** Serializes the catalog and hands it to the engine, which parses and holds it. Memoized on the
+ * map's identity, not a flag: refreshCardsFromAPI replaces the map when the etag moves, and the
+ * deck surfaces fire their validations concurrently. */
+export async function loadEngineCards(): Promise<void> {
   const cards = await getCards();
-  const obj: Record<string, VtesCard> = {};
-  for (const [id, card] of cards) {
-    obj[id.toString()] = card;
-  }
-  return JSON.stringify(obj);
+  if (engineCardsPromise && engineCardsFor === cards) return engineCardsPromise;
+  engineCardsFor = cards;
+  engineCardsPromise = (async () => {
+    const engine = await initEngine();
+    const obj: Record<string, VtesCard> = {};
+    for (const [id, card] of cards) {
+      obj[id.toString()] = card;
+    }
+    callEngine(() => engine.loadCards(JSON.stringify(obj)));
+  })().catch(e => {
+    engineCardsFor = null;
+    engineCardsPromise = null;
+    throw e;
+  });
+  return engineCardsPromise;
 }
 
 
 async function refreshCardsFromAPI(): Promise<void> {
   try {
     const headers: Record<string, string> = {};
-    if (currentEtag) {
+    // Only conditional when there is something to keep: a 304 answers "reuse what you have",
+    // and a rescued etag can outlive the cards store a version upgrade dropped.
+    if (currentEtag && cardsMap?.size) {
       headers['If-None-Match'] = currentEtag;
     }
 
@@ -50,8 +70,12 @@ async function refreshCardsFromAPI(): Promise<void> {
     if (resp.status === 304) return; // Not modified
     if (!resp.ok) return;
 
-    const etag = resp.headers.get('etag');
-    if (etag) currentEtag = etag.replace(/"/g, '');
+    const etag = resp.headers.get('etag')?.replace(/"/g, '') ?? null;
+    // The catalog is cacheable for an hour, so a cold page gets a 200 from the browser's
+    // own cache and never revalidates. Compare versions rather than trust the status: a
+    // fresh map would re-hand an identical catalog to the engine, growing its memory again.
+    if (etag && etag === currentEtag && cardsMap?.size) return;
+    currentEtag = etag;
 
     const data: Record<string, VtesCard> = await resp.json();
     const cards = Object.values(data);
@@ -66,6 +90,7 @@ async function refreshCardsFromAPI(): Promise<void> {
       tx.store.put(card);
     }
     await tx.done;
+    if (currentEtag) await db.put('metadata', currentEtag, CARDS_ETAG_KEY);
   } catch (e) {
     console.warn('Failed to refresh cards from API:', e);
   }

@@ -26,6 +26,7 @@ pub use permissions::{
 mod shared {
     use super::*;
     use crate::error::EngineError;
+    use std::sync::RwLock;
 
     pub fn can_change_role_json(
         actor_json: &str,
@@ -183,9 +184,23 @@ mod shared {
         Ok(d)
     }
 
-    pub fn parse_deck_json(text: &str, cards_json: &str) -> Result<String, EngineError> {
-        let card_map = cards::CardMap::load(cards_json)?;
-        let result = deck::parse_deck(text, &card_map)?;
+    /// Read guard over the loaded catalog, or an internal error when nothing has
+    /// been handed to `load_cards` yet.
+    pub fn with_card_map<T>(
+        cards: &RwLock<Option<cards::CardMap>>,
+        f: impl FnOnce(&cards::CardMap) -> Result<T, EngineError>,
+    ) -> Result<T, EngineError> {
+        let guard = cards
+            .read()
+            .map_err(|_| EngineError::internal("cards lock poisoned"))?;
+        let card_map = guard
+            .as_ref()
+            .ok_or_else(|| EngineError::internal("cards not loaded"))?;
+        f(card_map)
+    }
+
+    pub fn parse_deck_json(text: &str, card_map: &cards::CardMap) -> Result<String, EngineError> {
+        let result = deck::parse_deck(text, card_map)?;
         let mut json = result.deck.to_json();
         if !result.unrecognized_lines.is_empty() {
             let lines: Vec<JsonValue> = result
@@ -200,20 +215,19 @@ mod shared {
 
     pub fn validate_deck_json(
         deck_json: &str,
-        cards_json: &str,
+        card_map: &cards::CardMap,
         format: &str,
     ) -> Result<String, EngineError> {
-        let card_map = cards::CardMap::load(cards_json)?;
         let value = json::parse(deck_json)?;
         let d = deck_from_json(&value, false)?;
-        let errors = deck::validate_deck(&d, &card_map, format);
+        let errors = deck::validate_deck(&d, card_map, format);
         Ok(JsonValue::Array(errors.iter().map(|e| e.to_json()).collect()).dump())
     }
 
     #[allow(clippy::too_many_arguments)]
     pub fn export_twda_json(
         deck_json: &str,
-        cards_json: &str,
+        card_map: &cards::CardMap,
         tournament_name: &str,
         tournament_date: &str,
         tournament_place: &str,
@@ -222,12 +236,11 @@ mod shared {
         player_count: u32,
         player_name: &str,
     ) -> Result<String, EngineError> {
-        let card_map = cards::CardMap::load(cards_json)?;
         let value = json::parse(deck_json)?;
         let d = deck_from_json(&value, true)?;
         Ok(deck::export_twda(
             &d,
-            &card_map,
+            card_map,
             tournament_name,
             tournament_date,
             tournament_place,
@@ -338,10 +351,13 @@ mod shared {
 #[cfg(feature = "wasm")]
 mod wasm {
     use super::shared::*;
+    use std::sync::RwLock;
     use wasm_bindgen::prelude::*;
 
     #[wasm_bindgen]
-    pub struct WasmEngine;
+    pub struct WasmEngine {
+        cards: RwLock<Option<super::cards::CardMap>>,
+    }
 
     /// Err arm crosses into JS as a thrown string carrying the EngineError wire
     /// JSON ({"code","params","message"}); engine.ts re-throws it as a typed error.
@@ -354,7 +370,22 @@ mod wasm {
         #[wasm_bindgen(constructor)]
         #[allow(clippy::new_without_default)]
         pub fn new() -> Self {
-            WasmEngine
+            WasmEngine {
+                cards: RwLock::new(None),
+            }
+        }
+
+        /// Parses the card catalog once and holds it; every later deck call reads it.
+        /// The catalog is replaceable because a card refresh mid-session yields a new one.
+        #[wasm_bindgen(js_name = loadCards)]
+        pub fn load_cards(&self, cards_json: &str) -> Result<(), String> {
+            let card_map = super::cards::CardMap::load(cards_json).map_err(|e| e.to_json())?;
+            let mut guard = self
+                .cards
+                .write()
+                .map_err(|_| super::EngineError::internal("cards lock poisoned").to_json())?;
+            *guard = Some(card_map);
+            Ok(())
         }
 
         #[wasm_bindgen(js_name = canChangeRole)]
@@ -535,18 +566,15 @@ mod wasm {
         }
 
         #[wasm_bindgen(js_name = parseDeck)]
-        pub fn parse_deck(&self, text: &str, cards_json: &str) -> Result<String, String> {
-            js_str(parse_deck_json(text, cards_json))
+        pub fn parse_deck(&self, text: &str) -> Result<String, String> {
+            js_str(with_card_map(&self.cards, |cm| parse_deck_json(text, cm)))
         }
 
         #[wasm_bindgen(js_name = validateDeck)]
-        pub fn validate_deck(
-            &self,
-            deck_json: &str,
-            cards_json: &str,
-            format: &str,
-        ) -> Result<String, String> {
-            js_str(validate_deck_json(deck_json, cards_json, format))
+        pub fn validate_deck(&self, deck_json: &str, format: &str) -> Result<String, String> {
+            js_str(with_card_map(&self.cards, |cm| {
+                validate_deck_json(deck_json, cm, format)
+            }))
         }
 
         #[wasm_bindgen(js_name = createTournament)]
@@ -649,7 +677,9 @@ mod wasm {
 #[cfg(feature = "python")]
 mod python {
     use super::shared::*;
+    use pyo3::exceptions::PyValueError;
     use pyo3::prelude::*;
+    use std::sync::RwLock;
 
     /// Err arm crosses into Python as a ValueError whose message is the
     /// EngineError wire JSON ({"code","params","message"}); the backend parses it.
@@ -658,13 +688,29 @@ mod python {
     }
 
     #[pyclass]
-    pub struct PyEngine;
+    pub struct PyEngine {
+        cards: RwLock<Option<super::cards::CardMap>>,
+    }
 
     #[pymethods]
     impl PyEngine {
         #[new]
         fn new() -> Self {
-            PyEngine
+            PyEngine {
+                cards: RwLock::new(None),
+            }
+        }
+
+        /// Parses the card catalog once and holds it; every later deck call reads it.
+        /// The catalog is replaceable because a card refresh mid-session yields a new one.
+        fn load_cards(&self, cards_json: &str) -> PyResult<()> {
+            let card_map = super::cards::CardMap::load(cards_json)
+                .map_err(|e| PyValueError::new_err(e.to_json()))?;
+            let mut guard = self.cards.write().map_err(|_| {
+                PyValueError::new_err(super::EngineError::internal("cards lock poisoned").to_json())
+            })?;
+            *guard = Some(card_map);
+            Ok(())
         }
 
         fn can_change_role(
@@ -852,17 +898,14 @@ mod python {
             crate::cards::fold_ascii(s)
         }
 
-        fn parse_deck(&self, text: &str, cards_json: &str) -> PyResult<String> {
-            py_str(parse_deck_json(text, cards_json))
+        fn parse_deck(&self, text: &str) -> PyResult<String> {
+            py_str(with_card_map(&self.cards, |cm| parse_deck_json(text, cm)))
         }
 
-        fn validate_deck(
-            &self,
-            deck_json: &str,
-            cards_json: &str,
-            format: &str,
-        ) -> PyResult<String> {
-            py_str(validate_deck_json(deck_json, cards_json, format))
+        fn validate_deck(&self, deck_json: &str, format: &str) -> PyResult<String> {
+            py_str(with_card_map(&self.cards, |cm| {
+                validate_deck_json(deck_json, cm, format)
+            }))
         }
 
         fn create_tournament(&self, config_json: &str, actor_json: &str) -> PyResult<String> {
@@ -897,7 +940,6 @@ mod python {
         fn export_twda(
             &self,
             deck_json: &str,
-            cards_json: &str,
             tournament_name: &str,
             tournament_date: &str,
             tournament_place: &str,
@@ -906,17 +948,19 @@ mod python {
             player_count: u32,
             player_name: &str,
         ) -> PyResult<String> {
-            py_str(export_twda_json(
-                deck_json,
-                cards_json,
-                tournament_name,
-                tournament_date,
-                tournament_place,
-                tournament_format,
-                tournament_url,
-                player_count,
-                player_name,
-            ))
+            py_str(with_card_map(&self.cards, |cm| {
+                export_twda_json(
+                    deck_json,
+                    cm,
+                    tournament_name,
+                    tournament_date,
+                    tournament_place,
+                    tournament_format,
+                    tournament_url,
+                    player_count,
+                    player_name,
+                )
+            }))
         }
 
         fn check_table_vps(&self, vps: Vec<f64>) -> PyResult<Option<String>> {

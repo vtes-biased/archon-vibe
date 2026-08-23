@@ -34,11 +34,10 @@ export async function fetchDeckFromUrl(url: string): Promise<ParsedDeck> {
 
 export async function parseDeckText(text: string): Promise<ParsedDeck> {
   const engine = await initEngine();
-  const { getCardsJson } = await import('./cards');
-  const cardsJson = await getCardsJson();
-  if (!cardsJson) throw new Error('Cards data not loaded');
+  const { loadEngineCards } = await import('./cards');
+  await loadEngineCards();
 
-  const resultJson = callEngine(() => engine.parseDeck(text, cardsJson));
+  const resultJson = callEngine(() => engine.parseDeck(text));
   const result = JSON.parse(resultJson);
   const warnings: string[] = [];
   if (result.unrecognized_lines?.length) {
