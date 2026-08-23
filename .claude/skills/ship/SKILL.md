@@ -39,15 +39,31 @@ from `git show HEAD:<path>`, write it with `git hash-object -w`, and place it wi
 `git update-index --cacheinfo <mode>,<sha>,<path>`. Otherwise imperfect isolation
 is acceptable when files genuinely overlap.
 
+**Run that diff in the same shell invocation as the commit.** Across two calls a
+sibling deletes their own board line in the gap, and `git commit -- BOARD.md`
+takes the worktree rather than the hunks you just read and approved.
+
 **`--amend` carries the same hazard from the other end**: the commit you mean to
-amend may no longer be HEAD. Read `git log -1` as its own call and compare the sha
-to the one you wrote — chained onto the amend with `&&` it prints the answer
-without checking it, which is not a check. A sibling can land a commit in the gap
-between your inspection and your write, so re-read immediately before, and diff
-against what you expected after. If you do amend a sibling's commit you have
-reverted their work inside their own message: restore it index-only with
-`git read-tree <their-sha>` then a fresh `--amend`, never a `--hard` reset, which
-would take their worktree with it.
+amend may no longer be HEAD. Gate the write on the sha inside one invocation —
+`[ "$(git rev-parse HEAD)" = <sha> ] || exit 1` — because `git log -1 && git
+commit --amend` prints the answer without checking it, and reading it as its own
+call opens the very gap the check exists to close. Diff against what you expected
+after. If you do amend a sibling's commit you have reverted their work inside
+their own message: restore it index-only with `git read-tree <their-sha>` then a
+fresh `--amend`, never a `--hard` reset, which would take their worktree with it.
+
+**Never `--amend --no-edit` bare.** Amend writes the whole *index*, so a sibling
+who staged anything since your commit has their entire change absorbed under your
+message — the same hazard as a plain `git commit`, reached from a command that
+looks like it only edits your own work. To reshape a commit, build the tree you
+mean without going near the real index: `git read-tree` into a `GIT_INDEX_FILE`
+of your own, `git update-index --cacheinfo` your paths onto it, then
+`git commit-tree` and `git update-ref`. That touches neither the index nor the
+worktree, so a sibling mid-line never feels it.
+
+**Once a sibling has committed on top of yours, a foreign hunk inside your commit
+stands.** Rewriting it rewrites theirs, which is strictly worse than the
+misattribution. Leave it, and say so in the report.
 
 ## 2. Confirm the contract
 
