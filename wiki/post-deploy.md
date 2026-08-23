@@ -24,7 +24,7 @@ people to tell, and the wiki text that dies with it.
 
 ## Collapse the stored link moderation
 
-**Gated on** `c3b6df7`, which replaced the `{status, scope, by, at}` moderation
+**Gated on** `2d6190f`, which replaced the `{status, scope, by, at}` moderation
 record on a community link with a single value. `User` decodes strictly, so a row
 still carrying the record shape raises on every read of that member — this is a
 repair, not a tidy-up, and it runs **immediately after the deploy**, ahead of the
@@ -56,7 +56,7 @@ Delete this section.
 
 ## Backfill the `api` projection
 
-**Gated on** `c3b6df7`, the last commit to change the `api` projection's shape. A
+**Gated on** `2d6190f`, the last commit to change the `api` projection's shape. A
 projection is computed at write time, so every row saved before that commit went
 live carries a NULL or pre-narrowing `api` and is wrong for the public API.
 `init_db` adds the column on deploy; only a re-save fills it. Deploying an
