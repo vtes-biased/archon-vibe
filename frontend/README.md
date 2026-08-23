@@ -58,5 +58,5 @@ src/
 
 ## Type Synchronization
 
-Keep `src/types.ts` synchronized with `backend/src/models.py` using the `python-to-typescript-models` rule.
+Keep `src/lib/types.ts` synchronized with `backend/src/models.py` by hand.
 

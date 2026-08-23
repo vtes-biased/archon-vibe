@@ -1,4 +1,4 @@
-// Keep synchronized with backend/src/models.py using the python-to-typescript-models rule.
+// Hand-synchronized with backend/src/models.py.
 
 export type DataLevel = "public" | "member" | "full";
 

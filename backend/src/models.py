@@ -1,5 +1,4 @@
-"""Data models using msgspec. Changing a Struct here requires the
-python-to-typescript-models rule to keep frontend/src/lib/types.ts synchronized."""
+"""Data models using msgspec, hand-synchronized with frontend/src/lib/types.ts."""
 
 import json
 import secrets
