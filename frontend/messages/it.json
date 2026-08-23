@@ -64,7 +64,7 @@
   "login_reset_instructions": "Inserisci la tua email e ti invieremo un link per reimpostare la password.",
   "login_send_reset_link": "Invia Link di Reimpostazione",
   "login_recover_title": "Ottieni un nuovo link",
-  "login_recover_instructions": "Inserisci la tua email e ti invieremo un nuovo link. Funziona sia che tu abbia già impostato una password sia che non l'abbia fatto.",
+  "login_recover_instructions": "Inserisci la tua email e ti invieremo un nuovo link — funziona anche se non hai mai impostato una password. Se stavi creando un account nuovo, torna indietro e usa Registrati.",
   "login_recover_send": "Invia Nuovo Link",
   "login_welcome_back": "Bentornato! Accedi al tuo account.",
   "login_sign_in": "Accedi",

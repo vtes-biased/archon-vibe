@@ -37,6 +37,7 @@ from ..db import (
     get_sanctions_for_user,
     get_sanctions_for_users,
     get_tournament_by_uid,
+    get_user_by_contact_email,
     get_user_by_uid,
     get_user_by_vekn_id,
     resolve_event_code,
@@ -2032,18 +2033,21 @@ async def _resolve_or_create_offline_player(
             return player_data.temp_uid, user, False
 
     if player_data.email:
+        user = None
         auth_method = await get_auth_method_by_identifier("email", player_data.email)
         if auth_method:
             user = await get_user_by_uid(auth_method.user_uid)
-            if user:
-                if not user.vekn_id:
-                    user.vekn_id = await allocate_next_vekn_id()
-                    user.coopted_by = organizer_uid
-                    user.coopted_at = datetime.now(UTC)
-                    user.modified = datetime.now(UTC)
-                    bd = await save_object_from_model(ObjectType.USER, user)
-                    broadcast_precomputed(bd)
-                return player_data.temp_uid, user, False
+        if not user:
+            user = await get_user_by_contact_email(player_data.email)
+        if user:
+            if not user.vekn_id:
+                user.vekn_id = await allocate_next_vekn_id()
+                user.coopted_by = organizer_uid
+                user.coopted_at = datetime.now(UTC)
+                user.modified = datetime.now(UTC)
+                bd = await save_object_from_model(ObjectType.USER, user)
+                broadcast_precomputed(bd)
+            return player_data.temp_uid, user, False
 
     now = datetime.now(UTC)
     vekn_id = await allocate_next_vekn_id()

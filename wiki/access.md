@@ -89,7 +89,10 @@ wording that fits someone who has never had a password. That is the invited
 member's way back in: a member created with an email address carries a contact
 address and no email auth method, and the `reset` purpose creates the login on
 exactly that basis. A one-click resend is not buildable — an expired transient
-token is gone from storage, so the server cannot recover the address to resend to.
+token is gone from storage, so the server cannot recover the address to resend
+to, and for the same reason the page cannot tell which purpose the dead link
+served. That is why its copy names the signup tab for the one case a reset
+cannot serve: a signup link that expired before any account existed.
 
 ## OAuth2 provider
 

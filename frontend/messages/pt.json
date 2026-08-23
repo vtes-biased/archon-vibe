@@ -64,7 +64,7 @@
   "login_reset_instructions": "Digite seu e-mail e enviaremos um link para redefinir sua senha.",
   "login_send_reset_link": "Enviar Link de Redefinição",
   "login_recover_title": "Obtenha um novo link",
-  "login_recover_instructions": "Digite seu e-mail e enviaremos um novo link. Funciona tanto se você já definiu uma senha quanto se não.",
+  "login_recover_instructions": "Digite seu e-mail e enviaremos um novo link — funciona mesmo se você nunca definiu uma senha. Se você estava criando uma conta totalmente nova, volte e use Cadastrar.",
   "login_recover_send": "Enviar Novo Link",
   "login_welcome_back": "Bem-vindo de volta! Entre na sua conta.",
   "login_sign_in": "Entrar",

@@ -64,7 +64,7 @@
   "login_reset_instructions": "Ingrese su correo electrónico y le enviaremos un enlace para restablecer su contraseña.",
   "login_send_reset_link": "Enviar enlace de recuperación",
   "login_recover_title": "Obtenga un enlace nuevo",
-  "login_recover_instructions": "Ingrese su correo electrónico y le enviaremos un enlace nuevo. Funciona tanto si ya ha establecido una contraseña como si no.",
+  "login_recover_instructions": "Ingrese su correo electrónico y le enviaremos un enlace nuevo — funciona incluso si nunca ha establecido una contraseña. Si estaba creando una cuenta totalmente nueva, vuelva atrás y use Registrarse.",
   "login_recover_send": "Enviar enlace nuevo",
   "login_welcome_back": "¡Bienvenido de nuevo! Inicie sesión en su cuenta.",
   "login_sign_in": "Iniciar sesión",

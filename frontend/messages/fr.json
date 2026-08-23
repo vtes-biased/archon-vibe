@@ -64,7 +64,7 @@
   "login_reset_instructions": "Entrez votre email et nous vous enverrons un lien pour réinitialiser votre mot de passe.",
   "login_send_reset_link": "Envoyer le lien",
   "login_recover_title": "Obtenez un nouveau lien",
-  "login_recover_instructions": "Entrez votre email et nous vous enverrons un nouveau lien. Cela fonctionne que vous ayez déjà défini un mot de passe ou non.",
+  "login_recover_instructions": "Entrez votre email et nous vous enverrons un nouveau lien — cela fonctionne même si vous n'avez jamais défini de mot de passe. Si vous créiez un tout nouveau compte, revenez en arrière et utilisez Inscription.",
   "login_recover_send": "Envoyer un nouveau lien",
   "login_welcome_back": "Bon retour ! Connectez-vous à votre compte.",
   "login_sign_in": "Se connecter",
