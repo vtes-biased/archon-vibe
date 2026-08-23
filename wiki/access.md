@@ -94,6 +94,31 @@ to, and for the same reason the page cannot tell which purpose the dead link
 served. That is why its copy names the signup tab for the one case a reset
 cannot serve: a signup link that expired before any account existed.
 
+### The email of record
+
+`contact_email` is the account's address of record, not an address the member
+chose to publish — its name reads the other way round. It is what door-dedup
+409s on, what the account merge carries to the survivor, what the `reset`
+purpose recovers a login from for someone who never had a password, where the
+invite is sent, and what the VEKN registry push submits, falling back to
+`<vekn_id>@placeholder.vekn.net` when there is none. It becomes a published
+address for exactly two roles: an NC's or Prince's row carries it into the member
+projection in plaintext and into the public one base64-cloaked, a harvester
+speed-bump rather than access control. Every other member's reaches only the
+holder and full-access readers, and no `api` projection carries it at all.
+
+**Case is folded at the lookup, not at the row, and the two lookups differ on
+which.** `contact_email` is compared `LOWER()` on both sides in SQL, so a row
+keeps whatever case its writer supplied and no caller has to think about it. An
+email **auth method's** `identifier` is compared exactly, so it is lowercased on
+every write and every reader must lowercase too — a hand-typed venue address
+passed through raw finds no one.
+
+A `+tag` subaddress is deliberately not canonicalized: this is the address we
+actually send to and hand to the VEKN registry, so folding `a+vtes@x.com` to
+`a@x.com` would aim that mail at a mailbox the member may not own, and would
+turn two distinct people into one 409 at the door.
+
 ## OAuth2 provider
 
 A full RFC 6749 / RFC 7636 (PKCE) implementation for third-party API access.

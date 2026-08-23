@@ -2027,18 +2027,20 @@ async def _resolve_or_create_offline_player(
     Returns (temp_uid, real_user, created) — created=True only for a brand-new
     account (the go-online outcome summary tells the organizer how many real
     members were minted at the venue)."""
+    email = player_data.email.strip().lower() if player_data.email else None
+
     if player_data.vekn_id and not player_data.vekn_id.startswith("TEMP-"):
         user = await get_user_by_vekn_id(player_data.vekn_id)
         if user:
             return player_data.temp_uid, user, False
 
-    if player_data.email:
+    if email:
         user = None
-        auth_method = await get_auth_method_by_identifier("email", player_data.email)
+        auth_method = await get_auth_method_by_identifier("email", email)
         if auth_method:
             user = await get_user_by_uid(auth_method.user_uid)
         if not user:
-            user = await get_user_by_contact_email(player_data.email)
+            user = await get_user_by_contact_email(email)
         if user:
             if not user.vekn_id:
                 user.vekn_id = await allocate_next_vekn_id()
@@ -2057,7 +2059,7 @@ async def _resolve_or_create_offline_player(
         name=player_data.name,
         country=tournament_country,
         vekn_id=vekn_id,
-        contact_email=player_data.email.lower() if player_data.email else None,
+        contact_email=email,
         coopted_by=organizer_uid,
         coopted_at=now,
     )
@@ -2068,13 +2070,11 @@ async def _resolve_or_create_offline_player(
 
     broadcast_precomputed(bd)
 
-    if player_data.email:
+    if email:
         try:
-            await send_invite_email(
-                player_data.email.lower(), new_user.uid, new_user.name
-            )
+            await send_invite_email(email, new_user.uid, new_user.name)
         except Exception:
-            logger.warning(f"Failed to send invite email to {player_data.email}")
+            logger.warning(f"Failed to send invite email to {email}")
 
     return player_data.temp_uid, new_user, True
 
