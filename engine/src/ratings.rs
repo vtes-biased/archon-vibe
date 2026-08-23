@@ -89,7 +89,10 @@ pub(crate) fn players_with_rounds(t: &json::JsonValue) -> usize {
     t[tournament::STANDINGS]
         .members()
         .filter(|s| {
-            s[standing::GW].as_f64().unwrap_or(0.0) != 0.0
+            // A DQ'd row is stored zeroed, so the score alone would drop it from the
+            // field size the rating coefficient is read against.
+            s[standing::DISQUALIFIED].as_bool().unwrap_or(false)
+                || s[standing::GW].as_f64().unwrap_or(0.0) != 0.0
                 || s[standing::VP].as_f64().unwrap_or(0.0) != 0.0
                 || s[standing::TP].as_f64().unwrap_or(0.0) != 0.0
         })

@@ -120,16 +120,47 @@ pub(super) fn compute_preliminary_standings(
 /// GW > VP > TP > toss, DQ'd and proxies parked last. user_uid is a deterministic
 /// terminal tiebreak: without it, players tied on all five come out in
 /// nondeterministic HashMap order. Toss only ever orders finals candidates.
+type RankKey<'a> = (bool, f64, f64, f64, u32, &'a str);
+
+fn cmp_rank(a: RankKey, b: RankKey) -> std::cmp::Ordering {
+    a.0.cmp(&b.0)
+        .then(b.1.partial_cmp(&a.1).unwrap())
+        .then(b.2.partial_cmp(&a.2).unwrap())
+        .then(b.3.partial_cmp(&a.3).unwrap())
+        .then(b.4.cmp(&a.4))
+        .then(a.5.cmp(b.5))
+}
+
+fn rank_key(s: &Standing) -> RankKey<'_> {
+    (
+        s.disqualified || s.non_competing,
+        s.gw,
+        s.vp,
+        s.tp,
+        s.toss,
+        s.user_uid.as_str(),
+    )
+}
+
+fn row_rank_key(s: &JsonValue) -> RankKey<'_> {
+    (
+        s[standing::DISQUALIFIED].as_bool().unwrap_or(false)
+            || s[standing::NON_COMPETING].as_bool().unwrap_or(false),
+        s[standing::GW].as_f64().unwrap_or(0.0),
+        s[standing::VP].as_f64().unwrap_or(0.0),
+        s[standing::TP].as_f64().unwrap_or(0.0),
+        s[standing::TOSS].as_u32().unwrap_or(0),
+        s[standing::USER_UID].as_str().unwrap_or(""),
+    )
+}
+
 fn sort_by_rank(standings: &mut [Standing]) {
-    standings.sort_by(|a, b| {
-        (a.disqualified || a.non_competing)
-            .cmp(&(b.disqualified || b.non_competing))
-            .then(b.gw.partial_cmp(&a.gw).unwrap())
-            .then(b.vp.partial_cmp(&a.vp).unwrap())
-            .then(b.tp.partial_cmp(&a.tp).unwrap())
-            .then(b.toss.cmp(&a.toss))
-            .then(a.user_uid.cmp(&b.user_uid))
-    });
+    standings.sort_by(|a, b| cmp_rank(rank_key(a), rank_key(b)));
+}
+
+/// The same order for a sheet an importer built rather than play produced.
+pub fn sort_standing_rows(rows: &mut [JsonValue]) {
+    rows.sort_by(|a, b| cmp_rank(row_rank_key(a), row_rank_key(b)));
 }
 
 /// Refresh per-seat GW/TP from raw VPs plus current sanctions, so a late SA cascades.

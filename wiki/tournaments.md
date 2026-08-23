@@ -322,6 +322,14 @@ stored zeroed so its own flag decides first. The flag is **derived at placement,
 stored**: `compute_preliminary_standings` only ever sees players who sat at a
 finished table, so the class exists solely in an imported sheet.
 
+**An imported sheet arrives in the engine's own order.** Both importers sort with
+`sort_standings`, the one place the six-key rule lives — excluded rows last, then
+GW, VP, TP, toss, and `user_uid` as the terminal tiebreak. `compute_final_standings`
+competition-ranks the sheet it is handed, so a sheet ordered any other way places
+tied rows the engine never would. A vekn.net disqualification lands zeroed and
+flagged, a withdrawal zeroed and flagless — the withdrawal has no stored class
+here, only the derived no-show one ([vekn](vekn.md#tournaments)).
+
 `display_standings` is what a client renders, exported to WASM as
 `displayStandings` and called nowhere else. It **ranks the stored sheet it is
 handed** — never `compute_preliminary_standings` — because a round-less import has

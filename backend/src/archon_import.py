@@ -402,7 +402,11 @@ async def apply_archon_import(
             )
         )
 
-    standings_list.sort(key=lambda s: (-s.gw, -s.vp, -s.tp, -s.toss))
+    # The engine's own order, so an import cannot rank a sheet the engine never would.
+    standings_list = msgspec.json.decode(
+        engine.sort_standings(msgspec.json.encode(standings_list).decode()),
+        type=list[Standing],
+    )
 
     winner_uid = finals_winner_uid
     if not winner_uid and standings_list:

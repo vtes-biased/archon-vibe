@@ -142,7 +142,9 @@ type annotation.
 
 **The DQ signal is two signals** — `player.state == "Disqualified"` **or** an active
 disqualification sanction. Audit every consumer for the combined signal, and make
-any DQ create, lift or delete recompute standings.
+any DQ create, lift or delete recompute standings. A **producer** owes both halves:
+the VEKN sync writes an imported `dq` onto the standings row *and* the player state,
+because the rating path reads the state and the placement path reads the row.
 
 **Proxy players are excluded-but-not-zeroed**, the inverse of DQ. Consumers
 iterating standings unfiltered — league scoring and the VEKN push among them —

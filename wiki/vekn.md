@@ -196,6 +196,18 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   shape of a native or ETL-imported tournament. A summary-only winner with no
   `vpf` instead gets the tournament-win GW from the engine's rating rule, with no
   finals object.
+- **A disqualification or a withdrawal arrives as a flag, not a placement.** Each
+  participant carries `dq` and `wd` beside `pos`, and vekn.net files a flagged row
+  at `pos` = field size, so the placement test alone crowns one a finalist in a
+  field of five. A `dq` row is imported zeroed and disqualified on **both** halves
+  of the signal ([hazards](hazards.md#consumers-that-must-move-together)); a `wd`
+  row is imported zeroed and flagless, which is what the engine derives `no_show`
+  from and what the push sends back as `WD`. A foreign withdrawal that scored
+  loses those points on our sheet — the archive holds no placement for it either.
+  `dq` wins when both are set: `archon_approve.php` contaminates in either
+  direction, so no single row can be read back to the truth.
+- Sorts the sheet with the engine's own rule, never a key of its own
+  ([tournaments](tournaments.md#standings)).
 - Re-sync compares the authoritative play data so a VEKN-side score correction, and
   legacy folded imports, self-heal.
 - **Authority follows content.** VEKN is authoritative for a matched event only

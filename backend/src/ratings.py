@@ -341,8 +341,12 @@ async def recompute_all_ratings() -> int:
             if _engine.ranking_eligibility(json_str) != "eligible":
                 continue  # house format / < 8 players / no final: never rated
             category = rating_category_for_tournament(t)
-            players = _players_with_rounds(t)
-            players_by_category[category].update(players)
+            # The roster, not the scorers: a player whose row went to zero — DQ'd,
+            # withdrawn, a no-show — must still be recomputed, or the entry they
+            # already hold is never taken back.
+            players_by_category[category].update(
+                p.user_uid for p in t.players if p.user_uid
+            )
 
     # Pass 2: recompute per category using the normal code path
     updated = 0

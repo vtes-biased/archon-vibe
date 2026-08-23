@@ -277,6 +277,16 @@ mod shared {
         Ok(json::JsonValue::Array(ranked).dump())
     }
 
+    /// The engine's standings order for a sheet built by an importer: the six-key
+    /// rule lives in the engine, so an import cannot rank a sheet the engine never
+    /// would.
+    pub fn sort_standings_json(standings_json: &str) -> Result<String, EngineError> {
+        let standings = json::parse(standings_json)?;
+        let mut rows: Vec<JsonValue> = standings.members().cloned().collect();
+        super::tournament::sort_standing_rows(&mut rows);
+        Ok(json::JsonValue::Array(rows).dump())
+    }
+
     pub fn display_standings_json(config_json: &str) -> Result<String, EngineError> {
         let config = json::parse(config_json)?;
         let ranked =
@@ -922,6 +932,10 @@ mod python {
 
         fn compute_final_standings(&self, config_json: &str) -> PyResult<String> {
             py_str(compute_final_standings_json(config_json))
+        }
+
+        fn sort_standings(&self, standings_json: &str) -> PyResult<String> {
+            py_str(sort_standings_json(standings_json))
         }
 
         fn table_label(&self, rooms_json: &str, table_idx: usize) -> PyResult<Option<String>> {

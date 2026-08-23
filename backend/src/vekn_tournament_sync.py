@@ -6,6 +6,7 @@ from urllib.parse import quote
 from uuid import uuid7
 
 import msgspec
+from archon_engine import PyEngine
 
 from .broadcast import broadcast_precomputed
 from .data.timezones import CITY_TZ_OVERRIDES, COUNTRY_TIMEZONE
@@ -38,6 +39,7 @@ from .models import (
 from .vekn_api import PLACEHOLDER_VENUE_ID, VEKNAPIClient
 
 logger = logging.getLogger(__name__)
+_engine = PyEngine()
 
 # VEKN event type → (format, rank)
 EVENT_TYPE_MAP: dict[int, tuple[TournamentFormat, TournamentRank]] = {
@@ -181,15 +183,27 @@ def _map_vekn_to_tournament(
             if not user:
                 continue
 
+            # A flagged row is stored at pos == field size, so in a small field the
+            # placement test alone would crown it a finalist.
+            disqualified = str(vp_data.get("dq") or "0") == "1"
+            withdrawn = not disqualified and str(vp_data.get("wd") or "0") == "1"
             # pos 1..5 is final placement; pos == "1" is the tournament winner.
             prelim_gw = int(vp_data.get("gw", 0) or 0)
             pos = str(vp_data.get("pos") or "")
-            is_finalist = pos in ("1", "2", "3", "4", "5")
+            is_finalist = not (disqualified or withdrawn) and pos in (
+                "1",
+                "2",
+                "3",
+                "4",
+                "5",
+            )
             vp_prelim = float(vp_data.get("vp", 0) or 0)
             vp_finals = float(vp_data.get("vpf", 0) or 0)
             tp = int(vp_data.get("tp", 0) or 0)
             toss = int(vp_data.get("tie", 0) or 0)
-            if pos == "1":
+            if disqualified or withdrawn:
+                prelim_gw, vp_prelim, vp_finals, tp, toss = 0, 0.0, 0.0, 0, 0
+            if is_finalist and pos == "1":
                 winner_uid = user.uid
             if is_finalist:
                 finalists.append((user.uid, int(pos), vp_finals))
@@ -199,11 +213,13 @@ def _map_vekn_to_tournament(
             players.append(
                 Player(
                     user_uid=user.uid,
-                    state=PlayerState.FINISHED,
+                    state=PlayerState.DISQUALIFIED
+                    if disqualified
+                    else PlayerState.FINISHED,
                     payment_status=PaymentStatus.PAID,
                     toss=toss,
                     result=Score(
-                        gw=prelim_gw + (1 if pos == "1" else 0),
+                        gw=prelim_gw + (1 if is_finalist and pos == "1" else 0),
                         vp=vp_prelim + vp_finals,
                         tp=tp,
                     ),
@@ -218,6 +234,7 @@ def _map_vekn_to_tournament(
                     tp=tp,
                     toss=toss,
                     finalist=is_finalist,
+                    disqualified=disqualified,
                 )
             )
 
@@ -241,9 +258,13 @@ def _map_vekn_to_tournament(
                 state=TableState.FINISHED,
             )
 
-        # Total-order tiebreak (user_uid) — without it, tied rows keep VEKN's API
-        # order, which can vary across syncs and spuriously trip the equality check below.
-        standings.sort(key=lambda s: (-s.gw, -s.vp, -s.tp, -s.toss, s.user_uid))
+        # The engine's own order, so an import cannot rank a sheet the engine never
+        # would: excluded rows last, and a total-order tiebreak without which tied
+        # rows keep VEKN's API order and spuriously trip the equality check below.
+        standings = msgspec.json.decode(
+            _engine.sort_standings(msgspec.json.encode(standings).decode()),
+            type=list[Standing],
+        )
 
         return Tournament(
             uid=str(uuid7()),

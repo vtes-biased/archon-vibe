@@ -6,7 +6,7 @@ guard — belt-and-suspenders. `_map_vekn_to_tournament` is pure, no DB/mocks.
 
 from datetime import UTC, datetime
 
-from src.models import User
+from src.models import PlayerState, User
 from src.vekn_tournament_sync import _map_vekn_to_tournament
 
 
@@ -144,3 +144,43 @@ def test_no_final_import_omits_finals_but_keeps_winner():
     assert t.winner == "u1"
     winner = next(s for s in t.standings if s.user_uid == "u1")
     assert (winner.gw, winner.vp) == (1.0, 4.0)  # prelim only (gw not +1)
+
+
+# vekn.net files a flagged row at pos == field size, so in a small field the
+# placement test alone reads it as a finalist.
+def _flagged_event() -> dict:
+    return {
+        "event_id": "558",
+        "event_name": "Flagged Cup",
+        "eventtype_id": "2",
+        "event_startdate": "2025-03-01",
+        "venue_country": "FR",
+        "rounds": "3R+F",
+        "players": [
+            {"pos": "1", "veknid": "1", "gw": "1", "vp": "3", "vpf": "2", "tp": "36"},
+            {"pos": "2", "veknid": "2", "gw": "0", "vp": "2", "vpf": "1", "tp": "30"},
+            {"pos": "5", "veknid": "3", "gw": "1", "vp": "4", "tp": "40", "dq": "1"},
+            {"pos": "5", "veknid": "4", "gw": "0", "vp": "2", "tp": "25", "wd": "1"},
+            {"pos": "5", "veknid": "5", "gw": "0", "vp": "1", "tp": "18"},
+        ],
+    }
+
+
+def test_import_carries_the_disqualification_and_withdrawal_it_is_told_about():
+    users = {str(i): _user(f"u{i}", str(i)) for i in range(1, 6)}
+    t = _map_vekn_to_tournament(_flagged_event(), users)
+    assert t is not None
+
+    by_uid = {s.user_uid: s for s in t.standings}
+    assert by_uid["u3"].disqualified and not by_uid["u3"].finalist
+    assert (by_uid["u3"].gw, by_uid["u3"].vp, by_uid["u3"].tp) == (0.0, 0.0, 0)
+    # No stored withdrawal flag: a zeroed row is what the engine derives `no_show`
+    # from, and the push sends back as WD.
+    assert (by_uid["u4"].gw, by_uid["u4"].vp, by_uid["u4"].tp) == (0.0, 0.0, 0)
+    assert not by_uid["u4"].finalist and not by_uid["u4"].disqualified
+
+    states = {p.user_uid: p.state for p in t.players}
+    assert states["u3"] == PlayerState.DISQUALIFIED
+    assert "u3" not in {s.player_uid for s in t.finals.seating}
+    # The engine's order: excluded rows last.
+    assert [s.user_uid for s in t.standings][-1] == "u3"
