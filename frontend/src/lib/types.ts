@@ -308,8 +308,6 @@ export interface Deck {
   attribution?: string | null; // null = anonymous, vekn_id = attributed to member
 }
 
-/** Fields are optional based on the data level (public/member/full — see backend access_levels.py).
- * Decks are separate DeckObject entities, not embedded here. */
 export interface Room {
   name: string;
   count: number;
@@ -324,6 +322,8 @@ export interface TwdaStatus {
   at: string | null;
 }
 
+/** Fields are optional based on the data level (public/member/full — see backend access_levels.py).
+ * Decks are separate DeckObject entities, not embedded here. */
 export interface Tournament extends BaseObject {
   name: string;
   format: TournamentFormat;
