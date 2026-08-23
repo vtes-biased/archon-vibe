@@ -266,9 +266,9 @@ broadcasts, silently deaf. Lossless catch-up depends on the cursor being accurat
 The queue-overflow decision reaches only the deafness the *server* can see. A
 socket that dies without either end noticing — sleep, a wifi change, a NAT
 timeout — leaves `readyState` at OPEN forever: nothing arrives and `onerror` never
-fires, so a client whose reconnect hangs off that event alone waits indefinitely.
-One waited 2h45m, straight through a backend restart whose RST went nowhere it
-could see.
+fires, so a client whose reconnect hangs off that event alone waits indefinitely,
+serving stale data while claiming to be current. A server restart does not rescue
+it: the RST goes nowhere the zombie socket can see.
 
 **The contract is that some frame arrives at least every 30 seconds once the stream
 is live.** The server emits `{"type":"heartbeat"}` after 30 idle seconds; live
@@ -278,9 +278,13 @@ comment lines without dispatching anything to JS — no browser watchdog can be 
 on one. It carries **no `ts`**: a heartbeat stamped *now* would advance the client
 cursor past an event already committed but not yet broadcast.
 
-Catch-up is exempt — it streams continuously and its own flow is the liveness
-signal. The Discord bot ignores heartbeats; it bounds the same wedge with
-`sock_read` ([discord](discord.md#the-sse-listener)) and needs no watchdog.
+The *server* sends none during catch-up — that phase streams continuously and its
+own flow is the liveness signal. The client watchdog is armed at `onopen` and does
+not except it, so a catch-up that stalls past the window is torn down and retried
+like any other silence; nothing bounds the personal overlay against that, and the
+threshold is sized for it. The Discord bot ignores heartbeats; it bounds the same
+wedge with `sock_read` ([discord](discord.md#the-sse-listener)) and needs no
+watchdog.
 
 **The client reconnects when nothing has arrived for 75 seconds**, checked on a
 15-second tick against a wall clock — a throttled or slept tab wakes with the real
@@ -301,9 +305,12 @@ for the snapshot warm-up and for an offline-locked device, where the nudge would
 wrong mid-event.
 
 The status chip reads stream health, never `navigator.onLine`: a dead socket under
-a live NIC is precisely the state it must not report as online. It claims online
-only between a `sync_complete` and the next failure, and only a `sync_complete`
-clears the error — an `onopen` that never delivers is the failure being reported.
+a live NIC is precisely the state it must not report as online. It goes down when
+the stream closes and stays down through the whole backoff wait, returns to
+*syncing* when the socket reopens, and claims online only between a `sync_complete`
+and the next failure. The banner is separate and keeps the five-attempt threshold,
+so a one-second reconnect does not raise one; only a `sync_complete` clears it,
+since an `onopen` that never delivers is the failure being reported.
 
 ### Ephemeral events
 

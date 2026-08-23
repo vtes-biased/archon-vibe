@@ -392,7 +392,7 @@ async def _sse_loop(
                                 # of hammering /stream once per second.
                                 if synced:
                                     retry_delay = 1
-                            # `:`-comment lines (": connected"/": keepalive") ignored
+                            # `:`-comment lines (": connected") ignored
 
             except asyncio.CancelledError:
                 logger.info("SSE listener cancelled for %s; stopping", key)

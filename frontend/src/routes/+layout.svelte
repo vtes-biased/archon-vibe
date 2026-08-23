@@ -24,9 +24,10 @@
   let isOnline = $state(navigator.onLine);
   let isSyncing = $state(true);
   let syncError = $state(false);
-  // The chip's honesty: a live stream, not a live NIC. A socket can die with the network up,
-  // and reading navigator.onLine alone is what let a deaf tab keep reporting itself online.
-  let streamDown = $derived(!isOnline || syncError);
+  // Latched on the stream closing and cleared when it reopens, so the chip stays honest through
+  // a backoff wait — where nothing else is set and a live NIC would otherwise read as online.
+  let streamLost = $state(false);
+  let streamDown = $derived(!isOnline || streamLost);
   // Suppressed while offline-locked (mid-event refresh is the wrong nudge);
   // tracked in state and refreshed on sync events since the getter isn't reactive.
   let hasOfflineLocked = $state(false);
@@ -68,6 +69,8 @@
       hasOfflineLocked = getOfflineTournamentUids().size > 0;
       if (event.type === 'syncing') {
         isSyncing = true;
+      } else if (event.type === 'connected') {
+        streamLost = false;
       } else if (event.type === 'sync_complete') {
         // Only a completed catch-up clears the error: an onopen that never delivers is
         // exactly the failure being reported, and clearing there hides it again.
@@ -80,6 +83,7 @@
         syncError = true;
         isSyncing = false;
       } else if (event.type === 'disconnected') {
+        streamLost = true;
         isSyncing = false;
       }
     };
@@ -136,9 +140,9 @@
   <!-- Sticky stack, not overlay, so banners push content down and stack as block
        siblings; sticks at safe-t, not 0, or a stuck banner slides under the
        status bar in the installed PWA. -->
-  {#if streamDown || (getUpdateAvailable() && !hasOfflineLocked)}
+  {#if !isOnline || syncError || (getUpdateAvailable() && !hasOfflineLocked)}
     <div class="sticky top-safe-t z-50">
-      {#if streamDown}
+      {#if !isOnline || syncError}
         <div class="px-4 py-2 text-center text-sm {!isOnline ? 'status-offline' : 'bg-accent-soft/90 text-link-soft'}">
           {#if !isOnline}
             <span class="inline-flex items-center gap-2">
