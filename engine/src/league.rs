@@ -34,7 +34,6 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
 
         // GP and RTP score by *final* placement (winner 1st even if they did not lead
         // the preliminaries; other finalists tie for 2nd), resolved once per tournament.
-        // The finalist position rides the same rows, so the bonus cannot disagree with it.
         let winner = tournament[arg::WINNER].as_str().unwrap_or("");
         let final_place: std::collections::HashMap<String, (usize, i32)> = if mode == "Score" {
             std::collections::HashMap::new()

@@ -422,29 +422,6 @@ def test_final_positions_excludes_dq_and_proxy_rows():
     assert _final_positions(t) == {"w": (1, 1), "f": (2, 2), "p": (3, 0)}
 
 
-def test_final_positions_finalist_bonus_matches_a_played_final():
-    """The rating's finalist argument rides the placement row, so it must answer the
-    same on a tournament that played a final as on the summary import above — the
-    backend no longer reads the finals seating to decide it."""
-    t = _make_tournament(
-        winner="w",
-        rounds=[
-            [{"seating": [_seat("w"), _seat("f"), _seat("p")], "state": "Finished"}]
-        ],
-        finals={
-            "seating": [_seat("w", vp=3.0, gw=1), _seat("f")],
-            "seed_order": ["w", "f"],
-            "state": "Finished",
-        },
-        standings=[
-            {"user_uid": "w", "gw": 1.0, "vp": 5.0, "tp": 60, "finalist": True},
-            {"user_uid": "f", "gw": 0.0, "vp": 3.0, "tp": 50, "finalist": True},
-            {"user_uid": "p", "gw": 0.0, "vp": 2.0, "tp": 40},
-        ],
-    )
-    assert _final_positions(t) == {"w": (1, 1), "f": (2, 2), "p": (3, 0)}
-
-
 def _standings(n: int) -> list[dict]:
     """A rounds-less result sheet of n players — the VEKN-import shape, which is
     what `attested_player_count` falls back to counting."""

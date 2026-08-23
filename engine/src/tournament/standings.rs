@@ -284,7 +284,7 @@ pub fn is_no_show(standing: &JsonValue, winner: &str) -> bool {
 
 /// Reorders preliminary `standings` (must arrive sorted desc by score) into final
 /// placement per §3.7.5/§3.1: `winner` is rank 1, finalists share rank 2, DQ'd/proxy/no-show excluded and appended last.
-/// Stamps `finalist_position` too, so the rating bonus can never disagree with the placement.
+/// Stamps `finalist_position` on each row too.
 pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonValue> {
     let winner_present = !winner.is_empty()
         && standings

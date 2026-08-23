@@ -345,8 +345,9 @@ and each finalist row then carries its finals `{gw, vp, tp}` for display. Toss a
 finalist are sourced apart: toss off the roster when rounds exist and off the sheet
 row when they do not, finalist off the finals seating — the roster flag serves only
 as the round-less fallback, where neither a finals table nor a roster toss exists.
-That resolved row is what `compute_final_standings` then stamps, so the screen's
-rating reads the same finalist position the backend stored.
+The screen hands `compute_final_standings` that resolved row while the backend
+hands it the stored sheet; the two agree because every producer writes the sheet
+flag from finals membership, not because the stamp reconciles them.
 
 Its `sanctions` argument must hold **this tournament's own** sanctions and no
 others. `has_dq_sanction` matches on user and level alone — the payload carries no
