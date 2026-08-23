@@ -93,7 +93,7 @@ until the API app ships. Delete this section.
 
 ## Confirm the Sheriff role rename applied
 
-**Gated on** `a045d86`, which renamed the stored `Judgekin` role to `Sheriff`.
+**Gated on** `c92fe3f`, which renamed the stored `Judgekin` role to `Sheriff`.
 There is **nothing to run**: the rewrite is four guarded `UPDATE`s at the end of
 `schema.sql`, so `init_db` applies it on startup, before the process serves a
 request. That ordering is the point — `Role` decodes strictly, so a row still
