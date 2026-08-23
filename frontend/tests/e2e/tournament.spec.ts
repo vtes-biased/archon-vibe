@@ -194,6 +194,12 @@ test.describe('Tournament lifecycle', () => {
     await expect(page.getByText('Finished').first()).toBeVisible({ timeout: 2_000 });
     await expect(page.getByText('Tournament complete.')).toBeVisible({ timeout: 2_000 });
 
+    // A final that was played must stay on screen once the tournament is finished:
+    // finals qualification answers whether one can *start*, never whether to show one.
+    await page.getByRole('button', { name: 'Finals' }).click();
+    await expect(page.getByRole('heading', { name: 'Finals Table', exact: true }))
+      .toBeVisible({ timeout: 5_000 });
+
     const winnerBanner = page.locator('.banner-highlight').filter({ hasText: 'Winner' });
     await expect(winnerBanner).toBeVisible({ timeout: 2_000 });
     // Banner shows "Name (vekn_id)" — strip the id to match plain names

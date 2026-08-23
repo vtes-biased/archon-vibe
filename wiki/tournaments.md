@@ -377,6 +377,14 @@ The client reads the same pool over the `finalsQualification` WASM export, which
 answers who may qualify, whether a toss is still owed and whom it would touch —
 the three things every finals control in the UI is drawn from.
 
+It answers whether a final may **start**, and never whether one may be shown.
+`FinishFinals` and `FinishTournament` put every non-disqualified player in
+`Finished`, which empties the candidate pool, so a finished tournament always reads
+`possible = false` — and a round-less VEKN import, whose finals is reconstructed
+rather than played, never had two played rounds to count. The finals view therefore
+branches on the stored `finals` object first and consults qualification only where
+there is no final to show.
+
 `RandomToss` orders **every** tied group inside the qualifying five, not only the
 one straddling the cutoff: §3.1 resolves ties for any of the top five rankings, and
 the rank is not cosmetic — §3.1.3 has the **lowest** qualifier place their name card

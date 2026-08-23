@@ -85,7 +85,7 @@
     </div>
   {/if}
 
-  {#if !finalsQual.possible}
+  {#if !tournament.finals && !finalsQual.possible}
     <p class="text-ink-muted">{m.finals_require_rounds()}</p>
   {:else if !tournament.finals}
     <!-- Deliberately no Start Finals button: finishing without a final is
