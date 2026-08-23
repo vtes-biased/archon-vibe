@@ -310,7 +310,10 @@ non-competing players.
 `compute_final_standings` implements §3.7.5 placement: winner rank 1, other
 finalists share rank 2, non-finalists competition-ranked from `finalist_count + 1`.
 Whether a final happened is read from the per-player `finalist` flag, not from
-finals seating data.
+finals seating data. It also stamps each row with `finalist_position` — 1 for the
+winner, 2 for the other finalists, 0 for everyone else — and that stamp is the one
+source of the rating formula's finalist argument: the backend rating, the standings
+screen and league scoring all read it off the row rather than each deriving it.
 
 **A scoreless sheet row is a no-show and holds no placement.** An import writes a
 standings row for every name on the registration sheet, so a player who never sat
@@ -342,6 +345,8 @@ and each finalist row then carries its finals `{gw, vp, tp}` for display. Toss a
 finalist are sourced apart: toss off the roster when rounds exist and off the sheet
 row when they do not, finalist off the finals seating — the roster flag serves only
 as the round-less fallback, where neither a finals table nor a roster toss exists.
+That resolved row is what `compute_final_standings` then stamps, so the screen's
+rating reads the same finalist position the backend stored.
 
 Its `sanctions` argument must hold **this tournament's own** sanctions and no
 others. `has_dq_sanction` matches on user and level alone — the payload carries no

@@ -13,7 +13,6 @@ from src.models import (
 from src.ratings import (
     _compute_entry_sync,
     _final_positions,
-    _finalist_position,
     _is_disqualified,
 )
 
@@ -420,61 +419,30 @@ def test_final_positions_excludes_dq_and_proxy_rows():
             },
         ],
     )
-    assert _final_positions(t) == {"w": 1, "f": 2, "p": 3}
+    assert _final_positions(t) == {"w": (1, 1), "f": (2, 2), "p": (3, 0)}
 
 
-class TestFinalistPosition:
-    def test_winner(self):
-        t = _make_tournament(
-            winner="p1",
-            finals={
-                "seating": [_seat("p1"), _seat("p2")],
-                "seed_order": ["p1", "p2"],
-            },
-        )
-        assert _finalist_position(t, "p1") == 1
-
-    def test_runner_up(self):
-        t = _make_tournament(
-            winner="p1",
-            finals={
-                "seating": [_seat("p1"), _seat("p2")],
-                "seed_order": ["p1", "p2"],
-            },
-        )
-        assert _finalist_position(t, "p2") == 2
-
-    def test_non_finalist(self):
-        t = _make_tournament(
-            winner="p1",
-            finals={
-                "seating": [_seat("p1"), _seat("p2")],
-                "seed_order": ["p1", "p2"],
-            },
-        )
-        assert _finalist_position(t, "p3") == 0
-
-    def test_vekn_synced_runner_up(self):
-        """No finals object: uses standings.finalist flag."""
-        t = _make_tournament(
-            winner="p1",
-            standings=[
-                {"user_uid": "p1", "finalist": True},
-                {"user_uid": "p2", "finalist": True},
-                {"user_uid": "p3", "finalist": False},
-            ],
-        )
-        assert _finalist_position(t, "p2") == 2
-
-    def test_vekn_synced_non_finalist(self):
-        t = _make_tournament(
-            winner="p1",
-            standings=[
-                {"user_uid": "p1", "finalist": True},
-                {"user_uid": "p3", "finalist": False},
-            ],
-        )
-        assert _finalist_position(t, "p3") == 0
+def test_final_positions_finalist_bonus_matches_a_played_final():
+    """The rating's finalist argument rides the placement row, so it must answer the
+    same on a tournament that played a final as on the summary import above — the
+    backend no longer reads the finals seating to decide it."""
+    t = _make_tournament(
+        winner="w",
+        rounds=[
+            [{"seating": [_seat("w"), _seat("f"), _seat("p")], "state": "Finished"}]
+        ],
+        finals={
+            "seating": [_seat("w", vp=3.0, gw=1), _seat("f")],
+            "seed_order": ["w", "f"],
+            "state": "Finished",
+        },
+        standings=[
+            {"user_uid": "w", "gw": 1.0, "vp": 5.0, "tp": 60, "finalist": True},
+            {"user_uid": "f", "gw": 0.0, "vp": 3.0, "tp": 50, "finalist": True},
+            {"user_uid": "p", "gw": 0.0, "vp": 2.0, "tp": 40},
+        ],
+    )
+    assert _final_positions(t) == {"w": (1, 1), "f": (2, 2), "p": (3, 0)}
 
 
 def _standings(n: int) -> list[dict]:

@@ -211,6 +211,7 @@ pub mod standing {
 /// The display projection `compute_final_standings` stamps: derived, never
 /// stored on a `Standing`.
 pub mod standing_row {
+    pub const FINALIST_POSITION: &str = "finalist_position";
     pub const NO_SHOW: &str = "no_show";
 }
 

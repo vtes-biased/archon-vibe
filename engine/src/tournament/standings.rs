@@ -264,9 +264,10 @@ fn refresh_finals_scoring(tournament: &mut JsonValue, sanctions: &JsonValue) {
     }
 }
 
-fn with_rank(standing: &JsonValue, rank: usize) -> JsonValue {
+fn with_placement(standing: &JsonValue, rank: usize, finalist_position: i32) -> JsonValue {
     let mut obj = standing.clone();
     obj[arg::RANK] = (rank as i32).into();
+    obj[standing_row::FINALIST_POSITION] = finalist_position.into();
     obj
 }
 
@@ -283,6 +284,7 @@ pub fn is_no_show(standing: &JsonValue, winner: &str) -> bool {
 
 /// Reorders preliminary `standings` (must arrive sorted desc by score) into final
 /// placement per §3.7.5/§3.1: `winner` is rank 1, finalists share rank 2, DQ'd/proxy/no-show excluded and appended last.
+/// Stamps `finalist_position` too, so the rating bonus can never disagree with the placement.
 pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonValue> {
     let winner_present = !winner.is_empty()
         && standings
@@ -323,10 +325,10 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
 
     let mut out: Vec<JsonValue> = Vec::new();
     if let Some(w) = winner_entry {
-        out.push(with_rank(w, 1));
+        out.push(with_placement(w, 1, 1));
     }
     for s in &finalists {
-        out.push(with_rank(s, 2));
+        out.push(with_placement(s, 2, 2));
     }
 
     let start = if finalist_count > 0 {
@@ -346,14 +348,14 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
             rank = start + idx;
             prev_key = Some(key);
         }
-        out.push(with_rank(s, rank));
+        out.push(with_placement(s, rank, 0));
     }
 
     // Ranks here just need to sort last; the value itself is never shown (UI
     // renders these rows via the flag, not the rank).
     let excluded_start = finalist_count + non_finalists.len() + 1;
     for (i, s) in excluded.iter().enumerate() {
-        out.push(with_rank(s, excluded_start + i));
+        out.push(with_placement(s, excluded_start + i, 0));
     }
     out
 }
@@ -728,6 +730,15 @@ mod tests {
             .unwrap()
     }
 
+    fn fp_of(ranked: &[JsonValue], uid: &str) -> i32 {
+        ranked
+            .iter()
+            .find(|s| s["user_uid"].as_str() == Some(uid))
+            .unwrap_or_else(|| panic!("{uid} missing"))[standing_row::FINALIST_POSITION]
+            .as_i32()
+            .unwrap()
+    }
+
     #[test]
     fn final_standings_winner_first_finalists_tie_for_second() {
         // 8 players, top 5 finalists; p3 wins the finals from preliminary 3rd.
@@ -757,6 +768,13 @@ mod tests {
         assert_eq!(rank_of(&r, "p6"), 6, "first non-finalist is 6th");
         assert_eq!(rank_of(&r, "p7"), 6, "tied 6th shares rank");
         assert_eq!(rank_of(&r, "p8"), 8, "rank 7 skipped after the tie");
+        assert_eq!(fp_of(&r, "p3"), 1, "winner takes the winner bonus");
+        for u in ["p1", "p2", "p4", "p5"] {
+            assert_eq!(fp_of(&r, u), 2, "{u} takes the finalist bonus");
+        }
+        for u in ["p6", "p7", "p8"] {
+            assert_eq!(fp_of(&r, u), 0, "{u} takes no finalist bonus");
+        }
     }
 
     #[test]
@@ -796,6 +814,8 @@ mod tests {
         assert_eq!(rank_of(&r, "x"), 2);
         assert_eq!(rank_of(&r, "y"), 2);
         assert_eq!(rank_of(&r, "z"), 4);
+        assert_eq!(fp_of(&r, "w"), 1, "a flagless winner is still the winner");
+        assert_eq!(fp_of(&r, "x"), 0);
     }
 
     #[test]

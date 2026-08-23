@@ -166,6 +166,16 @@ The same did-this-row-score atom is also `players_with_rounds`' round-less branc
 to disagree — a scoreless finalist places 2nd yet never counts as having played — but
 tune one and look at the other.
 
+**The finalist bonus rides the placement row.** `compute_final_standings` stamps
+`finalist_position` beside `rank`, and it is the only source — `ratings.py` reads it
+off `_final_positions`, `league.rs` off the same map it takes `final_place` from,
+and the frontend off `StandingEntry.finalist_position`. The three used to derive it
+apart and each was wrong on the shape the others handled: a summary import (finalist
+flags, no finals table) cost its runners-up the bonus their own rating page gave
+them, and a winner carrying no finalist flag scored as an also-ran in league.
+Reaching for `tournament.finals` or the raw `finalist` flag to score a bonus
+re-opens it.
+
 **Standings count by table, not by round.** A finished table scores while its round
 is still running — the raffle pools depend on it, reading
 `compute_preliminary_standings` live rather than `tournament.standings` so a

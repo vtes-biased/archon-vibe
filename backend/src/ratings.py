@@ -76,13 +76,14 @@ def _final_standings(t: Tournament) -> list[dict]:
     return msgspec.json.decode(_engine.compute_final_standings(config))
 
 
-def _final_positions(t: Tournament) -> dict[str, int]:
-    """{user_uid: final placement} for one finished tournament, from the engine's
-    shared rule — computed once per tournament, never per (user, tournament)."""
+def _final_positions(t: Tournament) -> dict[str, tuple[int, int]]:
+    """{user_uid: (final placement, finalist position)} for one finished tournament,
+    from the engine's shared rule — computed once per tournament, never per
+    (user, tournament)."""
     # Drops the DQ'd/proxy/no-show tail (ranks past the whole field) using the row
     # flags, not the player-state signal callers use — absent = no placement.
     return {
-        s["user_uid"]: s["rank"]
+        s["user_uid"]: (s["rank"], s["finalist_position"])
         for s in _final_standings(t)
         if not s.get("disqualified")
         and not s.get("non_competing")
@@ -114,37 +115,20 @@ def _is_non_competing(t: Tournament, user_uid: str) -> bool:
     return any(p.user_uid == user_uid and p.non_competing for p in t.players)
 
 
-def _finalist_position(t: Tournament, user_uid: str) -> int:
-    """0=none, 1=winner, 2=runner-up."""
-    if t.winner == user_uid:
-        return 1
-    if t.finals:
-        # Runner-up: in finals but not winner
-        for seat in t.finals.seating:
-            if seat.player_uid == user_uid and user_uid != t.winner:
-                return 2
-    else:
-        # VEKN-synced tournaments: no finals object, use standings/players
-        for s in t.standings:
-            if s.user_uid == user_uid and s.finalist:
-                return 2
-    return 0
-
-
 def _compute_entry(
     t: Tournament,
     t_json: str,
     sanctions_json: str,
     user_uid: str,
     player_count: int,
-    positions: dict[str, int],
+    positions: dict[str, tuple[int, int]],
 ) -> TournamentRatingEntry:
     """Core entry computation from pre-encoded JSON + precomputed player count.
     VP/GW come from the Rust engine, so the SA-penalty scoring rule lives once, not here."""
     engine = _engine
     vp, gw = engine.compute_rating_vp_gw(t_json, sanctions_json, user_uid)
     gw = int(gw)
-    fp = _finalist_position(t, user_uid)
+    position, fp = positions.get(user_uid, (0, 0))
     points = engine.compute_rating_points(vp, gw, fp, player_count, t.rank.value)
     return TournamentRatingEntry(
         tournament_uid=t.uid,
@@ -156,7 +140,7 @@ def _compute_entry(
         gw=gw,
         finalist_position=fp,
         points=points,
-        position=positions.get(user_uid, 0),
+        position=position,
     )
 
 
@@ -217,7 +201,7 @@ async def recompute_ratings_for_players(
     played_by_t: dict[str, set[str]] = {}
     json_by_t: dict[str, str] = {}
     count_by_t: dict[str, int] = {}
-    positions_by_t: dict[str, dict[str, int]] = {}
+    positions_by_t: dict[str, dict[str, tuple[int, int]]] = {}
     eligible: list[Tournament] = []
     for t in all_tournaments:
         t_json = msgspec.json.encode(t).decode()

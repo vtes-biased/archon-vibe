@@ -13,6 +13,9 @@ export interface StandingEntry {
   rank: number;
   finals?: string;
   finalist?: boolean;
+  /** The rating formula's finalist argument, stamped by the engine beside `rank`:
+   *  1 winner, 2 other finalist, 0 neither. */
+  finalist_position?: number;
   /** DQ'd: score forfeited (zeroed), sorted last, no competitive rank / RTP. */
   disqualified?: boolean;
   /** Proxy: a non-competing official stood in. Excluded from rank/RTP/finals and
@@ -91,7 +94,8 @@ export function computeStandings(tournament: Tournament | null, sanctions: Sanct
   return displayStandings(tournament, sanctions).map(e => {
     const entry: StandingEntry = {
       user_uid: e.user_uid, gw: e.gw, vp: e.vp, tp: e.tp, toss: e.toss, rank: e.rank,
-      finalist: e.finalist, disqualified: e.disqualified, non_competing: e.non_competing,
+      finalist: e.finalist, finalist_position: e.finalist_position,
+      disqualified: e.disqualified, non_competing: e.non_competing,
       unplaced: e.disqualified || e.non_competing || e.no_show,
     };
     if (e.finals) entry.finals = formatScore(e.finals.gw, e.finals.vp, e.finals.tp);
@@ -224,10 +228,8 @@ export function getRatingPts(
   if (!ctx.eligible || !ctx.played.has(entry.user_uid)) return null;
   const vpGw = computeRatingVpGw(ctx.tournamentJson, ctx.sanctionsJson, entry.user_uid);
   if (!vpGw) return null;
-  const finalistPos = entry.user_uid === tournament.winner ? 1
-    : (tournament.finals?.seating.some((s) => s.player_uid === entry.user_uid) ? 2 : 0);
   // Engine returns gw as f64; the backend stores int(gw) before scoring it.
-  return computeRatingPoints(vpGw[0], Math.trunc(vpGw[1]), finalistPos, ctx.fieldSize, tournament.rank);
+  return computeRatingPoints(vpGw[0], Math.trunc(vpGw[1]), entry.finalist_position ?? 0, ctx.fieldSize, tournament.rank);
 }
 
 export function translateStandingsMode(mode: string | undefined): string {

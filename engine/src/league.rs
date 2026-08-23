@@ -1,6 +1,6 @@
 /// League standings computation shared between frontend (WASM) and backend (PyO3).
 /// Modes: RTP (full rating total), Score (preliminary GW/VP/TP only), GP (position-based points).
-use crate::model::{arg, tournament_config};
+use crate::model::{arg, standing_row, tournament_config};
 use json::JsonValue;
 
 use crate::error::EngineError;
@@ -34,8 +34,9 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
 
         // GP and RTP score by *final* placement (winner 1st even if they did not lead
         // the preliminaries; other finalists tie for 2nd), resolved once per tournament.
+        // The finalist position rides the same rows, so the bonus cannot disagree with it.
         let winner = tournament[arg::WINNER].as_str().unwrap_or("");
-        let final_place: std::collections::HashMap<String, usize> = if mode == "Score" {
+        let final_place: std::collections::HashMap<String, (usize, i32)> = if mode == "Score" {
             std::collections::HashMap::new()
         } else {
             crate::tournament::compute_final_standings(&tournament[arg::STANDINGS], winner)
@@ -43,7 +44,10 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
                 .filter_map(|s| {
                     Some((
                         s[arg::USER_UID].as_str()?.to_string(),
-                        s[arg::RANK].as_usize()?,
+                        (
+                            s[arg::RANK].as_usize()?,
+                            s[standing_row::FINALIST_POSITION].as_i32().unwrap_or(0),
+                        ),
                     ))
                 })
                 .collect()
@@ -88,7 +92,6 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
             let gw = standing[arg::GW].as_f64().unwrap_or(0.0);
             let vp = standing[arg::VP].as_f64().unwrap_or(0.0);
             let tp = standing[arg::TP].as_i32().unwrap_or(0);
-            let finalist = standing[arg::FINALIST].as_bool().unwrap_or(false);
 
             let entry = players.entry(uid.clone()).or_insert_with(|| PlayerEntry {
                 user_uid: uid.clone(),
@@ -122,17 +125,8 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
 
             match mode {
                 "RTP" => {
-                    // Finalist bonus is gated on the finalist flag: winner (final rank 1)
-                    // = 1, other finalists = 2, using the full total to match the global rating.
-                    let finalist_position = if finalist {
-                        if final_place.get(&uid) == Some(&1) {
-                            1
-                        } else {
-                            2
-                        }
-                    } else {
-                        0
-                    };
+                    // The full total, to match the global rating.
+                    let finalist_position = final_place.get(&uid).map_or(0, |&(_, fp)| fp);
                     entry.points += compute_rating_points(
                         total_vp,
                         total_gw as i32,
@@ -142,7 +136,7 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
                     );
                 }
                 "GP" => {
-                    let place = final_place.get(&uid).copied().unwrap_or(0);
+                    let place = final_place.get(&uid).map_or(0, |&(rank, _)| rank);
                     entry.points += compute_gp_points(place, 0);
                 }
                 _ => {
