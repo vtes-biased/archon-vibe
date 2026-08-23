@@ -164,7 +164,7 @@ def _flagged_event() -> dict:
     }
 
 
-def test_import_carries_the_disqualification_and_withdrawal_it_is_told_about():
+def test_flagged_row_never_reaches_the_finalist_or_winner_test():
     users = {str(i): _user(f"u{i}", str(i)) for i in range(1, 6)}
     t = _map_vekn_to_tournament(_flagged_event(), users)
     assert t is not None
@@ -172,8 +172,6 @@ def test_import_carries_the_disqualification_and_withdrawal_it_is_told_about():
     by_uid = {s.user_uid: s for s in t.standings}
     assert by_uid["u3"].disqualified and not by_uid["u3"].finalist
     assert (by_uid["u3"].gw, by_uid["u3"].vp, by_uid["u3"].tp) == (0.0, 0.0, 0)
-    # A withdrawal is an ordinary competitor here: it keeps what it earned and only
-    # loses the placement `pos` never held.
     assert not by_uid["u4"].finalist and not by_uid["u4"].disqualified
     assert (by_uid["u4"].gw, by_uid["u4"].vp, by_uid["u4"].tp) == (0.0, 2.0, 25)
 

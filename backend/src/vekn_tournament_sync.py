@@ -186,11 +186,11 @@ def _map_vekn_to_tournament(
             # `pos` on a dq'd or withdrawn row is the field size, not a placement,
             # so in a small field reading it as one crowns that player a finalist.
             disqualified = str(vp_data.get("dq") or "0") == "1"
-            unplaced = disqualified or str(vp_data.get("wd") or "0") == "1"
+            pos_is_field_size = disqualified or str(vp_data.get("wd") or "0") == "1"
             # pos 1..5 is final placement; pos == "1" is the tournament winner.
             prelim_gw = int(vp_data.get("gw", 0) or 0)
             pos = str(vp_data.get("pos") or "")
-            is_finalist = not unplaced and pos in ("1", "2", "3", "4", "5")
+            is_finalist = not pos_is_field_size and pos in ("1", "2", "3", "4", "5")
             vp_prelim = float(vp_data.get("vp", 0) or 0)
             vp_finals = float(vp_data.get("vpf", 0) or 0)
             tp = int(vp_data.get("tp", 0) or 0)
