@@ -6,7 +6,7 @@
   import DeceasedIcon from "./DeceasedIcon.svelte";
   import { getFilteredUsers, hasAnyUsers, userHasPastSanctions, isUserCurrentlySanctioned } from "$lib/db";
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
-  import { getRoleTone, getRoleLabel } from "$lib/roles";
+  import { getRoleTone } from "$lib/roles";
   import Badge, { badgeToneClass } from "$lib/components/Badge.svelte";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
@@ -428,7 +428,7 @@
                     ? badgeToneClass(getRoleTone(role))
                     : 'bg-surface-hover text-ink-muted hover:bg-surface-active'}"
                 >
-                  {getRoleLabel(role)}
+                  {role}
                 </button>
               {/each}
             </div>
@@ -567,7 +567,7 @@
                   {#if user.roles.length > 0}
                     <div class="flex flex-wrap gap-1">
                       {#each user.roles as role}
-                        <Badge tone={getRoleTone(role)}>{getRoleLabel(role)}</Badge>
+                        <Badge tone={getRoleTone(role)}>{role}</Badge>
                       {/each}
                     </div>
                   {/if}
@@ -596,7 +596,7 @@
                     {#if user.roles.length > 0}
                       <div class="flex flex-wrap gap-1">
                         {#each user.roles as role}
-                          <Badge tone={getRoleTone(role)}>{getRoleLabel(role)}</Badge>
+                          <Badge tone={getRoleTone(role)}>{role}</Badge>
                         {/each}
                       </div>
                     {:else}

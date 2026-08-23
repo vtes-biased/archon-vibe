@@ -99,7 +99,7 @@ ROLE_MAP: dict[str, Role] = {
     "Prince": Role.PRINCE,
     "Rulemonger": Role.RULEMONGER,
     "Judge": Role.JUDGE,
-    "Judgekin": Role.JUDGEKIN,
+    "Judgekin": Role.SHERIFF,
     "NC": Role.NC,
     "Ethics": Role.ETHICS,
 }

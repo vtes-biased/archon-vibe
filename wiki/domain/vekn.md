@@ -37,9 +37,10 @@ the region of the member under allegation gets equal participation and voting
 rights for that investigation, bringing the panel to five (Code of Ethics,
 Introduction).
 
-The app additionally models Judge, Sheriff (stored as `Judgekin`), Rulemonger,
-Playtest Coordinator, Playtester, Ethics and DEV. These are app-managed
-appointments; how they are granted is [access](../access.md), not domain.
+The app additionally models Judge, Sheriff — the rank the judges guide calls
+*Judgekin* — Rulemonger, Playtest Coordinator, Playtester, Ethics and DEV. These
+are app-managed appointments; how they are granted is [access](../access.md), not
+domain.
 
 ## Ethics sanctions
 

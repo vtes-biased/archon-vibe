@@ -90,3 +90,26 @@ SELECT count(*) FROM objects WHERE type = 'user'
 
 **Owes afterwards**: nothing to tell anyone — no consumer can reach the column
 until the API app ships. Delete this section.
+
+## Confirm the Sheriff role rename applied
+
+**Gated on** `a045d86`, which renamed the stored `Judgekin` role to `Sheriff`.
+There is **nothing to run**: the rewrite is four guarded `UPDATE`s at the end of
+`schema.sql`, so `init_db` applies it on startup, before the process serves a
+request. That ordering is the point — `Role` decodes strictly, so a row still
+holding the old value would raise on every read of any list containing it. The
+statements stay in `schema.sql` afterwards, like the `ALTER`s above them: any
+database predating this deploy still needs them.
+
+**Proves it worked**: 0 on production.
+
+```sql
+SELECT count(*) FROM objects WHERE type = 'user'
+  AND ("public" @> '{"roles":["Judgekin"]}' OR "member" @> '{"roles":["Judgekin"]}'
+    OR "api" @> '{"roles":["Judgekin"]}' OR "full" @> '{"roles":["Judgekin"]}');
+```
+
+**Owes afterwards**: nothing to tell anyone — the badge already read *Sheriff*.
+The legacy-archon role maps still key on `Judgekin` on purpose: the daily merge
+reads it from the old database and must keep granting the role. Delete this
+section.

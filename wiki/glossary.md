@@ -39,10 +39,11 @@ whether **proxy cards** are allowed, while a **proxy player**
 
 **IC** — Inner Circle, the app's global administrator tier. **NC** — National
 Coordinator. **Prince** — a city-level organizer. **Ethics** — the Ethics
-Committee. **Rulemonger**, **Judge**, **Sheriff** (stored as `Judgekin`) — judge
-certifications, which are profile titles and grant no tournament power. **PTC** /
-**PT** — playtest coordinator and playtester. **DEV** — the OAuth client manager
-role.
+Committee. **Rulemonger**, **Judge**, **Sheriff** — judge certifications, which
+are profile titles and grant no tournament power. The judges guide calls a Sheriff
+a *Judgekin*, and legacy archon still stores that word.
+**PTC** / **PT** — playtest coordinator and playtester. **DEV** — the OAuth
+client manager role.
 
 **TWDA** — the Tournament Winning Deck Archive. **krcg** — the community card-data
 library. **archon** — both this app and the legacy spreadsheet-and-PHP system it

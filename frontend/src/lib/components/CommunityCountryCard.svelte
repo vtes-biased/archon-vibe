@@ -4,7 +4,7 @@
   import DiscordContact from "./DiscordContact.svelte";
   import { deobfuscateContact } from "$lib/contact";
   import { getCountryFlag } from "$lib/geonames";
-  import { getRoleTone, getRoleLabel } from "$lib/roles";
+  import { getRoleTone } from "$lib/roles";
   import type { CommunityLink } from "$lib/types";
   import type { UserListItem } from "$lib/db";
   import { ChevronDown, ChevronRight, Pencil } from "@lucide/svelte";
@@ -50,7 +50,7 @@
     <div class="flex items-center gap-2 flex-wrap">
       <a href="/users/{official.uid}" class="font-medium text-ink-strong hover:text-link transition-colors">{official.name}</a>
       {#each official.roles.filter(r => r === "NC" || r === "Prince") as role}
-        <Badge tone={getRoleTone(role)}>{getRoleLabel(role)}</Badge>
+        <Badge tone={getRoleTone(role)}>{role}</Badge>
       {/each}
       {#if official.city}
         <span class="text-sm text-ink-muted">{official.city}</span>
@@ -153,7 +153,7 @@
               {:else}
                 <ChevronRight class="w-4 h-4 text-ink-faint" />
               {/if}
-              <Badge tone={getRoleTone("Prince")}>{getRoleLabel("Prince")}</Badge>
+              <Badge tone={getRoleTone("Prince")}>Prince</Badge>
               <span class="text-xs text-ink-faint">({princes.length})</span>
             </button>
             {#if princesOpen}

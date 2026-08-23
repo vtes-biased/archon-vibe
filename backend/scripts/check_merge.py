@@ -25,7 +25,7 @@ FAIL, OK, WARN = "\033[31mFAIL\033[0m", "\033[32mok\033[0m", "\033[33mwarn\033[0
 # Roles are seeded by the ETL and app-managed thereafter — no sync ever writes
 # them. These archon-seeded roles surviving the VEKN sync is the regression net
 # for that rule.
-PROTECTED_ROLES = ("Judge", "Judgekin", "Ethics", "Rulemonger", "PTC", "PT", "DEV")
+PROTECTED_ROLES = ("Judge", "Sheriff", "Ethics", "Rulemonger", "PTC", "PT", "DEV")
 
 METRICS = {
     "users": "SELECT count(*) FROM objects WHERE type='user' AND deleted_at IS NULL",

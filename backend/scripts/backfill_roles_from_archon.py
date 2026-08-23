@@ -3,7 +3,7 @@
 UNION ONLY, never replace — roles are app-managed since the migration, so a
 replace would drop grants made in the new app.
 
-Default scope is Judge/Judgekin only. Measured on prod 2026-08-09, the new DB
+Default scope is Judge/Sheriff only. Measured on prod 2026-08-09, the new DB
 is a strict subset of legacy for those two (pure migration loss, safe to
 union); Prince/NC/Ethics diverge in BOTH directions (real in-app churn since
 cutover — legacy only ever mirrored vekn.net's princeid/coordinatorid for
@@ -76,7 +76,7 @@ ROLE_MAP: dict[str, Role] = {
     "Prince": Role.PRINCE,
     "Rulemonger": Role.RULEMONGER,
     "Judge": Role.JUDGE,
-    "Judgekin": Role.JUDGEKIN,
+    "Judgekin": Role.SHERIFF,
     "NC": Role.NC,
     "Ethics": Role.ETHICS,
 }
@@ -87,7 +87,7 @@ BATCH_STATEMENT_TIMEOUT_MS = 600_000
 
 # See the module docstring: judge ranks are the only roles the migration actually
 # lost. Overridable with --roles for a deliberate, reviewed widening.
-DEFAULT_BACKFILL_ROLES = (Role.JUDGE, Role.JUDGEKIN)
+DEFAULT_BACKFILL_ROLES = (Role.JUDGE, Role.SHERIFF)
 
 # Stable output/storage order for roles (declaration order of the enum).
 ROLE_ORDER = {r: i for i, r in enumerate(Role)}

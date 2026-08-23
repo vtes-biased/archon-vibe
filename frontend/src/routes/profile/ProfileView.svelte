@@ -8,7 +8,6 @@
   import { updateProfile } from "$lib/stores/auth.svelte";
   import { showToast } from "$lib/stores/toast.svelte";
   import { canChangeCountry, isOfficial as engineIsOfficial } from "$lib/engine";
-  import { getRoleLabel } from "$lib/roles";
   import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
   import { getLocale } from "$lib/paraglide/runtime.js";
   import type { CommunityLink } from "$lib/types";
@@ -249,7 +248,7 @@
       <span class="text-ink-muted">{m.common_roles()}</span>
       <div class="flex flex-wrap gap-2 justify-end">
         {#each user.roles as role}
-          <span class="px-2 py-1 text-xs rounded bg-surface-hover text-ink-strong">{getRoleLabel(role)}</span>
+          <span class="px-2 py-1 text-xs rounded bg-surface-hover text-ink-strong">{role}</span>
         {/each}
       </div>
     </div>

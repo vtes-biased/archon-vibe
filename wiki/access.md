@@ -53,7 +53,7 @@ covering both minting the member and issuing the VEKN ID — splitting them invi
 the two halves to drift.
 
 **Appointments** — NC grants **Prince** in their own country; PTC grants **PT**;
-Rulemonger grants **Judge** and **Judgekin**; everything else is IC's. **A target
+Rulemonger grants **Judge** and **Sheriff**; everything else is IC's. **A target
 must hold a `vekn_id` to hold any role.**
 
 Rules carrying a precondition the table cannot express keep a resolver beside it:

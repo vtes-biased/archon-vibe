@@ -11,7 +11,7 @@ export type Role =
   | "PT" // Playtester
   | "Rulemonger"
   | "Judge"
-  | "Judgekin"
+  | "Sheriff"
   | "DEV"; // Developer (can register OAuth clients)
 
 

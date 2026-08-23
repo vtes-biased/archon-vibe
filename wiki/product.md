@@ -32,7 +32,7 @@ their country; a Prince does not — it is a city-level role without that
 oversight. Judge-call broadcasts reach the explicit tournament organizers only,
 since they are the ones physically present.
 
-VEKN judge certifications (Judge, Sheriff — stored as `Judgekin` —, Rulemonger)
+VEKN judge certifications (Judge, Sheriff, Rulemonger)
 are profile titles. They appear on member profiles and grant no extra power in
 tournament management.
 

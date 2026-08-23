@@ -37,7 +37,7 @@ METADATA = [
 ]
 
 _ORG_LEVELS = {Role.PRINCE: 2, Role.NC: 3, Role.IC: 4}
-_JUDGE_LEVELS = {Role.JUDGEKIN: 1, Role.JUDGE: 2, Role.RULEMONGER: 3}
+_JUDGE_LEVELS = {Role.SHERIFF: 1, Role.JUDGE: 2, Role.RULEMONGER: 3}
 _PT_LEVELS = {Role.PT: 1, Role.PTC: 2}
 
 

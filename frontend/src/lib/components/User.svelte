@@ -4,7 +4,7 @@
   import type { User, Role } from "$lib/types";
   import { createUser, updateUser, uploadAvatar } from "$lib/api";
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
-  import { getRoleTone, getRoleLabel } from "$lib/roles";
+  import { getRoleTone } from "$lib/roles";
   import Badge, { badgeToneClass } from "$lib/components/Badge.svelte";
   import { deobfuscateContact } from "$lib/contact";
   import { getAuthState } from "$lib/stores/auth.svelte";
@@ -218,7 +218,7 @@
     "PT",
     "Rulemonger",
     "Judge",
-    "Judgekin",
+    "Sheriff",
     "DEV",
   ];
 
@@ -445,12 +445,12 @@
               type="button"
               onclick={(e) => { e.stopPropagation(); if (allowed) toggleRole(role); }}
               disabled={!allowed}
-              title={allowed ? m.user_toggle_role({ role: getRoleLabel(role) }) : m.user_cannot_change_role({ role: getRoleLabel(role) })}
+              title={allowed ? m.user_toggle_role({ role }) : m.user_cannot_change_role({ role })}
               class="px-3 py-1 rounded text-sm font-medium transition-colors {editRoles.includes(role)
                 ? badgeToneClass(getRoleTone(role))
                 : 'bg-surface-hover text-ink-muted'} {allowed ? 'hover:opacity-80 cursor-pointer' : 'opacity-50 cursor-not-allowed'}"
             >
-              {getRoleLabel(role)}
+              {role}
             </button>
           {/each}
         </div>
@@ -574,7 +574,7 @@
               <span class="font-medium">{m.common_roles()}:</span>
               <div class="flex flex-wrap gap-1">
                 {#each user.roles as role}
-                  <Badge tone={getRoleTone(role)}>{getRoleLabel(role)}</Badge>
+                  <Badge tone={getRoleTone(role)}>{role}</Badge>
                 {/each}
               </div>
             </div>

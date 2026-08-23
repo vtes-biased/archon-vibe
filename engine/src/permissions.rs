@@ -14,7 +14,7 @@ pub enum Role {
     PT,
     Rulemonger,
     Judge,
-    Judgekin,
+    Sheriff,
     DEV,
 }
 
@@ -30,7 +30,7 @@ impl Role {
             "PT" => Some(Role::PT),
             "Rulemonger" => Some(Role::Rulemonger),
             "Judge" => Some(Role::Judge),
-            "Judgekin" => Some(Role::Judgekin),
+            "Sheriff" => Some(Role::Sheriff),
             "DEV" => Some(Role::DEV),
             _ => None,
         }
@@ -46,7 +46,7 @@ impl Role {
             Role::PT => "PT",
             Role::Rulemonger => "Rulemonger",
             Role::Judge => "Judge",
-            Role::Judgekin => "Judgekin",
+            Role::Sheriff => "Sheriff",
             Role::DEV => "DEV",
         }
     }
@@ -61,13 +61,13 @@ impl Role {
         Role::PT,
         Role::Rulemonger,
         Role::Judge,
-        Role::Judgekin,
+        Role::Sheriff,
         Role::DEV,
     ];
 }
 
 // Short names for the tables — they only read as a matrix without the prefix.
-use Role::{Ethics, Judge, Judgekin, Prince, Rulemonger, DEV, IC, NC, PT, PTC};
+use Role::{Ethics, Judge, Prince, Rulemonger, Sheriff, DEV, IC, NC, PT, PTC};
 
 #[derive(Debug, Clone)]
 pub struct UserContext {
@@ -553,7 +553,7 @@ pub const ROLE_APPOINTMENTS: &[Appointment] = &[
         same_country: &[],
     },
     Appointment {
-        role: Judgekin,
+        role: Sheriff,
         global: &[IC, Rulemonger],
         same_country: &[],
     },
@@ -1130,7 +1130,7 @@ mod tests {
 
         let rm = ctx(vec![Rulemonger], Some("US"));
         assert!(can_change_role(&rm, &target, Judge).allowed);
-        assert!(can_change_role(&rm, &target, Judgekin).allowed);
+        assert!(can_change_role(&rm, &target, Sheriff).allowed);
         assert!(!can_change_role(&rm, &target, Prince).allowed);
         assert!(!can_change_role(&rm, &target, PT).allowed);
     }

@@ -37,7 +37,7 @@ class Role(StrEnum):
     PT = "PT"
     RULEMONGER = "Rulemonger"
     JUDGE = "Judge"
-    JUDGEKIN = "Judgekin"
+    SHERIFF = "Sheriff"
     DEV = "DEV"
 
 
