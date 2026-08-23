@@ -139,17 +139,10 @@ CONTENT_LINK_TYPES: frozenset[CommunityLinkType] = frozenset(
 )
 
 
-class LinkModeration(msgspec.Struct, kw_only=True, frozen=True):
-    status: Annotated[str, msgspec.Meta(description='Either "hidden" or "promoted".')]
-    by: Annotated[str, msgspec.Meta(description="Uid of the moderator who acted.")]
-    at: Instant
-    scope: Annotated[
-        str | None,
-        msgspec.Meta(
-            description='Reach of a promotion: "global" (IC) or "national" (NC). '
-            "Null when the status is hidden."
-        ),
-    ] = None
+class LinkModeration(StrEnum):
+    HIDDEN = "hidden"
+    NATIONAL = "national"
+    GLOBAL = "global"
 
 
 class CommunityLink(msgspec.Struct, kw_only=True, frozen=True):
@@ -170,7 +163,14 @@ class CommunityLink(msgspec.Struct, kw_only=True, frozen=True):
             "Null falls back to the owner's country."
         ),
     ] = None
-    moderation: LinkModeration | None = None
+    moderation: Annotated[
+        LinkModeration | None,
+        msgspec.Meta(
+            description="A moderator's decision on the link: hidden, or promoted "
+            "to a country's card (national, NC) or the global one (global, IC). "
+            "Null when no moderator has acted."
+        ),
+    ] = None
 
 
 class TimerState(msgspec.Struct, kw_only=True):

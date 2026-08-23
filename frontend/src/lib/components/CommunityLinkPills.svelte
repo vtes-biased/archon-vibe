@@ -47,9 +47,8 @@
   let { links }: { links: CommunityLink[] } = $props();
 
   const pinTitle = (link: CommunityLink) =>
-    link.moderation?.status !== "promoted" ? null
-    : link.moderation.scope === "global" ? m.community_scope_global()
-    : link.moderation.scope === "national" ? m.community_scope_national()
+    link.moderation === "global" ? m.community_scope_global()
+    : link.moderation === "national" ? m.community_scope_national()
     : null;
 </script>
 

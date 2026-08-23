@@ -22,9 +22,41 @@ answers whether a given deploy has made it actionable — the same check
 gates it and why, what to run, what proves it worked, and what it owes afterwards:
 people to tell, and the wiki text that dies with it.
 
+## Collapse the stored link moderation
+
+**Gated on** `c3b6df7`, which replaced the `{status, scope, by, at}` moderation
+record on a community link with a single value. `User` decodes strictly, so a row
+still carrying the record shape raises on every read of that member — this is a
+repair, not a tidy-up, and it runs **immediately after the deploy**, ahead of the
+`api` backfill below. Running it against the earlier build would have that build
+write the record shape straight back.
+
+**Run** from the deployed tree, count first, then apply:
+
+```sh
+/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/collapse_link_moderation.py
+/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/collapse_link_moderation.py --apply
+```
+
+Only the rows the app cannot decode are touched, so nothing else can be writing
+them. Idempotent.
+
+**Proves it worked**: both return 0.
+
+```sql
+SELECT count(*) FROM objects WHERE type = 'user'
+  AND jsonb_path_exists("full", '$.community_links[*].moderation.status');
+SELECT count(*) FROM objects WHERE type = 'user'
+  AND jsonb_path_exists("api", '$.community_links[*].moderation.status');
+```
+
+**Owes afterwards**: nothing to tell anyone — a member whose link was hidden or
+pinned keeps that decision, and the record it was stored in was never displayed.
+Delete this section.
+
 ## Backfill the `api` projection
 
-**Gated on** `86ddcf0`, the last commit to change the `api` projection's shape. A
+**Gated on** `c3b6df7`, the last commit to change the `api` projection's shape. A
 projection is computed at write time, so every row saved before that commit went
 live carries a NULL or pre-narrowing `api` and is wrong for the public API.
 `init_db` adds the column on deploy; only a re-save fills it. Deploying an
@@ -48,12 +80,12 @@ returns exactly the count of users without a `vekn_id`.
 
 A NULL check alone cannot see a *stale* projection, so two shape queries must
 also return 0 — a deck still carrying the constant the narrowing removed, and a
-link still carrying the moderation audit the narrowing removed:
+link whose moderation is still a record rather than one value:
 
 ```sql
 SELECT count(*) FROM objects WHERE type = 'deck' AND "api" ? 'public';
 SELECT count(*) FROM objects WHERE type = 'user'
-  AND jsonb_path_exists("api", '$.community_links[*].moderation.by');
+  AND jsonb_path_exists("api", '$.community_links[*].moderation.status');
 ```
 
 **Owes afterwards**: nothing to tell anyone — no consumer can reach the column

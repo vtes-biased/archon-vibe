@@ -45,7 +45,7 @@
   const canEdit = (e: LinkEntry) => isOwn(e) || canModerate(linkCountry(e));
 
   const pinScope = (l: CommunityLink) =>
-    l.moderation?.status === "promoted" ? l.moderation.scope : null;
+    l.moderation === "global" || l.moderation === "national" ? l.moderation : null;
   const linkCountry = (e: LinkEntry) => e.link.country || e.user.country || null;
 
   const entries = $derived.by(() => {
@@ -53,7 +53,7 @@
     for (const user of allUsersWithLinks) {
       for (const link of user.community_links || []) {
         const entry = { user, link };
-        if (link.moderation?.status === "hidden" && !canModerate(linkCountry(entry))) continue;
+        if (link.moderation === "hidden" && !canModerate(linkCountry(entry))) continue;
         all.push(entry);
       }
     }

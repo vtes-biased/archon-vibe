@@ -1,6 +1,6 @@
 """The rules a community link obeys, shared by the owner's editor and a moderator's."""
 
-from datetime import UTC, datetime
+import logging
 
 from fastapi import HTTPException
 
@@ -13,17 +13,17 @@ from .models import (
     User,
 )
 
+logger = logging.getLogger(__name__)
+
 MAX_LANGUAGES = 5
 
 
-def state_of(moderation: LinkModeration | None) -> str:
-    if moderation is None:
-        return "none"
-    return moderation.scope or "none" if moderation.status == "promoted" else "hidden"
-
-
 def moderation_for(
-    actor: User, state: str, country: str | None, current: LinkModeration | None
+    actor: User,
+    state: str,
+    country: str | None,
+    current: LinkModeration | None,
+    url: str,
 ) -> LinkModeration | None:
     if state == "global":
         allowed = permissions.can_promote_link_global(actor)
@@ -38,14 +38,10 @@ def moderation_for(
             status_code=403,
             detail=f"You don't have the authority to set a link {state} in {country}",
         )
-    if state == state_of(current):
+    if state == (current.value if current else "none"):
         return current
-    if state == "none":
-        return None
-    stamp = {"by": actor.uid, "at": datetime.now(UTC)}
-    if state == "hidden":
-        return LinkModeration(status="hidden", **stamp)
-    return LinkModeration(status="promoted", scope=state, **stamp)
+    logger.info(f"{actor.uid} moderated {url} ({country}) to {state}")
+    return None if state == "none" else LinkModeration(state)
 
 
 def validated_type(raw: str) -> CommunityLinkType:

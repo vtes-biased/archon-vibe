@@ -342,7 +342,7 @@ USER = {
             "label": "VTES Discord",
             "country": "GB",
             "languages": [],
-            "moderation": {"scope": "global", "status": "promoted"},
+            "moderation": "global",
         },
         {
             "url": "https://www.vekn.fr/forum/",
@@ -350,7 +350,7 @@ USER = {
             "label": "VEKN France",
             "country": "FR",
             "languages": [],
-            "moderation": {"scope": "national", "status": "promoted"},
+            "moderation": "national",
         },
     ],
     "limited_offline": None,

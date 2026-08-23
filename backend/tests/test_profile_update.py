@@ -128,8 +128,7 @@ async def test_owner_pin_takes_the_capability_that_scope_needs(
         headers=make_auth_header(user.uid),
     )
     assert response.status_code == 200
-    moderation = response.json()["user"]["community_links"][0]["moderation"]
-    assert (moderation["status"], moderation["scope"]) == ("promoted", "national")
+    assert response.json()["user"]["community_links"][0]["moderation"] == "national"
 
     response = await test_client.patch(
         "/auth/me",

@@ -269,7 +269,7 @@ async def list_community_links() -> StreamingResponse:
         "coalesce(o.\"api\"->'community_links', '[]'::jsonb)) "
         "WITH ORDINALITY AS link(value, idx) "
         'WHERE o.type = %s AND o."api" IS NOT NULL AND o.deleted_at IS NULL '
-        "AND coalesce(link.value->'moderation'->>'status', '') <> 'hidden' "
+        "AND coalesce(link.value->>'moderation', '') <> 'hidden' "
         "AND ({keyset}) ORDER BY o.uid DESC, link.idx DESC LIMIT %s"
     )
     return _ndjson(

@@ -81,8 +81,8 @@ async def test_moderation_permission_matrix(
 
 @pytest.mark.asyncio
 async def test_promote_persists_scope(test_client: AsyncClient, test_db):
-    """A successful promote stamps the moderation status and the scope that the
-    frontend filter consumes — national for the country's NC, global for IC."""
+    """A successful promote stores the one moderation value the frontend filter
+    consumes — national for the country's NC, global for IC."""
     nc = await _insert_user(roles=[Role.NC], country="FR")
     ic = await _insert_user(roles=[Role.IC], country="FR")
     target_nat = await _insert_user(roles=[], country="FR")
@@ -95,8 +95,7 @@ async def test_promote_persists_scope(test_client: AsyncClient, test_db):
     )
     assert r1.status_code == 200
     stored = await db.get_user_by_uid(target_nat.uid)
-    assert stored.community_links[0].moderation.status == "promoted"
-    assert stored.community_links[0].moderation.scope == "national"
+    assert stored.community_links[0].moderation == "national"
 
     r2 = await test_client.patch(
         f"/api/users/{target_intl.uid}/community-link-moderation",
@@ -105,7 +104,7 @@ async def test_promote_persists_scope(test_client: AsyncClient, test_db):
     )
     assert r2.status_code == 200
     stored = await db.get_user_by_uid(target_intl.uid)
-    assert stored.community_links[0].moderation.scope == "global"
+    assert stored.community_links[0].moderation == "global"
 
 
 @pytest.mark.asyncio
@@ -120,4 +119,4 @@ async def test_self_moderation_allowed(test_client: AsyncClient, test_db):
     )
     assert response.status_code == 200
     stored = await db.get_user_by_uid(ic.uid)
-    assert stored.community_links[0].moderation.scope == "global"
+    assert stored.community_links[0].moderation == "global"

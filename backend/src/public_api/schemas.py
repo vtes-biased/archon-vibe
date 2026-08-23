@@ -5,7 +5,6 @@ import msgspec
 from ..access_levels import (
     API_SYNC_FIELDS,
     DECK_API_EXCLUDE,
-    LINK_MODERATION_API_FIELDS,
     PLAYER_API_EXCLUDE,
     TOURNAMENT_API_EXCLUDE,
     USER_API_FIELDS,
@@ -113,7 +112,6 @@ def _build() -> dict[str, dict]:
     _keep(components["User"], USER_API_FIELDS)
     _drop(components["League"], API_SYNC_FIELDS)
     _drop(components["DeckObject"], DECK_API_EXCLUDE)
-    _keep(components["LinkModeration"], LINK_MODERATION_API_FIELDS)
     components["CommunityLinkEntry"] = {
         "type": "object",
         "description": "One member's link. The link's `country` is resolved: it "

@@ -22,12 +22,9 @@ export type CommunityLinkType = "discord" | "telegram" | "whatsapp" | "forum" | 
 export type LinkPlacement = "channel" | "content";
 export type LinkMedia = "video" | "podcast" | "text" | "social";
 
-export interface LinkModeration {
-  status: "hidden" | "promoted";
-  by: string; // moderator user_uid
-  at: string; // ISO datetime
-  scope?: "global" | "national" | null; // promoted only: IC | NC pin level
-}
+// A moderator's decision: hidden, or pinned to a country card (NC) or the
+// global one (IC). Absent/null = nobody has acted.
+export type LinkModeration = "hidden" | "national" | "global";
 
 export interface CommunityLink {
   type: CommunityLinkType;

@@ -568,9 +568,11 @@ Member-contributed links to external community resources, with moderator
 oversight. `community_links` is a field on `User`, defaulting to `[]`.
 
 `CommunityLink`: `type`, `url`, `label`, `languages` (ISO 639-1, capped at 5),
-`country`, and `moderation` (`status` hidden|promoted, `by`, `at`, `scope` global
-(IC) | national (NC)). The backend validates only the two-letter shape of a
-language code.
+`country`, and `moderation` — **one value, not a record**: `hidden`, `national`
+(NC) or `global` (IC), null when no moderator has acted. Who moderated and when
+is logged, never stored: nothing read it back, and an audit field on a synced
+object is one every projection then has to withhold. The backend validates only
+the two-letter shape of a language code.
 
 The curated list of content languages lives in `languages.ts`, labelled by
 endonym. It is a **separate and wider vocabulary than the five interface
@@ -619,10 +621,10 @@ Any user with a `vekn_id` may add, limit 5 (10 for IC/NC/Prince). One editor
 modal serves both the community page and the profile, sending the whole array
 through `PATCH /auth/me`. On update, existing moderation is re-applied by URL
 match, so a rewritten URL drops its pin and the editor warns before saving.
-Hidden and the two pin scopes are mutually exclusive, so a link carries **one
-four-valued state** — `none` / `hidden` / `national` / `global` — and both
-editors set it through `community_links.py`, which gates each value on the
-capability it needs: `moderate_link` for none and hidden, `promote_link_national`,
+Hidden and the two pins are mutually exclusive, so a link carries **one
+four-valued state** — `none` (stored null) / `hidden` / `national` / `global` —
+and both editors set it through `community_links.py`, which gates each value on
+the capability it needs: `moderate_link` for none and hidden, `promote_link_national`,
 `promote_link_global`. Officials curate their own links through that same
 country-scoped grant, not a self-service exemption, which is what lets the editor
 carry the state itself: an NC files their country's Discord already pinned rather

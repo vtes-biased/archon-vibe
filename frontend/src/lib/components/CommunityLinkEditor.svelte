@@ -40,11 +40,7 @@
   let touched = $state(false);
 
   const auth = $derived(getAuthState());
-  const currentModeration = !original?.moderation
-    ? "none"
-    : original.moderation.status === "hidden"
-      ? "hidden"
-      : (original.moderation.scope ?? "none");
+  const currentModeration = original?.moderation ?? "none";
   let moderation = $state<string>(currentModeration);
   const canPinNational = $derived(canPromoteLinkNational(auth.user, country || null).allowed);
   const canPinGlobal = $derived(canPromoteLinkGlobal(auth.user).allowed);
