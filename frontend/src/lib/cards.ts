@@ -33,9 +33,7 @@ export async function getCards(): Promise<Map<number, VtesCard>> {
   return cardsMap;
 }
 
-/** Serializes the catalog and hands it to the engine, which parses and holds it. Memoized on the
- * map's identity, not a flag: refreshCardsFromAPI replaces the map when the etag moves, and the
- * deck surfaces fire their validations concurrently. */
+/** Memoized on a promise, not a flag: the deck surfaces fire their validations concurrently. */
 export async function loadEngineCards(): Promise<void> {
   const cards = await getCards();
   if (engineCardsPromise && engineCardsFor === cards) return engineCardsPromise;
@@ -59,8 +57,9 @@ export async function loadEngineCards(): Promise<void> {
 async function refreshCardsFromAPI(): Promise<void> {
   try {
     const headers: Record<string, string> = {};
-    // Only conditional when there is something to keep: a 304 answers "reuse what you have",
-    // and a rescued etag can outlive the cards store a version upgrade dropped.
+    // Only conditional when there is something to keep: a body that fails mid-download leaves
+    // currentEtag set with no cards, and a 304 would then wedge getCards() into throwing for
+    // the rest of the session.
     if (currentEtag && cardsMap?.size) {
       headers['If-None-Match'] = currentEtag;
     }

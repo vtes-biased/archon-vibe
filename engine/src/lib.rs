@@ -184,8 +184,6 @@ mod shared {
         Ok(d)
     }
 
-    /// Read guard over the loaded catalog, or an internal error when nothing has
-    /// been handed to `load_cards` yet.
     pub fn with_card_map<T>(
         cards: &RwLock<Option<cards::CardMap>>,
         f: impl FnOnce(&cards::CardMap) -> Result<T, EngineError>,
@@ -375,8 +373,6 @@ mod wasm {
             }
         }
 
-        /// Parses the card catalog once and holds it; every later deck call reads it.
-        /// The catalog is replaceable because a card refresh mid-session yields a new one.
         #[wasm_bindgen(js_name = loadCards)]
         pub fn load_cards(&self, cards_json: &str) -> Result<(), String> {
             let card_map = super::cards::CardMap::load(cards_json).map_err(|e| e.to_json())?;
@@ -701,8 +697,6 @@ mod python {
             }
         }
 
-        /// Parses the card catalog once and holds it; every later deck call reads it.
-        /// The catalog is replaceable because a card refresh mid-session yields a new one.
         fn load_cards(&self, cards_json: &str) -> PyResult<()> {
             let card_map = super::cards::CardMap::load(cards_json)
                 .map_err(|e| PyValueError::new_err(e.to_json()))?;
