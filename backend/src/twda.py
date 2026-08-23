@@ -49,9 +49,6 @@ async def submit_twda_pr(
 ) -> str | None:
     """Create or update a PR on GiottoVerducci/TWD with the winner's deck.
 
-    Every write lands on our own fork; the archive's installation is used only to
-    open the pull request from it.
-
     Returns the PR URL on success, None on failure.
     """
     if not is_configured():
@@ -99,8 +96,8 @@ async def submit_twda_pr(
                 return resp.status, await resp.text()
 
         try:
-            # 1. Fast-forward the fork's master to the archive's, so the branch is
-            #    cut from what the PR will actually be diffed against.
+            # Fast-forward the fork's master to the archive's, so the branch is
+            # cut from what the PR will actually be diffed against.
             sync_status, sync_text = await _req(
                 "POST",
                 f"/repos/{TWDA_FORK_REPO}/merge-upstream",
@@ -111,7 +108,6 @@ async def submit_twda_pr(
                 logger.error(f"Failed to sync TWD fork: {sync_status} {sync_text}")
                 return None
 
-            # 2. Get the fork's master SHA
             status, text = await _req(
                 "GET", f"/repos/{TWDA_FORK_REPO}/git/refs/heads/master", fork_token
             )
@@ -120,7 +116,6 @@ async def submit_twda_pr(
                 return None
             base_sha = json.loads(text)["object"]["sha"]
 
-            # 3. Create or reset the feature branch
             ref_status, _ = await _req(
                 "GET",
                 f"/repos/{TWDA_FORK_REPO}/git/refs/heads/{branch}",
@@ -146,7 +141,6 @@ async def submit_twda_pr(
                     )
                     return None
 
-            # 4. Create or update the deck file on the branch
             file_status, file_text = await _req(
                 "GET",
                 f"/repos/{TWDA_FORK_REPO}/contents/{file_path}",
@@ -173,7 +167,6 @@ async def submit_twda_pr(
                 logger.error(f"Failed to commit deck file: {put_status} {put_text}")
                 return None
 
-            # 5. Find existing open PR or create a new one, on the archive
             pr_status, pr_text = await _req(
                 "GET",
                 f"/repos/{TWDA_TARGET_REPO}/pulls",

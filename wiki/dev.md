@@ -174,7 +174,11 @@ permissions are repository-wide and the archive will not grant write: the
 **fork installation** (`vtes-biased/TWD`) is asked for Contents read-and-write and
 holds every write — the fork sync, the branch, the deck commit — while the
 **archive installation** (`GiottoVerducci/TWD`) is asked for Pull requests
-read-and-write and nothing else. No webhook on either. The private key and client
+read-and-write and nothing else. The App *declares* both permissions because the
+fork needs Contents, but an installation holds only what its owner approved: the
+archive's approved Pull requests alone, which is exactly why the old
+both-at-once token request was refused. The per-request `permissions` narrowing is
+what keeps us from ever asking it for more. No webhook on either. The private key and client
 id are shared; only the two installation ids differ, and both are vault secrets.
 **The fork must stay public** — the archive's token has no access to it and can
 only reference a public head. With any of the five unset the feature is silently

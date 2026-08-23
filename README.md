@@ -219,7 +219,7 @@ To set up your own GitHub App for TWDA:
 1. **Register a GitHub App** at https://github.com/settings/apps/new
    - **Name**: e.g. "Archon TWDA Bot"
    - **Homepage URL**: your Archon instance URL
-   - **Permissions** (Repository): Contents **Read & Write**, Pull requests **Read & Write**
+   - **Permissions** (Repository): Contents **Read & Write**, Pull requests **Read & Write**. Contents is declared for the fork's sake; the archive's installation need only approve Pull requests, and each token request narrows to the one permission that installation is used for.
    - No webhook needed (uncheck "Active" under Webhook)
    - **Where can this app be installed?**: "Any account", so the archive owner can install it
 
@@ -227,7 +227,7 @@ To set up your own GitHub App for TWDA:
 
 3. **Fork** `GiottoVerducci/TWD` under your own account and leave it **public** — the archive's token cannot read a private head. Nothing needs to be pushed to it; the auto-PR creates every branch it uses.
 
-4. **Install the App twice**, noting each **Installation ID** from the URL after installation (`https://github.com/settings/installations/{INSTALLATION_ID}`): on your fork, and on `GiottoVerducci/TWD` (ask the repo owner). Each installation is asked at runtime for only the permission it needs.
+4. **Install the App twice**, noting each **Installation ID** from the URL after installation (`https://github.com/settings/installations/{INSTALLATION_ID}`): on your fork with Contents, and on `GiottoVerducci/TWD` (ask the repo owner) with Pull requests only — the archive never needs to approve write access.
 
 When all five variables are set, Archon will create a branch `archon/{vekn_event_id}` on the fork and open a PR with the winner's deck in TWDA format. If the decklist is updated later, the PR is automatically updated. If the variables are not set, this feature is silently skipped.
 
