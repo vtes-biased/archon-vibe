@@ -126,6 +126,15 @@ their next snapshot resync. Preserve that in any new merge-like flow.
 remap. The offline remap itself uses a naive JSON string replace, whose
 substring-collision risk is mitigated only by UUID v7 length.
 
+**The engine reads its inputs untyped**, so a rename does not reach it. Every
+domain object crosses into `engine/` as a JSON string indexed by literal —
+`value["winner"]` — with no `Deserialize` for any domain type and not one `.get()`
+in the crate. serde_json yields `Null` for an absent key and the call sites take
+`.as_str().unwrap_or("")`, so renaming a field in `models.py` silently feeds the
+engine an empty value past a green build and a green test suite. `just
+model-drift` does not cover this: it compares Python to TypeScript, and the engine
+has no model to compare.
+
 **Svelte 5 `$props()`**: props must be listed in the destructure, not merely in the
 type annotation.
 

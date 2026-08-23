@@ -27,7 +27,7 @@ just dev-reset # reset the dev database
 
 `just lint` auto-fixes formatting, then runs the checks nothing can fix for you;
 `just lint-check` is the read-only half and is what `just test` calls. Both end on
-the same five gates:
+the same six gates:
 
 - `just permission-drift` — a role literal used to gate outside the engine's
   capability table.
@@ -51,6 +51,14 @@ the same five gates:
 - `just public-api-isolation` — the app naming the public API, or the API
   importing the app's machinery ([public-api](public-api.md#isolation)). It runs
   in CI too, unlike the two gates above it.
+- `just model-drift` — `models.py` and `types.ts` disagreeing on a field name or
+  an enum value ([sync](sync.md#adding-a-new-object-type)). Nothing generates one
+  from the other. It compares names and values, not types: `datetime` is `string`
+  over the wire and every optional spelling differs, so types would be noise. A
+  shape that genuinely belongs to one side is listed in the script with its
+  reason, which is also what keeps a parse that stopped matching from passing
+  everything in silence. In CI it rides the backend job, not the lint one:
+  `models.py` instantiates `PyEngine` at import, so it needs the built engine.
 
 In dev only the **database** runs in Docker; backend and frontend run natively. The
 compose file is **not** production-hardened — uvicorn reload, a default password.

@@ -170,6 +170,7 @@ lint-check:
     just dark-variant
     just locale-parity
     just public-api-isolation
+    just model-drift
 
 # Fail when a role literal is used for gating outside the engine's capability
 # table — the drift this repo's permission model keeps re-growing without it.
@@ -197,6 +198,11 @@ locale-parity:
 public-api-isolation:
     uv run python3 scripts/check_public_api_isolation.py
 
+# Fail when models.py and types.ts disagree on a field name or an enum value —
+# nothing generates one from the other, so a one-sided change ships silently.
+model-drift:
+    uv run python3 scripts/check_model_drift.py
+
 # Lint and auto-fix all code
 lint:
     uv run ruff check --fix . && uv run ruff format .
@@ -207,6 +213,7 @@ lint:
     just dark-variant
     just locale-parity
     just public-api-isolation
+    just model-drift
 
 # Warn (never fail) when the hand-synced backup scripts drift from server-setup's
 # copies (script headers document the contract). Comment wording and the

@@ -704,7 +704,7 @@ state.
 5. **Broadcast** after mutations. No registration step: the stream types derive
    from `list(ObjectType)` and snapshot generation reads whatever the single corpus
    scan returns, so both pick up the new type automatically.
-6. **Frontend type** in `types.ts`.
+6. **Frontend type** in `types.ts` — `just model-drift` fails until it exists.
 7. **IndexedDB store** in `db.ts` — bump the version, which triggers a full clear.
 8. **Add to `SPECS`** in `sync.ts`.
 

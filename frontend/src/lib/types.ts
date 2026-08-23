@@ -310,6 +310,20 @@ export interface Deck {
 
 /** Fields are optional based on the data level (public/member/full — see backend access_levels.py).
  * Decks are separate DeckObject entities, not embedded here. */
+export interface Room {
+  name: string;
+  count: number;
+}
+
+export type TwdaOutcome = "submitted" | "skipped" | "failed";
+
+export interface TwdaStatus {
+  outcome: TwdaOutcome;
+  reason: string; // skip reason code → twda_reason_* i18n keys
+  pr_url: string;
+  at: string | null;
+}
+
 export interface Tournament extends BaseObject {
   name: string;
   format: TournamentFormat;
@@ -339,7 +353,7 @@ export interface Tournament extends BaseObject {
   max_players?: number; // soft registration cap (0 = none): warn-only, never blocks
   open_rounds?: boolean; // non-VEKN house format: per-player cap, not pushed to VEKN, not ranked
   self_organized_rounds?: boolean; // open-rounds: let registered players seat their own pod (#274)
-  table_rooms?: { name: string; count: number }[];
+  table_rooms?: Room[];
 
   // Full data (varies by level)
   external_ids?: Record<string, string>;
@@ -347,12 +361,7 @@ export interface Tournament extends BaseObject {
   vekn_pushed_at?: string | null;
   vekn_results_stale?: boolean; // results diverged after the write-once VEKN push
   // Last TWDA auto-submission outcome (organizer projection only)
-  twda_status?: {
-    outcome: "submitted" | "skipped" | "failed";
-    reason: string; // skip reason code → twda_reason_* i18n keys
-    pr_url: string;
-    at: string | null;
-  } | null;
+  twda_status?: TwdaStatus | null;
   checkin_code?: string;
   players?: Player[];
   rounds?: Table[][];
