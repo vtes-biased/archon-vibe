@@ -278,9 +278,9 @@ BEFORE INSERT OR UPDATE ON objects
 FOR EACH ROW
 EXECUTE FUNCTION update_objects_modified_at();
 
--- The Judgekin role is stored under the name the product always displayed. This
--- runs before the app serves: the Role enum no longer accepts the old value, so a
--- row still holding it fails to decode and takes its whole user list with it.
+-- Runs before the app serves, and stays for any database that predates it: the
+-- Role enum no longer accepts the old value, so a row still holding it fails to
+-- decode and takes its whole user list with it.
 UPDATE objects SET "public" = jsonb_set("public", '{roles}', (
     SELECT jsonb_agg(CASE WHEN e.v = '"Judgekin"'::jsonb THEN '"Sheriff"'::jsonb ELSE e.v END)
     FROM jsonb_array_elements("public"->'roles') AS e(v)))

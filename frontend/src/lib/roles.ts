@@ -20,7 +20,6 @@ export function getRoleTone(role: Role): BadgeTone {
   return ROLE_TONES[role];
 }
 
-/** Judge filter includes Sheriff and Rulemonger. */
 export function expandRolesForFilter(roles: Role[]): Role[] {
   const expanded = new Set(roles);
   if (expanded.has('Judge')) {
