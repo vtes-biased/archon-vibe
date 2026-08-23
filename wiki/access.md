@@ -82,8 +82,7 @@ restrictions.
 **Magic-link lifetimes are per purpose**: 15 minutes for signup and password
 reset, 7 days for an invite — its recipient did not ask for the email and has no
 reason to be watching their inbox. Clicking any of them mints a separate
-10-minute window to submit the password; the emailed link itself survives that
-window expiring.
+10-minute window to submit the password.
 
 An expired or already-used link routes to `/login?recover=1`, the reset form under
 wording that fits someone who has never had a password. That is the invited

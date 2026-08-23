@@ -15,6 +15,7 @@
 
   let password = $state("");
   let passwordError = $state<string | null>(null);
+  let linkDead = $state(false);
 
   onMount(async () => {
     const params = new URLSearchParams(window.location.search);
@@ -40,6 +41,7 @@
 
   async function handleSetPassword() {
     passwordError = null;
+    linkDead = false;
 
     if (password.length < 8) {
       passwordError = m.auth_verify_error_password_length();
@@ -48,6 +50,7 @@
 
     if (!verifyResult) {
       passwordError = m.auth_verify_error_session_expired();
+      linkDead = true;
       return;
     }
 
@@ -57,6 +60,7 @@
       goto("/");
     } else {
       passwordError = auth.error || m.auth_verify_error_set_password();
+      linkDead = true;
     }
   }
 
@@ -113,9 +117,11 @@
             {#if passwordError}
             <div class="p-3 banner-error border rounded-lg text-sm">
               {passwordError}
-              <a href="/login?recover=1" class="block mt-2 underline">
-                {m.auth_verify_get_new_link()}
-              </a>
+              {#if linkDead}
+                <a href="/login?recover=1" class="block mt-2 underline">
+                  {m.auth_verify_get_new_link()}
+                </a>
+              {/if}
             </div>
           {/if}
 

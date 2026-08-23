@@ -2053,6 +2053,7 @@ async def _resolve_or_create_offline_player(
         name=player_data.name,
         country=tournament_country,
         vekn_id=vekn_id,
+        contact_email=player_data.email.lower() if player_data.email else None,
         coopted_by=organizer_uid,
         coopted_at=now,
     )
