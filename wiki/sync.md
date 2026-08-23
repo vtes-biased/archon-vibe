@@ -296,7 +296,9 @@ goes through `handleError()` and its capped backoff like every other reconnect, 
 the loop hazard in [hazards](hazards.md#concurrency-and-connections).
 
 **Reconnection has no terminal state** — a tab that stops retrying is deaf until
-someone reloads it, and nobody reloads a tab that looks fine. Attempts continue
+someone reloads it, and nobody reloads a tab that looks fine. Signing out is the
+one path that tears the stream down deliberately, and it reconnects anonymously
+rather than leaving the tab with nothing pending. Attempts continue
 indefinitely on the capped backoff, and the counter resets on `sync_complete`, not
 on `onopen`: a cause that lets the socket open and then go silent would otherwise
 reset its own backoff on every watchdog trip and reconnect at a fixed fast
@@ -304,8 +306,9 @@ interval. Five attempts is the threshold at which the banner goes up, suppressed
 for the snapshot warm-up and for an offline-locked device, where the nudge would be
 wrong mid-event.
 
-The status chip reads stream health, never `navigator.onLine`: a dead socket under
-a live NIC is precisely the state it must not report as online. It goes down when
+The status chip reads stream health, not the NIC alone: `navigator.onLine` still
+forces it down, but a dead socket under a live NIC is precisely the state it must
+not report as online. It goes down when
 the stream closes and stays down through the whole backoff wait, returns to
 *syncing* when the socket reopens, and claims online only between a `sync_complete`
 and the next failure. The banner is separate and keeps the five-attempt threshold,

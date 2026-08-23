@@ -24,8 +24,6 @@
   let isOnline = $state(navigator.onLine);
   let isSyncing = $state(true);
   let syncError = $state(false);
-  // Latched on the stream closing and cleared when it reopens, so the chip stays honest through
-  // a backoff wait — where nothing else is set and a live NIC would otherwise read as online.
   let streamLost = $state(false);
   let streamDown = $derived(!isOnline || streamLost);
   // Suppressed while offline-locked (mid-event refresh is the wrong nudge);
@@ -72,8 +70,6 @@
       } else if (event.type === 'connected') {
         streamLost = false;
       } else if (event.type === 'sync_complete') {
-        // Only a completed catch-up clears the error: an onopen that never delivers is
-        // exactly the failure being reported, and clearing there hides it again.
         syncError = false;
         isSyncing = false;
       } else if (event.type === 'error') {

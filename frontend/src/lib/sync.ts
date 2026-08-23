@@ -125,6 +125,7 @@ class SyncManager {
   private static readonly WATCHDOG_TICK_MS = 15_000;
   private lastFrameAt = 0;
   private watchdog: ReturnType<typeof setInterval> | null = null;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private alerted = false;
 
   // Resets only on sync_complete; assumes the server always closes a catch-up stream with
@@ -632,13 +633,18 @@ class SyncManager {
       console.error(`SSE connection failed after ${this.reconnectAttempts} attempts; still retrying`);
       this.emit({ type: 'error', error: 'Failed to connect after multiple attempts' });
     }
-    setTimeout(() => { void this.connect(); }, delay);
+    this.retryTimer = setTimeout(() => { void this.connect(); }, delay);
   }
 
   async disconnect(): Promise<void> {
     // Synchronously, before the awaits below: a tick landing mid-flush would start a second
-    // backoff timer racing this one.
+    // backoff timer racing this one. Dropping the pending retry is what lets a manual
+    // reconnect stick, instead of being torn down when the stale timer fires.
     this.stopWatchdog();
+    if (this.retryTimer !== null) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
     if (this.eventSource) {
       this.eventSource.close();
       this.eventSource = null;

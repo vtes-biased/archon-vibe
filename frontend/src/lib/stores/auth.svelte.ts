@@ -428,6 +428,9 @@ export async function logout(): Promise<void> {
   forgetViews();
   await syncManager.reset();
   setAuthState({ user: null, authMethods: [], isAuthenticated: false, isLoading: false, error: null });
+  // An anonymous tab still streams the public view. Without this the tab is left deaf with no
+  // retry pending — the one absorbing state the reconnect loop otherwise has none of.
+  void syncManager.connect();
 }
 
 export interface ProfileUpdate {
