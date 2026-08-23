@@ -204,28 +204,32 @@ When a sanctioned tournament finishes and the winner's decklist is available, Ar
 
 Official app: [vekn-archon](https://github.com/organizations/vtes-biased/settings/apps/vekn-archon)
 
+GitHub App permissions are repository-wide, so the archive is never asked for write access. One App is installed twice: on a fork you own, which holds the branch and the deck commit, and on the archive, which grants only the right to open the Pull Request.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TWDA_GITHUB_APP_ID` | _(empty)_ | GitHub App numeric ID |
+| `TWDA_GITHUB_CLIENT_ID` | _(empty)_ | GitHub App client ID |
 | `TWDA_GITHUB_PRIVATE_KEY` | _(empty)_ | PEM key: file path or inline contents |
-| `TWDA_GITHUB_INSTALLATION_ID` | _(empty)_ | Installation ID on TWD repo |
+| `TWDA_GITHUB_INSTALLATION_ID` | _(empty)_ | Installation ID on the TWD repo |
+| `TWDA_GITHUB_FORK_INSTALLATION_ID` | _(empty)_ | Installation ID on your fork of TWD |
+| `TWDA_GITHUB_FORK_OWNER` | _(empty)_ | Account owning the fork, e.g. `vtes-biased` |
 
 To set up your own GitHub App for TWDA:
 
 1. **Register a GitHub App** at https://github.com/settings/apps/new
    - **Name**: e.g. "Archon TWDA Bot"
    - **Homepage URL**: your Archon instance URL
-   - **Permissions** (Repository):
-     - Contents: **Read & Write** (to create branches and commit deck files)
-     - Pull requests: **Read & Write** (to open PRs)
+   - **Permissions** (Repository): Contents **Read & Write**, Pull requests **Read & Write**
    - No webhook needed (uncheck "Active" under Webhook)
-   - **Where can this app be installed?**: "Only on this account" is fine
+   - **Where can this app be installed?**: "Any account", so the archive owner can install it
 
 2. **Generate a private key** on the App settings page. Download the `.pem` file.
 
-3. **Install the App** on the `GiottoVerducci/TWD` repository (or ask the repo owner to install it). Note the **Installation ID** from the URL after installation (`https://github.com/settings/installations/{INSTALLATION_ID}`).
+3. **Fork** `GiottoVerducci/TWD` under your own account and leave it **public** — the archive's token cannot read a private head. Nothing needs to be pushed to it; the auto-PR creates every branch it uses.
 
-When all three variables are set, Archon will create a branch `archon/{vekn_event_id}` and open a PR with the winner's deck in TWDA format. If the decklist is updated later, the PR is automatically updated. If the variables are not set, this feature is silently skipped.
+4. **Install the App twice**, noting each **Installation ID** from the URL after installation (`https://github.com/settings/installations/{INSTALLATION_ID}`): on your fork, and on `GiottoVerducci/TWD` (ask the repo owner). Each installation is asked at runtime for only the permission it needs.
+
+When all five variables are set, Archon will create a branch `archon/{vekn_event_id}` on the fork and open a PR with the winner's deck in TWDA format. If the decklist is updated later, the PR is automatically updated. If the variables are not set, this feature is silently skipped.
 
 ## License
 

@@ -112,3 +112,35 @@ SELECT count(*) FROM objects WHERE type = 'user'
 
 **Owes afterwards**: nothing to tell anyone — no consumer can reach the column
 until the API app ships. Delete this section.
+
+## Re-submit the decks the archive refused
+
+**Gated on** the commit carrying this section — *"Submit the winner's deck from a
+fork we own"*, findable as `git log -1 --format=%h --grep='fork we own'` — which
+moved every TWDA write onto our own fork. Before it, the auto-PR asked the
+archive's installation for `contents: write`, was refused, and no winning deck
+reached the TWDA since the feature went live.
+
+**Order matters**: the fork, its installation and the two vault entries must exist
+**before** the deploy. An event finishing in the gap between the deploy and the
+configuration records `skipped / not_configured` instead of `failed`, and nothing
+refires it — its results are already pushed, so the batch retry never looks at it
+again. The query below catches both shapes for that reason.
+
+**Run**: list the events, then for each one `POST /api/tournaments/{uid}/push-vekn`
+as an admin. With the results already pushed that path skips vekn.net entirely and
+re-runs only the submission.
+
+```sql
+SELECT "full"->>'uid', "full"->>'name', "full"->'twda_status'->>'outcome'
+FROM objects WHERE type='tournament' AND deleted_at IS NULL
+  AND ("full"->'twda_status'->>'outcome' = 'failed'
+    OR ("full"->'twda_status'->>'outcome' = 'skipped'
+        AND "full"->'twda_status'->>'reason' = 'not_configured'));
+```
+
+**Proves it worked**: the query returns no rows, and each event's `twda_status`
+reads `submitted` with a PR URL on `GiottoVerducci/TWD`.
+
+**Owes afterwards**: nothing to tell anyone — the organizers never saw the failure.
+Delete this section.

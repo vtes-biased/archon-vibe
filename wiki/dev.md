@@ -168,9 +168,17 @@ public key is served at runtime, never baked into the build
 ([architecture](architecture.md#web-push)).
 
 **TWDA auto-PR** — `TWDA_GITHUB_CLIENT_ID`, `TWDA_GITHUB_PRIVATE_KEY` (a file path or
-inline PEM), `TWDA_GITHUB_INSTALLATION_ID`. The GitHub App needs Contents and Pull
-requests at read-and-write, no webhook, installed on the TWD repository. With the
-variables unset the feature is silently skipped.
+inline PEM), `TWDA_GITHUB_INSTALLATION_ID`, `TWDA_GITHUB_FORK_INSTALLATION_ID`,
+`TWDA_GITHUB_FORK_OWNER`. **One App, installed twice**, because GitHub App
+permissions are repository-wide and the archive will not grant write: the
+**fork installation** (`vtes-biased/TWD`) is asked for Contents read-and-write and
+holds every write — the fork sync, the branch, the deck commit — while the
+**archive installation** (`GiottoVerducci/TWD`) is asked for Pull requests
+read-and-write and nothing else. No webhook on either. The private key and client
+id are shared; only the two installation ids differ, and both are vault secrets.
+**The fork must stay public** — the archive's token has no access to it and can
+only reference a public head. With any of the five unset the feature is silently
+skipped.
 
 Secrets and PII never enter the repository — the repo is public and CI publishes
 wheels as release assets ([dogmas](dogmas.md#dependencies-and-data)).

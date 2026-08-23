@@ -117,6 +117,10 @@ backend_env:
   SNAPSHOT_DIR: /var/lib/archon/snapshots
   TWDA_GITHUB_CLIENT_ID: "{{ vault_twda_github_client_id | default('') }}"
   TWDA_GITHUB_INSTALLATION_ID: "{{ vault_twda_github_installation_id | default('') }}"
+  # Second installation of the SAME App, on our fork of the archive: it holds the
+  # branch and the deck commit, so the archive grants no write at all.
+  TWDA_GITHUB_FORK_INSTALLATION_ID: "{{ vault_twda_github_fork_installation_id | default('') }}"
+  TWDA_GITHUB_FORK_OWNER: "vtes-biased"
   # PRIVATE_KEY is the runtime PEM path — derived from env_dir so it always matches
   # where the role copies the vault-delivered .pem.
   TWDA_GITHUB_PRIVATE_KEY: "{{ env_dir }}/twda_github_app.pem"

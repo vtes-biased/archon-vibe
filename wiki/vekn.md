@@ -257,7 +257,9 @@ Manual triggers: `POST /admin/sync-vekn` (members and tournaments),
 ### Outbound
 
 `twda.py` opens or updates a GitHub pull request against the
-[TWDA repo](https://github.com/GiottoVerducci/TWD), idempotent on branch
+[TWDA repo](https://github.com/GiottoVerducci/TWD) from a fork we own — every write
+lands there, the archive granting only permission to open the pull request
+([dev](dev.md#configuration)) — idempotent on branch
 `archon/{event_code}` and file `decks/{event_code}.txt`, create-or-update, with the
 short event link in the PR body and in the deck header krcg parses back as the
 entry's `event_link` — which is what makes an entry we submitted resolvable against
