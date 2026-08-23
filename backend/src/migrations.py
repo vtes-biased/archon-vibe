@@ -1,20 +1,6 @@
 """Ordered rewrites of stored documents, run from the lifespan before serving.
 
-`objects` is schemaless, so a field's meaning lives in the code that decodes it.
-When that meaning changes, every row written under the old reading raises on
-decode — and `msgspec` raises for the whole list, not the row. An entry here
-rewrites those rows through `save_object`, which recomputes all four projections
-from `full`, so the shapes stay single-sourced.
-
-A failure propagates and the app does not serve: the rows an entry targets are
-exactly the ones the new code cannot read, so serving half-migrated is the
-outage this mechanism exists to remove, unbounded and quiet instead of bounded
-and loud. Rolling back is the remedy — the previous build decodes the old shape,
-since an entry ships in the commit that breaks it.
-
-Every entry pairs with a live section in `wiki/post-deploy.md` carrying its proof
-queries; `just migration-pairing` fails on an unpaired one either way. Report
-mode runs the same guards without the app:
+Report mode runs the same guards without the app:
 
     uv run python -m backend.src.migrations --dsn "$DATABASE_URL"
     uv run python -m backend.src.migrations --dsn "$DATABASE_URL" --apply
@@ -104,9 +90,8 @@ async def run_migrations(*, apply: bool = True) -> dict[str, int]:
         rewritten = 0
         async with db.get_connection() as conn:
             for uid in uids:
-                # One transaction PER ROW: a single wrapping one would stamp every
-                # row with the same CURRENT_TIMESTAMP, and catch-up's strict
-                # `modified_at > since` would skip a run split across a cursor.
+                # One transaction PER ROW: a shared CURRENT_TIMESTAMP is what a
+                # catch-up cursor's strict `modified_at > since` splits across.
                 async with conn.transaction():
                     result = await conn.execute(_LOCK_ROW, (uid,))
                     row = await result.fetchone()

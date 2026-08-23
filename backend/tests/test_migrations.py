@@ -1,12 +1,9 @@
 """The stored-value migration runner, against a real database.
 
-A migration exists because the running code cannot decode the rows it targets,
-and it runs before the app serves — so a failing one is a total outage, not a
-degraded read ([architecture](architecture.md#stored-value-migrations)). Nothing
-else can cover the guards: they are jsonb predicates over shapes no model can
-express, so a fixture built through `save_user` would already hold the new shape.
-Both invariants the mechanism rests on are pinned here — the row decodes
-afterwards, and a second run rewrites nothing.
+The guards are jsonb predicates over shapes no model can express, so a fixture
+built through `save_user` would already hold the new one and cover nothing. Two
+invariants: an old-shape row decodes after the run, and a second run rewrites
+nothing.
 """
 
 import json

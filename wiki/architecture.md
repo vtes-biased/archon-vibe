@@ -105,9 +105,11 @@ The lifespan runs it right after `init_db`, before the app serves — **not** fr
 must never mutate through. A failure propagates and the process does not serve:
 the rows an entry targets are exactly the ones the running code cannot read, so
 serving half-migrated restores the outage the mechanism removes, unbounded and
-quiet instead of bounded and loud. Rolling the deploy back is the remedy, and it
-is always available — an entry ships in the commit that breaks the old shape, so
-the previous build still decodes it. `python -m backend.src.migrations` runs the
+quiet instead of bounded and loud. The remedy is to roll **forward**: entries are
+self-guarding, so fixing one and restarting resumes at exactly the rows still
+pending. Rolling the deploy back is clean only while no row has moved — the
+per-row transactions commit as they go, and the previous build cannot decode a
+row the run already rewrote. `python -m backend.src.migrations` runs the
 same guards without the app, reporting by default and rewriting on `--apply`;
 that is how an entry is rehearsed against a copy of production before it lands.
 

@@ -401,8 +401,10 @@ that runs ([sync](sync.md#streaming)).
 **A stored-value migration that raises takes the backend down**, and that is the
 chosen behaviour, not an oversight — half-migrated serving restores the outage
 the mechanism removes ([architecture](architecture.md#stored-value-migrations)).
-Three things follow. An entry lands only after being run against a **copy of
-production data**, not just CI: the bot's lightbulb v2→v3 migration crash-looped
+The way out is forward, not back: the per-row transactions commit as they go, so
+once a row has moved the previous build cannot decode it either. Three things
+follow. An entry lands only after being run against a **copy of production
+data**, not just CI: the bot's lightbulb v2→v3 migration crash-looped
 69 times in production while CI stayed green ([testing](testing.md#traps)).
 Its [post-deploy](post-deploy.md) section is deleted only once **every**
 long-lived database answers 0 — beta included; prod-only proof strands beta on

@@ -34,7 +34,7 @@ people to tell, and the wiki text that dies with it.
 
 **Migration** `rename-judgekin-to-sheriff`
 
-**Gated on** `GATING_SHA`, which moved the rewrite out of `schema.sql` into the
+**Gated on** `9f9c06c`, which moved the rewrite out of `schema.sql` into the
 lifespan's migration run. There is **nothing to run**: `Role` decodes strictly,
 so a row still holding the old value raises on every read of any user list
 containing it, and the entry rewrites those rows before the process serves.
@@ -56,7 +56,7 @@ section and its entry.
 
 **Migration** `collapse-link-moderation`
 
-**Gated on** `GATING_SHA`, which replaced the post-deploy collapse script with a
+**Gated on** `9f9c06c`, which replaced the post-deploy collapse script with a
 lifespan migration. There is **nothing to run**. Until the entry has run against
 a database, a row still carrying the `{status, scope, by, at}` record raises on
 every read of that member (`User` decodes strictly) **and every hidden link on it

@@ -47,11 +47,10 @@ def declared_migrations() -> list[str]:
 
 def main() -> int:
     declared = declared_migrations()
-    if not declared and MIGRATIONS.exists():
-        # An empty list is the goal state; a parse that stopped matching is not.
-        if "Migration(" in MIGRATIONS.read_text(encoding="utf-8"):
-            print("check_migration_pairing.py no longer parses migrations.py")
-            return 1
+    # An empty list is the goal state; a parse that stopped matching is not.
+    if not declared and "Migration(" in MIGRATIONS.read_text(encoding="utf-8"):
+        print("check_migration_pairing.py no longer parses migrations.py")
+        return 1
 
     proven = _MARKER.findall(POST_DEPLOY.read_text(encoding="utf-8"))
 
