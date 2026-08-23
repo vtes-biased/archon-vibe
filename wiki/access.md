@@ -89,6 +89,14 @@ the Discord bot still uses it; the form encoding is what every third-party OAuth
 library reaches for, so refusing it made the endpoint non-compliant for exactly
 the audience the daemon grant exists to serve.
 
+`/oauth/authorize` answers with `{"redirect_url": …}` on every path that ends in a
+navigation — consent already on file, approval, denial — and never with a 302. The
+consent page holds a Bearer token, so it reaches the endpoint through `fetch`, and a
+fetch cannot read `Location` off a redirect: `redirect: "manual"` yields an opaque
+response whose header list is empty. While the auto-approve path returned a 302 the
+page navigated to the empty string, which reloads the consent page, which calls
+`/authorize` again — a returning user looped forever instead of reaching the app.
+
 Endpoints `/oauth/{authorize,token,userinfo}`; client CRUD and secret regeneration
 under `/oauth/clients` (DEV role); `GET /oauth/consents` lists authorized apps and
 is **first-party session only**, rejecting OAuth tokens with 403;

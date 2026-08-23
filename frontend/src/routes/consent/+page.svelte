@@ -50,17 +50,8 @@
     try {
       const response = await fetch(
         `${API_BASE}/oauth/authorize?${params.toString()}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          redirect: "manual",
-        },
+        { headers: { Authorization: `Bearer ${token}` } },
       );
-
-      if (response.type === "opaqueredirect" || response.status === 302) {
-        // Auto-approved (existing consent), browser handles redirect
-        window.location.href = response.headers.get("Location") || "";
-        return;
-      }
 
       if (!response.ok) {
         const data = await response.json();
@@ -70,6 +61,12 @@
       }
 
       const data = await response.json();
+      if (data.redirect_url) {
+        // Consent already on file: no prompt, straight back to the app.
+        window.location.href = data.redirect_url;
+        return;
+      }
+
       clientName = data.client_name;
       scopes = data.scopes;
       scopeDescriptions = data.scope_descriptions;

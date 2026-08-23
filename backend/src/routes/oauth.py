@@ -12,7 +12,6 @@ import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from .. import permissions
@@ -176,9 +175,8 @@ async def authorize_get(
         params = {"code": code_value}
         if state:
             params["state"] = state
-        return RedirectResponse(
-            url=f"{redirect_uri}?{urlencode(params)}", status_code=302
-        )
+        # Never a 302: the caller is a fetch, which cannot read Location.
+        return {"redirect_url": f"{redirect_uri}?{urlencode(params)}"}
 
     return {
         "client_name": client.name,
@@ -230,9 +228,7 @@ async def authorize_post(user: CurrentUser, body: AuthorizeApprovalRequest):
         params = {"error": "access_denied"}
         if state:
             params["state"] = state
-        return RedirectResponse(
-            url=f"{redirect_uri}?{urlencode(params)}", status_code=302
-        )
+        return {"redirect_url": f"{redirect_uri}?{urlencode(params)}"}
 
     if not code_challenge:
         raise HTTPException(400, "PKCE code_challenge is required")
