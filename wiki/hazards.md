@@ -154,8 +154,11 @@ sheet, so a consumer filtering `disqualified || non_competing` over stored rows
 never sees it. Every consumer of a **placement** must take all three:
 `_final_positions` in `ratings.py`, `final_place` in `league.rs` — where a tail rank
 *is* GP points, so league scoring skips the class outright alongside DQ and proxy —
-and the frontend, which derives them once as `StandingEntry.unplaced` in
-`computeStandings`. A rank rendered off the raw flags puts a number on a no-show.
+the frontend, which derives them once as `StandingEntry.unplaced` in
+`computeStandings`, and the VEKN push, whose placement field takes the archive's own
+`DQ`/`WD` flag for the first two and drops the proxy
+([vekn](vekn.md#archondata-format)). A rank rendered off the raw flags puts a number
+on a no-show.
 The same did-this-row-score atom is also `players_with_rounds`' round-less branch in
 `engine/src/ratings.rs`, with the hand-written twins named below. The two are allowed
 to disagree — a scoreless finalist places 2nd yet never counts as having played — but
@@ -254,6 +257,14 @@ the Tournament model. A `player_count` field on `Tournament` would make real
 tournament JSON silently satisfy that read with different semantics — which is why
 the attested size is stored as `reported_player_count`. Name any further count
 field the same way.
+
+**An email auth method's `identifier` is matched exactly**, so every reader must
+fold the address it is handed to lowercase — that is how it is written on every
+path. A raw address finds nothing and falls silently through to the caller's next
+branch rather than erroring. `contact_email` is the opposite, compared `LOWER()`
+on both sides in SQL, so the two halves of an email lookup do not normalize alike
+([access](access.md#the-email-of-record)). Two readers make both lookups: the
+registration row import and go-online's offline player resolution.
 
 **Role writes have two out-of-band consumers** — the Discord Linked Roles push,
 which fires on any role delta with no periodic reconcile, and the resync
