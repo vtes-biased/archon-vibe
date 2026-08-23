@@ -22,6 +22,10 @@ pub(super) struct Standing {
     /// Proxy: excluded from rank/rating/finals, sorted last like DQ, but unlike DQ
     /// the score is NOT zeroed (VPs stay real for opponents/table-sum checks).
     pub non_competing: bool,
+    /// Held no placement by the importer's word rather than by a scoreless row —
+    /// vekn.net's `wd`. Score is NOT zeroed: they played, so they still count
+    /// toward the field the rating threshold is read against.
+    pub no_show: bool,
 }
 
 /// Sorted GW desc, VP desc, TP desc, toss desc. GW/TP recompute per table from raw
@@ -95,6 +99,7 @@ pub(super) fn compute_preliminary_standings(
             let non_competing = player
                 .and_then(|p| p[player::NON_COMPETING].as_bool())
                 .unwrap_or(false);
+            let no_show = false;
             let (gw, vp, tp) = if disqualified {
                 (0.0, 0.0, 0.0)
             } else {
@@ -109,6 +114,7 @@ pub(super) fn compute_preliminary_standings(
                 finalist,
                 disqualified,
                 non_competing,
+                no_show,
             }
         })
         .collect();
@@ -117,11 +123,11 @@ pub(super) fn compute_preliminary_standings(
     standings
 }
 
-/// GW > VP > TP > toss, DQ'd and proxies parked last. user_uid is a deterministic
-/// terminal tiebreak: without it, players tied on all five come out in
-/// nondeterministic HashMap order. Toss only ever orders finals candidates.
 type RankKey<'a> = (bool, f64, f64, f64, u32, &'a str);
 
+/// GW > VP > TP > toss, excluded rows parked last. user_uid is a deterministic
+/// terminal tiebreak: without it, players tied on all five come out in
+/// nondeterministic HashMap order. Toss only ever orders finals candidates.
 fn cmp_rank(a: RankKey, b: RankKey) -> std::cmp::Ordering {
     a.0.cmp(&b.0)
         .then(b.1.partial_cmp(&a.1).unwrap())
@@ -133,7 +139,7 @@ fn cmp_rank(a: RankKey, b: RankKey) -> std::cmp::Ordering {
 
 fn rank_key(s: &Standing) -> RankKey<'_> {
     (
-        s.disqualified || s.non_competing,
+        s.disqualified || s.non_competing || s.no_show,
         s.gw,
         s.vp,
         s.tp,
@@ -145,7 +151,8 @@ fn rank_key(s: &Standing) -> RankKey<'_> {
 fn row_rank_key(s: &JsonValue) -> RankKey<'_> {
     (
         s[standing::DISQUALIFIED].as_bool().unwrap_or(false)
-            || s[standing::NON_COMPETING].as_bool().unwrap_or(false),
+            || s[standing::NON_COMPETING].as_bool().unwrap_or(false)
+            || s[standing::NO_SHOW].as_bool().unwrap_or(false),
         s[standing::GW].as_f64().unwrap_or(0.0),
         s[standing::VP].as_f64().unwrap_or(0.0),
         s[standing::TP].as_f64().unwrap_or(0.0),
@@ -277,9 +284,10 @@ pub fn is_no_show(standing: &JsonValue, winner: &str) -> bool {
     !standing[standing::DISQUALIFIED].as_bool().unwrap_or(false)
         && !standing[standing::FINALIST].as_bool().unwrap_or(false)
         && standing[standing::USER_UID].as_str() != Some(winner)
-        && standing[standing::GW].as_f64().unwrap_or(0.0) == 0.0
-        && standing[standing::VP].as_f64().unwrap_or(0.0) == 0.0
-        && standing[standing::TP].as_f64().unwrap_or(0.0) == 0.0
+        && (standing[standing::NO_SHOW].as_bool().unwrap_or(false)
+            || (standing[standing::GW].as_f64().unwrap_or(0.0) == 0.0
+                && standing[standing::VP].as_f64().unwrap_or(0.0) == 0.0
+                && standing[standing::TP].as_f64().unwrap_or(0.0) == 0.0))
 }
 
 /// Reorders preliminary `standings` (must arrive sorted desc by score) into final
@@ -295,7 +303,7 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
         .members()
         .map(|s| {
             let mut row = s.clone();
-            row[standing_row::NO_SHOW] = is_no_show(s, winner).into();
+            row[standing::NO_SHOW] = is_no_show(s, winner).into();
             row
         })
         .collect();
@@ -307,7 +315,7 @@ pub fn compute_final_standings(standings: &JsonValue, winner: &str) -> Vec<JsonV
     for s in &stamped {
         if s[standing::DISQUALIFIED].as_bool().unwrap_or(false)
             || s[standing::NON_COMPETING].as_bool().unwrap_or(false)
-            || s[standing_row::NO_SHOW].as_bool().unwrap_or(false)
+            || s[standing::NO_SHOW].as_bool().unwrap_or(false)
         {
             // Never place — excluded here so they can't tie with or displace a real
             // competitor. UI renders their row via the flag, not the rank value.
@@ -480,6 +488,7 @@ pub fn display_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<J
                 .and_then(|p| p[player::NON_COMPETING].as_bool())
                 .unwrap_or(false)
                 || row.is_some_and(|r| r[standing::NON_COMPETING].as_bool().unwrap_or(false));
+            let no_show = row.is_some_and(|r| r[standing::NO_SHOW].as_bool().unwrap_or(false));
             let (gw, vp, tp) = if disqualified {
                 (0.0, 0.0, 0.0)
             } else {
@@ -494,6 +503,7 @@ pub fn display_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<J
                 finalist,
                 disqualified,
                 non_competing,
+                no_show,
             }
         })
         .collect();
@@ -512,6 +522,7 @@ pub fn display_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<J
                 standing::FINALIST => s.finalist,
                 standing::DISQUALIFIED => s.disqualified,
                 standing::NON_COMPETING => s.non_competing,
+                standing::NO_SHOW => s.no_show,
             };
             if let Some(seat) = finals_seat(&s.user_uid) {
                 obj[arg::FINALS] = json::object! {
@@ -677,6 +688,7 @@ pub fn finals_qualification(tournament: &JsonValue, standings: &JsonValue) -> Js
             finalist: s[standing::FINALIST].as_bool().unwrap_or(false),
             disqualified: s[standing::DISQUALIFIED].as_bool().unwrap_or(false),
             non_competing: s[standing::NON_COMPETING].as_bool().unwrap_or(false),
+            no_show: s[standing::NO_SHOW].as_bool().unwrap_or(false),
         })
         .collect();
     sort_by_rank(&mut rows);

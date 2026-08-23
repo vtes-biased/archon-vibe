@@ -201,7 +201,7 @@ def _map_vekn_to_tournament(
             vp_finals = float(vp_data.get("vpf", 0) or 0)
             tp = int(vp_data.get("tp", 0) or 0)
             toss = int(vp_data.get("tie", 0) or 0)
-            if disqualified or withdrawn:
+            if disqualified:
                 prelim_gw, vp_prelim, vp_finals, tp, toss = 0, 0.0, 0.0, 0, 0
             if is_finalist and pos == "1":
                 winner_uid = user.uid
@@ -235,6 +235,7 @@ def _map_vekn_to_tournament(
                     toss=toss,
                     finalist=is_finalist,
                     disqualified=disqualified,
+                    no_show=withdrawn,
                 )
             )
 
@@ -258,9 +259,9 @@ def _map_vekn_to_tournament(
                 state=TableState.FINISHED,
             )
 
-        # The engine's own order, so an import cannot rank a sheet the engine never
-        # would: excluded rows last, and a total-order tiebreak without which tied
-        # rows keep VEKN's API order and spuriously trip the equality check below.
+        # Sorted through the engine, whose terminal tiebreak is what keeps tied rows
+        # off VEKN's API order — which varies across syncs and would spuriously trip
+        # the equality check below.
         standings = msgspec.json.decode(
             _engine.sort_standings(msgspec.json.encode(standings).decode()),
             type=list[Standing],

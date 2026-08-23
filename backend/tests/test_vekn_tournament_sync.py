@@ -146,8 +146,6 @@ def test_no_final_import_omits_finals_but_keeps_winner():
     assert (winner.gw, winner.vp) == (1.0, 4.0)  # prelim only (gw not +1)
 
 
-# vekn.net files a flagged row at pos == field size, so in a small field the
-# placement test alone reads it as a finalist.
 def _flagged_event() -> dict:
     return {
         "event_id": "558",
@@ -174,13 +172,11 @@ def test_import_carries_the_disqualification_and_withdrawal_it_is_told_about():
     by_uid = {s.user_uid: s for s in t.standings}
     assert by_uid["u3"].disqualified and not by_uid["u3"].finalist
     assert (by_uid["u3"].gw, by_uid["u3"].vp, by_uid["u3"].tp) == (0.0, 0.0, 0)
-    # No stored withdrawal flag: a zeroed row is what the engine derives `no_show`
-    # from, and the push sends back as WD.
-    assert (by_uid["u4"].gw, by_uid["u4"].vp, by_uid["u4"].tp) == (0.0, 0.0, 0)
-    assert not by_uid["u4"].finalist and not by_uid["u4"].disqualified
+    assert by_uid["u4"].no_show and not by_uid["u4"].disqualified
+    assert not by_uid["u4"].finalist
+    assert (by_uid["u4"].gw, by_uid["u4"].vp, by_uid["u4"].tp) == (0.0, 2.0, 25)
 
     states = {p.user_uid: p.state for p in t.players}
     assert states["u3"] == PlayerState.DISQUALIFIED
     assert "u3" not in {s.player_uid for s in t.finals.seating}
-    # The engine's order: excluded rows last.
-    assert [s.user_uid for s in t.standings][-1] == "u3"
+    assert set([s.user_uid for s in t.standings][-2:]) == {"u3", "u4"}

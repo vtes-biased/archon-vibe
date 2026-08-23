@@ -201,11 +201,12 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   at `pos` = field size, so the placement test alone crowns one a finalist in a
   field of five. A `dq` row is imported zeroed and disqualified on **both** halves
   of the signal ([hazards](hazards.md#consumers-that-must-move-together)); a `wd`
-  row is imported zeroed and flagless, which is what the engine derives `no_show`
-  from and what the push sends back as `WD`. A foreign withdrawal that scored
-  loses those points on our sheet — the archive holds no placement for it either.
-  `dq` wins when both are set: `archon_approve.php` contaminates in either
-  direction, so no single row can be read back to the truth.
+  row is imported with its score intact and `no_show` stored on it, the flag the
+  push sends back as `WD`. It keeps the score because a withdrawal *played*: zeroing
+  it would drop the row from the field count the 8-player rating threshold is read
+  against, and one withdrawal would unrate the whole event. `dq` wins when both are
+  set: `archon_approve.php` contaminates in either direction, so no single row can
+  be read back to the truth.
 - Sorts the sheet with the engine's own rule, never a key of its own
   ([tournaments](tournaments.md#standings)).
 - Re-sync compares the authoritative play data so a VEKN-side score correction, and

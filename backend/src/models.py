@@ -708,6 +708,7 @@ class Standing(msgspec.Struct, kw_only=True, frozen=True):
     finalist: bool = False
     disqualified: bool = False  # forfeited score (zeroed), sorted last, no RTP
     non_competing: bool = False  # excluded from rank/RTP/finals, score NOT zeroed
+    no_show: bool = False  # held no placement by the importer's word, score NOT zeroed
 
 
 class RafflePool(StrEnum):

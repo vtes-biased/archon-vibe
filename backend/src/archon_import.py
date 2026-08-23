@@ -402,7 +402,6 @@ async def apply_archon_import(
             )
         )
 
-    # The engine's own order, so an import cannot rank a sheet the engine never would.
     standings_list = msgspec.json.decode(
         engine.sort_standings(msgspec.json.encode(standings_list).decode()),
         type=list[Standing],

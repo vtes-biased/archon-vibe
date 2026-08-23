@@ -69,7 +69,8 @@ def _players_with_rounds(t: Tournament) -> set[str]:
 def _final_standings(t: Tournament) -> list[dict]:
     """The engine's final placement sheet for one finished tournament: winner
     first, then finalists, then the DQ'd/proxy/no-show tail, each row stamped with
-    its `rank`, its `finalist_position` and the derived `no_show`."""
+    its `rank`, its `finalist_position` and its `no_show` — derived from a scoreless
+    row, or carried over from the importer that stored it."""
     config = msgspec.json.encode(
         {"standings": t.standings, "winner": t.winner}
     ).decode()

@@ -161,10 +161,18 @@ the frontend, which derives them once as `StandingEntry.unplaced` in
 `DQ`/`WD` flag for the first two and drops the proxy
 ([vekn](vekn.md#archondata-format)). A rank rendered off the raw flags puts a number
 on a no-show.
-The same did-this-row-score atom is also `players_with_rounds`' round-less branch in
-`engine/src/ratings.rs`, with the hand-written twins named below. The two are allowed
-to disagree — a scoreless finalist places 2nd yet never counts as having played — but
-tune one and look at the other.
+The atom has two readings and they are **not** interchangeable. `players_with_rounds`'
+round-less branch in `engine/src/ratings.rs` answers *was this row in the field that
+played* — `disqualified || scored`, because a DQ'd row is stored zeroed yet counts
+toward the 8-player threshold (A.2) and toward the coefficient's own count. Its
+hand-written twins, `_players_with_rounds` in `backend/src/ratings.py` and
+`playedPlayerUids` in `frontend/src/lib/tournament-utils.ts`, answer *did this player
+play* and stay on the score alone, since a DQ'd player earns no entry anyway. They
+are further allowed to disagree — a scoreless finalist places 2nd yet never counts as
+having played — but tune one and look at the others.
+The **daily recompute collects the roster, not the scorers**
+(`recompute_all_ratings`): a player whose row went to zero is no longer found by
+either reading, and the entry they already hold would never be taken back.
 
 **The finalist bonus rides the placement row.** `compute_final_standings` stamps
 `finalist_position` beside `rank`, and it is the only source — `ratings.py` reads it

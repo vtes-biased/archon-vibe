@@ -277,9 +277,8 @@ mod shared {
         Ok(json::JsonValue::Array(ranked).dump())
     }
 
-    /// The engine's standings order for a sheet built by an importer: the six-key
-    /// rule lives in the engine, so an import cannot rank a sheet the engine never
-    /// would.
+    /// The engine's standings order for a sheet built by an importer rather than
+    /// by play.
     pub fn sort_standings_json(standings_json: &str) -> Result<String, EngineError> {
         let standings = json::parse(standings_json)?;
         let mut rows: Vec<JsonValue> = standings.members().cloned().collect();
