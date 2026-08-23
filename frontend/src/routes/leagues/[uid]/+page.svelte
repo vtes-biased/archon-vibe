@@ -161,8 +161,6 @@
     organizerNames = names;
 
     standingsError = false;
-    // League scoring needs each event's whole result sheet, which the list projection drops —
-    // a league's finished events are a handful, so they are re-read by key.
     const finished = await Promise.all(
       leagueTournaments.filter(t => t.state === "Finished").map(t => getTournament(t.uid)),
     );

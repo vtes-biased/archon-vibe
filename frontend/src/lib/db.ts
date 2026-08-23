@@ -238,21 +238,20 @@ export async function getUser(uid: string): Promise<User | undefined> {
   return db.get('users', uid);
 }
 
-/** One member's list row, straight off the index — no IndexedDB round-trip. */
 export async function getUserListItem(uid: string): Promise<UserListItem | undefined> {
   const index = await getUserIndex();
   return index.get(uid)?.user;
 }
 
-/** Every member the viewer holds, projected. Unordered: both consumers — the rankings and the
- * community directory — impose their own order, and a name sort of ~19k rows would be waste. */
+/** Name-ordered: the community directory renders its link lists straight off this order, and the
+ * rankings' stable sort falls back to it on equal ratings. The index itself is in uid order. */
 export async function getUserListItems(): Promise<UserListItem[]> {
   const index = await getUserIndex();
   const items: UserListItem[] = [];
   // Tombstones now hard-delete the row (sync.ts); this !deleted_at filter is defensive, hiding any
   // pre-change soft-deleted row a client still holds until its next full resync.
   for (const entry of index.values()) if (!entry.user.deleted_at) items.push(entry.user);
-  return items;
+  return items.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function hasAnyUsers(): Promise<boolean> {
@@ -282,8 +281,6 @@ export async function deleteUser(uid: string): Promise<void> {
   dropFromUserIndex(uid);
 }
 
-/** What every member list, search box and directory reads of a member: the four rating histories
- * and the `wins` uid array collapse to counts, and a surface wanting the whole row reads it by key. */
 export interface UserListItem {
   uid: string;
   deleted_at?: string | null;
@@ -305,8 +302,7 @@ export interface UserListItem {
   win_count: number;
 }
 
-/** getAll() over the ~19k-member corpus costs ~330ms and ~14MB of heap, so this index is read once
- * and patched on write; saveUser/saveUsersBatch/deleteUser/clearAllUsers must all patch it or it goes stale. */
+/** saveUser/saveUsersBatch/deleteUser/clearAllUsers must all patch this or search goes stale. */
 interface UserIndexEntry {
   user: UserListItem;
   /** Word-prefix haystack: name, nickname, email and Discord handle tokens. */
@@ -700,9 +696,6 @@ export async function clearAllTournaments(): Promise<void> {
   memberPlayingUid = null;
 }
 
-/** What every tournament list surface reads of an event. A stored tournament carries 54 fields
- * against these, and `players` alone is 40% of its bytes; a detail surface reads the whole row by
- * key instead. */
 export interface TournamentListItem {
   uid: string;
   modified: string;
@@ -739,13 +732,11 @@ function projectTournament(t: Tournament): TournamentListItem {
   };
 }
 
-/** getAll() over the ~9.5k-event corpus costs ~1.3s and ~60MB of heap, so the list surfaces read
- * this projection instead; saveTournament/saveTournamentsBatch/deleteTournament/clearAllTournaments
- * must all patch it or the lists go stale. */
+/** saveTournament/saveTournamentsBatch/deleteTournament/clearAllTournaments must all patch this
+ * or the lists go stale. */
 let tournamentIndexPromise: Promise<Map<string, TournamentListItem>> | null = null;
 
-/** Tournaments the signed-in member plays in. Keeping `player_uids` on the projection would re-add
- * ~3.6KB per large event to answer what is a couple of dozen uids for a real member. */
+/** Tournaments the signed-in member plays in. */
 let memberPlayingPromise: Promise<Set<string>> | null = null;
 let memberPlayingUid: string | null = null;
 
@@ -774,8 +765,6 @@ function getMemberPlaying(userUid: string): Promise<Set<string>> {
   return memberPlayingPromise;
 }
 
-// Chains onto the build promises rather than materialized collections, so a write landing mid-build
-// still applies; the IDB write has already committed by the time this runs, so re-projecting is always correct.
 function patchTournamentIndex(t: Tournament): void {
   if (tournamentIndexPromise) void tournamentIndexPromise.then(idx => idx.set(t.uid, projectTournament(t)));
   const uid = memberPlayingUid;
@@ -790,7 +779,6 @@ function dropFromTournamentIndex(uid: string): void {
   if (memberPlayingPromise) void memberPlayingPromise.then(set => set.delete(uid));
 }
 
-/** Every event the viewer holds, projected. Callers filter and sort it themselves. */
 export async function getTournamentListItems(): Promise<TournamentListItem[]> {
   const index = await getTournamentIndex();
   return [...index.values()];

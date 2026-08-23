@@ -536,11 +536,12 @@ scoring pulls each finished event's result sheet that way. `sanctions`, `leagues
 and `promos` stay whole-store reads: they are small enough that a projection would
 buy nothing.
 
-**The in-memory user search index** (`db.ts` `getUserIndex`) carries the same
-`UserListItem` map plus per-member search tokens, because a `getAll()` scan per
-keystroke costs 100ms+ — completions over 300ms were reported before it. Its tokens
-come from the **stored** row rather than the projection, so email and Discord-handle
-search still reach fields the projection drops.
+**The in-memory user search index** (`db.ts` `getUserIndex`) is that same
+`UserListItem` map, each entry carrying precomputed search tokens and a normalized
+name beside the row: a `getAll()` scan per keystroke cost 100ms+, and completions
+over 300ms were reported before it. The map is in uid order, so
+`getUserListItems` sorts by name before returning — the community directory renders
+its link lists straight off that order and the rankings tie-break on it.
 
 **Cache Storage is allowlist-only.** The service worker writes exactly two things
 to Cache Storage: precached build assets and SPA navigations. Every other
