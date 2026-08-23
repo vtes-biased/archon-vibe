@@ -12,16 +12,10 @@ Asserted at the HTTP boundary against a real DB and the real routes.
 from datetime import UTC, datetime
 from uuid import uuid7
 
-import jwt
 import pytest
 from httpx import AsyncClient
 from src import db
-from src.db_oauth import (
-    get_oauth_token_by_jti,
-    insert_oauth_client,
-    upsert_oauth_consent,
-)
-from src.middleware.auth import JWT_ALGORITHM, JWT_SECRET
+from src.db_oauth import insert_oauth_client, upsert_oauth_consent
 from src.models import OAuthClient, OAuthConsent, OAuthScope, User
 from src.routes.oauth import _issue_token_pair, ph
 
@@ -78,10 +72,21 @@ async def test_revoke_kills_the_lineage_and_shrugs_at_an_unknown_token(
     )
     assert response.status_code == 200
     for label, pair in (("first", first), ("second", second)):
-        for name in ("access_token", "refresh_token"):
-            claims = jwt.decode(pair[name], JWT_SECRET, algorithms=[JWT_ALGORITHM])
-            record = await get_oauth_token_by_jti(claims["jti"])
-            assert record is not None and record.revoked, f"{label} {name}"
+        response = await test_client.get(
+            "/oauth/userinfo",
+            headers={"Authorization": f"Bearer {pair['access_token']}"},
+        )
+        assert response.status_code == 401, label
+
+    # Ordered after the reads: refusing a revoked refresh token re-revokes its
+    # chain, which would repair the very state those reads check.
+    for label, pair in (("first", first), ("second", second)):
+        response = await test_client.post(
+            "/oauth/token",
+            data=credentials
+            | {"grant_type": "refresh_token", "refresh_token": pair["refresh_token"]},
+        )
+        assert response.status_code == 400, label
 
     # An unknown token is not an error, and neither is a token already revoked.
     for token in ("not-a-jwt", second["refresh_token"]):

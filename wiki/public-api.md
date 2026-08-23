@@ -157,12 +157,11 @@ shape asserted in two places
 ([hazards](hazards.md#two-implementations-of-one-gate)).
 
 **A third party only ever types one hostname.** `/oauth/token` and
-`/oauth/revoke` are the app's endpoints, but the API's vhost proxies them, and
-proxies the tournament banner route beside them. Every one of the three keeps
-the app's own path rather than a rewritten one, so `banner_path` works verbatim
-against the API host and nothing has to be kept in step. The minting flow itself
-is a member account plus the DEV role an IC grants, then a self-registered
-client: the reference page states that rather than telling a reader to ask us.
+`/oauth/revoke` are the app's endpoints, not the API's, but the API's vhost
+proxies them ([deployment](#deployment)) so minting, revoking and reading share
+one authority. The minting flow itself is a member account plus the DEV role an
+IC grants, then a self-registered client: the reference page states that rather
+than telling a reader to ask us.
 
 `/docs` and `/openapi.json` are open. The owner's "no anonymous" decision was
 about the data; a reference page nobody can read before registering is a barrier
@@ -240,10 +239,11 @@ window.
 | `limit_req` on everything else under `/v1` and on `/docs` | a separate, far more generous zone | single-row lookups; a client resolving a page of event codes bursts legitimately |
 | `limit_req_status`, `limit_conn_status` | 429 | nginx defaults to 503, which reads as "outage, retry" rather than "slow down" |
 
-Two locations are proxied to the **app** rather than the API process:
-`/oauth/token`, so minting and reading share a hostname, and the tournament
-banner path, so `banner_path` resolves. Both keep the app's path verbatim; a
-rewrite here would be a second place to change when either moves.
+Three locations are proxied to the **app** rather than the API process:
+`/oauth/token` and `/oauth/revoke`, so minting, revoking and reading share a
+hostname, and the tournament banner path, so `banner_path` resolves. All three
+keep the app's path verbatim; a rewrite here would be a second place to change
+when any of them moves.
 
 The zones are `limit_req_zone`/`limit_conn_zone` and so live in a `conf.d` file —
 they are http-context directives and cannot go in the server block. The streams
