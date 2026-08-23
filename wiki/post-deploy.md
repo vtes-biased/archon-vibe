@@ -145,7 +145,7 @@ reads `submitted` with a PR URL on `GiottoVerducci/TWD`.
 **Owes afterwards**: nothing to tell anyone — the organizers never saw the failure.
 Delete this section.
 
-## Correct the winners vekn.net already crowned wrong
+## Correct the finalists vekn.net already recorded wrong
 
 **Gated on** the commit carrying this section — *"Report the winner vekn.net crowns
 at position 1"*, findable as `git log -1 --format=%h --grep='position 1'` — which
@@ -158,21 +158,48 @@ refuses a second submission once an archon file is stored and offers no overwrit
 so each one is a manual `veknparticipant.pos` fix on vekn.net.
 
 ```sql
-SELECT "full"->>'uid', "full"->>'name', "full"->'external_ids'->>'vekn'
-FROM objects WHERE type='tournament' AND deleted_at IS NULL
-  AND "full"->>'state'='Finished' AND "full"->>'vekn_pushed_at' IS NOT NULL
-  AND jsonb_array_length(COALESCE("full"->'rounds', '[]'::jsonb)) > 0
-  AND COALESCE("full"->>'winner', '') <> ''
-  AND "full"->>'winner' IS DISTINCT FROM ("full"->'standings'->0->>'user_uid');
+WITH t AS (
+    SELECT uid, "full" AS f FROM objects
+    WHERE type='tournament' AND deleted_at IS NULL
+      AND "full"->>'state'='Finished' AND "full"->>'vekn_pushed_at' IS NOT NULL
+      AND jsonb_array_length(COALESCE("full"->'rounds', '[]'::jsonb)) > 0
+      AND COALESCE("full"->>'winner', '') <> ''
+), paid AS (
+    SELECT t.uid, array_agg(v ORDER BY v) AS paid FROM t, LATERAL (
+        SELECT e->>'user_uid' AS v
+        FROM jsonb_array_elements(t.f->'standings') WITH ORDINALITY AS q(e, n)
+        WHERE n <= 5) s GROUP BY t.uid
+), seated AS (
+    SELECT t.uid, array_agg(v ORDER BY v) AS seated FROM t, LATERAL (
+        SELECT e->>'player_uid' AS v
+        FROM jsonb_array_elements(t.f->'finals'->'seating') AS e) s GROUP BY t.uid
+)
+SELECT t.uid, t.f->>'name' AS name, t.f->'external_ids'->>'vekn' AS vekn,
+       t.f->>'winner' IS DISTINCT FROM (t.f->'standings'->0->>'user_uid') AS wrong_winner,
+       paid.paid, seated.seated
+FROM t JOIN paid USING (uid) LEFT JOIN seated USING (uid)
+WHERE paid.paid IS DISTINCT FROM seated.seated
+   OR t.f->>'winner' IS DISTINCT FROM (t.f->'standings'->0->>'user_uid');
 ```
 
 The rounds guard keeps out VEKN and ETL imports, which carry a push stamp they
 never earned here; the winner guard keeps out no-final events, which have none.
-Event 13385, *Fee Stake: Jyväskylä 9*, is the known case — Ari-Pekka Alestalo won
-the final from the fifth seat and vekn.net holds Lasse Pöyry at position 1.
+
+The old order corrupts the record **two** ways, and a winner check alone sees only
+the first. vekn.net reads the pushed field as `finalrank`: row 1 is crowned, rows
+2–5 are paid the finalist bonus. So the five rows it pays are the *preliminary*
+top five, which parts from the seated five whenever a qualifier withdrew and the
+next-ranked was promoted — the winner can still land on row 1 and the record be
+wrong about who reached the final. Comparing the two sets catches both classes.
+
+Event 13385, *Fee Stake: Jyväskylä 9*, is the known winner case — Ari-Pekka
+Alestalo won the final from the fifth seat and vekn.net holds Lasse Pöyry at
+position 1. Event 13413, *Fee Stake Melbourne 2026*, is the known finalist case —
+Nathaneal Zheng withdrew and Alan Stevenson was promoted, but vekn.net credits
+Zheng a finalist and pays Stevenson nothing.
 
 **Proves it worked**: every listed event shows its actual winner at position 1 on
-vekn.net, and — checked a day later, once the nightly batch has run — the rating
+vekn.net and its seated five at positions 1–5, and — checked a day later, once the nightly batch has run — the rating
 points have moved with the position. Whether upstream re-derives them is
 [unestablished](domain/vekn.md#never-chase-veknnets-stored-rtp), so this half is
 verified rather than assumed.
