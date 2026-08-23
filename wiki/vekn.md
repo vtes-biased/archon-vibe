@@ -90,11 +90,12 @@ Standard/CC 6, Limited/Basic 3, V5/Basic 16.
   [below](#tournaments).
 - **Member creation requires a city.** The registry refuses a create whose
   `firstname`, `lastname`, `email`, `country` or `city` is empty — `state` is the
-  one optional field — and the tournament desk form that mints most members never
-  asks for a city. `push_member` sends the country capital in place of an empty
-  one; the roster sync writes that city back on its next pull, so the local row
-  ends up holding it too. A member with no country cannot be pushed at all and
-  keeps its amber pending-sync badge.
+  one optional field, per its own `createPlayer` in `vekn-api/vekn/registry.php`
+  — and the tournament desk form that mints most members never asks for a city.
+  `push_member` sends the country capital in place of an empty one; the roster
+  sync writes that city back on its next pull, so the local row ends up holding
+  it too. A member with no country cannot be pushed at all and keeps its amber
+  pending-sync badge.
 - Open-rounds events are never pushed.
 
 ### Outage resilience

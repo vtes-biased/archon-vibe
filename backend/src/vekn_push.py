@@ -330,8 +330,7 @@ async def push_member(
     email = user.contact_email or f"{user.vekn_id}@placeholder.vekn.net"
     country = user.country or ""
 
-    # The registry refuses a create with an empty city, and the desk form that
-    # mints most members never asks for one.
+    # The registry refuses a create with an empty city.
     country_data = get_country(country) if country else None
     city = user.city or (country_data["capital"] if country_data else "")
 
