@@ -278,25 +278,5 @@ BEFORE INSERT OR UPDATE ON objects
 FOR EACH ROW
 EXECUTE FUNCTION update_objects_modified_at();
 
--- Runs before the app serves, and stays for any database that predates it: the
--- Role enum no longer accepts the old value, so a row still holding it fails to
--- decode and takes its whole user list with it.
-UPDATE objects SET "public" = jsonb_set("public", '{roles}', (
-    SELECT jsonb_agg(CASE WHEN e.v = '"Judgekin"'::jsonb THEN '"Sheriff"'::jsonb ELSE e.v END)
-    FROM jsonb_array_elements("public"->'roles') AS e(v)))
-WHERE type = 'user' AND "public"->'roles' ? 'Judgekin';
-UPDATE objects SET "member" = jsonb_set("member", '{roles}', (
-    SELECT jsonb_agg(CASE WHEN e.v = '"Judgekin"'::jsonb THEN '"Sheriff"'::jsonb ELSE e.v END)
-    FROM jsonb_array_elements("member"->'roles') AS e(v)))
-WHERE type = 'user' AND "member"->'roles' ? 'Judgekin';
-UPDATE objects SET "api" = jsonb_set("api", '{roles}', (
-    SELECT jsonb_agg(CASE WHEN e.v = '"Judgekin"'::jsonb THEN '"Sheriff"'::jsonb ELSE e.v END)
-    FROM jsonb_array_elements("api"->'roles') AS e(v)))
-WHERE type = 'user' AND "api"->'roles' ? 'Judgekin';
-UPDATE objects SET "full" = jsonb_set("full", '{roles}', (
-    SELECT jsonb_agg(CASE WHEN e.v = '"Judgekin"'::jsonb THEN '"Sheriff"'::jsonb ELSE e.v END)
-    FROM jsonb_array_elements("full"->'roles') AS e(v)))
-WHERE type = 'user' AND "full"->'roles' ? 'Judgekin';
-
 -- Note: vekn_id_counter table is no longer used.
 -- VEKN IDs are now allocated by finding the first gap >= 1000000.

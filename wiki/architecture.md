@@ -83,6 +83,48 @@ all connections via their locks, any further acquire blocks and deadlocks.
   fixed exemplar (object plus `avatars`/`banners`/`push_subscriptions` side rows,
   since there is no FK cascade).
 
+### Stored-value migrations
+
+`objects` is schemaless, so there are no *schema* migrations — but a field's
+meaning lives in the code that decodes it, and `msgspec` decodes strictly. When a
+stored value's shape or vocabulary changes, every row written under the old
+reading raises on decode, and it raises for the whole list rather than the row.
+
+`backend/src/migrations.py` is the one place those rewrites live: an ordered
+tuple of entries, each a guard query naming the rows that still hold the old
+shape and a function mutating one `full` document. The runner takes them in
+order, locks each row `FOR UPDATE` in its **own** transaction and re-saves it
+through `save_object`, which recomputes all four projections — hand-written
+per-column SQL would restate `compute_public/member/api/full` and put one fact in
+two places, and a single wrapping transaction would stamp every row with the same
+`CURRENT_TIMESTAMP`, which a catch-up cursor's strict `modified_at > since` can
+split across.
+
+The lifespan runs it right after `init_db`, before the app serves — **not** from
+`init_db` itself, which fourteen ops scripts call and which a report-only run
+must never mutate through. A failure propagates and the process does not serve:
+the rows an entry targets are exactly the ones the running code cannot read, so
+serving half-migrated restores the outage the mechanism removes, unbounded and
+quiet instead of bounded and loud. Rolling the deploy back is the remedy, and it
+is always available — an entry ships in the commit that breaks the old shape, so
+the previous build still decodes it. `python -m backend.src.migrations` runs the
+same guards without the app, reporting by default and rewriting on `--apply`;
+that is how an entry is rehearsed against a copy of production before it lands.
+
+Nothing in the tree records that an entry has run, so its proof is a section in
+[post-deploy](post-deploy.md) and the two die in one commit —
+`just migration-pairing` ([dev](dev.md#lint-gates)) fails on either half
+outliving the other. That death condition is what an entry is for and what keeps
+the per-boot guard queries near zero. `_stamp_missing_event_codes`, which runs
+beside it, is deliberately not an entry: it mints a missing value rather than
+repairing an unreadable one, nothing breaks while a code is absent, and it has no
+condition under which it would ever be deleted.
+
+The mechanism is for **bounded** row counts — tens to low thousands. A pre-serve
+migration extends deploy downtime by its own runtime, so a corpus-scale rewrite
+stays a post-deploy script with a stated, accepted window; `reproject_public.py`
+is the standing example.
+
 ## Event system
 
 **Business events** — domain actions like `Tournament.RoundStart`, processed by

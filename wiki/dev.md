@@ -27,7 +27,7 @@ just dev-reset # reset the dev database
 
 `just lint` auto-fixes formatting, then runs the checks nothing can fix for you;
 `just lint-check` is the read-only half and is what `just test` calls. Both end on
-the same six gates:
+the same seven gates:
 
 - `just permission-drift` — a role literal used to gate outside the engine's
   capability table.
@@ -51,6 +51,15 @@ the same six gates:
 - `just public-api-isolation` — the app naming the public API, or the API
   importing the app's machinery ([public-api](public-api.md#isolation)). It runs
   in CI too, unlike the two gates above it.
+- `just migration-pairing` — a stored-value migration with no proof section in
+  [post-deploy](post-deploy.md), or a section proving an entry that no longer
+  exists ([architecture](architecture.md#stored-value-migrations)). Nothing in
+  the tree records that an entry ran, so the section is the only proof it reached
+  a database, and the pairing is what makes the entry die in the commit that
+  retires it. It parses `migrations.py` with `ast` rather than importing it —
+  importing would pull in the engine — and fails when that parse stops matching,
+  which is what keeps an empty result from passing everything in silence. It runs
+  in CI, on the lint job.
 - `just model-drift` — `models.py`, `types.ts` and the engine disagreeing on a
   field name or an enum value ([sync](sync.md#adding-a-new-object-type)). Nothing
   generates one from another. It compares names and values, not types: `datetime`

@@ -171,6 +171,7 @@ lint-check:
     just locale-parity
     just public-api-isolation
     just model-drift
+    just migration-pairing
 
 # Fail when a role literal is used for gating outside the engine's capability
 # table — the drift this repo's permission model keeps re-growing without it.
@@ -203,6 +204,12 @@ public-api-isolation:
 model-drift:
     uv run python3 scripts/check_model_drift.py
 
+# Fail when a stored-value migration has no proof section in wiki/post-deploy.md,
+# or a section proves an entry that no longer exists — the pairing is what makes
+# an entry die in the commit that retires its proof.
+migration-pairing:
+    uv run python3 scripts/check_migration_pairing.py
+
 # Lint and auto-fix all code
 lint:
     uv run ruff check --fix . && uv run ruff format .
@@ -214,6 +221,7 @@ lint:
     just locale-parity
     just public-api-isolation
     just model-drift
+    just migration-pairing
 
 # Warn (never fail) when the hand-synced backup scripts drift from server-setup's
 # copies (script headers document the contract). Comment wording and the

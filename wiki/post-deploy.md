@@ -16,34 +16,54 @@ that go/no-go.** Work carrying judgment — reviewing a dedup's output, diffing 
 of Fame membership either side of a backfill — stays a board line that happens to
 have a production step. Without that boundary this page becomes a second board.
 
+A section whose first line is **Migration** followed by a slug is the standing
+proof of an entry in `backend/src/migrations.py`
+([architecture](architecture.md#stored-value-migrations)). It has nothing to
+run — the entry rewrote the rows before the process served — but its queries are
+the only record that the rewrite reached a given database, so it is deleted only
+once **every** long-lived one answers 0, and the entry it names dies in the same
+commit. `just migration-pairing` fails on either half outliving the other.
+
 **Every item names the commit that gates it**, so `git tag --contains <sha>`
 answers whether a given deploy has made it actionable — the same check
 `/post-deploy` already runs against a feedback issue's fix. An item states what
 gates it and why, what to run, what proves it worked, and what it owes afterwards:
 people to tell, and the wiki text that dies with it.
 
-## Collapse the stored link moderation
+## Prove the Judgekin → Sheriff rename applied
 
-**Gated on** `2d6190f`, which replaced the `{status, scope, by, at}` moderation
-record on a community link with a single value. Until it runs, a row still
-carrying the record shape raises on every read of that member (`User` decodes
-strictly) **and every hidden link on it is served to everyone**: both filters
-compare `moderation` against a plain string, and a record matches neither. This
-is a repair, not a tidy-up — it runs **immediately after the deploy**, ahead of
-the `api` backfill below. Running it against the earlier build would have that
-build write the record shape straight back.
+**Migration** `rename-judgekin-to-sheriff`
 
-**Run** from the deployed tree, count first, then apply:
+**Gated on** `GATING_SHA`, which moved the rewrite out of `schema.sql` into the
+lifespan's migration run. There is **nothing to run**: `Role` decodes strictly,
+so a row still holding the old value raises on every read of any user list
+containing it, and the entry rewrites those rows before the process serves.
 
-```sh
-/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/collapse_link_moderation.py
-/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/collapse_link_moderation.py --apply
+**Proves it worked**: 0 on beta *and* production.
+
+```sql
+SELECT count(*) FROM objects WHERE type = 'user'
+  AND ("public" @> '{"roles":["Judgekin"]}' OR "member" @> '{"roles":["Judgekin"]}'
+    OR "api" @> '{"roles":["Judgekin"]}' OR "full" @> '{"roles":["Judgekin"]}');
 ```
 
-Only the rows the app cannot decode are touched, so nothing else can be writing
-them. Idempotent.
+**Owes afterwards**: nothing to tell anyone — the badge already read *Sheriff*.
+The legacy-archon role maps still key on `Judgekin` on purpose: the daily merge
+reads it from the old database and must keep granting the role. Delete this
+section and its entry.
 
-**Proves it worked**: both return 0.
+## Prove the link-moderation collapse applied
+
+**Migration** `collapse-link-moderation`
+
+**Gated on** `GATING_SHA`, which replaced the post-deploy collapse script with a
+lifespan migration. There is **nothing to run**. Until the entry has run against
+a database, a row still carrying the `{status, scope, by, at}` record raises on
+every read of that member (`User` decodes strictly) **and every hidden link on it
+is served to everyone**: both filters compare `moderation` against a plain
+string, and a record matches neither.
+
+**Proves it worked**: 0 on beta *and* production, for both columns.
 
 ```sql
 SELECT count(*) FROM objects WHERE type = 'user'
@@ -54,7 +74,7 @@ SELECT count(*) FROM objects WHERE type = 'user'
 
 **Owes afterwards**: nothing to tell anyone — every moderation decision survives
 the collapse, and the record it was stored in was never displayed. Delete this
-section.
+section and its entry.
 
 ## Backfill the `api` projection
 
@@ -92,26 +112,3 @@ SELECT count(*) FROM objects WHERE type = 'user'
 
 **Owes afterwards**: nothing to tell anyone — no consumer can reach the column
 until the API app ships. Delete this section.
-
-## Confirm the Sheriff role rename applied
-
-**Gated on** `c92fe3f`, which renamed the stored `Judgekin` role to `Sheriff`.
-There is **nothing to run**: the rewrite is four guarded `UPDATE`s at the end of
-`schema.sql`, so `init_db` applies it on startup, before the process serves a
-request. That ordering is the point — `Role` decodes strictly, so a row still
-holding the old value would raise on every read of any list containing it. The
-statements stay in `schema.sql` afterwards, like the `ALTER`s above them: any
-database predating this deploy still needs them.
-
-**Proves it worked**: 0 on production.
-
-```sql
-SELECT count(*) FROM objects WHERE type = 'user'
-  AND ("public" @> '{"roles":["Judgekin"]}' OR "member" @> '{"roles":["Judgekin"]}'
-    OR "api" @> '{"roles":["Judgekin"]}' OR "full" @> '{"roles":["Judgekin"]}');
-```
-
-**Owes afterwards**: nothing to tell anyone — the badge already read *Sheriff*.
-The legacy-archon role maps still key on `Judgekin` on purpose: the daily merge
-reads it from the old database and must keep granting the role. Delete this
-section.

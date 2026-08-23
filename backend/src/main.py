@@ -43,6 +43,7 @@ from .db import (
 from .db_oauth import cleanup_expired_oauth_codes, cleanup_expired_oauth_tokens
 from .engine_errors import EngineRejection
 from .middleware.auth import get_current_user
+from .migrations import run_migrations
 from .models import (
     DataLevel,
     ObjectType,
@@ -362,6 +363,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _shutdown_event = asyncio.Event()
     _install_fast_shutdown_signals()
     await init_db()
+    await run_migrations()
     await _stamp_missing_event_codes()
 
     if os.getenv("DISCORD_CLIENTID"):

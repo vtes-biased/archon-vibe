@@ -398,6 +398,18 @@ external-proxy route — feedback, TWDA, web push ([vekn](vekn.md#outage-resilie
 costed with `cursor_tuple_fraction` and can report a different scan than the one
 that runs ([sync](sync.md#streaming)).
 
+**A stored-value migration that raises takes the backend down**, and that is the
+chosen behaviour, not an oversight — half-migrated serving restores the outage
+the mechanism removes ([architecture](architecture.md#stored-value-migrations)).
+Three things follow. An entry lands only after being run against a **copy of
+production data**, not just CI: the bot's lightbulb v2→v3 migration crash-looped
+69 times in production while CI stayed green ([testing](testing.md#traps)).
+Its [post-deploy](post-deploy.md) section is deleted only once **every**
+long-lived database answers 0 — beta included; prod-only proof strands beta on
+the old values with nothing left in the tree to re-apply. And the row count must
+be bounded, tens to low thousands: a pre-serve migration extends deploy downtime
+by its own runtime, so a corpus-scale rewrite stays a post-deploy script.
+
 **A backend-first deploy is safe by design**: an unknown snapshot type is counted
 toward the `eof` total and ignored. Do not "fix" that by counting only recognised
 types ([sync](sync.md#adding-a-new-object-type)).

@@ -35,6 +35,14 @@ in `objects` with `public`/`member`/`full` JSONB columns written at write time,
 plus `api` for the public read API. No ORM, no schema migrations, no read-time
 per-viewer filtering.
 
+**Stored *values* still migrate.** A schemaless table removes the schema
+migration, not the one a changed meaning forces: strict decoding makes a stale
+row raise for its whole list. Those rewrites live in one ordered, self-guarding
+place, run before the app serves and paired with the proof that retires them
+([architecture](architecture.md#stored-value-migrations)) — never in `schema.sql`,
+which every ops script applies, and never in a script run after the deploy, which
+buys the window back.
+
 **No pagination. Anywhere.** No pages, no cursors, no `limit`/`offset` — a
 consumer never assembles a result from parts. The rare online-only REST reads
 return the whole role-scoped set and filter client-side; a surface that can return
