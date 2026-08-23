@@ -23,7 +23,7 @@ server (PyO3) behave identically.
 | `self_organized_rounds` | bool | players seat their own pods |
 | `standings_mode` | Private / Cutoff / Top 10 / Public | display default during play |
 | `decklists_mode` | Winner / Finalists / All | applied after finish |
-| `round_time`, `finals_time` | seconds, 0 = none | the shared timer |
+| `round_time`, `finals_time` | seconds; `round_time` 0 = untimed, `finals_time` 0 = use `round_time` | the shared timer |
 | `table_rooms` | named rooms over table ranges | labels in seating, print and player views |
 
 **Ranking eligibility** — the engine's `ranking_eligibility` is the single

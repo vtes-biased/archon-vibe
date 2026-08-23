@@ -89,70 +89,18 @@ def _referenced(node, components: dict[str, dict], seen: set[str]) -> None:
             _referenced(value, components, seen)
 
 
-# A missing key here is a KeyError at import: a projection that drops a field
-# must drop its documentation with it.
-_FIELD_DOCS = {
+# Appended to what the model already says, never replacing it: what is left here
+# is true of this API rather than of the stored field. A missing key — or a field
+# with no description of its own — is a KeyError at import.
+_API_NOTES = {
     "Tournament": {
-        "country": "ISO 3166-1 alpha-2 code of the host country. Empty when the "
-        "event predates the field, which many imported records do.",
-        "timezone": "IANA name, such as `Europe/Stockholm`. The one to read "
-        "`start` and `finish` in.",
-        "start": "Local start, ISO 8601 and carrying no offset. Pair it with "
-        "`timezone` to get an instant.",
-        "finish": "Local finish, same convention as `start`.",
-        "rank": "Championship level. Empty for an ordinary event.",
-        "event_code": "The event's permanent public handle, usable in place of "
-        "the uid. Empty on records imported from an archive.",
-        "banner_path": "Path to the event's image on this host, already "
-        "versioned. Append it to this API's base URL. Null when there is none.",
-        "table_extra_time": "Extra seconds granted per table, keyed by the "
-        "table's index within its round as a string.",
-        "external_ids": "This event's id on other systems, keyed by system "
-        "name. `vekn` is a vekn.net event id.",
-        "winner": "Uid of the winning member, null while undecided.",
-        "league_uid": "Uid of the league this event counts towards, null if none.",
-        "organizers_uids": "Uids of the members organizing the event.",
-        "max_rounds": "Preliminary rounds planned. 0 means it was never set.",
-        "round_time": "Round length in seconds. 0 means untimed.",
-        "finals_time": "Finals length in seconds. 0 means untimed.",
-    },
-    "Table": {
-        "organized_by": "Uid of the player who seated this table themselves, in "
-        "a tournament that allows it. Null on a table the organizer seated.",
-    },
-    "FinalsTable": {
-        "organized_by": "Always null: a final is never self-organized. The "
-        "field is inherited from the preliminary table shape.",
-    },
-    "DeckObject": {
-        "cards": "Card id to count. Ids are krcg's, resolvable at "
-        "https://v4.api.krcg.org.",
-        "attribution": "Designer credit: a VEKN id, the sentinel `twda` when "
-        "the credit lives in the archive rather than with us, or null for "
-        "anonymous.",
-        "round": "The round this deck was played in, null when it is the "
-        "event's single registered deck.",
-        "tournament_uid": "Uid of the tournament the deck was played in.",
-        "user_uid": "Uid of the member who played it.",
+        "banner_path": "Append it to this API's base URL.",
+        "event_code": "Usable in place of the uid on this API's routes.",
     },
     "User": {
-        "vekn_id": "The member's VEKN number, and the only way to address them here.",
-        "country": "ISO 3166-1 alpha-2 code of the member's country.",
-        "wins": "Uids of the tournaments this member won.",
-        "roles": "Organizational roles held, if any.",
+        "vekn_id": "The only way to address a member here: this API publishes no "
+        "names.",
     },
-    "CommunityLink": {
-        "languages": "ISO 639-1 codes. Empty means the link is not language-specific.",
-        "country": "ISO 3166-1 alpha-2 code of the country the link serves.",
-    },
-    "CategoryRating": {
-        "total": "Rating points across the listed tournaments.",
-        "tournaments": "Every rated result contributing to the total.",
-    },
-}
-
-_ENUM_DOCS = {
-    "TournamentRank": "An empty string is an ordinary event, which is most of them.",
 }
 
 
@@ -176,12 +124,10 @@ def _build() -> dict[str, dict]:
         },
         "required": ["vekn_id", "link"],
     }
-    for name, fields in _FIELD_DOCS.items():
+    for name, fields in _API_NOTES.items():
         properties = components[name]["properties"]
-        for field, text in fields.items():
-            properties[field]["description"] = text
-    for name, text in _ENUM_DOCS.items():
-        components[name]["description"] = text
+        for field, note in fields.items():
+            properties[field]["description"] += " " + note
     for name, example in EXAMPLES.items():
         components[name]["example"] = example
     components.update(_STREAM_LINES)

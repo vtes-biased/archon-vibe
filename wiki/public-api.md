@@ -183,9 +183,19 @@ payload the API never emits is a promise it does not keep.
 **Every example is a real row**, captured from the corpus and run through
 `access_levels` at capture time, because a shape full of nulls answers no
 question a consumer actually has (`examples.py`; the league is constructed, there
-being none to capture). Field documentation lives in `schemas.py` beside them and
-is keyed by component and field name, so **a projection that drops a field and
-leaves its documentation behind is a `KeyError` at import**, not a stale sentence.
+being none to capture).
+
+**A field documents itself**: the meaning lives on the Struct as a
+`msgspec.Meta` description — what a dict's keys are, which standard a code obeys,
+what a sentinel like an empty `rank` means — and `schema_components()` carries it
+into the reference, so pruning a field takes its documentation with it and the two
+cannot drift. `schemas.py` adds only what is true of *this API* rather than of
+the stored field — that `banner_path` is relative to the API's base URL, that
+`vekn_id` is the only way to address a member here — and **appends** it rather
+than replacing the field's own sentence, which is what kept the two from saying
+the same thing twice. Those few remain keyed by component and field name, so
+**one left behind by a projection that dropped its field is a `KeyError` at
+import**, not a stale sentence.
 
 A stream's body is not one JSON document, so its response schema is a string with
 a worked example, and the line union lives beside it as a `{Name}Line` component.

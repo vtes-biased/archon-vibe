@@ -5,9 +5,13 @@ import json
 import secrets
 from datetime import datetime
 from enum import StrEnum
+from typing import Annotated
 
 import msgspec
 from archon_engine import PyEngine
+
+Uid = Annotated[str, msgspec.Meta(description="UUID v7.")]
+Instant = Annotated[datetime, msgspec.Meta(description="UTC instant.")]
 
 
 class ObjectType(StrEnum):
@@ -137,34 +141,66 @@ CONTENT_LINK_TYPES: frozenset[CommunityLinkType] = frozenset(
 
 
 class LinkModeration(msgspec.Struct, kw_only=True, frozen=True):
-    status: str  # "hidden" | "promoted"
-    by: str
-    at: datetime
-    scope: str | None = None  # promoted only: "global" (IC) | "national" (NC)
+    status: Annotated[str, msgspec.Meta(description='Either "hidden" or "promoted".')]
+    by: Annotated[str, msgspec.Meta(description="Uid of the moderator who acted.")]
+    at: Instant
+    scope: Annotated[
+        str | None,
+        msgspec.Meta(
+            description='Reach of a promotion: "global" (IC) or "national" (NC). '
+            "Null when the status is hidden."
+        ),
+    ] = None
 
 
 class CommunityLink(msgspec.Struct, kw_only=True, frozen=True):
     type: CommunityLinkType
     url: str
     label: str = ""
-    # ISO 639-1 codes; empty = shows under every filter.
-    languages: list[str] = msgspec.field(default_factory=list)
-    # The country the link serves; absent falls back to the owner's.
-    country: str | None = None
+    languages: Annotated[
+        list[str],
+        msgspec.Meta(
+            description="ISO 639-1 codes. Empty means the link is not "
+            "language-specific."
+        ),
+    ] = msgspec.field(default_factory=list)
+    country: Annotated[
+        str | None,
+        msgspec.Meta(
+            description="ISO 3166-1 alpha-2 code of the country the link serves. "
+            "Null falls back to the owner's country."
+        ),
+    ] = None
     moderation: LinkModeration | None = None
 
 
 class TimerState(msgspec.Struct, kw_only=True):
-    started_at: datetime | None = None
-    elapsed_before_pause: float = 0.0
+    started_at: Annotated[
+        datetime | None,
+        msgspec.Meta(
+            description="UTC instant the timer last started running. Null while "
+            "it has never run."
+        ),
+    ] = None
+    elapsed_before_pause: Annotated[
+        float, msgspec.Meta(description="Seconds accumulated before the last pause.")
+    ] = 0.0
     paused: bool = True
 
 
 class Announcement(msgspec.Struct, kw_only=True):
-    id: str  # uuid7 hex, the client dedup/dismissal key (not a BaseObject uid)
+    id: Annotated[
+        str,
+        msgspec.Meta(
+            description="uuid7 hex, the client's dedup and dismissal key. Not a "
+            "BaseObject uid."
+        ),
+    ]
     body: str
-    created_at: datetime
-    author_uid: str
+    created_at: Instant
+    author_uid: Annotated[
+        str, msgspec.Meta(description="Uid of the member who posted it.")
+    ]
     author_name: str = ""
 
 
@@ -176,63 +212,118 @@ class RatingCategory(StrEnum):
 
 
 class TournamentRatingEntry(msgspec.Struct, kw_only=True, frozen=True):
-    tournament_uid: str
+    tournament_uid: Annotated[
+        str, msgspec.Meta(description="Uid of the tournament this result is from.")
+    ]
     tournament_name: str
-    date: str  # ISO date
+    date: Annotated[
+        str,
+        msgspec.Meta(description="The tournament's start date, ISO 8601 `YYYY-MM-DD`."),
+    ]
     player_count: int
-    rank: str  # TournamentRank value
+    rank: Annotated[
+        str,
+        msgspec.Meta(description="TournamentRank value, empty for an ordinary event."),
+    ]
     vp: float
     gw: int
-    finalist_position: int  # 0=none, 1=winner, 2=runner-up
+    finalist_position: Annotated[
+        int,
+        msgspec.Meta(description="0 not a finalist, 1 winner, 2 runner-up."),
+    ]
     points: int
-    # VEKN 3.7.5 band: winner 1, other finalists tied 2, then non-finalists.
-    # 0 = not yet backfilled on rows written before the field existed.
-    position: int = 0
+    position: Annotated[
+        int,
+        msgspec.Meta(
+            description="VEKN 3.7.5 band: winner 1, other finalists tied 2, then "
+            "non-finalists. 0 on rows written before the field existed."
+        ),
+    ] = 0
 
 
 class CategoryRating(msgspec.Struct, kw_only=True):
-    total: int = 0
-    tournaments: list[TournamentRatingEntry] = msgspec.field(default_factory=list)
+    total: Annotated[
+        int, msgspec.Meta(description="Rating points across the listed tournaments.")
+    ] = 0
+    tournaments: Annotated[
+        list[TournamentRatingEntry],
+        msgspec.Meta(description="Every rated result contributing to the total."),
+    ] = msgspec.field(default_factory=list)
 
 
 class BaseObject(msgspec.Struct, kw_only=True):
-    uid: str  # UUID v7
-    modified: datetime
-    deleted_at: datetime | None = None
+    uid: Uid
+    modified: Annotated[
+        datetime, msgspec.Meta(description="UTC instant of the last write.")
+    ]
+    deleted_at: Annotated[
+        datetime | None,
+        msgspec.Meta(description="UTC instant of the soft delete. Null while live."),
+    ] = None
 
 
 class AuthMethod(msgspec.Struct, kw_only=True):
-    uid: str  # UUID v7
-    modified: datetime
-    user_uid: str
+    uid: Uid
+    modified: Annotated[
+        datetime, msgspec.Meta(description="UTC instant of the last write.")
+    ]
+    user_uid: Annotated[str, msgspec.Meta(description="Uid of the member it logs in.")]
     method_type: AuthMethodType
-    identifier: str  # email address, discord ID, or passkey credential ID
-    credential_hash: str | None = None  # password hash or passkey public key
+    identifier: Annotated[
+        str,
+        msgspec.Meta(
+            description="Email address, Discord snowflake id, or WebAuthn "
+            "credential id, per method_type."
+        ),
+    ]
+    credential_hash: Annotated[
+        str | None,
+        msgspec.Meta(description="Password hash or passkey public key."),
+    ] = None
     verified: bool = False
-    created_at: datetime | None = None
-    last_used_at: datetime | None = None
-    sign_count: int = 0  # WebAuthn signature counter
+    created_at: Annotated[
+        datetime | None, msgspec.Meta(description="UTC instant of first use.")
+    ] = None
+    last_used_at: Annotated[
+        datetime | None, msgspec.Meta(description="UTC instant of the last login.")
+    ] = None
+    sign_count: Annotated[
+        int, msgspec.Meta(description="WebAuthn signature counter.")
+    ] = 0
 
 
 class User(BaseObject, kw_only=True):
     name: str
-    country: str | None = None
-    vekn_id: str | None = None
+    country: Annotated[
+        str | None,
+        msgspec.Meta(description="ISO 3166-1 alpha-2 code of the member's country."),
+    ] = None
+    vekn_id: Annotated[
+        str | None, msgspec.Meta(description="The member's VEKN number.")
+    ] = None
     city: str | None = None
-    city_geoname_id: int | None = None
+    city_geoname_id: Annotated[
+        int | None, msgspec.Meta(description="GeoNames id of the city.")
+    ] = None
     state: str | None = None
     nickname: str | None = None
-    roles: list[Role] = msgspec.field(default_factory=list)
+    roles: Annotated[
+        list[Role], msgspec.Meta(description="Organizational roles held, if any.")
+    ] = msgspec.field(default_factory=list)
 
     avatar_path: str | None = None
 
-    # promo_uid -> remaining copies; server-written only (promo_stock.recompute),
-    # full projection only.
-    promo_stock: dict[str, int] = msgspec.field(default_factory=dict)
+    # server-written only (promo_stock.recompute), full projection only.
+    promo_stock: Annotated[
+        dict[str, int],
+        msgspec.Meta(description="Promo uid to copies the member still holds."),
+    ] = msgspec.field(default_factory=dict)
 
     contact_email: str | None = None
     contact_discord: str | None = None
-    discord_id: str | None = None
+    discord_id: Annotated[
+        str | None, msgspec.Meta(description="Discord snowflake id.")
+    ] = None
     contact_phone: str | None = None
     phone_is_whatsapp: bool = False
 
@@ -243,27 +334,42 @@ class User(BaseObject, kw_only=True):
 
     community_links: list[CommunityLink] = msgspec.field(default_factory=list)
 
-    coopted_by: str | None = None
-    coopted_at: datetime | None = None
+    coopted_by: Annotated[
+        str | None, msgspec.Meta(description="Uid of the member who co-opted them.")
+    ] = None
+    coopted_at: Annotated[datetime | None, msgspec.Meta(description="UTC.")] = None
 
     # not a soft-delete; history and ratings stay live.
-    deceased_at: datetime | None = None
+    deceased_at: Annotated[
+        datetime | None,
+        msgspec.Meta(description="UTC instant the in-memoriam marker was set."),
+    ] = None
     deceased_by_uid: str | None = None  # audit only; full projection only
 
     vekn_synced: bool = False
-    vekn_synced_at: datetime | None = None
-    local_modifications: set[str] = msgspec.field(
-        default_factory=set
-    )  # fields never overwritten by VEKN sync
+    vekn_synced_at: Annotated[
+        datetime | None, msgspec.Meta(description="UTC instant of the last VEKN sync.")
+    ] = None
+    local_modifications: Annotated[
+        set[str],
+        msgspec.Meta(description="User field names never overwritten by VEKN sync."),
+    ] = msgspec.field(default_factory=set)
 
-    vekn_prefix: str | None = None
+    vekn_prefix: Annotated[
+        str | None,
+        msgspec.Meta(
+            description="VEKN id prefix this member administers members under."
+        ),
+    ] = None
     calendar_token: str | None = None
 
     constructed_online: CategoryRating | None = None
     constructed_offline: CategoryRating | None = None
     limited_online: CategoryRating | None = None
     limited_offline: CategoryRating | None = None
-    wins: list[str] = msgspec.field(default_factory=list)
+    wins: Annotated[
+        list[str], msgspec.Meta(description="Uids of the tournaments this member won.")
+    ] = msgspec.field(default_factory=list)
 
 
 class Score(msgspec.Struct, kw_only=True, frozen=True):
@@ -281,9 +387,14 @@ class Sanction(BaseObject, kw_only=True):
     subcategory: SanctionSubcategory | None = None
     round_number: int | None = None
     description: str
-    issued_at: datetime
-    expires_at: datetime | None = None  # None = permanent
-    lifted_at: datetime | None = None
+    issued_at: Instant
+    expires_at: Annotated[
+        datetime | None, msgspec.Meta(description="UTC. Null means permanent.")
+    ] = None
+    lifted_at: Annotated[
+        datetime | None,
+        msgspec.Meta(description="UTC instant it was lifted. Null while it stands."),
+    ] = None
     lifted_by_uid: str | None = None
 
 
@@ -302,13 +413,35 @@ class League(BaseObject, kw_only=True):
     name: str
     kind: LeagueKind = LeagueKind.LEAGUE
     standings_mode: LeagueStandingsMode = LeagueStandingsMode.RTP
-    format: str | None = None  # TournamentFormat value or None = any
-    country: str | None = None  # None = worldwide
-    start: datetime | None = None
-    finish: datetime | None = None  # None = ongoing
+    format: Annotated[
+        str | None,
+        msgspec.Meta(description="TournamentFormat value. Null accepts any format."),
+    ] = None
+    country: Annotated[
+        str | None,
+        msgspec.Meta(description="ISO 3166-1 alpha-2 code. Null means worldwide."),
+    ] = None
+    start: Annotated[
+        datetime | None,
+        msgspec.Meta(
+            description="Local opening of the league window, ISO 8601 and "
+            "carrying no offset."
+        ),
+    ] = None
+    finish: Annotated[
+        datetime | None,
+        msgspec.Meta(
+            description="Local close, same convention as `start`. Null means ongoing."
+        ),
+    ] = None
     description: str = ""
-    organizers_uids: list[str] = msgspec.field(default_factory=list)
-    parent_uid: str | None = None
+    organizers_uids: Annotated[
+        list[str], msgspec.Meta(description="Uids of the members running the league.")
+    ] = msgspec.field(default_factory=list)
+    parent_uid: Annotated[
+        str | None,
+        msgspec.Meta(description="Uid of the meta-league this one belongs to."),
+    ] = None
     open_to_country_princes: bool = False  # attach-only; inert without a country
 
 
@@ -327,6 +460,8 @@ class TournamentFormat(StrEnum):
 
 
 class TournamentRank(StrEnum):
+    """An empty string is an ordinary event, which is most of them."""
+
     BASIC = ""
     NC = "National Championship"
     CC = "Continental Championship"
@@ -335,13 +470,41 @@ class TournamentRank(StrEnum):
 class TournamentMinimal(BaseObject, kw_only=True):
     name: str
     format: TournamentFormat = TournamentFormat.Standard
-    rank: TournamentRank = TournamentRank.BASIC
+    rank: Annotated[TournamentRank, msgspec.Meta(description="Championship level.")] = (
+        TournamentRank.BASIC
+    )
     online: bool = False
-    start: datetime | None = None
-    finish: datetime | None = None
-    timezone: str = "UTC"
-    country: str | None = None
-    league_uid: str | None = None
+    start: Annotated[
+        datetime | None,
+        msgspec.Meta(
+            description="Local start, ISO 8601 and carrying no offset. Pair it "
+            "with `timezone` to get an instant."
+        ),
+    ] = None
+    finish: Annotated[
+        datetime | None,
+        msgspec.Meta(description="Local finish, same convention as `start`."),
+    ] = None
+    timezone: Annotated[
+        str,
+        msgspec.Meta(
+            description="IANA name, such as `Europe/Stockholm`. The one to read "
+            "`start` and `finish` in."
+        ),
+    ] = "UTC"
+    country: Annotated[
+        str | None,
+        msgspec.Meta(
+            description="ISO 3166-1 alpha-2 code of the host country. Empty when "
+            "the event predates the field, which many imported records do."
+        ),
+    ] = None
+    league_uid: Annotated[
+        str | None,
+        msgspec.Meta(
+            description="Uid of the league this event counts towards, null if none."
+        ),
+    ] = None
     state: TournamentState = TournamentState.PLANNED
 
 
@@ -364,7 +527,9 @@ class Room(msgspec.Struct, kw_only=True):
 
 
 class TournamentConfig(TournamentMinimal, kw_only=True):
-    organizers_uids: list[str] = msgspec.field(default_factory=list)
+    organizers_uids: Annotated[
+        list[str], msgspec.Meta(description="Uids of the members organizing the event.")
+    ] = msgspec.field(default_factory=list)
     venue: str = ""
     venue_url: str = ""
     address: str = ""
@@ -375,9 +540,15 @@ class TournamentConfig(TournamentMinimal, kw_only=True):
     description: str = ""
     standings_mode: StandingsMode = StandingsMode.PRIVATE
     decklists_mode: DeckListsMode = DeckListsMode.WINNER
-    max_rounds: int = 0
-    # Soft cap (0 = none): the UI warns past it, never blocks; no waitlist.
-    max_players: int = 0
+    max_rounds: Annotated[
+        int,
+        msgspec.Meta(
+            description="Preliminary rounds planned. 0 means it was never set."
+        ),
+    ] = 0
+    max_players: Annotated[
+        int, msgspec.Meta(description="Soft cap on registrations. 0 means none.")
+    ] = 0
     # House (non-VEKN) event: per-player cap from a shared pool, never pushed to
     # VEKN/ratings/RTP. Decoupled from max_rounds, which VEKN-push forces to 2-4.
     open_rounds: bool = False
@@ -385,8 +556,15 @@ class TournamentConfig(TournamentMinimal, kw_only=True):
         False  # open rounds: registered players may seat their own pod
     )
     table_rooms: list[Room] = msgspec.field(default_factory=list)
-    round_time: int = 0  # seconds, 0 = no timer
-    finals_time: int = 0  # seconds, 0 = use round_time
+    round_time: Annotated[
+        int, msgspec.Meta(description="Round length in seconds. 0 means untimed.")
+    ] = 0
+    finals_time: Annotated[
+        int,
+        msgspec.Meta(
+            description="Finals length in seconds. 0 falls back to `round_time`."
+        ),
+    ] = 0
 
 
 class PlayerState(StrEnum):
@@ -409,17 +587,35 @@ class Player(msgspec.Struct, kw_only=True):
     user_uid: str | None = None
     state: PlayerState = PlayerState.REGISTERED
     payment_status: PaymentStatus = PaymentStatus.PENDING
-    toss: int = 0  # non-zero when draws for seeding finals
-    result: Score = Score()  # aggregated score, used when no round detail (VEKN sync)
+    toss: Annotated[
+        int, msgspec.Meta(description="Draw for finals seeding. 0 means no draw.")
+    ] = 0
+    result: Annotated[
+        Score,
+        msgspec.Meta(
+            description="Aggregated score, used when there is no round detail."
+        ),
+    ] = Score()
     finalist: bool = False
     display_name: str | None = None
-    non_competing: bool = False  # proxy stand-in; excluded from rank/RTP/finals
+    non_competing: Annotated[
+        bool,
+        msgspec.Meta(description="Proxy stand-in: excluded from rank, RTP and finals."),
+    ] = False
 
 
 class Seat(msgspec.Struct, kw_only=True):
-    player_uid: str
+    player_uid: Annotated[
+        str, msgspec.Meta(description="Uid of the member seated here.")
+    ]
     result: Score = Score()
-    judge_uid: str = ""  # set if a judge scored this seat; players can't edit it then
+    # players can't edit a seat a judge has scored
+    judge_uid: Annotated[
+        str,
+        msgspec.Meta(
+            description="Uid of the judge who scored the seat. Empty if none."
+        ),
+    ] = ""
 
 
 class TableState(StrEnum):
@@ -431,7 +627,9 @@ class TableState(StrEnum):
 
 
 class ScoreOverride(msgspec.Struct, kw_only=True):
-    judge_uid: str
+    judge_uid: Annotated[
+        str, msgspec.Meta(description="Uid of the judge who overrode the score.")
+    ]
     comment: str = ""
 
 
@@ -439,30 +637,67 @@ class Table(msgspec.Struct, kw_only=True):
     seating: list[Seat]
     state: TableState = TableState.IN_PROGRESS
     override: ScoreOverride | None = None
-    organized_by: str | None = None
+    organized_by: Annotated[
+        str | None,
+        msgspec.Meta(
+            description="Uid of the player who seated this table themselves, in a "
+            "tournament that allows it. Null on a table the organizer seated."
+        ),
+    ] = None
 
 
 class FinalsTable(Table, kw_only=True):
     seating: list[Seat]
-    seed_order: list[str]
+    organized_by: Annotated[
+        str | None,
+        msgspec.Meta(
+            description="Always null: a final is never self-organized. The field "
+            "is inherited from the preliminary table shape."
+        ),
+    ] = None
+    seed_order: Annotated[
+        list[str], msgspec.Meta(description="Uids of the finalists in seeding order.")
+    ]
 
 
 class DeckObject(BaseObject, kw_only=True):
-    tournament_uid: str
-    user_uid: str
-    round: int | None = None
+    tournament_uid: Annotated[
+        str, msgspec.Meta(description="Uid of the tournament the deck was played in.")
+    ]
+    user_uid: Annotated[
+        str, msgspec.Meta(description="Uid of the member who played it.")
+    ]
+    round: Annotated[
+        int | None,
+        msgspec.Meta(
+            description="The round this deck was played in, null when it is the "
+            "event's single registered deck."
+        ),
+    ] = None
     name: str = ""
     author: str = ""
     comments: str = ""
-    cards: dict[str, int] = msgspec.field(default_factory=dict)
-    attribution: str | None = None
+    cards: Annotated[
+        dict[str, int],
+        msgspec.Meta(
+            description="Card id to count. Ids are krcg's, resolvable at "
+            "https://v4.api.krcg.org."
+        ),
+    ] = msgspec.field(default_factory=dict)
+    attribution: Annotated[
+        str | None,
+        msgspec.Meta(
+            description="Designer credit: a VEKN id, the sentinel `twda` when the "
+            "credit lives in the archive rather than with us, or null for anonymous."
+        ),
+    ] = None
     public: bool = False  # engine-set from decklists_mode, not client-writable
 
 
 class Standing(msgspec.Struct, kw_only=True, frozen=True):
     # set by the engine on FinishRound/FinishTournament, or directly by VEKN sync
     # (no round detail in that case).
-    user_uid: str
+    user_uid: Annotated[str, msgspec.Meta(description="Uid of the ranked member.")]
     gw: float = 0.0
     vp: float = 0.0
     tp: int = 0
@@ -483,13 +718,17 @@ class RafflePool(StrEnum):
 class RaffleDraw(msgspec.Struct, kw_only=True):
     label: str
     pool: RafflePool
-    winners: list[str] = msgspec.field(default_factory=list)
+    winners: Annotated[
+        list[str], msgspec.Meta(description="Uids of the members drawn.")
+    ] = msgspec.field(default_factory=list)
     # display-only; never written to promos_distributed
-    prize_promo_uid: str | None = None
+    prize_promo_uid: Annotated[
+        str | None, msgspec.Meta(description="Uid of the promo awarded.")
+    ] = None
 
 
 class PromoDistribution(msgspec.Struct, kw_only=True):
-    promo_uid: str
+    promo_uid: Annotated[str, msgspec.Meta(description="Uid of the promo handed out.")]
     qty: int
 
 
@@ -504,49 +743,101 @@ class TwdaStatus(msgspec.Struct, kw_only=True):
     # routes/tournaments.maybe_submit_twda.
 
     outcome: TwdaOutcome
-    reason: str = ""  # skip reason code, mapped to i18n frontend-side
+    reason: Annotated[
+        str,
+        msgspec.Meta(
+            description="Skip reason code, mapped to a message frontend-side."
+        ),
+    ] = ""
     pr_url: str = ""
-    at: datetime | None = None
+    at: Annotated[
+        datetime | None, msgspec.Meta(description="UTC instant of the attempt.")
+    ] = None
 
 
 class Tournament(TournamentConfig, kw_only=True):
-    # versioned URL (?v=<epoch-ms>); bytes live in the banners table, this is
-    # just the path.
-    banner_path: str | None = None
-    external_ids: dict[str, str] = msgspec.field(default_factory=dict)  # platform: id
-    # The event's permanent public handle. Written once and never rewritten: a
-    # published TWDA branch and every shared short link key on it. Not
-    # `checkin_code`, which is a capability token — publishing it grants check-in.
-    event_code: str = ""
+    # bytes live in the banners table.
+    banner_path: Annotated[
+        str | None,
+        msgspec.Meta(
+            description="Path to the event's image on this host, already versioned "
+            "(`?v=<epoch-ms>`). Null when there is none."
+        ),
+    ] = None
+    external_ids: Annotated[
+        dict[str, str],
+        msgspec.Meta(
+            description="This event's id on other systems, keyed by system name. "
+            "`vekn` is a vekn.net event id."
+        ),
+    ] = msgspec.field(default_factory=dict)
+    # Written once and never rewritten: a published TWDA branch and every shared
+    # short link key hang on it. Not `checkin_code`, which is a capability token
+    # — publishing it grants check-in.
+    event_code: Annotated[
+        str,
+        msgspec.Meta(
+            description="The event's permanent public handle. Empty on records "
+            "imported from an archive."
+        ),
+    ] = ""
     checkin_code: str = msgspec.field(default_factory=lambda: secrets.token_urlsafe(16))
     players: list[Player] = msgspec.field(default_factory=list)
     rounds: list[list[Table]] = msgspec.field(default_factory=list)
     finals: FinalsTable | None = None
-    winner: str = ""
+    winner: Annotated[
+        str,
+        msgspec.Meta(description="Uid of the winning member. Empty while undecided."),
+    ] = ""
     # engine-computed or VEKN-sync-populated; not cleared when rounds are empty.
     standings: list[Standing] = msgspec.field(default_factory=list)
-    # Externally attested field size for a row that carries no roster of its own.
-    # 0 = no attestation, derive as before. Never `player_count`: league scoring
-    # already reads that key off a synthesized summary object.
-    reported_player_count: int = 0
+    # Never `player_count`: league scoring already reads that key off a
+    # synthesized summary object.
+    reported_player_count: Annotated[
+        int,
+        msgspec.Meta(
+            description="Externally attested field size for a row that carries no "
+            "roster of its own. 0 means no attestation, derive it from the roster."
+        ),
+    ] = 0
     raffles: list[RaffleDraw] = msgspec.field(default_factory=list)
     # organizer-entered via ReportPromos; server never writes this — the offline
     # device is authoritative on go-online.
     promos_distributed: list[PromoDistribution] = msgspec.field(default_factory=list)
-    promo_stock_source_uid: str = ""
-    vekn_pushed_at: datetime | None = None
+    promo_stock_source_uid: Annotated[
+        str,
+        msgspec.Meta(
+            description="Uid of the holder the event's promos are drawn from."
+        ),
+    ] = ""
+    vekn_pushed_at: Annotated[
+        datetime | None,
+        msgspec.Meta(
+            description="UTC instant the results were pushed to vekn.net. Null if "
+            "never pushed."
+        ),
+    ] = None
     # sticky: results changed after vekn_pushed_at. The push is write-once, so
     # only a manual admin fix clears it.
     vekn_results_stale: bool = False
     twda_status: TwdaStatus | None = None  # organizer projection only
     offline_mode: bool = False
     offline_device_id: str = ""
-    offline_user_uid: str = ""
-    offline_since: datetime | None = None
+    offline_user_uid: Annotated[
+        str, msgspec.Meta(description="Uid of the member holding the event offline.")
+    ] = ""
+    offline_since: Annotated[
+        datetime | None,
+        msgspec.Meta(description="UTC instant the event went offline."),
+    ] = None
     timer: TimerState = msgspec.field(default_factory=TimerState)  # online-only
-    table_extra_time: dict[str, int] = msgspec.field(
-        default_factory=dict
-    )  # table_idx → extra seconds
+    table_extra_time: Annotated[
+        dict[str, int],
+        msgspec.Meta(
+            description="Extra seconds granted per table, keyed by the table's "
+            "index within its round as a string."
+        ),
+    ] = msgspec.field(default_factory=dict)
     announcements: list[Announcement] = msgspec.field(default_factory=list)
 
 
@@ -559,7 +850,9 @@ class PromoKind(StrEnum):
 class PromoHolding(msgspec.Struct, kw_only=True):
     """Server-computed inventory aggregate for one holder (promo ledger)."""
 
-    assigned: int = 0  # stock credited in (assignments + intakes)
+    assigned: Annotated[
+        int, msgspec.Meta(description="Stock credited in: assignments plus intakes.")
+    ] = 0
     remaining: int = 0
 
 
@@ -573,16 +866,36 @@ class PromoLedgerEntry(msgspec.Struct, kw_only=True):
     # promo_ledger side table, not synced. Append-mostly — corrections are
     # compensating rows (negative qty), never edits.
 
-    uid: str
+    uid: Uid
     kind: PromoLedgerKind
-    promo_uid: str
-    qty: int  # negative = compensating correction
-    from_uid: str  # source holder; for intake, the receiving holder
-    to_uid: str | None = None  # assignment target; None for intake/distribution
+    promo_uid: Annotated[str, msgspec.Meta(description="Uid of the promo moved.")]
+    qty: Annotated[
+        int,
+        msgspec.Meta(
+            description="Copies moved. Negative is a compensating correction."
+        ),
+    ]
+    from_uid: Annotated[
+        str,
+        msgspec.Meta(
+            description="Uid of the source holder; of the receiver on an intake."
+        ),
+    ]
+    to_uid: Annotated[
+        str | None,
+        msgspec.Meta(
+            description="Uid of the assignment target. Null on an intake or a "
+            "distribution."
+        ),
+    ] = None
     note: str = ""
-    happened_at: datetime
-    created_by: str
-    created_at: datetime
+    happened_at: Annotated[
+        datetime, msgspec.Meta(description="UTC instant the move actually happened.")
+    ]
+    created_by: Annotated[
+        str, msgspec.Meta(description="Uid of the member who recorded the row.")
+    ]
+    created_at: Instant
 
 
 class Promo(BaseObject, kw_only=True):
@@ -592,18 +905,25 @@ class Promo(BaseObject, kw_only=True):
     name: str
     kind: PromoKind = PromoKind.CARD
     description: str = ""
-    release_date: datetime | None = None
+    release_date: Annotated[
+        datetime | None,
+        msgspec.Meta(description="UTC. Null when the promo has no announced release."),
+    ] = None
     # retirement flag; a referenced promo is never soft-deleted so historical
     # references keep resolving.
     active: bool = True
     # UX-only distribution filter, no access control; empty = unrestricted, both
     # set means AND.
     allowed_ranks: list[TournamentRank] = msgspec.field(default_factory=list)
-    league_uids: list[str] = msgspec.field(default_factory=list)
+    league_uids: Annotated[
+        list[str],
+        msgspec.Meta(description="Uids of the leagues the promo is restricted to."),
+    ] = msgspec.field(default_factory=list)
     image_path: str | None = None
-    holdings: dict[str, PromoHolding] = msgspec.field(
-        default_factory=dict
-    )  # full projection only
+    holdings: Annotated[  # full projection only
+        dict[str, PromoHolding],
+        msgspec.Meta(description="Holder uid to that holder's inventory."),
+    ] = msgspec.field(default_factory=dict)
 
 
 class OAuthScope(StrEnum):
@@ -614,39 +934,52 @@ class OAuthScope(StrEnum):
 
 class OAuthClient(BaseObject, kw_only=True):
     name: str
-    client_id: str  # 32-char random
-    client_secret_hash: str  # Argon2 hash
+    client_id: Annotated[str, msgspec.Meta(description="32-character random id.")]
+    client_secret_hash: Annotated[str, msgspec.Meta(description="Argon2 hash.")]
     redirect_uris: list[str]
     scopes: list[OAuthScope]
-    created_by_uid: str
+    created_by_uid: Annotated[
+        str, msgspec.Meta(description="Uid of the member who registered the client.")
+    ]
     active: bool = True
 
 
 class OAuthAuthorizationCode(BaseObject, kw_only=True):
     """Short-lived authorization code (60s TTL, single use)."""
 
-    code: str  # 64-char random
+    code: Annotated[str, msgspec.Meta(description="64-character random code.")]
     client_id: str
-    user_uid: str
+    user_uid: Annotated[
+        str, msgspec.Meta(description="Uid of the member who authorized it.")
+    ]
     redirect_uri: str
     scopes: list[OAuthScope]
-    code_challenge: str  # S256 PKCE challenge
-    expires_at: datetime
+    code_challenge: Annotated[str, msgspec.Meta(description="S256 PKCE challenge.")]
+    expires_at: Annotated[
+        datetime, msgspec.Meta(description="UTC instant the code stops working.")
+    ]
     used: bool = False
 
 
 class OAuthToken(BaseObject, kw_only=True):
-    token_jti: str  # JWT ID
+    token_jti: Annotated[str, msgspec.Meta(description="JWT id.")]
     client_id: str
-    user_uid: str
+    user_uid: Annotated[str, msgspec.Meta(description="Uid of the member it acts for.")]
     scopes: list[OAuthScope]
-    token_type: str  # "access" or "refresh"
-    expires_at: datetime
+    token_type: Annotated[
+        str, msgspec.Meta(description='Either "access" or "refresh".')
+    ]
+    expires_at: Annotated[
+        datetime, msgspec.Meta(description="UTC instant the token stops verifying.")
+    ]
     revoked: bool = False
-    parent_token_uid: str | None = None  # refresh chain tracking
+    parent_token_uid: Annotated[
+        str | None,
+        msgspec.Meta(description="Uid of the token this one was refreshed from."),
+    ] = None
 
 
 class OAuthConsent(BaseObject, kw_only=True):
-    user_uid: str
+    user_uid: Annotated[str, msgspec.Meta(description="Uid of the consenting member.")]
     client_id: str
     scopes: list[OAuthScope]
