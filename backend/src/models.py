@@ -601,6 +601,10 @@ class Player(msgspec.Struct, kw_only=True):
         bool,
         msgspec.Meta(description="Proxy stand-in: excluded from rank, RTP and finals."),
     ] = False
+    missing_decklist: Annotated[
+        bool,
+        msgspec.Meta(description="Checked in without the decklist the event requires."),
+    ] = False
 
 
 class Seat(msgspec.Struct, kw_only=True):

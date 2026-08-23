@@ -192,7 +192,7 @@ TOURNAMENT_API_EXCLUDE = (
         "offline_device_id",
     }
 )
-PLAYER_API_EXCLUDE = {"display_name", "payment_status"}
+PLAYER_API_EXCLUDE = {"display_name", "missing_decklist", "payment_status"}
 
 
 def compute_tournament_public(d: dict) -> dict:

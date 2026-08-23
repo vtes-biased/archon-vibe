@@ -249,6 +249,7 @@ export interface Player {
   finalist: boolean;
   display_name?: string | null; // Discord guild nickname (per-tournament)
   non_competing?: boolean; // proxy: non-competing official stood in; excluded from rank/RTP/finals
+  missing_decklist?: boolean;
 }
 
 export interface Standing {
