@@ -411,6 +411,14 @@ The browser clears IndexedDB and re-fetches the snapshot at its current level, s
 streaming the corpus after the resync line is wasted work that also discards a
 pooled connection on the client's mid-fetch teardown.
 
+**A client-side level change closes the stream before it clears the stores.** The
+resync above arrives on a stream the server has already finished with, but the
+client re-levels itself too — cross-tab logout, a profile save, a role or country
+change — and there the clear runs against a stream still delivering. A frame
+landing in one of the clear's await gaps writes a row at the level being left
+behind, and the snapshot refill that follows only adds rows, so it never removes
+it. Buffered frames are dropped for the same reason.
+
 **Staleness guard** — orthogonal to entitlement, so the fingerprint cannot replace
 it. The three-day freshness guard over `max(since, generated_at)` catches a client
 away long enough that a soft-deleted object may have been hard-purged by the 30-day
