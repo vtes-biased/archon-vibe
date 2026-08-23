@@ -6,7 +6,9 @@ silently is not.
 
 ## Architecture
 
-**Offline-first is non-negotiable.** Every UI read comes from IndexedDB. The
+**Offline-first is non-negotiable.** Every UI read comes from IndexedDB —
+directly, or through a memory-resident projection maintained over it
+([sync](sync.md#the-list-projections)) — never from the network. The
 backend API exists for mutations. SSE pushes state changes per user at the
 role-appropriate level. There is exactly one sanctioned exception, and it has
 four conditions — [sync](sync.md#online-only-rest-reads).

@@ -2,7 +2,7 @@
   // Single-select user typeahead: IndexedDB search, min 2 chars, keyboard
   // nav, flag + #vekn_id rows. The one search box — organizers, promos, …
   import { onMount } from "svelte";
-  import type { User } from "$lib/types";
+  import type { UserListItem } from "$lib/db";
   import { getFilteredUsers, warmUserIndex } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
   import * as m from '$lib/paraglide/messages.js';
@@ -14,7 +14,7 @@
     membersOnly = true,
     inputId,
   }: {
-    onselect: (user: User) => void;
+    onselect: (user: UserListItem) => void;
     placeholder?: string;
     excludeUids?: string[];
     // Default on: everything a user gets picked FOR here — organizing, holding promo stock — is
@@ -24,7 +24,7 @@
   } = $props();
 
   let search = $state("");
-  let searchResults = $state<User[]>([]);
+  let searchResults = $state<UserListItem[]>([]);
   let searchTotal = $state(0);
   let selectedIndex = $state(-1);
   const SEARCH_LIMIT = 8;
@@ -67,7 +67,7 @@
     }
   }
 
-  function pick(user: User) {
+  function pick(user: UserListItem) {
     search = "";
     searchResults = [];
     searchTotal = 0;

@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { getAllUsers, getSuspendedUserUids } from "$lib/db";
+  import { getUserListItems, getSuspendedUserUids, type UserListItem } from "$lib/db";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { syncManager } from "$lib/sync";
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
   import DeceasedIcon from "$lib/components/DeceasedIcon.svelte";
   import Button from "$lib/components/Button.svelte";
-  import type { User, RatingCategory } from "$lib/types";
+  import type { RatingCategory } from "$lib/types";
   import { HOF_MIN_WINS } from "$lib/tournament-utils";
   import { Trophy, Loader2, ChevronLeft, ChevronRight } from "@lucide/svelte";
   import { goto } from "$app/navigation";
@@ -17,7 +17,7 @@
   const TAB_VALUES: Tab[] = ["constructed_offline", "constructed_online", "limited_offline", "limited_online", "halloffame"];
 
   // Single exclusion policy: straight suspensions are hidden from every tab; probations stay visible.
-  let users = $state<User[]>([]);
+  let users = $state<UserListItem[]>([]);
   let suspendedUids = $state<Set<string>>(new Set());
   let isSyncing = $state(!syncManager.isSynced);
 
@@ -50,25 +50,24 @@
   let filtered = $derived.by(() => {
     if (isHof) {
       let result = users.filter(u => {
-        if ((u.wins?.length ?? 0) < HOF_MIN_WINS) return false;
+        if (u.win_count < HOF_MIN_WINS) return false;
         if (suspendedUids.has(u.uid)) return false;
         if (selectedCountry !== "all" && u.country !== selectedCountry) return false;
         return true;
       });
-      result.sort((a, b) => (b.wins?.length ?? 0) - (a.wins?.length ?? 0));
+      result.sort((a, b) => b.win_count - a.win_count);
       return result;
     }
 
     const cat = activeTab as RatingCategory;
     let result = users.filter(u => {
       if (suspendedUids.has(u.uid)) return false;
-      const c = u[cat];
-      return c && c.total > 0;
+      return u.ratings[cat] > 0;
     });
     if (selectedCountry !== "all") {
       result = result.filter(u => u.country === selectedCountry);
     }
-    result.sort((a, b) => (b[cat]?.total ?? 0) - (a[cat]?.total ?? 0));
+    result.sort((a, b) => b.ratings[cat] - a.ratings[cat]);
     return result;
   });
 
@@ -77,7 +76,7 @@
 
   async function loadData() {
     const [allUsers, suspended] = await Promise.all([
-      getAllUsers(),
+      getUserListItems(),
       getSuspendedUserUids(),
     ]);
     users = allUsers;
@@ -202,7 +201,7 @@
           <tbody>
             {#each paged as user, i}
               {@const rank = page * pageSize + i + 1}
-              {@const value = isHof ? (user.wins?.length ?? 0) : (user[activeTab as RatingCategory]?.total ?? 0)}
+              {@const value = isHof ? user.win_count : user.ratings[activeTab as RatingCategory]}
               <!-- Whole row navigates; the name <a> keeps keyboard focus + cmd-click new-tab,
                    so the row onclick is a mouse-only enhancement (skips clicks on the link). -->
               <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->

@@ -1,4 +1,5 @@
 import type { User, Role } from '$lib/types';
+import type { UserListItem } from './db';
 import { expandRolesForFilter } from './roles';
 import { normalizeSearch } from './utils';
 
@@ -53,7 +54,7 @@ class DisplayContext {
     this.pagination.currentPage = 1;
   }
 
-  setPagination(currentPage: number, pageSize: number, visibleUsers: User[]): void {
+  setPagination(currentPage: number, pageSize: number, visibleUsers: UserListItem[]): void {
     this.pagination = {
       currentPage,
       pageSize,

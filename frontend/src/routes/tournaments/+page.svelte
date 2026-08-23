@@ -1,13 +1,13 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
   import { untrack } from "svelte";
-  import { getFilteredTournaments, getAgendaTournaments, getLeague, type TournamentStateFilter } from "$lib/db";
+  import { getFilteredTournaments, getAgendaTournaments, getLeague, type TournamentListItem, type TournamentStateFilter } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getCountries, getSortedCountries, getCountryFlag, getCountriesOnContinent } from "$lib/geonames";
   import { getAuthState, generateCalendarToken } from "$lib/stores/auth.svelte";
   import { canCreateTournament } from "$lib/engine";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
-  import type { Tournament, TournamentFormat } from "$lib/types";
+  import type { TournamentFormat } from "$lib/types";
   import { getStateTone, translateTournamentState } from "$lib/tournament-utils";
   import Badge from "$lib/components/Badge.svelte";
   import { zonedDate } from "$lib/utils";
@@ -21,7 +21,7 @@
   // absolute — prod builds set VITE_API_URL='' (same-origin), leaving API_BASE empty.
   const CALENDAR_BASE = API_BASE || window.location.origin;
 
-  let tournaments = $state<Tournament[]>([]);
+  let tournaments = $state<TournamentListItem[]>([]);
   let totalCount = $state(0);
   let upcomingCount = $state(0);
   let loaded = $state(false);
@@ -73,9 +73,8 @@
   });
 
   let searchQuery = $state(urlParams.get("q") ?? "");
-  // Debounced: search scans the whole tournaments table per query, so don't
-  // re-query every keystroke (country/format use narrower indexes and stay
-  // immediate).
+  // Debounced: search normalizes every projected name per query, so don't
+  // re-query every keystroke.
   let debouncedSearch = $state(urlParams.get("q") ?? "");
   $effect(() => {
     const q = searchQuery;
@@ -173,7 +172,7 @@
     }
   }
 
-  function formatDate(t: Tournament): string {
+  function formatDate(t: TournamentListItem): string {
     if (!t.start) return "—";
     try {
       const tz = t.online ? undefined : t.timezone || "UTC";

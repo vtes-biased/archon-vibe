@@ -505,14 +505,42 @@ without a `getAll()` scan of the corpus, which is what the arrival path from a
 shared link would otherwise pay. `decks.by-user` earned its keep when a member
 profile started listing decklists.
 
+Only `sanctions`' two, `decks`' two, `tournaments.by-country`, `by-code` and
+`by-vekn` still have a query behind them — the rest lost theirs to the list
+projections below. They stay because dropping an index needs a `DB_VERSION` bump,
+and this schema's upgrade deletes every store: a full snapshot re-download for
+every client, which no unused index is worth.
+
 A generic `ObjectSpec` array (`SPECS`) handles all types uniformly in the sync
 manager, and a single `isSynced` flag tracks state.
 
-**The in-memory user search index** (`db.ts` `getUserIndex`) exists because a
-`getAll()` scan of ~10k members costs 100ms+ per keystroke — completions over
-300ms were reported before it. It is a cache over the users store: every path
-that writes or clears that store must update or null the index promise, or search
-serves stale members.
+### The list projections
+
+**A top-level list reads a memory-resident projection, never the whole store.** A
+`getAll()` deserializes every field of every row — 64.6MB of JSON and ~1.3s for the
+9.5k tournaments, 18.7MB and ~330ms for the 19k members — and the list re-runs on
+every filter, page and search change, so overlapping reads measured 385MB of heap
+where the on-disk database is 62MB. `db.ts` holds one `Map` per corpus instead,
+built once per tab and patched on every write:
+
+| Projection | Drops | Keeps |
+|---|---|---|
+| `TournamentListItem` (2.4MB) | `players` — 40% of a stored event's bytes — plus `rounds`, `finals`, `standings`, config and timer state | the list columns, `organizers_uids` and `winner` |
+| `UserListItem` (2.2MB) | the four `CategoryRating` histories and the `wins` uid array, together most of a stored member's bytes | identity, contact, roles, community links, and the rating totals and win count as scalars |
+
+The agenda's "am I in this event" is a separate `Set` of the signed-in member's
+tournament uids, rebuilt when that uid changes: carrying `player_uids` on the
+projection would re-add ~3.6KB per large event to answer what is two dozen uids for
+a real member. A surface needing a whole object reads it **by key** — league
+scoring pulls each finished event's result sheet that way. `sanctions`, `leagues`
+and `promos` stay whole-store reads: they are small enough that a projection would
+buy nothing.
+
+**The in-memory user search index** (`db.ts` `getUserIndex`) carries the same
+`UserListItem` map plus per-member search tokens, because a `getAll()` scan per
+keystroke costs 100ms+ — completions over 300ms were reported before it. Its tokens
+come from the **stored** row rather than the projection, so email and Discord-handle
+search still reach fields the projection drops.
 
 **Cache Storage is allowlist-only.** The service worker writes exactly two things
 to Cache Storage: precached build assets and SPA navigations. Every other

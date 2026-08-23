@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getAllUsers } from "$lib/db";
+  import { getUserListItems, type UserListItem } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getAuthState, updateProfile } from "$lib/stores/auth.svelte";
   import { getCountries, getCountryFlag } from "$lib/geonames";
@@ -8,7 +8,7 @@
   import { showToast } from "$lib/stores/toast.svelte";
   import { canModerateLink, canPromoteLinkNational, getCommunityLinkReference } from "$lib/engine";
   import { getLocale } from "$lib/paraglide/runtime.js";
-  import type { CommunityLink, LinkMedia, User } from "$lib/types";
+  import type { CommunityLink, LinkMedia } from "$lib/types";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
   import CommunityCountryCard from "./CommunityCountryCard.svelte";
   import CommunityContentPool from "./CommunityContentPool.svelte";
@@ -21,13 +21,13 @@
   let { sponsorMode = false, adding = $bindable(false) }:
     { sponsorMode?: boolean; adding?: boolean } = $props();
 
-  interface LinkEntry { user: User; link: CommunityLink }
+  interface LinkEntry { user: UserListItem; link: CommunityLink }
 
   const auth = $derived(getAuthState());
   const countries = getCountries();
 
-  let allUsersWithLinks = $state<User[]>([]);
-  let officials = $state<User[]>([]);
+  let allUsersWithLinks = $state<UserListItem[]>([]);
+  let officials = $state<UserListItem[]>([]);
   let loaded = $state(false);
   let searchQuery = $state("");
   let pickedCountry = $state<string | null>(null);
@@ -67,7 +67,7 @@
   const contentLinks = $derived(unpinned.filter(e => reference.placement[e.link.type] === "content"));
 
   const officialsByCountry = $derived.by(() => {
-    const grouped = new Map<string, User[]>();
+    const grouped = new Map<string, UserListItem[]>();
     for (const official of officials) {
       const code = official.country || "??";
       if (!grouped.has(code)) grouped.set(code, []);
@@ -155,7 +155,7 @@
   const ownLinks = $derived(auth.user?.community_links ?? []);
 
   async function loadData() {
-    const allUsers = await getAllUsers();
+    const allUsers = await getUserListItems();
     allUsersWithLinks = allUsers.filter(u => !u.deleted_at && u.community_links?.length);
     // Officials directory: NC/Prince reachable by contact info — independent of
     // community_links (an official with an email but no link must still show).

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { Tournament, User } from "$lib/types";
+  import type { Tournament } from "$lib/types";
+  import type { UserListItem } from "$lib/db";
   import { tournamentAction } from "$lib/tournament-actions";
   import { toUserMessage } from "$lib/errors";
   import { showToast } from "$lib/stores/toast.svelte";
@@ -31,7 +32,7 @@
   const label = (uid: string) => names[uid] ?? seatDisplay(uid, playerInfo);
   const invalid = $derived(!winner || !count || count < roster.length);
 
-  function add(user: User) {
+  function add(user: UserListItem) {
     names = { ...names, [user.uid]: user.vekn_id ? `${user.name} (${user.vekn_id})` : user.name };
     if (!roster.includes(user.uid)) roster = [...roster, user.uid];
     if (!winner) winner = user.uid;

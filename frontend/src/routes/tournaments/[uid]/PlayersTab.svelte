@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Tournament, User, Player, DeckObject, Sanction } from "$lib/types";
+  import type { UserListItem } from "$lib/db";
   type DeckMap = Record<string, DeckObject[]>;
   import { formatScore } from "$lib/utils";
   import AddPlayerForm from "$lib/components/AddPlayerForm.svelte";
@@ -320,10 +321,10 @@
   const filtersActive = $derived(paymentFilter !== 'all' || deckFilter !== 'all');
 
   // Modal entry points (modal internals live in CreateAndRegisterModal)
-  let sponsorTarget = $state<User | null>(null);
+  let sponsorTarget = $state<UserListItem | null>(null);
   let showCreateModal = $state(false);
 
-  async function addPlayerByUser(user: User) {
+  async function addPlayerByUser(user: UserListItem) {
     if (!user.vekn_id && "vekn_id" in user) {
       // An empty vekn_id means unsponsored; a missing key means the field is
       // hidden from this level — fall through, since the server injects the

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import type { User } from "$lib/types";
+  import type { UserListItem } from "$lib/db";
   import { getFilteredUsers, warmUserIndex } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
   import * as m from '$lib/paraglide/messages.js';
@@ -21,7 +21,7 @@
     playerName?: string;
   } = $props();
 
-  let results = $state<User[]>([]);
+  let results = $state<UserListItem[]>([]);
   let total = $state(0);
   let selectedIndex = $state(-1);
   const SEARCH_LIMIT = 10;
@@ -44,7 +44,7 @@
     results = r.slice(0, SEARCH_LIMIT);
   }
 
-  function selectUser(user: User) {
+  function selectUser(user: UserListItem) {
     vekn = user.vekn_id || user.name;
     name = user.name;
     search = user.name + (user.vekn_id ? ` (${user.vekn_id})` : '');

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { User } from "$lib/types";
+  import type { UserListItem } from "$lib/db";
   import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased, deleteMember } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
   import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2, Trash2, TriangleAlert, ArrowLeftRight } from "@lucide/svelte";
@@ -43,7 +44,7 @@
   let showMergeModal = $state(false);
   let showDeleteConfirm = $state(false);
   let linkVeknIdInput = $state("");
-  let mergeTarget = $state<User | null>(null);
+  let mergeTarget = $state<UserListItem | null>(null);
   let processingAction = $state(false);
 
   // A uid carrying a VEKN ID is immovable — the backend refuses to soft-delete

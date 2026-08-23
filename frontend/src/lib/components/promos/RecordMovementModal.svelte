@@ -1,7 +1,8 @@
 <script lang="ts">
   // Record a promo inventory movement (officials): intake = print batch received from BCP, assignment
   // = stock moved holder→holder, distribution = a non-tournament exit. Negative qty is a compensating correction.
-  import type { Promo, PromoLedgerKind, User } from "$lib/types";
+  import type { Promo, PromoLedgerKind } from "$lib/types";
+  import type { UserListItem } from "$lib/db";
   import { createPromoLedgerEntry } from "$lib/api";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { getCountryFlag } from "$lib/geonames";
@@ -29,9 +30,9 @@
   let promoUid = $state("");
   let qty = $state<number | null>(1);
   let note = $state("");
-  let toUser = $state<User | null>(null);
+  let toUser = $state<UserListItem | null>(null);
   // IC only: null = self (the server default).
-  let fromUser = $state<User | null>(null);
+  let fromUser = $state<UserListItem | null>(null);
 
   // Local today (toISOString would shift the date near midnight).
   const now = new Date();
@@ -100,7 +101,7 @@
     'w-full px-3 py-2 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent';
 </script>
 
-{#snippet userChip(user: User, onclear: () => void)}
+{#snippet userChip(user: UserListItem, onclear: () => void)}
   <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-hover rounded-lg text-sm text-ink-strong">
     {#if user.country}
       <span>{getCountryFlag(user.country)}</span>

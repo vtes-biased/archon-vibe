@@ -1,7 +1,7 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
   import { onDestroy } from 'svelte';
-  import type { User } from '$lib/types';
+  import type { UserListItem } from '$lib/db';
   import { getFilteredUsers, getTournament, warmUserIndex } from '$lib/db';
   import { getCountryFlag } from '$lib/geonames';
   import { validateDeck, type ValidationError } from '$lib/engine';
@@ -33,7 +33,7 @@
   let attributionVekn = $state('');
   let attributionSearch = $state('');
   let attributionName = $state(''); // resolved display name from autocomplete
-  let attrResults = $state<User[]>([]);
+  let attrResults = $state<UserListItem[]>([]);
   let attrTotal = $state(0);
   let attrSelectedIndex = $state(-1);
   const ATTR_SEARCH_LIMIT = 10;
@@ -80,7 +80,7 @@
     attrResults = results.slice(0, ATTR_SEARCH_LIMIT);
   }
 
-  function selectAttrUser(user: User) {
+  function selectAttrUser(user: UserListItem) {
     attributionVekn = user.vekn_id || user.name;
     attributionName = user.name;
     attributionSearch = user.name + (user.vekn_id ? ` (${user.vekn_id})` : '');

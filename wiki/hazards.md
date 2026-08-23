@@ -29,6 +29,16 @@ access-version handshake nor any test can catch the missing backfill — see
 [sync](sync.md#access-levels) for the re-save script and
 [testing](testing.md#traps) for why no test covers it.
 
+**A store with a projection has two writers to satisfy, not one.** `db.ts` keeps a
+memory-resident map over `tournaments` and over `users`
+([sync](sync.md#the-list-projections)), and every save, batch save, delete and
+clear in that file patches it. That is why the hooks sit there rather than in the
+sync manager: `saveTournament` has nine callers outside `db.ts` and SSE is only one
+of them, so a projection fed off the stream alone goes stale on every optimistic
+local mutation. A new path that reaches either store without those helpers leaves
+the lists stale and **nothing fails** — the row is right in IndexedDB and wrong on
+screen.
+
 **Our country rows are ISO codes; the corpora we compare them against are names.**
 Every write path normalises through `geonames.stored_country`, so a stored value is
 a two-letter code, vekn.net's `XX` unknown-venue placeholder, or nothing. The

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import type { User, Tournament } from "$lib/types";
+  import type { Tournament } from "$lib/types";
+  import type { UserListItem } from "$lib/db";
   import { getFilteredUsers, getRegistrationBarredUids, warmUserIndex } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
   import { Ban, TriangleAlert, Flower2 } from "@lucide/svelte";
@@ -13,16 +14,16 @@
     oncreate,
   }: {
     tournament: Tournament;
-    onadd: (user: User) => void;
+    onadd: (user: UserListItem) => void;
     oncreate?: () => void;
   } = $props();
 
   let playerSearch = $state("");
-  let searchResults = $state<User[]>([]);
+  let searchResults = $state<UserListItem[]>([]);
   let searchTotal = $state(0);
   let selectedIndex = $state(-1);
   let suspendedUids = $state<Set<string>>(new Set());
-  let pendingDeceased = $state<User | null>(null);
+  let pendingDeceased = $state<UserListItem | null>(null);
   const SEARCH_LIMIT = 10;
   const dropdownOpen = $derived(searchResults.length > 0 || playerSearch.trim().length >= 2);
   // See UserPicker: the index build makes early keystrokes slower than later ones,
@@ -70,7 +71,7 @@
 
   // Deceased members are warned, not blocked: backfilling a past (finished)
   // event can legitimately add a member who has since passed away.
-  function chooseUser(user: User) {
+  function chooseUser(user: UserListItem) {
     if (user.deceased_at) {
       pendingDeceased = user;
       return;
@@ -83,7 +84,7 @@
     pendingDeceased = null;
   }
 
-  function selectUser(user: User) {
+  function selectUser(user: UserListItem) {
     onadd(user);
     playerSearch = "";
     searchResults = [];

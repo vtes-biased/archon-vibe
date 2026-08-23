@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, type StoreNames } from 'idb';
-import type { User, Role, Sanction, Tournament, DeckObject, League, Promo, VtesCard, OfflinePlayer } from '$lib/types';
+import type { User, Role, Sanction, Tournament, DeckObject, League, Promo, VtesCard, OfflinePlayer,
+  CommunityLink, RatingCategory, TournamentFormat, TournamentRank, TournamentState } from '$lib/types';
 import { expandRolesForFilter } from './roles';
 import { normalizeSearch, searchTokens } from './utils';
 
@@ -237,12 +238,21 @@ export async function getUser(uid: string): Promise<User | undefined> {
   return db.get('users', uid);
 }
 
-export async function getAllUsers(): Promise<User[]> {
-  const db = await getDB();
+/** One member's list row, straight off the index — no IndexedDB round-trip. */
+export async function getUserListItem(uid: string): Promise<UserListItem | undefined> {
+  const index = await getUserIndex();
+  return index.get(uid)?.user;
+}
+
+/** Every member the viewer holds, projected. Unordered: both consumers — the rankings and the
+ * community directory — impose their own order, and a name sort of ~19k rows would be waste. */
+export async function getUserListItems(): Promise<UserListItem[]> {
+  const index = await getUserIndex();
+  const items: UserListItem[] = [];
   // Tombstones now hard-delete the row (sync.ts); this !deleted_at filter is defensive, hiding any
   // pre-change soft-deleted row a client still holds until its next full resync.
-  const users = await db.getAllFromIndex('users', 'by-name');
-  return users.filter(u => !u.deleted_at);
+  for (const entry of index.values()) if (!entry.user.deleted_at) items.push(entry.user);
+  return items;
 }
 
 export async function hasAnyUsers(): Promise<boolean> {
@@ -272,10 +282,33 @@ export async function deleteUser(uid: string): Promise<void> {
   dropFromUserIndex(uid);
 }
 
-/** getAll() over the ~10k-member corpus costs ~100ms+ (each User embeds 4 CategoryRating
- * histories), so this index is read once and patched on write; saveUser/saveUsersBatch/deleteUser/clearAllUsers must all patch it or it goes stale. */
+/** What every member list, search box and directory reads of a member: the four rating histories
+ * and the `wins` uid array collapse to counts, and a surface wanting the whole row reads it by key. */
+export interface UserListItem {
+  uid: string;
+  deleted_at?: string | null;
+  name: string;
+  nickname?: string | null;
+  country: string | null;
+  city?: string | null;
+  vekn_id?: string | null;
+  roles: Role[];
+  deceased_at?: string | null;
+  coopted_by?: string | null;
+  discord_id?: string | null;
+  contact_email?: string | null;
+  contact_discord?: string | null;
+  contact_phone?: string | null;
+  phone_is_whatsapp?: boolean;
+  community_links?: CommunityLink[];
+  ratings: Record<RatingCategory, number>;
+  win_count: number;
+}
+
+/** getAll() over the ~19k-member corpus costs ~330ms and ~14MB of heap, so this index is read once
+ * and patched on write; saveUser/saveUsersBatch/deleteUser/clearAllUsers must all patch it or it goes stale. */
 interface UserIndexEntry {
-  user: User;
+  user: UserListItem;
   /** Word-prefix haystack: name, nickname, email and Discord handle tokens. */
   tokens: string[];
   /** Normalized full name — ranking key, precomputed to stay out of sort comparators. */
@@ -289,7 +322,33 @@ let userIndexPromise: Promise<Map<string, UserIndexEntry>> | null = null;
 
 function buildEntry(user: User): UserIndexEntry {
   return {
-    user,
+    user: {
+      uid: user.uid,
+      deleted_at: user.deleted_at,
+      name: user.name,
+      nickname: user.nickname,
+      country: user.country,
+      city: user.city,
+      // A missing `vekn_id` key is a level the field is hidden at; an empty one is an unsponsored
+      // member. The player-add path decides between sponsoring and adding on exactly that.
+      ...('vekn_id' in user ? { vekn_id: user.vekn_id } : {}),
+      roles: user.roles,
+      deceased_at: user.deceased_at,
+      coopted_by: user.coopted_by,
+      discord_id: user.discord_id,
+      contact_email: user.contact_email,
+      contact_discord: user.contact_discord,
+      contact_phone: user.contact_phone,
+      phone_is_whatsapp: user.phone_is_whatsapp,
+      community_links: user.community_links,
+      ratings: {
+        constructed_online: user.constructed_online?.total ?? 0,
+        constructed_offline: user.constructed_offline?.total ?? 0,
+        limited_online: user.limited_online?.total ?? 0,
+        limited_offline: user.limited_offline?.total ?? 0,
+      },
+      win_count: user.wins?.length ?? 0,
+    },
     // Contact fields exist only in the full projection (an official's entitled members, see backend
     // access_levels.py), so email/Discord search is implicitly scoped to those.
     tokens: [
@@ -333,7 +392,7 @@ function dropFromUserIndex(uid: string): void {
 
 /** Ranks name-leading matches above incidental word hits, then alphabetically — callers truncate to
  * the top 8/10, so without this a surname query would order by first name arbitrarily. */
-function sortSearchResults(entries: UserIndexEntry[], terms: string[]): User[] {
+function sortSearchResults(entries: UserIndexEntry[], terms: string[]): UserListItem[] {
   const lead = terms[0];
   if (lead) {
     // Rank key read off the entry, never recomputed per comparison — normalizing
@@ -353,7 +412,7 @@ export async function getFilteredUsers(
   country?: string,
   roles?: Role[],
   nameSearch?: string
-): Promise<User[]> {
+): Promise<UserListItem[]> {
   const plainRoles = roles && roles.length > 0 ? [...roles] : undefined;
   const expandedRoles = plainRoles ? expandRolesForFilter(plainRoles) : undefined;
   const terms = nameSearch?.trim() ? searchTokens(nameSearch) : [];
@@ -612,14 +671,10 @@ export async function getTournamentByCode(code: string): Promise<Tournament | un
   return byVekn && !byVekn.deleted_at ? byVekn : undefined;
 }
 
-export async function getAllTournaments(): Promise<Tournament[]> {
-  const db = await getDB();
-  return db.getAll('tournaments');
-}
-
 export async function saveTournament(tournament: Tournament): Promise<void> {
   const db = await getDB();
   await db.put('tournaments', tournament);
+  patchTournamentIndex(tournament);
 }
 
 export async function saveTournamentsBatch(tournaments: Tournament[]): Promise<void> {
@@ -628,20 +683,121 @@ export async function saveTournamentsBatch(tournaments: Tournament[]): Promise<v
   const tx = db.transaction('tournaments', 'readwrite');
   for (const t of tournaments) tx.store.put(t);
   await tx.done;
+  for (const t of tournaments) patchTournamentIndex(t);
 }
 
 export async function deleteTournament(uid: string): Promise<void> {
   const db = await getDB();
   await db.delete('tournaments', uid);
+  dropFromTournamentIndex(uid);
 }
 
 export async function clearAllTournaments(): Promise<void> {
   const db = await getDB();
   await db.clear('tournaments');
+  tournamentIndexPromise = null;
+  memberPlayingPromise = null;
+  memberPlayingUid = null;
+}
+
+/** What every tournament list surface reads of an event. A stored tournament carries 54 fields
+ * against these, and `players` alone is 40% of its bytes; a detail surface reads the whole row by
+ * key instead. */
+export interface TournamentListItem {
+  uid: string;
+  modified: string;
+  deleted_at?: string | null;
+  name: string;
+  format: TournamentFormat;
+  rank: TournamentRank;
+  online: boolean;
+  start: string | null;
+  timezone: string;
+  country: string | null;
+  league_uid?: string | null;
+  state: TournamentState;
+  organizers_uids?: string[];
+  winner?: string;
+}
+
+function projectTournament(t: Tournament): TournamentListItem {
+  return {
+    uid: t.uid,
+    modified: t.modified,
+    deleted_at: t.deleted_at,
+    name: t.name,
+    format: t.format,
+    rank: t.rank,
+    online: t.online,
+    start: t.start,
+    timezone: t.timezone,
+    country: t.country,
+    league_uid: t.league_uid,
+    state: t.state,
+    organizers_uids: t.organizers_uids,
+    winner: t.winner,
+  };
+}
+
+/** getAll() over the ~9.5k-event corpus costs ~1.3s and ~60MB of heap, so the list surfaces read
+ * this projection instead; saveTournament/saveTournamentsBatch/deleteTournament/clearAllTournaments
+ * must all patch it or the lists go stale. */
+let tournamentIndexPromise: Promise<Map<string, TournamentListItem>> | null = null;
+
+/** Tournaments the signed-in member plays in. Keeping `player_uids` on the projection would re-add
+ * ~3.6KB per large event to answer what is a couple of dozen uids for a real member. */
+let memberPlayingPromise: Promise<Set<string>> | null = null;
+let memberPlayingUid: string | null = null;
+
+async function getTournamentIndex(): Promise<Map<string, TournamentListItem>> {
+  if (!tournamentIndexPromise) {
+    tournamentIndexPromise = (async () => {
+      const db = await getDB();
+      const all = await db.getAll('tournaments');
+      return new Map(all.map(t => [t.uid, projectTournament(t)]));
+    })();
+  }
+  return tournamentIndexPromise;
+}
+
+function getMemberPlaying(userUid: string): Promise<Set<string>> {
+  if (!memberPlayingPromise || memberPlayingUid !== userUid) {
+    memberPlayingUid = userUid;
+    memberPlayingPromise = (async () => {
+      const db = await getDB();
+      const all = await db.getAll('tournaments');
+      const playing = new Set<string>();
+      for (const t of all) if (t.players?.some(pl => pl.user_uid === userUid)) playing.add(t.uid);
+      return playing;
+    })();
+  }
+  return memberPlayingPromise;
+}
+
+// Chains onto the build promises rather than materialized collections, so a write landing mid-build
+// still applies; the IDB write has already committed by the time this runs, so re-projecting is always correct.
+function patchTournamentIndex(t: Tournament): void {
+  if (tournamentIndexPromise) void tournamentIndexPromise.then(idx => idx.set(t.uid, projectTournament(t)));
+  const uid = memberPlayingUid;
+  if (uid && memberPlayingPromise) {
+    const plays = !!t.players?.some(pl => pl.user_uid === uid);
+    void memberPlayingPromise.then(set => { if (plays) set.add(t.uid); else set.delete(t.uid); });
+  }
+}
+
+function dropFromTournamentIndex(uid: string): void {
+  if (tournamentIndexPromise) void tournamentIndexPromise.then(idx => idx.delete(uid));
+  if (memberPlayingPromise) void memberPlayingPromise.then(set => set.delete(uid));
+}
+
+/** Every event the viewer holds, projected. Callers filter and sort it themselves. */
+export async function getTournamentListItems(): Promise<TournamentListItem[]> {
+  const index = await getTournamentIndex();
+  return [...index.values()];
 }
 
 export interface FilteredTournamentsResult {
-  items: Tournament[];
+  items: TournamentListItem[];
   total: number;
   /** Size of the leading upcoming/current cluster (see sortUpcomingFirst). */
   upcomingCount: number;
@@ -658,11 +814,11 @@ function todayCutoff(): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T00:00`;
 }
 
-const tournamentDate = (t: Tournament) => t.start || t.modified;
+const tournamentDate = (t: TournamentListItem) => t.start || t.modified;
 
 // "Upcoming" = not Finished and dated today or later, plus a Playing/Waiting
 // event from an earlier date, which belongs with the live ones.
-function isUpcoming(t: Tournament, cutoff: string): boolean {
+function isUpcoming(t: TournamentListItem, cutoff: string): boolean {
   return (
     t.state !== 'Finished' &&
     (tournamentDate(t) >= cutoff || t.state === 'Playing' || t.state === 'Waiting')
@@ -670,7 +826,7 @@ function isUpcoming(t: Tournament, cutoff: string): boolean {
 }
 
 /** Shared by both list queries so the filter and the divider agree on "upcoming". */
-function matchesState(t: Tournament, state: TournamentStateFilter, cutoff: string): boolean {
+function matchesState(t: TournamentListItem, state: TournamentStateFilter, cutoff: string): boolean {
   switch (state) {
     case 'upcoming':
       return isUpcoming(t, cutoff);
@@ -685,10 +841,10 @@ function matchesState(t: Tournament, state: TournamentStateFilter, cutoff: strin
 
 /** Sorts upcoming/current ascending then past descending, returning the upcoming cluster size for an
  * Upcoming/Past divider. Filtering to Finished needs no separate sort flip — with no upcoming events left, the whole list is the past cluster already in recency order. */
-export function sortUpcomingFirst(items: Tournament[]): number {
+export function sortUpcomingFirst(items: TournamentListItem[]): number {
   const cutoff = todayCutoff();
   const date = tournamentDate;
-  const isUpcomingHere = (t: Tournament) => isUpcoming(t, cutoff);
+  const isUpcomingHere = (t: TournamentListItem) => isUpcoming(t, cutoff);
   let upcomingCount = 0;
   items.sort((a, b) => {
     const ua = isUpcomingHere(a);
@@ -714,37 +870,20 @@ export async function getFilteredTournaments(
   page = 0,
   pageSize = 50,
 ): Promise<FilteredTournamentsResult> {
-  const db = await getDB();
-  let items: Tournament[];
+  const index = await getTournamentIndex();
+  const cutoff = todayCutoff();
+  const q = filters.search?.trim() ? normalizeSearch(filters.search.trim()) : '';
 
-  if (filters.country && filters.country !== 'all') {
-    items = await db.getAllFromIndex('tournaments', 'by-country', filters.country);
-  } else if (filters.format && filters.format !== 'all') {
-    items = await db.getAllFromIndex('tournaments', 'by-format', filters.format);
-  } else {
-    items = await db.getAll('tournaments');
-  }
-
-  if (filters.state && filters.state !== 'all') {
-    const cutoff = todayCutoff();
-    items = items.filter(t => matchesState(t, filters.state!, cutoff));
-  }
-  // Logged-out viewers see current + upcoming only (no finished/past events).
-  if (filters.excludePast) {
-    items = items.filter(t => t.state !== 'Finished');
-  }
-  if (filters.country && filters.country !== 'all') {
-    items = items.filter(t => t.country === filters.country);
-  }
-  if (filters.includeOnline === false) {
-    items = items.filter(t => !t.online);
-  }
-  if (filters.format && filters.format !== 'all') {
-    items = items.filter(t => t.format === filters.format);
-  }
-  if (filters.search?.trim()) {
-    const q = normalizeSearch(filters.search.trim());
-    items = items.filter(t => normalizeSearch(t.name).includes(q));
+  const items: TournamentListItem[] = [];
+  for (const t of index.values()) {
+    if (filters.state && filters.state !== 'all' && !matchesState(t, filters.state, cutoff)) continue;
+    // Logged-out viewers see current + upcoming only (no finished/past events).
+    if (filters.excludePast && t.state === 'Finished') continue;
+    if (filters.country && filters.country !== 'all' && t.country !== filters.country) continue;
+    if (filters.includeOnline === false && t.online) continue;
+    if (filters.format && filters.format !== 'all' && t.format !== filters.format) continue;
+    if (q && !normalizeSearch(t.name).includes(q)) continue;
+    items.push(t);
   }
 
   const upcomingCount = sortUpcomingFirst(items);
@@ -764,13 +903,14 @@ export async function getAgendaTournaments(
   page = 0,
   pageSize = 50,
 ): Promise<FilteredTournamentsResult> {
-  const db = await getDB();
-  const allItems = await db.getAll('tournaments');
+  const [index, playing] = await Promise.all([getTournamentIndex(), getMemberPlaying(userUid)]);
   const continentSet = new Set(continentCountries);
+  const cutoff = todayCutoff();
+  const q = filters.search?.trim() ? normalizeSearch(filters.search.trim()) : '';
 
-  let items = allItems.filter(t => {
+  const onAgenda = (t: TournamentListItem) => {
     if (t.organizers_uids?.includes(userUid)) return true;
-    if (t.players?.some(p => p.user_uid === userUid)) return true;
+    if (playing.has(t.uid)) return true;
     if (t.state === 'Finished') return false;
     if (t.country === userCountry) return true;
     if (filters.includeOnline && t.online) return true;
@@ -778,18 +918,15 @@ export async function getAgendaTournaments(
       if (t.rank === 'National Championship' || t.rank === 'Continental Championship') return true;
     }
     return false;
-  });
+  };
 
-  if (filters.state && filters.state !== 'all') {
-    const cutoff = todayCutoff();
-    items = items.filter(t => matchesState(t, filters.state!, cutoff));
-  }
-  if (filters.format && filters.format !== 'all') {
-    items = items.filter(t => t.format === filters.format);
-  }
-  if (filters.search?.trim()) {
-    const q = normalizeSearch(filters.search.trim());
-    items = items.filter(t => normalizeSearch(t.name).includes(q));
+  const items: TournamentListItem[] = [];
+  for (const t of index.values()) {
+    if (!onAgenda(t)) continue;
+    if (filters.state && filters.state !== 'all' && !matchesState(t, filters.state, cutoff)) continue;
+    if (filters.format && filters.format !== 'all' && t.format !== filters.format) continue;
+    if (q && !normalizeSearch(t.name).includes(q)) continue;
+    items.push(t);
   }
 
   const upcomingCount = sortUpcomingFirst(items);

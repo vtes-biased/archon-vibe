@@ -13,12 +13,13 @@
   import { isOfficial as engineIsOfficial, canSponsorMember } from "$lib/engine";
   import { displayContext } from "$lib/displayContext";
   import type { User as UserType, Role } from "$lib/types";
+  import type { UserListItem } from "$lib/db";
   import Button from '$lib/components/Button.svelte';
   import { RefreshCw, Users } from "@lucide/svelte";
   import { syncQueryParams, currentParams, readPageParam, pageParam } from "$lib/url-filters";
   import * as m from '$lib/paraglide/messages.js';
 
-  let filteredUsers = $state<UserType[]>([]);
+  let filteredUsers = $state<UserListItem[]>([]);
   let error = $state<string | null>(null);
   let isOnline = $state(navigator.onLine);
   let isSyncing = $state(true);

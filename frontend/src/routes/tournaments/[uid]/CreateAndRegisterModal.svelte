@@ -1,6 +1,7 @@
 <script lang="ts">
-  import type { Tournament, User } from "$lib/types";
-  import { getFilteredUsers, getUser, getRegistrationBarredUids } from "$lib/db";
+  import type { Tournament } from "$lib/types";
+  import type { UserListItem } from "$lib/db";
+  import { getFilteredUsers, getUserListItem, getRegistrationBarredUids } from "$lib/db";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { isOffline, addOfflinePlayer } from "$lib/stores/offline.svelte";
   import { getCountryFlag } from "$lib/geonames";
@@ -23,9 +24,9 @@
     tournament: Tournament;
     doAction: (action: TournamentEventType, body?: any) => Promise<string | null>;
     // Parent add path: register, or route a no-VEKN member here as sponsorTarget.
-    addPlayerByUser: (user: User) => Promise<void>;
+    addPlayerByUser: (user: UserListItem) => Promise<void>;
     showCreateModal: boolean;
-    sponsorTarget: User | null;
+    sponsorTarget: UserListItem | null;
   } = $props();
 
   const auth = getAuthState();
@@ -50,12 +51,12 @@
   let createCountry = $state('');
   let createLoading = $state(false);
   // Dedup review: look-alike members surfaced before a create is allowed to mint.
-  let createCandidates = $state<User[]>([]);
+  let createCandidates = $state<UserListItem[]>([]);
   let candidateSuspended = $state<Set<string>>(new Set());
   let dedupHeading = $state<HTMLElement | null>(null);
   // Deceased look-alikes are addable (backfilling a past event) but must be
   // confirmed — mirror AddPlayerForm's warn-not-block guard on the new add paths.
-  let pendingDeceased = $state<User | null>(null);
+  let pendingDeceased = $state<UserListItem | null>(null);
 
   // Announce the form→review swap to keyboard/SR users by moving focus to the
   // review heading (the DOM changes in place with no navigation otherwise).
@@ -94,7 +95,7 @@
   // Picking a surfaced duplicate pivots into the normal add path (register, or
   // sponsor+register) — no new member is minted. Suspended rows are
   // non-interactive; deceased ones route through the confirm.
-  function chooseCandidate(user: User) {
+  function chooseCandidate(user: UserListItem) {
     resetCreateModal();
     if (user.deceased_at) { pendingDeceased = user; return; }
     addPlayerByUser(user);
@@ -174,7 +175,7 @@
       // Cross-country email collision the client couldn't see locally: the
       // backend 409 carries the matched uid — pivot to sponsor+register it.
       if (e instanceof ApiError && e.code === 'user.email_exists' && e.params?.uid) {
-        const matched = await getUser(e.params.uid);
+        const matched = await getUserListItem(e.params.uid);
         if (matched) { chooseCandidate(matched); return; }
         // Match not in the local mirror yet: keep the modal, tell them to search.
         showToast({ type: 'error', message: m.create_dedup_email_exists_search() });

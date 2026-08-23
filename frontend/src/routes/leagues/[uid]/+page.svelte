@@ -2,7 +2,7 @@
   import { toUserMessage } from '$lib/errors';
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
-  import { getLeague, getAllTournaments, getAllLeagues, sortUpcomingFirst } from "$lib/db";
+  import { getLeague, getTournament, getTournamentListItems, getAllLeagues, sortUpcomingFirst, type TournamentListItem } from "$lib/db";
   import { updateLeague, deleteLeagueApi, addLeagueOrganizer, removeLeagueOrganizer } from "$lib/api";
   import { syncManager } from "$lib/sync";
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
@@ -34,7 +34,7 @@
 
   let league = $state<League | null>(null);
   let parentLeague = $state<{ uid: string; name: string } | null>(null);
-  let leagueTournaments = $state<Tournament[]>([]);
+  let leagueTournaments = $state<TournamentListItem[]>([]);
   let upcomingTournamentCount = $state(0);
   let childLeagues = $state<League[]>([]);
   let orphanLeagues = $state<League[]>([]);
@@ -43,10 +43,10 @@
   // otherwise lives only in each tournament's Config tab).
   let addEventOpen = $state(false);
   let addEventLoading = $state(false);
-  let linkableTournaments = $state<Tournament[]>([]);
+  let linkableTournaments = $state<TournamentListItem[]>([]);
 
   async function openAddEvent() {
-    const all = await getAllTournaments();
+    const all = await getTournamentListItems();
     // Create-form gating inverted: MY tournaments, league-less, format-compatible.
     linkableTournaments = all
       .filter(t =>
@@ -59,7 +59,7 @@
     addEventOpen = true;
   }
 
-  async function linkTournament(t: Tournament) {
+  async function linkTournament(t: TournamentListItem) {
     addEventLoading = true;
     try {
       await tournamentAction(t.uid, "UpdateConfig", { config: { league_uid: uid } });
@@ -130,7 +130,7 @@
     const p = l.parent_uid ? await getLeague(l.parent_uid) : undefined;
     parentLeague = p && !p.deleted_at ? { uid: p.uid, name: p.name } : null;
 
-    const allTournaments = await getAllTournaments();
+    const allTournaments = await getTournamentListItems();
     leagueTournaments = allTournaments.filter(t => t.league_uid === uid && !t.deleted_at);
     upcomingTournamentCount = sortUpcomingFirst(leagueTournaments);
 
@@ -161,7 +161,12 @@
     organizerNames = names;
 
     standingsError = false;
-    const finishedTournaments = leagueTournaments.filter(t => t.state === "Finished" && t.standings?.length);
+    // League scoring needs each event's whole result sheet, which the list projection drops —
+    // a league's finished events are a handful, so they are re-read by key.
+    const finished = await Promise.all(
+      leagueTournaments.filter(t => t.state === "Finished").map(t => getTournament(t.uid)),
+    );
+    const finishedTournaments = finished.filter((t): t is Tournament => !!t?.standings?.length);
     if (finishedTournaments.length > 0) {
       try {
         const tournamentData = finishedTournaments.map(t => ({

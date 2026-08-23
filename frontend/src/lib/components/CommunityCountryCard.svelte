@@ -5,18 +5,19 @@
   import { deobfuscateContact } from "$lib/contact";
   import { getCountryFlag } from "$lib/geonames";
   import { getRoleTone, getRoleLabel } from "$lib/roles";
-  import type { CommunityLink, User } from "$lib/types";
+  import type { CommunityLink } from "$lib/types";
+  import type { UserListItem } from "$lib/db";
   import { ChevronDown, ChevronRight, Pencil } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  interface LinkEntry { user: User; link: CommunityLink }
+  interface LinkEntry { user: UserListItem; link: CommunityLink }
 
   interface Props {
     code: string;
     name: string;
     pinned: LinkEntry[];
     groups: LinkEntry[];
-    officials: User[];
+    officials: UserListItem[];
     isOwnCountry: boolean;
     expanded: boolean;
     showLinks: boolean;
@@ -42,7 +43,7 @@
   let princesOpen = $state(false);
 </script>
 
-{#snippet officialRow(official: User)}
+{#snippet officialRow(official: UserListItem)}
   {@const email = deobfuscateContact(official.contact_email)}
   {@const phone = deobfuscateContact(official.contact_phone)}
   <div class="py-3 first:pt-0 last:pb-0">

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { User } from "$lib/types";
+  import type { UserListItem } from "$lib/db";
   import { getUser } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
   import { showToast } from "$lib/stores/toast.svelte";
@@ -33,7 +34,7 @@
     loadOrganizers();
   });
 
-  async function handleAdd(user: User) {
+  async function handleAdd(user: UserListItem) {
     loading = true;
     try {
       await onadd(user.uid);

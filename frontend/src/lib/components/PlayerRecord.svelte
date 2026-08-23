@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { User, Tournament, DeckObject } from "$lib/types";
-  import { getAllTournaments, getDecksByUser, getTournament } from "$lib/db";
+  import type { TournamentListItem } from "$lib/db";
+  import { getTournamentListItems, getDecksByUser, getTournament } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
@@ -13,10 +14,10 @@
 
   let wins = $state<Tournament[]>([]);
   let decks = $state<{ deck: DeckObject; tournament: Tournament | undefined }[]>([]);
-  let undocumented = $state<Tournament[]>([]);
+  let undocumented = $state<TournamentListItem[]>([]);
   let expandedDeck = $state<string | null>(null);
 
-  function day(t: Tournament | undefined): string {
+  function day(t: { start: string | null } | undefined): string {
     return t?.start?.slice(0, 10) ?? "";
   }
 
@@ -38,7 +39,7 @@
       return;
     }
     const owned = new Set(mine.map(d => d.tournament_uid));
-    undocumented = (await getAllTournaments())
+    undocumented = (await getTournamentListItems())
       .filter(t => t.winner === uid && !t.deleted_at && !owned.has(t.uid))
       .sort((a, b) => day(b).localeCompare(day(a)));
   }
