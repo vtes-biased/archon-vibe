@@ -10,6 +10,20 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- The winner's decklist from a tournament now reaches the TWDA archive.
+- Invite links now last a week, and an expired one offers a fresh link.
+- A member invited by email is no longer given a second account when they play at a venue.
+- A tab that loses its live connection now notices and reconnects on its own.
+- The offline indicator no longer claims you are online while the connection is retrying.
+- The member and tournament lists load and filter far faster.
+- A member created at the tournament desk now syncs to vekn.net.
+- The winner reported to vekn.net is now the player who won the final, not the top seed.
+- A tournament that ended without a final no longer pays its standings leader the winner's rating points.
+- A disqualification recorded on vekn.net is kept when the tournament is imported.
+- A registered player who never sat is no longer ranked among the field in an imported tournament.
+
 ## v1.0.7 — 2026-08-21
 
 - The seating editor can now add and remove players from the round.
