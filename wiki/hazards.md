@@ -186,7 +186,11 @@ re-opens it. Rank and position are deliberately not the same answer: a sheet nam
 a winner but flagging no finalist places that winner 1st and stamps 0, because
 nothing there evidences a final. `final_played` is that one test, and the +1
 tournament-win GW in `compute_rating_vp_gw` and `league.rs` is gated on it too —
-a winner credit is a credit either way.
+a winner credit is a credit either way. `ranking_eligibility` deliberately does
+**not** use it: a bare `winner` counts as a final there, because a crowned event
+still rates for participation and VP — it is only the winner's credit that goes.
+Unifying the two would stop such an event rating at all, which is a different
+answer to a question still with the Rules Director.
 
 **Standings count by table, not by round.** A finished table scores while its round
 is still running — the raffle pools depend on it, reading

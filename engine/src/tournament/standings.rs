@@ -271,8 +271,6 @@ fn with_placement(standing: &JsonValue, rank: usize, finalist_position: i32) -> 
     obj
 }
 
-/// An importer can name a winner no final produced — an archon file with no finals
-/// table crowns its top preliminary seat. Only a flag on the sheet tells the two apart.
 pub fn final_played(standings: &JsonValue) -> bool {
     standings
         .members()
@@ -539,7 +537,7 @@ pub fn display_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<J
 
 /// SA-adjusted rating VP/GW for a finished tournament, including finals VP/GW unlike
 /// preliminary standings. A win credits +1 GW where a final was played but no finals
-/// table recorded it (inert when `winner == ""`, and when nothing evidences a final).
+/// table recorded it (inert when `winner == ""`).
 pub fn compute_rating_vp_gw(
     tournament: &JsonValue,
     sanctions: &JsonValue,
