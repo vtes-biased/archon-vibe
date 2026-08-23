@@ -53,6 +53,16 @@ Our **VEKN imports** of no-final events *do* get full credit, because the import
 sets winner and finalist from the upstream position. So a native no-final finish is
 under-rated against the identical event imported from vekn.net.
 
+The **archon-file importer** is a third answer again: with no finals table in the
+file it stamps the top preliminary row as `winner` outright
+(`archon_import.py`, the `if not winner_uid` fallback after the standings sort).
+That winner then takes rank 1, the 90·coef bonus and a Hall-of-Fame-eligible win —
+a fact invented locally, where the VEKN importer at least carries one the upstream
+record states and the engine deliberately states none. `wiki/tournaments.md` does
+contemplate a no-final *import* carrying a winner, so this is not simply a bug to
+delete: whichever way Q1 and Q2 are answered, the three paths have to end up saying
+the same thing, and the archon importer is the one with no source to point at.
+
 ## The evidence that vekn.net credits them
 
 Decomposing the per-player `rtp` the VEKN event API returns, against
