@@ -112,7 +112,6 @@ pub fn compute_league_standings(config_json: &str) -> Result<String, EngineError
                 continue;
             }
 
-            // Non-Score total = prelim + finals + the no-final tournament-win GW.
             let (fgw, fvp, ftp) = finals_by_uid.get(&uid).copied().unwrap_or((0.0, 0.0, 0));
             let win_gw = if !has_finals && uid == winner && final_played {
                 1.0

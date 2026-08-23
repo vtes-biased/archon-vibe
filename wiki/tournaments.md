@@ -28,7 +28,9 @@ server (PyO3) behave identically.
 
 **Ranking eligibility** — the engine's `ranking_eligibility` is the single
 predicate behind the rating inclusion filter, the ranked/unranked badge and the
-RtP column: at least 8 players who played **and** a played final, never for
+RtP column: at least 8 players who played **and** a final — a finals table or a
+named winner, which is a wider test than the `final_played` the rating bonus and
+the tournament-win GW are gated on ([hazards](hazards.md)) — never for
 open-rounds or self-organized events, and never for a row with no play data at all
 (`no_results` — an archival record carries a winner but nothing that was played).
 
