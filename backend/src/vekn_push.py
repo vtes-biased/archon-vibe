@@ -16,6 +16,7 @@ from .db import (
     save_user,
     tournament_transaction,
 )
+from .geonames import get_country
 from .models import (
     ObjectType,
     Tournament,
@@ -329,6 +330,11 @@ async def push_member(
     email = user.contact_email or f"{user.vekn_id}@placeholder.vekn.net"
     country = user.country or ""
 
+    # The registry refuses a create with an empty city, and the desk form that
+    # mints most members never asks for one.
+    country_data = get_country(country) if country else None
+    city = user.city or (country_data["capital"] if country_data else "")
+
     try:
         await client.create_member(
             veknid=user.vekn_id,
@@ -337,7 +343,7 @@ async def push_member(
             email=email,
             country=country,
             state=user.state or "",
-            city=user.city or "",
+            city=city,
         )
     except VEKNAPIConnectionError:
         raise  # batch-fatal: let batch_push abort and retry next cycle
