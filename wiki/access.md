@@ -112,11 +112,22 @@ response whose header list is empty. While the auto-approve path returned a 302 
 page navigated to the empty string, which reloads the consent page, which calls
 `/authorize` again — a returning user looped forever instead of reaching the app.
 
-Endpoints `/oauth/{authorize,token,userinfo}`; client CRUD and secret regeneration
-under `/oauth/clients` (DEV role); `GET /oauth/consents` lists authorized apps and
-is **first-party session only**, rejecting OAuth tokens with 403;
-`DELETE /oauth/consents/{client_id}` revokes consent and immediately revokes live
-tokens for that client.
+Endpoints `/oauth/{authorize,token,revoke,userinfo}`; client CRUD and secret
+regeneration under `/oauth/clients` (DEV role); `GET /oauth/consents` lists
+authorized apps and is **first-party session only**, rejecting OAuth tokens with
+403; `DELETE /oauth/consents/{client_id}` revokes consent and immediately revokes
+live tokens for that client.
+
+`POST /oauth/revoke` (RFC 7009) is how a client hands a pair back without sending
+the user to their profile page. It takes the token itself rather than a jti, and
+revokes the **whole rotation lineage** it belongs to — either half kills the other,
+and a rotated chain dies with it. Expiry is not verified on the way in, so an
+expired access token still names the live refresh sibling handed back with it.
+Past client authentication every answer is 200 — unknown, malformed, expired or
+another client's token alike — so the endpoint is no oracle for which tokens
+exist; only a bad client secret (401) and a missing `token` (400) fail. Consent
+survives: revoking tokens is not revoking the grant, which is
+`DELETE /oauth/consents/{client_id}`.
 
 Scopes: `profile:read` (limited to `/oauth/*`) and `user:impersonate` (full API)
 delegate a *user's* authority; `api:read` delegates nobody's and is refused at

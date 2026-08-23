@@ -156,13 +156,13 @@ Both checks run on this app's own SQL, since the isolation lint forbids the
 shape asserted in two places
 ([hazards](hazards.md#two-implementations-of-one-gate)).
 
-**A third party only ever types one hostname.** `/oauth/token` is the app's
-endpoint, but the API's vhost proxies it, and proxies the tournament banner route
-beside it. Both keep the app's own path rather than a rewritten one, so
-`banner_path` works verbatim against the API host and nothing has to be kept in
-step. The minting flow itself is a member account plus the DEV role an IC grants,
-then a self-registered client: the reference page states that rather than telling
-a reader to ask us.
+**A third party only ever types one hostname.** `/oauth/token` and
+`/oauth/revoke` are the app's endpoints, but the API's vhost proxies them, and
+proxies the tournament banner route beside them. Every one of the three keeps
+the app's own path rather than a rewritten one, so `banner_path` works verbatim
+against the API host and nothing has to be kept in step. The minting flow itself
+is a member account plus the DEV role an IC grants, then a self-registered
+client: the reference page states that rather than telling a reader to ask us.
 
 `/docs` and `/openapi.json` are open. The owner's "no anonymous" decision was
 about the data; a reference page nobody can read before registering is a barrier

@@ -277,7 +277,15 @@ class TokenRequest(BaseModel):
     scope: str = ""
 
 
-# The handler takes a raw Request to accept both encodings, so FastAPI derives
+class RevokeRequest(BaseModel):
+    """POST /revoke body (RFC 7009)."""
+
+    client_id: str = ""
+    client_secret: str = ""
+    token: str = ""
+
+
+# Both handlers take a raw Request to accept either encoding, so FastAPI derives
 # no request body of its own.
 _TOKEN_BODY = {
     "requestBody": {
@@ -288,10 +296,19 @@ _TOKEN_BODY = {
         },
     }
 }
+_REVOKE_BODY = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            media: {"schema": RevokeRequest.model_json_schema()}
+            for media in ("application/x-www-form-urlencoded", "application/json")
+        },
+    }
+}
 
 
-async def _token_body(request: Request) -> TokenRequest:
-    """Form-encoded as RFC 6749 requires, or JSON with the same keys."""
+async def _rfc_body[T: BaseModel](request: Request, model: type[T]) -> T:
+    """Form-encoded as the RFCs require, or JSON with the same keys."""
     raw = await request.body()
     if request.headers.get("content-type", "").startswith(
         "application/x-www-form-urlencoded"
@@ -304,8 +321,8 @@ async def _token_body(request: Request) -> TokenRequest:
             raise HTTPException(400, "Body must be form-encoded or JSON") from None
     if not isinstance(fields, dict):
         raise HTTPException(400, "Body must be form-encoded or JSON")
-    known = TokenRequest.model_fields
-    return TokenRequest(
+    known = model.model_fields
+    return model(
         **{k: str(v) for k, v in fields.items() if k in known and v is not None}
     )
 
@@ -317,7 +334,7 @@ async def token_endpoint(request: Request):
     The client authenticates with its client_id and client_secret in the body,
     form-encoded as RFC 6749 requires or as JSON with the same keys.
     """
-    body = await _token_body(request)
+    body = await _rfc_body(request, TokenRequest)
     grant_type = body.grant_type
 
     client = await get_oauth_client_by_client_id(body.client_id)
@@ -534,6 +551,40 @@ async def _issue_token_pair(
         "expires_in": int(ACCESS_TOKEN_LIFETIME.total_seconds()),
         "scope": " ".join(scopes),
     }
+
+
+@router.post("/revoke", openapi_extra=_REVOKE_BODY)
+async def revoke_token(request: Request):
+    """Revoke a token and the whole rotation lineage it belongs to (RFC 7009)."""
+    body = await _rfc_body(request, RevokeRequest)
+
+    client = await get_oauth_client_by_client_id(body.client_id)
+    if not client or not client.active:
+        raise HTTPException(401, "Invalid client credentials")
+
+    try:
+        ph.verify(client.client_secret_hash, body.client_secret)
+    except VerifyMismatchError:
+        raise HTTPException(401, "Invalid client credentials") from None
+
+    if not body.token:
+        raise HTTPException(400, "Missing token")
+
+    try:
+        payload = jwt.decode(
+            body.token,
+            JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],
+            options={"verify_exp": False},
+        )
+    except jwt.InvalidTokenError:
+        return {"status": "ok"}
+
+    record = await get_oauth_token_by_jti(payload.get("jti", ""))
+    if record and record.client_id == client.client_id:
+        await revoke_oauth_token_chain(record.parent_token_uid or record.uid)
+
+    return {"status": "ok"}
 
 
 @router.get("/userinfo")

@@ -58,7 +58,7 @@ server {
 
   # Proxied to the app, at the app's own path: a third party never types a
   # second hostname, and a rewritten path here would drift from `banner_path`.
-{%- for path in ['= /oauth/token', '~ ^/api/tournaments/[0-9a-fA-F-]+/banner$'] %}
+{%- for path in ['= /oauth/token', '= /oauth/revoke', '~ ^/api/tournaments/[0-9a-fA-F-]+/banner$'] %}
   location {{ path }} {
     limit_req zone={{ _zone }}_read burst=100 nodelay;
     proxy_pass http://127.0.0.1:{{ r.backend_port }};
