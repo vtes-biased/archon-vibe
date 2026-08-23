@@ -664,8 +664,8 @@ class SyncManager {
 
   /** After clearAllStores(), lastSync is null so connect() fetches snapshot first. */
   async refresh(): Promise<void> {
-    // Close first, drop buffers first: this runs against a live stream, and a frame landing in one of
-    // clearAllStores()'s await gaps writes a row at the access level being left — which the refill only adds over.
+    // Ordering is load-bearing: close before clearing, and drop the buffers before disconnect(),
+    // whose flushAllBuffers() would otherwise write them back at the outgoing access level.
     this.buffers.clear();
     await this.disconnect();
     await this.clearAllStores();
