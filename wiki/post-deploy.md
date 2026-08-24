@@ -76,43 +76,6 @@ SELECT count(*) FROM objects WHERE type = 'user'
 the collapse, and the record it was stored in was never displayed. Delete this
 section and its entry.
 
-## Backfill the `api` projection
-
-**Gated on** `200af6b`, the last commit to change the `api` projection's shape. A
-projection is computed at write time, so every row saved before that commit went
-live carries a NULL or pre-narrowing `api` and is wrong for the public API.
-`init_db` adds the column on deploy; only a re-save fills it. Deploying an
-earlier commit of the series and running this then would satisfy the proof
-queries below on the old shape and delete this section with nothing left to
-re-trigger it.
-
-**Run** from the deployed tree, count first, then apply:
-
-```sh
-/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/reproject_public.py
-/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/reproject_public.py --apply
-```
-
-It re-saves users, tournaments, decks and leagues (sanctions and promos are
-permanently NULL at `api`). Safe against the live backend and idempotent.
-
-**Proves it worked**: `SELECT count(*) FROM objects WHERE type = 'tournament' AND
-"api" IS NULL AND deleted_at IS NULL` returns 0, and the same query for `user`
-returns exactly the count of users without a `vekn_id`.
-
-A NULL check alone cannot see a *stale* projection, so two shape queries must
-also return 0 — a deck still carrying the constant the narrowing removed, and a
-link whose moderation is still a record rather than one value:
-
-```sql
-SELECT count(*) FROM objects WHERE type = 'deck' AND "api" ? 'public';
-SELECT count(*) FROM objects WHERE type = 'user'
-  AND jsonb_path_exists("api", '$.community_links[*].moderation.status');
-```
-
-**Owes afterwards**: nothing to tell anyone — no consumer can reach the column
-until the API app ships. Delete this section.
-
 ## Re-submit the decks the archive refused
 
 **Gated on** the commit carrying this section — *"Submit the winner's deck from a
