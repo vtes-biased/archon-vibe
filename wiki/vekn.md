@@ -216,6 +216,23 @@ draws `provided 4, expected 3` on every attempt. Only three of the seven are sti
 being retried; the other four carry a `vekn_pushed_at` from the legacy-archon
 migration, which stamps without uploading, so nothing tries them at all.
 
+**When the calendar entries are corrected, the retry is not automatic.** Three of
+the seven are unstamped, so the hourly batch picks them up on its own. The other
+four carry a `vekn_pushed_at` from the migration, and nothing on this side clears
+it — `UNPUSHED_RESULTS_QUERY` filters on it, the manual push-vekn route skips the
+results push on a stamped row too, and a raw SQL clear would strand the member
+projection on the old value. **Deferred, with a trigger**: when vekn.net reports
+the entries fixed, run per event and check the report before writing.
+
+```sh
+… /opt/archon/backend/scripts/fix_stuck_vekn_push.py --vekn <id> --stamp-only
+… fix_stuck_vekn_push.py --vekn <id> --stamp-only --apply
+```
+
+Then the next hourly batch uploads to the existing calendar event. It is
+**approval that publishes**, so expect the audit to read them as pending, not as
+placed, until an official works the queue.
+
 Comparing those counts means reading the calendar field as the string it is:
 `event.php` returns `CONCAT(rounds, "R", IF(final > 0, "+F", ""))`, so `3R+F` is
 four in the archon file's terms and the `+F` must be added back —
