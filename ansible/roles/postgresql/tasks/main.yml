@@ -11,13 +11,22 @@
     state: present
     update_cache: true
 
-# The unversioned metapackage depends on PGDG's newest major, so leaving it
+# The unversioned metapackages depend on PGDG's newest major, so leaving either
 # installed makes every apt upgrade pull the next one in beside ours.
-- name: Remove the unversioned postgresql metapackage
+- name: Remove the unversioned postgresql metapackages
   ansible.builtin.apt:
-    name: postgresql
+    name:
+      - postgresql
+      - postgresql-client
     state: absent
     autoremove: false
+
+# apt-get autoremove is run by the upgrade role; contrib must be manual or an
+# unrelated upgrade can sweep the extensions out from under the database.
+- name: Mark manually installed postgresql-contrib-{{ postgresql_version }}
+  ansible.builtin.command: apt-mark manual postgresql-contrib-{{ postgresql_version }}
+  register: postgresql_contrib_mark
+  changed_when: "'was already set to manually installed' not in postgresql_contrib_mark.stdout"
 
 - name: Ensure postgresql service is enabled + running
   ansible.builtin.service:
