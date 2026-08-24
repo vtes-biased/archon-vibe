@@ -69,11 +69,14 @@ async def _ours(t: Tournament) -> dict[str, int]:
     return out
 
 
-def _theirs(event: dict) -> dict[str, int]:
-    """{vekn_id: pos} as vekn.net holds it. `pos` on a DQ'd or withdrawn row is
-    the field size rather than a placement, so those rows carry no placement."""
+def _theirs(event: dict) -> tuple[dict[str, int], int]:
+    """({vekn_id: pos} as vekn.net holds it, upstream row count). `pos` on a DQ'd
+    or withdrawn row is the field size rather than a placement, so those rows
+    carry no placement. An empty map over a non-empty roster means upstream
+    stores no placement for this event at all — not that it disagrees."""
     out: dict[str, int] = {}
-    for p in event.get("players", []):
+    rows = event.get("players", []) or []
+    for p in rows:
         vekn_id = str(p.get("veknid") or "")
         pos = str(p.get("pos") or "")
         if not vekn_id or not pos.isdigit():
@@ -81,7 +84,7 @@ def _theirs(event: dict) -> dict[str, int]:
         if str(p.get("dq") or "0") == "1" or str(p.get("wd") or "0") == "1":
             continue
         out[vekn_id] = int(pos)
-    return out
+    return out, len(rows)
 
 
 def _top(placement: dict[str, int], n: int) -> set[str]:
@@ -95,6 +98,7 @@ async def run(args: argparse.Namespace) -> int:
     checked = agreed = unreachable = 0
     wrong_crown: list[str] = []
     wrong_five: list[str] = []
+    no_placement: list[str] = []
     try:
         async with db.get_connection() as conn:
             rows = await (
@@ -118,7 +122,16 @@ async def run(args: argparse.Namespace) -> int:
                 continue
 
             checked += 1
-            ours, theirs = await _ours(t), _theirs(event)
+            ours = await _ours(t)
+            theirs, upstream_rows = _theirs(event)
+            if not theirs:
+                # Nothing to disagree with: upstream stores no placement here.
+                no_placement.append(str(event_id))
+                print(
+                    f"  NONE  {event_id:>6} {t.name} — {upstream_rows} row(s), no pos"
+                )
+                continue
+
             our_first = {v for v, pos in ours.items() if pos == 1}
             their_first = {v for v, pos in theirs.items() if pos == 1}
             crown_differs = our_first != their_first
@@ -138,12 +151,15 @@ async def run(args: argparse.Namespace) -> int:
         print()
         print(f"{checked} event(s) compared, {unreachable} unreachable.")
         print(f"  {agreed:>6} agree with vekn.net")
+        print(f"  {len(no_placement):>6} hold no placement upstream at all")
         print(f"  {len(wrong_crown):>6} crown a different player at position 1")
         print(f"  {len(wrong_five):>6} agree on the winner but not on the five")
         if wrong_crown:
             print(f"\nwrong crown: {','.join(wrong_crown)}")
         if wrong_five:
             print(f"wrong five: {','.join(wrong_five)}")
+        if no_placement:
+            print(f"no placement: {','.join(no_placement)}")
         return 0
     finally:
         await client.close()
