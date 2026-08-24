@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.0.8 — 2026-08-24
 
 - The winner's decklist from a tournament now reaches the TWDA archive.
 - Invite links now last a week, and an expired one offers a fresh link.
