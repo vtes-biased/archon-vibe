@@ -99,6 +99,7 @@ async def run(args: argparse.Namespace) -> int:
     wrong_crown: list[str] = []
     wrong_five: list[str] = []
     no_placement: list[str] = []
+    round_mismatch = 0
     try:
         async with db.get_connection() as conn:
             rows = await (
@@ -125,10 +126,16 @@ async def run(args: argparse.Namespace) -> int:
             ours = await _ours(t)
             theirs, upstream_rows = _theirs(event)
             if not theirs:
-                # Nothing to disagree with: upstream stores no placement here.
+                # vekn.net refuses an upload whose round count disagrees with the
+                # calendar, so the two counts are reported next to the absence.
                 no_placement.append(str(event_id))
+                ours_n = len(t.rounds) + (1 if t.finals else 0)
+                theirs_n = str(event.get("rounds") or "?")
+                flag = "ROUNDS" if str(ours_n) != theirs_n else "      "
+                round_mismatch += 1 if flag.strip() else 0
                 print(
-                    f"  NONE  {event_id:>6} {t.name} — {upstream_rows} row(s), no pos"
+                    f"  NONE  {event_id:>6} {flag} ours:{ours_n} vekn:{theirs_n} "
+                    f"{upstream_rows} row(s) — {t.name}"
                 )
                 continue
 
@@ -152,6 +159,7 @@ async def run(args: argparse.Namespace) -> int:
         print(f"{checked} event(s) compared, {unreachable} unreachable.")
         print(f"  {agreed:>6} agree with vekn.net")
         print(f"  {len(no_placement):>6} hold no placement upstream at all")
+        print(f"  {round_mismatch:>6} of those disagree with the calendar on rounds")
         print(f"  {len(wrong_crown):>6} crown a different player at position 1")
         print(f"  {len(wrong_five):>6} agree on the winner but not on the five")
         if wrong_crown:
