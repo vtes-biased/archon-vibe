@@ -73,8 +73,8 @@ async def _ours(t: Tournament) -> dict[str, int]:
 def _theirs(event: dict) -> tuple[dict[str, int], int]:
     """({vekn_id: pos} as vekn.net holds it, upstream row count). `pos` on a DQ'd
     or withdrawn row is the field size rather than a placement, so those rows
-    carry no placement. An empty map over a non-empty roster means upstream
-    stores no placement for this event at all — not that it disagrees."""
+    carry no placement. An empty map means upstream has no participant rows,
+    which is an archon file nobody has approved yet — not a disagreement."""
     out: dict[str, int] = {}
     rows = event.get("players", []) or []
     for p in rows:
@@ -138,8 +138,8 @@ async def run(args: argparse.Namespace) -> int:
             ours = await _ours(t)
             theirs, upstream_rows = _theirs(event)
             if not theirs:
-                # vekn.net refuses an upload whose round count disagrees with the
-                # calendar, so the two counts are reported next to the absence.
+                # No participant rows is the normal state of an archon file
+                # nobody has approved yet, so this is a queue, not a failure.
                 no_placement.append(str(event_id))
                 ours_n = len(t.rounds) + (1 if t.finals else 0)
                 raw = str(event.get("rounds") or "")
@@ -147,7 +147,7 @@ async def run(args: argparse.Namespace) -> int:
                 flag = "ROUNDS" if theirs_n != ours_n else "      "
                 round_mismatch += 1 if flag.strip() else 0
                 print(
-                    f"  NONE  {event_id:>6} {flag} ours:{ours_n} "
+                    f"  PEND  {event_id:>6} {flag} ours:{ours_n} "
                     f"vekn:{theirs_n} ({raw or '?'}) {upstream_rows} row(s) — {t.name}"
                 )
                 continue
@@ -171,8 +171,8 @@ async def run(args: argparse.Namespace) -> int:
         print()
         print(f"{checked} event(s) compared, {unreachable} unreachable.")
         print(f"  {agreed:>6} agree with vekn.net")
-        print(f"  {len(no_placement):>6} hold no placement upstream at all")
-        print(f"  {round_mismatch:>6} of those disagree with the calendar on rounds")
+        print(f"  {len(no_placement):>6} await approval on vekn.net")
+        print(f"  {round_mismatch:>6} of those are refused on the round count")
         print(f"  {len(wrong_crown):>6} crown a different player at position 1")
         print(f"  {len(wrong_five):>6} agree on the winner but not on the five")
         if wrong_crown:
@@ -180,7 +180,7 @@ async def run(args: argparse.Namespace) -> int:
         if wrong_five:
             print(f"wrong five: {','.join(wrong_five)}")
         if no_placement:
-            print(f"no placement: {','.join(no_placement)}")
+            print(f"awaiting approval: {','.join(no_placement)}")
         return 0
     finally:
         await client.close()

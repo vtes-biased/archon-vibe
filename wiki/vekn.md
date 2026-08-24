@@ -84,6 +84,19 @@ and the standings screen read, with two departures the format forces:
   winner bonus to every one of them; the ordinal matches what vekn.net does with
   such an event itself. What it *should* do is [open](tournaments.md).
 
+**A successful upload is not a published result.** `uploadArchon` validates and
+writes to `#__veknarchon`, then returns 200 — and that is all it does. The
+`#__veknparticipant` rows every reader sees, `pos` included, are inserted only by
+`archon_approve.php`, a manual page restricted to super users, the Ratings
+Coordinator and NCs. So between our push and a human approval an event legitimately
+carries **no players at all** on vekn.net: `attendance` 0, an empty `players` list,
+no placement, no rating. That is a queue, not a loss, and no API call clears it.
+
+A corollary worth stating, because it looks like a bug: reading an event back after
+a successful push and finding nothing there proves nothing about the push. The
+only failure it distinguishes is one that `uploadArchon` rejected outright, and
+those raise on the inner `code` at the time.
+
 **vekn.net's importer cross-contaminates a mixed tail.** `archon_approve.php` sets
 `dq` or `wd` in a `switch` that never clears the other, so a `WD` row following a
 `DQ` row is stored as disqualified too. Nothing we can send prevents it.
@@ -185,29 +198,28 @@ later, since whether upstream re-derives points from a corrected `pos` is
 [unestablished](domain/vekn.md#never-chase-veknnets-stored-rtp); if they do not
 follow, the winner holds the loser's rating and that is its own board line.
 
-### Results vekn.net never stored — cause not yet established
+### Events awaiting approval on vekn.net
 
-The same audit found 28 finished events holding **no placement upstream at all**
-— and upstream holds no *roster* for them either, zero player rows each — plus
-12478 and 12844, whose vekn ids resolve to no event. Their players earned nothing
-from them. **Ours to diagnose before anything is handed to anyone.**
+*(Measured 2026-08-24, `backend/scripts/audit_vekn_placement.py` over 322 events.)*
 
-The round count explains **7 of the 28**, not all of them: 12498, 12555, 12959,
-13495, 13487, 13500, 13473. vekn.net refuses an upload whose archon file
-disagrees with the calendar entry on rounds, and *Göcsej Under Siege* is the
-worked case — ours 4 against the calendar's `3R`, which is the `provided 4,
-expected 3` its upload returns to this day. Because a refused upload never stamps
-`vekn_pushed_at`, `batch_push` selects it every hour and is refused every hour.
+28 finished events carry no participant rows upstream. That is the normal state of
+an archon file we uploaded and nobody has approved yet — participants exist only
+once `archon_approve.php` runs, above — so it is a **queue an official has to
+work**, not a defect of ours and nothing to hand the API maintainers. 12478
+(*"Prueba fallida to be deleted"*) and 12844 resolve to no event at all and are
+separate.
 
-**The other 21 agree on rounds and are unexplained.** Whatever refused them is a
-second cause, and a zero-row roster upstream says the upload never landed at all
-rather than landing without positions.
+Seven of the 28 are genuinely refused, on the round count: 12498, 12555, 12959,
+13495, 13487, 13500, 13473. vekn.net computes `nrounds + final` and compares it to
+the archon file's, so *Göcsej Under Siege* — ours 4 against a calendar `3R` —
+draws `provided 4, expected 3` on every attempt. Only three of the seven are still
+being retried; the other four carry a `vekn_pushed_at` from the legacy-archon
+migration, which stamps without uploading, so nothing tries them at all.
 
-Comparing the counts requires reading the calendar field as the string it is:
-`3R+F` is three prelims **and a final**, four in the archon file's terms, so the
-`+F` must be added back — `_parse_rounds` drops it on purpose, because
-`max_rounds` is prelim-only. Comparing that string against an integer flags every
-event and reports one shared cause where there are at least two.
+Comparing those counts means reading the calendar field as the string it is:
+`event.php` returns `CONCAT(rounds, "R", IF(final > 0, "+F", ""))`, so `3R+F` is
+four in the archon file's terms and the `+F` must be added back —
+`_parse_rounds` drops it on purpose, because `max_rounds` is prelim-only.
 
 ## Inbound sync
 
