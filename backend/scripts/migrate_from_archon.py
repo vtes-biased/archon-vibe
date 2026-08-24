@@ -1,9 +1,11 @@
-"""ETL + daily merge: legacy **archon** DB → **archon-vibe** unified `objects` table.
+"""ETL + merge: legacy **archon** DB → **archon-vibe** unified `objects` table.
 
 Two modes against the same mapping code: insert-only ETL (default;
 `--truncate` wipes first) for beta rebuilds and disaster fallback, and
-idempotent `--merge`, run daily during the parallel-run period against old
-archon as a read-only second upstream.
+idempotent `--merge` against a legacy archon DB as a read-only second upstream.
+
+The legacy stack it read from is decommissioned and its database archived, so
+both modes now need a restored dump to point at.
 
 Reads the OLD archon Postgres (members / leagues / tournaments / clients /
 member_deletions) and writes the NEW archon-vibe schema, REUSING the backend's
@@ -17,10 +19,9 @@ Dry-run against the sandbox (from the repo root):
     NEW_DATABASE_URL=postgresql://etl:etl@localhost:5544/archon_new \\
     uv run python backend/scripts/migrate_from_archon.py --truncate
 
-On the prod box the deployed venv already has `backend.src` installed, so run
-it directly (no checkout needed) — this is what the archon-legacy-sync unit does:
-    /opt/archon/backend/.venv/bin/python \\
-      /opt/archon/backend/scripts/migrate_from_archon.py --merge
+On a deployed box the venv already has `backend.src` installed, so the script
+runs directly against it with no checkout:
+    /opt/archon/backend/.venv/bin/python path/to/migrate_from_archon.py --merge
 
 `--limit N` caps each type for quick smoke runs; `--truncate` wipes the new
 objects/auth_methods first so ETL reruns are idempotent.

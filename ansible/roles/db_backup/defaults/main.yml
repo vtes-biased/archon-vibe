@@ -19,8 +19,6 @@ r: {}
 db_backup_backup_dir_default: /var/backups/postgres
 db_backup_retention_days_default: 7
 db_backup_exclude_default: []
-# 03:00 lands a restore point right before the 04:00 legacy_sync merge, the
-# riskiest daily write, and its 15m jitter must stay inside that gap.
 db_backup_oncalendar_default: "*-*-* 03:00:00"
 db_backup_check_oncalendar_default: "Sun *-*-* 06:00:00"
 db_backup_remote_enabled_default: false

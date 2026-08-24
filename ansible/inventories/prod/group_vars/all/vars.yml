@@ -29,9 +29,6 @@ env_dir: /etc/archon
 backend_service: archon-backend
 bot_service: archon-bot
 api_service: archon-public-api
-# Legacy archon stack sharing the vekn.net VPS during the parallel run; it
-# writes to the same PG cluster, so migrate_postgres.yml must stop/start it.
-legacy_web_service: archon_web
 
 # PostgreSQL pinned via PGDG repo. Python is managed by uv, identical on prod and beta.
 postgresql_version: 17
@@ -42,29 +39,18 @@ uv_python_install_dir: /opt/uv/python
 # reprovision. No-op against a swap already added by hand.
 swapfile_enabled: true
 
-# Distinct role from legacy archon's `archon` PG role: both stacks share one
-# PG17 cluster during the parallel run, and reusing `archon` would reset its
-# password and lock legacy out.
 db_name: archon
 db_user: archonvibe
 db_password: "{{ vault_db_password }}"
 
-# PG footprint trimmed for the tiny VPS shared by both stacks during the
-# parallel run. shared_buffers + max_connections need a PG restart to take
-# effect; max_connections covers new(<=20) + legacy(<=20) + merge + reserved.
+# PG footprint trimmed for the tiny VPS. shared_buffers and max_connections
+# both need a PG restart to take effect.
 postgresql_shared_buffers: 96MB
 postgresql_max_connections: 60
 postgresql_effective_cache_size: 384MB
 
-# Legacy-archon merge (parallel run; remove at Phase-4 decommission).
-# Reads legacy `archondb` over the socket via peer auth (the unit runs as OS
-# user `archon`); the new-db write uses the archonvibe scram cred.
-legacy_sync_enabled: false
-legacy_db_user: archon
-legacy_db_name: archondb
-
-# Daily cluster-wide pg_dump (covers `archon` AND legacy `archondb`) + weekly
-# restore-verify. Everything not below is the db_backup role's default.
+# Daily cluster-wide pg_dump + weekly restore-verify. Everything not below is
+# the db_backup role's default.
 # Dead-man's switch: set vault_db_backup_healthcheck_url + ..._check_healthcheck_url
 # to healthchecks.io-style URLs; empty = no pings (journald only).
 # Off-box push via restic -> S3, local-only until the bucket exists; flip on by

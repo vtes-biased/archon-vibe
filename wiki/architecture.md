@@ -842,7 +842,6 @@ rounds, tables, seating, scores and players, matching players by VEKN ID.
 | Deleted-objects purge | daily, 01:30 UTC | `db.py` |
 | Promo stock recompute | daily, 02:00 UTC | `promo_stock.py` |
 | Rating recompute (ratings, then Hall of Fame wins) | daily, 02:30 UTC | `ratings.py` |
-| Legacy-archon merge | daily, 04:00 server time, systemd timer, own flag — off everywhere | `scripts/migrate_from_archon.py --merge` |
 | TWDA sync (reconstruction + winner decks) | daily, 05:00 UTC, own flag | `twda_import.py` |
 
 **Every daily job is a `CronTrigger` at a pinned UTC hour, never an interval** —

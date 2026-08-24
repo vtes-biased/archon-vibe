@@ -5,7 +5,7 @@ Discord bot, PostgreSQL 17, nginx + Let's Encrypt) to one of two targets:
 
 | env  | host                     | main domain             | bot domain                 |
 |------|--------------------------|-------------------------|----------------------------|
-| beta | server-setup (frankfurt) | `new.archon.krcg.org`   | `bot.archon.krcg.org`      |
+| beta | server-setup (frankfurt) | `archon.krcg.org`       | `bot.archon.krcg.org`      |
 | prod | `vekn.net` VPS           | `archon.vekn.net`       | `bot.archon.vekn.net`      |
 
 Build strategy: all deployable artifacts (Rust engine wheel, backend wheel, bot
@@ -229,29 +229,6 @@ The `system_upgrade` role stops the backend + bot services before rebooting and
 restarts + health-checks them afterwards. Prod only: beta (frankfurt) system
 updates, reboots included, are owned by server-setup's own upgrade pipeline.
 
-## One-shot PG16 → PG17 migration (prod only)
-
-Prod currently runs PostgreSQL 16. Run this **once** after a full on-disk
-backup, **before** the Phase-1 stand-up:
-
-```bash
-just migrate-postgres-prod   # 1. archondb → PG17, back on port 5432
-# verify legacy archon runs clean on PG17, then:
-just database-prod           # 2. new archon db/user/tunings in the PG17 cluster
-```
-
-The order matters: with PG16 still holding 5432, apt puts the 17 cluster on
-5433 while the postgresql role tasks and `DATABASE_URL` (unix socket, no
-port) silently target 5432 — the legacy cluster. Migrating first puts PG17 on
-5432, so everything that follows lands in the one shared cluster (which also
-halves PG RAM on the ~2GB box).
-
-The playbook stops both stacks (legacy `archon_web` included — it would
-otherwise keep writing to the cluster being dumped), takes a `pg_dumpall`
-backup, stands up PG17 in parallel on port 5433, restores, swaps the ports,
-and restarts the services. PG16 stays on disk, stopped, as a ~48h rollback
-path.
-
 ## Layout
 
 ```
@@ -267,7 +244,6 @@ ansible/
 │   ├── deploy.yml        # prod: backend + frontend + bot (standalone)
 │   ├── deploy-beta.yml   # beta: app on the server-setup foundation (frankfurt)
 │   ├── upgrade.yml       # system_upgrade role
-│   ├── migrate_postgres.yml   # PG16 -> PG17 migration (prod)
 │   └── site.yml          # bootstrap + database + deploy
 ├── tasks/                # fetch_release.yml (shared self-fetch) + app_user.yml (beta)
 ├── vars/                 # release_artifacts.yml (shared artifact resolution)
@@ -279,7 +255,6 @@ ansible/
 │   ├── fastapi_backend/  # wheel install, venv, systemd (localhost only)
 │   ├── static_site/      # dist rsync, https vhost, backend proxy, SSE
 │   ├── discord_bot/      # wheel install, venv, systemd, bot.<domain> vhost
-│   ├── legacy_sync/      # daily legacy-archon merge (prod, parallel run)
 │   └── db_backup/        # daily pg_dump + weekly restore-verify (prod)
 └── build/                # fetched/built artifacts (git-ignored)
 ```

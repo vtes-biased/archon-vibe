@@ -1,5 +1,6 @@
-> Elaborated context for **two** lines in `BOARD.md` — the post-flip steps and
-> the legacy-archon decommission. Deleted with the later of the two.
+> Elaborated context for the post-flip-steps line in `BOARD.md`. Deleted with it.
+> The legacy-archon decommission it also covered is done: legacy is gone from the
+> box and its database archived.
 > `#N` below is a **retired tracker number**, not a GitHub issue and not a live
 > pointer — the surrounding prose carries the fact. A real GitHub issue is
 > written `gh-N`.
@@ -27,7 +28,6 @@ CI-built Release artifacts, tag-then-release ceremony) was delivered by epics
 - **#39** Phase 1 — parallel run at `new.archon.vekn.net` (weeks)
 - **#40** Phase 2 — flip (vhost swap, minutes)
 - **#41** Phase 3 — post-flip (bot guild install, TWDA, passkeys, monitoring)
-- **#42** Phase 4 — decommission old archon
 - related: **#113** officials-contacts re-projection on deploy (not a migration
   concern per owner; rides its own ticket)
 
@@ -192,13 +192,6 @@ redirect URIs + ToS/privacy URLs (#24), TWDA import/push if desired, passkey
 opt-in, optional re-login notice, monitor error rates / SSE / IDB hydration for
 2–4 weeks. `VEKN_PUSH` has been live since Phase 1.
 
-### Phase 4 (#42) — decommission
-
-Disable #115 (roles need nothing — they're app-managed since the seed, no
-re-enable question); final `pg_dump` archive; stop
-`archon_web`; remove `old.archon.vekn.net` vhost/DNS; consolidate certbot;
-archive the old repo; cold-store `tournament_events`.
-
 ---
 
 ## Critical files
@@ -207,7 +200,6 @@ archive the old repo; cold-store `tournament_events`.
 - `backend/scripts/migrate_validate.py`, `check_merge.py` — validation (done; extend for merge invariants)
 - `backend/src/vekn_push.py` — stamping/guards (#114)
 - `backend/src/vekn_sync.py`, `vekn_tournament_sync.py` — remove role writes, sync stamping (#114/#115)
-- `ansible/playbooks/migrate_postgres.yml` — must stop `archon_web` (#116)
 - old repo: nothing to modify — freeze is operational (stop service + maintenance page)
 
 ## Decisions
@@ -264,7 +256,6 @@ Revised 2026-06-10 (owner):
       via magic link
 - [ ] Vhost swap rehearsed against the box's nginx state: no duplicate
       `server_name`, certs valid for `archon.vekn.net`/`old.`/`bot.`
-- [ ] `old.archon.vekn.net` serves read-only legacy for ~30 days post-flip
 
 ## The dedup run, as beta measured it
 

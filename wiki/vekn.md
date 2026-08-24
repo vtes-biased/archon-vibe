@@ -554,11 +554,27 @@ attached to the wrong tournament and the other is never recorded at all.
 
 ## Legacy archon sync
 
+**Retired 2026-08-24.** Legacy archon is decommissioned: the `archon_web` unit,
+the daily merge timer and the `archondb` database are gone from the VPS, and
+archon-vibe is the only stack on it. What follows is the record of how the corpus
+we hold was built, and it still governs `--merge`, which survives for a restored
+dump.
+
 `backend/scripts/migrate_from_archon.py` has two modes sharing the mapping code:
 an **insert-only ETL** (default; `--truncate` wipes first) for beta rebuilds and
-disaster fallback, and an **idempotent `--merge`** run daily during the
-parallel-run period, with old archon as a read-only second upstream. Cutover is
-freeze, final merge, vhost swap. The runner is a systemd timer, not an in-app job.
+disaster fallback, and an **idempotent `--merge`** that ran daily through the
+parallel run, with old archon as a read-only second upstream. Cutover was freeze,
+final merge, vhost swap. The runner was a systemd timer, not an in-app job.
+
+**Where the archive is.** The final `archondb` dump was verified by restoring it
+and counting 39,475 `tournament_events` rows, and it exists in three places: the
+nightly backup's own restic repo `archon-db-backups/archondb`, a copy held
+off-box, and a separate `tournament_events`-only extract beside it — that table
+is the one thing the new schema has no equivalent for, so it was archived rather
+than migrated. Because the database no longer exists, `pg-backup` never prunes
+that repo again and its snapshots are frozen; the nightly *"repo has no
+backed-up database"* warning it now logs for `archondb` is **expected and
+permanent**, and is the marker that the archive is there.
 
 **Single writer per field**, which is what prevents a daily flip-flop between
 syncs:

@@ -97,22 +97,7 @@
         env: "{{ bot_env }}"
         env_dir: "{{ env_dir }}"
 
-    # 6. Legacy-archon -> archon-vibe daily merge, prod-only, gated by
-    # legacy_sync_enabled. Remove at Phase-4 decommission.
-    - role: legacy_sync
-      when: legacy_sync_enabled | bool
-      r:
-        site_root: "{{ backend_site_root }}"
-        user: "{{ archon_user }}"
-        group: "{{ archon_group }}"
-        env_dir: "{{ env_dir }}"
-        legacy_db_user: "{{ legacy_db_user }}"
-        legacy_db_name: "{{ legacy_db_name }}"
-        new_db_user: "{{ db_user }}"
-        new_db_password: "{{ db_password }}"
-        new_db_name: "{{ db_name }}"
-
-    # 7. Daily cluster-wide DB backup + weekly restore-verify, gated by
+    # 6. Daily cluster-wide DB backup + weekly restore-verify, gated by
     # db_backup_enabled. Optional off-box push via restic -> S3.
     - role: db_backup
       when: db_backup_enabled | bool

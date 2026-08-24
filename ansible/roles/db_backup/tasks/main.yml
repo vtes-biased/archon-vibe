@@ -1,7 +1,6 @@
 ---
-# pg_dump -F c of every non-template DB, so it covers both `archon` and legacy
-# `archondb` while the parallel run coexists, with no config change needed at
-# Phase-4 decommission.
+# pg_dump -F c of every non-template DB, so a database added to the cluster is
+# covered with no config change.
 - name: Set effective defaults
   ansible.builtin.set_fact:
     _backup_dir: "{{ r.backup_dir | default(db_backup_backup_dir_default) }}"

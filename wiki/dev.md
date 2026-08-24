@@ -117,6 +117,12 @@ reaches it, and owns the only vhost carrying rate limits
 Nothing auto-deploys, and there is no public version endpoint — never sniff the app
 for a version.
 
+The `new.` hostnames the parallel run used — `new.archon.vekn.net` and
+`new.archon.krcg.org` — still resolve, with no vhost and no certificate behind
+them. That is deliberate: the A records are kept as the affordance for standing a
+future major version beside the live one, so a resolving name with nothing serving
+it is the expected state, not a leftover to clean up.
+
 ### The release order
 
 The changeset is written **before** the tag, not after the deploy. `/changeset`
