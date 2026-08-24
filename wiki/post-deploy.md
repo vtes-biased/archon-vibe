@@ -112,8 +112,8 @@ be, and would need adjudicating rather than correcting: the candidate set includ
 legacy-archon migrations, where legacy archon did the upload and our winner is a
 reconstruction.
 
-The 28 events holding no placement upstream are a different defect and not this
-item's business: their results never reached vekn.net at all.
+The 28 events holding no placement upstream are a different defect, deferred with
+the VEKN API maintainers ([vekn](vekn.md#results-veknnet-never-stored--with-the-api-maintainers)).
 
 **Proves it worked**: every listed event shows its actual winner at position 1 on
 vekn.net and its seated five at positions 1–5, and — checked a day later, once the nightly batch has run — the rating

@@ -164,6 +164,22 @@ go-online, has no in-app clear path, and surfaces to organizers as an "Out of sy
 with vekn.net" header badge — shown regardless of `VITE_VEKN_PUSH`, unlike the
 amber pending-sync badges, which are flag-gated.
 
+### Results vekn.net never stored — with the API maintainers
+
+*(Measured 2026-08-24, `backend/scripts/audit_vekn_placement.py` over 322 events.)*
+
+28 events we consider finished hold **no placement upstream at all**, and two more
+carry a vekn id that resolves to no event. The results reached vekn.net or were
+never accepted by it, and the players earned nothing from them either way. One
+cause is known: the upload is refused when the archon file's round count disagrees
+with the calendar entry's, which is `batch_push`'s hourly no-op on *Göcsej Under
+Siege* — it never stamps `vekn_pushed_at`, so it is retried and refused forever.
+
+The list went to the VEKN API maintainers on 2026-08-24. **Deferred here, not on
+the board**: the fix is theirs, and ours is the re-push once they have made it
+possible. **Trigger** — the maintainers answer, or the audit script shows any of
+the 28 holding a placement. Then it returns through `/intake` as an ordinary line.
+
 ## Inbound sync
 
 ### Members
