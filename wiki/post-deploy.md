@@ -70,50 +70,43 @@ made the pushed placement field the final placement instead of the preliminary
 standings order. Every event finished before it goes live pushes the old order, so
 a list drawn earlier is stale by the time it is answered.
 
-**Run** on production, then hand the rows to the Rulemonger: the results upload
-refuses a second submission once an archon file is stored and offers no overwrite,
-so each one is a manual `veknparticipant.pos` fix on vekn.net.
+**Run** on production, then correct the rows on vekn.net directly: the results
+upload refuses a second submission once an archon file is stored and offers no
+overwrite, so each one is a manual `veknparticipant.pos` fix.
 
-```sql
-WITH t AS (
-    SELECT uid, "full" AS f FROM objects
-    WHERE type='tournament' AND deleted_at IS NULL
-      AND "full"->>'state'='Finished' AND "full"->>'vekn_pushed_at' IS NOT NULL
-      AND jsonb_array_length(COALESCE("full"->'rounds', '[]'::jsonb)) > 0
-      AND COALESCE("full"->>'winner', '') <> ''
-), paid AS (
-    SELECT t.uid, array_agg(v ORDER BY v) AS paid FROM t, LATERAL (
-        SELECT e->>'user_uid' AS v
-        FROM jsonb_array_elements(t.f->'standings') WITH ORDINALITY AS q(e, n)
-        WHERE n <= 5) s GROUP BY t.uid
-), seated AS (
-    SELECT t.uid, array_agg(v ORDER BY v) AS seated FROM t, LATERAL (
-        SELECT e->>'player_uid' AS v
-        FROM jsonb_array_elements(t.f->'finals'->'seating') AS e) s GROUP BY t.uid
-)
-SELECT t.uid, t.f->>'name' AS name, t.f->'external_ids'->>'vekn' AS vekn,
-       t.f->>'winner' IS DISTINCT FROM (t.f->'standings'->0->>'user_uid') AS wrong_winner,
-       paid.paid, seated.seated
-FROM t JOIN paid USING (uid) LEFT JOIN seated USING (uid)
-WHERE paid.paid IS DISTINCT FROM seated.seated
-   OR t.f->>'winner' IS DISTINCT FROM (t.f->'standings'->0->>'user_uid');
+```sh
+sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
+  /opt/archon/backend/.venv/bin/python \
+  /opt/archon/backend/scripts/audit_vekn_placement.py'
 ```
 
-The rounds guard keeps out VEKN and ETL imports, which carry a push stamp they
-never earned here; the winner guard keeps out no-final events, which have none.
+**Ask upstream, never our own rows.** A SQL-only check cannot answer this and an
+earlier draft of this item got it wrong twice. `standings` is the *preliminary*
+order — `ratings._final_standings` reorders it into the placement sheet using
+`winner` — so `standings[0] <> winner` flags every final won from a lower seat,
+which is ordinary rather than broken, and reported 207 of 323 events. And
+`vekn_pushed_at` is stamped by the legacy-archon migration and the vekn.net
+importer as well as by our push, so it is no evidence this code uploaded
+anything. Only what the VEKN API returns settles either question, which is what
+the script fetches.
 
-The old order corrupts the record **two** ways, and a winner check alone sees only
-the first. vekn.net reads the pushed field as `finalrank`: row 1 is crowned, rows
-2–5 are paid the finalist bonus. So the five rows it pays are the *preliminary*
-top five, which parts from the seated five whenever a qualifier withdrew and the
-next-ranked was promoted — the winner can still land on row 1 and the record be
-wrong about who reached the final. Comparing the two sets catches both classes.
+Measured 2026-08-24 against 322 events: **279 agree**, 28 hold no placement
+upstream at all, 4 crown a different player, 11 agree on the winner but not on
+the five. Fifteen events need correcting, not the two hundred the old query
+claimed.
 
-Event 13385, *Fee Stake: Jyväskylä 9*, is the known winner case — Ari-Pekka
-Alestalo won the final from the fifth seat and vekn.net holds Lasse Pöyry at
-position 1. Event 13413, *Fee Stake Melbourne 2026*, is the known finalist case —
-Nathaneal Zheng withdrew and Alan Stevenson was promoted, but vekn.net credits
-Zheng a finalist and pays Stevenson nothing.
+- **wrong crown** — 12997, 13379, 13506, 13436
+- **wrong five** — 12637, 12955, 12820, 12951, 12994, 12837, 13169, 13226, 13004,
+  13497, 13413
+
+Event 13413, *Fee Stake Melbourne 2026*, is the worked finalist case — Nathaneal
+Zheng withdrew and Alan Stevenson was promoted, but vekn.net credits Zheng a
+finalist and pays Stevenson nothing. Event 13385, *Fee Stake: Jyväskylä 9*, was
+this item's original worked winner case and **now agrees with us upstream** —
+establish why before assuming the rest of the list is stable.
+
+The 28 events holding no placement upstream are a different defect and not this
+item's business: their results never reached vekn.net at all.
 
 **Proves it worked**: every listed event shows its actual winner at position 1 on
 vekn.net and its seated five at positions 1–5, and — checked a day later, once the nightly batch has run — the rating
