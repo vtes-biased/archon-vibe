@@ -78,6 +78,7 @@ async def _fetch(sql, params):
         async with get_connection() as conn:
             cur = await conn.execute(sql, params)
             return await cur.fetchall()
+
     return await asyncio.shield(run())
 ```
 
