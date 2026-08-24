@@ -15,7 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from . import db
-from .models import ObjectType, Role
+from .models import ObjectType
 
 logger = logging.getLogger(__name__)
 
@@ -28,48 +28,7 @@ class Migration:
     rewrite: Callable[[dict], None]
 
 
-def _rename_judgekin_to_sheriff(full_data: dict) -> None:
-    full_data["roles"] = [
-        Role.SHERIFF if role == "Judgekin" else role
-        for role in full_data.get("roles") or []
-    ]
-
-
-def _collapse_link_moderation(full_data: dict) -> None:
-    for link in full_data.get("community_links") or []:
-        moderation = link.get("moderation")
-        if isinstance(moderation, dict):
-            # A promotion with no scope was already read as unmoderated.
-            link["moderation"] = (
-                "hidden"
-                if moderation["status"] == "hidden"
-                else moderation.get("scope")
-            )
-
-
-MIGRATIONS: tuple[Migration, ...] = (
-    Migration(
-        name="rename-judgekin-to-sheriff",
-        obj_type=ObjectType.USER,
-        pending="""
-            SELECT uid FROM objects
-            WHERE type = 'user' AND "full"->'roles' ? 'Judgekin'
-            ORDER BY uid
-        """,
-        rewrite=_rename_judgekin_to_sheriff,
-    ),
-    Migration(
-        name="collapse-link-moderation",
-        obj_type=ObjectType.USER,
-        pending="""
-            SELECT uid FROM objects
-            WHERE type = 'user'
-              AND jsonb_path_exists("full", '$.community_links[*].moderation.status')
-            ORDER BY uid
-        """,
-        rewrite=_collapse_link_moderation,
-    ),
-)
+MIGRATIONS: tuple[Migration, ...] = ()
 
 _LOCK_ROW = 'SELECT "full", deleted_at FROM objects WHERE uid = %s FOR UPDATE'
 

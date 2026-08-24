@@ -30,52 +30,6 @@ answers whether a given deploy has made it actionable — the same check
 gates it and why, what to run, what proves it worked, and what it owes afterwards:
 people to tell, and the wiki text that dies with it.
 
-## Prove the Judgekin → Sheriff rename applied
-
-**Migration** `rename-judgekin-to-sheriff`
-
-**Gated on** `f741e66`, which moved the rewrite out of `schema.sql` into the
-lifespan's migration run. There is **nothing to run**: `Role` decodes strictly,
-so a row still holding the old value raises on every read of any user list
-containing it, and the entry rewrites those rows before the process serves.
-
-**Proves it worked**: 0 on beta *and* production.
-
-```sql
-SELECT count(*) FROM objects WHERE type = 'user'
-  AND ("public" @> '{"roles":["Judgekin"]}' OR "member" @> '{"roles":["Judgekin"]}'
-    OR "api" @> '{"roles":["Judgekin"]}' OR "full" @> '{"roles":["Judgekin"]}');
-```
-
-**Owes afterwards**: nothing to tell anyone — the badge already read *Sheriff*.
-The legacy-archon role maps still key on `Judgekin` on purpose: the daily merge
-reads it from the old database and must keep granting the role. Delete this
-section and its entry.
-
-## Prove the link-moderation collapse applied
-
-**Migration** `collapse-link-moderation`
-
-**Gated on** `f741e66`, which replaced the post-deploy collapse script with a
-lifespan migration. There is **nothing to run**. Until the entry has run against
-a database, a row still carrying the `{status, scope, by, at}` record raises on
-every read of that member (`User` decodes strictly) **and every hidden link on it
-is served to everyone**: both filters compare `moderation` against a plain
-string, and a record matches neither.
-
-**Proves it worked**: 0 on beta *and* production, for both columns.
-
-```sql
-SELECT count(*) FROM objects WHERE type = 'user'
-  AND jsonb_path_exists("full", '$.community_links[*].moderation.status');
-SELECT count(*) FROM objects WHERE type = 'user'
-  AND jsonb_path_exists("api", '$.community_links[*].moderation.status');
-```
-
-**Owes afterwards**: nothing to tell anyone — every moderation decision survives
-the collapse, and the record it was stored in was never displayed. Delete this
-section and its entry.
-
 ## Re-submit the decks the archive refused
 
 **Gated on** the commit carrying this section — *"Submit the winner's deck from a
