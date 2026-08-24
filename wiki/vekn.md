@@ -566,15 +566,28 @@ disaster fallback, and an **idempotent `--merge`** that ran daily through the
 parallel run, with old archon as a read-only second upstream. Cutover was freeze,
 final merge, vhost swap. The runner was a systemd timer, not an in-app job.
 
-**Where the archive is.** The final `archondb` dump was verified by restoring it
-and counting 39,475 `tournament_events` rows, and it exists in three places: the
-nightly backup's own restic repo `archon-db-backups/archondb`, a copy held
-off-box, and a separate `tournament_events`-only extract beside it — that table
-is the one thing the new schema has no equivalent for, so it was archived rather
-than migrated. Because the database no longer exists, `pg-backup` never prunes
-that repo again and its snapshots are frozen; the nightly *"repo has no
-backed-up database"* warning it now logs for `archondb` is **expected and
-permanent**, and is the marker that the archive is there.
+**Where the archive is.** Three artefacts, each held both on the prod box and
+off-box on the maintainer's machine:
+
+| File | On prod | What it is |
+|---|---|---|
+| `archondb-final-<stamp>.dump` | `/var/backups/archondb-final/` | the database as legacy left it, restore-verified at 39,475 `tournament_events` rows |
+| `tournament_events-<stamp>.dump` | `/var/backups/archondb-final/` | that table alone — the one thing the new schema has no equivalent for, archived rather than migrated |
+| `archondb-premigration-<stamp>.dump` | `/var/backups/archondb-premigration/` | the older original, taken from the PG16 cluster before it was dropped |
+
+**Those two directories are deliberately outside `/var/backups/postgres`.**
+`pg-backup.sh` deletes every `*.dump` older than `RETENTION_DAYS` in its own
+backup dir — including dumps of databases that no longer exist, which is exactly
+what these are — so an archive stored there erases itself a week later. The
+corollary is that nothing manages them either: they are not pruned, and **not
+pushed off-box by restic**, which covers only `/var/backups/postgres`. The
+off-box copies are the durable half.
+
+The nightly job also still holds the frozen restic repo `archon-db-backups/archondb`
+from before the drop. Because the database no longer exists, `pg-backup` never
+prunes that repo again; the *"repo has no backed-up database"* warning it now
+logs each night is **expected and permanent**, and is the marker that the archive
+is there.
 
 **Single writer per field**, which is what prevents a daily flip-flop between
 syncs:
