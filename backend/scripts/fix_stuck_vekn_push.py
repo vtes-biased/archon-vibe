@@ -34,6 +34,12 @@ when rounds change while `vekn_pushed_at` is set, which would read as "diverged
 from vekn.net" on results vekn.net never received. This script bypasses the route,
 so it just clears the stamp up front.
 
+`--stamp-only` does step 1 alone, for a different case: an event vekn.net refused
+for a reason since corrected on its side. Nothing here can retry it otherwise —
+the stamp is what `UNPUSHED_RESULTS_QUERY` filters on, the manual push-vekn route
+skips the results push on a stamped tournament too, and a raw SQL update would
+leave the member projection carrying the old value.
+
 Targeted on purpose — never a sweep. A trailing empty round on a Playing
 tournament is also the normal transient shape of a round an organizer has just
 opened but not yet seated.
@@ -101,22 +107,29 @@ def describe(t: Tournament) -> str:
     )
 
 
-async def check(t: Tournament) -> list[str]:
+async def check(t: Tournament, stamp_only: bool = False) -> list[str]:
     """Preconditions. Anything returned here blocks --apply."""
     problems = []
     if not t.external_ids.get("vekn"):
         problems.append("no external_ids.vekn — push would create a NEW calendar event")
     if not t.rounds:
         problems.append("no rounds")
-    elif t.rounds[-1]:
-        problems.append(
-            f"last round is not empty ({len(t.rounds[-1])} tables) — nothing to remove"
-        )
-    elif len(t.rounds) < 2:
-        problems.append(
-            "removing the empty round would leave 0 rounds (push needs > 0)"
-        )
-    if t.state not in (
+    elif not stamp_only:
+        if t.rounds[-1]:
+            problems.append(
+                f"last round is not empty ({len(t.rounds[-1])} tables) "
+                "— nothing to remove"
+            )
+        elif len(t.rounds) < 2:
+            problems.append(
+                "removing the empty round would leave 0 rounds (push needs > 0)"
+            )
+    if stamp_only:
+        if not t.vekn_pushed_at:
+            problems.append("already unstamped — batch_push picks it up as it is")
+        if t.state is not TournamentState.FINISHED:
+            problems.append(f"state {t.state.value} — the push set is Finished-only")
+    elif t.state not in (
         TournamentState.PLAYING,
         TournamentState.WAITING,
         TournamentState.FINISHED,
@@ -139,6 +152,18 @@ async def check(t: Tournament) -> list[str]:
             + ", ".join(missing[:5])
         )
     return problems
+
+
+async def clear_stamp(t: Tournament) -> None:
+    """Hand a tournament back to batch_push, changing nothing else. For an event
+    refused for a reason that has since been fixed upstream: the stamp is what
+    UNPUSHED_RESULTS_QUERY filters on, and no route clears it."""
+    t.vekn_pushed_at = None
+    t.modified = datetime.now(UTC)
+    async with db.get_connection() as conn:
+        await db.save_tournament(t, conn=conn)
+    print("After:\n" + describe(t))
+    print("\nNext hourly batch_push will upload results to the existing vekn event.")
 
 
 async def apply(t: Tournament) -> None:
@@ -190,20 +215,23 @@ async def run(args: argparse.Namespace) -> int:
         if t is None:
             return 1
         print("Before:\n" + describe(t))
-        problems = await check(t)
+        problems = await check(t, stamp_only=args.stamp_only)
         if problems:
             print("\nBLOCKED:")
             for p in problems:
                 print(f"  - {p}")
             return 1
         if not args.apply:
-            print(
-                f"\nWould: clear vekn_pushed_at, CancelRound round "
-                f"{len(t.rounds) - 1} (empty), FinishTournament. Re-run with --apply."
+            todo = (
+                "clear vekn_pushed_at"
+                if args.stamp_only
+                else f"clear vekn_pushed_at, CancelRound round "
+                f"{len(t.rounds) - 1} (empty), FinishTournament"
             )
+            print(f"\nWould: {todo}. Re-run with --apply.")
             return 0
         print("\nApplying:")
-        await apply(t)
+        await (clear_stamp(t) if args.stamp_only else apply(t))
         return 0
     finally:
         await db.close_db()
@@ -216,6 +244,12 @@ def parse_args() -> argparse.Namespace:
     g.add_argument("--vekn", help="vekn event id of the stuck tournament")
     g.add_argument("--uid", help="tournament uid")
     p.add_argument("--apply", action="store_true", help="write (default: report)")
+    p.add_argument(
+        "--stamp-only",
+        action="store_true",
+        help="only clear vekn_pushed_at, for an event refused for a reason since "
+        "fixed on vekn.net",
+    )
     args = p.parse_args()
     if not args.dsn:
         p.error("--dsn or DATABASE_URL is required")
