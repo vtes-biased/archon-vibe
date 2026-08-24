@@ -164,21 +164,42 @@ go-online, has no in-app clear path, and surfaces to organizers as an "Out of sy
 with vekn.net" header badge — shown regardless of `VITE_VEKN_PUSH`, unlike the
 amber pending-sync badges, which are flag-gated.
 
-### Results vekn.net never stored — with the API maintainers
+### Placements handed to the VEKN API maintainers
 
-*(Measured 2026-08-24, `backend/scripts/audit_vekn_placement.py` over 322 events.)*
+*(Measured 2026-08-24, `backend/scripts/audit_vekn_placement.py` over 322 events:
+279 agree, 15 disagree, 28 hold no placement, 2 resolve to no event.)*
 
-28 events we consider finished hold **no placement upstream at all**, and two more
-carry a vekn id that resolves to no event. The results reached vekn.net or were
-never accepted by it, and the players earned nothing from them either way. One
-cause is known: the upload is refused when the archon file's round count disagrees
-with the calendar entry's, which is `batch_push`'s hourly no-op on *Göcsej Under
-Siege* — it never stamps `vekn_pushed_at`, so it is retried and refused forever.
+15 events carry a placement upstream that disagrees with ours, all of them from
+the preliminary-standings push order the placement fix replaced. 4 crown a
+different player at row 1 — 12997, 13379, 13506, 13436 — and 11 agree on the
+winner but not on the five: 12637, 12955, 12820, 12951, 12994, 12837, 13169,
+13226, 13004, 13497, 13413. In each of the four crowns upstream holds the same
+five we do and differs only in which sits at row 1, which is that order's exact
+signature and is why our side is the right one.
 
-The list went to the VEKN API maintainers on 2026-08-24. **Deferred here, not on
-the board**: the fix is theirs, and ours is the re-push once they have made it
-possible. **Trigger** — the maintainers answer, or the audit script shows any of
-the 28 holding a placement. Then it returns through `/intake` as an ordinary line.
+The results upload is write-once, so the list went to the VEKN API maintainers on
+2026-08-24 rather than being corrected row by row. **Deferred here, not on the
+board**: the fix is theirs. **Trigger** — the maintainers answer, or a re-run of
+the audit shows the 15 agreeing. What is owed then is the rating check a day
+later, since whether upstream re-derives points from a corrected `pos` is
+[unestablished](domain/vekn.md#never-chase-veknnets-stored-rtp); if they do not
+follow, the winner holds the loser's rating and that is its own board line.
+
+### Results vekn.net never stored — cause not yet established
+
+The same audit found 28 finished events holding **no placement upstream at all**,
+plus 12478 and 12844, whose vekn ids resolve to no event. Their players earned
+nothing from them. **Ours to diagnose before anything is handed to anyone**: only
+one cause is so far established, and it may not be the only one.
+
+That cause is the round count. vekn.net refuses an upload whose archon file
+disagrees with the calendar entry on rounds, and the refusal leaves exactly this
+trace. *Göcsej Under Siege* is the worked case — 4 rounds against the calendar's
+3 — and because a refused upload never stamps `vekn_pushed_at`, `batch_push`
+selects it every hour and is refused every hour, silently.
+
+The audit prints both counts beside each of the 28, so the question of whether
+they share one cause is answered by re-running it and reading the `ROUNDS` flags.
 
 ## Inbound sync
 
