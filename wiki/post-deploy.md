@@ -102,8 +102,15 @@ claimed.
 Event 13413, *Fee Stake Melbourne 2026*, is the worked finalist case — Nathaneal
 Zheng withdrew and Alan Stevenson was promoted, but vekn.net credits Zheng a
 finalist and pays Stevenson nothing. Event 13385, *Fee Stake: Jyväskylä 9*, was
-this item's original worked winner case and **now agrees with us upstream** —
-establish why before assuming the rest of the list is stable.
+this item's original worked winner case and no longer appears: it was corrected
+by hand before this measurement.
+
+**Our side is the right one for all four crowns.** Each holds the same five as we
+do and differs only in which of them sits at row 1 — the old push order's exact
+signature. A disagreement that moved a *different* player into the five would not
+be, and would need adjudicating rather than correcting: the candidate set includes
+legacy-archon migrations, where legacy archon did the upload and our winner is a
+reconstruction.
 
 The 28 events holding no placement upstream are a different defect and not this
 item's business: their results never reached vekn.net at all.
