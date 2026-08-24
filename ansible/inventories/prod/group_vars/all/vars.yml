@@ -132,6 +132,10 @@ backend_env:
   GITHUB_OAUTH_SECRET: "{{ vault_github_oauth_secret | default('') }}"
   GITHUB_OAUTH_REDIRECT_URI: "{{ site_url_base }}/auth/github/callback"
 
+# Certbot fails the whole deploy on a hostname that does not resolve, and
+# api.archon.vekn.net has no A record yet. Flip to true once it does.
+public_api_enabled: false
+
 # The public read API runs as a second unit off the same wheel and venv, so its
 # environment is deliberately derived from the app's: one JWT secret verifies a
 # token minted by the other, and /v1/export serves the snapshot the app writes.

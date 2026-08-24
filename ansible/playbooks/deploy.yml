@@ -25,6 +25,7 @@
         server_name: "{{ domain_bot }}"
         contact_email: "{{ contact_email }}"
     - role: nginx_tls
+      when: public_api_enabled | bool
       r:
         server_name: "{{ domain_api }}"
         contact_email: "{{ contact_email }}"
@@ -53,6 +54,7 @@
     #    own vhost. Untagged on purpose — the quick lane restarts the backend,
     #    and this unit is PartOf it, so new code reaches both.
     - role: public_api
+      when: public_api_enabled | bool
       r:
         service_name: "{{ api_service }}"
         backend_service: "{{ backend_service }}"
