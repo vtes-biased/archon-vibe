@@ -26,6 +26,7 @@ import argparse
 import asyncio
 import importlib.util
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -87,6 +88,17 @@ def _theirs(event: dict) -> tuple[dict[str, int], int]:
     return out, len(rows)
 
 
+def _calendar_rounds(raw: str) -> int:
+    """Total rounds the calendar entry declares. The field reads like `3R+F` —
+    a prelim count and an optional final — and the archon file's count includes
+    the final, so `+F` must be added back rather than dropped the way
+    `vekn_tournament_sync._parse_rounds` drops it for `max_rounds`."""
+    m = re.match(r"\s*(\d+)", raw)
+    if not m:
+        return -1
+    return int(m.group(1)) + (1 if "F" in raw.upper() else 0)
+
+
 def _top(placement: dict[str, int], n: int) -> set[str]:
     return {v for v, pos in placement.items() if 1 <= pos <= n}
 
@@ -130,12 +142,13 @@ async def run(args: argparse.Namespace) -> int:
                 # calendar, so the two counts are reported next to the absence.
                 no_placement.append(str(event_id))
                 ours_n = len(t.rounds) + (1 if t.finals else 0)
-                theirs_n = str(event.get("rounds") or "?")
-                flag = "ROUNDS" if str(ours_n) != theirs_n else "      "
+                raw = str(event.get("rounds") or "")
+                theirs_n = _calendar_rounds(raw)
+                flag = "ROUNDS" if theirs_n != ours_n else "      "
                 round_mismatch += 1 if flag.strip() else 0
                 print(
-                    f"  NONE  {event_id:>6} {flag} ours:{ours_n} vekn:{theirs_n} "
-                    f"{upstream_rows} row(s) — {t.name}"
+                    f"  NONE  {event_id:>6} {flag} ours:{ours_n} "
+                    f"vekn:{theirs_n} ({raw or '?'}) {upstream_rows} row(s) — {t.name}"
                 )
                 continue
 
