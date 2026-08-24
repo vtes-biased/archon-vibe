@@ -187,19 +187,27 @@ follow, the winner holds the loser's rating and that is its own board line.
 
 ### Results vekn.net never stored — cause not yet established
 
-The same audit found 28 finished events holding **no placement upstream at all**,
-plus 12478 and 12844, whose vekn ids resolve to no event. Their players earned
-nothing from them. **Ours to diagnose before anything is handed to anyone**: only
-one cause is so far established, and it may not be the only one.
+The same audit found 28 finished events holding **no placement upstream at all**
+— and upstream holds no *roster* for them either, zero player rows each — plus
+12478 and 12844, whose vekn ids resolve to no event. Their players earned nothing
+from them. **Ours to diagnose before anything is handed to anyone.**
 
-That cause is the round count. vekn.net refuses an upload whose archon file
-disagrees with the calendar entry on rounds, and the refusal leaves exactly this
-trace. *Göcsej Under Siege* is the worked case — 4 rounds against the calendar's
-3 — and because a refused upload never stamps `vekn_pushed_at`, `batch_push`
-selects it every hour and is refused every hour, silently.
+The round count explains **7 of the 28**, not all of them: 12498, 12555, 12959,
+13495, 13487, 13500, 13473. vekn.net refuses an upload whose archon file
+disagrees with the calendar entry on rounds, and *Göcsej Under Siege* is the
+worked case — ours 4 against the calendar's `3R`, which is the `provided 4,
+expected 3` its upload returns to this day. Because a refused upload never stamps
+`vekn_pushed_at`, `batch_push` selects it every hour and is refused every hour.
 
-The audit prints both counts beside each of the 28, so the question of whether
-they share one cause is answered by re-running it and reading the `ROUNDS` flags.
+**The other 21 agree on rounds and are unexplained.** Whatever refused them is a
+second cause, and a zero-row roster upstream says the upload never landed at all
+rather than landing without positions.
+
+Comparing the counts requires reading the calendar field as the string it is:
+`3R+F` is three prelims **and a final**, four in the archon file's terms, so the
+`+F` must be added back — `_parse_rounds` drops it on purpose, because
+`max_rounds` is prelim-only. Comparing that string against an integer flags every
+event and reports one shared cause where there are at least two.
 
 ## Inbound sync
 
