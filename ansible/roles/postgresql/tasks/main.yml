@@ -21,13 +21,6 @@
     state: absent
     autoremove: false
 
-# apt-get autoremove is run by the upgrade role; contrib must be manual or an
-# unrelated upgrade can sweep the extensions out from under the database.
-- name: Mark manually installed postgresql-contrib-{{ postgresql_version }}
-  ansible.builtin.command: apt-mark manual postgresql-contrib-{{ postgresql_version }}
-  register: postgresql_contrib_mark
-  changed_when: "'was already set to manually installed' not in postgresql_contrib_mark.stdout"
-
 - name: Ensure postgresql service is enabled + running
   ansible.builtin.service:
     name: "postgresql@{{ postgresql_version }}-main"
