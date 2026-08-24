@@ -11,6 +11,14 @@
     state: present
     update_cache: true
 
+# The unversioned metapackage depends on PGDG's newest major, so leaving it
+# installed makes every apt upgrade pull the next one in beside ours.
+- name: Remove the unversioned postgresql metapackage
+  ansible.builtin.apt:
+    name: postgresql
+    state: absent
+    autoremove: false
+
 - name: Ensure postgresql service is enabled + running
   ansible.builtin.service:
     name: "postgresql@{{ postgresql_version }}-main"

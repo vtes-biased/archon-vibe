@@ -62,12 +62,18 @@
     - name: Gather service facts
       ansible.builtin.service_facts:
 
-    - name: Report post-reboot status for critical services
-      ansible.builtin.debug:
-        msg: >-
-          {{ item }} ->
+    # Reporting this instead of asserting it let a reboot finish green with the
+    # database down: a superseded PG cluster took 5432 and nothing said so.
+    - name: Assert the critical services came back
+      ansible.builtin.assert:
+        that:
+          - (ansible_facts.services[item + '.service'] | default({})).state
+            | default('missing') == 'running'
+        fail_msg: >-
+          {{ item }} is
           {{ (ansible_facts.services[item + '.service'] | default({})).state
-             | default('missing') }}
+             | default('missing') }} after the reboot on {{ inventory_hostname }}.
+        success_msg: "{{ item }} is running"
       loop:
         - nginx
         - "postgresql@{{ postgresql_version }}-main"

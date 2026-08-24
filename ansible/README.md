@@ -225,9 +225,10 @@ REBOOT=1 just upgrade-prod                 # also reboot if /var/run/reboot-requ
 FULL=1 REBOOT=1 just upgrade-prod          # dist-upgrade + reboot (major kernel bumps)
 ```
 
-The `system_upgrade` role stops the backend + bot services before rebooting and
-restarts + health-checks them afterwards. Prod only: beta (frankfurt) system
-updates, reboots included, are owned by server-setup's own upgrade pipeline.
+The `system_upgrade` role stops the backend + bot services before rebooting,
+restarts them afterwards, and then **fails the play** if nginx, postgres, the
+backend or the bot is not running. Prod only: beta (frankfurt) system updates,
+reboots included, are owned by server-setup's own upgrade pipeline.
 
 ## Layout
 

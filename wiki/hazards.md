@@ -429,6 +429,28 @@ around.
 under an existing prefix is fine; a new top-level segment 404s in production while
 passing dev CORS and the test suite ([access](access.md#deployment-gate)).
 
+**A superseded PostgreSQL cluster left enabled steals 5432 at the next boot**, and
+nothing in the stack can tell you it happened. Both clusters are configured for
+5432; whichever systemd starts first wins and the other dies on *could not create
+any TCP/IP sockets*. `DATABASE_URL` is a unix socket with **no port in it**, so the
+backend silently reaches whatever cluster is there — on 2026-08-24 that was the
+PG16 cluster the 16→17 migration had left on disk as a rollback path and never
+disabled, holding an empty `archon` shell that an early `database-prod` run had
+created in the wrong cluster. The play that rebooted the box reported `failed=0`.
+Two rules follow: **`pg_dropcluster` a superseded cluster** rather than trusting it
+to stay stopped, since only removal survives a reboot; and never read a 200 from
+`/` as proof the database is up — nginx serves the SPA shell without touching it.
+The `system_upgrade` role now asserts the critical units after a reboot, which is
+what turns this shape into a red play.
+
+**An apt upgrade can install a *new* PostgreSQL major beside the pinned one.** The
+default lane runs `apt upgrade --with-new-pkgs`, needed so kernel metapackages can
+pull a new `linux-image-*`, and the same mechanism lets the unversioned
+`postgresql` metapackage — which always depends on PGDG's newest — drag in the
+next major, whose postinst then wants a cluster of its own. Installing only
+versioned `postgresql-<N>` packages is not enough; the metapackage must be absent,
+which the `postgresql` role now enforces.
+
 **A `ClientTimeout` breach raises `asyncio.TimeoutError`, not an
 `aiohttp.ClientError`**, so `except aiohttp.ClientError` misses timeouts on every
 external-proxy route — feedback, TWDA, web push ([vekn](vekn.md#outage-resilience)).
