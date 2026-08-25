@@ -166,6 +166,16 @@ before each yield**, so a slow client never pins a pool slot through its catch-u
 and the heap holds at most one batch. The ORDER BY is load-bearing: the client's
 `since` high-water mark must advance monotonically.
 
+**Every pooled read on the stream and snapshot connect path runs under
+`asyncio.shield`**, acquisition and release inside the shielded coroutine: the
+viewer resolution, the access-version handshake, each catch-up batch, the
+personal overlay, the scoped catch-up and the live participant refresh. A client
+hanging up cancels the awaiting task mid-query, psycopg cannot roll back a
+connection still `ACTIVE`, and the pool discards it and pays a fresh Postgres
+connect — the rule the public API's `_fetch` already applied
+([public-api](public-api.md#the-stream),
+[hazards](hazards.md#concurrency-and-connections)).
+
 **`stream_objects_snapshot(conn)`** is an unordered whole-corpus scan — one pass for
 *all* types and *every* level, yielding `(type, public, member, api, full)`. A full
 snapshot captures every non-deleted row and needs no ordering, so dropping the
@@ -408,8 +418,10 @@ without reconnecting.
 
 **On mismatch** the server emits `{"type": "resync"}` and **returns immediately**.
 The browser clears IndexedDB and re-fetches the snapshot at its current level, so
-streaming the corpus after the resync line is wasted work that also discards a
-pooled connection on the client's mid-fetch teardown.
+streaming the corpus after the resync line is wasted work. The early return is
+only that economy — the protection against a hang-up discarding a pooled
+connection is the shield on every stream-path read ([streaming](#streaming)),
+which covers the ordinary delta catch-up no early return spares.
 
 **A client-side level change closes the stream before it clears the stores.** The
 resync above arrives on a stream the server has already finished with, but the
@@ -462,9 +474,19 @@ bump.
 
 ## Snapshots
 
-On first connect, with no `since`, the frontend fetches a pre-computed gzip
-snapshot instead of streaming from scratch. Snapshots regenerate every 15 minutes,
-one file per level, avoiding a DB connection held open for an initial stream of
+On first connect, with no `since`, the client takes a pre-computed gzip snapshot
+instead of streaming from scratch — and the **server enforces it**: a cursorless
+`/stream` connect is answered with the resync directive and closed, never served
+the corpus off a pooled connection. The frontend's snapshot-first flow never
+opens a cursorless stream itself, yet production logged whole-corpus streams
+several times an hour, 33.5k objects over 3–13 s each — which is why the rule is
+enforced where any HTTP client can reach it rather than left as a frontend
+convention. The directive is withheld
+only while no snapshot file exists — `/snapshot` 503s then, and the redirect
+would loop the client through connect → resync → 503 — so a snapshot-less
+backend serves the corpus stream instead, a state confined to a first boot
+because startup kicks a generation. Snapshots regenerate every 15 minutes, one
+file per level, avoiding a DB connection held open for an initial stream of
 thousands of objects. `/snapshot` streams the gzip from disk in chunks, holding one
 fd open per response so the atomic-rename regeneration stays consistent mid-stream;
 the file is never read into the heap, so hundreds of concurrent reconnects don't

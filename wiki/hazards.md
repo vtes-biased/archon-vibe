@@ -328,6 +328,24 @@ to share across threads.
 through the backoff, or a persistent cause spins a full-speed clear-and-reconnect
 loop ([sync](sync.md#resync)).
 
+**A pooled query cancelled mid-flight costs the pool its connection.** A client
+hang-up cancels the awaiting task; psycopg cannot roll back a connection still
+`ACTIVE`, so the pool discards it and pays a fresh Postgres connect — against
+production's eight slots, on the endpoint every client hits on every reconnect.
+Run every pooled read on a hang-up-exposed path under `asyncio.shield`, acquire
+and release inside the shielded coroutine; the stream path and the public API's
+`_fetch` are the exemplars, and a new read on either must join them
+([sync](sync.md#streaming)).
+
+**A cursorless stream connect is answered with `resync` only while a snapshot
+file exists** — `/snapshot` 503s without one, and the client would loop
+connect → resync → 503 → reconnect, worse than the corpus stream the directive
+replaces. The corpus-stream fallback is deliberately confined to the cursorless
+case: an av-mismatched client can only converge through `/snapshot`, whose
+response header is the fingerprint's sole transport, so "simplifying" the two
+branches together would corpus-stream a mismatched client on every reconnect
+forever ([sync](sync.md#snapshots)).
+
 ## Cards and decks
 
 **The card model has three name fields plus variants**, all four being parser

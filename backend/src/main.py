@@ -790,7 +790,8 @@ async def get_snapshot(
     """
     from .snapshots import get_snapshot_path
 
-    viewer = await _resolve_viewer(request, token, authorization)
+    # Shielded: a reader hanging up mid-query costs the pool the connection.
+    viewer = await asyncio.shield(_resolve_viewer(request, token, authorization))
     level = _viewer_level(viewer)
 
     snapshot_path = get_snapshot_path(level.value)
@@ -807,7 +808,7 @@ async def get_snapshot(
     headers = {
         "Cache-Control": "no-cache",
         "Accept-Ranges": "none",
-        "X-Access-Version": await compute_access_version(viewer),
+        "X-Access-Version": await asyncio.shield(compute_access_version(viewer)),
     }
     if download:
         # Dated from the file's mtime (regen time, not "now"). No Content-Encoding:
@@ -1081,8 +1082,11 @@ async def stream_updates(
     per-item filtering. `tournament=<uid>` opens a bot-scoped stream: catch-up and
     live events restricted to that tournament + its sanctions, same access rule."""
     from .db import _pool, stream_objects_new
+    from .snapshots import get_snapshot_path
 
-    stream_user = await _resolve_viewer(request, token, authorization)
+    # Shielded, here and on every pooled read below: a client hanging up
+    # cancels the awaiting task mid-query and costs the pool the connection.
+    stream_user = await asyncio.shield(_resolve_viewer(request, token, authorization))
     # One label per connection in every log line: who + scope — makes
     # open/close/overflow/sync-complete attributable when tracing an SSE issue.
     _who = stream_user.uid if stream_user else "anon"
@@ -1114,7 +1118,9 @@ async def stream_updates(
 
     # Sole access-change mechanism: a stale fp means an entitlement change a
     # since-delta can't repair. Scoped (bot) streams carry no `av`, so they skip this.
-    if not scoped_stream and av != await compute_access_version(stream_user):
+    if not scoped_stream and av != await asyncio.shield(
+        compute_access_version(stream_user)
+    ):
         force_resync = True
         effective_since = None
 
@@ -1123,6 +1129,14 @@ async def stream_updates(
     if fresh_dt and datetime.now(UTC) - fresh_dt > timedelta(days=3):
         force_resync = True
         effective_since = None
+
+    # A cursorless connect takes the pre-computed snapshot, never a corpus
+    # stream off a pooled connection — guarded on the file existing, because
+    # /snapshot 503s without one and resync → 503 → reconnect would loop.
+    if not scoped_stream and not force_resync and not since:
+        if get_snapshot_path(level.value):
+            force_resync = True
+            logger.info(f"Cursorless connect answered with resync ({conn_label})")
 
     async def event_generator():
         conn = SSEConnection(
@@ -1137,8 +1151,8 @@ async def stream_updates(
             # resync is a no-op for them — skip and fall through to the replay.
             scoped = tournament is not None
             if force_resync and not scoped:
-                # Client tears down on this line — streaming the corpus after it
-                # is wasted, and a mid-fetchall teardown discards the pooled connection.
+                # Client tears down on this line — streaming the corpus after
+                # it is wasted work.
                 yield 'data: {"type":"resync"}\n\n'
                 return
 
@@ -1151,8 +1165,10 @@ async def stream_updates(
             # Only that tournament + its sanctions, skipping the catch-up/overlay
             # below. `since` ignored — scoped state always replays in full.
             if scoped:
-                frames, last_timestamp = await _scoped_catchup_frames(
-                    stream_user, tournament, conn.sent_participant_uids
+                frames, last_timestamp = await asyncio.shield(
+                    _scoped_catchup_frames(
+                        stream_user, tournament, conn.sent_participant_uids
+                    )
                 )
                 for line in frames:
                     if _shutdown_event and _shutdown_event.is_set():
@@ -1188,7 +1204,9 @@ async def stream_updates(
             # never pinned across a client read.
             if not scoped and stream_user and level == DataLevel.MEMBER and _pool:
                 try:
-                    overlay, overlay_count = await _overlay_frames(stream_user)
+                    overlay, overlay_count = await asyncio.shield(
+                        _overlay_frames(stream_user)
+                    )
                 except Exception as e:
                     logger.error(f"Error in personal overlay: {e}", exc_info=True)
                     overlay, overlay_count = [], 0
@@ -1234,11 +1252,15 @@ async def stream_updates(
                     # fetch into a list with the pool released before yielding.
                     if scoped and conn.needs_participant_refresh and _pool:
                         conn.needs_participant_refresh = False
-                        try:
+
+                        async def _refresh_participants() -> list[str]:
                             async with _pool.connection() as db_conn:
-                                pframes = await _participant_user_frames(
+                                return await _participant_user_frames(
                                     db_conn, tournament, conn.sent_participant_uids
                                 )
+
+                        try:
+                            pframes = await asyncio.shield(_refresh_participants())
                         except Exception as e:
                             logger.error(
                                 f"Participant refresh failed ({conn_label}): {e}"

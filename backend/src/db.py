@@ -491,6 +491,11 @@ async def stream_objects_new(
     last_modified: str | None = None
     last_uid: str | None = None
 
+    # Shielded: a reader hanging up mid-query costs the pool the connection.
+    async def _fetch_batch(sql: str, params: list) -> list:
+        async with _pool.connection() as c:
+            return await (await c.execute(sql, (*params, batch_size))).fetchall()
+
     while True:
         conditions = [f"{col} IS NOT NULL"]
         params: list = []
@@ -509,8 +514,7 @@ async def stream_objects_new(
             f"SELECT {col}::text, modified_at, uid FROM objects "  # ty: ignore[invalid-argument-type]
             f"WHERE {where} ORDER BY modified_at ASC, uid ASC LIMIT %s"
         )
-        async with _pool.connection() as c:
-            rows = await (await c.execute(sql, (*params, batch_size))).fetchall()
+        rows = await asyncio.shield(_fetch_batch(sql, params))
 
         if not rows:
             break
