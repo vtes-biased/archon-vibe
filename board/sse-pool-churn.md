@@ -117,6 +117,51 @@ with **no delay** by design, so anything that re-levels a group of viewers at on
 produces precisely the simultaneous connect-and-abandon pattern that turns three a
 day into a spike against eight slots.
 
+## The second cost: a cursorless connect streams the whole corpus
+
+Measured on prod 2026-08-25. `stream_updates` sets `effective_since = since` and
+passes it straight to `stream_objects_new`. A connect carrying **no** `since` at
+all therefore streams every object the viewer may see, from the database, over one
+pooled connection:
+
+```
+Aug 25 04:09:38  Sync complete (user=019f19ff-… full-corpus):
+                 19106 user, 0 sanction, 9591 tournament, 4823 deck, 21 league, 0 promo in 5.321s
+Aug 25 04:09:49  Sync complete (user=019f19ff-… full-corpus):   (the same viewer, 11 s later)
+                 19106 user, 0 sanction, 9591 tournament, 4823 deck, 21 league, 0 promo in 3.197s
+Aug 25 04:48:53  Sync complete (user=019f1a00-… full-corpus):
+                 19106 user, 0 sanction, 9591 tournament, 4823 deck, 21 league, 0 promo in 12.905s
+```
+
+33,541 objects, three to thirteen seconds, one of eight slots each time. The
+`full-corpus` label is not the diagnosis — it is `main.py`'s word for any stream
+that is not bot-scoped — but the per-type counts are, since they are the whole
+corpus rather than a delta.
+
+`wiki/sync.md` says a first connect with no `since` fetches the pre-computed
+snapshot "instead of streaming from scratch". That is a **frontend convention with
+no server-side guard**: the server serves the corpus to whoever asks. Any client
+that has lost its cursor — cleared storage, a private window, a new device, a
+failed snapshot fetch, an errored ingest — takes the database path instead, and the
+production log shows it happening several times an hour on an ordinary day.
+
+The server already knows the cheap answer. `main.py:1142`, on the forced-resync
+branch, yields `{"type":"resync"}` and returns, under the comment *"streaming the
+corpus after it is wasted, and a mid-fetchall teardown discards the pooled
+connection"* — the exact reasoning, applied to the exact shape of request, that a
+bare cursorless connect never reaches.
+
+**This is why the two costs are one line.** The long stream is what gives a hang-up
+time to land mid-query; the shield is what stops that hang-up costing a connection.
+Fixing either alone leaves the European Championship exposed: shielding without the
+guard still pins eight slots for seconds at a time under a mass reconnect, and the
+guard without the shield still discards a connection whenever a delta is cancelled.
+
+The trap to avoid when implementing: answering a cursorless connect with `resync`
+sends the client to `/snapshot`, which **503s until a snapshot file exists**. A
+client that loops connect → resync → failed snapshot → connect is worse than the
+corpus stream it replaced.
+
 ## Verification
 
 Reproduce locally rather than waiting on production: hang up a few milliseconds into
@@ -126,3 +171,5 @@ isolates the loop from the handshake — and watch for
 `discarding closed connection`. Absence of that line, with the connection returned
 to the pool, is the proof. A production log check afterwards can only ever show
 absence of evidence, so it is a confirmation, not the gate.
+
+For the cursorless path, connect with no `since` and assert the response is the resync directive rather than a corpus stream, then confirm a snapshot-less backend does not put the client in a loop.

@@ -87,8 +87,8 @@ Its `test` profile backs `just test-e2e` ([testing](testing.md)).
 ## Deployment
 
 Real deployment is **wheels plus systemd via Ansible**, under `ansible/`. There is
-no Docker production path. Production runs on a ~2 GB VPS, which is why the
-connection pool is small and bulk table loads are forbidden
+no Docker production path. Production runs on a 945 MB single-core VPS, which is why
+the connection pool is small and bulk table loads are forbidden
 ([architecture](architecture.md#database-access)).
 
 Because the backend ships as an installed wheel, **bundled data files must load

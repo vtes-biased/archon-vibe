@@ -48,8 +48,10 @@ reconnect. A daily job hard-deletes after 30 days.
 
 ## Database access
 
-psycopg3 async, no ORM. The pool is small (`max_size=20`, autocommit), sized for a
-~2 GB VPS, so connections must cycle fast: check one out, run a query, release.
+psycopg3 async, no ORM. The pool is small and autocommit: `max_size` defaults to 20
+in code, and production overrides it to **8** via `DB_POOL_MAX_SIZE`, sized for a
+945 MB single-core VPS. Connections must cycle fast: check one out, run a query,
+release.
 Production holds 15k+ users and 7k+ tournaments on that box — never bulk-load a
 whole table into memory, use targeted `WHERE id = ANY(...)` queries.
 
