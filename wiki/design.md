@@ -309,7 +309,10 @@ plain-text excerpt from the source for a folded preview.
 local data and is handed over as a Blob — a plain navigation to a download
 endpoint carries no `Authorization` header, so an authenticated one answers 401 to
 every click. The account data export is the exception, because its payload is
-genuinely server-side; it passes the token in the query string.
+genuinely server-side; it passes the token in the query string. A *small*
+server-side file (the sealed NDA) is instead fetched with the auth header and
+handed over as a Blob — query-token auth stays confined to the one snapshot
+endpoint that already speaks it.
 
 Shared helpers live in `tournament-utils.ts`; don't re-duplicate score helpers per
 file.

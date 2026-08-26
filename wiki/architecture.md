@@ -608,7 +608,42 @@ cache-first handler — a deliberate exception to its default rule that every ot
 same-origin GET passes through untouched, so authenticated responses never land in
 Cache Storage.
 
-### Community links
+### NDA records
+
+The playtest enrollment workflow: a PTC (or IC, `manage_nda` in
+[access](access.md#capabilities)) requests a signature, the member click-signs
+the BCP NDA in-app, and the resulting record gates PT grants
+([access](access.md#capabilities), Appointments).
+
+Records live in the `nda_records` side table — one row per request or upload,
+never in `objects`, never projected or synced ([sync](sync.md#access-levels)):
+the sealed file and the signer's PII are served only by gated REST reads with
+`Cache-Control: private, no-store`. Endpoints, all under
+`/api/users/{uid}/nda`: `GET` (status + records; PTC/IC or self), `POST
+/request` (PTC/IC; one open request per member, enforced by a partial unique
+index), `GET /document` (the agreement text, prefilled with the member's name
+and the current date), `POST /sign` (self-only; requires the pending request),
+`POST /upload` (PTC/IC; paper-scan fallback, PDF or image, 8 MB), `GET
+/{record_uid}/pdf` (the sealed file).
+
+The document is a versioned constant in `backend/src/nda.py` (`NDA_VERSION`,
+sha256 over the template): each signature pins the exact (version, hash) it was
+shown, so BCP wording changes never orphan old evidence. Signing renders a
+sealed PDF — the filled agreement plus an audit page carrying the typed name,
+email, address, phone, member uid, VEKN id, requester, UTC timestamp, record id,
+version and hash — stores it in the row, and emails the signer a copy
+best-effort (the record stands even when SMTP fails). The paper template's BCP
+countersignature question (pre-embedded image vs offer/acceptance wording) is
+BCP's call and still open; the audit page names Black Chantry's signatory as the
+paper template does.
+
+Lifecycle: the record **persists after PT is revoked** (it is the evidence, not
+the role), dies with the member's hard delete (`delete_object` and the 30-day
+purge clean the side table), and follows the *person* through account surgery —
+merge re-homes it on the survivor, detach takes it to the personal account, like
+`calendar_token` (pinned by `test_surgery_moves_nda_record_with_the_person`).
+Existing PT holders from before this workflow keep the role and surface as
+missing-NDA on the member page for the PTC to backfill via the scan upload.
 
 Member-contributed links to external community resources, with moderator
 oversight. `community_links` is a field on `User`, defaulting to `[]`.

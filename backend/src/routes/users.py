@@ -19,6 +19,7 @@ from ..db import delete_avatar as db_delete_avatar
 from ..db import get_avatar as db_get_avatar
 from ..db import save_user as db_save_user
 from ..db import upsert_avatar as db_upsert_avatar
+from ..db import user_has_nda as db_user_has_nda
 from ..geonames import stored_country
 from ..middleware.auth import CurrentUser, OptionalUser
 from ..models import Role, User
@@ -220,8 +221,11 @@ async def update_user(
         added_roles = new_roles - old_roles
         removed_roles = old_roles - new_roles
 
+        target_has_nda = await db_user_has_nda(uid)
         for role in added_roles | removed_roles:
-            if not permissions.can_change_role(current_user, user, role):
+            if not permissions.can_change_role(
+                current_user, user, role, target_has_nda=target_has_nda
+            ):
                 raise HTTPException(
                     status_code=403,
                     detail=f"You don't have permission to change the {role.value} role",

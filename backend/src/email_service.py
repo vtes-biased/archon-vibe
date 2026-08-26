@@ -3,6 +3,7 @@
 import logging
 import os
 from datetime import timedelta
+from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -119,4 +120,54 @@ If you didn't request this email, you can safely ignore it.
         return True
     except Exception as e:
         logger.error(f"Failed to send magic link email to {to_email}: {e}")
+        return False
+
+
+async def send_nda_copy_email(to_email: str, signer_name: str, pdf: bytes) -> bool:
+    """Best-effort copy of the sealed NDA to its signer; the record already
+    stands in the database, so a mail failure is logged, never raised."""
+    server, port, username, password, from_addr, use_tls = _get_mail_config()
+
+    # "mixed" (not "alternative"): the PDF is an attachment, not a body variant.
+    msg = MIMEMultipart("mixed")
+    msg["Subject"] = "Your signed Black Chantry playtest NDA"
+    msg["From"] = from_addr
+    msg["To"] = to_email
+    msg.attach(
+        MIMEText(
+            f"Hello {signer_name},\n\n"
+            "Attached is your copy of the Black Chantry Productions "
+            "confidentiality and nondisclosure agreement you signed on the "
+            "VEKN Archon platform, sealed with its signature record.\n\n"
+            "Keep it for your records.\n",
+            "plain",
+        )
+    )
+    attachment = MIMEApplication(pdf, _subtype="pdf")
+    attachment.add_header(
+        "Content-Disposition", "attachment", filename="bcp-playtest-nda.pdf"
+    )
+    msg.attach(attachment)
+
+    try:
+        if username and password:
+            await aiosmtplib.send(
+                msg,
+                hostname=server,
+                port=port,
+                username=username,
+                password=password,
+                start_tls=use_tls,
+            )
+        else:
+            await aiosmtplib.send(
+                msg,
+                hostname=server,
+                port=port,
+                start_tls=False,
+            )
+        logger.info(f"NDA copy sent to {to_email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send NDA copy to {to_email}: {e}")
         return False

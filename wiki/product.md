@@ -46,9 +46,9 @@ passkeys, Discord OAuth plus Linked Roles, GitHub link (link-only, used to
 
 **Members** — profiles with contact and socials, avatar upload, VEKN ID
 claim/sponsor/link/abandon/force-abandon, the role set (IC, NC, Prince, Judge,
-Sheriff, Rulemonger, Ethics, PTC, Playtester, DEV), IC-only account merge,
-cooptation tracking, privacy-filtered directory, in-memoriam flag for deceased
-members.
+Sheriff, Rulemonger, Ethics, PTC, Playtester, DEV), playtest NDA click-to-sign
+with sealed-PDF records gating the PT role, IC-only account merge, cooptation
+tracking, privacy-filtered directory, in-memoriam flag for deceased members.
 
 **Tournaments** — full config, the Planned→Registration→Waiting→Playing→Finished
 state machine with reopen, registration and check-in, simulated-annealing seating

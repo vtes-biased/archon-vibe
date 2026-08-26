@@ -18,6 +18,7 @@ from .db import (
     get_connection,
     get_sanctions_for_user,
     get_user_by_uid,
+    remap_nda_user,
     save_object_from_model,
     save_sanction,
     save_user,
@@ -159,6 +160,7 @@ async def merge_users(
     # auth_methods aren't synced (no SSE); the rest are — collect their
     # BroadcastData too.
     await reassign_auth_methods(delete_uid, keep_uid)
+    await remap_nda_user(delete_uid, keep_uid)
     broadcasts = [merged_bd]
     broadcasts += await reassign_sanctions(delete_uid, keep_uid)
     broadcasts += await reassign_decks(delete_uid, keep_uid)
@@ -262,6 +264,9 @@ async def detach_user_from_vekn(
     )
     personal_bd = await save_user(personal)
     await reassign_auth_methods(user_uid, new_uid)
+    # The NDA is the human's contract, not the VEKN record's — it walks away
+    # with the personal account, like the login and the calendar feed.
+    await remap_nda_user(user_uid, new_uid)
 
     # Sanctions/decks are NOT reassigned — they key on this stable uid.
     # calendar_token=None here is a no-op via COALESCE (already cleared above).

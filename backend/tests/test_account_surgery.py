@@ -50,6 +50,7 @@ async def _cleanup_surgery():
         async with db.get_connection() as conn:
             await conn.execute("DELETE FROM objects WHERE type IN ('sanction', 'deck')")
             await conn.execute("DELETE FROM auth_methods")
+            await conn.execute("DELETE FROM nda_records")
 
 
 def _auth(user_uid: str, identifier: str) -> AuthMethod:
@@ -357,6 +358,41 @@ async def test_detach_moves_calendar_token_to_personal(test_db):
         resolved = await db.get_user_by_calendar_token("feed-token-xyz")
         assert resolved is not None
         assert resolved.uid == personal.uid
+
+
+@pytest.mark.asyncio
+async def test_surgery_moves_nda_record_with_the_person(test_db):
+    """The NDA is the human's contract: a merge re-homes it on the survivor,
+    a detach takes it to the personal account (architecture.md, NDA records)."""
+    keep = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Keeper")
+    dying = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Dying")
+    await db.save_user(keep)
+    await db.save_user(dying)
+
+    async with _cleanup_surgery():
+        await db.insert_nda_upload(
+            str(uuid7()), dying.uid, "some-ptc", b"%PDF-scan", "application/pdf"
+        )
+        assert await db.user_has_nda(dying.uid)
+        await accounts.merge_users(keep.uid, dying.uid)
+        assert await db.user_has_nda(keep.uid)
+        assert not await db.user_has_nda(dying.uid)
+
+        vekn_user = User(
+            uid=str(uuid7()),
+            modified=datetime.now(UTC),
+            name="Splitter",
+            vekn_id="9000003",
+        )
+        await db.save_user(vekn_user)
+        await db.insert_nda_upload(
+            str(uuid7()), vekn_user.uid, "some-ptc", b"%PDF-scan", "application/pdf"
+        )
+        result = await accounts.detach_user_from_vekn(vekn_user.uid)
+        assert result is not None
+        personal, _vekn_record, _broadcasts = result
+        assert await db.user_has_nda(personal.uid)
+        assert not await db.user_has_nda(vekn_user.uid)
 
 
 @pytest.mark.asyncio

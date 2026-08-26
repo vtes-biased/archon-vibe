@@ -74,6 +74,9 @@ pub struct UserContext {
     pub roles: Vec<Role>,
     pub country: Option<String>,
     pub vekn_id: Option<String>,
+    /// Read only by [`can_change_role`]'s PT-grant arm; absent means false, so
+    /// callers that never grant PT can omit it.
+    pub has_nda: bool,
 }
 
 impl UserContext {
@@ -85,11 +88,13 @@ impl UserContext {
 
         let country = value[arg::COUNTRY].as_str().map(|s| s.to_string());
         let vekn_id = value[arg::VEKN_ID].as_str().map(|s| s.to_string());
+        let has_nda = value[arg::HAS_NDA].as_bool().unwrap_or(false);
 
         Ok(UserContext {
             roles,
             country,
             vekn_id,
+            has_nda,
         })
     }
 
@@ -193,6 +198,7 @@ pub enum Capability {
     ManageOauthClients,
     RunAdminSync,
     SetArchivalResults,
+    ManageNda,
 }
 
 impl Capability {
@@ -512,6 +518,16 @@ pub const CAPABILITIES: &[Rule] = &[
         deny: "Only IC can trigger a sync",
         deny_scope: None,
     },
+    Rule {
+        capability: Capability::ManageNda,
+        name: "manage_nda",
+        global: &[IC, PTC],
+        same_country: &[],
+        self_service: false,
+        organizer: false,
+        deny: "Only IC or PTC can manage NDA records",
+        deny_scope: None,
+    },
     // Not the organizer: a reconstruction has none, and an import's organizer is
     // whatever upstream claimed. Invalidation authority is IC's anyway (8.6).
     Rule {
@@ -693,6 +709,11 @@ fn appointment_for(role: Role) -> &'static Appointment {
 pub fn can_change_role(actor: &UserContext, target: &UserContext, role: Role) -> PermissionResult {
     if target.vekn_id.is_none() {
         return PermissionResult::deny("User must have a VEKN ID to be assigned roles");
+    }
+    // A target already holding PT is being revoked, not granted — grandfathered
+    // holders (role predates the NDA record) stay revocable.
+    if role == PT && !target.has_role(PT) && !target.has_nda {
+        return PermissionResult::deny("A signed NDA must be on record to grant the PT role");
     }
     let appointment = appointment_for(role);
     if actor.has_any(appointment.global) {
@@ -930,6 +951,7 @@ mod tests {
             roles,
             country: country.map(|s| s.to_string()),
             vekn_id: Some("1000001".to_string()),
+            has_nda: true,
         }
     }
 
@@ -1142,10 +1164,35 @@ mod tests {
             roles: vec![],
             country: Some("FR".to_string()),
             vekn_id: None,
+            has_nda: true,
         };
         let result = can_change_role(&ic, &target, Prince);
         assert!(!result.allowed);
         assert!(result.reason.unwrap().contains("VEKN ID"));
+    }
+
+    #[test]
+    fn test_pt_grant_requires_nda() {
+        let ptc = ctx(vec![PTC], Some("US"));
+        let ic = ctx(vec![IC], Some("US"));
+        let unsigned = UserContext {
+            roles: vec![],
+            country: Some("FR".to_string()),
+            vekn_id: Some("1000002".to_string()),
+            has_nda: false,
+        };
+        let result = can_change_role(&ptc, &unsigned, PT);
+        assert!(!result.allowed);
+        assert!(result.reason.unwrap().contains("NDA"));
+        assert!(!can_change_role(&ic, &unsigned, PT).allowed);
+        // Other roles ignore the NDA precondition.
+        assert!(can_change_role(&ic, &unsigned, Judge).allowed);
+        // A grandfathered holder stays revocable without a record.
+        let holder = UserContext {
+            roles: vec![PT],
+            ..unsigned
+        };
+        assert!(can_change_role(&ptc, &holder, PT).allowed);
     }
 
     #[test]

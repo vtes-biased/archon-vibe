@@ -351,13 +351,17 @@ function checkPermission(
 export function canChangeRole(
   actor: UserContext,
   target: UserContext,
-  role: string
+  role: string,
+  // The NDA fact is not on User (never projected) — callers that can see it
+  // pass it in; absent means false, which only bites when granting PT.
+  targetHasNda = false
 ): PermissionResult {
   const actorJson = JSON.stringify({ roles: actor.roles ?? [], country: actor.country });
   const targetJson = JSON.stringify({
     roles: target.roles ?? [],
     country: target.country,
     vekn_id: target.vekn_id ?? null,
+    has_nda: targetHasNda,
   });
 
   const resultJson = callEngine(() => getEngine().canChangeRole(actorJson, targetJson, role));
@@ -498,6 +502,10 @@ export function isOrganizer(
 
 export function canSetArchivalResults(user: UserContext | null): PermissionResult {
   return checkPermission('set_archival_results', user);
+}
+
+export function canManageNda(user: UserContext | null): PermissionResult {
+  return checkPermission('manage_nda', user);
 }
 
 export function canEditLeague(

@@ -24,6 +24,7 @@
     mode = "view",
     editable = true,
     inline = false,
+    targetHasNda,
     onupdated,
     oncreated,
     oncancel,
@@ -33,6 +34,7 @@
     mode?: "view" | "edit" | "create";
     editable?: boolean;
     inline?: boolean;
+    targetHasNda?: boolean;
     onupdated?: (user: User) => void;
     oncreated?: (user: User) => void;
     oncancel?: () => void;
@@ -59,7 +61,7 @@
     }
     if (!user) return false;
     try {
-      return engineCanChangeRole(auth.user, user, role).allowed;
+      return engineCanChangeRole(auth.user, user, role, targetHasNda ?? false).allowed;
     } catch {
       return false;
     }
@@ -457,6 +459,11 @@
         {#if mode !== "create" && user && !user.vekn_id}
           <p class="mt-2 text-xs text-link">
             {m.user_vekn_required_for_roles()}
+          </p>
+        {/if}
+        {#if mode !== "create" && user && targetHasNda === false && !editRoles.includes("PT")}
+          <p class="mt-2 text-xs text-link">
+            {m.user_nda_required_for_pt()}
           </p>
         {/if}
       </fieldset>

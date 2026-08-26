@@ -4,10 +4,12 @@
   import { getUser } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canEditUser, canManageVekn, canMarkDeceased, canDeleteMember, canSponsorMember, canMergeAccounts, canIssueRestrictedSanction } from "$lib/engine";
+  import { canEditUser, canManageVekn, canMarkDeceased, canDeleteMember, canSponsorMember, canMergeAccounts, canIssueRestrictedSanction, canManageNda } from "$lib/engine";
   import type { User } from "$lib/types";
+  import { getNdaStatus, type NdaStatus } from "$lib/api";
   import UserComponent from "$lib/components/User.svelte";
   import VeknManagement from "$lib/components/VeknManagement.svelte";
+  import NdaSection from "$lib/components/NdaSection.svelte";
   import SanctionsManager from "$lib/components/SanctionsManager.svelte";
   import PlayerRatings from "$lib/components/PlayerRatings.svelte";
   import PlayerRecord from "$lib/components/PlayerRecord.svelte";
@@ -92,6 +94,33 @@
     if (!auth.user || !user || !isOnline) return false;
     if (canManage || user.vekn_id) return false;
     return canSponsorMember(auth.user).allowed;
+  });
+
+  let ndaStatus = $state<NdaStatus | null>(null);
+
+  // NDA records are never synced or projected, so this is an explicit online
+  // read, gated on the capability the endpoint itself enforces.
+  const canNda = $derived.by(() => {
+    if (!auth.user || !user || !isOnline) return false;
+    return canManageNda(auth.user).allowed;
+  });
+
+  async function loadNda() {
+    if (!uid) return;
+    try {
+      ndaStatus = await getNdaStatus(uid);
+    } catch {
+      ndaStatus = null;
+    }
+  }
+
+  $effect(() => {
+    uid; // reactive dependency
+    if (canNda) {
+      loadNda();
+    } else {
+      ndaStatus = null;
+    }
   });
 
   const canIssueSanctions = $derived.by(() => {
@@ -188,6 +217,7 @@
       {user}
       mode="view"
       editable={canEdit && isOnline}
+      targetHasNda={canNda ? (ndaStatus?.has_nda ?? false) : undefined}
       onupdated={handleUserUpdated}
     />
 
@@ -206,6 +236,10 @@
       <div class="mt-6">
         <VeknManagement {user} {sponsorOnly} {canMerge} onaction={handleUserUpdated} ondelete={handleMemberDeleted} canMarkDeceased={canManageDeceased} canDelete={canDelete} />
       </div>
+    {/if}
+
+    {#if canNda}
+      <NdaSection {user} status={ndaStatus} onchanged={loadNda} />
     {/if}
 
     <SanctionsManager {user} canIssueSanctions={canIssueSanctions} />

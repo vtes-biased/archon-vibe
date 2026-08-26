@@ -33,6 +33,11 @@ through the separate API process ([public-api](public-api.md)).
 
 "None" means the column is NULL and the object is invisible at that level.
 
+Playtest NDA records appear at **no** level: they carry PII and live in the
+`nda_records` side table, not on `User`, so nothing about them is projected or
+streamed — every read is a gated REST fetch
+([architecture](architecture.md#nda-records)).
+
 No api payload carries `modified` or `deleted_at`: both are `objects` columns the
 API app reads directly — `modified_at` orders and batches its streams
 ([public-api](public-api.md#the-stream)), and it exposes neither.

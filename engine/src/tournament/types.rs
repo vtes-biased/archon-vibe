@@ -323,6 +323,7 @@ impl ActorContext {
                 .collect(),
             country: None,
             vekn_id: None,
+            has_nda: false,
         }
     }
 

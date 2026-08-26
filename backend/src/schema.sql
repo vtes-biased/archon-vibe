@@ -280,3 +280,29 @@ EXECUTE FUNCTION update_objects_modified_at();
 
 -- Note: vekn_id_counter table is no longer used.
 -- VEKN IDs are now allocated by finding the first gap >= 1000000.
+
+-- NDA records - playtest NDA requests and signature evidence (sealed PDF or
+-- uploaded scan). Deliberately NOT a synced object type and no User field:
+-- the record carries PII and must never reach a broadcast projection.
+CREATE TABLE IF NOT EXISTS nda_records (
+    uid TEXT PRIMARY KEY,
+    user_uid TEXT NOT NULL,
+    status TEXT NOT NULL,
+    document_version INTEGER,
+    document_sha256 TEXT,
+    signer_name TEXT,
+    signer_email TEXT,
+    signer_address TEXT,
+    signer_phone TEXT,
+    requested_by TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    signed_at TIMESTAMPTZ,
+    pdf BYTEA,
+    content_type TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_nda_records_user_uid
+ON nda_records(user_uid);
+-- One open request at a time; signing flips it to 'signed' in place.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_nda_records_pending
+ON nda_records(user_uid)
+WHERE status = 'pending';

@@ -36,6 +36,7 @@ omitted from the rows below.
 | `delete_organizer_sanction` | tournament organizer, while the tournament is unfinished |
 | `record_promo_intake`, `view_full_promo_ledger` | NC — global (the inventory chain is not country-scoped) |
 | `manage_oauth_clients` | DEV — global |
+| `manage_nda` | PTC — global (request, upload, view and download playtest NDA records) |
 
 `moderate_link` and `promote_link_national` scope on the **link's** country, which
 a `CommunityLink` carries as a field of its own defaulting to its owner's — so an
@@ -54,11 +55,16 @@ the two halves to drift.
 
 **Appointments** — NC grants **Prince** in their own country; PTC grants **PT**;
 Rulemonger grants **Judge** and **Sheriff**; everything else is IC's. **A target
-must hold a `vekn_id` to hold any role.**
+must hold a `vekn_id` to hold any role**, and **granting PT requires an NDA on
+record** ([architecture](architecture.md#nda-records)) — a grant, not a hold: a
+target already holding PT is being revoked, so grandfathered holders (role
+predates the NDA workflow) keep the role and stay revocable. The NDA fact lives
+off `User`, so callers pass it into `can_change_role` explicitly (`has_nda` on
+the target context, absent = false).
 
 Rules carrying a precondition the table cannot express keep a resolver beside it:
-sanction level, tournament state, a target's own roles (`can_change_country`), and
-the `open_to_country_princes` league flag.
+sanction level, tournament state, a target's own roles (`can_change_country`),
+the target's NDA record (PT), and the `open_to_country_princes` league flag.
 
 **Two out-of-band consumers watch role writes**: the Discord Linked Roles push
 fires on **any** role delta with no periodic reconcile, while the resync

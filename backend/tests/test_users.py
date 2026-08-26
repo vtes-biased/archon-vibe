@@ -160,8 +160,9 @@ async def test_role_change_resyncs_only_for_access_roles(
         return types
 
     try:
-        # Neither a plain badge (PT) nor a Prince widens what the user sees.
-        for role in (Role.PT, Role.PRINCE):
+        # Neither a plain badge (Judge) nor a Prince widens what the user sees.
+        # (Judge, not PT: granting PT is gated on an NDA record.)
+        for role in (Role.JUDGE, Role.PRINCE):
             current = await db.get_user_by_uid(target.uid)
             resp = await test_client.put(
                 f"/api/users/{target.uid}",

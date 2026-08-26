@@ -37,6 +37,7 @@ pub mod arg {
     pub const FULL_NAME: &str = "full_name";
     pub const GROUP: &str = "group";
     pub const GW: &str = "gw";
+    pub const HAS_NDA: &str = "has_nda";
     pub const HAS_TIES: &str = "has_ties";
     pub const IS_ORGANIZER: &str = "is_organizer";
     pub const KEY: &str = "key";

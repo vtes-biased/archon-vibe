@@ -11,10 +11,11 @@
   import { HOF_MIN_WINS } from "$lib/tournament-utils";
   import { registerPasskey } from "$lib/stores/passkeys.svelte";
   import { syncManager } from "$lib/sync";
-  import { claimVeknId, abandonVeknId, uploadAvatar } from "$lib/api";
+  import { claimVeknId, abandonVeknId, uploadAvatar, getNdaStatus } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
 
-  import { User, TriangleAlert, Trophy } from "@lucide/svelte";
+  import { User, TriangleAlert, Trophy, FileSignature } from "@lucide/svelte";
+  import InlineNotice from "$lib/components/InlineNotice.svelte";
   import AvatarCropper from "$lib/components/AvatarCropper.svelte";
   import PlayerRatings from "$lib/components/PlayerRatings.svelte";
   import PlayerRecord from "$lib/components/PlayerRecord.svelte";
@@ -70,6 +71,20 @@
   // comes from the user object rather than authMethods.
   const hasGithub = $derived(!!auth.user?.github_login);
   const githubUsername = $derived(auth.user?.github_login || null);
+
+  let ndaPending = $state(false);
+  let ndaChecked = $state(false);
+
+  // One silent online check per visit: NDA requests are never synced, so a
+  // pending signature is only discoverable by asking the server.
+  $effect(() => {
+    const u = auth.user;
+    if (!u || ndaChecked || !navigator.onLine) return;
+    ndaChecked = true;
+    getNdaStatus(u.uid, { suppressErrorToast: true })
+      .then((s) => (ndaPending = !!s.pending))
+      .catch(() => {});
+  });
 
   onMount(async () => {
     const params = new URLSearchParams(window.location.search);
@@ -236,6 +251,15 @@
       </div>
     {:else}
       {@const user = auth.user}
+
+      {#if ndaPending}
+        <div class="mb-4">
+          <InlineNotice tone="warn" icon={FileSignature}>
+            {m.profile_nda_pending_notice()}
+            <a href="/nda" class="text-link underline ml-1">{m.profile_nda_pending_link()}</a>
+          </InlineNotice>
+        </div>
+      {/if}
 
       <div class="bg-surface-card rounded-lg shadow border border-line">
         {#key user.uid}

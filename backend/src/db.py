@@ -423,6 +423,7 @@ async def delete_object(
             await c.execute(
                 "DELETE FROM push_subscriptions WHERE user_uid = %s", (uid,)
             )
+            await c.execute("DELETE FROM nda_records WHERE user_uid = %s", (uid,))
 
     if conn:
         await _run(conn)
@@ -579,6 +580,9 @@ async def purge_deleted_objects(days: int = 30) -> int:
                 )
                 await conn.execute(
                     "DELETE FROM push_subscriptions WHERE user_uid = ANY(%s)", (purged,)
+                )
+                await conn.execute(
+                    "DELETE FROM nda_records WHERE user_uid = ANY(%s)", (purged,)
                 )
         return len(purged)
 
@@ -1548,6 +1552,143 @@ async def delete_promo_image(promo_uid: str) -> bool:
         )
         row = await result.fetchone()
         return row is not None
+
+
+_NDA_COLS = (
+    "uid, user_uid, status, document_version, document_sha256, signer_name, "
+    "signer_email, requested_by, created_at, signed_at, content_type"
+)
+
+
+def _nda_row_to_dict(row: tuple) -> dict:
+    return {
+        "uid": row[0],
+        "user_uid": row[1],
+        "status": row[2],
+        "document_version": row[3],
+        "document_sha256": row[4],
+        "signer_name": row[5],
+        "signer_email": row[6],
+        "requested_by": row[7],
+        "created_at": row[8],
+        "signed_at": row[9],
+        "content_type": row[10],
+    }
+
+
+async def create_nda_request(uid: str, user_uid: str, requested_by: str) -> bool:
+    """False when the member already has an open request (partial unique index)."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """INSERT INTO nda_records (uid, user_uid, status, requested_by)
+            VALUES (%s, %s, 'pending', %s)
+            ON CONFLICT (user_uid) WHERE status = 'pending' DO NOTHING
+            RETURNING uid""",
+            (uid, user_uid, requested_by),
+        )
+        return await result.fetchone() is not None
+
+
+async def get_nda_records(user_uid: str) -> list[dict]:
+    async with get_connection() as conn:
+        result = await conn.execute(
+            f"SELECT {_NDA_COLS} FROM nda_records WHERE user_uid = %s "
+            "ORDER BY created_at DESC",
+            (user_uid,),
+        )
+        return [_nda_row_to_dict(r) for r in await result.fetchall()]
+
+
+async def get_nda_pending(user_uid: str) -> dict | None:
+    async with get_connection() as conn:
+        result = await conn.execute(
+            f"SELECT {_NDA_COLS} FROM nda_records "
+            "WHERE user_uid = %s AND status = 'pending'",
+            (user_uid,),
+        )
+        row = await result.fetchone()
+        return _nda_row_to_dict(row) if row else None
+
+
+async def seal_nda_signature(
+    record_uid: str,
+    user_uid: str,
+    *,
+    document_version: int,
+    document_sha256: str,
+    signer_name: str,
+    signer_email: str,
+    signer_address: str,
+    signer_phone: str,
+    signed_at: datetime,
+    pdf: bytes,
+) -> bool:
+    """Flip the pending request to signed and seal the evidence in one write."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """UPDATE nda_records SET status = 'signed',
+                document_version = %s, document_sha256 = %s, signer_name = %s,
+                signer_email = %s, signer_address = %s, signer_phone = %s,
+                signed_at = %s, pdf = %s, content_type = 'application/pdf'
+            WHERE uid = %s AND user_uid = %s AND status = 'pending'
+            RETURNING uid""",
+            (
+                document_version,
+                document_sha256,
+                signer_name,
+                signer_email,
+                signer_address,
+                signer_phone,
+                signed_at,
+                pdf,
+                record_uid,
+                user_uid,
+            ),
+        )
+        return await result.fetchone() is not None
+
+
+async def insert_nda_upload(
+    uid: str, user_uid: str, uploaded_by: str, pdf: bytes, content_type: str
+) -> None:
+    async with get_connection() as conn:
+        await conn.execute(
+            """INSERT INTO nda_records
+                (uid, user_uid, status, requested_by, signed_at, pdf, content_type)
+            VALUES (%s, %s, 'uploaded', %s, CURRENT_TIMESTAMP, %s, %s)""",
+            (uid, user_uid, uploaded_by, pdf, content_type),
+        )
+
+
+async def get_nda_pdf(user_uid: str, record_uid: str) -> tuple[bytes, str] | None:
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "SELECT pdf, content_type FROM nda_records "
+            "WHERE uid = %s AND user_uid = %s AND pdf IS NOT NULL",
+            (record_uid, user_uid),
+        )
+        row = await result.fetchone()
+        return (bytes(row[0]), row[1]) if row else None
+
+
+async def user_has_nda(user_uid: str) -> bool:
+    """An NDA is on record: signed in-app or a paper scan uploaded."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "SELECT 1 FROM nda_records "
+            "WHERE user_uid = %s AND status IN ('signed', 'uploaded') LIMIT 1",
+            (user_uid,),
+        )
+        return await result.fetchone() is not None
+
+
+async def remap_nda_user(old_uid: str, new_uid: str) -> None:
+    """Point NDA records at the account surgery's surviving human."""
+    async with get_connection() as conn:
+        await conn.execute(
+            "UPDATE nda_records SET user_uid = %s WHERE user_uid = %s",
+            (new_uid, old_uid),
+        )
 
 
 _LEDGER_COLS = (

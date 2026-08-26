@@ -727,3 +727,83 @@ export async function createPromoLedgerEntry(payload: LedgerEntryPayload): Promi
 export async function getPromoLedger(): Promise<PromoLedgerEntry[]> {
   return apiRequest<PromoLedgerEntry[]>('/api/promos/ledger', { method: 'GET' });
 }
+
+export interface NdaRecord {
+  uid: string;
+  user_uid: string;
+  status: 'pending' | 'signed' | 'uploaded';
+  document_version: number | null;
+  document_sha256: string | null;
+  signer_name: string | null;
+  signer_email: string | null;
+  requested_by: string;
+  created_at: string;
+  signed_at: string | null;
+  content_type: string | null;
+}
+
+export interface NdaStatus {
+  records: NdaRecord[];
+  pending: NdaRecord | null;
+  has_nda: boolean;
+  document_version: number;
+}
+
+/** PTC/IC for any member; members for themselves. Online-only read — NDA records
+ * are never synced or projected. */
+export async function getNdaStatus(
+  userUid: string,
+  opts?: { suppressErrorToast?: boolean }
+): Promise<NdaStatus> {
+  return apiRequest<NdaStatus>(`/api/users/${userUid}/nda`, { method: 'GET' }, opts);
+}
+
+export async function requestNdaSignature(userUid: string): Promise<void> {
+  await apiRequest<void>(`/api/users/${userUid}/nda/request`, { method: 'POST' });
+}
+
+export async function getNdaDocument(
+  userUid: string
+): Promise<{ text: string; version: number; sha256: string }> {
+  return apiRequest(`/api/users/${userUid}/nda/document`, { method: 'GET' });
+}
+
+export async function signNda(
+  userUid: string,
+  data: { name: string; email: string; address: string; phone: string }
+): Promise<{ success: boolean; record_uid: string }> {
+  return apiRequest(`/api/users/${userUid}/nda/sign`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function uploadNdaScan(userUid: string, file: File): Promise<void> {
+  const formData = new FormData();
+  formData.append('file', file, file.name);
+  await apiRequest<void>(`/api/users/${userUid}/nda/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+/** Small PII evidence file: fetched with the auth header and handed over as a
+ * Blob, unlike the query-token data export (see design.md, downloads). */
+export async function downloadNdaPdf(userUid: string, recordUid: string): Promise<void> {
+  if (!isOnline()) throw new Error(m.error_action_requires_online());
+  const response = await authorizedFetch(
+    `${API_URL}/api/users/${userUid}/nda/${recordUid}/pdf`
+  );
+  if (!response.ok) throw new ApiError('Download failed', response.status);
+  const blob = await response.blob();
+  const ext = (response.headers.get('Content-Type') ?? 'application/pdf')
+    .split('/')
+    .pop()!
+    .replace('jpeg', 'jpg');
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `bcp-playtest-nda.${ext}`;
+  a.click();
+  URL.revokeObjectURL(url);
+}

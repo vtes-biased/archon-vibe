@@ -71,14 +71,24 @@ def can_edit_user(actor: User, target: User) -> bool:
     return _check("edit_member_profile", actor, target=target)
 
 
-def can_change_role(actor: User, target: User, role: Role) -> bool:
-    """Grant or revoke one role — see the engine's appointment matrix."""
+def can_change_role(
+    actor: User, target: User, role: Role, *, target_has_nda: bool = False
+) -> bool:
+    """Grant or revoke one role — see the engine's appointment matrix. The NDA
+    fact lives in nda_records, not on User, so the caller passes it in; it only
+    matters when granting PT (the engine ignores it everywhere else)."""
+    target_context = user_to_context(target) | {"has_nda": target_has_nda}
     result = _engine.can_change_role(
         json.dumps(user_to_context(actor)),
-        json.dumps(user_to_context(target)),
+        json.dumps(target_context),
         role.value,
     )
     return json.loads(result)["allowed"]
+
+
+def can_manage_nda(actor: User) -> bool:
+    """Request, upload, view and download playtest NDA records."""
+    return _check("manage_nda", actor)
 
 
 def can_change_country(actor: User, target: User) -> bool:
