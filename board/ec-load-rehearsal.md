@@ -43,8 +43,11 @@ Box side (frankfurt, `deploy@57.129.110.107`), in order:
    `sudo -u new_archon bash -c 'set -a; . /etc/new_archon/new-archon-backend.env;
    set +a; /opt/new_archon/backend/venv/bin/python loadtest_users.py mint
    --count 200 --ttl-minutes 120 --out /tmp/tokens.txt'`
-   (scp `backend/scripts/loadtest_users.py` over; it imports `backend.src` from
-   the wheel). Fetch `/tmp/tokens.txt` back to the driving machine.
+   (scp `backend/scripts/loadtest_users.py` to `/tmp` first; it imports
+   `backend.src` from the wheel, and the env file is root:new_archon 0640 so
+   the sudo above can read it). The tokens file is written by `new_archon`
+   world-readable in the real `/tmp` — fine for two-hour synthetic tokens —
+   so `deploy` can scp it back to the driving machine.
 4. Find the postgres unit (`systemctl list-units 'postgresql*'`), then start the
    sampler: `./loadtest_sample.sh new_archon samples.csv 1 new-archon-backend
    nginx <postgres-unit>`.
