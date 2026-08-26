@@ -3,8 +3,7 @@
 # cluster, dumps each to its own file (pg_dump -F c), dumps cluster globals
 # (pg_dumpall --globals-only), optionally uploads to S3-compatible storage via
 # restic (one repo per DB, plus one for globals), and prunes locally.
-# Kept in sync with server-setup's files/pg-backup.sh (frankfurt runs that
-# copy) — sole divergence: forget --group-by host.
+# Kept in sync with server-setup's files/pg-backup.sh (frankfurt runs that copy).
 #
 # Per-DB progress is logged via `logger -t <db>` so journald filtering picks it
 # up alongside the app's other syslog streams. pg_dump / restic stderr lands
