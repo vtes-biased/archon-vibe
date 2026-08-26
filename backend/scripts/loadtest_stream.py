@@ -35,12 +35,10 @@ import aiohttp
 
 SYNC_COMPLETE_PREFIX = 'data: {"type":"sync_complete"'
 RESYNC_LINE = 'data: {"type":"resync"}'
-HEARTBEAT_LINE = 'data: {"type":"heartbeat"}'
 
 
 class Client:
-    def __init__(self, idx: int, token: str | None):
-        self.idx = idx
+    def __init__(self, token: str | None):
         self.token = token
         self.device_id = f"loadtest-{uuid.uuid4()}"
         self.av: str | None = None
@@ -48,7 +46,6 @@ class Client:
         self.generated_at: str | None = None
         self.resp: aiohttp.ClientResponse | None = None
         self.reader: asyncio.Task | None = None
-        self.live_frames = 0
 
     def stream_params(self, cursorless: bool = False) -> dict[str, str]:
         params = {"device_id": self.device_id}
@@ -112,12 +109,11 @@ async def read_to_sync_complete(
     return {"error": "stream ended before sync_complete", "ttfb": ttfb}
 
 
-async def hold_live(resp: aiohttp.ClientResponse, c: Client) -> None:
+async def hold_live(resp: aiohttp.ClientResponse) -> None:
+    """Drain the held stream — reading is what keeps the connection open."""
     try:
-        async for raw in resp.content:
-            line = raw.decode(errors="replace").rstrip("\n")
-            if line.startswith("data: ") and line != HEARTBEAT_LINE:
-                c.live_frames += 1
+        async for _ in resp.content:
+            pass
     except (aiohttp.ClientError, asyncio.CancelledError):
         pass
 
@@ -136,7 +132,7 @@ async def open_stream(
             resp.close()
             return result
         c.resp = resp
-        c.reader = asyncio.create_task(hold_live(resp, c))
+        c.reader = asyncio.create_task(hold_live(resp))
         return result
     except (aiohttp.ClientError, ValueError, TimeoutError) as e:
         return {"error": f"{type(e).__name__}: {e}"}
@@ -244,7 +240,7 @@ async def main() -> int:
         with open(args.tokens_file) as f:
             tokens = [line.strip() for line in f if line.strip()]
     clients = [
-        Client(i, tokens[i] if i < len(tokens) else None) for i in range(args.clients)
+        Client(tokens[i] if i < len(tokens) else None) for i in range(args.clients)
     ]
     print(
         f"{len(clients)} clients ({min(len(tokens), len(clients))} member, "

@@ -12,7 +12,10 @@ floor, not a forecast:
 
 - cold connect: snapshot TTFB p95 0.43s, full member download 84MB inflated in
   ~7.3s, stream sync_complete p95 0.18s — 0 errors.
-- mass cursorless: resync directive p95 0.09s, server closes immediately.
+- mass cursorless: resync directive p95 0.09s, server closes immediately. A
+  fresh client carries no `av`, so it is the access-version-mismatch branch that
+  answers, not the cursorless snapshot-redirect guard — same directive, earlier
+  branch; attribute the numbers accordingly.
 - reconnect burst: sync_complete p95 0.20s — 0 errors.
 - pool: active backends capped at exactly 8, sessions delta 7 over the whole
   window (pool warm-up, no churn).

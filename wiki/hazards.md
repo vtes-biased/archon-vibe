@@ -429,6 +429,15 @@ instead of growing its own guard.
 
 ## Deploy
 
+**Systemd's default 1024-fd soft cap truncates in-flight responses under a
+room-sized connect burst.** A 200-client cold connect costs roughly two sockets
+per client plus the one snapshot fd each response holds — ~600 fds before the
+pool and logs — and running out does not refuse new connections: it cut 26 of
+200 snapshot downloads mid-body (`TransferEncodingError`) in the local
+rehearsal. The backend and public-API unit templates pin `LimitNOFILE=65536`; a
+new unit that serves streams or file responses must do the same, since nothing
+else fails loudly when the cap is near.
+
 **A scheduled job whose period reaches a day never fires.** The backend unit sets
 `RuntimeMaxSec=1d` — a daily restart that re-fetches the krcg-static card data
 without a redeploy — and APScheduler 3.x fires an `IntervalTrigger` at start + N,

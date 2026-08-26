@@ -490,7 +490,9 @@ file per level, avoiding a DB connection held open for an initial stream of
 thousands of objects. `/snapshot` streams the gzip from disk in chunks, holding one
 fd open per response so the atomic-rename regeneration stays consistent mid-stream;
 the file is never read into the heap, so hundreds of concurrent reconnects don't
-spike memory.
+spike memory. What they do spend is file descriptors — that fd plus the sockets —
+which is why the serving units pin `LimitNOFILE`
+([hazards](hazards.md#deploy)).
 
 **All four files come from ONE pass** over `objects`, selecting every projection
 column of a row together and writing one gzip stream per level as it goes, pinned
