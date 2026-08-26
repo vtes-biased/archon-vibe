@@ -1,10 +1,6 @@
 ---
-# nginx (www-data) serves /snapshot bodies straight from this dir via
-# X-Accel-Redirect: parent traversable but not readable, snapshots dir setgid
-# www-data so regenerated files inherit a group the backend cannot chgrp to.
-# Imported by both deploy playbooks tags:[always], so the perms ride every
-# deploy — a bootstrap-only home would leave the accel location 403ing until
-# the next provisioning run.
+# nginx (www-data) serves /snapshot bodies from this dir via X-Accel-Redirect:
+# setgid www-data so regenerated files inherit a group the backend cannot chgrp to.
 - name: Ensure the app lib dir is nginx-traversable
   ansible.builtin.file:
     path: "{{ app_lib_dir }}"
@@ -20,3 +16,13 @@
     owner: "{{ archon_user }}"
     group: www-data
     mode: "2750"
+
+# Files predating the setgid dir (or written by a pre-accel backend) are 0600
+# archon-group; nothing but this rewrites them, so it must ride every deploy.
+- name: Ensure existing snapshot files are nginx-readable
+  ansible.builtin.file:
+    path: "{{ app_lib_dir }}/snapshots"
+    state: directory
+    recurse: true
+    group: www-data
+    mode: g+rX

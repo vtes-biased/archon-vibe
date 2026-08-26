@@ -48,6 +48,3 @@
     owner: root
     group: "{{ archon_group }}"
     mode: "0750"
-
-# /var/lib/archon and its snapshots dir belong to tasks/snapshot_dirs.yml,
-# imported by the deploy playbook: nginx-facing perms must ride every deploy.

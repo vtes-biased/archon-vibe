@@ -526,9 +526,10 @@ re-measured 2026-08-26 with nginx serving the bodies: the cold burst drained
 200 × ~12.8MB gzip in under a minute with zero errors, a mass cursorless
 connect got its resync directive in 1.3s p50, and a full reconnect burst
 reached `sync_complete` in 0.76s p50. The backend's memory never moved —
-304MB before the burst, 314MB at the end of the run, against a 735MB peak
-when Python served the bytes — [hazards](hazards.md#deploy) carries nginx's
-side of it and what stays unobserved on the production box. The cold phase
+304MB before the burst, 314MB at the end of the run, where the same burst
+through the app's own streaming path peaks it at 735MB —
+[hazards](hazards.md#deploy) carries nginx's side of it and what stays
+unobserved on the production box. The cold phase
 itself is bandwidth-bound: 200 × ~13MB gzip saturates whatever uplink the
 room shares, which is why devices that synced before the event matter — they
 take the reconnect path instead.

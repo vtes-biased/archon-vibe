@@ -455,14 +455,15 @@ the database's working set at the exact moment a room cold-connects. The
 location — a new nginx location that proxies a streamed file must do the
 same.
 
-**A room-sized cold connect is nginx's burst now, not Python's** (re-measured
-2026-08-26, 200 member snapshot downloads on beta): the backend's cgroup
-stayed flat — 304MB before, 314MB after — where serving the bytes from Python
-had peaked it at 735MB, and nginx peaked at 514MB for the first seconds
-before decaying to 30MB with the last download, the surplus being kernel TCP
-send-buffer memory absorbing client-speed backpressure on the one remaining
-hop plus the snapshot file's page cache charged to nginx's cgroup — both
-reclaimable under pressure, unlike Python heap. TCP autotuning shrinks those
+**A room-sized cold connect is nginx's burst on the accel path and Python's
+on the app's own** (measured 2026-08-26, 200 member snapshot downloads on
+beta): accel-served, the backend's cgroup stays flat — 304MB before, 314MB
+after — and nginx peaks at 514MB for the first seconds before decaying to
+30MB with the last download, the surplus being kernel TCP send-buffer memory
+absorbing client-speed backpressure on the one remaining hop plus the
+snapshot file's page cache charged to nginx's cgroup — both reclaimable under
+pressure, unlike Python heap. The same burst through the app's streaming path
+peaks the backend at 735MB. TCP autotuning shrinks those
 buffers when memory is short, so a tight box should serve the same burst
 slower rather than bigger — still an assumption, not a measurement: nothing
 has run this burst on the 945MB single-core production box, and a production
