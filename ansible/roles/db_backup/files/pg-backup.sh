@@ -3,7 +3,8 @@
 # cluster, dumps each to its own file (pg_dump -F c), dumps cluster globals
 # (pg_dumpall --globals-only), optionally uploads to S3-compatible storage via
 # restic (one repo per DB, plus one for globals), and prunes locally.
-# Kept in sync with server-setup's files/pg-backup.sh (frankfurt runs that copy).
+# Kept in sync with server-setup's files/pg-backup.sh (frankfurt runs that
+# copy) — sole divergence: forget --group-by host.
 #
 # Per-DB progress is logged via `logger -t <db>` so journald filtering picks it
 # up alongside the app's other syslog streams. pg_dump / restic stderr lands
@@ -54,7 +55,7 @@ restic_push() {
         notify "$name" "restic backup FAILED"
         return 1
     fi
-    if ! /usr/bin/restic forget \
+    if ! /usr/bin/restic forget --group-by host \
            --keep-daily "$REMOTE_KEEP_DAILY" \
            --keep-weekly "$REMOTE_KEEP_WEEKLY" \
            --keep-monthly "$REMOTE_KEEP_MONTHLY" --prune; then

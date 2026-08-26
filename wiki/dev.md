@@ -123,6 +123,27 @@ them. That is deliberate: the A records are kept as the affordance for standing 
 future major version beside the live one, so a resolving name with nothing serving
 it is the expected state, not a leftover to clean up.
 
+### Backups
+
+Production only — `ansible/roles/db_backup`, gated on `db_backup_enabled`; the
+beta playbook never runs it. Daily at 03:00 UTC a systemd timer dumps every
+non-template database in the cluster except `postgres` itself (`pg_dump -F c`,
+one file per DB) plus the cluster globals — login roles and password hashes,
+without which a full-cluster restore has no roles to connect as — into
+`/var/backups/postgres`, kept locally for 7 days. Each dump is also pushed
+off-box with restic to S3, one repository per database plus one for globals;
+remote retention is 7 daily, 4 weekly and 12 monthly snapshots, applied with
+`restic forget --group-by host` — the default `host,paths` grouping would put
+each timestamp-named dump in a group of its own and keep everything forever.
+Weekly (Wednesday 06:00 on prod) a second timer proves the per-database backups
+restorable: `restic check` decodes a 10% sample of each database's repo, then
+the latest snapshot is restored round-trip into a throwaway database that must
+come back with user tables — the globals repo gets no such check. Both timers
+carry a healthchecks.io dead-man's switch that alerts by *absence* of the
+success ping. A restic repository belongs to its database: one that is dropped
+or excluded leaves a repo nothing prunes, which the backup run surfaces as a
+journald warning for manual deletion.
+
 ### The release order
 
 The changeset is written **before** the tag, not after the deploy. `/changeset`
