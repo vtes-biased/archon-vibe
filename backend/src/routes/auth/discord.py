@@ -24,6 +24,7 @@ from ...db import (
     update_auth_method,
 )
 from ...models import AuthMethod, AuthMethodType, User
+from ...roles_hook import discord_api_base
 from ._tokens import create_access_token, create_refresh_token, verify_token
 
 router = APIRouter()
@@ -47,8 +48,9 @@ async def discord_authorize(
     link: bool = Query(
         False, description="Set to true to link Discord to existing account"
     ),
-    redirect: str = Query(
-        "/profile", description="Frontend path to redirect after OAuth"
+    redirect: str | None = Query(
+        None,
+        description="Frontend path to redirect after OAuth (same-origin path only)",
     ),
     token: str | None = Query(
         None,
@@ -60,6 +62,11 @@ async def discord_authorize(
 
     if not client_id:
         raise HTTPException(status_code=500, detail="Discord OAuth not configured")
+
+    # Same-origin paths only — a full URL or "//host" here would become an open
+    # redirect via the callback (frontend successTarget() applies the same rule).
+    if redirect and not (redirect.startswith("/") and not redirect.startswith("//")):
+        redirect = None
 
     state = secrets.token_urlsafe(32)
 
@@ -92,7 +99,7 @@ async def discord_authorize(
         "scope": "identify email role_connections.write",
         "state": state,
     }
-    discord_auth_url = f"https://discord.com/api/oauth2/authorize?{urlencode(params)}"
+    discord_auth_url = f"{discord_api_base()}/oauth2/authorize?{urlencode(params)}"
 
     return RedirectResponse(url=discord_auth_url, status_code=302)
 
@@ -114,12 +121,12 @@ async def discord_callback(
 
     link_mode = stored.get("link_mode", False)
     user_uid_from_state = stored.get("user_uid")
-    redirect_path = stored.get("redirect", "/profile" if link_mode else "/")
+    redirect_path = stored.get("redirect") or ("/profile" if link_mode else "/")
 
     async with aiohttp.ClientSession() as session:
         try:
             async with session.post(
-                "https://discord.com/api/oauth2/token",
+                f"{discord_api_base()}/oauth2/token",
                 data={
                     "client_id": client_id,
                     "client_secret": client_secret,
@@ -144,7 +151,7 @@ async def discord_callback(
 
         try:
             async with session.get(
-                "https://discord.com/api/users/@me",
+                f"{discord_api_base()}/users/@me",
                 headers={"Authorization": f"Bearer {discord_tokens['access_token']}"},
             ) as user_response:
                 if user_response.status != 200:
@@ -356,7 +363,10 @@ async def discord_callback(
         access_token, _ = create_access_token(user_uid)
         refresh_token = create_refresh_token(user_uid)
 
-        params = urlencode({"token": access_token, "refresh": refresh_token})
+        token_params = {"token": access_token, "refresh": refresh_token}
+        if stored.get("redirect"):
+            token_params["redirect"] = stored["redirect"]
+        params = urlencode(token_params)
         return RedirectResponse(
             url=f"{frontend_url}/login?{params}",
             status_code=302,

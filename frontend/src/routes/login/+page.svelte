@@ -82,7 +82,11 @@
   }
 
   function handleDiscordLogin() {
-    window.location.href = `${API_BASE}/auth/discord/authorize`;
+    const target = successTarget();
+    window.location.href =
+      target === "/"
+        ? `${API_BASE}/auth/discord/authorize`
+        : `${API_BASE}/auth/discord/authorize?redirect=${encodeURIComponent(target)}`;
   }
 
   async function handleSignupMagicLink() {
@@ -109,11 +113,7 @@
 
     // Auto-redirect to Discord OAuth when login_hint=discord (used by Discord bot)
     if (params.get("login_hint") === "discord") {
-      const redirect = params.get("redirect");
-      const discordUrl = redirect
-        ? `${API_BASE}/auth/discord/authorize?redirect=${encodeURIComponent(redirect)}`
-        : `${API_BASE}/auth/discord/authorize`;
-      window.location.href = discordUrl;
+      handleDiscordLogin();
       return;
     }
 
@@ -141,9 +141,9 @@
 
     if (token && refresh) {
       await storeTokensFromCallback(token, refresh);
-      const target = successTarget();
-      replaceState("/login", {});
-      goto(target);
+      // Single replacing navigation: a separate replaceState would strip the
+      // query before the auth $effect below re-reads it and re-routes to "/".
+      goto(successTarget(), { replaceState: true });
       return;
     }
 

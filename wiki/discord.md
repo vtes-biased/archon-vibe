@@ -56,7 +56,8 @@ Then in any server: Server Settings → Roles → a role → Links → Add requi
 Members opt in through the server menu → Linked Roles → Connect.
 
 Env: `DISCORD_CLIENTID`, `DISCORD_SECRET`, `DISCORD_REDIRECT_URI`,
-`DISCORD_BOT_TOKEN`.
+`DISCORD_BOT_TOKEN`; `DISCORD_API_BASE` overrides the API host (defaults to the
+real Discord — the backend test suite points it at a local fake).
 
 **Alternatives considered and rejected** — bot direct role assignment needs a
 per-server install and doesn't scale; webhooks for announcements are orthogonal to

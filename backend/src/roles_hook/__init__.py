@@ -14,6 +14,11 @@ from ..models import Role
 
 logger = logging.getLogger(__name__)
 
+
+def discord_api_base() -> str:
+    return os.getenv("DISCORD_API_BASE", "https://discord.com/api")
+
+
 # Discord metadata field definitions (max 5, we use 3)
 METADATA = [
     {
@@ -66,7 +71,7 @@ async def register_metadata() -> None:
         )
         return
 
-    url = f"https://discord.com/api/v10/applications/{client_id}/role-connections/metadata"
+    url = f"{discord_api_base()}/v10/applications/{client_id}/role-connections/metadata"
     headers = {"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"}
 
     async with aiohttp.ClientSession() as session:
@@ -88,7 +93,7 @@ async def push_role_metadata(user, access_token: str) -> bool:
     metadata = build_metadata(user)
     platform_name, platform_username = build_platform_info(user)
 
-    url = f"https://discord.com/api/v10/users/@me/applications/{client_id}/role-connection"
+    url = f"{discord_api_base()}/v10/users/@me/applications/{client_id}/role-connection"
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
@@ -119,7 +124,7 @@ async def refresh_discord_token(refresh_token: str) -> dict | None:
 
     async with aiohttp.ClientSession() as session:
         async with session.post(
-            "https://discord.com/api/oauth2/token",
+            f"{discord_api_base()}/oauth2/token",
             data={
                 "client_id": client_id,
                 "client_secret": client_secret,

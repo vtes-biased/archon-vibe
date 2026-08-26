@@ -82,8 +82,15 @@ restrictions.
 | Email + password | register or login | `routes/auth.py` |
 | Magic link | signup, password reset, invite; the link stays valid until the password is actually set, not merely verified | `email_service.py` |
 | WebAuthn / passkeys | FIDO2; four endpoints — `register/{options,verify}` to add to an existing authenticated account, and `create/{options,verify}` unauthenticated to create a new user | `passkeys.svelte.ts` |
-| Discord OAuth | `GET /auth/discord/authorize` with `mode=login|link` → callback; login matches by Discord ID or creates a user, link attaches the Discord ID to the authenticated user | `routes/auth.py` |
+| Discord OAuth | `GET /auth/discord/authorize` (`?link=true` attaches the Discord ID to the authenticated user) → callback; login matches by Discord ID or creates a user | `routes/auth/discord.py` |
 | GitHub OAuth | **link-only**, not a login method; stores `github_login`/`github_id` on User (full-only), used to @-mention a reporter on their feedback issue | `routes/auth/github.py` |
+
+**Every login method honours `/login?redirect=<path>`** — same-origin paths
+only (open-redirect guard), checked in the login page's `successTarget()` and
+again at the Discord authorize ingress, which carries the path through the
+OAuth state and back onto the callback's `/login` URL. The consent page sends
+its own path and query there, so a third-party OAuth login — the Discord bot's
+`login_hint=discord` links included — resumes the authorization after login.
 
 **Magic-link lifetimes are per purpose**: 15 minutes for signup and password
 reset, 7 days for an invite — its recipient did not ask for the email and has no
