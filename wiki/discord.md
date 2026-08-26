@@ -173,5 +173,6 @@ genuinely died.
 
 **Display names** — Register, AddPlayer and CheckIn accept an optional
 `display_name` (the Discord nickname) stored on the player and shown in player and
-seat displays. `/auth?login_hint=discord` auto-redirects bot-generated links to
+seat displays. Bot-generated links point at `/consent?…&login_hint=discord`; an unauthenticated
+user forwards to `/login?redirect=…&login_hint=discord`, which auto-redirects to
 Discord OAuth.

@@ -206,7 +206,12 @@ the VEKN registry, GitHub — and only paired with a guard test pinning it to th
 real contract ([dogmas](dogmas.md#testing)). `bot/tests/test_rest_fakes_match_hikari.py`
 binds every REST call shape the bot uses against the real `RESTClientImpl` and
 against each fake, and `test_refresh_single_flight.py` proves its backend fake
-reproduces the bug it stands for. Faking our own engine, database or modules is
+reproduces the bug it stands for. `test_discord_login_redirect.py` fakes Discord
+at the HTTP boundary (`DISCORD_API_BASE`) with no contract pin — none is
+constructible without a local library encoding Discord's HTTP API, and its
+invariant is our redirect round-trip, not Discord's response shape; that backend
+arc is deliberately where the post-login redirect is pinned, the frontend legs
+being marshalling. Faking our own engine, database or modules is
 the banned case itself: the TWDA credit suite runs the real route helper against
 the real DB and engine, and the archondata suite finishes a real tournament
 through the engine rather than hand-typing a standings sheet.

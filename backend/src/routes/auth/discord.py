@@ -24,7 +24,7 @@ from ...db import (
     update_auth_method,
 )
 from ...models import AuthMethod, AuthMethodType, User
-from ...roles_hook import discord_api_base
+from ...roles_hook import discord_api_base, push_role_metadata
 from ._tokens import create_access_token, create_refresh_token, verify_token
 
 router = APIRouter()
@@ -63,8 +63,6 @@ async def discord_authorize(
     if not client_id:
         raise HTTPException(status_code=500, detail="Discord OAuth not configured")
 
-    # Same-origin paths only — a full URL or "//host" here would become an open
-    # redirect via the callback (frontend successTarget() applies the same rule).
     if redirect and not (redirect.startswith("/") and not redirect.startswith("//")):
         redirect = None
 
@@ -375,8 +373,6 @@ async def discord_callback(
 
 async def _store_and_push_discord_roles(user_uid: str, discord_tokens: dict) -> None:
     try:
-        from ...roles_hook import push_role_metadata
-
         await store_transient_token(
             f"discord_rc:{user_uid}",
             {

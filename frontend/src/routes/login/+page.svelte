@@ -82,11 +82,7 @@
   }
 
   function handleDiscordLogin() {
-    const target = successTarget();
-    window.location.href =
-      target === "/"
-        ? `${API_BASE}/auth/discord/authorize`
-        : `${API_BASE}/auth/discord/authorize?redirect=${encodeURIComponent(target)}`;
+    window.location.href = `${API_BASE}/auth/discord/authorize?redirect=${encodeURIComponent(successTarget())}`;
   }
 
   async function handleSignupMagicLink() {

@@ -30,8 +30,6 @@
     if (auth.isLoading) await initAuth();
 
     if (!auth.isAuthenticated) {
-      // Path + query, not the full URL: successTarget() only honours
-      // same-origin paths (open-redirect guard), and so does the backend.
       const currentPath = window.location.pathname + window.location.search;
       const params = new URLSearchParams(window.location.search);
       const loginHint = params.get("login_hint");
