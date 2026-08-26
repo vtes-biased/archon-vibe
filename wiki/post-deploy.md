@@ -32,17 +32,19 @@ people to tell, and the wiki text that dies with it.
 
 ## Re-submit the decks the archive refused
 
-**Gated on** the commit carrying this section — *"Submit the winner's deck from a
-fork we own"*, findable as `git log -1 --format=%h --grep='fork we own'` — which
-moved every TWDA write onto our own fork. Before it, the auto-PR asked the
-archive's installation for `contents: write`, was refused, and no winning deck
-reached the TWDA since the feature went live.
+**Gated on** the commit that makes the archive accept our pull requests —
+*"Decline maintainer modification"*, findable as
+`git log -1 --format=%h --grep='Decline maintainer modification'`. GitHub grants
+the base maintainer edit rights on a cross-repository branch by default, and the
+archive's installation — pull requests and nothing else — cannot grant that on a
+fork it cannot see, so every creation was refused with a 422: the stuck events
+have their deck committed on the fork's branch with no pull request behind it.
+Running earlier just re-records the refusal.
 
-**Order matters**: the fork, its installation and the two vault entries must exist
-**before** the deploy. An event finishing in the gap between the deploy and the
-configuration records `skipped / not_configured` instead of `failed`, and nothing
-refires it — its results are already pushed, so the batch retry never looks at it
-again. The query below catches both shapes for that reason.
+The query catches two shapes: `failed`, the refused creations, and
+`skipped / not_configured`, events that finished before the fork installation and
+its vault entries existed — nothing refires either, because their results are
+already pushed and the batch retry never looks at them again.
 
 **Run**: list the events, then for each one `POST /api/tournaments/{uid}/push-vekn`
 as an admin. With the results already pushed that path skips vekn.net entirely and

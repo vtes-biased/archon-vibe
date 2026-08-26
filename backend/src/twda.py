@@ -194,6 +194,8 @@ async def submit_twda_pr(
                     ),
                     "head": head,
                     "base": "master",
+                    # GitHub defaults this to true and refuses it with 422 for this App.
+                    "maintainer_can_modify": False,
                 },
             )
             if pr_create_status == 201:
