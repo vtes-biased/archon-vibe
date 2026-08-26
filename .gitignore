@@ -124,3 +124,6 @@ archon-restore/
 # Personal data (scraped NC/Prince contacts) — never commit plaintext.
 # Dev keeps an untracked copy here; prod gets it via ansible-vault at deploy.
 backend/src/data/officials_contacts.json
+
+# Signed NDA agreement PDF — keep out of the public repo.
+BCP_NDA_Agreement.pdf
