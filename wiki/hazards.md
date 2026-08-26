@@ -448,16 +448,15 @@ beta, every proxy temp file page-cached and the disk I/O per snapshot
 multiplied; on production's few hundred spare MB that surge evicts the
 database's working set at the exact moment a room cold-connects. The
 `static_site` role renders `proxy_buffering off` into the `/snapshot` location
-— a new nginx location that proxies a streamed file must do the same.
-Unbuffered, the same run peaked nginx at 574MB and the backend at 735MB —
-kernel socket buffers absorbing the backpressure instead of temp files.
+— a new nginx location that proxies a streamed file must do the same; the
+entry below carries what the unbuffered path costs instead.
 
 **A room-sized cold connect cost beta ~1.3GB of transient memory across the
 two proxy hops, and production has ~300MB spare.** That is the known limit the
 rehearsal leaves: 200 unbuffered member snapshot downloads peaked the
-backend's cgroup at 735MB (306MB when nginx spooled instead) and nginx at
-574MB, the surplus being kernel TCP send-buffer memory absorbing client-speed
-backpressure. TCP autotuning shrinks those buffers when memory is short, so a
+backend's cgroup at 735MB (306MB when nginx spooled instead), nginx at 574MB
+and Postgres at 260MB, the surplus above idle being kernel TCP send-buffer
+memory absorbing client-speed backpressure. TCP autotuning shrinks those buffers when memory is short, so a
 tight box should serve the same burst slower rather than bigger — but that
 deflation is an assumption, not a measurement: nothing has run this burst on a
 945MB single-core box, and a production room cold-connecting en masse is the
