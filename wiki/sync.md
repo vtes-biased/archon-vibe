@@ -492,26 +492,46 @@ would loop the client through connect → resync → 503 — so a snapshot-less
 backend serves the corpus stream instead, a state confined to a first boot
 because startup kicks a generation. Snapshots regenerate every 15 minutes, one
 file per level, avoiding a DB connection held open for an initial stream of
-thousands of objects. `/snapshot` streams the gzip from disk in chunks, holding one
-fd open per response so the atomic-rename regeneration stays consistent mid-stream;
-the file is never read into the heap, so hundreds of concurrent reconnects cost
-no Python memory. What they do spend is file descriptors — that fd plus the
-sockets — which is why the serving units pin `LimitNOFILE`; kernel socket
-buffers, which at 200 clients measured in the hundreds of megabytes per hop;
-and, unless nginx proxies the snapshot unbuffered, the spooling the backend
-avoids ([hazards](hazards.md#deploy)).
+thousands of objects.
+
+In production `/snapshot` serves no bytes itself: the app authenticates,
+resolves the level, computes `X-Access-Version`, and answers with
+`X-Accel-Redirect` into an internal nginx location aliasing the snapshot
+directory — nginx serves the pre-gzipped file via sendfile, one page-cached
+copy shared across every client, so a room-sized cold connect never runs its
+bytes through Python at all. The handoff is a deployment pairing: the backend
+emits the header only when `SNAPSHOT_ACCEL_PREFIX` is set, and the inventory
+sets it beside the `static_site` role param that renders the location, so a
+backend with no nginx in front streams itself. Two traps live in that
+location: an internal redirect drops custom upstream headers, so it re-emits
+the load-bearing `X-Access-Version` from `$upstream_http_x_access_version`;
+and nginx reads the files as `www-data`, which is why the snapshots dir is
+setgid `www-data` with its perms asserted on **every** deploy
+(`ansible/tasks/snapshot_dirs.yml`) and the generator chmods its temp files
+to 0640 before the rename.
+
+The app's own path remains for dev, for the fallback and for the zip export:
+it streams the gzip from disk in chunks, holding one fd open per response so
+the atomic-rename regeneration stays consistent mid-stream, and declares
+`Content-Length` from `fstat` on that same fd — uvicorn then writes unframed,
+halving the copy churn, and a mid-stream regeneration cannot truncate the
+declared body. The file is never read into the heap. What a burst on this
+path spends is file descriptors — the fd plus the sockets, why the serving
+units pin `LimitNOFILE` — and kernel socket buffers per proxy hop
+([hazards](hazards.md#deploy)).
 
 Rehearsed at European Championship scale against beta — 200 concurrent member
-clients (`backend/scripts/loadtest_stream.py`), a pool of 8, a prod-scale
-corpus, the VEKN sync running concurrently: a cold connect held snapshot TTFB
-at ~1s p50 / 2s p95, a mass cursorless connect got its resync directive in
-0.57s p50, and a full reconnect burst reached `sync_complete` in 0.85s p50 —
-zero errors across all three, the pool never past its max, and not one extra
-Postgres session opened. Peak memory is the part that does not transfer to the
-production VPS — [hazards](hazards.md#deploy) carries those numbers and the
-limit they leave open. The cold phase itself is bandwidth-bound: 200 × ~9MB
-gzip saturates whatever uplink the room shares, which is why devices that
-synced before the event matter — they take the reconnect path instead.
+clients (`backend/scripts/loadtest_stream.py`), a prod-scale corpus,
+re-measured 2026-08-26 with nginx serving the bodies: the cold burst drained
+200 × ~12.8MB gzip in under a minute with zero errors, a mass cursorless
+connect got its resync directive in 1.3s p50, and a full reconnect burst
+reached `sync_complete` in 0.76s p50. The backend's memory never moved —
+304MB before the burst, 314MB at the end of the run, against a 735MB peak
+when Python served the bytes — [hazards](hazards.md#deploy) carries nginx's
+side of it and what stays unobserved on the production box. The cold phase
+itself is bandwidth-bound: 200 × ~13MB gzip saturates whatever uplink the
+room shares, which is why devices that synced before the event matter — they
+take the reconnect path instead.
 
 **All four files come from ONE pass** over `objects`, selecting every projection
 column of a row together and writing one gzip stream per level as it goes, pinned

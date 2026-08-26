@@ -433,36 +433,42 @@ instead of growing its own guard.
 refuse connects.** Measured in the local EC rehearsal at macOS's 256-fd
 default: 26 of 200 snapshot downloads cut mid-body (`TransferEncodingError` on
 the client) with nothing logged server-side. Per process, a 200-seat cold
-connect costs the backend about one socket plus one snapshot fd per client, and
-nginx — which terminates every client connection and opens the upstream pair —
+connect costs the backend one socket per client — plus a snapshot fd each on
+the no-accel fallback path — and nginx, which terminates every client
+connection, opens the upstream pair and holds the accel-served snapshot fd,
 roughly twice that, so systemd's default 1024 soft cap leaves under 2×
 headroom with nothing failing loudly as it nears. The backend and public-API
 unit templates pin `LimitNOFILE=65536`; nginx's own cap, and any new unit
 serving streams or file responses, must be checked the same way.
 
-**The snapshot's zero-heap streaming ends at nginx unless its location stays
-unbuffered.** With nginx's default `proxy_buffering`, each `/snapshot` response
-— ~9MB gzip per member client — is spooled at whatever pace the client reads,
-and a 200-client cold connect measured **2.5GB** of nginx cgroup memory on
-beta, every proxy temp file page-cached and the disk I/O per snapshot
-multiplied; on production's few hundred spare MB that surge evicts the
-database's working set at the exact moment a room cold-connects. The
-`static_site` role renders `proxy_buffering off` into the `/snapshot` location
-— a new nginx location that proxies a streamed file must do the same; the
-entry below carries what the unbuffered path costs instead.
+**nginx buffering must stay off wherever `/snapshot` bytes still transit the
+proxy.** In production the ordinary body takes the accel path — nginx serves
+the file itself — but the proxied `/snapshot` location still carries
+`download=1`, whose zip re-envelope streams through Python, and the no-accel
+fallback. With nginx's default `proxy_buffering`, each proxied response —
+~13MB gzip per member client — is spooled at whatever pace the client reads:
+a 200-client cold connect through the proxy measured **2.5GB** of nginx
+cgroup memory on beta, every proxy temp file page-cached and the disk I/O per
+snapshot multiplied; on production's few hundred spare MB that surge evicts
+the database's working set at the exact moment a room cold-connects. The
+`static_site` role renders `proxy_buffering off` into the `/snapshot`
+location — a new nginx location that proxies a streamed file must do the
+same.
 
-**A room-sized cold connect cost beta ~1.3GB of transient memory across the
-two proxy hops, and production has ~300MB spare.** That is the known limit the
-rehearsal leaves: 200 unbuffered member snapshot downloads peaked the
-backend's cgroup at 735MB (306MB when nginx spooled instead), nginx at 574MB
-and Postgres at 260MB, the surplus above idle being kernel TCP send-buffer
-memory absorbing client-speed backpressure. TCP autotuning shrinks those buffers when memory is short, so a
-tight box should serve the same burst slower rather than bigger — but that
-deflation is an assumption, not a measurement: nothing has run this burst on a
-945MB single-core box, and a production room cold-connecting en masse is the
-one shape of this load still unobserved. Devices that synced before the event
-skip it entirely — they reconnect with cursors, which beta served in under a
-second at 200 clients.
+**A room-sized cold connect is nginx's burst now, not Python's** (re-measured
+2026-08-26, 200 member snapshot downloads on beta): the backend's cgroup
+stayed flat — 304MB before, 314MB after — where serving the bytes from Python
+had peaked it at 735MB, and nginx peaked at 514MB for the first seconds
+before decaying to 30MB with the last download, the surplus being kernel TCP
+send-buffer memory absorbing client-speed backpressure on the one remaining
+hop plus the snapshot file's page cache charged to nginx's cgroup — both
+reclaimable under pressure, unlike Python heap. TCP autotuning shrinks those
+buffers when memory is short, so a tight box should serve the same burst
+slower rather than bigger — still an assumption, not a measurement: nothing
+has run this burst on the 945MB single-core production box, and a production
+room cold-connecting en masse remains the one shape of this load unobserved.
+Devices that synced before the event skip it entirely — they reconnect with
+cursors, which beta served in under a second at 200 clients.
 
 **A scheduled job whose period reaches a day never fires.** The backend unit sets
 `RuntimeMaxSec=1d` — a daily restart that re-fetches the krcg-static card data

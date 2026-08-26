@@ -19,6 +19,10 @@
     - name: Ensure runtime user + app dirs
       ansible.builtin.import_tasks: ../tasks/app_user.yml
 
+    - name: Ensure snapshot dirs carry the nginx-facing perms
+      ansible.builtin.import_tasks: ../tasks/snapshot_dirs.yml
+      tags: [always]
+
   roles:
     # 1. Database + owner role (server-setup). Runs as the postgres OS user for
     #    peer auth over the unix socket; the runtime user (== db_user) connects
@@ -91,6 +95,8 @@
         owner: "{{ archon_user }}"
         group: "{{ archon_group }}"
         backend_port: "{{ backend_port }}"
+        snapshot_accel_prefix: "{{ snapshot_accel_prefix }}"
+        snapshot_accel_dir: "{{ backend_env.SNAPSHOT_DIR }}"
 
     # 6. Bot service only — vhost delegated to nginx_site below.
     - role: discord_bot

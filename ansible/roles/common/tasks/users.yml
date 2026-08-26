@@ -49,18 +49,5 @@
     group: "{{ archon_group }}"
     mode: "0750"
 
-- name: Ensure /var/lib/archon exists (snapshots etc.)
-  ansible.builtin.file:
-    path: /var/lib/archon
-    state: directory
-    owner: "{{ archon_user }}"
-    group: "{{ archon_group }}"
-    mode: "0750"
-
-- name: Ensure /var/lib/archon/snapshots exists
-  ansible.builtin.file:
-    path: /var/lib/archon/snapshots
-    state: directory
-    owner: "{{ archon_user }}"
-    group: "{{ archon_group }}"
-    mode: "0750"
+# /var/lib/archon and its snapshots dir belong to tasks/snapshot_dirs.yml,
+# imported by the deploy playbook: nginx-facing perms must ride every deploy.

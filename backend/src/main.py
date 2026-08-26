@@ -708,14 +708,15 @@ async def _resolve_viewer(
     return None
 
 
-def _iter_file_chunks(path, chunk_size: int = 64 * 1024) -> Iterator[bytes]:
-    """Yield a file's bytes in chunks, holding ONE fd open for the whole response.
+def _iter_file_chunks(f, chunk_size: int = 64 * 1024) -> Iterator[bytes]:
+    """Yield an open file's bytes in chunks, holding its ONE fd for the whole
+    response.
 
     The held fd pins the inode, so an atomic os.rename mid-stream (snapshot
     regen) is safe. Sync generator → Starlette iterates it in a threadpool,
     keeping the blocking reads off the event loop.
     """
-    with open(path, "rb") as f:
+    with f:
         while chunk := f.read(chunk_size):
             yield chunk
 
@@ -785,9 +786,12 @@ async def get_snapshot(
     download: bool = False,
     authorization: Annotated[str | None, Header()] = None,
 ) -> Response:
-    """Serve pre-computed gzip snapshot for the viewer's access level, streamed
-    from disk — never read whole into heap. One fd held for the whole response,
-    so a mid-stream atomic-rename regen leaves in-flight readers on their old inode.
+    """Serve the pre-computed gzip snapshot for the viewer's access level.
+
+    Behind nginx (SNAPSHOT_ACCEL_PREFIX set) the app answers headers-only and
+    hands the body off via X-Accel-Redirect; otherwise it streams from disk —
+    never read whole into heap, one fd held for the whole response so a
+    mid-stream atomic-rename regen leaves in-flight readers on their old inode.
     `download=1` re-envelopes the same content as a .zip attachment.
     """
     from .snapshots import get_snapshot_path
@@ -826,9 +830,20 @@ async def get_snapshot(
             headers=headers,
         )
 
+    accel_prefix = os.getenv("SNAPSHOT_ACCEL_PREFIX")
+    if accel_prefix:
+        # nginx drops custom upstream headers on the internal redirect; the
+        # accel location re-emits X-Access-Version from $upstream_http_*.
+        headers["X-Accel-Redirect"] = f"{accel_prefix}/{level.value}.jsonl.gz"
+        return Response(headers=headers)
+
+    f = open(snapshot_path, "rb")
     headers["Content-Encoding"] = "gzip"
+    # Sized from the SAME fd being served: a separate stat would race the
+    # regen's atomic rename and declare another inode's length for this body.
+    headers["Content-Length"] = str(os.fstat(f.fileno()).st_size)
     return StreamingResponse(
-        _iter_file_chunks(snapshot_path),
+        _iter_file_chunks(f),
         media_type="application/x-ndjson",
         headers=headers,
     )

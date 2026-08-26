@@ -27,7 +27,5 @@
   loop:
     - { path: "{{ opt_root }}", owner: "{{ archon_user }}", mode: "0755" }
     - { path: "{{ env_dir }}", owner: "root", mode: "0750" }
-    - { path: "{{ app_lib_dir }}", owner: "{{ archon_user }}", mode: "0750" }
-    - { path: "{{ app_lib_dir }}/snapshots", owner: "{{ archon_user }}", mode: "0750" }
   loop_control:
     label: "{{ item.path }}"

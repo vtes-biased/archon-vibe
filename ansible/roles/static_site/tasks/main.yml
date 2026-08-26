@@ -15,6 +15,8 @@
     _backend_paths: "{{ r.backend_paths | default(static_site_backend_paths_default) }}"
     _sse_path: "{{ r.sse_path | default(static_site_sse_path_default) }}"
     _client_max_body: "{{ r.client_max_body | default(static_site_client_max_body_default) }}"
+    _snapshot_accel_dir: "{{ r.snapshot_accel_dir | default('') }}"
+    _snapshot_accel_prefix: "{{ r.snapshot_accel_prefix | default(static_site_snapshot_accel_prefix_default) }}"
     _dist_dir: "{{ r.site_root }}/dist"
 
 - name: Ensure dist directory exists

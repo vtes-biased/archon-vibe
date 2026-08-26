@@ -14,6 +14,10 @@
       ansible.builtin.import_tasks: ../tasks/fetch_release.yml
       tags: [always]
 
+    - name: Ensure snapshot dirs carry the nginx-facing perms
+      ansible.builtin.import_tasks: ../tasks/snapshot_dirs.yml
+      tags: [always]
+
   roles:
     # 1. TLS certs for main + bot + api domains (certbot webroot, idempotent)
     - role: nginx_tls
@@ -78,6 +82,8 @@
         owner: "{{ archon_user }}"
         group: "{{ archon_group }}"
         backend_port: "{{ backend_port }}"
+        snapshot_accel_prefix: "{{ snapshot_accel_prefix }}"
+        snapshot_accel_dir: "{{ backend_env.SNAPSHOT_DIR }}"
 
     # 5. Discord bot service + nginx vhost on bot.<domain>
     - role: discord_bot

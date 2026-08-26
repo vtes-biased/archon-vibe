@@ -25,6 +25,8 @@ bot_site_root: "{{ opt_root }}/bot"
 frontend_site_root: /var/www/archon
 bot_state_dir: /var/lib/archon-bot
 env_dir: /etc/archon
+app_lib_dir: /var/lib/archon             # backend snapshots etc. (perms in tasks/snapshot_dirs.yml)
+snapshot_accel_prefix: /_snapshots       # internal nginx location serving /snapshot bodies
 
 backend_service: archon-backend
 bot_service: archon-bot
@@ -100,7 +102,8 @@ backend_env:
   VAPID_PUBLIC_KEY: "{{ vault_vapid_public_key | default('') }}"
   VAPID_PRIVATE_KEY: "{{ vault_vapid_private_key | default('') }}"
   VAPID_SUBJECT: "mailto:{{ contact_email }}"
-  SNAPSHOT_DIR: /var/lib/archon/snapshots
+  SNAPSHOT_DIR: "{{ app_lib_dir }}/snapshots"
+  SNAPSHOT_ACCEL_PREFIX: "{{ snapshot_accel_prefix }}"
   TWDA_GITHUB_CLIENT_ID: "{{ vault_twda_github_client_id | default('') }}"
   TWDA_GITHUB_INSTALLATION_ID: "{{ vault_twda_github_installation_id | default('') }}"
   TWDA_GITHUB_FORK_INSTALLATION_ID: "{{ vault_twda_github_fork_installation_id | default('') }}"

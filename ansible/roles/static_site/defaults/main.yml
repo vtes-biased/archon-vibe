@@ -8,6 +8,11 @@
 # r.backend_paths    optional  - list of URL prefixes proxied to the backend
 # r.sse_path         optional  - location that needs SSE-friendly nginx knobs
 # r.client_max_body  optional  - client_max_body_size
+# r.snapshot_accel_dir optional - dir of the backend's pre-gzipped snapshots;
+#                      when set, an internal location serves /snapshot bodies
+#                      the backend hands off via X-Accel-Redirect
+# r.snapshot_accel_prefix optional - URI prefix of that internal location; must
+#                      match the backend's SNAPSHOT_ACCEL_PREFIX env
 r: {}
 static_site_backend_paths_default:
   - /api
@@ -19,3 +24,4 @@ static_site_backend_paths_default:
   - /snapshot
 static_site_sse_path_default: /stream
 static_site_client_max_body_default: "10M"
+static_site_snapshot_accel_prefix_default: /_snapshots

@@ -57,6 +57,9 @@ async def generate_snapshots() -> dict[str, int]:
         try:
             for level in _LEVELS:
                 fd, tmp_paths[level] = tempfile.mkstemp(dir=SNAPSHOT_DIR, suffix=".tmp")
+                # 0640, not mkstemp's 0600: production nginx reads these via
+                # X-Accel-Redirect, through the dir's setgid-assigned group.
+                os.fchmod(fd, 0o640)
                 os.close(fd)
                 writers[level] = gzip.open(
                     tmp_paths[level], "wt", encoding="utf-8", compresslevel=6
