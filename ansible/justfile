@@ -46,6 +46,8 @@ build-engine-wheel:
       -w /io/engine \
       {{manylinux}} \
       bash -c "curl -LsSf https://astral.sh/uv/install.sh | sh && \
+               curl -LsSf https://sh.rustup.rs | sh -s -- -y --profile minimal >/dev/null && \
+               source /root/.cargo/env && \
                /root/.local/bin/uv tool install maturin && \
                /root/.local/bin/maturin build --release \
                  --compatibility manylinux_2_28 \
