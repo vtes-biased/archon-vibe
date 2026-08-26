@@ -632,7 +632,10 @@ shown, so BCP wording changes never orphan old evidence. Signing renders a
 sealed PDF — the filled agreement plus an audit page carrying the typed name,
 email, address, phone, member uid, VEKN id, requester, UTC timestamp, record id,
 version and hash — stores it in the row, and emails the signer a copy
-best-effort (the record stands even when SMTP fails). The paper template's BCP
+best-effort (the record stands even when SMTP fails). The PDF embeds DejaVu, so
+the evidence fields render Latin, Greek and Cyrillic; characters outside that
+coverage (CJK among them) drop from the rendered PDF with only an fpdf warning,
+though the typed name is stored verbatim in the row either way. The paper template's BCP
 countersignature question (pre-embedded image vs offer/acceptance wording) is
 BCP's call and still open; the audit page names Black Chantry's signatory as the
 paper template does.

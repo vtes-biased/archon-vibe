@@ -1651,8 +1651,8 @@ async def seal_nda_signature(
 async def insert_nda_upload(
     uid: str, user_uid: str, uploaded_by: str, pdf: bytes, content_type: str
 ) -> None:
-    """The scan satisfies any open request, so both write together — a leftover
-    pending row would nag the member forever and block re-requests."""
+    """A leftover pending row would block every future request through the
+    partial unique index, so the delete rides the insert's transaction."""
     async with get_connection() as conn:
         async with conn.transaction():
             await conn.execute(
