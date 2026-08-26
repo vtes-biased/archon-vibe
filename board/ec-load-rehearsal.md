@@ -39,15 +39,18 @@ Box side (frankfurt, `deploy@57.129.110.107`), in order:
 2. Prod parity: add `DB_POOL_MAX_SIZE=8` to
    `/etc/new_archon/new-archon-backend.env`, `systemctl restart
    new-archon-backend`. Revert both after the window.
-3. Mint tokens on the box so the JWT secret stays there (adjust venv/env paths):
-   `sudo -u new_archon bash -c 'set -a; . /etc/new_archon/new-archon-backend.env;
-   set +a; /opt/new_archon/backend/venv/bin/python loadtest_users.py mint
+3. Mint tokens on the box so the JWT secret stays there. Scp
+   `backend/scripts/loadtest_users.py` to `/tmp` (world-readable — `new_archon`
+   cannot read `/home/deploy`), then:
+   `sudo -u new_archon bash -c 'while IFS= read -r l; do case $l in \#*|"") ;;
+   *) export "$l";; esac; done < /etc/new_archon/new-archon-backend.env;
+   exec /opt/new_archon/backend/.venv/bin/python /tmp/loadtest_users.py mint
    --count 200 --ttl-minutes 120 --out /tmp/tokens.txt'`
-   (scp `backend/scripts/loadtest_users.py` to `/tmp` first; it imports
-   `backend.src` from the wheel, and the env file is root:new_archon 0640 so
-   the sudo above can read it). The tokens file is written by `new_archon`
-   world-readable in the real `/tmp` — fine for two-hour synthetic tokens —
-   so `deploy` can scp it back to the driving machine.
+   The line-wise export is deliberate: the env file is systemd format with
+   unquoted spaced values, which `set -a; . file` word-splits and executes.
+   The env file is root:new_archon 0640, so the sudo can read it. The tokens
+   file lands world-readable in the real `/tmp` — fine for two-hour synthetic
+   tokens — so `deploy` can scp it back to the driving machine.
 4. Find the postgres unit (`systemctl list-units 'postgresql*'`), then start the
    sampler: `./loadtest_sample.sh new_archon samples.csv 1 new-archon-backend
    nginx <postgres-unit>`.
