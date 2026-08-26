@@ -49,8 +49,6 @@
     }),
   );
 
-  // Post-login destination (?redirect= from e.g. a tournament page sign-in CTA).
-  // Same-origin paths only — never a full URL (open-redirect guard).
   function successTarget(): string {
     const r = new URLSearchParams(window.location.search).get("redirect");
     return r && r.startsWith("/") && !r.startsWith("//") ? r : "/";
@@ -107,7 +105,6 @@
   onMount(async () => {
     const params = new URLSearchParams(window.location.search);
 
-    // Auto-redirect to Discord OAuth when login_hint=discord (used by Discord bot)
     if (params.get("login_hint") === "discord") {
       handleDiscordLogin();
       return;

@@ -119,7 +119,6 @@ async def discord_callback(
 
     link_mode = stored.get("link_mode", False)
     user_uid_from_state = stored.get("user_uid")
-    redirect_path = stored.get("redirect") or ("/profile" if link_mode else "/")
 
     async with aiohttp.ClientSession() as session:
         try:
@@ -176,6 +175,7 @@ async def discord_callback(
     existing_auth = await get_auth_method_by_identifier("discord", discord_id)
 
     if link_mode and user_uid_from_state:
+        redirect_path = stored.get("redirect") or "/profile"
         if existing_auth:
             if existing_auth.user_uid == user_uid_from_state:
                 return RedirectResponse(

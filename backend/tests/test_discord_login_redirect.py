@@ -1,13 +1,5 @@
-"""The post-login `?redirect=` survives the Discord OAuth round-trip — /login
-sends it to `/auth/discord/authorize`, the callback hands it back to /login —
-so a consent-page login via Discord resumes the third-party authorization.
-Only a same-origin path is carried: anything else is dropped at the authorize
-ingress, never echoed.
-
-Discord itself is a system we neither own nor can run, so it is faked at the
-HTTP boundary (`DISCORD_API_BASE`): the invariant under test is the state
-round-trip on our side, which any token + user response exercises.
-"""
+"""A same-origin `?redirect=` path survives the Discord OAuth authorize →
+callback round-trip; anything else is dropped at the ingress, never echoed."""
 
 import contextlib
 from urllib.parse import parse_qs, urlparse

@@ -85,8 +85,9 @@ restrictions.
 | Discord OAuth | `GET /auth/discord/authorize` (`?link=true` attaches the Discord ID to the authenticated user) → callback; login matches by Discord ID or creates a user | `routes/auth/discord.py` |
 | GitHub OAuth | **link-only**, not a login method; stores `github_login`/`github_id` on User (full-only), used to @-mention a reporter on their feedback issue | `routes/auth/github.py` |
 
-**Every login method honours `/login?redirect=<path>`** — same-origin paths
-only (open-redirect guard), checked in the login page's `successTarget()` and
+**Password, passkey and Discord login honour `/login?redirect=<path>`** (magic
+link never returns to `/login` and drops it) — same-origin paths only
+(open-redirect guard), checked in the login page's `successTarget()` and
 again at the Discord authorize ingress, which carries the path through the
 OAuth state and back onto the callback's `/login` URL. The consent page sends
 its own path and query there, so a third-party OAuth login — the Discord bot's
