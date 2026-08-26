@@ -299,6 +299,11 @@ API process must see the same `SNAPSHOT_DIR`.
 
 ## Deferred
 
+- **Prod rollout** — beta is live and verified; prod repeats the same three
+  steps with `api.archon.vekn.net`, port 7007, unit `archon-public-api`: the A
+  record, a full (not quick-lane) deploy, then a registered `api:read` client
+  exercising a daemon token, the throttle and the app's rejection of that token.
+  Trigger: the owner's next prod window.
 - **User-level TWD opt-out** — a member asking not to have their name or deck in
   the TWDA. Trigger: a member asks.
 - **League standings** — needs engine compute, or promo-stock-style cross-object
