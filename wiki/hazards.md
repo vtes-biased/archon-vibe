@@ -440,6 +440,19 @@ headroom with nothing failing loudly as it nears. The backend and public-API
 unit templates pin `LimitNOFILE=65536`; nginx's own cap, and any new unit
 serving streams or file responses, must be checked the same way.
 
+**The snapshot's zero-heap streaming ends at nginx unless its location stays
+unbuffered.** With nginx's default `proxy_buffering`, each `/snapshot` response
+— ~9MB gzip per member client — is spooled at whatever pace the client reads,
+and a 200-client cold connect measured **2.5GB** of nginx cgroup memory on
+beta, every proxy temp file page-cached and the disk I/O per snapshot
+multiplied; on production's few hundred spare MB that surge evicts the
+database's working set at the exact moment a room cold-connects. The
+`static_site` role renders `proxy_buffering off` into the `/snapshot` location
+— a new nginx location that proxies a streamed file must do the same.
+Unbuffered, the same run peaked nginx at 574MB and the backend at 735MB:
+kernel socket buffers absorbing the backpressure, which shrink under memory
+pressure instead of spooling to disk.
+
 **A scheduled job whose period reaches a day never fires.** The backend unit sets
 `RuntimeMaxSec=1d` — a daily restart that re-fetches the krcg-static card data
 without a redeploy — and APScheduler 3.x fires an `IntervalTrigger` at start + N,

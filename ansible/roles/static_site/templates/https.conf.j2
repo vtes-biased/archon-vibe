@@ -52,6 +52,12 @@ server {
   # `X-Access-Version` response header, which a split-origin deploy would drop.
 {% for path in _backend_paths %}
   location {{ path }} {
+{% if path == '/snapshot' %}
+    # Unbuffered on purpose: the backend streams the gzip from disk at no pooled
+    # cost, while buffering makes nginx spool ~9MB per slow client — a 200-client
+    # cold connect measured 2.5GB of nginx memory, page-caching every temp file.
+    proxy_buffering off;
+{% endif %}
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header Host $http_host;

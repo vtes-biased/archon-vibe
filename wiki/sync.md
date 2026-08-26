@@ -491,8 +491,22 @@ thousands of objects. `/snapshot` streams the gzip from disk in chunks, holding 
 fd open per response so the atomic-rename regeneration stays consistent mid-stream;
 the file is never read into the heap, so hundreds of concurrent reconnects don't
 spike memory. What they do spend is file descriptors — that fd plus the sockets —
-which is why the serving units pin `LimitNOFILE`
+which is why the serving units pin `LimitNOFILE`, and nginx must proxy the
+snapshot unbuffered or it re-adds the very spooling the backend avoids
 ([hazards](hazards.md#deploy)).
+
+Rehearsed at European Championship scale against beta — 200 concurrent member
+clients (`backend/scripts/loadtest_stream.py`), a pool of 8, a prod-scale
+corpus, the VEKN sync running concurrently: a cold connect held snapshot TTFB
+at ~1s p50 / 2s p95, a mass cursorless connect got its resync directive in
+0.57s p50, and a full reconnect burst reached `sync_complete` in 0.85s p50 —
+zero errors across all three, the pool never past its max, and not one extra
+Postgres session opened. Peak memory: backend 735MB, nginx 574MB, Postgres
+260MB, on a box with more headroom than the production VPS — the figures
+transfer with that caveat, and the socket-buffer share of them deflates under
+memory pressure. The cold phase itself is bandwidth-bound: 200 × ~9MB gzip
+saturates whatever uplink the room shares, which is why devices that synced
+before the event matter — they take the reconnect path instead.
 
 **All four files come from ONE pass** over `objects`, selecting every projection
 column of a row together and writing one gzip stream per level as it goes, pinned
