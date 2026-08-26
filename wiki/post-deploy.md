@@ -48,7 +48,8 @@ change restarts PostgreSQL, a few seconds of downtime.
 **Proves it worked**: `journalctl --disk-usage` at or under 256 MB,
 `/var/cache/apt/archives` holding no `.deb`, no `.cache/uv` under `/root` or
 `/opt/archon`, no units for rsyslog, multipathd, fwupd, ModemManager or udisks2,
-`SHOW max_connections` answering 20, and roughly a gigabyte back on `df -h /`.
+`SHOW max_connections` answering 20 with the archon database's `datconnlimit`
+back at `-1`, and roughly a gigabyte back on `df -h /`.
 
 **Owes afterwards**: nothing to tell anyone. Delete this section.
 

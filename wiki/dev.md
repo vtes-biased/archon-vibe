@@ -97,7 +97,8 @@ VMware guest tools) and rsyslog — a second copy of what the journal already
 keeps — are purged, the journal is capped at 256 MB, apt keeps no downloaded
 packages, and every uv call runs `--no-cache`, so a deploy leaves no build cache
 behind. PostgreSQL is sized to the pools that actually connect — 20 slots against
-the app's 8 and the public API's 4 — not to a client count the box never sees.
+the app's 8 and the public API's 4, leaving the superuser reserve of 3 and
+headroom for pg_dump and ad-hoc psql — not to a client count the box never sees.
 
 Because the backend ships as an installed wheel, **bundled data files must load
 through `importlib.resources`**, never `Path(__file__)`
