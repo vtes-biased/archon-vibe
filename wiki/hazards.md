@@ -429,14 +429,16 @@ instead of growing its own guard.
 
 ## Deploy
 
-**Systemd's default 1024-fd soft cap truncates in-flight responses under a
-room-sized connect burst.** A 200-client cold connect costs roughly two sockets
-per client plus the one snapshot fd each response holds — ~600 fds before the
-pool and logs — and running out does not refuse new connections: it cut 26 of
-200 snapshot downloads mid-body (`TransferEncodingError`) in the local
-rehearsal. The backend and public-API unit templates pin `LimitNOFILE=65536`; a
-new unit that serves streams or file responses must do the same, since nothing
-else fails loudly when the cap is near.
+**Running out of file descriptors truncates responses mid-body — it does not
+refuse connects.** Measured in the local EC rehearsal at macOS's 256-fd
+default: 26 of 200 snapshot downloads cut mid-body (`TransferEncodingError` on
+the client) with nothing logged server-side. Per process, a 200-seat cold
+connect costs the backend about one socket plus one snapshot fd per client, and
+nginx — which terminates every client connection and opens the upstream pair —
+roughly twice that, so systemd's default 1024 soft cap leaves under 2×
+headroom with nothing failing loudly as it nears. The backend and public-API
+unit templates pin `LimitNOFILE=65536`; nginx's own cap, and any new unit
+serving streams or file responses, must be checked the same way.
 
 **A scheduled job whose period reaches a day never fires.** The backend unit sets
 `RuntimeMaxSec=1d` — a daily restart that re-fetches the krcg-static card data

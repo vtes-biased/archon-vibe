@@ -13,8 +13,8 @@ Group={{ r.group }}
 WorkingDirectory={{ r.site_root }}
 EnvironmentFile={{ _env_dir }}/{{ r.service_name }}.env
 ExecStart={{ r.venv_dir }}/bin/uvicorn --host 127.0.0.1 --port {{ r.port }} --log-level info --timeout-graceful-shutdown 5 backend.src.public_api.main:app
-# The NDJSON stream and bulk export hold a socket pair per concurrent reader,
-# and systemd's default soft cap of 1024 truncates responses when it hits.
+# The NDJSON stream and bulk export hold a socket and a file fd per reader,
+# tight against the 1024 default — running out truncates responses mid-body.
 LimitNOFILE=65536
 Restart=always
 RestartSec=3

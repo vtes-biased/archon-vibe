@@ -31,8 +31,11 @@ floor, not a forecast:
 
 Box side (frankfurt, `deploy@57.129.110.107`), in order:
 
-1. `systemctl show new-archon-backend -p LimitNOFILE` — if soft cap is 1024,
-   either deploy first (templates now set 65536) or raise it for the window.
+1. `systemctl show new-archon-backend nginx -p LimitNOFILE` — nginx holds the
+   larger half of the fd budget (it terminates every client connection and
+   opens the upstream pair) and its unit is not covered by the template change.
+   If the backend's soft cap is 1024, either deploy first (templates now set
+   65536) or raise it for the window.
 2. Prod parity: add `DB_POOL_MAX_SIZE=8` to
    `/etc/new_archon/new-archon-backend.env`, `systemctl restart
    new-archon-backend`. Revert both after the window.
