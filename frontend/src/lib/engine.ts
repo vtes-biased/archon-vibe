@@ -352,8 +352,6 @@ export function canChangeRole(
   actor: UserContext,
   target: UserContext,
   role: string,
-  // The NDA fact is not on User (never projected) — callers that can see it
-  // pass it in; absent means false, which only bites when granting PT.
   targetHasNda = false
 ): PermissionResult {
   const actorJson = JSON.stringify({ roles: actor.roles ?? [], country: actor.country });

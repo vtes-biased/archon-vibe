@@ -643,7 +643,10 @@ purge clean the side table), and follows the *person* through account surgery â€
 merge re-homes it on the survivor, detach takes it to the personal account, like
 `calendar_token` (pinned by `test_surgery_moves_nda_record_with_the_person`).
 Existing PT holders from before this workflow keep the role and surface as
-missing-NDA on the member page for the PTC to backfill via the scan upload.
+missing-NDA on the member page for the PTC to backfill via the scan upload; an
+upload also resolves any open signature request in the same write.
+
+### Community links
 
 Member-contributed links to external community resources, with moderator
 oversight. `community_links` is a field on `User`, defaulting to `[]`.

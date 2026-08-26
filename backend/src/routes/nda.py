@@ -1,6 +1,5 @@
 """Playtest NDA records: request, click-to-sign, scan-upload fallback, and the
-sealed-PDF evidence. Records live in the nda_records side table — never synced,
-never projected — so every read here is an explicit, gated fetch."""
+sealed-PDF evidence."""
 
 import logging
 from datetime import UTC, datetime

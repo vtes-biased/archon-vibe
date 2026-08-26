@@ -704,8 +704,8 @@ fn appointment_for(role: Role) -> &'static Appointment {
         .expect("every Role has a ROLE_APPOINTMENTS row (asserted by test)")
 }
 
-/// [`ROLE_APPOINTMENTS`] plus one precondition the table can't express: roles
-/// hang off a VEKN ID, so a member without one cannot hold any.
+/// [`ROLE_APPOINTMENTS`] plus the preconditions the table can't express: roles
+/// hang off a VEKN ID, and granting PT takes an NDA on record.
 pub fn can_change_role(actor: &UserContext, target: &UserContext, role: Role) -> PermissionResult {
     if target.vekn_id.is_none() {
         return PermissionResult::deny("User must have a VEKN ID to be assigned roles");

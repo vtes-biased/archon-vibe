@@ -282,8 +282,7 @@ EXECUTE FUNCTION update_objects_modified_at();
 -- VEKN IDs are now allocated by finding the first gap >= 1000000.
 
 -- NDA records - playtest NDA requests and signature evidence (sealed PDF or
--- uploaded scan). Deliberately NOT a synced object type and no User field:
--- the record carries PII and must never reach a broadcast projection.
+-- uploaded scan).
 CREATE TABLE IF NOT EXISTS nda_records (
     uid TEXT PRIMARY KEY,
     user_uid TEXT NOT NULL,

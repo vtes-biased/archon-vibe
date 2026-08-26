@@ -1651,13 +1651,20 @@ async def seal_nda_signature(
 async def insert_nda_upload(
     uid: str, user_uid: str, uploaded_by: str, pdf: bytes, content_type: str
 ) -> None:
+    """The scan satisfies any open request, so both write together — a leftover
+    pending row would nag the member forever and block re-requests."""
     async with get_connection() as conn:
-        await conn.execute(
-            """INSERT INTO nda_records
-                (uid, user_uid, status, requested_by, signed_at, pdf, content_type)
-            VALUES (%s, %s, 'uploaded', %s, CURRENT_TIMESTAMP, %s, %s)""",
-            (uid, user_uid, uploaded_by, pdf, content_type),
-        )
+        async with conn.transaction():
+            await conn.execute(
+                "DELETE FROM nda_records WHERE user_uid = %s AND status = 'pending'",
+                (user_uid,),
+            )
+            await conn.execute(
+                """INSERT INTO nda_records
+                    (uid, user_uid, status, requested_by, signed_at, pdf, content_type)
+                VALUES (%s, %s, 'uploaded', %s, CURRENT_TIMESTAMP, %s, %s)""",
+                (uid, user_uid, uploaded_by, pdf, content_type),
+            )
 
 
 async def get_nda_pdf(user_uid: str, record_uid: str) -> tuple[bytes, str] | None:

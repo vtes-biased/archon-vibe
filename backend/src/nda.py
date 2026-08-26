@@ -1,14 +1,11 @@
 """The BCP playtest NDA: canonical document text, template fill, and the sealed
-PDF a signature produces.
-
-The template is versioned and hashed: each signature record pins the exact
-(version, sha256) it was shown, so BCP wording changes never orphan old
-evidence. Text is deliberately ASCII-only — the PDF renders with core fonts
-(latin-1) and the hash must be encoding-unambiguous.
+PDF a signature produces. Keep the template ASCII — its sha256 is signature
+evidence, so its bytes must be encoding-unambiguous.
 """
 
 import hashlib
 from datetime import UTC, datetime
+from importlib import resources
 
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
@@ -148,10 +145,6 @@ def fill_template(recipient_name: str, on: datetime) -> str:
     )
 
 
-def _to_latin1(text: str) -> str:
-    return text.encode("latin-1", errors="replace").decode("latin-1")
-
-
 def build_sealed_pdf(
     *,
     recipient_name: str,
@@ -167,26 +160,31 @@ def build_sealed_pdf(
     pdf = FPDF()
     pdf.set_title("Black Chantry Productions - Confidentiality and NDA")
     pdf.set_auto_page_break(auto=True, margin=18)
+    # Unicode fonts, not the core (latin-1) ones: the signer's name, address and
+    # e-mail are evidence and must never degrade to "?".
+    fonts = resources.files(__package__) / "data" / "fonts"
+    pdf.add_font("DejaVu", "", str(fonts / "DejaVuSans.ttf"))
+    pdf.add_font("DejaVu", "B", str(fonts / "DejaVuSans-Bold.ttf"))
     pdf.add_page()
 
     for block in fill_template(recipient_name, signed_at).split("\n\n"):
-        text = _to_latin1(block.replace("\n", " ").strip())
+        text = block.replace("\n", " ").strip()
         if text.startswith("## "):
-            pdf.set_font("helvetica", style="B", size=13)
+            pdf.set_font("DejaVu", style="B", size=13)
             pdf.multi_cell(0, 7, text[3:], align="C")
         elif text.startswith("# "):
-            pdf.set_font("helvetica", style="B", size=15)
+            pdf.set_font("DejaVu", style="B", size=15)
             pdf.multi_cell(0, 8, text[2:], align="C")
         else:
-            pdf.set_font("helvetica", size=10)
+            pdf.set_font("DejaVu", size=10)
             pdf.multi_cell(0, 5, text.replace("**", ""), align="J")
         pdf.ln(3)
 
     pdf.add_page()
-    pdf.set_font("helvetica", style="B", size=13)
+    pdf.set_font("DejaVu", style="B", size=13)
     pdf.multi_cell(0, 7, "ELECTRONIC SIGNATURE RECORD", align="C")
     pdf.ln(4)
-    pdf.set_font("helvetica", size=10)
+    pdf.set_font("DejaVu", size=10)
     pdf.multi_cell(
         0,
         5,
@@ -210,10 +208,8 @@ def build_sealed_pdf(
         ("Document SHA-256", nda_sha256()),
     ]
     for label, value in rows:
-        pdf.set_font("helvetica", style="B", size=9)
-        pdf.cell(55, 6, _to_latin1(label))
-        pdf.set_font("helvetica", size=9)
-        pdf.multi_cell(
-            0, 6, _to_latin1(value or "-"), new_x=XPos.LMARGIN, new_y=YPos.NEXT
-        )
+        pdf.set_font("DejaVu", style="B", size=9)
+        pdf.cell(55, 6, label)
+        pdf.set_font("DejaVu", size=9)
+        pdf.multi_cell(0, 6, value or "-", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     return bytes(pdf.output())

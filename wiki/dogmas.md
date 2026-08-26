@@ -10,8 +10,8 @@ silently is not.
 directly, or through a memory-resident projection maintained over it
 ([sync](sync.md#the-list-projections)) — never from the network. The
 backend API exists for mutations. SSE pushes state changes per user at the
-role-appropriate level. There is exactly one sanctioned exception, and it has
-four conditions — [sync](sync.md#online-only-rest-reads).
+role-appropriate level. The sanctioned exceptions are enumerated, and each must
+meet four conditions — [sync](sync.md#online-only-rest-reads).
 
 **All business logic lives in the shared Rust engine**, compiled to WASM
 (frontend) and PyO3 (backend), so online and offline paths cannot diverge. No

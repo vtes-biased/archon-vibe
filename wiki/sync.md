@@ -765,9 +765,10 @@ table.
 ## Online-only REST reads
 
 "All UI reads come from IndexedDB" governs the data the app **displays as
-content**. It has exactly one sanctioned exception: the promo ledger audit view
-reads `GET /api/promos/ledger` directly. A surface qualifies only when **all four**
-hold:
+content**. It has exactly two sanctioned exceptions: the promo ledger audit view
+reads `GET /api/promos/ledger` directly, and the member record's NDA panel reads
+`GET /api/users/{uid}/nda` ([architecture](architecture.md#nda-records)). A
+surface qualifies only when **all four** hold:
 
 1. **Online-only** — never needed at a venue or during an offline tournament.
 2. **Officials-only** — not player- or tournament-facing display.

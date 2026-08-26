@@ -74,9 +74,7 @@ def can_edit_user(actor: User, target: User) -> bool:
 def can_change_role(
     actor: User, target: User, role: Role, *, target_has_nda: bool = False
 ) -> bool:
-    """Grant or revoke one role — see the engine's appointment matrix. The NDA
-    fact lives in nda_records, not on User, so the caller passes it in; it only
-    matters when granting PT (the engine ignores it everywhere else)."""
+    """Grant or revoke one role — see the engine's appointment matrix."""
     target_context = user_to_context(target) | {"has_nda": target_has_nda}
     result = _engine.can_change_role(
         json.dumps(user_to_context(actor)),
