@@ -30,6 +30,28 @@ answers whether a given deploy has made it actionable — the same check
 gates it and why, what to run, what proves it worked, and what it owes afterwards:
 people to tell, and the wiki text that dies with it.
 
+## Trim the production box
+
+**Gated on** the commit that prunes the provisioning role — findable as
+`git log -1 --format=%h --grep='Trim the production box'`. Ansible runs from the
+laptop checkout, not from a release, so the gate is that commit being in the
+checkout the play runs from, and every command below is owner-executed.
+
+**Run**: `just dry-foundation-prod` first and read the check-mode diff. The one
+judgment call is the purge's autoremove list: a metapackage such as
+`ubuntu-server` riding along with the six pruned packages is expected, a cascade
+beyond that is a stop. The real run deletes `/var/log/syslog*`, `kern.log*` and
+`mail.*` — journal duplicates — while `auth.log*` stays as the only pre-cap auth
+history. Then `just foundation-prod && just database-prod`; the `max_connections`
+change restarts PostgreSQL, a few seconds of downtime.
+
+**Proves it worked**: `journalctl --disk-usage` at or under 256 MB,
+`/var/cache/apt/archives` holding no `.deb`, no `.cache/uv` under `/root` or
+`/opt/archon`, no units for rsyslog, multipathd, fwupd, ModemManager or udisks2,
+`SHOW max_connections` answering 20, and roughly a gigabyte back on `df -h /`.
+
+**Owes afterwards**: nothing to tell anyone. Delete this section.
+
 ## Confirm the off-box backup retention prunes
 
 **Gated on** the commit that groups `restic forget` by host — findable as

@@ -96,6 +96,7 @@
       - /usr/local/bin/uv
       - python
       - install
+      - --no-cache
       - "{{ r.python_version }}"
   environment:
     UV_PYTHON_INSTALL_DIR: "{{ r.uv_python_install_dir }}"
@@ -143,6 +144,7 @@
       - /usr/local/bin/uv
       - pip
       - install
+      - --no-cache
       - --python
       - "{{ _venv_dir }}/bin/python"
       - --requirement
@@ -161,6 +163,7 @@
       - /usr/local/bin/uv
       - pip
       - install
+      - --no-cache
       - --python
       - "{{ _venv_dir }}/bin/python"
       - --reinstall

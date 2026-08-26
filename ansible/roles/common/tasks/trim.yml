@@ -1,0 +1,71 @@
+---
+- name: Purge packages the box has no use for
+  ansible.builtin.apt:
+    name: "{{ common_pruned_packages }}"
+    state: absent
+    purge: true
+    autoremove: true
+
+# auth.log* stays: it is the only pre-cap sshd auth history on the box.
+- name: Find rsyslog's log files (duplicates of what the journal keeps)
+  ansible.builtin.find:
+    paths: /var/log
+    patterns:
+      - "syslog*"
+      - "kern.log*"
+      - "mail.*"
+    file_type: file
+  register: _rsyslog_files
+
+- name: Remove rsyslog's log files
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ _rsyslog_files.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Keep no downloaded packages in the apt cache
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/60no-package-cache
+    mode: "0644"
+    content: |
+      APT::Keep-Downloaded-Packages "false";
+
+- name: Find cached package downloads
+  ansible.builtin.find:
+    paths: /var/cache/apt/archives
+    patterns: "*.deb"
+  register: _apt_archives
+
+- name: Clean the apt package cache
+  ansible.builtin.apt:
+    clean: true
+  when: _apt_archives.matched > 0
+
+- name: Remove uv caches (every uv call runs --no-cache)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /root/.cache/uv
+    - "{{ opt_root }}/.cache/uv"
+
+- name: Ensure journald drop-in dir exists
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Cap the journal size
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/50-cap.conf
+    mode: "0644"
+    content: |
+      [Journal]
+      SystemMaxUse={{ journal_max_use }}
+  notify:
+    - Restart journald
+    - Vacuum journal

@@ -7,6 +7,9 @@
 - name: Import packages tasks
   ansible.builtin.import_tasks: packages.yml
 
+- name: Import trim tasks
+  ansible.builtin.import_tasks: trim.yml
+
 # users before python: python.yml chowns /opt/uv/python to the archon group,
 # which users.yml creates — reversed, the real run fails (chgrp: no such group).
 - name: Import users tasks

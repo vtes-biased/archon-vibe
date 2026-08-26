@@ -8,3 +8,14 @@
   ansible.builtin.service:
     name: unattended-upgrades
     state: restarted
+
+- name: Restart journald
+  ansible.builtin.service:
+    name: systemd-journald
+    state: restarted
+
+# --rotate first: --vacuum-size only removes archived journal files.
+- name: Vacuum journal
+  ansible.builtin.command:
+    cmd: "journalctl --rotate --vacuum-size={{ journal_max_use }}"
+  changed_when: true

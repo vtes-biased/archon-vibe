@@ -44,9 +44,10 @@ db_user: archonvibe
 db_password: "{{ vault_db_password }}"
 
 # PG footprint trimmed for the tiny VPS. shared_buffers and max_connections
-# both need a PG restart to take effect.
+# both need a PG restart to take effect. 20 slots: app pool 8 + public API 4 +
+# superuser reserve 3, headroom for pg_dump and ad-hoc psql.
 postgresql_shared_buffers: 96MB
-postgresql_max_connections: 60
+postgresql_max_connections: 20
 postgresql_effective_cache_size: 384MB
 
 # Daily cluster-wide pg_dump + weekly restore-verify. Everything not below is
@@ -132,6 +133,8 @@ public_api_env:
   SITE_URL_BASE: "{{ site_url_base }}"
   PUBLIC_API_URL_BASE: "https://{{ domain_api }}"
   DATABASE_URL: "{{ backend_env.DATABASE_URL }}"
+  # Unset, the code default of 20 would exceed max_connections on its own.
+  DB_POOL_MAX_SIZE: 4
   JWT_SECRET: "{{ backend_env.JWT_SECRET }}"
   SNAPSHOT_DIR: "{{ backend_env.SNAPSHOT_DIR }}"
 

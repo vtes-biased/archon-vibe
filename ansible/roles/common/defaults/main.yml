@@ -22,3 +22,15 @@ common_base_packages:
   - rsync
   - ufw
   - unattended-upgrades
+
+# The distro image ships these; a single-disk VM uses none of them, and rsyslog
+# only duplicates the journal. absent+purge makes their absence a guarantee.
+common_pruned_packages:
+  - fwupd
+  - modemmanager
+  - multipath-tools
+  - open-vm-tools
+  - rsyslog
+  - udisks2
+
+journal_max_use: 256M

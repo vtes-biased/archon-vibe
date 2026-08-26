@@ -87,9 +87,17 @@ Its `test` profile backs `just test-e2e` ([testing](testing.md)).
 ## Deployment
 
 Real deployment is **wheels plus systemd via Ansible**, under `ansible/`. There is
-no Docker production path. Production runs on a 945 MB single-core VPS, which is why
-the connection pool is small and bulk table loads are forbidden
-([architecture](architecture.md#database-access)).
+no Docker production path. Production runs on a 945 MB single-core VPS with a
+24 GB disk, which is why the connection pool is small and bulk table loads are
+forbidden ([architecture](architecture.md#database-access)).
+
+The `common` role guarantees the box's baseline beyond what it installs: the
+daemons a single-disk VM never uses (multipath, fwupd, ModemManager, udisks2,
+VMware guest tools) and rsyslog — a second copy of what the journal already
+keeps — are purged, the journal is capped at 256 MB, apt keeps no downloaded
+packages, and every uv call runs `--no-cache`, so a deploy leaves no build cache
+behind. PostgreSQL is sized to the pools that actually connect — 20 slots against
+the app's 8 and the public API's 4 — not to a client count the box never sees.
 
 Because the backend ships as an installed wheel, **bundled data files must load
 through `importlib.resources`**, never `Path(__file__)`

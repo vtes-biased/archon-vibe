@@ -30,6 +30,7 @@
       - /usr/local/bin/uv
       - python
       - install
+      - --no-cache
       - "{{ python_version }}"
   environment:
     UV_PYTHON_INSTALL_DIR: "{{ uv_python_install_dir }}"
