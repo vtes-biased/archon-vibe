@@ -29,7 +29,7 @@ reaches consumers with no code change here.
 | `/v1/decks` | stream of published decks; `tournament` |
 | `/v1/users` | stream of members, each carrying all four ratings; `country`, `category`, `tournament` |
 | `/v1/community-links` | stream, one line per link |
-| `/v1/export` | the whole corpus as the generated `api.jsonl.gz` snapshot, never more than an hour old |
+| `/v1/export` | the whole corpus as the generated `api.jsonl.gz` snapshot, rebuilt within 15 minutes of any change |
 
 ## The stream
 

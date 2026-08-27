@@ -5,6 +5,7 @@ client has already written rows by the time it could notice a truncated file."""
 
 import gzip
 import io
+import json
 import logging
 import os
 import tempfile
@@ -24,17 +25,26 @@ SNAPSHOT_FORMAT_VERSION = 2
 # Column order of the projections in a stream_objects_snapshot row, after `type`.
 _LEVELS = ("public", "member", "api", "full")
 
+# Corpus fingerprint the published files were built from. Process memory, never
+# disk: an empty module rebuilds after any restart, which is what makes a format
+# or projection change land without anyone clearing the directory.
+_built_from: tuple[int, str | None] | None = None
+_built_counts: dict[str, int] = {}
+
 
 def _snapshot_path(level: str) -> Path:
     return SNAPSHOT_DIR / f"{level}.jsonl.gz"
 
 
 async def generate_snapshots() -> dict[str, int]:
-    """Generate the snapshot file for every access level in ONE pass over `objects`.
+    """Generate the snapshot file for every access level in ONE pass over `objects`,
+    unless the corpus has not moved since the files on disk were built.
 
     Returns dict of {level: object_count}.
     Reads the {level}::text columns directly — no Python deserialization.
     """
+    global _built_from, _built_counts
+
     from .db import _pool, batch_read_connection, stream_objects_snapshot
 
     if not _pool:
@@ -45,10 +55,23 @@ async def generate_snapshots() -> dict[str, int]:
     counts = dict.fromkeys(_LEVELS, 0)
 
     async with batch_read_connection() as conn:
-        # DB-clock instant taken BEFORE any row is read, so any row modified after
-        # is either in the file or caught by since-delta — a post-read max could miss one.
-        gen_row = await (await conn.execute("SELECT now()::timestamp")).fetchone()
-        generated_at = gen_row[0].isoformat()
+        # now() is transaction-start, so the anchor precedes the corpus read and a
+        # row modified after it is either in the file or caught by since-delta. The
+        # count spans deleted rows, so a hard purge moves the sentinel.
+        gen_row = await (
+            await conn.execute(
+                "SELECT count(*), max(modified_at), now()::timestamp FROM objects"
+            )
+        ).fetchone()
+        row_count, newest, generated = gen_row
+        sentinel = (row_count, newest.isoformat() if newest else None)
+        generated_at = generated.isoformat()
+
+        if sentinel == _built_from and all(
+            _snapshot_path(level).exists() for level in _LEVELS
+        ):
+            logger.info("Snapshots unchanged at %s objects, skipped", row_count)
+            return _built_counts
 
         # Every file comes from ONE pass, so all must be open at once. Temp file +
         # atomic rename per level: a failed generation leaves the previous snapshot in place.
@@ -102,6 +125,8 @@ async def generate_snapshots() -> dict[str, int]:
                     pass
             raise
 
+    _built_from, _built_counts = sentinel, counts
+
     elapsed = time.time() - start
     sizes = {lvl: _snapshot_path(lvl).stat().st_size / 1024 for lvl in _LEVELS}
     logger.info(
@@ -118,3 +143,17 @@ def get_snapshot_path(level: str) -> Path | None:
     """Get the path for a snapshot file, or None if it doesn't exist."""
     path = _snapshot_path(level)
     return path if path.exists() else None
+
+
+def snapshot_generated_at(level: str) -> str | None:
+    """The generation instant stamped in a published file's header line.
+
+    Read from the file, not from `_built_from`: several workers serve one shared
+    directory and each holds its own module state, so only the file itself is the
+    value a client can have echoed back.
+    """
+    try:
+        with gzip.open(_snapshot_path(level), "rt", encoding="utf-8") as fh:
+            return json.loads(fh.readline()).get("generated_at")
+    except (OSError, ValueError):
+        return None

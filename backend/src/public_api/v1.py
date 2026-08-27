@@ -297,8 +297,8 @@ async def list_community_links() -> StreamingResponse:
     },
 )
 async def export() -> FileResponse:
-    """The whole corpus as one gzipped JSON Lines file, never more than an hour
-    old. One request instead of five, and the cheapest way to take everything."""
+    """The whole corpus as one gzipped JSON Lines file, rebuilt within 15 minutes of
+    any change. One request instead of five, and the cheapest way to take everything."""
     path = get_snapshot_path("api")
     if path is None:
         raise HTTPException(503, "Export not generated yet")

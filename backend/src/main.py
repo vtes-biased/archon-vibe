@@ -276,12 +276,12 @@ async def run_vekn_push() -> None:
 
 
 async def run_snapshot_generation() -> None:
-    """Generate access-level snapshots (scheduled every 15 minutes)."""
+    """Rebuild the access-level snapshots if the corpus moved (checked every 15
+    minutes)."""
     try:
         from .snapshots import generate_snapshots
 
-        stats = await generate_snapshots()
-        logger.info(f"Snapshots generated: {stats}")
+        await generate_snapshots()
     except Exception as e:
         logger.error(f"Error generating snapshots: {e}", exc_info=True)
 
@@ -473,7 +473,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         name="Snapshot Generation",
         replace_existing=True,
     )
-    logger.info("Snapshot generation scheduled every 15 minutes")
+    logger.info("Snapshot check scheduled every 15 minutes")
 
     _scheduler.add_job(
         run_purge_deleted_objects,
@@ -484,8 +484,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     logger.info("Purge of deleted objects scheduled daily at 01:30 UTC")
 
-    # Always regenerate at startup: until a file exists /snapshot 503s, blocking
-    # bootstrap for the minutes the full sync chain would otherwise take.
+    # Always at startup: until a file exists /snapshot 503s, blocking bootstrap for
+    # the minutes the full sync chain would otherwise take. A fresh process holds no
+    # sentinel, so this pass always builds.
     asyncio.create_task(run_snapshot_generation())
 
     _scheduler.start()
@@ -1106,7 +1107,7 @@ async def stream_updates(
     per-item filtering. `tournament=<uid>` opens a bot-scoped stream: catch-up and
     live events restricted to that tournament + its sanctions, same access rule."""
     from .db import _pool, stream_objects_new
-    from .snapshots import get_snapshot_path
+    from .snapshots import get_snapshot_path, snapshot_generated_at
 
     # Shielded, here and on every pooled read below: a client hanging up
     # cancels the awaiting task mid-query and costs the pool the connection.
@@ -1148,9 +1149,14 @@ async def stream_updates(
         force_resync = True
         effective_since = None
 
-    # Orthogonal to entitlement: away >3 days risks a soft-delete already
-    # hard-purged by the 30-day job, which a since-delta would miss.
-    if fresh_dt and datetime.now(UTC) - fresh_dt > timedelta(days=3):
+    # Away >3 days risks a soft-delete already hard-purged by the 30-day job. A
+    # client holding the published file is exempt: it is rebuilt only when the
+    # corpus moves, so a resync would hand back identical bytes and loop.
+    if (
+        fresh_dt
+        and datetime.now(UTC) - fresh_dt > timedelta(days=3)
+        and generated_at != snapshot_generated_at(level.value)
+    ):
         force_resync = True
         effective_since = None
 

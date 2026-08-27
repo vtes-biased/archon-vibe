@@ -86,3 +86,37 @@ async def test_snapshot_files_are_complete_wellformed_jsonl(
     assert per_level["public"] <= per_level["member"] <= per_level["full"]
     # The public API never sees an object a member cannot.
     assert per_level["api"] <= per_level["member"]
+
+
+@pytest.mark.asyncio
+async def test_snapshot_rebuilt_only_when_the_corpus_moves(
+    populated_db, tmp_path, monkeypatch
+):
+    """A pass over an unmoved corpus must leave the published files alone, header
+    stamp included: a quiet day would otherwise rewrite four identical files
+    ninety-six times, and restamping would loop every away client through a resync
+    into bytes it already holds."""
+    monkeypatch.setattr(snapshots, "SNAPSHOT_DIR", tmp_path)
+    await snapshots.generate_snapshots()
+
+    # Inode, not mtime: an atomic rename always publishes a new one, whatever the
+    # filesystem's timestamp resolution says.
+    def inodes() -> dict[str, int]:
+        return {
+            level: snapshots._snapshot_path(level).stat().st_ino
+            for level in snapshots._LEVELS
+        }
+
+    published = inodes()
+    stamped = snapshots.snapshot_generated_at("member")
+    assert stamped is not None
+
+    await snapshots.generate_snapshots()
+    assert inodes() == published
+    assert snapshots.snapshot_generated_at("member") == stamped
+
+    # Any write moves max(modified_at), so the sentinel differs and the pass runs.
+    await db.save_user(populated_db[0])
+    await snapshots.generate_snapshots()
+    assert inodes() != published
+    assert snapshots.snapshot_generated_at("member") != stamped

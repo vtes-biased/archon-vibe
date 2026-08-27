@@ -482,6 +482,15 @@ it. The three-day freshness guard over `max(since, generated_at)` catches a clie
 away long enough that a soft-deleted object may have been hard-purged by the 30-day
 job, so the since-delta would miss the deletion.
 
+**A client echoing the published file's own `generated_at` is never resynced by
+it.** The snapshot is rebuilt only when the corpus moves ([snapshots](#snapshots)),
+so a file still on disk *is* the proof that nothing has changed since it was built:
+the resync would hand back the identical bytes, and the client would echo the same
+stale stamp on its next connect — a permanent loop over a corpus that is simply
+quiet. The comparison reads the header line off the file rather than the
+generator's in-process sentinel, since several workers share one directory and hold
+their own.
+
 **Resync backoff** — the first resync reconnects immediately, but consecutive
 resyncs with no intervening `sync_complete` route through exponential backoff, so a
 persistent cause cannot spin a full-speed clear-and-reconnect loop. The streak
@@ -531,9 +540,26 @@ convention. The directive is withheld
 only while no snapshot file exists — `/snapshot` 503s then, and the redirect
 would loop the client through connect → resync → 503 — so a snapshot-less
 backend serves the corpus stream instead, a state confined to a first boot
-because startup kicks a generation. Snapshots regenerate every 15 minutes, one
-file per level, avoiding a DB connection held open for an initial stream of
-thousands of objects.
+because startup kicks a generation. One file per level, avoiding a DB connection
+held open for an initial stream of thousands of objects.
+
+**The pass runs every 15 minutes but rebuilds only when the corpus moved.** Its
+anchor query reads `count(*), max(modified_at), now()` in one statement, and that
+count-and-newest pair is the sentinel: unchanged from the pair the published files
+were built from, the pass logs and returns. The count spans soft-deleted rows, so
+the 30-day hard purge shows up as a sentinel that moved even though the newest
+modification did not, and rebuilds. The sentinel lives in **process memory, never
+on disk** — an empty module means the first pass after any restart rebuilds, which
+is what makes a `SNAPSHOT_FORMAT_VERSION` bump or a projection change land without
+anyone remembering to clear the directory. A file-existence check rides with it, so
+an emptied directory rebuilds too. Rebuilding on a schedule instead cost a
+whole-corpus read and 35 MB of gzip ninety-six times a day, evicting the database's
+working set from page cache to reproduce four identical files.
+
+A quiet corpus therefore leaves files arbitrarily old, and their header stamp stays
+the instant the content was generated — restamping it would mean rewriting 35 MB to
+change one line, which is the write this exists to avoid. The freshness question
+moves to the staleness guard instead ([resync](#resync)).
 
 In production `/snapshot` serves no bytes itself: the app authenticates,
 resolves the level, computes `X-Access-Version`, and answers with
@@ -637,7 +663,7 @@ re-deflates through `zipfile` into a non-seekable sink drained every 64 KB, so t
 heap stays bounded and the archive streams. IC gets a download button behind a
 confirm modal warning that the file carries member PII.
 
-It is an *export*, not a backup: up to 15 minutes stale, no soft-deleted
+It is an *export*, not a backup: up to 15 minutes behind the corpus, no soft-deleted
 tombstones, no static card data. `pg_dump` remains the backup tool.
 
 ## Frontend storage
