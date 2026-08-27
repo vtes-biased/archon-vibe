@@ -3,6 +3,8 @@
   import UserList from '$lib/components/UserList.svelte';
   import CommunityTab from '$lib/components/CommunityTab.svelte';
   import PromosTab from '$lib/components/promos/PromosTab.svelte';
+  import Button from '$lib/components/Button.svelte';
+  import { Plus } from '@lucide/svelte';
   import { getAuthState } from '$lib/stores/auth.svelte';
   import { isOfficial } from '$lib/engine';
   import * as m from '$lib/paraglide/messages.js';
@@ -37,12 +39,10 @@
       <h1 class="text-3xl font-semibold text-accent">{m.nav_community()}</h1>
 
       {#if activeTab === 'community' && !sponsorMode && canAddLink}
-        <button
-          onclick={() => addingLink = true}
-          class="px-4 py-2 text-sm font-medium btn-success rounded-lg transition-colors shadow-md"
-        >
+        <Button variant="create" size="lg" onclick={() => addingLink = true}>
+          <Plus class="w-4 h-4" aria-hidden="true" />
           {m.community_add_link()}
-        </button>
+        </Button>
       {/if}
     </div>
 

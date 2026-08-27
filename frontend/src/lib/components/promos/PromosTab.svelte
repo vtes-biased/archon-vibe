@@ -112,8 +112,8 @@
     <h2 class="text-lg font-medium text-ink-strong">{m.promo_catalog_title()}</h2>
     {#if canManagePromo && promos.some((p) => p.active)}
       <!-- With no active promos displayed, the create CTA lives in the gallery
-           empty state instead (one primary per surface). -->
-      <Button variant="primary" onclick={openCreate}>
+           empty state instead (one create CTA per surface). -->
+      <Button variant="create" onclick={openCreate}>
         <Plus class="w-4 h-4" aria-hidden="true" />
         {m.promo_new()}
       </Button>

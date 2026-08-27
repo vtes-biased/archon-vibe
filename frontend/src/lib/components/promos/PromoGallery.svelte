@@ -52,7 +52,7 @@
     <p class="text-ink-muted text-sm">{m.promo_gallery_empty_hint()}</p>
     {#if canManagePromo}
       <div class="mt-4">
-        <Button variant="primary" onclick={() => oncreate?.()}>
+        <Button variant="create" onclick={() => oncreate?.()}>
           <Plus class="w-4 h-4" aria-hidden="true" />
           {m.promo_gallery_empty_cta()}
         </Button>

@@ -7,8 +7,9 @@
   import { canManageLeagues } from "$lib/engine";
   import { normalizeSearch } from "$lib/utils";
   import type { League, LeagueStandingsMode } from "$lib/types";
-  import { Loader2, BarChart3 } from "@lucide/svelte";
+  import { Loader2, BarChart3, Plus } from "@lucide/svelte";
   import Badge from "$lib/components/Badge.svelte";
+  import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let leagues = $state<League[]>([]);
@@ -117,12 +118,10 @@
       <h1 class="text-3xl font-semibold text-accent">{m.leagues_title()}</h1>
 
       {#if canCreate}
-        <a
-          href="/leagues/new"
-          class="px-4 py-2 text-sm font-medium btn-success rounded-lg transition-colors shadow-md"
-        >
+        <Button variant="create" size="lg" href="/leagues/new">
+          <Plus class="w-4 h-4" aria-hidden="true" />
           {m.league_new_btn()}
-        </a>
+        </Button>
       {/if}
     </div>
 

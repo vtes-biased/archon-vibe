@@ -88,6 +88,11 @@ both themes, and each class is defined once with `light-dark()`.
 | **Status** — meaning | `badge-*`, `banner-*`, `toast-*`, `status-*`, `btn-success`/`-pending`, `dot-*`, `text-info`/`text-warn`/`text-highlight` | success and info = azure · pending and warn = amethyst · danger and error = crimson · highlight = fuchsia |
 | **Categorical** — identity | `badge-blue`/`-amethyst`/`-fuchsia`/`-crimson`/`-slate` | arbitrary distinct tags; the hue is just a label |
 
+Azure carries two jobs: status meaning above, and the `create` button variant
+([Buttons](#buttons)), which reuses `btn-success` for its fill. The two never meet
+on one control — status azure labels a fact (a Paid chip, an info banner), `create`
+names an action.
+
 Raw stock Tailwind colour utilities do not adapt to the theme — use role utilities
 or these semantic classes, never `bg-emerald-*`-style tints.
 
@@ -161,7 +166,8 @@ disabled and loading states, so call sites pass intent rather than classes.
 
 | Variant | Colour | Intent |
 |---|---|---|
-| `primary` | crimson | **every** affirmative action — lifecycle CTAs and form/auth submits alike |
+| `primary` | crimson | every affirmative action except creation — lifecycle CTAs and form/auth submits alike |
+| `create` | **azure** | starting a new top-level item from a list surface, and nothing else |
 | `danger` | **violet** | destructive: delete, drop, force-takeover, cancel round, finish tournament |
 | `secondary` | neutral solid | neutral secondary action, bulk utilities, the More overflow trigger |
 | `ghost` | neutral outline | tertiary, de-emphasised |
@@ -171,17 +177,34 @@ shows one filled crimson button and collapses the rest into an overflow menu. A
 legitimate second lifecycle choice — Start Round versus Start Finals — drops to
 `secondary`, never a second `primary`.
 
+**`create` spends its own budget, not the primary one.** A list surface shows at
+most one azure create button, and it does not count against the crimson primary —
+`/tournaments` legitimately carries a blue New Tournament in its header and a
+crimson calendar-feed CTA in agenda view. The six create buttons are the tournament
+and league headers, the community add-link, the member list, and the promo catalog
+header and its gallery empty state.
+
+**The boundary is top-level and list-shaped.** `create` opens a *new item of the
+list you are looking at*; it never dresses a form submit, a row-level add, a nested
+add-to-this-thing, or a state the button can toggle into — a blue button reading
+Cancel is the leak this rule exists to prevent, so the member list's create button
+hides while its form is open and the form carries its own cancel. Everything else
+affirmative stays `primary`.
+
 **Danger is violet, never red.** Red and crimson are the same hue family and
 collapse together even under colourblindness, so destructive actions get their own
 hue. Meaning must not rest on hue alone: pair `danger` with an icon and a verb.
 
 Props: `size`, `block`, `loading` (spinner, `aria-busy`, auto-disables),
-`disabled`; extra layout classes via `class`. Focus comes from the global
-`:focus-visible` ring — never add a bespoke outline.
+`disabled`, `href` (renders an `<a>`, which takes neither state); extra layout
+classes via `class`. Focus comes from the global `:focus-visible` ring — never add
+a bespoke outline.
 
 **Do not** route through `Button`: icon-only buttons, toggles, tabs, segmented
-controls, dropdown and menu options, row- or card-wrapping buttons, `<a>`-styled
-links, or Discord brand-fill buttons.
+controls, dropdown and menu options, row- or card-wrapping buttons, text links, or
+Discord brand-fill buttons. A *button-shaped* link is not an exception — pass
+`href` and `Button` renders an `<a>` with the same classes, keeping cmd- and
+middle-click, which `onclick={goto}` would lose.
 
 Disabled states: `Button` owns its own. Form inputs use `disabled:opacity-50`,
 icon-only and small raw buttons `disabled:opacity-40`.

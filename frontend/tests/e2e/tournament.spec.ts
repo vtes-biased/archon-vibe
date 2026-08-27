@@ -69,7 +69,7 @@ test.describe('Tournament lifecycle', () => {
     await page.goto('/tournaments');
     await waitForSync(page);
 
-    await page.getByText('+ New Tournament').click();
+    await page.getByRole('link', { name: 'New Tournament' }).click();
     await expect(page).toHaveURL(/\/tournaments\/new/);
 
     await page.locator('#name').fill('E2E Test Tournament');

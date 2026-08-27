@@ -15,7 +15,7 @@
   import type { User as UserType, Role } from "$lib/types";
   import type { UserListItem } from "$lib/db";
   import Button from '$lib/components/Button.svelte';
-  import { RefreshCw, Users } from "@lucide/svelte";
+  import { RefreshCw, Users, Plus } from "@lucide/svelte";
   import { syncQueryParams, currentParams, readPageParam, pageParam } from "$lib/url-filters";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -180,10 +180,6 @@
     }
   }
 
-
-  function toggleCreateForm() {
-    showCreateForm = !showCreateForm;
-  }
 
   async function handleUserCreated(_created: UserType) {
     showCreateForm = false;
@@ -358,16 +354,16 @@
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-3xl font-semibold text-accent">{m.nav_users()}</h1>
 
-        {#if canSponsor}
+        {#if canSponsor && !showCreateForm}
           <Button
             id="new-user-button"
-            variant="primary"
+            variant="create"
             size="lg"
-            class="shadow-md hover:shadow-lg"
-            onclick={toggleCreateForm}
+            onclick={() => showCreateForm = true}
             disabled={!isOnline}
           >
-            {showCreateForm ? m.common_cancel() : m.user_list_new_user()}
+            <Plus class="w-4 h-4" aria-hidden="true" />
+            {m.user_list_new_user()}
           </Button>
         {/if}
       </div>

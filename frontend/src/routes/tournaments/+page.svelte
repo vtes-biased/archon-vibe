@@ -12,7 +12,7 @@
   import Badge from "$lib/components/Badge.svelte";
   import { zonedDate } from "$lib/utils";
   import { syncQueryParams, currentParams, readPageParam, pageParam } from "$lib/url-filters";
-  import { Loader2, Trophy, Calendar, Copy, Check } from "@lucide/svelte";
+  import { Loader2, Trophy, Calendar, Copy, Check, Plus } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
@@ -335,12 +335,10 @@
       <h1 class="text-3xl font-semibold text-accent">{m.nav_tournaments()}</h1>
 
       {#if canCreate}
-        <a
-          href="/tournaments/new"
-          class="px-4 py-2 text-sm font-medium btn-success rounded-lg transition-colors shadow-md"
-        >
+        <Button variant="create" size="lg" href="/tournaments/new">
+          <Plus class="w-4 h-4" aria-hidden="true" />
           {m.tournaments_new_btn()}
-        </a>
+        </Button>
       {/if}
     </div>
 
