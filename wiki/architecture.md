@@ -881,7 +881,7 @@ rounds, tables, seating, scores and players, matching players by VEKN ID.
 | Job | Schedule | Module |
 |---|---|---|
 | VEKN sync (members, tournaments) | at startup, then every `VEKN_SYNC_INTERVAL_HOURS` | `vekn_sync.py`, `vekn_tournament_sync.py` |
-| Snapshot generation | at startup, then every 15 min | `snapshots.py` |
+| Snapshot rebuild, only if the corpus moved | at startup, then checked every 15 min | `snapshots.py` |
 | OAuth cleanup | hourly | `db_oauth.py` |
 | VEKN push batch | hourly, configurable | `vekn_push.py` |
 | Sanction cleanup | daily, 01:00 UTC | `db.py` |

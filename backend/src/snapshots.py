@@ -26,8 +26,7 @@ SNAPSHOT_FORMAT_VERSION = 2
 _LEVELS = ("public", "member", "api", "full")
 
 # Corpus fingerprint the published files were built from. Process memory, never
-# disk: an empty module rebuilds after any restart, which is what makes a format
-# or projection change land without anyone clearing the directory.
+# disk: a restart must rebuild.
 _built_from: tuple[int, str | None] | None = None
 _built_counts: dict[str, int] = {}
 
@@ -56,8 +55,7 @@ async def generate_snapshots() -> dict[str, int]:
 
     async with batch_read_connection() as conn:
         # now() is transaction-start, so the anchor precedes the corpus read and a
-        # row modified after it is either in the file or caught by since-delta. The
-        # count spans deleted rows, so a hard purge moves the sentinel.
+        # row modified after it is either in the file or caught by since-delta.
         gen_row = await (
             await conn.execute(
                 "SELECT count(*), max(modified_at), now()::timestamp FROM objects"
@@ -148,9 +146,9 @@ def get_snapshot_path(level: str) -> Path | None:
 def snapshot_generated_at(level: str) -> str | None:
     """The generation instant stamped in a published file's header line.
 
-    Read from the file, not from `_built_from`: several workers serve one shared
-    directory and each holds its own module state, so only the file itself is the
-    value a client can have echoed back.
+    Read off the file rather than tracked in memory: a generation that failed or
+    was skipped leaves an older file published, and it is that file's stamp a
+    client echoes back.
     """
     try:
         with gzip.open(_snapshot_path(level), "rt", encoding="utf-8") as fh:

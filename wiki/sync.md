@@ -487,9 +487,9 @@ it.** The snapshot is rebuilt only when the corpus moves ([snapshots](#snapshots
 so a file still on disk *is* the proof that nothing has changed since it was built:
 the resync would hand back the identical bytes, and the client would echo the same
 stale stamp on its next connect — a permanent loop over a corpus that is simply
-quiet. The comparison reads the header line off the file rather than the
-generator's in-process sentinel, since several workers share one directory and hold
-their own.
+quiet. The comparison reads the header line off the published file rather than
+tracking the instant in memory: a generation that failed or was skipped leaves an
+older file published, and it is that file's stamp the client echoes.
 
 **Resync backoff** — the first resync reconnects immediately, but consecutive
 resyncs with no intervening `sync_complete` route through exponential backoff, so a

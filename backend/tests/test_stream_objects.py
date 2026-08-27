@@ -116,7 +116,18 @@ async def test_snapshot_rebuilt_only_when_the_corpus_moves(
     assert snapshots.snapshot_generated_at("member") == stamped
 
     # Any write moves max(modified_at), so the sentinel differs and the pass runs.
+    # A soft delete leaves the row in place, so the count is untouched here.
+    await db.soft_delete_user(populated_db[1].uid)
     await db.save_user(populated_db[0])
     await snapshots.generate_snapshots()
     assert inodes() != published
     assert snapshots.snapshot_generated_at("member") != stamped
+
+    # The count half, which the timestamp half cannot cover: the 30-day purge
+    # hard-deletes a row the snapshot already excluded, and the newest
+    # modification stays exactly where it was.
+    rebuilt = inodes()
+    async with db.get_connection() as conn:
+        await conn.execute("DELETE FROM objects WHERE uid = %s", (populated_db[1].uid,))
+    await snapshots.generate_snapshots()
+    assert inodes() != rebuilt
