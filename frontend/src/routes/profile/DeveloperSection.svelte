@@ -121,7 +121,7 @@
   }
 </script>
 
-<div class="p-6 border-t border-line">
+<div class="p-3 sm:p-6">
   <button
     onclick={toggle}
     class="flex items-center justify-between w-full text-left"

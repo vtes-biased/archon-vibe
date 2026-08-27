@@ -1,16 +1,11 @@
 <script lang="ts">
-  import { User, Camera, Unlink, Share2, Check, Plus, Pencil, CloudOff } from "@lucide/svelte";
+  import { User, Camera, Unlink, Share2, Check, CloudOff } from "@lucide/svelte";
   import { getSortedCountries, getCountryFlag } from "$lib/geonames";
   import CityAutocomplete from "$lib/components/CityAutocomplete.svelte";
-  import CommunityLinkEditor from "$lib/components/CommunityLinkEditor.svelte";
-  import CommunityLinkPills from "$lib/components/CommunityLinkPills.svelte";
   import Button from "$lib/components/Button.svelte";
   import { updateProfile } from "$lib/stores/auth.svelte";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { canChangeCountry, isOfficial as engineIsOfficial } from "$lib/engine";
-  import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
-  import { getLocale } from "$lib/paraglide/runtime.js";
-  import type { CommunityLink } from "$lib/types";
+  import { canChangeCountry } from "$lib/engine";
   import Badge from "$lib/components/Badge.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -31,9 +26,6 @@
   const sortedCountries = getSortedCountries();
   let copied = $state(false);
 
-  // Identity, not authority: it only decides which contact-visibility note to show.
-  const isOfficial = $derived(engineIsOfficial(user ?? null));
-
   // An official can't move their own country: that would shift the scope their
   // FULL projection is computed for, an authority self-service never has.
   const isCountryLocked = $derived(!!user && !canChangeCountry(user, user).allowed);
@@ -45,15 +37,6 @@
   let editCountry = $state(initial.country || "");
   let editCity = $state(initial.city || "");
   let editCityGeonameId = $state<number | null>(initial.city_geoname_id ?? null);
-  let editContactEmail = $state(initial.contact_email || "");
-  let editContactPhone = $state(initial.contact_phone || "");
-  let editPhoneIsWhatsapp = $state(initial.phone_is_whatsapp ?? false);
-
-  const editLinks = $derived<CommunityLink[]>(user.community_links ?? []);
-  let editing = $state<{ link: CommunityLink | null } | null>(null);
-
-  const defaultLanguage = $derived(COUNTRY_LANGUAGE[editCountry] || getLocale());
-  const maxLinks = $derived(isOfficial ? 10 : 5);
 
   let lastSaved: Record<string, unknown> = {
     name: initial.name || "",
@@ -61,18 +44,13 @@
     country: initial.country || "",
     city: initial.city || "",
     city_geoname_id: initial.city_geoname_id ?? null,
-    contact_email: initial.contact_email || "",
-    contact_phone: initial.contact_phone || "",
-    phone_is_whatsapp: initial.phone_is_whatsapp ?? false,
-    community_links: JSON.stringify(initial.community_links || []),
   };
 
   async function saveField(field: string, value: unknown) {
-    const cmp = field === "community_links" ? JSON.stringify(value) : value;
-    if (lastSaved[field] === cmp) return;
+    if (lastSaved[field] === value) return;
     const ok = await updateProfile({ [field]: value });
     if (ok) {
-      lastSaved[field] = cmp;
+      lastSaved[field] = value;
     } else {
       showToast({ type: "error", message: m.profile_save_error() });
     }
@@ -81,15 +59,12 @@
   async function saveFields(data: Record<string, unknown>) {
     const changed: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(data)) {
-      const cmp = k === "community_links" ? JSON.stringify(v) : v;
-      if (lastSaved[k] !== cmp) changed[k] = v;
+      if (lastSaved[k] !== v) changed[k] = v;
     }
     if (Object.keys(changed).length === 0) return;
     const ok = await updateProfile(changed);
     if (ok) {
-      for (const [k, v] of Object.entries(changed)) {
-        lastSaved[k] = k === "community_links" ? JSON.stringify(v) : v;
-      }
+      for (const [k, v] of Object.entries(changed)) lastSaved[k] = v;
     } else {
       showToast({ type: "error", message: m.profile_save_error() });
     }
@@ -108,18 +83,6 @@
       country: editCountry || undefined,
     });
   }
-
-  function saveLinks(links: CommunityLink[], moderated?: { url: string; state: string }) {
-    editing = null;
-    const payload = moderated
-      ? links.map(l => (l.url === moderated.url ? { ...l, state: moderated.state } : l))
-      : links;
-    saveField("community_links", payload);
-  }
-
-  const editedIndex = $derived(
-    editing?.link ? editLinks.findIndex(l => l.url === editing!.link!.url) : -1
-  );
 
   async function shareProfile() {
     const url = `${window.location.origin}/users/${user.uid}`;
@@ -217,6 +180,12 @@
         {m.profile_claim_vekn_title()}
       </Button>
     </div>
+    <!-- Not gated on country: a brand-new user without one still needs the
+         pointer; the community page prompts for country. -->
+    <div class="p-3 rounded border text-sm banner-warn">
+      {m.profile_sponsorship_banner()}
+      <a href="/users?tab=community&sponsor=1" class="underline hover:text-warn ml-1">{m.profile_find_coordinator()}</a>
+    </div>
   {/if}
 
   <div>
@@ -254,100 +223,3 @@
     </div>
   {/if}
 </div>
-
-<div class="p-6 border-t border-line space-y-4">
-  <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.profile_contact_info()}</h3>
-
-  {#if isOfficial}
-    <div class="p-3 rounded border text-sm banner-info">
-      {#if user.roles?.includes("IC")}
-        {m.profile_ic_contact_visibility()}
-      {:else}
-        {m.profile_official_contact_visibility()}
-      {/if}
-    </div>
-  {/if}
-
-  <div class="space-y-4">
-    <div>
-      <label for="edit-contact-email" class="block text-sm font-medium text-ink-muted mb-1">{m.profile_contact_email()}</label>
-      <input id="edit-contact-email" type="email" bind:value={editContactEmail}
-        onblur={() => saveField("contact_email", editContactEmail || undefined)}
-        class={inputClass} />
-    </div>
-    <div>
-      <label for="edit-contact-phone" class="block text-sm font-medium text-ink-muted mb-1">{m.profile_phone()}</label>
-      <input id="edit-contact-phone" type="tel" bind:value={editContactPhone}
-        onblur={() => saveField("contact_phone", editContactPhone || undefined)}
-        class={inputClass} />
-      <label class="flex items-center gap-2 mt-2 text-sm text-ink-muted cursor-pointer">
-        <input type="checkbox" bind:checked={editPhoneIsWhatsapp}
-          onchange={() => saveField("phone_is_whatsapp", editPhoneIsWhatsapp)}
-          class="rounded border-line-strong bg-surface-card text-accent focus:ring-accent" />
-        {m.profile_phone_is_whatsapp()}
-      </label>
-    </div>
-  </div>
-</div>
-
-{#if user.vekn_id}
-  <div class="p-6 border-t border-line">
-    <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide mb-4">{m.profile_community_links()}</h3>
-
-    {#if !isOfficial}
-      <div class="p-3 rounded border text-sm banner-info mb-4">
-        {m.profile_community_links_member()}
-      </div>
-    {/if}
-
-    <div class="space-y-2">
-      {#each editLinks as link (link.url + link.type)}
-        <div class="flex items-center justify-between gap-2 border border-line-strong rounded-lg p-2">
-          <CommunityLinkPills links={[link]} />
-          <button type="button" onclick={() => { editing = { link }; }}
-            aria-label={m.community_edit_link()}
-            class="grid place-items-center w-11 h-11 shrink-0 text-ink-faint hover:text-link transition-colors">
-            <Pencil class="w-4 h-4" />
-          </button>
-        </div>
-      {/each}
-    </div>
-
-    {#if editLinks.length < maxLinks}
-      <button type="button" onclick={() => { editing = { link: null }; }}
-        class="mt-3 flex items-center gap-1 min-h-11 text-sm text-link hover:text-link-soft transition-colors">
-        <Plus class="w-4 h-4" />
-        {m.profile_add_link()}
-      </button>
-    {/if}
-  </div>
-{/if}
-
-{#if editing}
-  <CommunityLinkEditor
-    link={editing.link}
-    ownerCountry={editCountry || null}
-    {defaultLanguage}
-    onclose={() => { editing = null; }}
-    onsave={(link, state) => saveLinks(
-      editedIndex >= 0
-        ? editLinks.map((l, i) => (i === editedIndex ? link : l))
-        : [...editLinks, link],
-      state ? { url: link.url, state } : undefined
-    )}
-    ondelete={editedIndex >= 0
-      ? () => saveLinks(editLinks.filter((_, i) => i !== editedIndex))
-      : undefined}
-  />
-{/if}
-
-<!-- Sponsorship banner for non-members (not gated on country: a brand-new user
-     without one still needs the pointer; the community page prompts for country) -->
-{#if !user.vekn_id}
-  <div class="p-6 border-t border-line">
-    <div class="p-3 rounded border text-sm banner-warn">
-      {m.profile_sponsorship_banner()}
-      <a href="/users?tab=community&sponsor=1" class="underline hover:text-warn ml-1">{m.profile_find_coordinator()}</a>
-    </div>
-  </div>
-{/if}

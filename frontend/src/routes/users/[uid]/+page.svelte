@@ -13,10 +13,19 @@
   import SanctionsManager from "$lib/components/SanctionsManager.svelte";
   import PlayerRatings from "$lib/components/PlayerRatings.svelte";
   import PlayerRecord from "$lib/components/PlayerRecord.svelte";
-  import { Loader2, Share2, Check } from "@lucide/svelte";
+  import UserContact from "$lib/components/UserContact.svelte";
+  import TabStrip from "$lib/components/TabStrip.svelte";
+  import { Loader2, Share2, Check, IdCard, Swords } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let copied = $state(false);
+
+  type TabId = 'profile' | 'record';
+  let activeTab = $state<TabId>('profile');
+  const tabs: { id: TabId; label: string; icon: typeof IdCard }[] = [
+    { id: 'profile', label: m.profile_tab_profile(), icon: IdCard },
+    { id: 'record', label: m.profile_tab_record(), icon: Swords },
+  ];
 
   async function shareProfile() {
     if (!user) return;
@@ -221,33 +230,43 @@
       onupdated={handleUserUpdated}
     />
 
-    {#if user.coopted_by}
-      {@const date = user.coopted_at ? new Date(user.coopted_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—"}
-      <p class="mt-2 px-4 text-xs text-ink-faint">
-        {#if sponsorName}
-          {m.user_sponsored_by({ name: sponsorName, date })}
-        {:else}
-          {m.user_sponsored_unknown({ date })}
-        {/if}
-      </p>
-    {/if}
-
-    {#if canManage || sponsorOnly}
-      <div class="mt-6">
-        <VeknManagement {user} {sponsorOnly} {canMerge} onaction={handleUserUpdated} ondelete={handleMemberDeleted} canMarkDeceased={canManageDeceased} canDelete={canDelete} />
-      </div>
-    {/if}
-
-    {#if canNda}
-      <NdaSection {user} status={ndaStatus} onchanged={loadNda} />
-    {/if}
-
-    <SanctionsManager {user} canIssueSanctions={canIssueSanctions} />
-
     <div class="mt-6">
-      <PlayerRatings {user} />
+      <TabStrip {tabs} bind:active={activeTab} />
     </div>
 
-    <PlayerRecord {user} />
+    {#if activeTab === 'profile'}
+      <div class="mt-6">
+        <UserContact {user} />
+      </div>
+
+      {#if user.coopted_by}
+        {@const date = user.coopted_at ? new Date(user.coopted_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—"}
+        <p class="mt-2 px-4 text-xs text-ink-faint">
+          {#if sponsorName}
+            {m.user_sponsored_by({ name: sponsorName, date })}
+          {:else}
+            {m.user_sponsored_unknown({ date })}
+          {/if}
+        </p>
+      {/if}
+
+      {#if canManage || sponsorOnly}
+        <div class="mt-6">
+          <VeknManagement {user} {sponsorOnly} {canMerge} onaction={handleUserUpdated} ondelete={handleMemberDeleted} canMarkDeceased={canManageDeceased} canDelete={canDelete} />
+        </div>
+      {/if}
+
+      {#if canNda}
+        <NdaSection {user} status={ndaStatus} onchanged={loadNda} />
+      {/if}
+
+      <SanctionsManager {user} canIssueSanctions={canIssueSanctions} />
+    {:else}
+      <div class="mt-6">
+        <PlayerRatings {user} />
+      </div>
+
+      <PlayerRecord {user} />
+    {/if}
   {/if}
 </div>

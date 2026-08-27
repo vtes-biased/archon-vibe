@@ -14,7 +14,7 @@
   import { claimVeknId, abandonVeknId, uploadAvatar, getNdaStatus } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
 
-  import { User, TriangleAlert, Trophy, FileSignature } from "@lucide/svelte";
+  import { User, TriangleAlert, Trophy, FileSignature, IdCard, Swords, Settings } from "@lucide/svelte";
   import InlineNotice from "$lib/components/InlineNotice.svelte";
   import AvatarCropper from "$lib/components/AvatarCropper.svelte";
   import PlayerRatings from "$lib/components/PlayerRatings.svelte";
@@ -22,7 +22,9 @@
   import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  import ProfileView from "./ProfileView.svelte";
+  import TabStrip from "$lib/components/TabStrip.svelte";
+  import ProfileIdentity from "./ProfileIdentity.svelte";
+  import ProfileContact from "./ProfileContact.svelte";
   import LinkedAccounts from "./LinkedAccounts.svelte";
   import AuthorizedApps from "./AuthorizedApps.svelte";
   import AppSettings from "./AppSettings.svelte";
@@ -51,6 +53,14 @@
   let abandoningVekn = $state(false);
 
   let showAvatarCropper = $state(false);
+
+  type TabId = 'profile' | 'record' | 'account';
+  let activeTab = $state<TabId>('profile');
+  const tabs: { id: TabId; label: string; icon: typeof IdCard }[] = [
+    { id: 'profile', label: m.profile_tab_profile(), icon: IdCard },
+    { id: 'record', label: m.profile_tab_record(), icon: Swords },
+    { id: 'account', label: m.profile_tab_account(), icon: Settings },
+  ];
 
   const hasEmail = $derived(
     auth.isAuthenticated && auth.authMethods.some((am) => am.type === "email")
@@ -116,6 +126,8 @@
     if (claim !== null) {
       showClaimModal = true;
     }
+
+    if (discordLinked || error || githubLinked || githubErr) activeTab = 'account';
 
     if (discordLinked || error || githubLinked || githubErr || claim !== null) {
       replaceState("/profile", {});
@@ -263,57 +275,67 @@
 
       <div class="bg-surface-card rounded-lg shadow border border-line">
         {#key user.uid}
-        <ProfileView
+        <ProfileIdentity
           {user}
           onAvatarClick={() => (showAvatarCropper = true)}
           onAbandonVekn={() => (showAbandonConfirm = true)}
           onClaimVekn={() => (showClaimModal = true)}
         />
-        {/key}
-        <!-- Own ratings + HoF: mounted here too, since PlayerRatings otherwise
-             only appears on the public /users/[uid] page. -->
-        <div class="p-6 border-t border-line space-y-4">
-          <div class="flex items-center justify-between gap-3 flex-wrap">
-            <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.user_detail_ratings()}</h3>
-            {#if (user.wins?.length ?? 0) >= HOF_MIN_WINS}
-              <Badge kind="link" tone="highlight" href="/rankings?tab=halloffame">
-                <Trophy class="w-3 h-3" aria-hidden="true" />
-                {m.profile_hof_member({ wins: String(user.wins?.length ?? 0) })}
-              </Badge>
-            {/if}
+
+        <TabStrip {tabs} bind:active={activeTab} />
+
+        {#if activeTab === 'profile'}
+          <div class="p-3 sm:p-6">
+            <ProfileContact {user} />
           </div>
-          <PlayerRatings {user} showHeading={false} />
-          <PlayerRecord {user} self />
-        </div>
-        <LinkedAccounts
-          {hasEmail}
-          {emailIdentifier}
-          {hasDiscord}
-          {discordUsername}
-          {hasGithub}
-          {githubUsername}
-          {hasPasskey}
-          {discordMessage}
-          {discordError}
-          {githubMessage}
-          {githubError}
-          {passkeyMessage}
-          error={auth.error}
-          onLinkEmail={handleLinkEmail}
-          onLinkDiscord={handleLinkDiscord}
-          onLinkGithub={handleLinkGithub}
-          onUnlinkGithub={handleUnlinkGithub}
-          onRegisterPasskey={handleRegisterPasskey}
-        />
-        <AuthorizedApps />
-        <AppSettings />
-        {#if isDev}
-          <DeveloperSection />
+        {:else if activeTab === 'record'}
+          <div class="p-3 sm:p-6 space-y-4">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.user_detail_ratings()}</h3>
+              {#if (user.wins?.length ?? 0) >= HOF_MIN_WINS}
+                <Badge kind="link" tone="highlight" href="/rankings?tab=halloffame">
+                  <Trophy class="w-3 h-3" aria-hidden="true" />
+                  {m.profile_hof_member({ wins: String(user.wins?.length ?? 0) })}
+                </Badge>
+              {/if}
+            </div>
+            <PlayerRatings {user} showHeading={false} />
+            <PlayerRecord {user} self />
+          </div>
+        {:else}
+          <div class="divide-y divide-line">
+            <LinkedAccounts
+              {hasEmail}
+              {emailIdentifier}
+              {hasDiscord}
+              {discordUsername}
+              {hasGithub}
+              {githubUsername}
+              {hasPasskey}
+              {discordMessage}
+              {discordError}
+              {githubMessage}
+              {githubError}
+              {passkeyMessage}
+              error={auth.error}
+              onLinkEmail={handleLinkEmail}
+              onLinkDiscord={handleLinkDiscord}
+              onLinkGithub={handleLinkGithub}
+              onUnlinkGithub={handleUnlinkGithub}
+              onRegisterPasskey={handleRegisterPasskey}
+            />
+            <AuthorizedApps />
+            <AppSettings />
+            {#if isDev}
+              <DeveloperSection />
+            {/if}
+            {#if canAdminister}
+              <AdminSection />
+            {/if}
+            <DataSection onResync={handleResync} onLogout={handleLogout} />
+          </div>
         {/if}
-        {#if canAdminister}
-          <AdminSection />
-        {/if}
-        <DataSection onResync={handleResync} onLogout={handleLogout} />
+        {/key}
       </div>
     {/if}
 

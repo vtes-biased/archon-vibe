@@ -125,6 +125,7 @@ especially for house-format and beta-ish features.
 | add | ajouter | añadir | adicionar | aggiungere |
 | Constructed / Limited | Construit / Limité¹¹ | Constructed / Limited | Constructed / Limited | Constructed / Limited |
 | rating points | points de rating | puntos de rating | pontos de classificação¹² | punti rating |
+| play record (profile tab) | Historique de jeu | Historial de juego | Histórico de partidas | Storico di gioco |
 | in-person | en présentiel | presencial(es) | presencial(is) | in presenza |
 | best N tournaments | N meilleurs tournois | mejores N torneos | melhores N torneios | migliori N tornei |
 | National / Continental Championship | Championnat national / continental | Campeonato Nacional / Continental | National / Continental Championship (kept English) | Campionato Nazionale / Continentale |

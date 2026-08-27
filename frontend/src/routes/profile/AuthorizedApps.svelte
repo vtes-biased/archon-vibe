@@ -86,7 +86,7 @@
   }
 </script>
 
-<div class="p-6 border-t border-line">
+<div class="p-3 sm:p-6">
   <button onclick={toggle} class="flex items-center justify-between w-full text-left">
     <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.profile_authorized_apps_section()}</h3>
     <ChevronDown class="w-4 h-4 text-ink-muted transition-transform {expanded ? 'rotate-180' : ''}" />

@@ -6,14 +6,11 @@
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
   import { getRoleTone } from "$lib/roles";
   import Badge, { badgeToneClass } from "$lib/components/Badge.svelte";
-  import { deobfuscateContact } from "$lib/contact";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { canChangeRole as engineCanChangeRole, canChangeCountry, isOfficial } from "$lib/engine";
   import CityAutocomplete from "./CityAutocomplete.svelte";
   import AvatarCropper from "./AvatarCropper.svelte";
   import SanctionsManager from "./SanctionsManager.svelte";
-  import CommunityLinkPills from "./CommunityLinkPills.svelte";
-  import DiscordContact from "./DiscordContact.svelte";
   import Button from '$lib/components/Button.svelte';
   import { Loader2, X, User as UserIcon, Camera, SquarePen } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -588,37 +585,6 @@
           {/if}
 
           <SanctionsManager {user} canIssueSanctions={false} inline={true} />
-
-          {#if user.contact_email || user.discord_id || user.contact_phone}
-            {@const email = deobfuscateContact(user.contact_email)}
-            {@const phone = deobfuscateContact(user.contact_phone)}
-            <div class="mt-3 pt-3 border-t border-line-strong space-y-1">
-              <span class="font-medium text-ink-muted">{m.profile_contact()}:</span>
-              {#if email}
-                <div class="flex items-center gap-2">
-                  <a href="mailto:{email}" class="text-link hover:text-link-soft text-sm">{email}</a>
-                </div>
-              {/if}
-              {#if user.discord_id}
-                <div class="text-sm">
-                  <DiscordContact discordId={user.discord_id} username={user.contact_discord} />
-                </div>
-              {/if}
-              {#if phone}
-                {#if user.phone_is_whatsapp}
-                  <a href="https://wa.me/{phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener noreferrer" class="text-sm text-link hover:text-link-soft">WhatsApp: {phone}</a>
-                {:else}
-                  <div class="text-sm">{phone}</div>
-                {/if}
-              {/if}
-            </div>
-          {/if}
-
-          {#if user.community_links?.length}
-            <div class="mt-3 pt-3 border-t border-line-strong">
-              <CommunityLinkPills links={user.community_links} />
-            </div>
-          {/if}
         </div>
       </div>
 

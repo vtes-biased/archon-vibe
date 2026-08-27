@@ -28,6 +28,7 @@
   let myDeckErrors = $state<ValidationError[] | null>([]);
 
   import ActionBar from "./ActionBar.svelte";
+  import TabStrip from "$lib/components/TabStrip.svelte";
   import ArchonImportModal from "./ArchonImportModal.svelte";
   import CsvRegisterModal from "./CsvRegisterModal.svelte";
   import PlayersTab from "./PlayersTab.svelte";
@@ -959,24 +960,7 @@ import TournamentModals from "./TournamentModals.svelte";
             onAddBanner={() => bannerComp?.openCropper()}
           />
 
-          <!-- Four labelled tabs don't fit 360px in English, worse in the other
-               locales, so only the active tab spells itself out. The accessible
-               name stays the full label at every width. -->
-          <div class="flex border-b border-line overflow-x-auto">
-            {#each tabs as tab}
-              {@const TabIcon = tab.icon}
-              {@const active = activeTab === tab.id}
-              <button
-                onclick={() => activeTab = tab.id}
-                aria-label={tab.label}
-                aria-current={active ? 'page' : undefined}
-                class="flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 {active ? 'border-accent text-ink-strong' : 'border-transparent text-ink-muted hover:text-ink-bright hover:border-line-strong'}"
-              >
-                <TabIcon class="w-4 h-4 shrink-0" aria-hidden="true" />
-                <span class={active ? '' : 'hidden sm:inline'}>{tab.label}</span>
-              </button>
-            {/each}
-          </div>
+          <TabStrip {tabs} bind:active={activeTab} />
 
           <div class="p-3 sm:p-6">
             {#if activeTab === 'players'}

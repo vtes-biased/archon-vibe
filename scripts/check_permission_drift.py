@@ -43,7 +43,7 @@ ALLOWED = {
     "frontend/src/lib/displayContext.ts": "role filter expansion",
     "frontend/src/lib/components/CommunityTab.svelte": "official sort order + directory",
     "frontend/src/lib/components/CommunityCountryCard.svelte": "official badges + NC-before-Princes grouping",
-    "frontend/src/routes/profile/ProfileView.svelte": "which contact-visibility note to show",
+    "frontend/src/routes/profile/ProfileContact.svelte": "which contact-visibility note to show",
 }
 
 # The engine owns the rules; its own file is the point of the exercise.

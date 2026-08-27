@@ -313,6 +313,26 @@ Because a restored filter can hide data, **every list's empty state must
 distinguish "nothing matches these filters" from "nothing here yet"** and offer a
 one-click Clear filters.
 
+**Tabs come in two idioms and they are not interchangeable.** A **segmented pill
+toggle** filters the page under it — a few short labels, no icons, every label
+always visible (`/rankings`, `/users`). A **tab strip** swaps the panel beneath a
+subject that stays put: `TabStrip.svelte` owns it and no surface hand-rolls it —
+icon always, the label spelled out on the **active tab only** below `sm`,
+`aria-label` the full label at every width, `aria-current="page"` on the active
+one, and the row scrolls rather than wraps. The active-only label is what makes
+three or four tabs survive five locales at 360px; a text-shrinking fix is fragile
+there, where the overflow is worse than English suggests. The strip carries the
+tournament console, the member profile and the public member page.
+
+**One fold grammar.** `FoldableSection` is the app's single disclosure shell —
+muted box, chevron right closed and down open, the whole header a 44px target —
+and anything that folds uses it, inside the console and out. Four chevron patterns
+exist today for that one gesture, and the three that are not `FoldableSection` are
+drift rather than alternatives: the uppercase header with a rotating chevron in the
+profile's authorized-apps, developer and administration sections; the card with its
+count in the header in `PlayerRatings`; and `DeckAccordion` in `PlayerRecord`. The
+[console redesign pass](#the-redesign-pass) is where they collapse.
+
 **Modals** — `fixed inset-0 z-50` with backdrop blur, `role="dialog"`,
 `aria-modal`, `aria-labelledby`, Escape handling and a focus-on-mount action.
 Always `stopPropagation` on the backdrop, the content container and any form
@@ -369,6 +389,38 @@ endpoint that already speaks it.
 Shared helpers live in `tournament-utils.ts`; don't re-duplicate score helpers per
 file.
 
+## Member profile
+
+Two surfaces show one member: `/profile`, the owner's own, and `/users/[uid]`, the
+public one. A top player's record — four rating categories, wins, decklists — runs
+about 950px on a phone with the account stack another screen behind it, so both are
+tabbed.
+
+**Identity stays above the strip.** Avatar, name, nickname, VEKN ID, country, city
+and roles are the page's subject, not tab content. Below it:
+
+| Surface | Tabs |
+|---|---|
+| `/profile` | Profile · Play record · Account |
+| `/users/[uid]` | Profile · Play record |
+
+- **Profile** — contact details and community links; on the public page also the
+  sponsor note and whatever VEKN, NDA and sanction controls the viewer's access
+  grants.
+- **Play record** — ratings, then the wins and the decklists. The
+  undocumented-decklist nudge sits between them on `/profile` only: it is
+  actionable by the player alone and reads as a reproach on anyone else's page.
+- **Account** — linked accounts, authorized apps, settings, developer,
+  administration, data.
+
+Two constraints the structure has to keep. An **OAuth return lands on Account**:
+the Discord and GitHub link confirmations render inside that tab and are invisible
+anywhere else. And the **undocumented-decklist nudge sits beside the wins it
+names**, never below the decklists — tabs already put it one gesture deep, which is
+this structure's accepted cost. The count and the wins behind it stay together for
+the same reason [tournaments](tournaments.md) states: the number is auditable
+rather than asserted.
+
 ## Console surfaces
 
 The organizer console is a workbench, not a brochure. A proposed console feature
@@ -392,9 +444,9 @@ surface as icons; actions that operate on the tournament go in Tools.
 **No "Advanced" section.** It names a frequency, not a topic, and becomes a
 dumping ground; every config field lives in the section its subject belongs to.
 
-Two components enforce the console grammar: `FoldableSection` is the one shell
-every config section uses, and `InlineNotice` is the one shape for a notice —
-two tones, chosen by what the reader must *do*, not by severity theatre.
+`InlineNotice` is the one shape for a notice — two tones, chosen by what the
+reader must *do*, not by severity theatre. Config sections fold through the
+app-wide [fold grammar](#patterns).
 
 ### The redesign pass
 
@@ -425,13 +477,14 @@ Decisions already taken, not to be re-litigated:
 - **Go Offline stays in the masthead button row** (owner, 2026-08-08: "always
   accessible and obvious") — state-dependent and time-critical, and the masthead is
   the one surface present on every tab.
-- **Tab labels show the active one only.** A text-shrinking fix is fragile across
-  five locales, where the overflow is worse than English suggests.
 - **No Start Finals CTA in an empty Finals tab.** Finishing without a final is
   legitimate ([rules §3.1.6](domain/tournament-rules.md)), so a CTA there would
   frame finals as the expected path.
 - **The description drops out of the organizer view only** — organizers wrote it,
   players still need it.
+- **The fold cleanup rides this pass**, console or not: the profile's
+  authorized-apps, developer and administration sections, `PlayerRatings` and
+  `DeckAccordion` all move onto `FoldableSection` ([fold grammar](#patterns)).
 
 Rejected, with the reason that killed each: **per-tab status counts** and **a
 masthead reporting live round state**, both because the action bar's guidance line

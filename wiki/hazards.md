@@ -446,7 +446,7 @@ The adoption is what makes a second writer on a `User` field safe: `PATCH
 /auth/me` replaces the **whole** `community_links` array, so an owner saving from
 a stale copy would silently revert a moderator's edit. For the same reason an
 editing surface must derive from the live user rather than snapshot it at mount —
-`ProfileView` does, deliberately, against the general rule that a modal captures
+`ProfileContact` does, deliberately, against the general rule that a modal captures
 its item at open time.
 
 ## Outbound fetches

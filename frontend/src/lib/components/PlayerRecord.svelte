@@ -8,8 +8,6 @@
   import { Trophy, TriangleAlert } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  // self=true adds the missing-decklist prompt, which is only actionable by the
-  // player themselves and reads as a reproach on anyone else's page.
   let { user, self = false }: { user: User | undefined; self?: boolean } = $props();
 
   let wins = $state<Tournament[]>([]);

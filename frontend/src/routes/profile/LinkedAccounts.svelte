@@ -64,7 +64,7 @@
   }
 </script>
 
-<div class="p-6 border-t border-line space-y-4">
+<div class="p-3 sm:p-6 space-y-4">
   <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.profile_linked_accounts()}</h3>
 
   <div class="flex items-center justify-between">
