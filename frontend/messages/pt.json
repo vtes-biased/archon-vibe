@@ -1599,7 +1599,7 @@
   "err_tournament_cannot_alter_seating": "Não é possível alterar os assentos neste estado",
   "err_tournament_cannot_set_non_competing": "Não é possível alterar o status de proxy após as finais ou quando o torneio já está encerrado",
   "err_tournament_cannot_waitlist_player": "Somente um jogador registrado pode ir para a lista de espera",
-  "err_tournament_player_waitlisted": "Este jogador está na lista de espera — promova-o antes de fazer o check-in",
+  "err_tournament_player_waitlisted": "Este jogador está na lista de espera — um organizador precisa promovê-lo antes do check-in",
   "err_tournament_no_round_in_progress": "Nenhuma rodada em andamento",
   "err_tournament_no_round_to_finish": "Nenhuma rodada para encerrar",
   "err_tournament_no_round_to_cancel": "Nenhuma rodada para cancelar",

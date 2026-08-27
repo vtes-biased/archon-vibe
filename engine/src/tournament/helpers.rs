@@ -155,8 +155,6 @@ pub(super) fn player_exists(players: &JsonValue, user_uid: &str) -> bool {
         .any(|p| p[player::USER_UID].as_str() == Some(user_uid))
 }
 
-/// The cap counts registered seats only — the waitlist sits outside it, which is
-/// what lets it grow without ever refusing a registration.
 pub(super) fn past_registration_cap(tournament: &JsonValue) -> bool {
     let cap = tournament[tournament::MAX_PLAYERS].as_usize().unwrap_or(0);
     cap > 0

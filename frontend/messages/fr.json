@@ -1599,7 +1599,7 @@
   "err_tournament_cannot_alter_seating": "Impossible de modifier le placement dans cet état",
   "err_tournament_cannot_set_non_competing": "Impossible de modifier le statut de proxy après les finales ou une fois le tournoi terminé",
   "err_tournament_cannot_waitlist_player": "Seul un joueur inscrit peut être mis sur la liste d'attente",
-  "err_tournament_player_waitlisted": "Ce joueur est sur la liste d'attente — promouvez-le avant de le pointer",
+  "err_tournament_player_waitlisted": "Ce joueur est sur la liste d'attente — un organisateur doit le promouvoir avant le pointage",
   "err_tournament_no_round_in_progress": "Aucune ronde en cours",
   "err_tournament_no_round_to_finish": "Aucune ronde à terminer",
   "err_tournament_no_round_to_cancel": "Aucune ronde à annuler",

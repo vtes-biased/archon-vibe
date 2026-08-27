@@ -142,9 +142,11 @@ Registration is never refused: past `max_players` a self-service `Register` land
 the player waitlisted, and they cannot check in until an organizer clears the flag
 with `SetWaitlisted`. The cap counts unwaitlisted players only, so the waitlist
 grows behind a full roster rather than inflating it. A waitlisted player *is*
-`Registered` — inert to seating, scoring and standings for free — and the engine
-holds that invariant from both ends: `SetWaitlisted` refuses to waitlist anyone who
-is not `Registered`, and seating clears the flag, below.
+`Registered` — inert to seating, scoring and standings for free. `SetWaitlisted`
+refuses to waitlist anyone further along, and seating clears the flag, below, so
+nothing reaches a table still carrying it. `DropOut` is the one path that leaves a
+waitlisted player `Finished` with the flag set, deliberately: clearing it there
+would count someone who never got in against the cap forever.
 
 **Only a self-service sign-up waitlists.** `AddPlayer` never does — an organizer
 adding a player is a deliberate act — except that the bulk CSV import passes

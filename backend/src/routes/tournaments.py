@@ -89,10 +89,10 @@ _RATING_IRRELEVANT_ACTIONS = frozenset(
         "DeleteDeck",
         "SetPaymentStatus",
         "MarkAllPaid",
+        "SetWaitlisted",
         # Rating recompute only reads FINISHED tournaments, and the engine
         # blocks this toggle once finished, so it never changes a live rating.
         "SetNonCompeting",
-        "SetWaitlisted",
         "RaffleDraw",
         "RaffleUndo",
         "RaffleClear",
@@ -371,7 +371,7 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
         named["name"] if named else (tournament.country or ""),
         tournament_format,
         f"{frontend_url()}{handle}",
-        len(tournament.players),
+        len([p for p in tournament.players if not p.waitlisted]),
         player_name,
     )
 

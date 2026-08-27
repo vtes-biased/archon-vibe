@@ -133,7 +133,6 @@
     return new Set(standings.map(s => s.user_uid).filter(u => !roster.has(u)));
   });
   const totalPlayers = $derived(rosterCount + archivalUids.size);
-  // The cap counts seats taken; the waitlist sits outside it and is reported beside it.
   const seatedCount = $derived(totalPlayers - waitlistCount);
 
   let expandedPlayer = $state<string | null>(null);
@@ -278,8 +277,7 @@
     }
     const sort = playerSort;
     if (sort === 'registration') {
-      // The array IS the registration order — appended on Register, order-preserving
-      // on Unregister. Sorting nothing is the sort.
+      // The array is already in registration order: sorting nothing is the sort.
     } else if (sort === 'payment') {
       const rank: Record<string, number> = { Paid: 0, Pending: 1, Refunded: 2, Cancelled: 3 };
       players.sort((a, b) => (rank[a.payment_status] ?? 9) - (rank[b.payment_status] ?? 9));
@@ -442,8 +440,7 @@
           </Button>
         {/if}
       </div>
-      <!-- Waitlist: the cap verdict, reversible in one tap. Demotion needs a
-           Registered player — a checked-in or seated one is already through the door. -->
+      <!-- Waitlist: the cap verdict, reversible in one tap. -->
       {#if !archivalUids.has(puid)}
         <div class="pt-2 border-t border-dashed border-line">
           <div class="flex items-center gap-2">

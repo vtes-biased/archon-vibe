@@ -894,7 +894,7 @@ import TournamentModals from "./TournamentModals.svelte";
               <div class="text-ink-bright">{m.tournament_reported_count({ count: String(attested) })}</div>
             {:else}
               <!-- Imported records: standings may exceed a partial/absent roster. -->
-              <div class="text-ink-bright">{m.tournament_registered_count({ count: String(Math.max(tournament.players?.length ?? 0, standings.length)) })}</div>
+              <div class="text-ink-bright">{m.tournament_registered_count({ count: String(Math.max(tournament.players?.filter(p => !p.waitlisted).length ?? 0, standings.length)) })}</div>
             {/if}
           </div>
           {/if}

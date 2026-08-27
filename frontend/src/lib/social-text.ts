@@ -86,7 +86,7 @@ export async function generateResultsText(
   if (tournament.rank) typeParts.push(tournament.rank);
   if (typeParts.length) lines.push(typeParts.join(" \u00B7 "));
 
-  const playerCount = tournament.players?.length ?? 0;
+  const playerCount = tournament.players?.filter(p => !p.waitlisted).length ?? 0;
   if (playerCount > 0) lines.push(m.players_count({ count: String(playerCount) }));
 
   lines.push("");

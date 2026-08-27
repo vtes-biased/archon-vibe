@@ -1599,7 +1599,7 @@
   "err_tournament_cannot_alter_seating": "Cannot alter seating in this state",
   "err_tournament_cannot_set_non_competing": "Cannot change proxy status after finals or once the tournament is finished",
   "err_tournament_cannot_waitlist_player": "Only a registered player can be moved to the waitlist",
-  "err_tournament_player_waitlisted": "This player is on the waitlist — promote them before checking them in",
+  "err_tournament_player_waitlisted": "This player is on the waitlist — an organizer must promote them before check-in",
   "err_tournament_no_round_in_progress": "No rounds in progress",
   "err_tournament_no_round_to_finish": "No rounds to finish",
   "err_tournament_no_round_to_cancel": "No rounds to cancel",

@@ -696,7 +696,7 @@
   {/if}
 
   {#if (tournament.state === "Planned" || tournament.state === "Registration") && (tournament.players?.length ?? 0) > 0}
-    {@const registered = tournament.players!.filter(p => p.state === "Registered")}
+    {@const registered = tournament.players!.filter(p => p.state === "Registered" && !p.waitlisted)}
     {#if registered.length > 0}
       <div class="mt-4">
         <button

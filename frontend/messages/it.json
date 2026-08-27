@@ -1599,7 +1599,7 @@
   "err_tournament_cannot_alter_seating": "Impossibile modificare la disposizione in questo stato",
   "err_tournament_cannot_set_non_competing": "Impossibile modificare lo stato di proxy dopo le finali o una volta terminato il torneo",
   "err_tournament_cannot_waitlist_player": "Solo un giocatore registrato può essere messo in lista d'attesa",
-  "err_tournament_player_waitlisted": "Questo giocatore è in lista d'attesa — promuovilo prima di fare il check in",
+  "err_tournament_player_waitlisted": "Questo giocatore è in lista d'attesa — un organizzatore deve promuoverlo prima del check in",
   "err_tournament_no_round_in_progress": "Nessun round in corso",
   "err_tournament_no_round_to_finish": "Nessun round da terminare",
   "err_tournament_no_round_to_cancel": "Nessun round da annullare",

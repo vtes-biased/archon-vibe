@@ -95,7 +95,7 @@ pub enum TournamentEvent {
         vekn_id: Option<String>,
         display_name: Option<String>,
         /// Set by the bulk import, whose rows are registrations the players made
-        /// themselves; an organizer adding a player never waitlists.
+        /// themselves.
         waitlist_past_cap: bool,
     },
     RemovePlayer {
