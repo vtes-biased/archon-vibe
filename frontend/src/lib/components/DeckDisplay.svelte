@@ -20,7 +20,7 @@
     playerUid = '',
     playerName = undefined,
     playerVekn = undefined,
-    deckIndex = 0,
+    multideck = false,
     format = '',
     onsaved,
     onreplace,
@@ -32,7 +32,7 @@
     playerUid?: string;
     playerName?: string;
     playerVekn?: string;
-    deckIndex?: number;
+    multideck?: boolean;
     format?: string;
     onsaved?: () => void;
     onreplace?: () => void;
@@ -144,7 +144,7 @@
       await tournamentAction(tournamentUid, 'UpsertDeck', {
         player_uid: targetUid,
         deck: deckData,
-        multideck: false,
+        multideck,
       });
 
       editing = false;

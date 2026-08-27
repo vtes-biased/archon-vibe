@@ -188,14 +188,23 @@ async def _process_deck_ops(
             is_multideck = op.get("multideck", False)
             for d in existing_decks:
                 if d.user_uid == player_uid:
-                    if is_multideck and deck_index is not None:
-                        if d.round != deck_index:
-                            continue
+                    if is_multideck and d.round != deck_index:
+                        continue
                     d.deleted_at = datetime.now(UTC)
                     d.modified = datetime.now(UTC)
                     bd = await save_object_from_model(ObjectType.DECK, d)
                     bd.org_uids = _org_uids
                     affected.append(bd)
+
+        elif op_type == "set_round":
+            deck_uid = op.get("deck_uid")
+            target = next((d for d in existing_decks if d.uid == deck_uid), None)
+            if target:
+                target.round = op.get("round")
+                target.modified = datetime.now(UTC)
+                bd = await save_object_from_model(ObjectType.DECK, target)
+                bd.org_uids = _org_uids
+                affected.append(bd)
 
         elif op_type == "set_public":
             deck_uid = op.get("deck_uid")
@@ -837,26 +846,6 @@ class CreateTournamentRequest(BaseModel):
     finals_time: int = 0
 
 
-def _deck_slot(tournament: Tournament, player_uid: str, before_round: int) -> int:
-    """The player's deck-slot index for round `before_round` (the finals being
-    `len(rounds)`, which counts every round they played).
-
-    `DeckObject.round` is a **per-player** slot, not the tournament's round —
-    under open rounds players progress through different subsets, so slot i is
-    the deck for that player's i-th round. The engine's `is_deck_locked` owns
-    the rule; this counts the same seatings for a prefix of the rounds.
-    """
-    return sum(
-        1
-        for rnd in tournament.rounds[:before_round]
-        if any(
-            table.state != TableState.CANCELLED
-            and any(seat.player_uid == player_uid for seat in table.seating)
-            for table in rnd
-        )
-    )
-
-
 @router.get("/{uid}/decks")
 async def get_round_decks(
     uid: str,
@@ -869,8 +858,7 @@ async def get_round_decks(
 
     `round` is the tournament's own coordinate — an index into
     `tournament.rounds`, with `len(rounds)` the finals, exactly as
-    `Sanction.round_number` uses it. `DeckObject.round` is *not* that
-    coordinate; `_deck_slot` translates.
+    `DeckObject.round` and `Sanction.round_number` use it.
     """
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -894,7 +882,7 @@ async def get_round_decks(
             status_code=403, detail="Only the event's officials can read its decks"
         )
 
-    by_slot = {
+    stamped = {
         (d.user_uid, d.round): d
         for d in await get_decks_for_tournament(uid)
         if not d.deleted_at
@@ -912,12 +900,8 @@ async def get_round_decks(
         decks = []
         for table in live:
             for seat in table.seating:
-                slot = (
-                    _deck_slot(tournament, seat.player_uid, index)
-                    if tournament.multideck
-                    else None
-                )
-                deck = by_slot.get((seat.player_uid, slot))
+                key = index if tournament.multideck else None
+                deck = stamped.get((seat.player_uid, key))
                 if deck:
                     decks.append(deck)
         rounds.append({"round": index, "decks": decks})

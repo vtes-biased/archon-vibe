@@ -15,6 +15,7 @@
     playerName = undefined,
     playerVekn = undefined,
     round = undefined,
+    multideck = false,
     onuploaded,
   }: {
     tournamentUid: string;
@@ -22,6 +23,7 @@
     playerName?: string;
     playerVekn?: string;
     round?: number;
+    multideck?: boolean;
     onuploaded?: () => void;
   } = $props();
 
@@ -214,7 +216,7 @@
       await tournamentAction(tournamentUid, 'UpsertDeck', {
         player_uid: targetUid,
         deck: deckData,
-        multideck: round !== undefined,
+        multideck,
       });
 
       success = true;

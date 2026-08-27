@@ -3248,7 +3248,7 @@ fn test_multideck_upsert_round_0() {
 
 #[test]
 fn test_multideck_upsert_round_1_playing() {
-    // 1 round played, player has 1 deck -> new deck goes at index 1 (unlocked)
+    // A played deck already stamped: the upload is the next pending one.
     let tournament = multideck_tournament("Playing", 1);
     let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0"}]"#;
     let event = json::object! {
@@ -3264,41 +3264,44 @@ fn test_multideck_upsert_round_1_playing() {
 }
 
 #[test]
-fn test_multideck_upsert_locked_round_blocked() {
-    // 1 round played, player has 0 decks -> new deck at index 0 (locked, round 0 already played)
+fn test_multideck_player_upload_lands_pending() {
+    // A player writes their pending deck and never a round: the round the deck
+    // is played in is stamped at seating, so a named one is dropped.
     let tournament = multideck_tournament("Playing", 1);
     let event = json::object! {
         type: "UpsertDeck",
         player_uid: "player-1",
-        deck: { name: "Late Deck", author: "", comments: "", cards: {} },
+        deck: { name: "Late Deck", author: "", comments: "", cards: {}, round: 0 },
         multideck: true,
     };
     let actor = make_player("player-1");
-    let result = run_event_with_decks(&tournament, &event, &actor, "[]");
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("already started"));
+    let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, "[]").unwrap();
+    assert_eq!(deck_ops.len(), 1);
+    assert_eq!(deck_ops[0]["op"].as_str(), Some("upsert"));
+    assert!(deck_ops[0]["deck"]["round"].is_null());
 }
 
 #[test]
-fn test_multideck_delete_unlocked() {
-    // 1 round played, player has 2 decks -> delete index 1 (unlocked)
+fn test_multideck_delete_pending() {
+    // The pending deck (no round) is the only one a player may drop.
     let tournament = multideck_tournament("Playing", 1);
-    let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0"}, {"user_uid": "player-1", "round": 1, "uid": "d1"}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0"}, {"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
     let event = json::object! {
         type: "DeleteDeck",
         player_uid: "player-1",
-        deck_index: 1,
+        deck_index: json::Null,
         multideck: true,
     };
     let actor = make_player("player-1");
     let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, decks).unwrap();
     assert_eq!(deck_ops.len(), 1);
     assert_eq!(deck_ops[0]["op"].as_str(), Some("delete"));
+    assert!(deck_ops[0]["deck_index"].is_null());
 }
 
 #[test]
 fn test_multideck_delete_locked_blocked() {
-    // 1 round played, delete index 0 (locked) -> blocked
+    // Round 0 was played, so its deck is stamped and cannot be dropped.
     let tournament = multideck_tournament("Playing", 1);
     let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0"}]"#;
     let event = json::object! {
@@ -3314,23 +3317,20 @@ fn test_multideck_delete_locked_blocked() {
 }
 
 #[test]
-fn test_multideck_delete_requires_index() {
-    // Multideck delete without deck_index during Playing -> error
-    let tournament = multideck_tournament("Playing", 1);
+fn test_multideck_delete_stamped_blocked() {
+    // A stamped deck is a deck that was played: immutable whatever the state.
+    let tournament = multideck_tournament("Waiting", 1);
     let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0"}]"#;
     let event = json::object! {
         type: "DeleteDeck",
         player_uid: "player-1",
-        deck_index: json::Null,
+        deck_index: 0,
         multideck: true,
     };
     let actor = make_player("player-1");
     let result = run_event_with_decks(&tournament, &event, &actor, decks);
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("deck_index required"));
+    assert!(result.unwrap_err().to_string().contains("already started"));
 }
 
 #[test]

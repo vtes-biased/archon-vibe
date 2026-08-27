@@ -25,10 +25,67 @@ class Migration:
     name: str
     obj_type: ObjectType
     pending: str
-    rewrite: Callable[[dict], None]
+    rewrite: Callable[..., None]
 
 
-MIGRATIONS: tuple[Migration, ...] = ()
+def _stamp_deck_round(full: dict, round_index: int | None) -> None:
+    full["round"] = round_index
+
+
+MIGRATIONS: tuple[Migration, ...] = (
+    Migration(
+        name="deck-round-stamp",
+        obj_type=ObjectType.DECK,
+        pending="""
+            WITH multideck_deck AS (
+                SELECT o.uid,
+                       o."full"->>'user_uid'     AS user_uid,
+                       (o."full"->>'round')::int AS slot,
+                       t."full"                  AS trn
+                FROM objects o
+                JOIN objects t
+                  ON t.uid = o."full"->>'tournament_uid' AND t.type = 'tournament'
+                WHERE o.type = 'deck'
+                  AND o.modified_at < TIMESTAMP '2026-08-27'
+                  AND o."full"->>'round' IS NOT NULL
+                  AND (t."full"->>'multideck')::boolean
+            ),
+            counted AS (
+                SELECT d.uid,
+                       r.ord - 1 AS round_index,
+                       row_number() OVER (PARTITION BY d.uid ORDER BY r.ord) - 1 AS nth
+                FROM multideck_deck d
+                CROSS JOIN LATERAL jsonb_array_elements(d.trn->'rounds')
+                    WITH ORDINALITY AS r(round, ord)
+                WHERE EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(r.round) tbl
+                    WHERE tbl->>'state' <> 'Cancelled'
+                      AND EXISTS (
+                          SELECT 1 FROM jsonb_array_elements(tbl->'seating') s
+                          WHERE s->>'player_uid' = d.user_uid
+                      )
+                )
+            )
+            SELECT d.uid,
+                   COALESCE(
+                       (SELECT c.round_index FROM counted c
+                        WHERE c.uid = d.uid AND c.nth = d.slot),
+                       CASE WHEN jsonb_typeof(d.trn->'finals') = 'object'
+                             AND d.slot = (SELECT count(*) FROM counted c WHERE c.uid = d.uid)
+                             AND EXISTS (
+                                 SELECT 1
+                                 FROM jsonb_array_elements(d.trn->'finals'->'seating') fs
+                                 WHERE fs->>'player_uid' = d.user_uid
+                             )
+                            THEN jsonb_array_length(d.trn->'rounds')
+                       END
+                   ) AS round_index
+            FROM multideck_deck d
+            ORDER BY d.uid
+        """,
+        rewrite=_stamp_deck_round,
+    ),
+)
 
 _LOCK_ROW = 'SELECT "full", deleted_at FROM objects WHERE uid = %s FOR UPDATE'
 
@@ -39,16 +96,16 @@ async def run_migrations(*, apply: bool = True) -> dict[str, int]:
     for migration in MIGRATIONS:
         async with db.get_connection() as conn:
             result = await conn.execute(migration.pending)
-            uids = [row[0] for row in await result.fetchall()]
-        if not uids:
+            rows = await result.fetchall()
+        if not rows:
             continue
         if not apply:
-            counts[migration.name] = len(uids)
+            counts[migration.name] = len(rows)
             continue
 
         rewritten = 0
         async with db.get_connection() as conn:
-            for uid in uids:
+            for uid, *computed in rows:
                 # One transaction PER ROW: a shared CURRENT_TIMESTAMP is what a
                 # catch-up cursor's strict `modified_at > since` splits across.
                 async with conn.transaction():
@@ -57,7 +114,7 @@ async def run_migrations(*, apply: bool = True) -> dict[str, int]:
                     if row is None:
                         continue  # hard-deleted since the sweep began
                     full_data, deleted_at = row
-                    migration.rewrite(full_data)
+                    migration.rewrite(full_data, *computed)
                     await db.save_object(
                         migration.obj_type,
                         uid,

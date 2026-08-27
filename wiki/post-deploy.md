@@ -106,3 +106,42 @@ reads `submitted` with a PR URL on `GiottoVerducci/TWD`.
 
 **Owes afterwards**: nothing to tell anyone — the organizers never saw the failure.
 Delete this section.
+
+## Prove the deck round stamps landed
+
+**Migration** `deck-round-stamp`
+
+**Gated on** the commit that stamps a multideck deck with the round it was played
+in — findable as `git log -1 --format=%h --grep='Stamp a multideck deck'`. There
+is nothing to run: the entry rewrote every stored `deck.round` from the player's
+i-th counted round to the tournament's own round index before the process served.
+Its guard is a single date literal, and deliberately so: every row the rewrite
+touches leaves the guard behind it, and no row the new build writes can ever enter
+it, so the entry is a strict one-shot whose safety rests on nothing the engine
+does. A guard that instead asked whether a stamp *looks* stale would have to know
+that a stamp survives a soft-cancel, and would re-stamp correct decks at every
+process start when it did not.
+
+That date is the **commit** date, so a multideck deck uploaded on production
+between this commit and the deploy keeps its old per-player slot. Deploying
+promptly is what keeps that window shut; anything that falls in it is one
+organizer re-upload.
+
+**Run**: nothing. To read the guard without the app,
+`uv run python -m backend.src.migrations --dsn "$DATABASE_URL"`.
+
+**Proves it worked**: that report answers `deck-round-stamp: 0 row(s) to rewrite`
+on every long-lived database — it counts what is still pending, so it answers 0
+both before the rewrite has anything to do and after it is done. The rewrite
+itself is proved by the shape the old per-player slot produced whenever a round
+was voided being absent: no player holding two decks stamped with one round.
+
+```sql
+SELECT "full"->>'tournament_uid', "full"->>'user_uid', "full"->>'round'
+FROM objects
+WHERE type = 'deck' AND deleted_at IS NULL AND "full"->>'round' IS NOT NULL
+GROUP BY 1, 2, 3 HAVING count(*) > 1;
+```
+
+**Owes afterwards**: nothing to tell anyone. Delete this section and the
+`deck-round-stamp` entry in `backend/src/migrations.py` in one commit.

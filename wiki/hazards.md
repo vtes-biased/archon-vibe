@@ -123,34 +123,22 @@ corpus around the allowlist. `require_api_token`
 purpose: the public API serves published data, so a token there is attribution,
 not authority, and a tournament-scoped one is no narrower.
 
-**A player's own round count is computed in four places, and a soft-cancelled
+**A player's own round count is computed in three places, and a soft-cancelled
 table is what splits them.** The engine owns the rule — `count_player_rounds_played`,
-which **skips `Cancelled` tables** — and it decides both the open-rounds per-player
-cap and, through `is_deck_locked`, which deck slot is still editable. Three callers
-must produce the same number: `roundsPlayed` in `tournament-utils.ts`, the inline
-`roundsPlayedMap` in `PlayersTab.svelte` (kept separate deliberately, one pass per
-render), and `_deck_slot` in the tournaments route. Both frontend copies once
-omitted the `Cancelled` filter, which told a player they were at their cap when the
-engine would still have seated them, and offered a deck slot nothing else read.
+which **skips `Cancelled` tables** — and it decides the open-rounds per-player cap
+and nothing else. Two callers must produce the same number: `roundsPlayed` in
+`tournament-utils.ts` and the inline `roundsPlayedMap` in `PlayersTab.svelte`
+(kept separate deliberately, one pass per render). Both once omitted the
+`Cancelled` filter, which told a player they were at their cap when the engine
+would still have seated them.
 
-That count is also *not* the tournament's round index. `DeckObject.round` is the
-player's **own** i-th round — under open rounds two players in the same round sit
-on different slots — while `Sanction.round_number` and the delegated deck read's
-`round` field are both the tournament's index, `len(rounds)` meaning the finals.
-It is per-player because the index is assigned at **upload**, and a deck is
-uploaded before the round it will be played in exists — `SelfOrganizeRound`
-creates each pod already `In Progress`, so a globally-indexed deck could only be
-uploaded after play began. That is a consequence of *when* the index is assigned,
-not a property decks must have; assigning at seating instead would make the
-tournament index workable.
-
-**Which matters, because the per-player count is not stable.** A mid-array
-`CancelRound` after later rounds have been played is a soft-cancel, and the count
-skips `Cancelled` — so every later slot shifts by one. The delegated read then
-answers the previous round's deck, and `is_deck_locked` re-opens a deck the player
-already played. `wiki/tournaments.md`'s never-remove-mid-array rule protects
-`standings_adjustment.round_number`, which really is index-tagged, and has never
-protected this.
+**That count is not a deck coordinate.** `DeckObject.round` is the tournament's
+own round index, stamped at seating — the same coordinate as
+`Sanction.round_number` and the delegated deck read's `round` field, `len(rounds)`
+meaning the finals ([tournaments](tournaments.md#engine-event-catalog)). Deriving it from the
+count instead is what a soft-cancel corrupts: the count skips `Cancelled`, so
+every later value shifts by one and a deck answers for a round it was not played
+in.
 
 **`preview_scores_json` deliberately duplicates the `SetScore` GW/TP cascade** —
 the preview runs on not-yet-persisted scores, so the two paths cannot share state.

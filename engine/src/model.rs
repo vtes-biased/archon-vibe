@@ -132,6 +132,7 @@ pub mod deck_object {
     pub const COMMENTS: &str = "comments";
     pub const NAME: &str = "name";
     pub const PUBLIC: &str = "public";
+    pub const ROUND: &str = "round";
     pub const UID: &str = "uid";
     pub const USER_UID: &str = "user_uid";
 }

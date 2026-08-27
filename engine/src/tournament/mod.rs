@@ -27,9 +27,9 @@ pub use types::{ActorContext, PlayerState, SeatScore, TournamentEvent, Tournamen
 use crate::error::EngineError;
 use helpers::{
     all_rounds_finished, collect_previous_rounds, count_played_rounds, count_player_rounds_played,
-    demote_unseated_players, find_player_index, is_deck_locked, player_exists,
-    players_in_other_active_rounds, require_can_edit_results, require_organizer, require_state,
-    require_state_or_finished, validate_enum,
+    demote_unseated_players, find_player_index, player_exists, players_in_other_active_rounds,
+    release_stamped_decks, require_can_edit_results, require_organizer, require_state,
+    require_state_or_finished, stamp_round_decks, validate_enum,
 };
 use raffle::compute_deck_public;
 use sanctions::{has_active_suspension, has_dq_sanction, table_sa_adjustments};
@@ -442,6 +442,12 @@ fn apply_event(
                     let _ = deck_ops.push(op);
                 }
             }
+            release_stamped_decks(
+                decks,
+                deck_ops,
+                &[tournament[tournament::ROUNDS].len()],
+                None,
+            );
             Ok(())
         }
 
@@ -995,6 +1001,12 @@ fn apply_event(
                 }
             }
 
+            stamp_round_decks(
+                tournament,
+                decks,
+                deck_ops,
+                tournament[tournament::ROUNDS].len() - 1,
+            );
             Ok(())
         }
 
@@ -1096,6 +1108,12 @@ fn apply_event(
                     }
                 }
             }
+            stamp_round_decks(
+                tournament,
+                decks,
+                deck_ops,
+                tournament[tournament::ROUNDS].len() - 1,
+            );
             Ok(())
         }
 
@@ -1190,6 +1208,7 @@ fn apply_event(
             if target_idx == len - 1 {
                 // Last round: hard-remove — no later round's index can shift.
                 tournament[tournament::ROUNDS].array_remove(len - 1);
+                let mut removed = vec![len - 1];
                 loop {
                     let n = tournament[tournament::ROUNDS].len();
                     if n == 0 {
@@ -1204,7 +1223,9 @@ fn apply_event(
                         break;
                     }
                     tournament[tournament::ROUNDS].array_remove(n - 1);
+                    removed.push(n - 1);
                 }
+                release_stamped_decks(decks, deck_ops, &removed, None);
                 // update_standings keeps a rounds-less tournament's standings, for the
                 // round-less VEKN imports; a cancel must not inherit that.
                 if tournament[tournament::ROUNDS].is_empty() {
@@ -1663,6 +1684,13 @@ fn apply_event(
                     }
                     demote_unseated_players(tournament, &left, *round);
                 }
+
+                let seated_now: std::collections::HashSet<&String> =
+                    seating.iter().flat_map(|t| t.iter()).collect();
+                for uid in old_results.keys().filter(|u| !seated_now.contains(u)) {
+                    release_stamped_decks(decks, deck_ops, &[*round], Some(uid));
+                }
+                stamp_round_decks(tournament, decks, deck_ops, *round);
             }
 
             // Refresh after the reseat (no later round event refreshes in Finished
@@ -1747,6 +1775,7 @@ fn apply_event(
                 }
                 .into();
             update_standings(tournament, sanctions);
+            stamp_round_decks(tournament, decks, deck_ops, last);
             Ok(())
         }
 
@@ -1789,6 +1818,7 @@ fn apply_event(
                 last,
             );
             update_standings(tournament, sanctions);
+            release_stamped_decks(decks, deck_ops, &[last], Some(player_uid));
             Ok(())
         }
 
@@ -2177,6 +2207,12 @@ fn apply_event(
             if state != TournamentState::Finished {
                 tournament[tournament::STATE] = "Playing".into();
             }
+            stamp_round_decks(
+                tournament,
+                decks,
+                deck_ops,
+                tournament[tournament::ROUNDS].len(),
+            );
             Ok(())
         }
 
@@ -2277,6 +2313,12 @@ fn apply_event(
             tournament[tournament::FINALS] = json::Null;
             tournament[tournament::STATE] = "Waiting".into();
             update_standings(tournament, sanctions);
+            release_stamped_decks(
+                decks,
+                deck_ops,
+                &[tournament[tournament::ROUNDS].len()],
+                None,
+            );
             Ok(())
         }
 
@@ -2332,30 +2374,27 @@ fn apply_event(
             if !is_registered {
                 return Err(EngineError::NotRegistered);
             }
+            let existing_count = decks
+                .members()
+                .filter(|d| d[deck_object::USER_UID].as_str() == Some(player_uid.as_str()))
+                .count();
             if !actor.is_organizer {
-                let existing_count = decks
-                    .members()
-                    .filter(|d| d[deck_object::USER_UID].as_str() == Some(player_uid.as_str()))
-                    .count();
                 match state {
-                    TournamentState::Playing => {
-                        if *multideck {
-                            if is_deck_locked(tournament, player_uid, existing_count) {
-                                return Err(EngineError::DeckLockedRound);
-                            }
-                        } else if existing_count > 0 {
-                            return Err(EngineError::DeckLockedPlaying);
-                        }
+                    TournamentState::Playing if !*multideck && existing_count > 0 => {
+                        return Err(EngineError::DeckLockedPlaying);
                     }
                     TournamentState::Finished if existing_count > 0 => {
                         return Err(EngineError::DeckLockedFinished);
                     }
-                    _ => {} // Planned, Registration, Waiting: always allowed
+                    _ => {}
                 }
             }
             let is_public = compute_deck_public(tournament, player_uid);
             let mut deck_data = deck.clone();
             deck_data[deck_object::PUBLIC] = is_public.into();
+            if !actor.is_organizer {
+                deck_data[deck_object::ROUND] = JsonValue::Null;
+            }
             let op = json::object! {
                 arg::OP => "upsert",
                 arg::PLAYER_UID => player_uid.as_str(),
@@ -2375,21 +2414,12 @@ fn apply_event(
                 return Err(EngineError::DeckDeleteForbidden);
             }
             if !actor.is_organizer {
+                if *multideck && deck_index.is_some() {
+                    return Err(EngineError::DeckLockedRound);
+                }
                 match state {
-                    TournamentState::Playing => {
-                        if *multideck {
-                            if let Some(idx) = deck_index {
-                                if is_deck_locked(tournament, player_uid, *idx) {
-                                    return Err(EngineError::DeckLockedRound);
-                                }
-                            } else {
-                                return Err(EngineError::internal(
-                                    "deck_index required for multideck delete",
-                                ));
-                            }
-                        } else {
-                            return Err(EngineError::DeckLockedPlaying);
-                        }
+                    TournamentState::Playing if !*multideck => {
+                        return Err(EngineError::DeckLockedPlaying);
                     }
                     TournamentState::Finished => {
                         return Err(EngineError::DeckLockedFinished);

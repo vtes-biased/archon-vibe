@@ -42,23 +42,26 @@
   const decksByUser = $derived(decksByUserProp ?? localDecks);
 
   const myDecks = $derived(decksByUser[myUid] ?? []);
-  const myDecksByRound = $derived(new Map(myDecks.map(d => [d.round ?? 0, d])));
   const isPlayer = $derived(tournament.players?.some(p => p.user_uid === myUid) ?? false);
   const isMultideck = $derived(!!tournament.multideck);
   const maxRounds = $derived(tournament.max_rounds ?? 0);
   // Per-player rounds played (open rounds: each player progresses through the pool independently).
   const myRoundsPlayed = $derived(roundsPlayed(tournament, myUid));
+  const roundCount = $derived(tournament.rounds?.length ?? 0);
 
-  const deckSlotCount = $derived.by(() => {
-    if (!isMultideck) return 1;
-    const slots = myRoundsPlayed + 1;
-    return maxRounds > 0 ? Math.min(slots, maxRounds) : slots;
-  });
+  const myStamped = $derived(
+    myDecks.filter(d => d.round !== null).sort((a, b) => (a.round ?? 0) - (b.round ?? 0)),
+  );
+  const myPending = $derived(myDecks.find(d => d.round === null) ?? null);
+  const showPendingSlot = $derived(
+    !!myPending || maxRounds === 0 || myRoundsPlayed < maxRounds,
+  );
 
+  // Accordion key: a stamped deck's round, or PENDING for the not-yet-played one.
+  const PENDING = -1;
   let uploadingFor = $state<string | null>(null);
-  let uploadingSlot = $state<number>(0);
   let expandedRoundIdx = $state<number | null>(null);
-  let confirmDeleteSlot = $state<number | null>(null);
+  let confirmDeletePending = $state(false);
   let expandedDecks = $state<Set<string>>(new Set());
   let cardsDb = $state<Map<number, VtesCard>>(new Map());
   $effect(() => { getCards().then(c => cardsDb = c); });
@@ -87,41 +90,25 @@
     }
   }
 
-  function isDeckLocked(index: number): boolean {
-    // Per-player (mirrors engine is_deck_locked): slot i locks once this player has played round i.
-    return index < myRoundsPlayed;
+  const canModifyPending = $derived(tournament.state !== 'Finished');
+
+  // Post-tournament recovery aside, a single-deck event's registered deck is
+  // frozen once play starts — the engine's own rule.
+  const singleDeckEditable = $derived(
+    tournament.state === 'Playing' ? false : tournament.state !== 'Finished' || myDecks.length === 0,
+  );
+
+  function roundLabel(round: number | null): string {
+    if (round === null) return m.decks_next_round();
+    if (round >= roundCount) return m.tournament_finals_heading();
+    return m.decks_round_label({ n: String(round + 1) });
   }
 
-  function canModifySlot(index: number): boolean {
-    const s = tournament.state;
-    if (s === 'Finished') return false;
-    if (s === 'Playing') {
-      return isMultideck ? !isDeckLocked(index) : false;
-    }
-    return s === 'Planned' || s === 'Registration' || s === 'Waiting';
-  }
-
-  const canPlayerUpload = $derived.by(() => {
-    const s = tournament.state;
-    if (s === 'Planned' || s === 'Registration' || s === 'Waiting') return true;
-    if (s === 'Playing') return myDecks.length === 0;
-    if (s === 'Finished') return myDecks.length === 0; // recovery
-    return false;
-  });
-
-  const canPlayerDelete = $derived.by(() => {
-    const s = tournament.state;
-    if (s === 'Planned' || s === 'Registration' || s === 'Waiting') return true;
-    return false;
-  });
-
-  const singleDeckEditable = $derived(myRoundsPlayed === 0 || tournament.state === 'Finished');
-
-  async function deleteDeck(playerUid: string, deckIndex?: number) {
+  async function deleteDeck(playerUid: string) {
     try {
       await tournamentAction(tournament.uid, 'DeleteDeck', {
         player_uid: playerUid,
-        deck_index: deckIndex ?? null,
+        deck_index: null,
         multideck: isMultideck,
       });
     } catch (e) {
@@ -196,40 +183,50 @@
     {#if isMultideck}
       <div class="bg-surface-muted/50 rounded-lg p-3 sm:p-4 space-y-2">
         <h3 class="text-sm font-semibold text-ink-strong">{m.decks_my_decks()}</h3>
-        {#each Array(deckSlotCount) as _, slotIdx}
-          {@const deck = myDecksByRound.get(slotIdx) ?? null}
-          {@const locked = isDeckLocked(slotIdx)}
-          {@const canModify = canModifySlot(slotIdx)}
-          {@const isExpanded = expandedRoundIdx === slotIdx}
+        {#each myStamped as deck (deck.uid)}
+          {@const isExpanded = expandedRoundIdx === deck.round}
           <DeckAccordion
             expanded={isExpanded}
-            ontoggle={() => expandedRoundIdx = isExpanded ? null : slotIdx}
-            roundLabel={m.decks_round_label({ n: String(slotIdx + 1) })}
+            ontoggle={() => expandedRoundIdx = isExpanded ? null : deck.round}
+            roundLabel={roundLabel(deck.round)}
             bgClass="bg-surface-muted/30"
           >
             {#snippet headerExtra()}
-              {#if locked}
-                <Lock class="w-3 h-3 text-ink-faint" />
-              {/if}
-              {#if deck}
+              <Lock class="w-3 h-3 text-ink-faint" />
+              <CircleCheck class="w-3.5 h-3.5 text-info" />
+            {/snippet}
+            <DeckDisplay {deck} tournamentUid={tournament.uid} format={tournament.format} />
+            <p class="text-sm text-ink-faint">{m.decks_locked()}</p>
+          </DeckAccordion>
+        {/each}
+        {#if showPendingSlot}
+          {@const isExpanded = expandedRoundIdx === PENDING}
+          <DeckAccordion
+            expanded={isExpanded}
+            ontoggle={() => expandedRoundIdx = isExpanded ? null : PENDING}
+            roundLabel={m.decks_next_round()}
+            bgClass="bg-surface-muted/30"
+          >
+            {#snippet headerExtra()}
+              {#if myPending}
                 <CircleCheck class="w-3.5 h-3.5 text-info" />
               {:else}
                 <span class="text-ink-faint truncate">{m.decks_no_deck()}</span>
               {/if}
             {/snippet}
-            {#if uploadingFor === myUid && uploadingSlot === slotIdx}
-              <DeckUpload tournamentUid={tournament.uid} round={slotIdx} onuploaded={onUploaded} />
-            {:else if deck}
+            {#if uploadingFor === myUid}
+              <DeckUpload tournamentUid={tournament.uid} multideck onuploaded={onUploaded} />
+            {:else if myPending}
               <DeckDisplay
-                {deck}
-                editable={canModify}
+                deck={myPending}
+                editable={canModifyPending}
                 tournamentUid={tournament.uid}
-                deckIndex={slotIdx}
+                multideck
                 format={tournament.format}
-                onreplace={canModify ? () => { uploadingFor = myUid; uploadingSlot = slotIdx; } : undefined}
-                ondelete={canModify ? () => { confirmDeleteSlot = slotIdx; } : undefined}
+                onreplace={canModifyPending ? () => { uploadingFor = myUid; } : undefined}
+                ondelete={canModifyPending ? () => { confirmDeletePending = true; } : undefined}
               />
-              {#if confirmDeleteSlot === slotIdx}
+              {#if confirmDeletePending}
                 <div class="mt-2 bg-accent-soft/20 border border-accent-soft-border/50 rounded-lg p-3 space-y-2">
                   <p class="text-sm text-link-soft font-medium">{m.decks_delete_confirm_title()}</p>
                   <p class="text-xs text-ink-muted">{m.decks_delete_confirm_msg()}</p>
@@ -237,29 +234,29 @@
                     <Button
                       variant="danger"
                       size="lg"
-                      onclick={() => { deleteDeck(myUid, slotIdx); confirmDeleteSlot = null; }}
+                      onclick={() => { deleteDeck(myUid); confirmDeletePending = false; }}
                     ><Trash2 class="w-4 h-4" aria-hidden="true" />{m.decks_delete_confirm_yes()}</Button>
                     <Button
                       variant="secondary"
-                      onclick={() => confirmDeleteSlot = null}
+                      onclick={() => confirmDeletePending = false}
                     >{m.common_cancel()}</Button>
                   </div>
                 </div>
               {/if}
-              {#if !canModify}
+              {#if !canModifyPending}
                 <p class="text-sm text-ink-faint">{m.decks_locked()}</p>
               {/if}
-            {:else if canModify}
+            {:else if canModifyPending}
               <Button
                 variant="secondary"
                 size="lg"
-                onclick={() => { uploadingFor = myUid; uploadingSlot = slotIdx; }}
+                onclick={() => { uploadingFor = myUid; }}
               >{m.decks_upload()}</Button>
             {:else}
               <p class="text-sm text-ink-faint">{m.decks_no_deck()}</p>
             {/if}
           </DeckAccordion>
-        {/each}
+        {/if}
       </div>
     {:else}
       <div class="bg-surface-muted/50 rounded-lg">
@@ -282,8 +279,8 @@
               {#if uploadingFor === myUid && singleDeckEditable}
                 <DeckUpload tournamentUid={tournament.uid} onuploaded={onUploaded} />
               {:else}
-                <DeckDisplay deck={myDecks[0]} editable={singleDeckEditable} tournamentUid={tournament.uid} format={tournament.format} onreplace={singleDeckEditable ? () => uploadingFor = myUid : undefined} ondelete={singleDeckEditable ? () => { confirmDeleteSlot = -1; } : undefined} />
-                {#if confirmDeleteSlot === -1}
+                <DeckDisplay deck={myDecks[0]} editable={singleDeckEditable} tournamentUid={tournament.uid} format={tournament.format} onreplace={singleDeckEditable ? () => uploadingFor = myUid : undefined} ondelete={singleDeckEditable ? () => { confirmDeletePending = true; } : undefined} />
+                {#if confirmDeletePending}
                   <div class="mt-2 bg-accent-soft/20 border border-accent-soft-border/50 rounded-lg p-3 space-y-2">
                     <p class="text-sm text-link-soft font-medium">{m.decks_delete_confirm_title()}</p>
                     <p class="text-xs text-ink-muted">{m.decks_delete_confirm_msg()}</p>
@@ -291,11 +288,11 @@
                       <Button
                         variant="danger"
                         size="lg"
-                        onclick={() => { deleteDeck(myUid); confirmDeleteSlot = null; }}
+                        onclick={() => { deleteDeck(myUid); confirmDeletePending = false; }}
                       ><Trash2 class="w-4 h-4" aria-hidden="true" />{m.decks_delete_confirm_yes()}</Button>
                       <Button
                         variant="secondary"
-                        onclick={() => confirmDeleteSlot = null}
+                        onclick={() => confirmDeletePending = false}
                       >{m.common_cancel()}</Button>
                     </div>
                   </div>
@@ -380,7 +377,7 @@
                       {/if}
                     {/if}
                     <span class="text-ink-muted truncate block {showIdentity ? 'text-xs' : 'text-sm'}">
-                      {#if isMultideck}<span class="text-ink-faint">{m.decks_round_label({ n: String(i + 1) })}</span> — {/if}
+                      {#if isMultideck}<span class="text-ink-faint">{roundLabel(deck.round)}</span> — {/if}
                       {deck.name || m.decks_unnamed()}
                     </span>
                   </div>

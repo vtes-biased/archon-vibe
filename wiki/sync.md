@@ -267,16 +267,15 @@ already carries rounds and seating) and pulls the decks once. It answers per
 rounds yield several at once — with `rounds: [{round, decks}]`, and is empty when
 no round is ongoing. Full entitlement only.
 
-`round` indexes `tournament.rounds`. **`DeckObject.round` does not**: it is a
-*per-player deck slot*, and under open rounds two players seated in the same
-round are on different slots, so the endpoint counts each player's own prior
-rounds to find theirs ([hazards](hazards.md#two-implementations-of-one-gate)).
-A multideck event answers that slot's deck, any other event the registered one;
-a deck not yet submitted is simply absent.
+`round` indexes `tournament.rounds`, and so does `DeckObject.round`: one
+coordinate, so the read is a lookup and translates nothing. A multideck event
+answers the deck stamped with that round, any other event the registered one; an
+unstamped deck is simply absent, whether none was submitted or the one submitted
+is still pending.
 
 **The finals is a round here**, at index `len(rounds)`. A non-multideck finalist
-plays their registered deck; a multideck one, whatever sits at the slot after
-their last preliminary. The rules say that slot should be empty — §3.1.5a has the
+plays their registered deck; a multideck one, whatever `StartFinals` stamped at
+`len(rounds)`. The rules say there should be nothing to stamp — §3.1.5a has the
 finalist replay a preliminary deck, Best-Performing or Free Choice — and which
 method an event announced is not modelled anywhere, so a finals deck is answered
 when one exists and simply absent when it does not.

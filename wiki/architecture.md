@@ -94,7 +94,10 @@ reading raises on decode, and it raises for the whole list rather than the row.
 
 `backend/src/migrations.py` is the one place those rewrites live: an ordered
 tuple of entries, each a guard query naming the rows that still hold the old
-shape and a function mutating one `full` document. The runner takes them in
+shape and a function mutating one `full` document. A guard may select more than
+the uid, and the extra columns reach the function beside the document — that is
+how a rewrite whose new value depends on *another* object gets it, since the
+function sees one document and cannot read. The runner takes them in
 order, locks each row `FOR UPDATE` in its **own** transaction and re-saves it
 through `save_object`, which recomputes all four projections — hand-written
 per-column SQL would restate `compute_public/member/api/full` and put one fact in

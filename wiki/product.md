@@ -65,8 +65,9 @@ seat their own 4–5 pod. Never pushed to VEKN, never rated.
 **Decks** — the card database in IndexedDB; upload by paste (local, offline),
 deckbuilder URL (VDB / VTESDecks / Amaranth, backend-proxied, online only) or QR;
 Rust parse and validation; attribution; decklist-required enforcement with
-override; multideck per-round locking; post-tournament upload; visibility by
-`decklists_mode`; automatic TWDA pull request on finish.
+override; multideck decks stamped with the round they were played in and locked by
+that stamp; post-tournament upload; visibility by `decklists_mode`; automatic TWDA
+pull request on finish.
 
 **Sanctions** — event-level (Caution, Warning, Standings Adjustment,
 Disqualification) and VEKN-wide (Suspension, Probation, Ban), with Judges Guide v2

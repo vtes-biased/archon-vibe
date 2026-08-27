@@ -190,11 +190,12 @@ export function buildSanctionsPayload(sanctions: Sanction[]): string {
 }
 
 export interface DeckOp {
-  op: 'upsert' | 'delete' | 'set_public';
+  op: 'upsert' | 'delete' | 'set_round' | 'set_public';
   player_uid?: string;
   deck?: { name: string; author: string; comments: string; cards: Record<string, number>; round?: number | null; public?: boolean; attribution?: string | null };
   deck_uid?: string;
-  deck_index?: number | null; // delete: multideck round-deck selector
+  deck_index?: number | null; // delete: the deck's round stamp, null being the pending deck
+  round?: number | null; // set_round: the round the deck was played in
   multideck?: boolean;
   public?: boolean;
 }

@@ -896,6 +896,7 @@
   "decks_collapse_all": "Collapse all",
   "decks_my_decks": "Your Decks",
   "decks_round_label": "Round {n}",
+  "decks_next_round": "Next round",
   "decks_locked": "Locked",
   "decks_hidden_until_round": "Deck submitted — hidden until round starts",
   "decks_delete": "Delete deck",

@@ -1,4 +1,4 @@
-use crate::model::{player, seat, table, tournament};
+use crate::model::{arg, deck_object, finals_table, player, seat, table, tournament};
 use json::JsonValue;
 
 use super::types::{ActorContext, TournamentState};
@@ -21,10 +21,80 @@ pub(super) fn count_player_rounds_played(tournament: &JsonValue, user_uid: &str)
         .count()
 }
 
-/// Returns true if a player's deck slot is locked (its round has already started for them).
-/// Indexed per-player: deck slot `i` is the deck for the player's `i`-th round.
-pub(super) fn is_deck_locked(tournament: &JsonValue, user_uid: &str, deck_index: usize) -> bool {
-    deck_index < count_player_rounds_played(tournament, user_uid)
+/// Every player seated in `round_idx`, the finals being `rounds.len()`.
+fn seated_in_round(tournament: &JsonValue, round_idx: usize) -> std::collections::HashSet<String> {
+    let rounds = &tournament[tournament::ROUNDS];
+    if round_idx >= rounds.len() {
+        return tournament[tournament::FINALS][finals_table::SEATING]
+            .members()
+            .filter_map(|seat| seat[seat::PLAYER_UID].as_str().map(String::from))
+            .collect();
+    }
+    rounds[round_idx]
+        .members()
+        .filter(|table| table[table::STATE].as_str() != Some("Cancelled"))
+        .flat_map(|table| table[table::SEATING].members())
+        .filter_map(|seat| seat[seat::PLAYER_UID].as_str().map(String::from))
+        .collect()
+}
+
+/// Bind each seated player's pending deck to `round_idx`, one deck per player per round.
+pub(super) fn stamp_round_decks(
+    tournament: &JsonValue,
+    decks: &JsonValue,
+    deck_ops: &mut JsonValue,
+    round_idx: usize,
+) {
+    if !tournament[tournament::MULTIDECK].as_bool().unwrap_or(false) {
+        return;
+    }
+    let seated = seated_in_round(tournament, round_idx);
+    let mut taken: std::collections::HashSet<&str> = decks
+        .members()
+        .filter(|d| d[deck_object::ROUND].as_usize() == Some(round_idx))
+        .filter_map(|d| d[deck_object::USER_UID].as_str())
+        .collect();
+    for deck in decks.members() {
+        if !deck[deck_object::ROUND].is_null() {
+            continue;
+        }
+        let uid = deck[deck_object::USER_UID].as_str().unwrap_or("");
+        if !seated.contains(uid) || !taken.insert(uid) {
+            continue;
+        }
+        let _ = deck_ops.push(json::object! {
+            arg::OP => "set_round",
+            arg::DECK_UID => deck[deck_object::UID].as_str().unwrap_or(""),
+            arg::ROUND => round_idx,
+        });
+    }
+}
+
+/// Return the decks stamped at `rounds_removed` to pending.
+pub(super) fn release_stamped_decks(
+    decks: &JsonValue,
+    deck_ops: &mut JsonValue,
+    rounds_removed: &[usize],
+    player_uid: Option<&str>,
+) {
+    for deck in decks.members() {
+        let Some(round) = deck[deck_object::ROUND].as_usize() else {
+            continue;
+        };
+        if !rounds_removed.contains(&round) {
+            continue;
+        }
+        if let Some(uid) = player_uid {
+            if deck[deck_object::USER_UID].as_str() != Some(uid) {
+                continue;
+            }
+        }
+        let _ = deck_ops.push(json::object! {
+            arg::OP => "set_round",
+            arg::DECK_UID => deck[deck_object::UID].as_str().unwrap_or(""),
+            arg::ROUND => JsonValue::Null,
+        });
+    }
 }
 
 pub(super) fn require_organizer(actor: &ActorContext) -> Result<(), EngineError> {

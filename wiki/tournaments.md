@@ -478,15 +478,14 @@ strand each other. A round that is over is not live: correcting its record moves
 seats and never player state, because a finished round has no player state it can
 correctly assert.
 
-A round slot is never removed mid-array, because
-`standings_adjustment.round_number` is index-tagged and would be corrupted.
-**This does not protect `deck.round`**, which is not the tournament's index at
-all but a per-player count of rounds played — and a soft-cancel lowers that
-count, shifting every later slot. See [hazards](hazards.md#two-implementations-of-one-gate).
-Removal from the tail is safe, which is why cancelling the last round sweeps the
-cancelled rounds behind it: their restore is worth less than ending at zero rounds
-whichever order the cancels came in, since cancel is offered only while `Playing`
-and a cancelled slot left stranded in `Waiting` can never be reached again.
+A round slot is never removed mid-array, because `standings_adjustment.round_number`
+and `deck.round` are both index-tagged and would be corrupted. Removal from the
+tail is safe, which is why cancelling the last round sweeps the cancelled rounds
+behind it: their restore is worth less than ending at zero rounds whichever order
+the cancels came in, since cancel is offered only while `Playing` and a cancelled
+slot left stranded in `Waiting` can never be reached again. The next round started
+reuses the indices a tail removal popped, so the removal releases the decks
+stamped there.
 
 **Scoring** — `SetScore` (`{player_uid, vp}` per seat), `Override` (organizer forces
 a table Finished, comment required), `Unoverride`.
@@ -495,6 +494,31 @@ a table Finished, comment required), `Unoverride`.
 
 **Decks** — `UpsertDeck`, `DeleteDeck`. All deck mutations are engine `deck_ops`
 side effects; there are no REST deck endpoints.
+
+A multideck deck is **stamped with the round it was played in**. `DeckObject.round`
+is the tournament's own index — `len(rounds)` the finals, as
+`Sanction.round_number` uses it — and is null until the player is seated:
+`StartRound`, `SelfOrganizeRound`, `SeatPlayer`, `AlterSeating` and `StartFinals`
+stamp the pending deck of everyone seated in the round they touch — not only the
+seat that moved — one deck per player per round, and `UnseatPlayer`, a tail
+`CancelRound`, `CancelFinals` and `ReopenTournament` release what the round they
+removed held. A single-deck event's registered deck is never stamped. Stamping at
+seating rather than at upload is what makes the index the tournament's: a deck is
+uploaded before the round it will be played in exists, so nothing earlier could
+name one.
+
+**Stamped is locked.** A stamped deck was played, so a player may neither replace
+nor delete it in any state — the engine drops any round a player names on an
+upload, leaving them one editable deck at a time. Only an organizer names a round,
+which is how a played round's deck is corrected.
+
+**An organizer sees a deck once it has been played**, never before: organizer
+eligibility is not enforced and they may be sitting at a table. On the roster a
+multideck deck is revealed by its stamp and a single-deck event's by the first
+round existing; until then the panel shows that a deck was submitted, and offers
+to replace it, without opening it. The roster's decks-in tally and its
+missing/problems filters count submitted decks either way — the chase asks who
+still owes a decklist, which is a question about check-in, not about contents.
 
 **Raffle** — `RaffleDraw` (pools AllPlayers, NonFinalists, GameWinners, NoGameWin,
 NoVictoryPoint; optional `prize_promo_uid`, display-only and never written to
@@ -573,8 +597,9 @@ naturally:
   started may exceed `max_rounds`.
 - On reaching the cap a player retires to `Completed` — finals-eligible, done with
   prelims. `CheckIn` is refused; `CheckInAll` skips them.
-- Deck locking becomes per-player: a player's deck locks when they hit their cap or
-  their last round starts, rather than tournament-wide.
+- Deck locking is per deck, not tournament-wide: seating stamps a player's pending
+  deck with its round and a stamped deck is immutable, so between rounds every
+  player has exactly one editable deck.
 - Standings are cumulative GW > VP > TP across all rounds played, as usual.
 
 ### Self-organized rounds

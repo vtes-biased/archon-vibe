@@ -170,26 +170,24 @@
 
   const isMultideck = $derived(!!tournament.multideck);
   const roundCount = $derived(tournament.rounds?.length ?? 0);
-  // Hides deck contents from organizers until the round has started: single-deck
-  // (round=null) until round 1, multideck (round=N) until round N+1 exists.
+  // Accordion key: a stamped deck's round, or PENDING for the not-yet-played one.
+  const PENDING = -1;
   function isDeckHiddenFromOrganizer(round: number | null): boolean {
     if (!isOrganizer) return false;
-    if (round === null) return roundCount === 0;
-    return roundCount <= round;
+    return isMultideck ? round === null : roundCount === 0;
   }
 
-  type RoundSlot = { round: number; deck: DeckObject | null };
+  type RoundSlot = { round: number | null; deck: DeckObject | null };
   function getMultideckSlots(uid: string): RoundSlot[] {
-    const decks = getPlayerDecks(uid);
-    if (roundCount === 0) return decks.map((d, i) => ({ round: d.round ?? i, deck: d }));
-    const byRound = new Map(decks.map(d => [d.round, d]));
-    return Array.from({ length: roundCount }, (_, r) => ({ round: r, deck: byRound.get(r) ?? null }));
+    const byRound = new Map(getPlayerDecks(uid).map(d => [d.round, d]));
+    const slots: RoundSlot[] = Array.from({ length: roundCount }, (_, r) => ({ round: r, deck: byRound.get(r) ?? null }));
+    if (tournament.finals) slots.push({ round: roundCount, deck: byRound.get(roundCount) ?? null });
+    slots.push({ round: null, deck: byRound.get(null) ?? null });
+    return slots;
   }
 
   function getPlayerDecks(uid: string): DeckObject[] {
-    const decks = decksByUser[uid] ?? [];
-    if (!isMultideck || tournament.state !== 'Playing') return decks;
-    return decks.filter(d => d.round === null || d.round < roundCount);
+    return decksByUser[uid] ?? [];
   }
   function getPlayerDeck(uid: string): DeckObject | null {
     return getPlayerDecks(uid)[0] ?? null;
@@ -540,14 +538,19 @@
     {@const playerDecks = getPlayerDecks(puid)}
     {@const errors = validationCache[puid] ?? []}
     {#if isOrganizer && uploadingFor === puid}
-      <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={uploadingRound} onuploaded={onUploaded} />
-    {:else if playerDecks.length > 0}
+      <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={uploadingRound} multideck={isMultideck} onuploaded={onUploaded} />
+    {:else if isMultideck || playerDecks.length > 0}
       {#if isMultideck}
         {#each getMultideckSlots(puid) as slot}
+          {@const key = slot.round ?? PENDING}
           <DeckAccordion
-            expanded={expandedDeckRound === slot.round}
-            ontoggle={() => expandedDeckRound = expandedDeckRound === slot.round ? null : slot.round}
-            roundLabel={m.decks_round_label({ n: String(slot.round + 1) })}
+            expanded={expandedDeckRound === key}
+            ontoggle={() => expandedDeckRound = expandedDeckRound === key ? null : key}
+            roundLabel={slot.round === null
+              ? m.decks_next_round()
+              : slot.round < roundCount
+                ? m.decks_round_label({ n: String(slot.round + 1) })
+                : m.tournament_finals_heading()}
           >
             {#snippet headerExtra()}
               <span class="text-ink-faint truncate">{slot.deck ? (slot.deck.name || m.decks_unnamed()) : m.players_no_deck()}</span>
@@ -560,12 +563,12 @@
               <Button
                 variant="secondary"
                 size="lg"
-                onclick={() => { uploadingFor = puid; uploadingRound = slot.round; }}
+                onclick={() => { uploadingFor = puid; uploadingRound = slot.round ?? undefined; }}
               >{m.decks_replace()}</Button>
             {:else if slot.deck}
-              <DeckDisplay deck={slot.deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = slot.round; } : undefined} />
+              <DeckDisplay deck={slot.deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = slot.round ?? undefined; } : undefined} />
             {:else if isOrganizer}
-              <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={slot.round} onuploaded={onUploaded} />
+              <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={slot.round ?? undefined} multideck onuploaded={onUploaded} />
             {:else}
               <p class="text-sm text-ink-muted">{m.players_no_deck()}</p>
             {/if}
@@ -588,7 +591,7 @@
           <DeckDisplay deck={playerDecks[0]} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined} />
         {/if}
       {/if}
-      {#if errors.length > 0 && !isDeckHiddenFromOrganizer(isMultideck ? 0 : null)}
+      {#if errors.length > 0 && playerDecks.some(d => !isDeckHiddenFromOrganizer(d.round))}
         <div class="space-y-1">
           {#each errors as err}
             <p class="text-sm {err.severity === 'error' ? 'text-link' : 'text-warn'}">
@@ -601,8 +604,8 @@
     {:else}
       <p class="text-sm text-ink-muted">{m.players_no_deck()}</p>
     {/if}
-    {#if isOrganizer && !archivalUids.has(puid) && playerDecks.length === 0 && (!isMultideck || roundCount === 0) && uploadingFor !== puid}
-      <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={isMultideck ? 0 : undefined} onuploaded={onUploaded} />
+    {#if isOrganizer && !archivalUids.has(puid) && playerDecks.length === 0 && !isMultideck && uploadingFor !== puid}
+      <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} onuploaded={onUploaded} />
     {/if}
   {/snippet}
 

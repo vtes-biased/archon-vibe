@@ -1,14 +1,14 @@
-"""The delegated deck read answers each seated player's *own* deck slot.
+"""The delegated deck read answers the deck stamped with the ongoing round.
 
-Regression guarded: `DeckObject.round` is a per-player slot, not the
-tournament's round index, and under open rounds the two diverge — players
-progress through the pool independently, so two people seated in round 2 can be
-on their 2nd and their 1st deck. Keying the lookup on the round index instead
-reads the wrong deck, silently, and only for open-rounds events; a standard
-event where everyone plays every round hides it completely.
+Regression guarded: `DeckObject.round` used to be a per-player count of rounds
+played, derived at upload. A mid-array `CancelRound` is a soft-cancel and that
+count skips `Cancelled` rounds, so cancelling round 0 after round 1 was played
+shifted every later slot down by one and the endpoint answered the previous
+round's deck — silently, and only once a round had been voided.
 
-Pins the delegated-deck-read contract: the endpoint answers each seated player's
-own slot. Asserted at the HTTP boundary against a real DB and the real route.
+Pins the delegated-deck-read contract: `round` on the wire and `DeckObject.round`
+are one coordinate, and a voided round moves neither. Asserted at the HTTP
+boundary against a real DB and the real route.
 """
 
 from datetime import UTC, datetime
@@ -36,8 +36,8 @@ from tests.conftest import make_auth_header, seed_tournament
 NOW = datetime.now(UTC)
 TRN = "trn-round-decks"
 ORG = "org-round-decks"
-# VETERAN played round 0 and is seated in round 1 — its 2nd deck.
-# NEWCOMER joins at round 1 under open rounds — its 1st.
+# VETERAN played round 0 and is seated in round 1; NEWCOMER joins at round 1
+# under open rounds. Round 0 is then voided, which moves neither stamp.
 VETERAN = "player-veteran"
 NEWCOMER = "player-newcomer"
 
@@ -62,7 +62,7 @@ async def _seed() -> None:
                 [
                     Table(
                         seating=[Seat(player_uid=VETERAN)],
-                        state=TableState.FINISHED,
+                        state=TableState.CANCELLED,
                     )
                 ],
                 [
@@ -74,7 +74,7 @@ async def _seed() -> None:
             ],
         )
     )
-    for user_uid, slot in ((VETERAN, 0), (VETERAN, 1), (NEWCOMER, 0)):
+    for user_uid, round_index in ((VETERAN, 0), (VETERAN, 1), (NEWCOMER, 1)):
         await db.save_object_from_model(
             ObjectType.DECK,
             DeckObject(
@@ -82,8 +82,8 @@ async def _seed() -> None:
                 modified=NOW,
                 tournament_uid=TRN,
                 user_uid=user_uid,
-                round=slot,
-                name=f"{user_uid}-slot-{slot}",
+                round=round_index,
+                name=f"{user_uid}-round-{round_index}",
             ),
         )
 
@@ -97,7 +97,7 @@ async def _drop() -> None:
 
 
 @pytest.mark.asyncio
-async def test_ongoing_round_answers_each_players_own_deck_slot(
+async def test_a_voided_round_does_not_shift_the_answer(
     test_client: AsyncClient, test_db
 ):
     await _seed()
@@ -108,10 +108,11 @@ async def test_ongoing_round_answers_each_players_own_deck_slot(
         assert resp.status_code == 200
         body = resp.json()
 
-        # Only round 1 is In Progress.
+        # Only round 1 is In Progress. Round 0 is voided, so a count of rounds
+        # played would answer VETERAN's round-0 deck here.
         assert [r["round"] for r in body["rounds"]] == [1]
         names = sorted(d["name"] for d in body["rounds"][0]["decks"])
-        assert names == [f"{NEWCOMER}-slot-0", f"{VETERAN}-slot-1"]
+        assert names == [f"{NEWCOMER}-round-1", f"{VETERAN}-round-1"]
     finally:
         await _drop()
 
