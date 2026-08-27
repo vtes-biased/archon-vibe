@@ -563,3 +563,12 @@ by its own runtime, so a corpus-scale rewrite stays a post-deploy script.
 **A backend-first deploy is safe by design**: an unknown snapshot type is counted
 toward the `eof` total and ignored. Do not "fix" that by counting only recognised
 types ([sync](sync.md#adding-a-new-object-type)).
+
+**An already-installed beta PWA keeps the production icon and name until it is
+reinstalled.** The manifest is read at install time, so resolving beta's identity
+before first paint reaches new installs only; every phone that installed beta
+before this shipped still shows a crimson mark reading "Archon" on the home
+screen, and only the in-app rail chip and its push notifications tell it apart.
+There is no way to re-prompt an install from the page, so this is recorded, not
+solved — a beta user reporting two identical icons is asked to reinstall
+([design](design.md#beta-identity)).

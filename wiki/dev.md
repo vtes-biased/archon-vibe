@@ -132,6 +132,30 @@ them. That is deliberate: the A records are kept as the affordance for standing 
 future major version beside the live one, so a resolving name with nothing serving
 it is the expected state, not a leftover to clean up.
 
+### Environment identity
+
+One release artifact is deployed to both hosts, so nothing about the environment
+can be baked at build time. It is resolved at **runtime from the hostname** —
+`archon.krcg.org` is beta, `archon.vekn.net` production — in the three runtimes
+that each need it independently, because none can read another's answer: the
+`app.html` head script (which resolves before first paint, since the manifest is
+read at install time, and publishes the answer as `documentElement.dataset.env`
+for the app to read), `service-worker.ts` off `self.location.hostname`, and
+`og.py` off the host the crawler reached. Anywhere else, read `dataset.env`
+rather than re-deriving. What each surface then shows is
+[design](design.md#beta-identity).
+
+Beta's identity assets ship in the same artifact under `-beta` names —
+`manifest-beta.webmanifest`, `favicon-beta.svg`, `icon-{192,512}-beta.png`,
+`apple-touch-icon-beta.png` — and production never requests them. The icons are
+generated from `favicon-beta.svg` onto the `#2A2520` ground; they are committed
+assets, not a build step.
+
+Social crawlers reach an og stub through the nginx UA-split, which now covers the
+bare `/` as well as the object and help paths. `/` proxies to the backend's
+`/og/site` rather than preserving the URI, because the backend's own `/` is the
+health check.
+
 ### Backups
 
 Production only — `ansible/roles/db_backup`, gated on `db_backup_enabled`; the

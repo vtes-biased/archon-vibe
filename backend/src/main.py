@@ -663,6 +663,20 @@ async def help_og_stub(slug: str, request: Request) -> Response:
     )
 
 
+@app.get("/og/site")
+async def site_og_stub(request: Request) -> Response:
+    """Open Graph stub for the bare app link — same crawler-only UA-split as the
+    object stubs, on a path of its own because `/` is the health check."""
+    from .og import render_site_og_html
+
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("host") or request.url.netloc
+    return Response(
+        content=render_site_og_html(f"{proto}://{host}"),
+        media_type="text/html",
+    )
+
+
 def _viewer_level(viewer: User | None) -> DataLevel:
     """Determine the viewer's base data level (delegates to db.base_data_level —
     the single source the access-version fingerprint also reuses)."""

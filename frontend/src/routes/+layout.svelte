@@ -10,6 +10,7 @@
   import { reconcilePush } from '$lib/stores/push.svelte';
   import { onMount } from 'svelte';
   import { Wifi, WifiOff, RefreshCw, Download, TriangleAlert, Trophy, BarChart3, Medal, Users, User, BookOpen } from '@lucide/svelte';
+  import Badge from '$lib/components/Badge.svelte';
   import Toast from '$lib/components/Toast.svelte';
   import WhatsNewModal from '$lib/components/WhatsNewModal.svelte';
   import * as m from '$lib/paraglide/messages.js';
@@ -21,6 +22,9 @@
   // Not onMount: that delays the fetch by a full mount cycle.
   const engineInit = initEngine();
 
+  // Resolved by the app.html head script from the hostname; read here rather than
+  // re-derived, and after mount because the shell is prerendered.
+  let isBeta = $state(false);
   let isOnline = $state(navigator.onLine);
   let isSyncing = $state(true);
   let syncError = $state(false);
@@ -49,6 +53,7 @@
   });
 
   onMount(() => {
+    isBeta = document.documentElement.dataset.env === 'beta';
     initTheme();
     initServiceWorker();
 
@@ -208,8 +213,11 @@
        top/bottom (iPad standalone), w-rail+pl-safe-l keeps icons off the notch
        on landscape phones (>=640px, so rail not bottom nav). -->
   <nav class="hidden sm:flex fixed left-0 top-0 bottom-0 w-rail pl-safe-l bg-surface-card border-r border-line flex-col items-center pt-[calc(1rem+var(--spacing-safe-t))] pb-[calc(1rem+var(--spacing-safe-b))] z-40">
-    <a href="/tournaments" onclick={(e) => openLastView(e, '/tournaments')} class="mb-6 text-link hover:text-link-soft" title={m.nav_home()}>
-      <img src="/favicon.svg" alt="Archon" class="w-16 h-16" />
+    <a href="/tournaments" onclick={(e) => openLastView(e, '/tournaments')} class="mb-6 flex flex-col items-center gap-1 text-link hover:text-link-soft" title={m.nav_home()}>
+      <img src={isBeta ? '/favicon-beta.svg' : '/favicon.svg'} alt={isBeta ? 'Archon Beta' : 'Archon'} class="w-16 h-16" />
+      {#if isBeta}
+        <Badge kind="identity" tone="beta">BETA</Badge>
+      {/if}
     </a>
 
     <div class="flex-1 flex flex-col gap-2 w-full">

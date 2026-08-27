@@ -120,6 +120,11 @@
     background: light-dark(#f1f5f9, rgb(30 41 59 / 0.6));
     color: light-dark(#334155, #e2e8f0);
 }
+/* The one green in the app, reserved to the beta environment mark. */
+.badge-beta {
+    background: light-dark(#ecfdf5, rgb(5 96 58 / 0.6));
+    color: light-dark(#05603a, #6ee7b7);
+}
 
 .btn-success                        { background-color: light-dark(#1e40af, #1d4ed8); color: #fff; }
 .btn-success:hover:not(:disabled)   { background-color: light-dark(#1d4ed8, #2563eb); }

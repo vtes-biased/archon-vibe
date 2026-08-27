@@ -8,11 +8,24 @@ import html
 from datetime import datetime
 
 SITE_TITLE = "Archon"
+BETA_SITE_TITLE = "Archon Beta"
+BETA_HOST = "archon.krcg.org"
 SITE_DESCRIPTION = "VEKN Tournament Management - Web App"
 FALLBACK_IMAGE = "/icon-512.png"  # square site icon
+BETA_FALLBACK_IMAGE = "/icon-512-beta.png"
 # Banner is the de-facto universal og:image size.
 BANNER_W, BANNER_H = 1200, 630
 ICON_W, ICON_H = 512, 512
+
+
+def _is_beta(base_url: str) -> bool:
+    """One deployment serves both hosts, so the environment is the host we were
+    reached on — the same resolution the frontend head script makes."""
+    return BETA_HOST in base_url
+
+
+def _site_title(base_url: str) -> str:
+    return BETA_SITE_TITLE if _is_beta(base_url) else SITE_TITLE
 
 
 def _format_date(start: str | None) -> str | None:
@@ -75,12 +88,18 @@ def _render_stub(
 ) -> str:
     """Render the og-tagged HTML stub shared by all object types."""
     canonical = f"{base_url}{canonical_path}"
+    beta = _is_beta(base_url)
+    fallback = BETA_FALLBACK_IMAGE if beta else FALLBACK_IMAGE
     if banner:
         image, img_w, img_h = f"{base_url}{banner}", BANNER_W, BANNER_H
         card = "summary_large_image"
     else:
-        image, img_w, img_h = f"{base_url}{FALLBACK_IMAGE}", ICON_W, ICON_H
+        image, img_w, img_h = f"{base_url}{fallback}", ICON_W, ICON_H
         card = "summary"
+    # A banner makes the card indistinguishable from production otherwise, and the
+    # results of an event recorded on beta never reach VEKN.
+    if beta and not title.endswith(BETA_SITE_TITLE):
+        title = f"{title} — {BETA_SITE_TITLE}"
 
     def e(s: object) -> str:
         return html.escape(str(s), quote=True)
@@ -112,15 +131,20 @@ def _render_stub(
 """
 
 
+def render_site_og_html(base_url: str) -> str:
+    """Site card for the bare app link — the form pasted to say "try the beta"."""
+    return _render_stub(base_url, "/", _site_title(base_url), SITE_DESCRIPTION, None)
+
+
 def render_og_html(base_url: str, uid: str, pub: dict | None) -> str:
     """`base_url` must be absolute (scheme://host) — og:image requires it for
     crawlers. `pub` is None or deleted → site-wide card, never an error."""
-    title, description, banner = SITE_TITLE, SITE_DESCRIPTION, None
+    title, description, banner = _site_title(base_url), SITE_DESCRIPTION, None
     # Both stubs canonicalise on the short form where there is one, so the two
     # URLs for the same event do not read as two pages.
     path = f"/tournaments/{uid}"
     if pub and not pub.get("deleted_at"):
-        title = pub.get("name") or SITE_TITLE
+        title = pub.get("name") or _site_title(base_url)
         description = _description(pub)
         banner = pub.get("banner_path")
         if pub.get("event_code"):
@@ -135,9 +159,9 @@ def render_league_og_html(
 
     Leagues carry no banner — always the square site icon summary card.
     """
-    title, description = SITE_TITLE, SITE_DESCRIPTION
+    title, description = _site_title(base_url), SITE_DESCRIPTION
     if pub and not pub.get("deleted_at"):
-        title = pub.get("name") or SITE_TITLE
+        title = pub.get("name") or _site_title(base_url)
         description = _league_description(pub, event_count)
     return _render_stub(base_url, f"/leagues/{uid}", title, description, None)
 
@@ -177,9 +201,13 @@ def render_help_og_html(base_url: str, slug: str) -> str:
     page = HELP_PAGES.get(slug)
     if not page:
         return _render_stub(
-            base_url, f"/help/{slug}", SITE_TITLE, SITE_DESCRIPTION, None
+            base_url, f"/help/{slug}", _site_title(base_url), SITE_DESCRIPTION, None
         )
     title, description = page
     return _render_stub(
-        base_url, f"/help/{slug}", f"{title} - {SITE_TITLE}", description, None
+        base_url,
+        f"/help/{slug}",
+        f"{title} - {_site_title(base_url)}",
+        description,
+        None,
     )

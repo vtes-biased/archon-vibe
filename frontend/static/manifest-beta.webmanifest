@@ -1,0 +1,20 @@
+{
+  "name": "Archon Beta",
+  "short_name": "Archon Beta",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#2A2520",
+  "theme_color": "#DC143C",
+  "icons": [
+    {
+      "src": "/icon-192-beta.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512-beta.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

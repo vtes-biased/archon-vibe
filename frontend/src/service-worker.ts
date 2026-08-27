@@ -100,6 +100,10 @@ sw.addEventListener('message', (event) => {
   }
 });
 
+// The worker has no DOM, so it re-resolves the environment app.html resolved for
+// the page: a beta push in the shade must not read as a production one.
+const beta = self.location.hostname === 'archon.krcg.org';
+
 // Backend payload: { title, body, url, tag }. iOS revokes permission if a push
 // doesn't show a notification, so this always calls showNotification.
 sw.addEventListener('push', (event) => {
@@ -110,10 +114,10 @@ sw.addEventListener('push', (event) => {
     data = { body: event.data?.text() ?? '' };
   }
   event.waitUntil(
-    sw.registration.showNotification(data.title || 'Archon', {
+    sw.registration.showNotification(data.title || (beta ? 'Archon Beta' : 'Archon'), {
       body: data.body || '',
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
+      icon: beta ? '/icon-192-beta.png' : '/icon-192.png',
+      badge: beta ? '/icon-192-beta.png' : '/icon-192.png',
       tag: data.tag, // collapse repeats (e.g. same round re-started)
       // re-alert (sound/vibrate) on a collapsed tag — judge calls set this
       renotify: data.renotify === true,

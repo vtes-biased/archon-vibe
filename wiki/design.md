@@ -91,12 +91,34 @@ both themes, and each class is defined once with `light-dark()`.
 Raw stock Tailwind colour utilities do not adapt to the theme — use role utilities
 or these semantic classes, never `bg-emerald-*`-style tints.
 
+#### The beta green
+
+Green has exactly one sanctioned use: the **beta environment mark** — the app icon
+`#00C853` on the standard `#2A2520` ground, and the `BETA` chip beside the rail
+logo (`badge-beta`, `light-dark(#05603a, #6ee7b7)` on `light-dark(#ecfdf5, rgb(5 96
+58 / 0.6))`). Reserving it is what makes it safe: green never appears in
+production, so it can never be read as a status colour, and a design review run on
+beta sees the true palette everywhere except that one deliberately foreign mark.
+Recolouring the app's own accent tokens on beta was rejected for the opposite
+reason — it would make beta useless for reviewing design.
+
 When to use what: **status text tokens** for inline status text and standalone
 icons where a badge would be too heavy; **status classes** for component-level
 status; **selection tokens** for the seating tap-to-swap affordance only, never for
 status; **categorical classes** for identity tags. `banner-*` is for info and
 warning boxes and **never on a chip** — a bordered `banner-warn` span reads as a
 shrunken alert box next to real badges; use a status badge.
+
+### Beta identity
+
+A user with both environments installed must never confuse them: results recorded
+on beta never reach VEKN, and the mistake surfaces long after the event. The two
+deployments are one release artifact, so the environment is resolved at runtime
+from the hostname ([dev](dev.md#environment-identity)) and every identity surface
+reads it — home-screen icon and name (`Archon Beta`, the name the mail and WebAuthn
+configuration already use), push notification icon, link-preview card, and the rail
+mark with its `BETA` chip. Below `sm` there is no rail: the home-screen icon and
+name are the whole signal, which is why they carry it rather than an in-app banner.
 
 ### Badges
 
