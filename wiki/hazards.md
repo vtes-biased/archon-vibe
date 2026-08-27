@@ -137,10 +137,20 @@ That count is also *not* the tournament's round index. `DeckObject.round` is the
 player's **own** i-th round — under open rounds two players in the same round sit
 on different slots — while `Sanction.round_number` and the delegated deck read's
 `round` field are both the tournament's index, `len(rounds)` meaning the finals.
-The deck index has to be per-player: `SelfOrganizeRound` creates each pod already
-`In Progress`, so a globally-indexed deck could only be uploaded after play began.
-Anything keying a *stored deck* on the tournament's round is wrong for every
-open-rounds event.
+It is per-player because the index is assigned at **upload**, and a deck is
+uploaded before the round it will be played in exists — `SelfOrganizeRound`
+creates each pod already `In Progress`, so a globally-indexed deck could only be
+uploaded after play began. That is a consequence of *when* the index is assigned,
+not a property decks must have; assigning at seating instead would make the
+tournament index workable.
+
+**Which matters, because the per-player count is not stable.** A mid-array
+`CancelRound` after later rounds have been played is a soft-cancel, and the count
+skips `Cancelled` — so every later slot shifts by one. The delegated read then
+answers the previous round's deck, and `is_deck_locked` re-opens a deck the player
+already played. `wiki/tournaments.md`'s never-remove-mid-array rule protects
+`standings_adjustment.round_number`, which really is index-tagged, and has never
+protected this.
 
 **`preview_scores_json` deliberately duplicates the `SetScore` GW/TP cascade** —
 the preview runs on not-yet-persisted scores, so the two paths cannot share state.

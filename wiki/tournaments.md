@@ -478,8 +478,11 @@ strand each other. A round that is over is not live: correcting its record moves
 seats and never player state, because a finished round has no player state it can
 correctly assert.
 
-A round slot is never removed mid-array: `deck.round` and
-`standings_adjustment.round_number` are index-tagged and would be corrupted.
+A round slot is never removed mid-array, because
+`standings_adjustment.round_number` is index-tagged and would be corrupted.
+**This does not protect `deck.round`**, which is not the tournament's index at
+all but a per-player count of rounds played — and a soft-cancel lowers that
+count, shifting every later slot. See [hazards](hazards.md#two-implementations-of-one-gate).
 Removal from the tail is safe, which is why cancelling the last round sweeps the
 cancelled rounds behind it: their restore is worth less than ending at zero rounds
 whichever order the cancels came in, since cancel is offered only while `Playing`
