@@ -123,9 +123,10 @@
   let standingsInitialized = false;
   let paymentFilter = $state<'all' | 'Pending' | 'Paid'>('all');
 
-  const paidCount = $derived(tournament.players?.filter(p => p.payment_status === 'Paid').length ?? 0);
+  const paidCount = $derived(tournament.players?.filter(p => !p.waitlisted && p.payment_status === 'Paid').length ?? 0);
   const rosterCount = $derived(tournament.players?.length ?? 0);
   const waitlistCount = $derived(tournament.players?.filter(p => p.waitlisted).length ?? 0);
+  const seatedRosterCount = $derived(rosterCount - waitlistCount);
   // Imported records: standings may list players the roster lacks. These get
   // display-only rows (no organizer actions — they would be rejected server-side).
   const archivalUids = $derived.by(() => {
@@ -304,7 +305,7 @@
   // who still owes a deck, or has one with validation issues.
   let deckFilter = $state<'all' | 'missing' | 'problems'>('all');
   const decksSubmittedCount = $derived(
-    tournament.players?.filter(p => getPlayerDecks(p.user_uid ?? '').length > 0).length ?? 0
+    tournament.players?.filter(p => !p.waitlisted && getPlayerDecks(p.user_uid ?? '').length > 0).length ?? 0
   );
 
   const filteredPlayers = $derived.by(() => {
@@ -654,10 +655,10 @@
         {#if waitlistCount > 0}
           <span class="text-xs text-ink-faint">· {m.players_waitlist_count({ count: String(waitlistCount) })}</span>
         {/if}
-        {#if isOrganizer && rosterCount > 0}
-          <span class="text-xs text-ink-faint">· {m.payment_summary({ paid: String(paidCount), total: String(rosterCount) })}</span>
+        {#if isOrganizer && seatedRosterCount > 0}
+          <span class="text-xs text-ink-faint">· {m.payment_summary({ paid: String(paidCount), total: String(seatedRosterCount) })}</span>
           {#if tournament.decklist_required}
-            <span class="text-xs text-ink-faint">· {m.decks_submitted_count({ submitted: String(decksSubmittedCount), total: String(rosterCount) })}</span>
+            <span class="text-xs text-ink-faint">· {m.decks_submitted_count({ submitted: String(decksSubmittedCount), total: String(seatedRosterCount) })}</span>
           {/if}
         {/if}
       </p>

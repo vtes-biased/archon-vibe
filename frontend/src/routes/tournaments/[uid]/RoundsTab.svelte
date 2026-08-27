@@ -232,9 +232,10 @@
       .filter(p => p.user_uid && !seated.has(p.user_uid))
       .map(p => ({
         uid: p.user_uid!,
-        note: p.waitlisted
-          ? m.waitlist_label()
-          : p.state === "Registered" || p.state === "Checked-in" ? "" : translatePlayerState(p.state),
+        note: [
+          p.waitlisted ? m.waitlist_label() : "",
+          p.state === "Registered" || p.state === "Checked-in" ? "" : translatePlayerState(p.state),
+        ].filter(Boolean).join(" · "),
       }));
   });
 
