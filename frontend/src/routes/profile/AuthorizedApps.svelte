@@ -6,10 +6,19 @@
   import * as m from '$lib/paraglide/messages.js';
   import { dialogPanel } from "$lib/actions/dialog";
 
+  interface Consent {
+    client_id: string;
+    name: string;
+    scopes: string[];
+    tournament_name: string | null;
+    granted_at: string;
+  }
+
   interface AuthorizedApp {
     client_id: string;
     name: string;
     scopes: string[];
+    events: string[];
     granted_at: string;
   }
 
@@ -30,7 +39,23 @@
   async function loadApps() {
     loading = true;
     try {
-      apps = await apiRequest<AuthorizedApp[]>("/oauth/consents");
+      // One consent row per event; revoking is per app, so the card is too.
+      const consents = await apiRequest<Consent[]>("/oauth/consents");
+      const byClient = new Map<string, AuthorizedApp>();
+      for (const c of consents) {
+        const app = byClient.get(c.client_id) ?? {
+          client_id: c.client_id,
+          name: c.name,
+          scopes: [],
+          events: [],
+          granted_at: c.granted_at,
+        };
+        for (const scope of c.scopes) if (!app.scopes.includes(scope)) app.scopes.push(scope);
+        if (c.tournament_name && !app.events.includes(c.tournament_name)) app.events.push(c.tournament_name);
+        if (c.granted_at > app.granted_at) app.granted_at = c.granted_at;
+        byClient.set(c.client_id, app);
+      }
+      apps = [...byClient.values()];
     } catch {
       // Error handled by apiRequest
     }
@@ -92,6 +117,9 @@
                       <li class="text-xs text-ink">• {scopeDesc[scope] ? scopeDesc[scope]() : scope}</li>
                     {/each}
                   </ul>
+                  {#if app.events.length}
+                    <div class="text-xs text-ink-muted mt-1.5">{m.authorized_apps_for_events({ events: app.events.join(", ") })}</div>
+                  {/if}
                   <div class="text-xs text-ink-faint mt-1.5">{m.authorized_apps_granted({ date: formatDate(app.granted_at) })}</div>
                 </div>
                 <Button variant="secondary" size="md" class="shrink-0" onclick={() => (confirmRevoke = app)}>

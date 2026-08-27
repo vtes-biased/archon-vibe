@@ -74,6 +74,18 @@ behalf of real users, and `/oauth/userinfo` reports the capabilities the holder
 has, so `/sanction` simply surfaces the API's refusal. Single process only —
 `sse_listener.py` holds module-level state.
 
+**It is the first consumer of the per-event grant model**
+([access](access.md#impersonation-is-per-event)). Its token store is keyed
+`(discord_id, tournament_uid)` and so is every API call, every refresh lock and
+every SSE subscription; `/setup` and the player commands mint a fresh grant per
+event, and the consent page names that event to the user. A member playing two
+Discord tournaments authorizes once for each.
+
+The bot therefore cannot claim a VEKN ID for a player: `/vekn/claim` merges two
+accounts and answers with a **first-party** token pair, which no delegated grant
+reaches. `/register` and `/checkin` send a member without a VEKN ID to their
+Archon profile to link one, then back.
+
 **Status: pre-production.** Deployed and running, not yet live on production
 guilds and not yet tested end to end.
 
@@ -85,8 +97,9 @@ capability. Then `/teardown`, `/announce`, `/sync` (reconcile voice channels —
 repair tool), `/register`, `/checkin`, `/report <vp>`, `/judge`, and a multi-step
 `/sanction`.
 
-**Modules** — `token_store.py` (SQLite: tokens, guild-tournament links with a
-scheduled event id, pending OAuth with a 15-minute TTL); `archon_api.py`;
+**Modules** — `token_store.py` (SQLite: tokens per (Discord account, event),
+guild-tournament links with a scheduled event id, pending OAuth with a 15-minute
+TTL carrying the event it is for); `archon_api.py`;
 `sse_listener.py` (per guild-tournament SSE subscription); `channel_manager.py`;
 `scheduled_events.py`; `oauth_callback.py`; `commands/`.
 
@@ -162,14 +175,15 @@ The cover image is the tournament banner transcoded webp→PNG. It needs the
 **MANAGE_EVENTS** bot permission and degrades gracefully without it, logging and
 posting a one-time hint to #judges.
 
-**OAuth flow** — `/setup` initiates PKCE, the user authorizes `user:impersonate`,
-the local callback server receives the redirect, and the token is stored in SQLite
-for all API calls and SSE subscriptions. Refresh clears the stored pair **only on
-400/401**, an invalid grant; 5xx, network errors and timeouts are treated as
-transient and feed the listener's reconnect backoff instead, so a backend blip
-cannot kill a valid token. A successful `/register` callback respawns any dead
-listeners for that organizer's guild links — self-service recovery once a token has
-genuinely died.
+**OAuth flow** — `/setup` initiates PKCE, the user authorizes `user:impersonate`
+**for that tournament**, the local callback server receives the redirect, and the
+token is stored in SQLite under that event for its API calls and SSE
+subscription. Refresh clears the stored pair **only on 400/401**, an invalid
+grant; 5xx, network errors and timeouts are treated as transient and feed the
+listener's reconnect backoff instead, so a backend blip cannot kill a valid
+token. A finished event is itself a 400, which is how a grant retires. A
+successful callback respawns that event's dead listener — self-service recovery
+once a token has genuinely died.
 
 **Display names** — Register, AddPlayer and CheckIn accept an optional
 `display_name` (the Discord nickname) stored on the player and shown in player and

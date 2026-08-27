@@ -19,6 +19,8 @@
   let stateParam = $state("");
   let clientId = $state("");
   let codeChallenge = $state("");
+  let tournament = $state<string | null>(null);
+  let tournamentName = $state<string | null>(null);
   let loading = $state(true);
   let submitting = $state(false);
   let error = $state<string | null>(null);
@@ -74,6 +76,8 @@
       stateParam = data.state;
       clientId = data.client_id;
       codeChallenge = data.code_challenge;
+      tournament = data.tournament;
+      tournamentName = data.tournament_name;
     } catch (e) {
       error = toUserMessage(e, m.oauth_error_load_failed());
     }
@@ -98,6 +102,7 @@
           scope: scopes.join(" "),
           state: stateParam,
           code_challenge: codeChallenge,
+          tournament: tournament ?? "",
           approved: true,
         }),
       });
@@ -134,6 +139,7 @@
           scope: scopes.join(" "),
           state: stateParam,
           code_challenge: codeChallenge,
+          tournament: tournament ?? "",
           approved: false,
         }),
       });
@@ -196,6 +202,11 @@
             <p class="text-ink-muted text-sm mt-1">
               {m.oauth_wants_access()}
             </p>
+            {#if tournamentName}
+              <p class="text-ink-strong text-sm mt-1 font-medium">
+                {m.oauth_for_event({ event: tournamentName })}
+              </p>
+            {/if}
           </div>
 
           <div class="space-y-3">

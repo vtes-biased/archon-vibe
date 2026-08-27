@@ -3,7 +3,6 @@ import secrets
 
 import hikari
 import lightbulb
-import miru
 
 from .. import config
 from ..archon_api import ArchonAPI
@@ -15,9 +14,11 @@ from ._common import fetch_userinfo
 logger = logging.getLogger(__name__)
 
 
-async def _ensure_auth(ctx: lightbulb.Context, store: TokenStore) -> dict | None:
+async def _ensure_auth(
+    ctx: lightbulb.Context, store: TokenStore, tournament_uid: str
+) -> dict | None:
     discord_id = str(ctx.user.id)
-    tokens = await store.get_tokens(discord_id)
+    tokens = await store.get_tokens(discord_id, tournament_uid)
     if tokens:
         return tokens
 
@@ -26,9 +27,10 @@ async def _ensure_auth(ctx: lightbulb.Context, store: TokenStore) -> dict | None
     await store.store_pending_oauth(
         state=state,
         discord_id=discord_id,
+        tournament_uid=tournament_uid,
         code_verifier=code_verifier,
     )
-    url = make_oauth_url(state, code_challenge)
+    url = make_oauth_url(state, code_challenge, tournament_uid)
     await ctx.respond(
         f"**Connect your Archon account**\n"
         f"Click the link below to authenticate:\n{url}\n\n"
@@ -36,83 +38,6 @@ async def _ensure_auth(ctx: lightbulb.Context, store: TokenStore) -> dict | None
         flags=hikari.MessageFlag.EPHEMERAL,
     )
     return None
-
-
-class VeknIdModal(miru.Modal, title="Enter your VEKN ID"):
-    vekn_id = miru.TextInput(
-        label="VEKN ID",
-        placeholder="e.g., 1234567",
-        required=True,
-        min_length=1,
-        max_length=20,
-    )
-
-    def __init__(
-        self, store: TokenStore, api: ArchonAPI, tournament_uid: str, action: str
-    ) -> None:
-        super().__init__()
-        self._store = store
-        self._api = api
-        self._tournament_uid = tournament_uid
-        self._action = action
-
-    async def callback(self, ctx: miru.ModalContext) -> None:
-        discord_id = str(ctx.user.id)
-        claim = await self._api.claim_vekn_id(discord_id, self.vekn_id.value.strip())
-        if not claim.ok:
-            await ctx.respond(
-                f"Could not claim VEKN ID: {claim.error}",
-                flags=hikari.MessageFlag.EPHEMERAL,
-            )
-            return
-
-        # The claim tombstones the old uid, so the stored OAuth tokens now
-        # authenticate a dead account (401s) — drop them, and use the claim
-        # response's fresh access token below for this one follow-up call.
-        await self._store.remove_tokens(discord_id)
-
-        display_name = _get_display_name(ctx)
-        merged = claim.data.get("user", {})
-        event_name = "CheckIn" if self._action == "checkin" else "Register"
-        reg = await self._api.tournament_action_with_token(
-            claim.data.get("access_token", ""),
-            self._tournament_uid,
-            event_name,
-            player_uid=merged.get("uid") if event_name == "CheckIn" else None,
-            user_uid=merged.get("uid") if event_name == "Register" else None,
-            vekn_id=merged.get("vekn_id"),
-            display_name=display_name,
-        )
-        if reg.ok:
-            verb = "checked in" if self._action == "checkin" else "registered"
-            await ctx.respond(
-                f"VEKN ID claimed and you're {verb}!",
-                flags=hikari.MessageFlag.EPHEMERAL,
-            )
-        else:
-            noun = "check-in" if self._action == "checkin" else "registration"
-            await ctx.respond(
-                f"VEKN ID claimed, but {noun} failed: {reg.error}\n"
-                f"Run `/{self._action}` again.",
-                flags=hikari.MessageFlag.EPHEMERAL,
-            )
-
-
-class VeknChoiceView(miru.View):
-    def __init__(
-        self, store: TokenStore, api: ArchonAPI, tournament_uid: str, action: str
-    ) -> None:
-        super().__init__(timeout=300)
-        self._store = store
-        self._api = api
-        self._tournament_uid = tournament_uid
-        self._action = action
-
-    @miru.button(label="I have a VEKN ID", style=hikari.ButtonStyle.PRIMARY)
-    async def has_vekn(self, ctx: miru.ViewContext, button: miru.Button) -> None:
-        modal = VeknIdModal(self._store, self._api, self._tournament_uid, self._action)
-        await ctx.respond_with_modal(modal)
-        self.stop()
 
 
 def _get_display_name(ctx) -> str | None:
@@ -131,18 +56,17 @@ async def _handle_registration_pipeline(
     ctx: lightbulb.Context,
     store: TokenStore,
     api: ArchonAPI,
-    miru_client: miru.Client,
     tournament_uid: str,
     action: str,
 ) -> None:
     """Shared pipeline for /register and /checkin."""
     discord_id = str(ctx.user.id)
 
-    tokens = await _ensure_auth(ctx, store)
+    tokens = await _ensure_auth(ctx, store, tournament_uid)
     if not tokens:
         return
 
-    info = await fetch_userinfo(api, ctx, discord_id)
+    info = await fetch_userinfo(api, ctx, discord_id, tournament_uid)
     if info is None:
         return
 
@@ -194,17 +118,16 @@ async def _handle_registration_pipeline(
             )
     else:
         # Sponsorship is no longer a bot flow — new players are created at the
-        # door by an official, who curates the member list.
-        view = VeknChoiceView(store, api, tournament_uid, action)
+        # door by an official, who curates the member list. Claiming an existing
+        # VEKN ID merges two accounts, which a per-event grant cannot reach.
         await ctx.respond(
             "**You need a VEKN ID to play.**\n"
-            "If you already have one, tap the button below to link it.\n"
+            f"If you already have one, link it on your Archon profile — "
+            f"{config.ARCHON_FRONTEND_URL}/profile — then run the command again.\n"
             "If you're new to VTES, see a tournament official at the "
             "check-in desk — they'll register you.",
-            components=view,
             flags=hikari.MessageFlag.EPHEMERAL,
         )
-        miru_client.start_view(view)
 
 
 class RegisterCommand(
@@ -217,15 +140,12 @@ class RegisterCommand(
         *,
         store: TokenStore,
         api: ArchonAPI,
-        miru_client: miru.Client,
     ) -> None:
         tournament_uid = await resolve_tournament(ctx, store)
         if not tournament_uid:
             return
 
-        await _handle_registration_pipeline(
-            ctx, store, api, miru_client, tournament_uid, "register"
-        )
+        await _handle_registration_pipeline(ctx, store, api, tournament_uid, "register")
 
 
 class CheckinCommand(
@@ -238,15 +158,12 @@ class CheckinCommand(
         *,
         store: TokenStore,
         api: ArchonAPI,
-        miru_client: miru.Client,
     ) -> None:
         tournament_uid = await resolve_tournament(ctx, store)
         if not tournament_uid:
             return
 
-        await _handle_registration_pipeline(
-            ctx, store, api, miru_client, tournament_uid, "checkin"
-        )
+        await _handle_registration_pipeline(ctx, store, api, tournament_uid, "checkin")
 
 
 _VP_CHOICES = [
@@ -275,11 +192,11 @@ class ReportCommand(
 
         discord_id = str(ctx.user.id)
 
-        tokens = await _ensure_auth(ctx, store)
+        tokens = await _ensure_auth(ctx, store, tournament_uid)
         if not tokens:
             return
 
-        info = await fetch_userinfo(api, ctx, discord_id)
+        info = await fetch_userinfo(api, ctx, discord_id, tournament_uid)
         if info is None:
             return
 

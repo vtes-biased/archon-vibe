@@ -11,13 +11,51 @@ from ..db_oauth import get_oauth_token_by_jti
 from ..jwt_config import JWT_ALGORITHM, JWT_SECRET
 from ..models import User
 
+# Sub-routes of the token's own tournament an OAuth actor never reaches, whatever
+# the user's capabilities: the infrastructure of running the event, not running it.
+_OAUTH_BARRED_SUBPATHS = frozenset(
+    {
+        "organizers",
+        "push-vekn",
+        "go-offline",
+        "go-online",
+        "force-takeover",
+        "force-unlock",
+        "sync-offline",
+    }
+)
+
+
+def _oauth_allows(request: Request, tournament_uid: str) -> bool:
+    """The whole reach of a tournament-scoped `user:impersonate` token. An
+    allowlist, so a route added anywhere else in the app is refused until it is
+    named here — `/snapshot` and the unscoped `/stream`, which hand over the
+    organizer's entire corpus, among them."""
+    path = request.url.path
+    if path.startswith("/oauth/"):
+        return True
+    if path == "/sanctions/":
+        return request.method == "POST"
+    if path == "/sanctions/reference":
+        return request.method == "GET"
+    if path == "/stream":
+        return request.query_params.get("tournament") == tournament_uid
+
+    segments = path.strip("/").split("/")
+    if segments[:3] != ["api", "tournaments", tournament_uid]:
+        return False
+    if request.method == "DELETE" and len(segments) == 3:
+        return False
+    return len(segments) < 4 or segments[3] not in _OAUTH_BARRED_SUBPATHS
+
 
 async def get_current_user(
     request: Request,
     authorization: Annotated[str | None, Header()] = None,
 ) -> User:
-    """Resolves both regular access tokens and OAuth access tokens; OAuth
-    tokens without user:impersonate scope are restricted to /oauth/*."""
+    """Resolves both regular access tokens and OAuth access tokens; a
+    profile:read token reaches /oauth/* only, and a user:impersonate token is
+    scoped to one tournament and the allowlist above."""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=401,
@@ -51,23 +89,23 @@ async def get_current_user(
             if not token_record or token_record.revoked:
                 raise HTTPException(status_code=401, detail="Token has been revoked")
 
-            path = request.url.path
-            if path.startswith("/auth/") or path.startswith("/admin/"):
-                raise HTTPException(
-                    status_code=403,
-                    detail="OAuth tokens cannot access auth or admin endpoints",
-                )
-
-            request.state.oauth_scopes = scope.split() if scope else []
-            request.state.oauth_client_id = client_id
-
             scopes = scope.split() if scope else []
+            tournament_uid = payload.get("tournament")
+            request.state.oauth_scopes = scopes
+            request.state.oauth_client_id = client_id
+            request.state.oauth_tournament = tournament_uid
+
             if "user:impersonate" not in scopes:
-                if not path.startswith("/oauth/"):
+                if not request.url.path.startswith("/oauth/"):
                     raise HTTPException(
                         status_code=403,
                         detail="This token only grants access to OAuth endpoints (profile:read)",
                     )
+            elif not tournament_uid or not _oauth_allows(request, tournament_uid):
+                raise HTTPException(
+                    status_code=403,
+                    detail="This token acts only on the tournament it was granted for",
+                )
 
         else:
             raise HTTPException(status_code=401, detail="Invalid token type")

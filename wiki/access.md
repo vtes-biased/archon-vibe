@@ -155,7 +155,7 @@ Endpoints `/oauth/{authorize,token,revoke,userinfo}`; client CRUD and secret
 regeneration under `/oauth/clients` (DEV role); `GET /oauth/consents` lists
 authorized apps and is **first-party session only**, rejecting OAuth tokens with
 403; `DELETE /oauth/consents/{client_id}` revokes consent and immediately revokes
-live tokens for that client.
+live tokens for that client, across every event it holds.
 
 `POST /oauth/revoke` (RFC 7009) is how a client hands a pair back without sending
 the user to their profile page. It takes the token itself rather than a jti, and
@@ -168,9 +168,60 @@ exist; only a bad client secret (401) and a missing `token` (400) fail. Consent
 survives: revoking tokens is not revoking the grant, which is
 `DELETE /oauth/consents/{client_id}`.
 
-Scopes: `profile:read` (limited to `/oauth/*`) and `user:impersonate` (full API)
-delegate a *user's* authority; `api:read` delegates nobody's and is refused at
-`/authorize` for that reason — it is the daemon grant's scope and only that.
+Scopes: `profile:read` (limited to `/oauth/*`) and `user:impersonate` (one
+tournament, below) delegate a *user's* authority; `api:read` delegates nobody's
+and is refused at `/authorize` for that reason — it is the daemon grant's scope
+and only that.
+
+### Impersonation is per event
+
+**`user:impersonate` is granted for exactly one tournament.** The authorize
+request carries `tournament=<uid>` beside the scope, the consent page names the
+event to the user, and the grant is stored and keyed on the triple
+**(client, user, tournament)** — a returning user gets a one-click approve for
+each new event and never a silent cross-event auto-approve. A token with the
+scope and no tournament is refused outright; there is no unscoped regime.
+
+The tournament rides the JWT as its **own `tournament` claim, never as a member
+of `scope`** — the scope string round-trips through the `OAuthScope` enum on
+refresh, and a uid is not an enum member.
+
+**A grant dies with its event.** `/authorize` refuses a `Finished` tournament and
+refresh refuses one too, so the relationship ends structurally rather than by
+anyone remembering to revoke. Within the last access token's hour the actor could
+otherwise revive the event, so `ReopenTournament` is barred for OAuth actors;
+every other action the engine already state-gates.
+
+`DELETE /oauth/consents/{client_id}` revokes the app, meaning **every** event it
+was granted; `GET /oauth/consents` answers one row per event, and the profile
+page folds them into one card per app.
+
+#### The allowlist
+
+Enforcement is an **allowlist**, in `middleware/auth.py`: a route added anywhere
+else in the app is refused until it is named here.
+
+| Reachable | |
+|---|---|
+| `/oauth/*` | the grant's own lifecycle |
+| `/api/tournaments/<the token's uid>/…` | minus the barred sub-routes below |
+| `POST /sanctions/` | body `tournament_uid` must equal the token's — a path gate cannot see a body, so the match is in the handler |
+| `GET /sanctions/reference` | engine-owned, public anyway |
+| `/stream?tournament=<the token's uid>` | the scoped stream, [sync](sync.md#the-sse-endpoint) |
+
+Everything else 403s — `/snapshot` and the unscoped `/stream` above all, which
+used to hand a third party the granting organizer's whole corpus, private decks
+included. `POST /vekn/claim` matters as much: it answers with a **first-party**
+token pair for the merged uid, so reaching it turned a delegated grant into a
+full session.
+
+**Barred inside the token's own tournament**, whatever the user may do: delete,
+`organizers` add/remove, `push-vekn`, and the offline-lock family (`go-offline`,
+`go-online`, `force-takeover`, `force-unlock`, `sync-offline`). These are the
+infrastructure of owning an event, not of running one.
+
+`GET /api/tournaments/{uid}/decks` is the delegated read a play platform needs
+once a round starts — [sync](sync.md#delegated-third-party-reads).
 
 Security: PKCE S256 required, Argon2-hashed client secrets, refresh-token rotation
 with a revocation chain, single-use authorization codes, consent persistence, and a

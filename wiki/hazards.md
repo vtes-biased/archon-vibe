@@ -113,6 +113,16 @@ share one. A change to how a token or a client is stored, revoked or deactivated
 must land on `backend/src/public_api/auth.py` as well as `db_oauth.py` — nothing
 points the one editor at the other.
 
+**An OAuth token is admitted at three doors, and only one runs the allowlist.**
+`get_current_user` (`middleware/auth.py`) holds the whole gate
+([access](access.md#the-allowlist)). `_resolve_user_from_token` (`main.py`) backs
+the `token=` query parameter on `/stream` and `/snapshot` and runs none of it, so
+it accepts first-party `access` tokens *only* — widening it reopens the unscoped
+corpus around the allowlist. `require_api_token`
+(`public_api/auth.py`) accepts a user's `oauth_access` token at any scope on
+purpose: the public API serves published data, so a token there is attribution,
+not authority, and a tournament-scoped one is no narrower.
+
 **`preview_scores_json` deliberately duplicates the `SetScore` GW/TP cascade** —
 the preview runs on not-yet-persisted scores, so the two paths cannot share state.
 A cascade change must land on both sides; the single equality test

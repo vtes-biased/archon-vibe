@@ -70,24 +70,27 @@ class SetupCommand(
 
         discord_id = str(ctx.user.id)
 
-        tokens = await store.get_tokens(discord_id)
+        tokens = await store.get_tokens(discord_id, tournament_uid)
         if not tokens:
             state = secrets.token_urlsafe(32)
             code_verifier, code_challenge = generate_pkce()
             await store.store_pending_oauth(
                 state=state,
                 discord_id=discord_id,
+                tournament_uid=tournament_uid,
                 code_verifier=code_verifier,
             )
-            url = make_oauth_url(state, code_challenge)
+            url = make_oauth_url(state, code_challenge, tournament_uid)
             await ctx.respond(
-                f"**Authorize Archon Bot**\nClick the link below to connect your Archon account:\n{url}\n\n"
+                f"**Authorize Archon Bot for this event**\nClick the link below to grant the bot access to it:\n{url}\n\n"
                 f"After authorization, run `/setup {self.url}` again.",
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
             return
 
-        info = await fetch_userinfo(api, ctx, discord_id, account="Archon account")
+        info = await fetch_userinfo(
+            api, ctx, discord_id, tournament_uid, account="Archon account"
+        )
         if info is None:
             return
 
@@ -221,7 +224,7 @@ class TeardownCommand(
             return
 
         is_archon_organizer = False
-        info = await api.get_userinfo(discord_id)
+        info = await api.get_userinfo(discord_id, tournament_uid)
         if info.ok:
             is_archon_organizer = _may_set_up(info.data)
 
@@ -319,7 +322,7 @@ class AnnounceCommand(
 
         is_organizer = link["organizer_discord_id"] == discord_id
         if not is_organizer:
-            info = await api.get_userinfo(discord_id)
+            info = await api.get_userinfo(discord_id, tournament_uid)
             if not info.ok or not _may_set_up(info.data):
                 await ctx.respond(
                     "Only the setup organizer, or an official who can create tournaments, can post announcements.",
@@ -371,7 +374,7 @@ class SyncCommand(
         # Same organizer gate as /announce and /teardown.
         is_organizer = link["organizer_discord_id"] == discord_id
         if not is_organizer:
-            info = await api.get_userinfo(discord_id)
+            info = await api.get_userinfo(discord_id, tournament_uid)
             if not info.ok or not _may_set_up(info.data):
                 await ctx.respond(
                     "Only the setup organizer, or an official who can create tournaments, can sync channels.",

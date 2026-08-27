@@ -56,6 +56,7 @@ async def test_revoke_kills_the_lineage_and_shrugs_at_an_unknown_token(
         user_uid=user.uid,
         client_id=client.client_id,
         scopes=[OAuthScope.PROFILE_READ],
+        tournament_uid=None,
         parent_token_uid=None,
     )
     response = await test_client.post(

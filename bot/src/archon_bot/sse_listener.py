@@ -186,12 +186,14 @@ async def probe_tournament(
 ) -> dict | None:
     """The backend answers 200 and just omits the tournament frame when the uid
     is unknown/unreadable, so absence before ``sync_complete`` means "no access"."""
-    tokens = await store.get_tokens(organizer_discord_id)
+    tokens = await store.get_tokens(organizer_discord_id, tournament_uid)
     if not tokens:
         return None
     if _access_token_expired(tokens["access_token"]):
         refreshed = await api.refresh_tokens(
-            organizer_discord_id, stale_access_token=tokens["access_token"]
+            organizer_discord_id,
+            tournament_uid,
+            stale_access_token=tokens["access_token"],
         )
         if not refreshed:
             return None
@@ -210,6 +212,7 @@ async def probe_tournament(
                     if resp.status == 401 and attempt == 0:
                         refreshed = await api.refresh_tokens(
                             organizer_discord_id,
+                            tournament_uid,
                             stale_access_token=tokens["access_token"],
                         )
                         if not refreshed:
@@ -260,10 +263,12 @@ async def _sse_loop(
 
     async with aiohttp.ClientSession() as session:
         while True:
-            tokens = await store.get_tokens(organizer_discord_id)
+            tokens = await store.get_tokens(organizer_discord_id, tournament_uid)
             if not tokens:
                 logger.warning(
-                    "No tokens for organizer %s, stopping SSE", organizer_discord_id
+                    "No tokens for organizer %s on %s, stopping SSE",
+                    organizer_discord_id,
+                    tournament_uid,
                 )
                 return
 
@@ -272,6 +277,7 @@ async def _sse_loop(
             if _access_token_expired(tokens["access_token"]):
                 refreshed = await api.refresh_tokens(
                     organizer_discord_id,
+                    tournament_uid,
                     stale_access_token=tokens["access_token"],
                 )
                 if refreshed:
@@ -290,12 +296,15 @@ async def _sse_loop(
                     if resp.status == 401:
                         refreshed = await api.refresh_tokens(
                             organizer_discord_id,
+                            tournament_uid,
                             stale_access_token=tokens["access_token"],
                         )
                         if refreshed:
                             # Token renewal is one-shot, not a failure to back off from.
                             continue
-                        if not await store.get_tokens(organizer_discord_id):
+                        if not await store.get_tokens(
+                            organizer_discord_id, tournament_uid
+                        ):
                             # Invalid grant, pair removed; a fresh /register respawns this.
                             logger.error("Refresh token rejected for SSE, stopping")
                             return

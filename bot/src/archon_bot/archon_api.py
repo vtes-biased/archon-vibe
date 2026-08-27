@@ -35,9 +35,10 @@ class ArchonAPI:
     def __init__(self, store: TokenStore):
         self._store = store
         self._session: aiohttp.ClientSession | None = None
-        # One refresh lock per discord_id: replaying a rotated-out refresh token
-        # trips the backend's reuse-detection and revokes the whole chain. (#11)
-        self._refresh_locks: dict[str, asyncio.Lock] = {}
+        # One refresh lock per grant — (discord_id, tournament_uid): replaying a
+        # rotated-out refresh token trips the backend's reuse-detection and
+        # revokes the whole chain. (#11)
+        self._refresh_locks: dict[tuple[str, str], asyncio.Lock] = {}
 
     async def init(self) -> None:
         # total=30 (aiohttp defaults to 300s): a hung backend must surface as an
@@ -50,28 +51,37 @@ class ArchonAPI:
         if self._session:
             await self._session.close()
 
-    def _refresh_lock_for(self, discord_id: str) -> asyncio.Lock:
-        """Get-or-create the per-organizer refresh lock (atomic under asyncio)."""
-        lock = self._refresh_locks.get(discord_id)
+    def _refresh_lock_for(self, discord_id: str, tournament_uid: str) -> asyncio.Lock:
+        """Get-or-create the per-grant refresh lock (atomic under asyncio)."""
+        key = (discord_id, tournament_uid)
+        lock = self._refresh_locks.get(key)
         if lock is None:
             lock = asyncio.Lock()
-            self._refresh_locks[discord_id] = lock
+            self._refresh_locks[key] = lock
         return lock
 
     async def refresh_tokens(
-        self, discord_id: str, *, stale_access_token: str | None = None
+        self,
+        discord_id: str,
+        tournament_uid: str,
+        *,
+        stale_access_token: str | None = None,
     ) -> dict | None:
         return await self._refresh_tokens(
-            discord_id, stale_access_token=stale_access_token
+            discord_id, tournament_uid, stale_access_token=stale_access_token
         )
 
     async def _refresh_tokens(
-        self, discord_id: str, *, stale_access_token: str | None = None
+        self,
+        discord_id: str,
+        tournament_uid: str,
+        *,
+        stale_access_token: str | None = None,
     ) -> dict | None:
-        """Single-flight per ``discord_id``; if the stored access token no longer
-        matches ``stale_access_token``, another caller already refreshed. (#11)"""
-        async with self._refresh_lock_for(discord_id):
-            tokens = await self._store.get_tokens(discord_id)
+        """Single-flight per grant; if the stored access token no longer matches
+        ``stale_access_token``, another caller already refreshed. (#11)"""
+        async with self._refresh_lock_for(discord_id, tournament_uid):
+            tokens = await self._store.get_tokens(discord_id, tournament_uid)
             if not tokens:
                 return None
 
@@ -83,9 +93,11 @@ class ArchonAPI:
             ):
                 return tokens
 
-            return await self._do_refresh(discord_id, tokens)
+            return await self._do_refresh(discord_id, tournament_uid, tokens)
 
-    async def _do_refresh(self, discord_id: str, tokens: dict) -> dict | None:
+    async def _do_refresh(
+        self, discord_id: str, tournament_uid: str, tokens: dict
+    ) -> dict | None:
         """POST the refresh grant and persist the rotated pair. Lock held."""
         assert self._session
         try:
@@ -102,11 +114,12 @@ class ArchonAPI:
                     # Invalid-grant is signaled via 400 only (401 = bad client
                     # creds); only then is the stored pair genuinely dead.
                     logger.warning(
-                        "Refresh token rejected (%s) for discord_id=%s",
+                        "Refresh token rejected (%s) for discord_id=%s tournament=%s",
                         resp.status,
                         discord_id,
+                        tournament_uid,
                     )
-                    await self._store.remove_tokens(discord_id)
+                    await self._store.remove_tokens(discord_id, tournament_uid)
                     return None
                 if resp.status != 200:
                     # 5xx / proxy blip (e.g. the backend's daily restart): the
@@ -129,6 +142,7 @@ class ArchonAPI:
 
         await self._store.store_tokens(
             discord_id=discord_id,
+            tournament_uid=tournament_uid,
             archon_uid=tokens["archon_uid"],
             access_token=data["access_token"],
             refresh_token=data["refresh_token"],
@@ -139,9 +153,11 @@ class ArchonAPI:
             "refresh_token": data["refresh_token"],
         }
 
-    async def _get_stored_token(self, discord_id: str) -> str | None:
+    async def _get_stored_token(
+        self, discord_id: str, tournament_uid: str
+    ) -> str | None:
         """Get stored access token (may be expired; caller handles 401 refresh)."""
-        tokens = await self._store.get_tokens(discord_id)
+        tokens = await self._store.get_tokens(discord_id, tournament_uid)
         if not tokens:
             return None
         return tokens["access_token"]
@@ -171,9 +187,10 @@ class ArchonAPI:
         method: str,
         path: str,
         discord_id: str,
+        tournament_uid: str,
         json_body: dict | None = None,
     ) -> ApiResult:
-        token = await self._get_stored_token(discord_id)
+        token = await self._get_stored_token(discord_id, tournament_uid)
         if not token:
             return ApiResult.fail(
                 "Your Archon session has expired. Run the command again to re-authenticate."
@@ -188,7 +205,7 @@ class ArchonAPI:
                 # Try refresh, passing the token that 401'd so a concurrent
                 # refresh is detected instead of double-spending the grant.
                 refreshed = await self._refresh_tokens(
-                    discord_id, stale_access_token=token
+                    discord_id, tournament_uid, stale_access_token=token
                 )
                 if not refreshed:
                     return ApiResult.fail(
@@ -211,8 +228,8 @@ class ArchonAPI:
                 return ApiResult.fail(self._extract_error(resp.status, text))
             return ApiResult.success(await resp.json())
 
-    async def get_userinfo(self, discord_id: str) -> ApiResult:
-        return await self._request("GET", "/oauth/userinfo", discord_id)
+    async def get_userinfo(self, discord_id: str, tournament_uid: str) -> ApiResult:
+        return await self._request("GET", "/oauth/userinfo", discord_id, tournament_uid)
 
     async def get_sanction_reference(self) -> dict:
         """Public, no-auth, engine-owned. Raises on failure; callers surface the
@@ -230,31 +247,9 @@ class ArchonAPI:
             "POST",
             f"/api/tournaments/{tournament_uid}/action",
             discord_id,
+            tournament_uid,
             json_body=payload,
         )
-
-    async def claim_vekn_id(self, discord_id: str, vekn_id: str) -> ApiResult:
-        return await self._request(
-            "POST", "/vekn/claim", discord_id, json_body={"vekn_id": vekn_id}
-        )
-
-    async def tournament_action_with_token(
-        self, access_token: str, tournament_uid: str, action: str, **kwargs: object
-    ) -> ApiResult:
-        """One-shot escape hatch: after ``/vekn/claim`` tombstones the linked
-        account, only its response's fresh access token can act for the user."""
-        assert self._session
-        payload = {"type": action, **kwargs}
-        async with self._session.post(
-            f"/api/tournaments/{tournament_uid}/action",
-            json=payload,
-            headers={"Authorization": f"Bearer {access_token}"},
-        ) as resp:
-            if resp.status >= 400:
-                text = await resp.text()
-                logger.error("API error POST action: %s %s", resp.status, text)
-                return ApiResult.fail(self._extract_error(resp.status, text))
-            return ApiResult.success(await resp.json())
 
     async def create_sanction(
         self,
@@ -278,7 +273,9 @@ class ArchonAPI:
             payload["subcategory"] = subcategory
         if round_number is not None:
             payload["round_number"] = round_number
-        return await self._request("POST", "/sanctions/", discord_id, json_body=payload)
+        return await self._request(
+            "POST", "/sanctions/", discord_id, tournament_uid, json_body=payload
+        )
 
     async def exchange_code(self, code: str, code_verifier: str) -> dict | None:
         assert self._session

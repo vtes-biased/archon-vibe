@@ -5,7 +5,7 @@ from uuid import uuid7
 
 import msgspec
 from archon_engine import PyEngine
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from .. import permissions
@@ -231,11 +231,20 @@ class UpdateSanctionRequest(BaseModel):
 @router.post("/", status_code=201)
 async def create_sanction(
     request: CreateSanctionRequest,
+    http_request: Request,
     current_user: OptionalUser = None,
 ) -> Response:
     """Only IC and Ethics can issue SUSPENSION and PROBATION outside tournaments."""
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
+
+    # The path allowlist cannot see a body, so the tournament match lands here.
+    oauth_tournament = getattr(http_request.state, "oauth_tournament", None)
+    if oauth_tournament and request.tournament_uid != oauth_tournament:
+        raise HTTPException(
+            status_code=403,
+            detail="This token acts only on the tournament it was granted for",
+        )
 
     try:
         level = SanctionLevel(request.level)

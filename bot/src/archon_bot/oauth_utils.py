@@ -16,8 +16,10 @@ def generate_pkce() -> tuple[str, str]:
     return code_verifier, code_challenge
 
 
-def make_oauth_url(state: str, code_challenge: str) -> str:
-    """Build Archon OAuth authorize URL with login_hint=discord."""
+def make_oauth_url(state: str, code_challenge: str, tournament_uid: str) -> str:
+    """Build Archon OAuth authorize URL with login_hint=discord. `user:impersonate`
+    is granted per event, so the tournament rides the request and the consent page
+    names it to the user."""
     params = {
         "response_type": "code",
         "client_id": config.OAUTH_CLIENT_ID,
@@ -27,5 +29,6 @@ def make_oauth_url(state: str, code_challenge: str) -> str:
         "code_challenge": code_challenge,
         "code_challenge_method": "S256",
         "login_hint": "discord",
+        "tournament": tournament_uid,
     }
     return f"{config.ARCHON_FRONTEND_URL}/consent?{urlencode(params)}"

@@ -18,6 +18,7 @@ from ..broadcast import (
     broadcast_judge_call,
     broadcast_personal,
     broadcast_precomputed,
+    entitled_level,
 )
 from ..card_data import cards_json_text
 from ..db import (
@@ -60,6 +61,8 @@ from ..models import (
     Role,
     Sanction,
     SanctionLevel,
+    Table,
+    TableState,
     TimerState,
     Tournament,
     TournamentFormat,
@@ -834,6 +837,71 @@ class CreateTournamentRequest(BaseModel):
     finals_time: int = 0
 
 
+@router.get("/{uid}/decks")
+async def get_round_decks(
+    uid: str,
+    current_user: OptionalUser = None,
+) -> Response:
+    """Every seated player's deck, per ongoing round. The delegated read an
+    online-play platform makes once a round starts; the scoped stream cannot
+    serve it, because it pushes stored projections and could never retract a
+    deck when the round ends.
+
+    `round` is the same index `DeckObject.round` carries — 0-based, with
+    len(rounds) the finals sentinel, as `Sanction.round_number` uses.
+    """
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    tournament = await get_tournament_by_uid(uid)
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    if (
+        entitled_level(
+            current_user,
+            obj_type=ObjectType.TOURNAMENT,
+            uid=tournament.uid,
+            country=tournament.country,
+            org_uids=tournament.organizers_uids,
+            obj_user_uid=None,
+        )
+        != "full"
+    ):
+        raise HTTPException(
+            status_code=403, detail="Only the event's officials can read its decks"
+        )
+
+    by_slot = {
+        (d.user_uid, d.round): d
+        for d in await get_decks_for_tournament(uid)
+        if not d.deleted_at
+    }
+
+    slots: list[tuple[int, list[Table]]] = list(enumerate(tournament.rounds))
+    if tournament.finals:
+        slots.append((len(tournament.rounds), [tournament.finals]))
+
+    rounds = []
+    for index, tables in slots:
+        live = [t for t in tables if t.state == TableState.IN_PROGRESS]
+        if not live:
+            continue
+        decks = []
+        for table in live:
+            for seat in table.seating:
+                deck = by_slot.get(
+                    (seat.player_uid, index if tournament.multideck else None)
+                )
+                if deck:
+                    decks.append(deck)
+        rounds.append({"round": index, "decks": decks})
+
+    return Response(
+        content=encoder.encode({"rounds": rounds}), media_type="application/json"
+    )
+
+
 def _parse_datetime(s: str | None) -> datetime | None:
     if not s:
         return None
@@ -1374,10 +1442,22 @@ _ACTION_TRUTHY_ONLY = frozenset(
 async def tournament_action(
     uid: str,
     request: TournamentActionRequest,
+    http_request: Request,
     current_user: OptionalUser = None,
 ) -> Response:
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
+
+    # A grant dies with its event, so reviving a finished one would outlive the
+    # consent that authorized it. Everything else the engine state-gates.
+    if (
+        request.type == "ReopenTournament"
+        and getattr(http_request.state, "oauth_tournament", None) is not None
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="A third-party token cannot reopen a finished tournament",
+        )
 
     event_data = {"type": request.type} | {
         name: value

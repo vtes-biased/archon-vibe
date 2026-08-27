@@ -316,30 +316,28 @@ class SanctionCommand(
 
         discord_id = str(ctx.user.id)
 
-        tokens = await store.get_tokens(discord_id)
+        tokens = await store.get_tokens(discord_id, tournament_uid)
         if not tokens:
             await ctx.respond(
-                "You need to connect your Archon account first. "
+                "You need to connect your Archon account to this event first. "
                 "Run `/register` in a tournament channel to get started.",
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
             return
 
-        info = await fetch_userinfo(api, ctx, discord_id)
+        info = await fetch_userinfo(api, ctx, discord_id, tournament_uid)
         if info is None:
             return
 
         target_discord_id = str(self.player.id)
-        target_tokens = await store.get_tokens(target_discord_id)
-        if not target_tokens:
+        target_uid = await store.get_archon_uid(target_discord_id)
+        if not target_uid:
             await ctx.respond(
                 f"{self.player.mention} hasn't connected their Archon account to the bot. "
                 f"Issue the sanction via the webapp instead.",
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
             return
-
-        target_uid = target_tokens["archon_uid"]
         target_display = self.player.username
 
         try:

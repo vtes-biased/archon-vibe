@@ -18,12 +18,25 @@ class TokenStore:
             os.chmod(self._db_path, 0o600)
         except OSError:
             pass
+        # Pre-scope rows are unscoped grants the backend now refuses outright, and
+        # a primary key is not ALTERable: drop, and let /setup and /register
+        # re-authorize per event.
+        async with self._db.execute("PRAGMA table_info(tokens)") as cur:
+            columns = {row[1] async for row in cur}
+        if columns and "tournament_uid" not in columns:
+            await self._db.execute("DROP TABLE tokens")
+            await self._db.execute("DROP TABLE IF EXISTS pending_oauth")
+
+        # A grant is per (user, event): the backend issues no token that reaches
+        # more than one tournament, so neither does the store.
         await self._db.execute("""
             CREATE TABLE IF NOT EXISTS tokens (
-                discord_id TEXT PRIMARY KEY,
+                discord_id TEXT NOT NULL,
+                tournament_uid TEXT NOT NULL,
                 archon_uid TEXT NOT NULL,
                 access_token TEXT NOT NULL,
-                refresh_token TEXT NOT NULL
+                refresh_token TEXT NOT NULL,
+                PRIMARY KEY (discord_id, tournament_uid)
             )
         """)
         await self._db.execute(
@@ -53,6 +66,7 @@ class TokenStore:
             CREATE TABLE IF NOT EXISTS pending_oauth (
                 state TEXT PRIMARY KEY,
                 discord_id TEXT NOT NULL,
+                tournament_uid TEXT NOT NULL,
                 code_verifier TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -70,11 +84,12 @@ class TokenStore:
         if self._db:
             await self._db.close()
 
-    async def get_tokens(self, discord_id: str) -> dict | None:
+    async def get_tokens(self, discord_id: str, tournament_uid: str) -> dict | None:
         assert self._db
         async with self._db.execute(
-            "SELECT archon_uid, access_token, refresh_token FROM tokens WHERE discord_id = ?",
-            (discord_id,),
+            "SELECT archon_uid, access_token, refresh_token FROM tokens "
+            "WHERE discord_id = ? AND tournament_uid = ?",
+            (discord_id, tournament_uid),
         ) as cur:
             row = await cur.fetchone()
             if not row:
@@ -85,22 +100,35 @@ class TokenStore:
                 "refresh_token": row[2],
             }
 
+    async def get_archon_uid(self, discord_id: str) -> str | None:
+        """Identity, not authority: which member a Discord account is, from
+        whichever event it last authorized."""
+        assert self._db
+        async with self._db.execute(
+            "SELECT archon_uid FROM tokens WHERE discord_id = ? LIMIT 1",
+            (discord_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else None
+
     async def store_tokens(
         self,
         discord_id: str,
+        tournament_uid: str,
         archon_uid: str,
         access_token: str,
         refresh_token: str,
     ) -> None:
         assert self._db
         await self._db.execute(
-            """INSERT INTO tokens (discord_id, archon_uid, access_token, refresh_token)
-               VALUES (?, ?, ?, ?)
-               ON CONFLICT(discord_id) DO UPDATE SET
+            """INSERT INTO tokens
+               (discord_id, tournament_uid, archon_uid, access_token, refresh_token)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(discord_id, tournament_uid) DO UPDATE SET
                  archon_uid = excluded.archon_uid,
                  access_token = excluded.access_token,
                  refresh_token = excluded.refresh_token""",
-            (discord_id, archon_uid, access_token, refresh_token),
+            (discord_id, tournament_uid, archon_uid, access_token, refresh_token),
         )
         await self._db.commit()
 
@@ -129,9 +157,12 @@ class TokenStore:
                 result[row[0]] = row[1]
         return result
 
-    async def remove_tokens(self, discord_id: str) -> None:
+    async def remove_tokens(self, discord_id: str, tournament_uid: str) -> None:
         assert self._db
-        await self._db.execute("DELETE FROM tokens WHERE discord_id = ?", (discord_id,))
+        await self._db.execute(
+            "DELETE FROM tokens WHERE discord_id = ? AND tournament_uid = ?",
+            (discord_id, tournament_uid),
+        )
         await self._db.commit()
 
     async def link_tournament(
@@ -268,13 +299,15 @@ class TokenStore:
         self,
         state: str,
         discord_id: str,
+        tournament_uid: str,
         code_verifier: str,
     ) -> None:
         assert self._db
         await self._db.execute(
-            """INSERT INTO pending_oauth (state, discord_id, code_verifier)
-               VALUES (?, ?, ?)""",
-            (state, discord_id, code_verifier),
+            """INSERT INTO pending_oauth
+               (state, discord_id, tournament_uid, code_verifier)
+               VALUES (?, ?, ?, ?)""",
+            (state, discord_id, tournament_uid, code_verifier),
         )
         await self._db.commit()
 
@@ -287,7 +320,8 @@ class TokenStore:
         )
         await self._db.commit()
         async with self._db.execute(
-            "SELECT discord_id, code_verifier FROM pending_oauth WHERE state = ?",
+            "SELECT discord_id, tournament_uid, code_verifier FROM pending_oauth "
+            "WHERE state = ?",
             (state,),
         ) as cur:
             row = await cur.fetchone()
@@ -295,7 +329,8 @@ class TokenStore:
                 return None
             return {
                 "discord_id": row[0],
-                "code_verifier": row[1],
+                "tournament_uid": row[1],
+                "code_verifier": row[2],
             }
 
     async def remove_pending_oauth(self, state: str) -> None:

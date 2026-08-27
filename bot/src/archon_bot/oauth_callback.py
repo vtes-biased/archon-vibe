@@ -57,9 +57,11 @@ async def handle_callback(request: web.Request) -> web.Response:
 
     archon_uid = userinfo["sub"]
     discord_id = pending["discord_id"]
+    tournament_uid = pending["tournament_uid"]
 
     await _store.store_tokens(
         discord_id=discord_id,
+        tournament_uid=tournament_uid,
         archon_uid=archon_uid,
         access_token=token_data["access_token"],
         refresh_token=token_data["refresh_token"],
@@ -68,9 +70,12 @@ async def handle_callback(request: web.Request) -> web.Response:
     # Self-service recovery: a dead-token listener stays dead until this fresh
     # grant respawns it (start_sse no-ops for listeners still alive).
     for gt in await _store.get_all_guild_tournaments():
-        if gt["organizer_discord_id"] == discord_id:
+        if (
+            gt["organizer_discord_id"] == discord_id
+            and gt["tournament_uid"] == tournament_uid
+        ):
             await start_sse(
-                _bot, _api, _store, gt["guild_id"], gt["tournament_uid"], discord_id
+                _bot, _api, _store, gt["guild_id"], tournament_uid, discord_id
             )
 
     try:

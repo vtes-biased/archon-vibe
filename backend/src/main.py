@@ -669,13 +669,21 @@ def _viewer_level(viewer: User | None) -> DataLevel:
 
 
 async def _resolve_user_from_token(token: str | None) -> User | None:
-    """Resolve a User from a JWT token query param. Returns None on any failure."""
+    """Resolve a User from a JWT token query param. Returns None on any failure.
+
+    First-party `access` tokens only: this path runs none of the middleware's
+    OAuth gate, so an `oauth_access` token accepted here would reach the
+    unscoped stream and `/snapshot` around the allowlist entirely. Third parties
+    send the Authorization header, which does run it.
+    """
     if not token:
         return None
     try:
         from .jwt_config import JWT_ALGORITHM, JWT_SECRET
 
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "access":
+            return None
         user_uid = payload.get("sub")
         if not user_uid:
             return None

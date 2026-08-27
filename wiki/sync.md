@@ -203,6 +203,14 @@ streamer's because each row now carries four projections.
 header, resolved revocation-aware with `oauth_access` and `user:impersonate`
 support.
 
+**The two ways are not equivalent, and must not be.** The header path runs
+`get_current_user`, and with it the OAuth allowlist
+([access](access.md#the-allowlist)): a third party reaches `/stream` only with a
+`tournament=` matching its own grant, and never reaches `/snapshot`. The query
+parameter runs none of that, so it accepts **first-party `access` tokens only** —
+an `oauth_access` token handed over that way is refused outright, or the
+allowlist would have a door beside it.
+
 **An invalid credential yields 401, never a silent downgrade.** Only a wholly
 absent credential gives anonymous → `public`. Clients react: the bot checks expiry
 before connecting and refreshes on 401; the webapp ensures a fresh token before
@@ -244,6 +252,30 @@ Scoped streams carry no access-version handshake **by design**: they replay full
 so the private-deck leak the fingerprint guards against cannot occur. Entitlement
 shifts reach the bot through the live re-evaluation and the next full replay. Only
 a move to *incremental* scoped catch-up would warrant revisiting this.
+
+### Delegated third-party reads
+
+A **third class** beside the offline-first stream and the PWA's online-only REST
+carve-out: a REST endpoint answering an OAuth actor a question the stream
+deliberately cannot. Do not "fix" one of these back onto the stream.
+
+`GET /api/tournaments/{uid}/decks` is the first. An online-play platform holding a
+per-event `user:impersonate` grant needs each seated player's deck once a round
+starts; it sees the round start on the scoped stream (the member projection
+already carries rounds and seating) and pulls the decks once. It answers per
+**ongoing** round — any round holding an `In Progress` table, so open and parallel
+rounds yield several at once — with `rounds: [{round, decks}]`, and is empty when
+no round is ongoing. `round` is the index `DeckObject.round` carries: 0-based,
+with `len(rounds)` the finals sentinel, the same convention as
+`Sanction.round_number`. A multideck event answers that round's deck, any other
+event the registered one; a deck not yet submitted is simply absent. Full
+entitlement only.
+
+It is a pull, not a push, for three reasons that all point the same way: the
+scoped stream's no-decks property is load-bearing (it is why scoped streams skip
+the access-version handshake), the stream serves stored projection columns and
+so could never *retract* a deck when a round ends, and a second stream endpoint
+would duplicate shields, coalescing and participant refresh.
 
 *Participant identities* — the bot has no User store but needs seated players'
 names, and the scope filter drops generic user broadcasts. So the scoped stream

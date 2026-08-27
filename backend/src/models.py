@@ -957,6 +957,10 @@ class OAuthAuthorizationCode(BaseObject, kw_only=True):
     ]
     redirect_uri: str
     scopes: list[OAuthScope]
+    tournament_uid: Annotated[
+        str | None,
+        msgspec.Meta(description="The event user:impersonate is scoped to."),
+    ] = None
     code_challenge: Annotated[str, msgspec.Meta(description="S256 PKCE challenge.")]
     expires_at: Annotated[
         datetime, msgspec.Meta(description="UTC instant the code stops working.")
@@ -969,6 +973,10 @@ class OAuthToken(BaseObject, kw_only=True):
     client_id: str
     user_uid: Annotated[str, msgspec.Meta(description="Uid of the member it acts for.")]
     scopes: list[OAuthScope]
+    tournament_uid: Annotated[
+        str | None,
+        msgspec.Meta(description="The event user:impersonate is scoped to."),
+    ] = None
     token_type: Annotated[
         str, msgspec.Meta(description='Either "access" or "refresh".')
     ]
@@ -986,3 +994,7 @@ class OAuthConsent(BaseObject, kw_only=True):
     user_uid: Annotated[str, msgspec.Meta(description="Uid of the consenting member.")]
     client_id: str
     scopes: list[OAuthScope]
+    tournament_uid: Annotated[
+        str | None,
+        msgspec.Meta(description="The event user:impersonate is scoped to."),
+    ] = None

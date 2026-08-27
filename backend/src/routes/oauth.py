@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from .. import permissions
+from ..db import get_tournament_by_uid
 from ..db_oauth import (
     delete_oauth_consent,
     get_oauth_client_by_client_id,
@@ -45,6 +46,7 @@ from ..models import (
     OAuthConsent,
     OAuthScope,
     OAuthToken,
+    TournamentState,
     User,
 )
 
@@ -95,6 +97,7 @@ def _create_oauth_jwt(
     client_id: str,
     jti: str,
     lifetime: timedelta,
+    tournament_uid: str | None = None,
 ) -> str:
     now = datetime.now(UTC)
     payload = {
@@ -106,6 +109,10 @@ def _create_oauth_jwt(
         "iat": now,
         "exp": now + lifetime,
     }
+    # A separate claim, never a member of `scope`: the scope string round-trips
+    # through OAuthScope on refresh and a uid is not an enum member.
+    if tournament_uid:
+        payload["tournament"] = tournament_uid
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
@@ -120,6 +127,24 @@ def _parse_scopes(scope_str: str) -> list[OAuthScope]:
     return scopes
 
 
+async def _grant_tournament(scopes: list[OAuthScope], tournament_uid: str):
+    """Resolve the event a `user:impersonate` grant is scoped to, refusing a
+    finished one. Returns the Tournament, or None when the grant carries no
+    impersonation. Every impersonate grant names exactly one event."""
+    if OAuthScope.USER_IMPERSONATE not in scopes:
+        if tournament_uid:
+            raise HTTPException(400, "tournament requires the user:impersonate scope")
+        return None
+    if not tournament_uid:
+        raise HTTPException(400, "user:impersonate must name a tournament")
+    tournament = await get_tournament_by_uid(tournament_uid)
+    if not tournament:
+        raise HTTPException(400, "Unknown tournament")
+    if tournament.state == TournamentState.FINISHED:
+        raise HTTPException(400, "Tournament is finished")
+    return tournament
+
+
 @router.get("/authorize")
 async def authorize_get(
     request: Request,
@@ -131,6 +156,7 @@ async def authorize_get(
     state: str = "",
     code_challenge: str = "",
     code_challenge_method: str = "",
+    tournament: str = "",
 ):
     """Validate OAuth authorization request parameters. Returns JSON with authorization details
     or redirects with code if consent already exists."""
@@ -155,7 +181,10 @@ async def authorize_get(
     if OAuthScope.API_READ in requested_scopes:
         raise HTTPException(400, "api:read is a client_credentials scope")
 
-    consent = await get_oauth_consent(user.uid, client_id)
+    event = await _grant_tournament(requested_scopes, tournament)
+    tournament_uid = event.uid if event else None
+
+    consent = await get_oauth_consent(user.uid, client_id, tournament_uid)
     if consent and set(requested_scopes).issubset(set(consent.scopes)):
         code_value = _generate_auth_code()
         now = datetime.now(UTC)
@@ -167,6 +196,7 @@ async def authorize_get(
             user_uid=user.uid,
             redirect_uri=redirect_uri,
             scopes=requested_scopes,
+            tournament_uid=tournament_uid,
             code_challenge=code_challenge,
             expires_at=now + AUTH_CODE_LIFETIME,
         )
@@ -183,12 +213,14 @@ async def authorize_get(
         "scopes": [s.value for s in requested_scopes],
         "scope_descriptions": {
             OAuthScope.PROFILE_READ.value: "Read your basic profile (roles, VEKN ID)",
-            OAuthScope.USER_IMPERSONATE.value: "Act on your behalf on API endpoints",
+            OAuthScope.USER_IMPERSONATE.value: "Act on your behalf on this event",
         },
         "redirect_uri": redirect_uri,
         "state": state,
         "client_id": client_id,
         "code_challenge": code_challenge,
+        "tournament": tournament_uid,
+        "tournament_name": event.name if event else None,
     }
 
 
@@ -201,6 +233,7 @@ class AuthorizeApprovalRequest(BaseModel):
     scope: str = ""
     state: str = ""
     code_challenge: str = ""
+    tournament: str = ""
     approved: bool = True
 
 
@@ -233,6 +266,9 @@ async def authorize_post(user: CurrentUser, body: AuthorizeApprovalRequest):
     if not code_challenge:
         raise HTTPException(400, "PKCE code_challenge is required")
 
+    event = await _grant_tournament(requested_scopes, body.tournament)
+    tournament_uid = event.uid if event else None
+
     now = datetime.now(UTC)
     consent = OAuthConsent(
         uid=str(uuid7()),
@@ -240,6 +276,7 @@ async def authorize_post(user: CurrentUser, body: AuthorizeApprovalRequest):
         user_uid=user.uid,
         client_id=client_id,
         scopes=requested_scopes,
+        tournament_uid=tournament_uid,
     )
     await upsert_oauth_consent(consent)
 
@@ -252,6 +289,7 @@ async def authorize_post(user: CurrentUser, body: AuthorizeApprovalRequest):
         user_uid=user.uid,
         redirect_uri=redirect_uri,
         scopes=requested_scopes,
+        tournament_uid=tournament_uid,
         code_challenge=code_challenge,
         expires_at=now + AUTH_CODE_LIFETIME,
     )
@@ -386,7 +424,9 @@ async def _handle_authorization_code(body: TokenRequest, client: OAuthClient) ->
 
     # Consent is authoritative: a revoke between code issuance and exchange (≤60s,
     # or any auto-approve race) deletes the consent row and must block redemption.
-    if not await get_oauth_consent(auth_code.user_uid, client.client_id):
+    if not await get_oauth_consent(
+        auth_code.user_uid, client.client_id, auth_code.tournament_uid
+    ):
         raise HTTPException(400, "Consent has been revoked")
 
     used_code = OAuthAuthorizationCode(
@@ -397,6 +437,7 @@ async def _handle_authorization_code(body: TokenRequest, client: OAuthClient) ->
         user_uid=auth_code.user_uid,
         redirect_uri=auth_code.redirect_uri,
         scopes=auth_code.scopes,
+        tournament_uid=auth_code.tournament_uid,
         code_challenge=auth_code.code_challenge,
         expires_at=auth_code.expires_at,
         used=True,
@@ -407,6 +448,7 @@ async def _handle_authorization_code(body: TokenRequest, client: OAuthClient) ->
         user_uid=auth_code.user_uid,
         client_id=client.client_id,
         scopes=auth_code.scopes,
+        tournament_uid=auth_code.tournament_uid,
         parent_token_uid=None,
     )
 
@@ -443,8 +485,16 @@ async def _handle_refresh_token(body: TokenRequest, client: OAuthClient) -> dict
 
     # Consent is authoritative: revoking it deletes the row, so a surviving refresh
     # token (e.g. a partial revoke) still can't mint new access tokens.
-    if not await get_oauth_consent(payload["sub"], client.client_id):
+    tournament_uid = payload.get("tournament")
+    if not await get_oauth_consent(payload["sub"], client.client_id, tournament_uid):
         raise HTTPException(400, "Consent has been revoked")
+
+    # A grant dies with its event: the scoped token is the whole of a third
+    # party's reach, so a finished tournament ends the relationship.
+    if tournament_uid:
+        event = await get_tournament_by_uid(tournament_uid)
+        if not event or event.state == TournamentState.FINISHED:
+            raise HTTPException(400, "Tournament is finished")
 
     now = datetime.now(UTC)
     revoked = OAuthToken(
@@ -454,6 +504,7 @@ async def _handle_refresh_token(body: TokenRequest, client: OAuthClient) -> dict
         client_id=token_record.client_id,
         user_uid=token_record.user_uid,
         scopes=token_record.scopes,
+        tournament_uid=token_record.tournament_uid,
         token_type=token_record.token_type,
         expires_at=token_record.expires_at,
         revoked=True,
@@ -469,6 +520,7 @@ async def _handle_refresh_token(body: TokenRequest, client: OAuthClient) -> dict
         user_uid=payload["sub"],
         client_id=client.client_id,
         scopes=scopes,
+        tournament_uid=tournament_uid,
         parent_token_uid=parent,
     )
 
@@ -506,6 +558,7 @@ async def _issue_token_pair(
     user_uid: str,
     client_id: str,
     scopes: list[OAuthScope],
+    tournament_uid: str | None,
     parent_token_uid: str | None,
 ) -> dict:
     now = datetime.now(UTC)
@@ -513,10 +566,22 @@ async def _issue_token_pair(
     refresh_jti = str(uuid7())
 
     access_token = _create_oauth_jwt(
-        user_uid, "access", scopes, client_id, access_jti, ACCESS_TOKEN_LIFETIME
+        user_uid,
+        "access",
+        scopes,
+        client_id,
+        access_jti,
+        ACCESS_TOKEN_LIFETIME,
+        tournament_uid,
     )
     refresh_token = _create_oauth_jwt(
-        user_uid, "refresh", scopes, client_id, refresh_jti, REFRESH_TOKEN_LIFETIME
+        user_uid,
+        "refresh",
+        scopes,
+        client_id,
+        refresh_jti,
+        REFRESH_TOKEN_LIFETIME,
+        tournament_uid,
     )
 
     access_record = OAuthToken(
@@ -526,6 +591,7 @@ async def _issue_token_pair(
         client_id=client_id,
         user_uid=user_uid,
         scopes=scopes,
+        tournament_uid=tournament_uid,
         token_type="access",
         expires_at=now + ACCESS_TOKEN_LIFETIME,
         parent_token_uid=parent_token_uid,
@@ -537,6 +603,7 @@ async def _issue_token_pair(
         client_id=client_id,
         user_uid=user_uid,
         scopes=scopes,
+        tournament_uid=tournament_uid,
         token_type="refresh",
         expires_at=now + REFRESH_TOKEN_LIFETIME,
         parent_token_uid=parent_token_uid or access_record.uid,
@@ -622,11 +689,16 @@ async def list_consents(user: CurrentUser, request: Request):
         client = await get_oauth_client_by_client_id(c.client_id)
         if not client:
             continue  # orphaned consent (client hard-deleted) — nothing to show
+        event = (
+            await get_tournament_by_uid(c.tournament_uid) if c.tournament_uid else None
+        )
         out.append(
             {
                 "client_id": c.client_id,
                 "name": client.name,
                 "scopes": [s.value for s in c.scopes],
+                "tournament": c.tournament_uid,
+                "tournament_name": event.name if event else None,
                 "granted_at": c.modified.isoformat(),
             }
         )

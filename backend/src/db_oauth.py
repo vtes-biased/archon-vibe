@@ -122,6 +122,7 @@ async def revoke_oauth_token_chain(parent_token_uid: str) -> int:
                     client_id=t.client_id,
                     user_uid=t.user_uid,
                     scopes=t.scopes,
+                    tournament_uid=t.tournament_uid,
                     token_type=t.token_type,
                     expires_at=t.expires_at,
                     revoked=True,
@@ -135,11 +136,16 @@ async def revoke_oauth_token_chain(parent_token_uid: str) -> int:
         return count
 
 
-async def get_oauth_consent(user_uid: str, client_id: str) -> OAuthConsent | None:
+async def get_oauth_consent(
+    user_uid: str, client_id: str, tournament_uid: str | None
+) -> OAuthConsent | None:
+    """Consent is keyed (user, client, tournament): approving one event never
+    speaks for another, and a NULL tournament is the profile:read-only grant."""
     async with get_connection() as conn:
         result = await conn.execute(
-            "SELECT data FROM oauth_consents WHERE data->>'user_uid' = %s AND data->>'client_id' = %s",
-            (user_uid, client_id),
+            "SELECT data FROM oauth_consents WHERE data->>'user_uid' = %s "
+            "AND data->>'client_id' = %s AND data->>'tournament_uid' IS NOT DISTINCT FROM %s",
+            (user_uid, client_id, tournament_uid),
         )
         row = await result.fetchone()
         if row:
@@ -149,7 +155,9 @@ async def get_oauth_consent(user_uid: str, client_id: str) -> OAuthConsent | Non
 
 async def upsert_oauth_consent(consent: OAuthConsent) -> None:
     async with get_connection() as conn:
-        existing = await get_oauth_consent(consent.user_uid, consent.client_id)
+        existing = await get_oauth_consent(
+            consent.user_uid, consent.client_id, consent.tournament_uid
+        )
         if existing:
             await conn.execute(
                 "UPDATE oauth_consents SET data = %s WHERE uid = %s",
@@ -173,7 +181,9 @@ async def get_oauth_consents_by_user(user_uid: str) -> list[OAuthConsent]:
 
 
 async def delete_oauth_consent(user_uid: str, client_id: str) -> bool:
-    """Hard-delete a user's remembered consent for a client. Returns True if a row was removed."""
+    """Hard-delete a user's remembered consent for a client — every event's grant,
+    not one: the profile page revokes the app, not a single tournament. Returns
+    True if a row was removed."""
     async with get_connection() as conn:
         result = await conn.execute(
             "DELETE FROM oauth_consents WHERE data->>'user_uid' = %s AND data->>'client_id' = %s RETURNING uid",
