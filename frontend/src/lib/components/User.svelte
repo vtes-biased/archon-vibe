@@ -303,7 +303,7 @@
   }
 </script>
 
-<div class={inline ? "p-4" : "bg-surface-card rounded-lg shadow p-4 hover:shadow-md transition-shadow border border-line"}>
+<div class={inline ? "" : "bg-surface-card rounded-lg shadow p-4 hover:shadow-md transition-shadow border border-line"}>
   {#if isEditing}
     <div role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <form

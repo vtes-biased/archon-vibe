@@ -187,9 +187,14 @@ header and its gallery empty state.
 **The boundary is top-level and list-shaped.** `create` opens a *new item of the
 list you are looking at*; it never dresses a form submit, a row-level add, a nested
 add-to-this-thing, or a state the button can toggle into — a blue button reading
-Cancel is the leak this rule exists to prevent, so the member list's create button
-hides while its form is open and the form carries its own cancel. Everything else
-affirmative stays `primary`.
+Cancel is the leak this rule exists to prevent. Everything else affirmative stays
+`primary`.
+
+**A create opens a modal, unless it has a page's worth of fields and earns a
+route.** Nothing expands inline: an inline form is what pushes the button into a
+toggle and gives that leak somewhere to start. Tournament and league creation take
+`/tournaments/new` and `/leagues/new` on field count alone; the community link, the
+promo entry and the member each open a dialog.
 
 **Danger is violet, never red.** Red and crimson are the same hue family and
 collapse together even under colourblindness, so destructive actions get their own

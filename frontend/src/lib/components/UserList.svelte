@@ -15,7 +15,8 @@
   import type { User as UserType, Role } from "$lib/types";
   import type { UserListItem } from "$lib/db";
   import Button from '$lib/components/Button.svelte';
-  import { RefreshCw, Users, Plus } from "@lucide/svelte";
+  import { RefreshCw, Users, Plus, X } from "@lucide/svelte";
+  import { dialogPanel } from "$lib/actions/dialog";
   import { syncQueryParams, currentParams, readPageParam, pageParam } from "$lib/url-filters";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -354,9 +355,8 @@
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-3xl font-semibold text-accent">{m.nav_users()}</h1>
 
-        {#if canSponsor && !showCreateForm}
+        {#if canSponsor}
           <Button
-            id="new-user-button"
             variant="create"
             size="lg"
             onclick={() => showCreateForm = true}
@@ -493,16 +493,6 @@
         </div>
       </div>
     </div>
-
-    {#if showCreateForm && canSponsor}
-      <div class="mb-6">
-        <User
-          mode="create"
-          oncreated={handleUserCreated}
-          oncancel={handleCreateCancel}
-        />
-      </div>
-    {/if}
 
     {#if error}
       <div
@@ -667,3 +657,42 @@
     {/if}
   </div>
 </div>
+
+{#if showCreateForm && canSponsor}
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <div
+    class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm sm:flex sm:items-center sm:justify-center sm:p-4"
+    role="presentation"
+    onclick={handleCreateCancel}
+  >
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <div
+      use:dialogPanel={handleCreateCancel}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-user-title"
+      tabindex="-1"
+      class="bg-surface-card w-full h-full overflow-y-auto pt-safe-t pb-safe-b sm:pt-0 sm:h-auto sm:max-h-[85dvh] sm:max-w-lg sm:rounded-lg sm:border sm:border-line sm:shadow-xl"
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
+    >
+      <div class="p-6 border-b border-line flex items-center justify-between gap-4">
+        <h2 id="create-user-title" class="text-xl font-medium text-ink-strong">
+          {m.user_list_new_user()}
+        </h2>
+        <button onclick={handleCreateCancel} aria-label={m.common_close()} class="p-2 text-ink-faint hover:text-link transition-colors">
+          <X class="w-5 h-5" />
+        </button>
+      </div>
+
+      <div class="p-6">
+        <User
+          inline
+          mode="create"
+          oncreated={handleUserCreated}
+          oncancel={handleCreateCancel}
+        />
+      </div>
+    </div>
+  </div>
+{/if}
