@@ -123,6 +123,8 @@ pub mod arg {
     pub const VEKN_ID: &str = "vekn_id";
     pub const VP: &str = "vp";
     pub const VPS: &str = "vps";
+    pub const WAITLIST_PAST_CAP: &str = "waitlist_past_cap";
+    pub const WAITLISTED: &str = "waitlisted";
     pub const WINNER: &str = "winner";
 }
 
@@ -154,6 +156,7 @@ pub mod player {
     pub const STATE: &str = "state";
     pub const TOSS: &str = "toss";
     pub const USER_UID: &str = "user_uid";
+    pub const WAITLISTED: &str = "waitlisted";
 }
 
 pub mod promo_distribution {

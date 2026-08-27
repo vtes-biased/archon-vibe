@@ -3892,3 +3892,79 @@ fn test_set_archival_results() {
         }
     );
 }
+
+#[test]
+fn test_registration_past_cap_waitlists_and_bars_check_in() {
+    let mut tournament = make_tournament();
+    tournament["state"] = "Registration".into();
+    tournament["max_players"] = 1.into();
+    tournament["players"] = json::array![
+        { user_uid: "p0", state: "Registered", payment_status: "Pending", toss: 0 },
+    ];
+
+    let register =
+        |uid: &str| json::object! { type: "Register", user_uid: uid, vekn_id: "1000001" };
+    let after_one =
+        run_event(&tournament, &register("p1"), &make_player("p1")).expect("register accepted");
+    let mut tournament = json::parse(&after_one).unwrap();
+    assert!(tournament["players"][1]["waitlisted"].as_bool().unwrap());
+
+    // The cap counts unwaitlisted seats, so the queue grows instead of the roster.
+    let after_two =
+        run_event(&tournament, &register("p2"), &make_player("p2")).expect("register accepted");
+    tournament = json::parse(&after_two).unwrap();
+    assert!(tournament["players"][2]["waitlisted"].as_bool().unwrap());
+
+    tournament["state"] = "Waiting".into();
+    let check_in = json::object! { type: "CheckIn", player_uid: "p1", vekn_id: "1000001" };
+    assert!(matches!(
+        run_event(&tournament, &check_in, &make_organizer()),
+        Err(EngineError::PlayerWaitlisted)
+    ));
+
+    let promote = json::object! { type: "SetWaitlisted", player_uid: "p1", waitlisted: false };
+    let promoted = run_event(&tournament, &promote, &make_organizer()).expect("promotion accepted");
+    let tournament = json::parse(&promoted).unwrap();
+    let checked_in =
+        run_event(&tournament, &check_in, &make_organizer()).expect("check-in accepted");
+    let tournament = json::parse(&checked_in).unwrap();
+    assert_eq!(
+        tournament["players"][1]["state"].as_str(),
+        Some("Checked-in")
+    );
+}
+
+#[test]
+fn test_waitlisted_player_skipped_by_check_in_all_and_spared_by_no_show_sweep() {
+    let mut tournament = make_tournament();
+    tournament["state"] = "Waiting".into();
+    tournament["players"] = json::array![
+        { user_uid: "p0", state: "Registered", payment_status: "Pending", toss: 0 },
+        { user_uid: "p1", state: "Registered", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Registered", payment_status: "Pending", toss: 0 },
+        { user_uid: "p3", state: "Registered", payment_status: "Pending", toss: 0 },
+        { user_uid: "p4", state: "Registered", payment_status: "Pending", toss: 0, waitlisted: true },
+    ];
+
+    let all_in = json::object! { type: "CheckInAll" };
+    let after = run_event(&tournament, &all_in, &make_organizer()).expect("check-in all accepted");
+    let tournament = json::parse(&after).unwrap();
+    assert_eq!(
+        tournament["players"][0]["state"].as_str(),
+        Some("Checked-in")
+    );
+    assert_eq!(
+        tournament["players"][4]["state"].as_str(),
+        Some("Registered")
+    );
+
+    let start =
+        json::parse(r#"{"type": "StartRound", "seating": [["p0","p1","p2","p3"]]}"#).unwrap();
+    let after = run_event(&tournament, &start, &make_organizer()).expect("round started");
+    let tournament = json::parse(&after).unwrap();
+    assert_eq!(
+        tournament["players"][4]["state"].as_str(),
+        Some("Registered")
+    );
+    assert!(tournament["players"][4]["waitlisted"].as_bool().unwrap());
+}

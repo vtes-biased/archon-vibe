@@ -245,6 +245,7 @@ export interface Player {
   display_name?: string | null; // Discord guild nickname (per-tournament)
   non_competing?: boolean; // proxy: non-competing official stood in; excluded from rank/RTP/finals
   missing_decklist?: boolean;
+  waitlisted?: boolean; // signed up past max_players: barred from check-in until an organizer promotes
 }
 
 export interface Standing {

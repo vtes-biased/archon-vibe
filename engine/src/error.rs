@@ -34,6 +34,8 @@ pub enum EngineError {
     CannotFinish,
     CannotAlterSeating,
     CannotSetNonCompeting,
+    CannotWaitlistPlayer,
+    PlayerWaitlisted,
     NoRoundInProgress,
     NoRoundToFinish,
     NoRoundToCancel,
@@ -136,6 +138,8 @@ impl EngineError {
             CannotFinish => "tournament.cannot_finish",
             CannotAlterSeating => "tournament.cannot_alter_seating",
             CannotSetNonCompeting => "tournament.cannot_set_non_competing",
+            CannotWaitlistPlayer => "tournament.cannot_waitlist_player",
+            PlayerWaitlisted => "tournament.player_waitlisted",
             NoRoundInProgress => "tournament.no_round_in_progress",
             NoRoundToFinish => "tournament.no_round_to_finish",
             NoRoundToCancel => "tournament.no_round_to_cancel",
@@ -291,6 +295,12 @@ impl fmt::Display for EngineError {
                     f,
                     "Cannot change proxy status after finals or once the tournament is finished"
                 )
+            }
+            CannotWaitlistPlayer => {
+                write!(f, "Only a registered player can be moved to the waitlist")
+            }
+            PlayerWaitlisted => {
+                write!(f, "Player is on the waitlist — promote them to check in")
             }
             NoRoundInProgress => write!(f, "No rounds in progress"),
             NoRoundToFinish => write!(f, "No rounds to finish"),

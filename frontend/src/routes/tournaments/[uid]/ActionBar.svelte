@@ -35,9 +35,9 @@
 
   const isFinals = $derived(tournament?.finals != null && (tournament?.state === "Playing" || tournament?.state === "Finished"));
 
-  const registeredCount = $derived(tournament?.players?.length ?? 0);
+  const registeredCount = $derived(tournament?.players?.filter(p => !p.waitlisted).length ?? 0);
   const checkedInCount = $derived(tournament?.players?.filter(p => p.state === "Checked-in").length ?? 0);
-  const uncheckedCount = $derived(tournament?.players?.filter(p => p.state === "Registered").length ?? 0);
+  const uncheckedCount = $derived(tournament?.players?.filter(p => p.state === "Registered" && !p.waitlisted).length ?? 0);
   const finishedPlayerCount = $derived(tournament?.players?.filter(p => p.state === "Finished").length ?? 0);
   const hasRounds = $derived((tournament?.rounds?.length ?? 0) > 0);
   // QR self-check-in is in-person only — online players can't scan a venue code. checkin_code is always set server-side, so gate on !online.
@@ -93,7 +93,7 @@
     const priorRealRounds = tournament?.rounds?.filter(r => r.some(t => t.state !== "Cancelled")).length ?? 0;
     if (priorRealRounds > 0) return [];
     return (tournament?.players ?? [])
-      .filter(p => p.state === "Registered" && p.user_uid)
+      .filter(p => p.state === "Registered" && !p.waitlisted && p.user_uid)
       .map(p => seatDisplay(p.user_uid!, playerInfo, tournament.online));
   });
 

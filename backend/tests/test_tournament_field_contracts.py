@@ -95,6 +95,7 @@ _ACTION_ANY_VALUE = {
     "seat",
     "toss",
     "non_competing",
+    "waitlisted",
     "player_uids",
     "config",
     "deck",

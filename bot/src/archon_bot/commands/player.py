@@ -97,6 +97,12 @@ async def _handle_registration_pipeline(
                 ),
                 None,
             )
+            if player_entry and player_entry.get("waitlisted"):
+                msg = (
+                    "You're on the **waitlist** — the event is at its "
+                    "registration cap. An organizer will promote you if a seat "
+                    "opens; you cannot check in until they do."
+                )
             if player_entry and player_entry.get("missing_decklist"):
                 msg += (
                     "\n\n**Warning:** This tournament requires a decklist. "

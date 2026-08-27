@@ -38,6 +38,7 @@ impl TournamentEvent {
                     .to_string(),
                 vekn_id: value[arg::VEKN_ID].as_str().map(|s| s.to_string()),
                 display_name: value[arg::DISPLAY_NAME].as_str().map(|s| s.to_string()),
+                waitlist_past_cap: value[arg::WAITLIST_PAST_CAP].as_bool().unwrap_or(false),
             }),
             "RemovePlayer" => Ok(Self::RemovePlayer {
                 user_uid: value[arg::USER_UID]
@@ -90,6 +91,19 @@ impl TournamentEvent {
                 Ok(Self::SetNonCompeting {
                     player_uid,
                     non_competing,
+                })
+            }
+            "SetWaitlisted" => {
+                let player_uid = value[arg::PLAYER_UID]
+                    .as_str()
+                    .ok_or("player_uid required")?
+                    .to_string();
+                let waitlisted = value[arg::WAITLISTED]
+                    .as_bool()
+                    .ok_or("waitlisted required")?;
+                Ok(Self::SetWaitlisted {
+                    player_uid,
+                    waitlisted,
                 })
             }
             "StartRound" => {

@@ -27,9 +27,9 @@ pub use types::{ActorContext, PlayerState, SeatScore, TournamentEvent, Tournamen
 use crate::error::EngineError;
 use helpers::{
     all_rounds_finished, collect_previous_rounds, count_played_rounds, count_player_rounds_played,
-    demote_unseated_players, find_player_index, player_exists, players_in_other_active_rounds,
-    release_stamped_decks, require_can_edit_results, require_organizer, require_state,
-    require_state_or_finished, stamp_round_decks, validate_enum,
+    demote_unseated_players, find_player_index, past_registration_cap, player_exists,
+    players_in_other_active_rounds, release_stamped_decks, require_can_edit_results,
+    require_organizer, require_state, require_state_or_finished, stamp_round_decks, validate_enum,
 };
 use raffle::compute_deck_public;
 use sanctions::{has_active_suspension, has_dq_sanction, table_sa_adjustments};
@@ -473,6 +473,7 @@ fn apply_event(
                 return Err(EngineError::PlayerSuspended);
             }
 
+            let waitlisted = past_registration_cap(tournament);
             let mut player = json::object! {
                 player::USER_UID => user_uid.as_str(),
                 player::STATE => "Registered",
@@ -481,6 +482,7 @@ fn apply_event(
                 player::RESULT => json::object!{ score::GW => 0, score::VP => 0.0, score::TP => 0 },
                 player::FINALIST => false,
                 player::NON_COMPETING => false,
+                player::WAITLISTED => waitlisted,
             };
             if let Some(dn) = display_name {
                 if !dn.is_empty() {
@@ -508,6 +510,7 @@ fn apply_event(
             user_uid,
             vekn_id,
             display_name,
+            waitlist_past_cap,
         } => {
             require_organizer(actor)?;
             if state != TournamentState::Planned
@@ -540,6 +543,8 @@ fn apply_event(
             } else {
                 "Registered"
             };
+            let waitlisted =
+                *waitlist_past_cap && !auto_checkin && past_registration_cap(tournament);
             let mut player = json::object! {
                 player::USER_UID => user_uid.as_str(),
                 player::STATE => player_state,
@@ -548,6 +553,7 @@ fn apply_event(
                 player::RESULT => json::object!{ score::GW => 0, score::VP => 0.0, score::TP => 0 },
                 player::FINALIST => false,
                 player::NON_COMPETING => false,
+                player::WAITLISTED => waitlisted,
             };
             if let Some(dn) = display_name {
                 if !dn.is_empty() {
@@ -654,6 +660,7 @@ fn apply_event(
                         player::RESULT => json::object!{ score::GW => 0, score::VP => 0.0, score::TP => 0 },
                         player::FINALIST => false,
                         player::NON_COMPETING => false,
+                        player::WAITLISTED => false,
                     };
                     if let Some(dn) = display_name {
                         if !dn.is_empty() {
@@ -668,6 +675,13 @@ fn apply_event(
             if tournament[tournament::PLAYERS][idx][player::STATE].as_str() == Some("Disqualified")
             {
                 return Err(EngineError::PlayerDisqualified);
+            }
+
+            if tournament[tournament::PLAYERS][idx][player::WAITLISTED]
+                .as_bool()
+                .unwrap_or(false)
+            {
+                return Err(EngineError::PlayerWaitlisted);
             }
 
             if has_dq_sanction(sanctions, player_uid) {
@@ -785,6 +799,9 @@ fn apply_event(
                 if capped.contains(uid) {
                     continue;
                 }
+                if players[i][player::WAITLISTED].as_bool().unwrap_or(false) {
+                    continue;
+                }
                 if ps == "Registered" || (state == TournamentState::Finished && ps == "Finished") {
                     players[i][player::STATE] = "Checked-in".into();
                 }
@@ -841,6 +858,23 @@ fn apply_event(
                 .ok_or(EngineError::PlayerNotFound)?;
             tournament[tournament::PLAYERS][idx][player::NON_COMPETING] = (*non_competing).into();
             update_standings(tournament, sanctions);
+            Ok(())
+        }
+
+        TournamentEvent::SetWaitlisted {
+            player_uid,
+            waitlisted,
+        } => {
+            require_organizer(actor)?;
+            let idx = find_player_index(&tournament[tournament::PLAYERS], player_uid)
+                .ok_or(EngineError::PlayerNotFound)?;
+            if *waitlisted
+                && tournament[tournament::PLAYERS][idx][player::STATE].as_str()
+                    != Some("Registered")
+            {
+                return Err(EngineError::CannotWaitlistPlayer);
+            }
+            tournament[tournament::PLAYERS][idx][player::WAITLISTED] = (*waitlisted).into();
             Ok(())
         }
 
@@ -994,7 +1028,10 @@ fn apply_event(
                             }
                         }
                     }
-                    Some("Registered") if drop_no_shows => {
+                    Some("Registered")
+                        if drop_no_shows
+                            && !players[i][player::WAITLISTED].as_bool().unwrap_or(false) =>
+                    {
                         players[i][player::STATE] = "Finished".into()
                     }
                     _ => {}
@@ -1060,6 +1097,9 @@ fn apply_event(
                     return Err(EngineError::SelfOrganizeIneligible {
                         player: uid.clone(),
                     });
+                }
+                if p[player::WAITLISTED].as_bool().unwrap_or(false) {
+                    return Err(EngineError::PlayerWaitlisted);
                 }
                 if max_rounds > 0 && count_player_rounds_played(tournament, uid) >= max_rounds {
                     return Err(EngineError::PlayerReachedMaxRounds);
@@ -1680,6 +1720,7 @@ fn apply_event(
                             }
                             tournament[tournament::PLAYERS][idx][player::STATE] =
                                 joined_state.into();
+                            tournament[tournament::PLAYERS][idx][player::WAITLISTED] = false.into();
                         }
                     }
                     demote_unseated_players(tournament, &left, *round);
@@ -1774,6 +1815,7 @@ fn apply_event(
                     "Playing"
                 }
                 .into();
+            tournament[tournament::PLAYERS][player_idx][player::WAITLISTED] = false.into();
             update_standings(tournament, sanctions);
             stamp_round_decks(tournament, decks, deck_ops, last);
             Ok(())
@@ -2718,6 +2760,7 @@ fn apply_event(
                             player::RESULT => json::object!{ score::GW => 0, score::VP => 0.0, score::TP => 0 },
                             player::FINALIST => *uid == winner,
                             player::NON_COMPETING => false,
+                            player::WAITLISTED => false,
                         };
                         if let Some(dn) = prior.and_then(|p| p[player::DISPLAY_NAME].as_str()) {
                             player[player::DISPLAY_NAME] = dn.into();

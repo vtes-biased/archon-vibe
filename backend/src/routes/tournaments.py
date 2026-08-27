@@ -92,6 +92,7 @@ _RATING_IRRELEVANT_ACTIONS = frozenset(
         # Rating recompute only reads FINISHED tournaments, and the engine
         # blocks this toggle once finished, so it never changes a live rating.
         "SetNonCompeting",
+        "SetWaitlisted",
         "RaffleDraw",
         "RaffleUndo",
         "RaffleClear",
@@ -1340,7 +1341,12 @@ async def bulk_register(
                 failed.append({"name": user.name, "reason": e.message})
                 continue
             events: list[dict] = [
-                {"type": "AddPlayer", "user_uid": user.uid, "vekn_id": user.vekn_id}
+                {
+                    "type": "AddPlayer",
+                    "user_uid": user.uid,
+                    "vekn_id": user.vekn_id,
+                    "waitlist_past_cap": True,
+                }
             ]
             effective_paid = request.default_paid if paid is None else paid
             if effective_paid:
@@ -1414,6 +1420,7 @@ class TournamentActionRequest(BaseModel):
     toss: int | None = None  # For SetToss
     status: str | None = None  # For SetPaymentStatus
     non_competing: bool | None = None  # For SetNonCompeting (proxy toggle)
+    waitlisted: bool | None = None  # For SetWaitlisted (promote/demote)
     seating: list[list[str]] | None = None  # For AlterSeating
     player_uids: list[str] | None = None  # For SelfOrganizeRound: the chosen pod
     config: dict | None = None  # For UpdateConfig: partial config fields

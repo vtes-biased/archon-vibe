@@ -605,6 +605,12 @@ class Player(msgspec.Struct, kw_only=True):
         bool,
         msgspec.Meta(description="Checked in without the decklist the event requires."),
     ] = False
+    waitlisted: Annotated[
+        bool,
+        msgspec.Meta(
+            description="Signed up past max_players: cannot check in until promoted."
+        ),
+    ] = False
 
 
 class Seat(msgspec.Struct, kw_only=True):

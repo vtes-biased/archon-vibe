@@ -94,6 +94,9 @@ pub enum TournamentEvent {
         user_uid: String,
         vekn_id: Option<String>,
         display_name: Option<String>,
+        /// Set by the bulk import, whose rows are registrations the players made
+        /// themselves; an organizer adding a player never waitlists.
+        waitlist_past_cap: bool,
     },
     RemovePlayer {
         user_uid: String,
@@ -122,6 +125,10 @@ pub enum TournamentEvent {
     SetNonCompeting {
         player_uid: String,
         non_competing: bool,
+    },
+    SetWaitlisted {
+        player_uid: String,
+        waitlisted: bool,
     },
 
     StartRound {

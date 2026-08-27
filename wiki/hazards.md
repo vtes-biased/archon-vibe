@@ -173,6 +173,14 @@ any DQ create, lift or delete recompute standings. A **producer** owes both halv
 the VEKN sync writes an imported `dq` onto the standings row *and* the player state,
 because the rating path reads the state and the placement path reads the row.
 
+**The players array's order is the registration order**, and nothing enforces it.
+`Register` appends, `Unregister` uses `array_remove`, the CSV import appends in file
+order and go-online resolves a `TEMP-` player by rewriting identity in place rather
+than position — so the order is real, and the roster's registration-order sort and
+the organizer's promote-from-the-waitlist decision both read it. There is no
+timestamp to fall back on: any path that rebuilds the array rather than mutating it
+in place silently reorders the queue, and nothing fails.
+
 **Proxy players are excluded-but-not-zeroed**, the inverse of DQ. Consumers
 iterating standings unfiltered — league scoring and the VEKN push among them —
 leak proxy scores. Filter on `disqualified || non_competing`.

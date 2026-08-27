@@ -102,12 +102,12 @@
   const atCap = $derived(
     (tournament.max_rounds ?? 0) > 0 && roundsPlayed(tournament, userUid) >= (tournament.max_rounds ?? 0),
   );
-  // Soft registration cap (max_players): warn-only, never blocks (venue seat caps
-  // are advisory; no waitlist by design).
+  // Registration is never refused: past the cap a sign-up lands on the waitlist.
+  const seatedCount = $derived(tournament.players?.filter(p => !p.waitlisted).length ?? 0);
   const registrationCapReached = $derived(
-    (tournament.max_players ?? 0) > 0 &&
-    (tournament.players?.length ?? 0) >= (tournament.max_players ?? 0),
+    (tournament.max_players ?? 0) > 0 && seatedCount >= (tournament.max_players ?? 0),
   );
+  const iAmWaitlisted = $derived(!!currentPlayerEntry?.waitlisted);
 
   // A registered participant can seat their own 4-5 pod without an organizer.
   // Mirrors the engine's eligibility gate (error.rs); the engine re-validates
@@ -117,6 +117,7 @@
     const uid = p.user_uid;
     if (!uid) return false;
     if (p.state !== "Registered" && p.state !== "Checked-in") return false;
+    if (p.waitlisted) return false;
     // No cap (max_rounds 0) means no per-player limit; only gate when a cap is set.
     return !((tournament.max_rounds ?? 0) > 0 && roundsPlayed(tournament, uid) >= (tournament.max_rounds ?? 0));
   }
@@ -154,7 +155,8 @@
     !!currentPlayerEntry &&
     (currentPlayerEntry.state === "Registered" || currentPlayerEntry.state === "Finished") &&
     tournament.state === "Waiting" &&
-    !atCap
+    !atCap &&
+    !iAmWaitlisted
   );
   // Missing/invalid decklist is a warning beside check-in, NOT a gate: the
   // engine allows deck-less check-in (mod.rs CheckIn just stamps missing_decklist).
@@ -259,6 +261,12 @@
 {/snippet}
 
 <div class="bg-surface-card rounded-lg shadow border border-line mb-6 p-6 space-y-4">
+  {#if iAmWaitlisted}
+    <div class="banner-warn border rounded-lg p-3 text-sm flex items-start gap-2">
+      <TriangleAlert class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+      <span>{m.tournament_waitlisted_player()}</span>
+    </div>
+  {/if}
   {#if tournament.state === "Registration" && !currentPlayerEntry}
     {#if userSuspended}
       <div class="text-sm text-link">{m.error_suspended_cannot_register()}</div>
@@ -278,7 +286,7 @@
       {#if registrationCapReached}
         <div class="banner-warn border rounded-lg p-3 text-sm flex items-start gap-2">
           <TriangleAlert class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
-          <span>{m.tournament_cap_warning_player({ count: String(tournament.players?.length ?? 0), cap: String(tournament.max_players ?? 0) })}</span>
+          <span>{m.tournament_cap_waitlist_player({ count: String(seatedCount), cap: String(tournament.max_players ?? 0) })}</span>
         </div>
       {/if}
       <Button
@@ -308,7 +316,7 @@
       {#if registrationCapReached}
         <div class="banner-warn border rounded-lg p-3 text-sm flex items-start gap-2">
           <TriangleAlert class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
-          <span>{m.tournament_cap_warning_player({ count: String(tournament.players?.length ?? 0), cap: String(tournament.max_players ?? 0) })}</span>
+          <span>{m.tournament_cap_warning_player({ count: String(seatedCount), cap: String(tournament.max_players ?? 0) })}</span>
         </div>
       {/if}
       <Button
@@ -362,7 +370,7 @@
           </span>
         {/if}
       </div>
-      {#if !tournament.online && !atCap && currentPlayerEntry.state === "Registered" && tournament.state === "Waiting"}
+      {#if !tournament.online && !atCap && !iAmWaitlisted && currentPlayerEntry.state === "Registered" && tournament.state === "Waiting"}
         <Button
           variant="ghost"
           onclick={() => showQrScanner = !showQrScanner}

@@ -119,6 +119,13 @@ late arrival joins a short table now or waits is the organizer's call — **the 
 has no default and must not decide**. Mechanics and edge cases:
 [tournaments](tournaments.md#player-states).
 
+**A registration is never refused.** Past the venue cap a sign-up lands on a
+waitlist instead — barred from check-in until an organizer promotes it — and the
+app never reorders that queue itself: it shows registration order and payment
+status side by side and the organizer decides, because paid-but-waitlisted against
+unpaid-but-registered is venue policy, not arithmetic.
+Mechanics: [tournaments](tournaments.md#player-states).
+
 **Decklist vs check-in** — when decklists are required, a player without one is
 warned at check-in and the organizer may override and check them in anyway.
 

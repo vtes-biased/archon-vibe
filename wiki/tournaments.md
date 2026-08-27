@@ -18,7 +18,7 @@ server (PyO3) behave identically.
 | Decklist required | yes/no | organizer choice |
 | Online | yes/no | the venue URL is the meeting place |
 | `max_rounds` | int, 0 = uncapped | per-player round cap |
-| `max_players` | int, 0 = none | **soft** cap, advisory for venue capacity: the UI warns past it, the engine never blocks, and there is no waitlist |
+| `max_players` | int, 0 = none | venue capacity: the engine never blocks a registration, it waitlists it — below |
 | `open_rounds` | bool | the non-VEKN house format, below |
 | `self_organized_rounds` | bool | players seat their own pods |
 | `standings_mode` | Private / Cutoff / Top 10 / Public | display default during play |
@@ -137,13 +137,35 @@ VPs are real, they were earned against real opponents, and a blanked row makes t
 table look wrong. This is the opposite of the DQ treatment, where zeroing *is* the
 point.
 
+`waitlisted` is the second such flag, and the registration cap's only teeth.
+Registration is never refused: past `max_players` a self-service `Register` lands
+the player waitlisted, and they cannot check in until an organizer clears the flag
+with `SetWaitlisted`. The cap counts unwaitlisted players only, so the waitlist
+grows behind a full roster rather than inflating it. A waitlisted player *is*
+`Registered` — inert to seating, scoring and standings for free — and the engine
+holds that invariant from both ends: `SetWaitlisted` refuses to waitlist anyone who
+is not `Registered`, and seating clears the flag, below.
+
+**Only a self-service sign-up waitlists.** `AddPlayer` never does — an organizer
+adding a player is a deliberate act — except that the bulk CSV import passes
+`waitlist_past_cap`, its rows being registrations the players made themselves at a
+ticketing source. Its `paid` column keeps setting payment status as before, and
+payment never reorders the waitlist: promoting a paid waitlister over an unpaid
+registrant is venue policy that differs per event, so the roster shows registration
+order and payment status side by side, sortable by either, and the organizer
+decides. The walk-in check-in path enrols un-waitlisted: an event past its cap is
+past registration, and the person is at the door.
+
 **Entering the tournament at all requires a `vekn_id`.** `Register`, `AddPlayer`
 and the `CheckIn` walk-in path each reject an empty one, so an official sponsors or
 links the account first. Offline play is the exception — it mints `TEMP-` ids that
 go-online resolves or turns into real members ([vekn](vekn.md#push-constraints)).
 
-Barriers to check-in: a required decklist not uploaded, a VEKN ban, a
-disqualification from this event, or reaching the per-player round cap.
+Barriers to check-in: sitting on the waitlist, a required decklist not uploaded, a
+VEKN ban, a disqualification from this event, or reaching the per-player round cap.
+`CheckInAll` skips waitlisted players rather than failing on them, and
+`SelfOrganizeRound` refuses them — self-seating past the cap would make it advisory
+again.
 
 **The door stays open mid-round** — check-in is allowed while a round is `Playing`,
 and a player never registered is enrolled by it. Checking someone in never seats
@@ -438,7 +460,7 @@ status.
 **Players** — `Register` / `Unregister` (self), `AddPlayer` / `RemovePlayer`
 (organizer; RemovePlayer is for a player who has not played — use `DropOut`
 otherwise), `DropOut` (preserves scores), `CheckIn`, `CheckInAll`, `ResetCheckIn`,
-`SetPaymentStatus`, `MarkAllPaid`, `SetNonCompeting`.
+`SetPaymentStatus`, `MarkAllPaid`, `SetNonCompeting`, `SetWaitlisted`.
 
 **Rounds and seating**
 
@@ -469,7 +491,10 @@ rule, shared by `AlterSeating` and `UnseatPlayer`. Joining a live round's seatin
 makes a player `Playing` — `Finished` if the tournament itself is, which a
 force-finish can leave holding a live round — except that a disqualified player
 keeps `Disqualified`, by state or by active sanction: seating them is allowed,
-un-disqualifying them as a side effect is not. Leaving the seating returns a
+un-disqualifying them as a side effect is not. **Seating also clears `waitlisted`**
+— putting someone at a table is the strongest promotion there is, and it is what
+keeps a waitlisted player from reaching `Playing` with a flag that would bar their
+next check-in. Leaving the seating returns a
 player to `Registered` — but only *from* `Playing`, so a player who dropped out
 mid-round (drop never vacates a seat) stays
 `Finished` instead of being silently reinstated into finals eligibility, and only
@@ -622,7 +647,9 @@ Organizer oversight is unchanged: `FinishRound` closes any round in any order,
 `StartRound` withdraws `Registered` no-shows only on round 1 of a standard
 tournament; rounds 2+ and open rounds leave them untouched, and a zero-rounds
 no-show is reinstatable by `CheckIn` between rounds, or onto a live table by
-`SeatPlayer` or the seating editor.
+`SeatPlayer` or the seating editor. **The sweep spares the waitlist** — a
+waitlisted player was never allowed to check in, so they are not a no-show, and
+they stay available for promotion into a later round.
 
 ## Sanctions
 

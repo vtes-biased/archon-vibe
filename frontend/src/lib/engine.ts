@@ -99,6 +99,7 @@ export type TournamentEventType =
   | 'SetPaymentStatus'
   | 'MarkAllPaid'
   | 'SetNonCompeting'
+  | 'SetWaitlisted'
   | 'StartRound'
   | 'SelfOrganizeRound'
   | 'FinishRound'
@@ -147,6 +148,7 @@ export interface TournamentEvent {
   toss?: number;
   status?: string;
   non_competing?: boolean;
+  waitlisted?: boolean;
   seating?: string[][];
   player_uids?: string[]; // SelfOrganizeRound: the chosen pod
   vekn_id?: string;

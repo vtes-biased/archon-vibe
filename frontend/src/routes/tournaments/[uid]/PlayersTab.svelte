@@ -16,6 +16,7 @@
   import DeckAccordion from "$lib/components/DeckAccordion.svelte";
   import CreateAndRegisterModal from "./CreateAndRegisterModal.svelte";
   import Button from "$lib/components/Button.svelte";
+  import Badge from "$lib/components/Badge.svelte";
   import { validateDeck, finalsQualification, type ValidationError, type TournamentEventType } from "$lib/engine";
   import { translatePlayerState, seatDisplay, translateStandingsMode, getRatingPts, ratingContext, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import { getAuthState } from "$lib/stores/auth.svelte";
@@ -118,12 +119,13 @@
   let editingToss = $state(false);
   let tossEdits = $state<Record<string, string>>({});
   // svelte-ignore state_referenced_locally — intentionally captures initial value
-  let playerSort = $state<'standings' | 'name' | 'vekn'>(standings.length > 0 ? 'standings' : 'name');
+  let playerSort = $state<'standings' | 'name' | 'vekn' | 'registration' | 'payment'>(standings.length > 0 ? 'standings' : 'name');
   let standingsInitialized = false;
   let paymentFilter = $state<'all' | 'Pending' | 'Paid'>('all');
 
   const paidCount = $derived(tournament.players?.filter(p => p.payment_status === 'Paid').length ?? 0);
   const rosterCount = $derived(tournament.players?.length ?? 0);
+  const waitlistCount = $derived(tournament.players?.filter(p => p.waitlisted).length ?? 0);
   // Imported records: standings may list players the roster lacks. These get
   // display-only rows (no organizer actions — they would be rejected server-side).
   const archivalUids = $derived.by(() => {
@@ -131,6 +133,8 @@
     return new Set(standings.map(s => s.user_uid).filter(u => !roster.has(u)));
   });
   const totalPlayers = $derived(rosterCount + archivalUids.size);
+  // The cap counts seats taken; the waitlist sits outside it and is reported beside it.
+  const seatedCount = $derived(totalPlayers - waitlistCount);
 
   let expandedPlayer = $state<string | null>(null);
   let expandedDeckRound = $state<number | null>(null);
@@ -273,7 +277,13 @@
       });
     }
     const sort = playerSort;
-    if (sort === 'standings' && standings.length > 0) {
+    if (sort === 'registration') {
+      // The array IS the registration order — appended on Register, order-preserving
+      // on Unregister. Sorting nothing is the sort.
+    } else if (sort === 'payment') {
+      const rank: Record<string, number> = { Paid: 0, Pending: 1, Refunded: 2, Cancelled: 3 };
+      players.sort((a, b) => (rank[a.payment_status] ?? 9) - (rank[b.payment_status] ?? 9));
+    } else if (sort === 'standings' && standings.length > 0) {
       const rankMap = new Map(standings.map(s => [s.user_uid, s.rank]));
       players.sort((a, b) => (rankMap.get(a.user_uid!) ?? 9999) - (rankMap.get(b.user_uid!) ?? 9999));
     } else if (sort === 'vekn') {
@@ -432,6 +442,28 @@
           </Button>
         {/if}
       </div>
+      <!-- Waitlist: the cap verdict, reversible in one tap. Demotion needs a
+           Registered player — a checked-in or seated one is already through the door. -->
+      {#if !archivalUids.has(puid)}
+        <div class="pt-2 border-t border-dashed border-line">
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-ink-muted">{m.waitlist_label()}</span>
+            <span class="flex-1"></span>
+            <button
+              role="switch"
+              aria-checked={!!player.waitlisted}
+              aria-label={m.waitlist_label()}
+              title={m.waitlist_hint()}
+              disabled={actionLoading || (!player.waitlisted && player.state !== "Registered")}
+              onclick={() => doAction("SetWaitlisted", { player_uid: puid, waitlisted: !player.waitlisted })}
+              class="relative w-9 h-5 rounded-full transition-colors disabled:opacity-50 {player.waitlisted ? 'bg-warn' : 'bg-surface-active'}"
+            >
+              <span class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform {player.waitlisted ? 'translate-x-4' : ''}"></span>
+            </button>
+          </div>
+          <p class="text-xs text-ink-faint mt-1.5">{m.waitlist_hint()}</p>
+        </div>
+      {/if}
       <!-- Proxy: demoted toggle, with the §5.1.1 explanation. -->
       <div class="pt-2 border-t border-dashed border-line">
         <div class="flex items-center gap-2">
@@ -470,6 +502,9 @@
       <span class="min-w-0 truncate {entry?.unplaced ? 'text-ink-faint' : (isTop5 && playerSort === 'standings' ? 'text-ink-strong font-medium' : 'text-ink')} text-sm">
         {playerInfo[puid]?.name ?? (puid || m.players_no_account())}
       </span>
+      {#if player.waitlisted}
+        <Badge kind="status" tone="pending" title={m.waitlist_hint()}>{m.waitlist_label()}</Badge>
+      {/if}
       {#if player.non_competing}
         <span class="text-xs px-2 py-0.5 rounded bg-surface-active text-ink-muted shrink-0" title={m.proxy_hint()}>{m.proxy_label()}</span>
       {/if}
@@ -615,9 +650,12 @@
            on the roster line. -->
       <p class="text-ink-muted shrink-0">
         {#if (tournament.max_players ?? 0) > 0}
-          {m.players_count_capped({ count: String(totalPlayers), cap: String(tournament.max_players) })}
+          {m.players_count_capped({ count: String(seatedCount), cap: String(tournament.max_players) })}
         {:else}
-          {m.players_count({ count: String(totalPlayers) })}
+          {m.players_count({ count: String(seatedCount) })}
+        {/if}
+        {#if waitlistCount > 0}
+          <span class="text-xs text-ink-faint">· {m.players_waitlist_count({ count: String(waitlistCount) })}</span>
         {/if}
         {#if isOrganizer && rosterCount > 0}
           <span class="text-xs text-ink-faint">· {m.payment_summary({ paid: String(paidCount), total: String(rosterCount) })}</span>
@@ -630,11 +668,11 @@
         <AddPlayerForm {tournament} onadd={addPlayerByUser} oncreate={() => showCreateModal = true} />
       {/if}
     </div>
-    <!-- Soft cap reached: warn-only — adding players is never blocked -->
-    {#if isOrganizer && (tournament.max_players ?? 0) > 0 && (tournament.players?.length ?? 0) >= (tournament.max_players ?? 0)}
+    <!-- Cap reached: sign-ups now waitlist, and the organizer adding a player still never does -->
+    {#if isOrganizer && (tournament.max_players ?? 0) > 0 && seatedCount >= (tournament.max_players ?? 0)}
       <div class="banner-warn border rounded-lg p-2 text-xs flex items-start gap-2">
         <TriangleAlert class="w-4 h-4 shrink-0" aria-hidden="true" />
-        <span>{m.players_cap_warning_organizer({ count: String(tournament.players?.length ?? 0), cap: String(tournament.max_players) })}</span>
+        <span>{m.players_cap_warning_organizer({ count: String(seatedCount), cap: String(tournament.max_players) })}</span>
       </div>
     {/if}
     <!-- One create surface, online and off: the modal requires an email and runs
@@ -702,6 +740,10 @@
               {/if}
               {@render optionChip(m.players_sort_name(), playerSort === 'name', () => playerSort = 'name', 'bg-surface-active text-ink-strong')}
               {@render optionChip(m.players_sort_vekn(), playerSort === 'vekn', () => playerSort = 'vekn', 'bg-surface-active text-ink-strong')}
+              {@render optionChip(m.players_sort_registration(), playerSort === 'registration', () => playerSort = 'registration', 'bg-surface-active text-ink-strong')}
+              {#if isOrganizer}
+                {@render optionChip(m.players_sort_payment(), playerSort === 'payment', () => playerSort = 'payment', 'bg-surface-active text-ink-strong')}
+              {/if}
             </div>
           </div>
           {#if isOrganizer}
@@ -795,6 +837,8 @@
               {#if tournament.state === "Waiting" && puid && openRounds && player.state !== "Disqualified" && player.state !== "Finished" && (roundsPlayedMap.get(puid) ?? 0) >= (tournament.max_rounds ?? 0)}
                 <!-- Open rounds: at cap and not dropped — no check-in, show their played count. -->
                 <Button variant="ghost" size="sm" class="min-h-[44px]" disabled title={m.player_completed_hint()}>{roundsPlayedMap.get(puid)}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
+              {:else if puid && player.waitlisted}
+                <Button variant="primary" size="sm" class="min-h-[44px]" onclick={() => doAction("SetWaitlisted", { player_uid: puid, waitlisted: false })}>{m.waitlist_promote()}</Button>
               {:else if puid && (tournament.state === "Waiting" || tournament.state === "Playing") && (player.state === "Finished" || player.state === "Registered")}
                 <!-- Finished = dropped out, which CheckIn reinstates (Checked-in
                      under cap, Completed at it, back to their seat mid-round).
@@ -869,6 +913,9 @@
               <td class="py-1.5 pr-2">
                 <span class="truncate flex items-center gap-1">
                   {playerInfo[puid]?.name ?? (puid || m.players_no_account())}
+                  {#if player.waitlisted}
+                    <Badge kind="status" tone="pending" title={m.waitlist_hint()}>{m.waitlist_label()}</Badge>
+                  {/if}
                   {#if player.non_competing}
                     <span class="text-xs px-2 py-0.5 rounded bg-surface-active text-ink-muted shrink-0" title={m.proxy_hint()}>{m.proxy_label()}</span>
                   {/if}
@@ -962,6 +1009,8 @@
                   <div class="flex items-center justify-end gap-1 whitespace-nowrap">
                     {#if tournament.state === "Waiting" && puid && openRounds && player.state !== "Disqualified" && player.state !== "Finished" && (roundsPlayedMap.get(puid) ?? 0) >= (tournament.max_rounds ?? 0)}
                       <Button variant="ghost" size="sm" disabled title={m.player_completed_hint()}>{roundsPlayedMap.get(puid)}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
+                    {:else if puid && player.waitlisted}
+                      <Button variant="primary" size="sm" onclick={() => doAction("SetWaitlisted", { player_uid: puid, waitlisted: false })}>{m.waitlist_promote()}</Button>
                     {:else if puid && (tournament.state === "Waiting" || tournament.state === "Playing") && (player.state === "Finished" || player.state === "Registered")}
                       <Button variant={player.state === "Registered" ? "primary" : "ghost"} size="sm" onclick={() => doAction("CheckIn", { player_uid: puid })}>{m.players_check_in()}</Button>
                     {:else if tournament.state === "Waiting" && player.state === "Checked-in" && puid}
