@@ -123,14 +123,24 @@ corpus around the allowlist. `require_api_token`
 purpose: the public API serves published data, so a token there is attribution,
 not authority, and a tournament-scoped one is no narrower.
 
-**A player's deck slot is counted in three places.** `DeckObject.round` is the
-player's *own* i-th round, not the tournament's — under open rounds the two
-diverge, and nothing in the field's name says so. The engine owns the rule
-(`is_deck_locked` over `count_player_rounds_played`, which skips `Cancelled`
-tables); `roundsPlayed` in `tournament-utils.ts` sizes the upload slots, and
-`_deck_slot` in the tournaments route answers the delegated deck read
-([sync](sync.md#delegated-third-party-reads)). Anything keying a deck on the
-tournament's round index is wrong for every open-rounds event.
+**A player's own round count is computed in four places, and a soft-cancelled
+table is what splits them.** The engine owns the rule — `count_player_rounds_played`,
+which **skips `Cancelled` tables** — and it decides both the open-rounds per-player
+cap and, through `is_deck_locked`, which deck slot is still editable. Three callers
+must produce the same number: `roundsPlayed` in `tournament-utils.ts`, the inline
+`roundsPlayedMap` in `PlayersTab.svelte` (kept separate deliberately, one pass per
+render), and `_deck_slot` in the tournaments route. Both frontend copies once
+omitted the `Cancelled` filter, which told a player they were at their cap when the
+engine would still have seated them, and offered a deck slot nothing else read.
+
+That count is also *not* the tournament's round index. `DeckObject.round` is the
+player's **own** i-th round — under open rounds two players in the same round sit
+on different slots — while `Sanction.round_number` and the delegated deck read's
+`round` field are both the tournament's index, `len(rounds)` meaning the finals.
+The deck index has to be per-player: `SelfOrganizeRound` creates each pod already
+`In Progress`, so a globally-indexed deck could only be uploaded after play began.
+Anything keying a *stored deck* on the tournament's round is wrong for every
+open-rounds event.
 
 **`preview_scores_json` deliberately duplicates the `SetScore` GW/TP cascade** —
 the preview runs on not-yet-persisted scores, so the two paths cannot share state.

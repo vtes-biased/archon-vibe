@@ -255,6 +255,7 @@
     const counts = new Map<string, number>();
     for (const round of tournament?.rounds ?? []) {
       for (const table of round) {
+        if (table.state === 'Cancelled') continue;
         for (const seat of table.seating ?? []) {
           counts.set(seat.player_uid, (counts.get(seat.player_uid) ?? 0) + 1);
         }

@@ -498,8 +498,6 @@ async def _handle_refresh_token(body: TokenRequest, client: OAuthClient) -> dict
     if not await get_oauth_consent(payload["sub"], client.client_id, tournament_uid):
         raise HTTPException(400, "Consent has been revoked")
 
-    # A grant dies with its event: the scoped token is the whole of a third
-    # party's reach, so a finished tournament ends the relationship.
     if tournament_uid:
         event = await get_tournament_by_uid(tournament_uid)
         if not event or event.state == TournamentState.FINISHED:

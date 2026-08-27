@@ -61,6 +61,7 @@ from ..models import (
     Role,
     Sanction,
     SanctionLevel,
+    Table,
     TableState,
     TimerState,
     Tournament,
@@ -837,7 +838,8 @@ class CreateTournamentRequest(BaseModel):
 
 
 def _deck_slot(tournament: Tournament, player_uid: str, before_round: int) -> int:
-    """The player's deck-slot index for round `before_round`.
+    """The player's deck-slot index for round `before_round` (the finals being
+    `len(rounds)`, which counts every round they played).
 
     `DeckObject.round` is a **per-player** slot, not the tournament's round —
     under open rounds players progress through different subsets, so slot i is
@@ -865,8 +867,10 @@ async def get_round_decks(
     serve it, because it pushes stored projections and could never retract a
     deck when the round ends.
 
-    `round` indexes `tournament.rounds`. The finals is not one: a multideck
-    event mints no deck slot for it.
+    `round` is the tournament's own coordinate — an index into
+    `tournament.rounds`, with `len(rounds)` the finals, exactly as
+    `Sanction.round_number` uses it. `DeckObject.round` is *not* that
+    coordinate; `_deck_slot` translates.
     """
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -896,8 +900,12 @@ async def get_round_decks(
         if not d.deleted_at
     }
 
+    slots: list[tuple[int, list[Table]]] = list(enumerate(tournament.rounds))
+    if tournament.finals:
+        slots.append((len(tournament.rounds), [tournament.finals]))
+
     rounds = []
-    for index, tables in enumerate(tournament.rounds):
+    for index, tables in slots:
         live = [t for t in tables if t.state == TableState.IN_PROGRESS]
         if not live:
             continue

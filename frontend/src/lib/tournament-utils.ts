@@ -138,7 +138,8 @@ export function translatePlayerState(state: string): string {
  *  Mirrors the engine's count_player_rounds_played (seating is the single source of truth). */
 export function roundsPlayed(tournament: Tournament, uid: string): number {
   return (tournament.rounds ?? []).filter(
-    (round) => round.some((table) => table.seating?.some((seat) => seat.player_uid === uid)),
+    (round) => round.some((table) =>
+      table.state !== 'Cancelled' && table.seating?.some((seat) => seat.player_uid === uid)),
   ).length;
 }
 
