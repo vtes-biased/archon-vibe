@@ -96,6 +96,20 @@ async def test_scoped_token_reaches_its_event_and_nothing_else(
             ("GET", "/stream", {}),
             ("GET", f"/stream?tournament={OTHER}", {}),
             ("POST", "/vekn/claim", {"vekn_id": "1234567"}),
+            # Self-granting: `/oauth/*` is otherwise reachable, so without the
+            # first-party guard a client keys itself consent for any other event.
+            (
+                "POST",
+                "/oauth/authorize",
+                {
+                    "client_id": "play-platform",
+                    "redirect_uri": "https://play.test/cb",
+                    "scope": "user:impersonate",
+                    "code_challenge": "x" * 43,
+                    "tournament": OTHER,
+                    "approved": True,
+                },
+            ),
             ("PUT", "/sanctions/some-sanction-uid", {}),
             ("DELETE", "/sanctions/some-sanction-uid", {}),
             ("POST", f"/api/tournaments/{GRANTED}/push-vekn", {}),

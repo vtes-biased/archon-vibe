@@ -265,11 +265,17 @@ starts; it sees the round start on the scoped stream (the member projection
 already carries rounds and seating) and pulls the decks once. It answers per
 **ongoing** round — any round holding an `In Progress` table, so open and parallel
 rounds yield several at once — with `rounds: [{round, decks}]`, and is empty when
-no round is ongoing. `round` is the index `DeckObject.round` carries: 0-based,
-with `len(rounds)` the finals sentinel, the same convention as
-`Sanction.round_number`. A multideck event answers that round's deck, any other
-event the registered one; a deck not yet submitted is simply absent. Full
-entitlement only.
+no round is ongoing. Full entitlement only.
+
+`round` indexes `tournament.rounds`. **`DeckObject.round` does not**: it is a
+*per-player deck slot*, and under open rounds two players seated in the same
+round are on different slots, so the endpoint counts each player's own prior
+rounds to find theirs ([hazards](hazards.md#two-implementations-of-one-gate)).
+A multideck event answers that slot's deck, any other event the registered one;
+a deck not yet submitted is simply absent.
+
+**The finals is not a round here.** A multideck event mints no deck slot for it —
+the upload UI caps slots at `max_rounds` — so there would be nothing to answer.
 
 It is a pull, not a push, for three reasons that all point the same way: the
 scoped stream's no-decks property is load-bearing (it is why scoped streams skip

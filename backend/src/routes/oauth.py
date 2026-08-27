@@ -109,8 +109,7 @@ def _create_oauth_jwt(
         "iat": now,
         "exp": now + lifetime,
     }
-    # A separate claim, never a member of `scope`: the scope string round-trips
-    # through OAuthScope on refresh and a uid is not an enum member.
+    # Never a member of `scope`: that string round-trips through OAuthScope.
     if tournament_uid:
         payload["tournament"] = tournament_uid
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
@@ -160,6 +159,8 @@ async def authorize_get(
 ):
     """Validate OAuth authorization request parameters. Returns JSON with authorization details
     or redirects with code if consent already exists."""
+    _require_first_party(request)
+
     if response_type != "code":
         raise HTTPException(400, "Only response_type=code is supported")
 
@@ -238,7 +239,11 @@ class AuthorizeApprovalRequest(BaseModel):
 
 
 @router.post("/authorize")
-async def authorize_post(user: CurrentUser, body: AuthorizeApprovalRequest):
+async def authorize_post(
+    user: CurrentUser, body: AuthorizeApprovalRequest, request: Request
+):
+    _require_first_party(request)
+
     client_id = body.client_id
     redirect_uri = body.redirect_uri
     scope = body.scope
@@ -486,6 +491,10 @@ async def _handle_refresh_token(body: TokenRequest, client: OAuthClient) -> dict
     # Consent is authoritative: revoking it deletes the row, so a surviving refresh
     # token (e.g. a partial revoke) still can't mint new access tokens.
     tournament_uid = payload.get("tournament")
+    scope_values = payload.get("scope", "").split()
+    if OAuthScope.USER_IMPERSONATE.value in scope_values and not tournament_uid:
+        raise HTTPException(400, "Unscoped impersonation grants are no longer issued")
+
     if not await get_oauth_consent(payload["sub"], client.client_id, tournament_uid):
         raise HTTPException(400, "Consent has been revoked")
 
@@ -674,8 +683,10 @@ async def userinfo(user: CurrentUser, request: Request):
 
 
 def _require_first_party(request: Request) -> None:
-    """Consent management is self-service only: a third-party OAuth token must not
-    enumerate or revoke the user's grants to other apps."""
+    """Consent is self-service only. A third-party OAuth token must not enumerate
+    or revoke the user's grants to other apps — nor *grant* one: a client holding
+    a token for one event would otherwise POST its own approval for another and
+    key itself a fresh consent, with no consent page and no one-click approve."""
     if getattr(request.state, "oauth_scopes", None) is not None:
         raise HTTPException(403, "Consent management requires a first-party session")
 

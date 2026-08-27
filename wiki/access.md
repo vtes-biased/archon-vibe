@@ -196,6 +196,11 @@ every other action the engine already state-gates.
 was granted; `GET /oauth/consents` answers one row per event, and the profile
 page folds them into one card per app.
 
+**`/oauth/authorize` is first-party session only**, both verbs, like the consent
+endpoints and for the same reason: `/oauth/*` is otherwise reachable with a
+scoped token, so a client could POST its own approval for a second event and key
+itself a consent no one ever saw a page for.
+
 #### The allowlist
 
 Enforcement is an **allowlist**, in `middleware/auth.py`: a route added anywhere
@@ -210,9 +215,9 @@ else in the app is refused until it is named here.
 | `/stream?tournament=<the token's uid>` | the scoped stream, [sync](sync.md#the-sse-endpoint) |
 
 Everything else 403s — `/snapshot` and the unscoped `/stream` above all, which
-used to hand a third party the granting organizer's whole corpus, private decks
+would hand a third party the granting organizer's whole corpus, private decks
 included. `POST /vekn/claim` matters as much: it answers with a **first-party**
-token pair for the merged uid, so reaching it turned a delegated grant into a
+token pair for the merged uid, so reaching it turns a delegated grant into a
 full session.
 
 **Barred inside the token's own tournament**, whatever the user may do: delete,

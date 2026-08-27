@@ -123,6 +123,15 @@ corpus around the allowlist. `require_api_token`
 purpose: the public API serves published data, so a token there is attribution,
 not authority, and a tournament-scoped one is no narrower.
 
+**A player's deck slot is counted in three places.** `DeckObject.round` is the
+player's *own* i-th round, not the tournament's — under open rounds the two
+diverge, and nothing in the field's name says so. The engine owns the rule
+(`is_deck_locked` over `count_player_rounds_played`, which skips `Cancelled`
+tables); `roundsPlayed` in `tournament-utils.ts` sizes the upload slots, and
+`_deck_slot` in the tournaments route answers the delegated deck read
+([sync](sync.md#delegated-third-party-reads)). Anything keying a deck on the
+tournament's round index is wrong for every open-rounds event.
+
 **`preview_scores_json` deliberately duplicates the `SetScore` GW/TP cascade** —
 the preview runs on not-yet-persisted scores, so the two paths cannot share state.
 A cascade change must land on both sides; the single equality test

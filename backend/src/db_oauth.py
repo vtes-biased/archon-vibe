@@ -139,8 +139,7 @@ async def revoke_oauth_token_chain(parent_token_uid: str) -> int:
 async def get_oauth_consent(
     user_uid: str, client_id: str, tournament_uid: str | None
 ) -> OAuthConsent | None:
-    """Consent is keyed (user, client, tournament): approving one event never
-    speaks for another, and a NULL tournament is the profile:read-only grant."""
+    """A NULL tournament is the profile:read-only grant."""
     async with get_connection() as conn:
         result = await conn.execute(
             "SELECT data FROM oauth_consents WHERE data->>'user_uid' = %s "

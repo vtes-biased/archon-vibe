@@ -672,9 +672,8 @@ async def _resolve_user_from_token(token: str | None) -> User | None:
     """Resolve a User from a JWT token query param. Returns None on any failure.
 
     First-party `access` tokens only: this path runs none of the middleware's
-    OAuth gate, so an `oauth_access` token accepted here would reach the
-    unscoped stream and `/snapshot` around the allowlist entirely. Third parties
-    send the Authorization header, which does run it.
+    OAuth gate, so an `oauth_access` token accepted here would reach the unscoped
+    corpus around the allowlist entirely.
     """
     if not token:
         return None

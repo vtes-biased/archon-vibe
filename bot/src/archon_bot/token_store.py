@@ -100,17 +100,6 @@ class TokenStore:
                 "refresh_token": row[2],
             }
 
-    async def get_archon_uid(self, discord_id: str) -> str | None:
-        """Identity, not authority: which member a Discord account is, from
-        whichever event it last authorized."""
-        assert self._db
-        async with self._db.execute(
-            "SELECT archon_uid FROM tokens WHERE discord_id = ? LIMIT 1",
-            (discord_id,),
-        ) as cur:
-            row = await cur.fetchone()
-            return row[0] if row else None
-
     async def store_tokens(
         self,
         discord_id: str,

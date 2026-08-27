@@ -39,7 +39,7 @@
   async function loadApps() {
     loading = true;
     try {
-      // One consent row per event; revoking is per app, so the card is too.
+      // Revoking is per app, so the card is too.
       const consents = await apiRequest<Consent[]>("/oauth/consents");
       const byClient = new Map<string, AuthorizedApp>();
       for (const c of consents) {

@@ -29,8 +29,7 @@ _OAUTH_BARRED_SUBPATHS = frozenset(
 def _oauth_allows(request: Request, tournament_uid: str) -> bool:
     """The whole reach of a tournament-scoped `user:impersonate` token. An
     allowlist, so a route added anywhere else in the app is refused until it is
-    named here — `/snapshot` and the unscoped `/stream`, which hand over the
-    organizer's entire corpus, among them."""
+    named here."""
     path = request.url.path
     if path.startswith("/oauth/"):
         return True

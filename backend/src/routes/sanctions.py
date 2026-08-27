@@ -238,7 +238,6 @@ async def create_sanction(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    # The path allowlist cannot see a body, so the tournament match lands here.
     oauth_tournament = getattr(http_request.state, "oauth_tournament", None)
     if oauth_tournament and request.tournament_uid != oauth_tournament:
         raise HTTPException(

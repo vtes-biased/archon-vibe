@@ -61,7 +61,6 @@ from ..models import (
     Role,
     Sanction,
     SanctionLevel,
-    Table,
     TableState,
     TimerState,
     Tournament,
@@ -837,6 +836,25 @@ class CreateTournamentRequest(BaseModel):
     finals_time: int = 0
 
 
+def _deck_slot(tournament: Tournament, player_uid: str, before_round: int) -> int:
+    """The player's deck-slot index for round `before_round`.
+
+    `DeckObject.round` is a **per-player** slot, not the tournament's round —
+    under open rounds players progress through different subsets, so slot i is
+    the deck for that player's i-th round. The engine's `is_deck_locked` owns
+    the rule; this counts the same seatings for a prefix of the rounds.
+    """
+    return sum(
+        1
+        for rnd in tournament.rounds[:before_round]
+        if any(
+            table.state != TableState.CANCELLED
+            and any(seat.player_uid == player_uid for seat in table.seating)
+            for table in rnd
+        )
+    )
+
+
 @router.get("/{uid}/decks")
 async def get_round_decks(
     uid: str,
@@ -847,8 +865,8 @@ async def get_round_decks(
     serve it, because it pushes stored projections and could never retract a
     deck when the round ends.
 
-    `round` is the same index `DeckObject.round` carries — 0-based, with
-    len(rounds) the finals sentinel, as `Sanction.round_number` uses.
+    `round` indexes `tournament.rounds`. The finals is not one: a multideck
+    event mints no deck slot for it.
     """
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -878,21 +896,20 @@ async def get_round_decks(
         if not d.deleted_at
     }
 
-    slots: list[tuple[int, list[Table]]] = list(enumerate(tournament.rounds))
-    if tournament.finals:
-        slots.append((len(tournament.rounds), [tournament.finals]))
-
     rounds = []
-    for index, tables in slots:
+    for index, tables in enumerate(tournament.rounds):
         live = [t for t in tables if t.state == TableState.IN_PROGRESS]
         if not live:
             continue
         decks = []
         for table in live:
             for seat in table.seating:
-                deck = by_slot.get(
-                    (seat.player_uid, index if tournament.multideck else None)
+                slot = (
+                    _deck_slot(tournament, seat.player_uid, index)
+                    if tournament.multideck
+                    else None
                 )
+                deck = by_slot.get((seat.player_uid, slot))
                 if deck:
                     decks.append(deck)
         rounds.append({"round": index, "decks": decks})
@@ -1448,8 +1465,6 @@ async def tournament_action(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    # A grant dies with its event, so reviving a finished one would outlive the
-    # consent that authorized it. Everything else the engine state-gates.
     if (
         request.type == "ReopenTournament"
         and getattr(http_request.state, "oauth_tournament", None) is not None
