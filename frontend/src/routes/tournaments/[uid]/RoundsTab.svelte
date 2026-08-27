@@ -12,7 +12,7 @@
   import Button from '$lib/components/Button.svelte';
   import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users, Settings2 } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
-  import VpInput from "./VpInput.svelte";
+  import VpInput from "$lib/components/VpInput.svelte";
   import { seatDisplay as seatDisplayUtil, seatDisplayParts, vpOptions, translateTableState, translatePlayerState, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
   import { showToast } from "$lib/stores/toast.svelte";

@@ -15,7 +15,7 @@
   import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
   import Button from '$lib/components/Button.svelte';
   import TimerDisplay from "./TimerDisplay.svelte";
-  import VpInput from "./VpInput.svelte";
+  import VpInput from "$lib/components/VpInput.svelte";
   import PlayerDecksSection from "./PlayerDecksSection.svelte";
   import RaffleSection from "./RaffleSection.svelte";
   import { callJudge } from "$lib/api";

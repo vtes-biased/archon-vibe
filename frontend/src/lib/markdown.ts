@@ -190,13 +190,17 @@ export function renderGuideSection(src: string): string {
   const renderer = new marked.Renderer();
   renderer.heading = ({ tokens, depth }: Tokens.Heading) => {
     const text = tokens.map(t => ('text' in t ? (t as any).text : t.raw)).join("");
-    const id = slugify(text);
+    // A translated heading slugifies to a translated id, so every locale would need
+    // its own spelling of every `](#anchor)`. `{#id}` pins one id across all of them.
+    const pinned = text.match(/\s*\{#([\w-]+)\}\s*$/);
+    const title = pinned ? text.slice(0, pinned.index) : text;
+    const id = pinned ? pinned[1]! : slugify(title);
     const inner = marked.parser(
       [{ type: "heading", depth, raw: "", text: "", tokens }] as any,
       { async: false }
     ) as string;
     const match = inner.match(/<h\d[^>]*>([\s\S]*?)<\/h\d>/);
-    const content = match ? match[1] : text;
+    const content = (match ? match[1]! : title).replace(/\s*\{#[\w-]+\}\s*$/, "");
     return `<h${depth} id="${id}" class="heading-anchor">${content} <a href="#${id}" class="anchor-link" aria-label="Link to this section">#</a></h${depth}>\n`;
   };
   renderer.blockquote = ({ tokens }: Tokens.Blockquote) => {

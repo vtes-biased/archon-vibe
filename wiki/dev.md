@@ -27,7 +27,7 @@ just dev-reset # reset the dev database
 
 `just lint` auto-fixes formatting, then runs the checks nothing can fix for you;
 `just lint-check` is the read-only half and is what `just test` calls. Both end on
-the same seven gates:
+the same eight gates:
 
 - `just permission-drift` — a role literal used to gate outside the engine's
   capability table.
@@ -80,6 +80,16 @@ the same seven gates:
   takes. Test modules are outside the sweep, so `tests.rs` keeps raw keys. In CI
   it rides the backend job, not the lint one: `models.py` instantiates `PyEngine`
   at import, so it needs the built engine.
+
+- `just help-mockups` — a help-guide "screenshot" that hand-rolls a `Button` or
+  `Badge`, or hard-codes a live UI label ([i18n](i18n.md#guide-mockups)). The
+  guides draw the console in miniature so the prose can point at it; nothing
+  recomputes those drawings when the real screen moves. It bans the class
+  signatures a primitive owns, so a control has to go through the component that
+  draws it for real, and it bans any literal that matches an `en.json` value,
+  because that literal is a copy of a live label. Sample data — a player name, a
+  clock face, a VEKN ID — never appears in the catalog, so the label rule does not
+  see it; the few that collide are listed in the script with their reason.
 
 In dev only the **database** runs in Docker; backend and frontend run natively. The
 compose file is **not** production-hardened — uvicorn reload, a default password.

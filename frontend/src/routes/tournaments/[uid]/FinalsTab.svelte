@@ -7,7 +7,7 @@
   import { tournamentAction } from "$lib/tournament-actions";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
-  import VpInput from "./VpInput.svelte";
+  import VpInput from "$lib/components/VpInput.svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import Button from '$lib/components/Button.svelte';
   import { ArrowRightLeft, ShieldCheck, Lock, TriangleAlert } from "@lucide/svelte";

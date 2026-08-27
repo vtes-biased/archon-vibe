@@ -2,12 +2,15 @@
   import { renderGuideSection } from "$lib/markdown";
   import * as m from "$lib/paraglide/messages.js";
   import ExampleBox from "./ExampleBox.svelte";
+  import Button from "$lib/components/Button.svelte";
+  import Badge from "$lib/components/Badge.svelte";
+  import InlineNotice from "$lib/components/InlineNotice.svelte";
+  import VpInput from "$lib/components/VpInput.svelte";
   import {
     QrCode, WifiOff, Wifi, Share2, ClipboardCopy, Download, Dices, Dice3, Undo2, Trash2,
-    Pause, RotateCcw, ChevronDown, ChevronRight,
-    ShieldCheck, TriangleAlert, Gavel, X, Ban,
-    Wrench, Users, Swords, Plus, SquarePlus, ArrowRightLeft,
-    CheckCheck, MoreHorizontal, Ellipsis, Banknote, FileX, UserMinus, Info,
+    Pause, RotateCcw, ChevronDown, ChevronRight, Plus, SquarePlus, ArrowRightLeft,
+    ShieldCheck, TriangleAlert, Gavel, X, Ban, Wrench, Users, Swords, Upload, Settings2,
+    CheckCheck, MoreHorizontal, Ellipsis, Banknote, FileX, UserMinus, Printer, Image,
   } from "@lucide/svelte";
 
   let openFaq = $state<number | null>(null);
@@ -31,28 +34,52 @@
   ];
 </script>
 
+<!-- Structural chrome the app builds from tournament state, which a doc has none
+     of. Controls and labels come from the real Button/Badge and the real message
+     keys, so only the surrounding layout is drawn here. -->
+{#snippet sheetGroup(title: string, open: boolean)}
+  <div class="flex items-center gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+    {#if open}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
+    {title}
+  </div>
+{/snippet}
+
+{#snippet sheetRow(label: string, Icon: any)}
+  <div class="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-ink-bright">
+    <Icon class="w-4 h-4 shrink-0" />
+    <span class="flex-1">{label}</span>
+  </div>
+{/snippet}
+
+{#snippet menu(label: string, Icon: any)}
+  <div>
+    <Button variant="secondary" size="md"><MoreHorizontal class="w-4 h-4" /> {m.common_more()}</Button>
+    <div class="mt-1 min-w-[12rem] max-w-xs rounded-lg border border-line-strong bg-surface-muted py-1 shadow-lg">
+      <span class="flex w-full items-center gap-2 px-3 py-2 text-sm text-ink-bright"><Icon class="w-4 h-4 shrink-0" /> {label}</span>
+    </div>
+  </div>
+{/snippet}
+
 {@html renderGuideSection(m.og_intro())}
 
-<!-- The console in miniature; later sections name places on this picture. -->
+{@html renderGuideSection(m.og_console())}
+
 <ExampleBox>
   <div class="space-y-4 max-w-sm">
-    <!-- Masthead: title, badges and the button row sit ABOVE the console card,
-         not inside it. -->
     <div class="space-y-2">
       <h3 class="text-lg font-semibold text-accent leading-tight">Alicante por la tarde</h3>
       <div class="flex flex-wrap items-center gap-1.5">
-        <span class="inline-flex items-center gap-1 rounded text-xs font-medium px-2 py-0.5 badge-pending">Check-in</span>
-        <span class="inline-flex items-center gap-1 rounded text-xs font-medium px-2 py-0.5 bg-surface-muted text-ink-muted">Standard</span>
-        <span class="inline-flex items-center gap-1 rounded text-xs font-medium px-2 py-0.5 bg-surface-muted text-ink-muted">Proxies allowed</span>
+        <Badge kind="status" tone="pending">{m.state_checkin()}</Badge>
+        <Badge>Standard</Badge>
+        <Badge>{m.tournament_proxies_allowed()}</Badge>
       </div>
       <div class="flex flex-wrap items-center gap-2 pt-0.5">
-        <span class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-line-strong text-ink"><Share2 class="w-4 h-4" /> Share</span>
-        <span class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-line-strong text-ink"><WifiOff class="w-4 h-4" /> Go Offline</span>
-        <span class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-line-strong text-ink"><Wrench class="w-4 h-4" /> Tools</span>
+        <Button variant="ghost" size="md"><Share2 class="w-4 h-4" /> {m.tournament_share()}</Button>
+        <Button variant="ghost" size="md"><WifiOff class="w-4 h-4" /> {m.offline_go_offline()}</Button>
+        <Button variant="ghost" size="md"><Wrench class="w-4 h-4" /> {m.tools_title()}</Button>
       </div>
     </div>
 
-    <!-- The console card: action bar on top, then the tab row. -->
     <div class="rounded-lg border border-line overflow-hidden">
       <div class="border-b border-line px-3 py-3 space-y-3">
         <div class="flex items-center gap-1 text-xs">
@@ -60,40 +87,519 @@
           <span class="text-ink-faint" aria-hidden="true">—</span>
           <span class="w-2 h-2 rounded-full bg-info inline-block"></span>
           <span class="text-ink-faint" aria-hidden="true">—</span>
-          <span class="text-link font-medium whitespace-nowrap"><span class="w-2 h-2 rounded-full bg-accent inline-block mr-1 align-middle"></span>Check-in</span>
+          <span class="text-link font-medium whitespace-nowrap"><span class="w-2 h-2 rounded-full bg-accent inline-block mr-1 align-middle"></span>{m.state_checkin()}</span>
           <span class="text-ink-faint" aria-hidden="true">—</span>
           <span class="w-2 h-2 rounded-full bg-surface-active inline-block"></span>
           <span class="text-ink-faint" aria-hidden="true">—</span>
           <span class="w-2 h-2 rounded-full bg-surface-active inline-block"></span>
         </div>
-        <p class="text-sm text-ink-muted">Round 1 complete. Check in for next round.</p>
+        <p class="text-sm text-ink-muted">{m.action_bar_waiting_after_round({ n: "1" })}</p>
         <div class="flex flex-wrap items-center gap-2">
-          <span class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-accent-strong text-white rounded-lg">Start Round 2</span>
-          <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm bg-surface-hover text-ink-bright rounded-lg"><CheckCheck class="w-4 h-4" /> Check All In</span>
-          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-surface-hover text-ink-bright rounded-lg"><MoreHorizontal class="w-4 h-4" /> More</span>
+          <Button variant="primary" size="lg">{m.overview_start_round({ n: "2" })}</Button>
+          <Button variant="secondary" size="md"><CheckCheck class="w-4 h-4" /> {m.overview_check_all_in()}</Button>
+          <Button variant="secondary" size="md"><MoreHorizontal class="w-4 h-4" /> {m.common_more()}</Button>
         </div>
       </div>
-      <!-- Tab row: a tab exists only where it has something to show, and on a
-           phone only the active one spells itself out. -->
       <div class="flex">
-        <span class="flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 border-accent text-ink-strong"><Users class="w-4 h-4" /> Players</span>
+        <span class="flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 border-accent text-ink-strong"><Users class="w-4 h-4" /> {m.tournament_tab_players()}</span>
         <span class="flex items-center px-4 py-3 border-b-2 border-transparent text-ink-muted"><Swords class="w-4 h-4" /></span>
       </div>
     </div>
 
-    <!-- the Tools drawer, opened on the group matching the state above -->
     <div class="rounded-lg border border-line overflow-hidden">
       <div class="flex items-center justify-between border-b border-line px-4 py-3">
-        <span class="text-sm font-semibold text-ink-strong">Tools</span>
+        <span class="text-sm font-semibold text-ink-strong">{m.tools_title()}</span>
         <X class="w-5 h-5 text-ink-muted" />
       </div>
-      <div class="flex items-center gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted"><ChevronRight class="w-4 h-4" /> Set up</div>
-      <div class="flex items-center gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted"><ChevronDown class="w-4 h-4" /> At the door</div>
-      <div class="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-ink-bright"><QrCode class="w-4 h-4 shrink-0" /><span class="flex-1">Show Check-in QR Code</span><ChevronRight class="w-4 h-4 shrink-0 text-ink-faint" /></div>
-      <div class="flex items-center gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted"><ChevronRight class="w-4 h-4" /> Wrap up</div>
+      {@render sheetGroup(m.tools_group_setup(), false)}
+      {@render sheetGroup(m.tools_group_door(), true)}
+      {@render sheetRow(m.checkin_qr_show_code(), QrCode)}
+      {@render sheetGroup(m.tools_group_wrapup(), false)}
     </div>
   </div>
 </ExampleBox>
+
+<!-- ==================== A small tournament, start to finish ==================== -->
+
+{@html renderGuideSection(m.og_step_create())}
+
+<ExampleBox>
+  <div class="space-y-3 max-w-sm">
+    <Button variant="create" size="lg"><Plus class="w-4 h-4" /> {m.tournaments_new_btn()}</Button>
+    <div class="rounded-lg border border-line-strong bg-surface-muted/40 p-4 space-y-3">
+      <div>
+        <span class="block text-sm text-ink-muted mb-1">{m.tfield_name_label()}</span>
+        <input type="text" value="Alicante por la tarde" tabindex="-1"
+          class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-hover border border-line-strong rounded-lg text-ink-strong" />
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <span class="block text-sm text-ink-muted mb-1">{m.tfield_format()}</span>
+          <select tabindex="-1" class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-hover border border-line-strong rounded-lg text-ink-strong"><option>Standard</option></select>
+        </div>
+        <div>
+          <span class="block text-sm text-ink-muted mb-1">{m.tfield_rank()}</span>
+          <select tabindex="-1" class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-hover border border-line-strong rounded-lg text-ink-strong"><option>{m.tfield_rank_basic()}</option></select>
+        </div>
+      </div>
+      <div>
+        <span class="block text-sm text-ink-muted mb-1">{m.tfield_round_count()}</span>
+        <select tabindex="-1" class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-hover border border-line-strong rounded-lg text-ink-strong"><option>2</option></select>
+      </div>
+    </div>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_step_registration())}
+
+<ExampleBox>
+  <Button variant="primary" size="lg">{m.overview_open_registration()}</Button>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_step_checkin())}
+
+<ExampleBox>
+  <Button variant="primary" size="lg">{m.overview_close_registration()}</Button>
+</ExampleBox>
+
+<!-- The door desk: the action-bar button of that moment, then one roster card
+     with its payment and deck controls already open. -->
+<ExampleBox>
+  <div class="space-y-3 max-w-sm">
+    <Button variant="secondary" size="md"><CheckCheck class="w-4 h-4" /> {m.overview_check_all_in()}</Button>
+    <div class="bg-surface-muted/50 rounded-lg">
+      <div class="p-3 pb-0">
+        <div class="flex items-center gap-1.5">
+          <span class="min-w-0 truncate text-ink text-sm">Alice</span>
+          <span class="flex-1"></span>
+          <Badge kind="status" tone="neutral">{m.player_state_registered()}</Badge>
+        </div>
+        <div class="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
+          <span class="min-w-0 truncate">#1002345</span>
+        </div>
+      </div>
+      <div class="px-3 pb-3 pt-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <Button variant="ghost" size="sm" class="min-h-[44px]"><Banknote class="w-3.5 h-3.5 text-warn" /><span class="text-warn">{m.payment_pending()}</span></Button>
+          <Button variant="ghost" size="sm" class="min-h-[44px]"><FileX class="w-3.5 h-3.5 text-ink-faint" /><span class="text-ink-muted">{m.players_no_deck()}</span></Button>
+          <Button variant="primary" size="sm" class="min-h-[44px]">{m.players_check_in()}</Button>
+          <Button variant="ghost" size="sm" class="min-h-[44px] ml-auto"><Ellipsis class="w-3.5 h-3.5" /> {m.common_more()}</Button>
+        </div>
+      </div>
+    </div>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_step_payment())}
+
+<!-- The badge IS the control — tapping it toggles the player's status. -->
+<ExampleBox>
+  <div class="space-y-3 max-w-sm">
+    <div class="flex gap-2 items-center">
+      <span class="text-ink text-sm">Alice</span>
+      <Badge kind="control" tone="pending">{m.payment_pending()}</Badge>
+      <span class="text-ink text-sm ml-3">Bob</span>
+      <Badge kind="control" tone="info">{m.payment_paid()}</Badge>
+    </div>
+    {@render menu(m.payment_mark_all_paid(), Banknote)}
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_step_late())}
+
+<ExampleBox>
+  <div class="space-y-3 max-w-sm">
+    <InlineNotice>{m.action_bar_unseated_notice({ names: "Diana" })}</InlineNotice>
+    <div class="bg-surface-muted/50 rounded-lg p-4">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-medium text-ink-strong">{m.rounds_table_n({ n: "2" })}</h3>
+        <Badge kind="status" tone="pending">{m.table_state_in_progress()}</Badge>
+      </div>
+      <div class="space-y-1 text-sm">
+        {#each ["Alice", "Bob", "Charlie"] as name}
+          <div class="py-2.5 flex items-center justify-between">
+            <span class="text-ink">{name}</span>
+            <span class="text-ink-faint text-xs">0GW 0TP</span>
+          </div>
+        {/each}
+      </div>
+      <div class="mt-2 pt-2 border-t border-line">
+        <span class="text-xs text-ink-faint"><Plus class="w-3.5 h-3.5 inline mr-1" />{m.rounds_seat_player()}</span>
+      </div>
+    </div>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_step_round())}
+
+<ExampleBox>
+  <Button variant="primary" size="lg">{m.overview_start_round({ n: "1" })}</Button>
+</ExampleBox>
+
+
+
+{@html renderGuideSection(m.og_step_scoring())}
+
+<!-- The real VpInput, so the chips can never drift from the ones players tap. -->
+<ExampleBox>
+  <div class="bg-surface-muted/50 rounded-lg p-4 max-w-sm">
+    <div class="flex items-center justify-between mb-2 gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <ChevronDown class="w-4 h-4 text-ink-muted shrink-0" />
+        <h3 class="text-sm font-medium truncate text-ink-strong">{m.rounds_table_n({ n: "1" })}</h3>
+      </div>
+      <Badge kind="status" tone="pending">{m.table_state_in_progress()}</Badge>
+    </div>
+    <div class="divide-y divide-line">
+      {#each ["Alice", "Bob", "Charlie", "Diana"] as name}
+        <div class="py-2.5">
+          <div class="flex items-center justify-between gap-2 text-sm">
+            <span class="text-ink min-w-0 truncate">{name}</span>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="text-ink-faint text-xs">0GW 0TP</span>
+              <UserMinus class="w-3.5 h-3.5 text-ink-faint" />
+              <TriangleAlert class="w-3.5 h-3.5 text-ink-faint" />
+            </div>
+          </div>
+          <div class="mt-1.5">
+            <VpInput value={0} options={[0, 0.5, 1, 1.5, 2, 3, 4]} label={name} onchange={() => {}} />
+          </div>
+        </div>
+      {/each}
+    </div>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_step_override())}
+
+<!-- A blocked table: the banner states the problem and the way out is the
+     primary control, not the ghost one it is on a table that already adds up. -->
+<ExampleBox>
+  <div class="space-y-3 max-w-sm">
+    <div class="banner-warn border rounded-lg p-3 space-y-1.5">
+      <p class="text-xs flex items-start gap-1.5">
+        <TriangleAlert class="w-4 h-4 shrink-0" />
+        <span>{m.vp_blocked_redirected()}</span>
+      </p>
+      <p class="text-xs">{m.vp_blocked_override_hint()}</p>
+    </div>
+    <Button variant="primary" size="lg" block class="min-h-[44px]"><ShieldCheck class="w-4 h-4" />{m.vp_blocked_override_btn()}</Button>
+    <div class="pt-2 border-t border-line">
+      <p class="text-xs text-ink-faint mb-1.5">{m.override_usage_hint()}</p>
+      <span class="text-xs text-ink-muted block mb-1">{m.override_judge_comment()}</span>
+      <textarea
+        class="w-full bg-surface-hover text-ink-strong text-xs rounded px-2 py-1 border border-line-strong resize-none"
+        placeholder={m.override_placeholder()}
+        rows="2"
+        tabindex="-1"
+      ></textarea>
+      <div class="flex gap-2 mt-1 justify-end">
+        <span class="px-2 py-1 text-xs text-ink-muted">{m.common_cancel()}</span>
+        <Button variant="primary" size="sm">{m.override_save()}</Button>
+      </div>
+    </div>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_step_sanction())}
+
+<ExampleBox>
+  <div class="flex items-center gap-2 max-w-sm">
+    <span class="text-ink text-sm flex-1">Charlie</span>
+    <span class="w-2 h-2 rounded-full bg-warn inline-block"></span>
+    <Button variant="secondary" size="sm"><TriangleAlert class="w-4 h-4 text-warn" />{m.players_sanction_btn()}</Button>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_step_end_round())}
+
+<ExampleBox>
+  <div class="flex flex-wrap gap-2">
+    <Button variant="primary" size="lg">{m.rounds_end_round()}</Button>
+    <Button variant="danger" size="md"><Ban class="w-4 h-4" /> {m.rounds_cancel_round()}</Button>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_step_toss())}
+
+<ExampleBox>
+  <div class="flex flex-wrap gap-2 items-center">
+    <Button variant="secondary" size="md"><Dice3 class="w-4 h-4" /> {m.players_random_toss()}</Button>
+    <Button variant="secondary" size="md">{m.players_edit_toss()}</Button>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_step_finals())}
+
+<ExampleBox>
+  <div class="flex flex-wrap gap-2">
+    <Button variant="primary" size="lg">{m.overview_start_finals()}</Button>
+    <Button variant="secondary" size="md"><ArrowRightLeft class="w-4 h-4" /> {m.rounds_alter_seating()}</Button>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_step_finish())}
+
+<ExampleBox>
+  <div class="space-y-3 max-w-sm">
+    <Button variant="primary" size="lg">{m.finals_finish()}</Button>
+    <InlineNotice tone="warn" icon={TriangleAlert}>{m.decks_winner_nudge_organizer({ name: "Alice" })}</InlineNotice>
+    <div class="rounded-lg border border-line overflow-hidden">
+      {@render sheetGroup(m.tools_group_wrapup(), true)}
+      {@render sheetRow(m.overview_finish_tournament(), TriangleAlert)}
+      {@render sheetRow(m.overview_reopen_tournament(), Undo2)}
+    </div>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_step_share())}
+
+<ExampleBox>
+  <div class="space-y-3">
+    <Button variant="ghost" size="md"><Share2 class="w-4 h-4" /> {m.tournament_share()}</Button>
+    <div class="rounded-lg border border-line max-w-xs overflow-hidden">
+      {@render sheetGroup(m.tools_group_wrapup(), true)}
+      {@render sheetRow(m.tools_copy_results(), ClipboardCopy)}
+      {@render sheetRow(m.tools_download_event(), Download)}
+    </div>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_step_promos())}
+
+<ExampleBox>
+  <!-- A labelled single-column form; each pool carries its eligible count. The
+       optional Prize picker is left out here — it only lists promos you have
+       already configured. -->
+  <div class="space-y-3 max-w-sm">
+    <div class="rounded-lg border border-line overflow-hidden">
+      {@render sheetGroup(m.tools_group_wrapup(), true)}
+      {@render sheetRow(m.promos_title(), Dices)}
+      {@render sheetRow(m.raffle_title(), Dices)}
+    </div>
+    <div>
+      <span class="block text-sm text-ink-muted mb-1">{m.raffle_name_label()}</span>
+      <input type="text" value={m.raffle_name_default({ n: "1" })} tabindex="-1"
+        class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-hover border border-line-strong rounded-lg text-ink-strong" />
+    </div>
+    <div>
+      <span class="block text-sm text-ink-muted mb-1">{m.raffle_pool_label()}</span>
+      <select tabindex="-1" class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-hover border border-line-strong rounded-lg text-ink-strong">
+        <option>{m.raffle_pool_all_players()} (12)</option>
+        <option>{m.raffle_pool_non_finalists()} (7)</option>
+        <option>{m.raffle_pool_game_winners()} (4)</option>
+        <option>{m.raffle_pool_no_game_win()} (8)</option>
+        <option>{m.raffle_pool_no_victory_point()} (3)</option>
+      </select>
+    </div>
+    <div>
+      <span class="block text-sm text-ink-muted mb-1">{m.raffle_winners()}</span>
+      <div class="flex items-center gap-1.5">
+        <span class="min-w-[44px] min-h-[44px] flex items-center justify-center bg-surface-hover border border-line-strong rounded-lg text-ink-strong">&minus;</span>
+        <input type="number" value="1" tabindex="-1" class="w-16 px-2 py-2 min-h-[44px] text-sm text-center bg-surface-hover border border-line-strong rounded-lg text-ink-strong" />
+        <span class="min-w-[44px] min-h-[44px] flex items-center justify-center bg-surface-hover border border-line-strong rounded-lg text-ink-strong">+</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-1.5 py-2 min-h-[44px] text-sm text-ink">
+      <input type="checkbox" tabindex="-1" class="rounded border-line-strong" />
+      {m.raffle_exclude_drawn()}
+    </div>
+    <Button variant="primary" size="md" block><Dices class="w-4 h-4" /> {m.raffle_draw_one({ count: "1" })}</Button>
+    <div class="flex flex-wrap items-center gap-2">
+      <Button variant="ghost" size="md"><Undo2 class="w-3.5 h-3.5" /> {m.raffle_undo_last()}</Button>
+      <Button variant="danger" size="md"><Trash2 class="w-3.5 h-3.5" /> {m.raffle_clear()}</Button>
+    </div>
+  </div>
+</ExampleBox>
+
+<!-- ==================== Offline: the first option branch ==================== -->
+
+{@html renderGuideSection(m.og_offline())}
+
+<ExampleBox>
+  <Button variant="ghost" size="md"><WifiOff class="w-4 h-4" /> {m.offline_go_offline()}</Button>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_offline_prepare())}
+
+<ExampleBox>
+  <!-- One banner: the way back online rides inside it, not underneath. -->
+  <div class="banner-warn border rounded-lg p-4 flex items-center justify-between gap-4 max-w-md">
+    <div class="flex items-center gap-2 min-w-0">
+      <WifiOff class="w-5 h-5 shrink-0" />
+      <div class="min-w-0">
+        <span class="text-warn font-medium text-sm">{m.offline_mode_banner()}</span>
+        <span class="text-xs text-ink-muted ml-2">{m.offline_last_sync({ time: "14:32" })}</span>
+      </div>
+    </div>
+    <div class="shrink-0">
+      <Button variant="primary" size="lg"><Wifi class="w-4 h-4" /> {m.offline_go_online()}</Button>
+    </div>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_force_takeover())}
+
+<!-- ==================== Bigger events ==================== -->
+
+{@html renderGuideSection(m.og_adv_prereg())}
+
+<ExampleBox>
+  <div class="space-y-3 max-w-sm">
+    <div class="flex items-center gap-2">
+      <span class="text-ink text-sm flex-1">Erik</span>
+      <Badge kind="status" tone="pending">{m.waitlist_label()}</Badge>
+      <Button variant="secondary" size="sm">{m.waitlist_promote()}</Button>
+    </div>
+    <div class="rounded-lg border border-line overflow-hidden">
+      {@render sheetGroup(m.tools_group_setup(), true)}
+      {@render sheetRow(m.csv_import_title(), Upload)}
+    </div>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_adv_qr())}
+
+<ExampleBox>
+  <Button variant="secondary" size="md"><QrCode class="w-4 h-4" /> {m.checkin_qr_show_code()}</Button>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_adv_approach())}
+
+{@html renderGuideSection(m.og_adv_seating())}
+
+<ExampleBox>
+  <Button variant="secondary" size="md"><Printer class="w-4 h-4" /> {m.rounds_print_seating()}</Button>
+</ExampleBox>
+
+
+
+<!-- The round toolbar, then the editor Alter seating opens: its Save/Cancel pair
+     is the moment's real CTA, so it leads. -->
+<ExampleBox>
+  <div class="space-y-3 max-w-sm">
+    <div class="flex flex-wrap gap-2">
+      <Button variant="secondary" size="md"><ArrowRightLeft class="w-4 h-4" /> {m.rounds_alter_seating()}</Button>
+      <Button variant="danger" size="md"><Ban class="w-4 h-4" /> {m.rounds_cancel_round()}</Button>
+    </div>
+    <div class="space-y-3">
+      <div class="flex gap-2 flex-wrap">
+        <Button variant="primary" size="lg">{m.rounds_save_seating()}</Button>
+        <Button variant="secondary" size="lg">{m.common_cancel()}</Button>
+      </div>
+      <div class="bg-surface-muted/50 rounded-lg p-4">
+        <h3 class="text-sm font-medium text-ink-strong mb-2">{m.rounds_table_n({ n: "1" })}</h3>
+        <div class="divide-y divide-line">
+          {#each ["Alice", "Bob", "Charlie", "Diana"] as name, i}
+            <div class="w-full min-h-[44px] py-1.5 px-1 flex items-center gap-2 text-sm">
+              <span class="w-5 text-center text-xs text-ink-faint tabular-nums">{i + 1}</span>
+              <span class="flex-1 text-ink">{name}</span>
+              <ArrowRightLeft class="w-4 h-4 shrink-0 text-ink-faint" />
+            </div>
+          {/each}
+        </div>
+      </div>
+      <Button variant="secondary" size="md"><SquarePlus class="w-4 h-4" /> {m.rounds_add_table()}</Button>
+    </div>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_adv_cancel_round())}
+
+{@html renderGuideSection(m.og_adv_banner())}
+
+{@html renderGuideSection(m.og_deck_management())}
+
+<ExampleBox>
+  <Button variant="secondary" size="md"><QrCode class="w-4 h-4" /> {m.deck_upload_scan_qr()}</Button>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_announcements())}
+
+<ExampleBox>
+  <div class="flex gap-2 items-start max-w-sm">
+    <textarea tabindex="-1" rows="2" placeholder={m.announcement_composer_placeholder()}
+      class="flex-1 bg-surface-hover text-ink-strong text-sm rounded-lg px-3 py-2 border border-line-strong resize-none"></textarea>
+    <Button variant="primary" size="md">{m.announcement_post()}</Button>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_co_organizers())}
+
+{@html renderGuideSection(m.og_proxy_players())}
+
+<!-- ==================== Online events ==================== -->
+
+{@html renderGuideSection(m.og_online_intro())}
+
+{@html renderGuideSection(m.og_timer())}
+
+<!-- The clock counts in minutes, not hours, and runs past zero into a negative
+     count-up. Pause swaps places with Start depending on whether it is running. -->
+<ExampleBox>
+  <div class="space-y-3 max-w-sm">
+    <div class="flex gap-4 justify-center">
+      {#each [{ t: "83:45", c: "text-info" }, { t: "4:30", c: "text-warn" }, { t: "-0:12", c: "text-link" }] as clock}
+        <span class="font-mono text-2xl font-bold tabular-nums {clock.c}">{clock.t}</span>
+      {/each}
+    </div>
+    <p class="text-xs text-ink-muted text-center">+2:00 {m.timer_extra_time()}</p>
+    <div class="flex gap-2 justify-center">
+      <Button variant="secondary" size="sm"><Pause class="w-3 h-3" /> {m.timer_pause()}</Button>
+      <Button variant="ghost" size="sm"><RotateCcw class="w-3 h-3" /> {m.timer_reset()}</Button>
+    </div>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_timer_controls())}
+
+<ExampleBox>
+  <div class="flex flex-wrap gap-1 max-w-sm">
+    {#each ["1", "2", "5", "10"] as n}
+      <Button variant="ghost" size="sm">+{n}min</Button>
+    {/each}
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_timer_extensions())}
+
+{@html renderGuideSection(m.og_judge_calls())}
+
+<ExampleBox>
+  <div class="space-y-3 max-w-sm">
+    <Button variant="primary" size="lg" block><Gavel class="w-5 h-5" /> {m.judge_call_btn()}</Button>
+    {#each [{ t: "3", p: "Alice" }, { t: "7", p: "Bob" }] as call}
+      <div class="banner-warn border rounded-lg p-3 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <Gavel class="w-5 h-5 text-warn shrink-0" />
+          <div>
+            <span class="text-sm font-medium text-ink-strong">{m.judge_call_alert()}</span>
+            <span class="text-sm text-ink ml-1">{m.rounds_table_n({ n: call.t })} &mdash; {call.p}</span>
+          </div>
+        </div>
+        <X class="w-4 h-4 text-ink-muted" />
+      </div>
+    {/each}
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_online_checkin())}
+
+<ExampleBox>
+  <Button variant="secondary" size="md"><RotateCcw class="w-4 h-4" /> {m.overview_reset_checkin()}</Button>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_discord())}
+
+{@html renderGuideSection(m.og_parallel_rounds())}
+
+<!-- ==================== Open rounds ==================== -->
+
+{@html renderGuideSection(m.og_open_rounds())}
+
+{@html renderGuideSection(m.og_self_organized())}
+
+<!-- ==================== Reference ==================== -->
 
 {@html renderGuideSection(m.og_configuration())}
 
@@ -149,495 +655,17 @@
   </div>
 </div>
 
-{@html renderGuideSection(m.og_open_rounds())}
+{@html renderGuideSection(m.og_scoring_reference())}
 
-{@html renderGuideSection(m.og_self_organized())}
+{@html renderGuideSection(m.og_sanctions_reference())}
 
-{@html renderGuideSection(m.og_co_organizers())}
+{@html renderGuideSection(m.og_delete_tournament())}
 
-<ExampleBox>
-  <button class="px-4 py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white rounded-lg">
-    Open Registration
-  </button>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_registration_tips())}
-
-<!-- Back to Planning is not a button of its own: it is a row inside the action
-     bar's More menu, which the prose below says in words. -->
-<ExampleBox>
-  <div class="flex flex-wrap items-start gap-2">
-    <span class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-accent-strong text-white rounded-lg">
-      Start Check-in
-    </span>
-    <div>
-      <span class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-surface-hover text-ink-bright rounded-lg"><MoreHorizontal class="w-4 h-4" /> More</span>
-      <div class="mt-1 min-w-[12rem] rounded-lg border border-line-strong bg-surface-muted py-1 shadow-lg">
-        <span class="flex w-full items-center gap-2 px-3 py-2 text-sm text-ink-bright"><Undo2 class="w-4 h-4 shrink-0" /> Back to Planning</span>
-      </div>
-    </div>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_checkin_back())}
-
-<!-- First check-in: the two action-bar buttons of that moment, then one roster
-     card in door mode, where the payment and deck controls sit open. -->
-<ExampleBox>
-  <div class="space-y-3 max-w-sm">
-    <div class="flex flex-wrap gap-2">
-      <span class="inline-flex items-center justify-center px-3 py-1.5 text-sm bg-surface-hover text-ink-bright rounded-lg">Show Check-in QR Code</span>
-      <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm bg-surface-hover text-ink-bright rounded-lg"><CheckCheck class="w-4 h-4" /> Check All In</span>
-    </div>
-    <div class="bg-surface-muted/50 rounded-lg">
-      <div class="p-3 pb-0">
-        <div class="flex items-center gap-1.5">
-          <span class="min-w-0 truncate text-ink text-sm">Alice</span>
-          <span class="flex-1"></span>
-          <span class="text-xs px-2 py-0.5 rounded bg-surface-hover text-ink-muted">Registered</span>
-        </div>
-        <div class="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
-          <span class="min-w-0 truncate">#1002345</span>
-        </div>
-      </div>
-      <div class="px-3 pb-3 pt-2">
-        <div class="flex items-center gap-2 flex-wrap">
-          <span class="inline-flex items-center justify-center gap-1 px-2 py-1 min-h-[44px] text-xs rounded-lg border border-line-strong"><Banknote class="w-3.5 h-3.5 text-warn" /><span class="text-warn">Pending</span></span>
-          <span class="inline-flex items-center justify-center gap-1 px-2 py-1 min-h-[44px] text-xs rounded-lg border border-line-strong"><FileX class="w-3.5 h-3.5 text-ink-faint" /><span class="text-ink-muted">No deck uploaded</span></span>
-          <span class="inline-flex items-center justify-center gap-1 px-2 py-1 min-h-[44px] text-xs bg-accent-strong text-white rounded-lg">Check in</span>
-          <span class="inline-flex items-center justify-center gap-1 px-2 py-1 min-h-[44px] ml-auto text-xs rounded-lg border border-line-strong text-ink"><Ellipsis class="w-3.5 h-3.5" /> More</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_checkin_methods())}
-
-<!-- Action bar names them, Rounds tab seats them. -->
-<ExampleBox>
-  <div class="space-y-3 max-w-sm">
-    <div class="flex items-start gap-2 text-sm text-ink-muted">
-      <Info class="w-4 h-4 mt-0.5 shrink-0" />
-      <span>Checked in but not seated this round: Diana. Seat them at a table with room, or leave them for the next round — your call.</span>
-    </div>
-    <div class="bg-surface-muted/50 rounded-lg p-4">
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="text-sm font-medium text-ink-strong">Table 2</h3>
-        <span class="text-xs px-2 py-0.5 rounded badge-pending">In Progress</span>
-      </div>
-      <div class="space-y-1 text-sm">
-        {#each ["Alice", "Bob", "Charlie"] as name}
-          <div class="py-2.5 flex items-center justify-between">
-            <span class="text-ink">{name}</span>
-            <span class="text-ink-faint text-xs">0GW 0TP</span>
-          </div>
-        {/each}
-      </div>
-      <div class="mt-2 pt-2 border-t border-line">
-        <button class="text-xs text-ink-faint">
-          <Plus class="w-3.5 h-3.5 inline mr-1" />Seat a player
-        </button>
-      </div>
-    </div>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_checkin_rules())}
-
-<ExampleBox>
-  <div>
-    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-surface-hover text-ink-bright rounded-lg"><MoreHorizontal class="w-4 h-4" /> More</span>
-    <div class="mt-1 min-w-[12rem] max-w-xs rounded-lg border border-line-strong bg-surface-muted py-1 shadow-lg">
-      <span class="flex w-full items-center gap-2 px-3 py-2 text-sm text-ink-bright"><Undo2 class="w-4 h-4 shrink-0" /> Reopen Registration</span>
-    </div>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_deck_management())}
-
-<ExampleBox>
-  <button class="px-4 py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white rounded-lg">
-    Start Round 1
-  </button>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_round_start_details())}
-
-<!-- The round toolbar, then the editor Alter seating opens: its Save/Cancel pair
-     is the moment's real CTA, so it leads. -->
-<ExampleBox>
-  <div class="space-y-3 max-w-sm">
-    <div class="flex flex-wrap gap-2">
-      <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm bg-surface-hover text-ink-bright rounded-lg"><ArrowRightLeft class="w-4 h-4" /> Alter seating</span>
-      <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm bg-surface-hover text-ink-bright rounded-lg">Finish Round 2</span>
-      <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm btn-danger rounded-lg"><Ban class="w-4 h-4" /> Cancel Round</span>
-    </div>
-    <div class="space-y-3">
-      <p class="text-sm text-ink">Tap a player, then tap a seat to swap them — or an open seat to move them.</p>
-      <div class="flex gap-2 flex-wrap">
-        <span class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-accent-strong text-white rounded-lg">Save seating</span>
-        <span class="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-surface-hover text-ink-bright rounded-lg">Cancel</span>
-      </div>
-      <div class="bg-surface-muted/50 rounded-lg p-4">
-        <h3 class="text-sm font-medium text-ink-strong mb-2">Table 1</h3>
-        <div class="divide-y divide-line">
-          {#each ["Alice", "Bob", "Charlie", "Diana"] as name, i}
-            <div class="w-full min-h-[44px] py-1.5 px-1 flex items-center gap-2 text-sm">
-              <span class="w-5 text-center text-xs text-ink-faint tabular-nums">{i + 1}</span>
-              <span class="flex-1 text-ink">{name}</span>
-              <ArrowRightLeft class="w-4 h-4 shrink-0 text-ink-faint" />
-            </div>
-          {/each}
-        </div>
-      </div>
-      <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm bg-surface-hover text-ink-bright rounded-lg"><SquarePlus class="w-4 h-4" /> Table</span>
-    </div>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_scoring_intro())}
-
-<!-- A table unfolded with Manage: whole-number VP chips per seat, with the half
-     as its own toggle. -->
-<ExampleBox>
-  <div class="bg-surface-muted/50 rounded-lg p-4 max-w-sm">
-    <div class="flex items-center justify-between mb-2 gap-2">
-      <div class="flex items-center gap-2 min-w-0">
-        <ChevronDown class="w-4 h-4 text-ink-muted shrink-0" />
-        <h3 class="text-sm font-medium truncate text-ink-strong">Table 1</h3>
-      </div>
-      <span class="text-xs px-2 py-0.5 rounded badge-pending shrink-0">In Progress</span>
-    </div>
-    <div class="divide-y divide-line">
-      {#each ["Alice", "Bob", "Charlie", "Diana"] as name}
-        <div class="py-2.5">
-          <div class="flex items-center justify-between gap-2 text-sm">
-            <span class="text-ink min-w-0 truncate">{name}</span>
-            <div class="flex items-center gap-2 shrink-0">
-              <span class="text-ink-faint text-xs">0GW 0TP</span>
-              <UserMinus class="w-3.5 h-3.5 text-ink-faint" />
-              <TriangleAlert class="w-3.5 h-3.5 text-ink-faint" />
-            </div>
-          </div>
-          <div class="mt-1.5 flex flex-wrap items-center gap-1">
-            {#each [0, 1, 2, 3, 4] as vp}
-              <span class="h-11 min-w-11 px-2 flex items-center justify-center rounded-lg border text-sm font-semibold tabular-nums {vp === 0 ? 'bg-accent-strong text-white border-accent-strong-hover ring-2 ring-accent' : 'bg-surface-hover text-ink-strong border-line-strong'}">{vp}</span>
-            {/each}
-            <span class="h-11 min-w-11 px-2 ml-1 flex items-center justify-center rounded-lg border text-sm font-semibold tabular-nums bg-surface-hover text-ink-strong border-line-strong">+½</span>
-          </div>
-        </div>
-      {/each}
-    </div>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_scoring_details())}
-
-<!-- Three moments of one flow, not three peers: the trigger at the foot of an
-     unfolded table, the comment form it opens, and — on a table that already
-     carries one — the overridden line with its undo. -->
-<ExampleBox>
-  <div class="space-y-4 max-w-sm">
-    <div class="flex justify-end">
-      <span class="px-2 py-1 text-xs text-warn"><ShieldCheck class="w-3.5 h-3.5 inline mr-1" />Override</span>
-    </div>
-    <div class="pt-2 border-t border-line">
-      <p class="text-xs text-ink-faint mb-1.5">Use Override for a judge ruling on a disputed or abandoned table — for a wrong number, correct the VPs instead.</p>
-      <span class="text-xs text-ink-muted block mb-1">Judge comment (required)</span>
-      <textarea
-        class="w-full bg-surface-hover text-ink-strong text-xs rounded px-2 py-1 border border-line-strong resize-none"
-        placeholder="Explain why this table result is being overridden..."
-        rows="2"
-        tabindex="-1"
-      ></textarea>
-      <div class="flex gap-2 mt-1 justify-end">
-        <span class="px-2 py-1 text-xs text-ink-muted">Cancel</span>
-        <span class="inline-flex items-center justify-center gap-1 px-2 py-1 text-xs bg-accent-strong text-white rounded-lg">Override &rarr; Finished</span>
-      </div>
-    </div>
-    <div class="pt-2 border-t border-line flex items-center justify-between gap-2">
-      <span class="text-xs text-warn min-w-0"><ShieldCheck class="w-3.5 h-3.5 inline mr-1" />Overridden: Time expired, ruling by head judge</span>
-      <span class="px-2 py-1 text-xs text-ink-faint shrink-0">Remove override</span>
-    </div>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_override_remove())}
-
-<ExampleBox>
-  <div class="space-y-3 max-w-sm">
-    <!-- What the player taps at their table: full-width, the loudest control on
-         their screen. -->
-    <div class="w-full flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] text-sm font-medium bg-accent-strong text-white rounded-lg">
-      <Gavel class="w-5 h-5" />
-      Call Judge
-    </div>
-    <div class="banner-warn border rounded-lg p-3 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <Gavel class="w-5 h-5 text-warn shrink-0" />
-        <div>
-          <span class="text-sm font-medium text-ink-strong">Judge Call!</span>
-          <span class="text-sm text-ink ml-1">Table 3 &mdash; Alice</span>
-        </div>
-      </div>
-      <button class="text-ink-muted p-1">
-        <X class="w-4 h-4" />
-      </button>
-    </div>
-    <div class="banner-warn border rounded-lg p-3 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <Gavel class="w-5 h-5 text-warn shrink-0" />
-        <div>
-          <span class="text-sm font-medium text-ink-strong">Judge Call!</span>
-          <span class="text-sm text-ink ml-1">Table 7 &mdash; Bob</span>
-        </div>
-      </div>
-      <button class="text-ink-muted p-1">
-        <X class="w-4 h-4" />
-      </button>
-    </div>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_finishing_round())}
-
-<ExampleBox>
-  <button class="px-4 py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white rounded-lg">
-    End Round
-  </button>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_between_rounds())}
-
-<ExampleBox>
-  <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm btn-danger rounded-lg">
-    <Ban class="w-4 h-4" />
-    Cancel Round
-  </span>
-</ExampleBox>
-
-<!-- Must not sit between og_timer_extensions and og_payment_tip: one section. -->
-{@html renderGuideSection(m.og_proxy_players())}
-
-{@html renderGuideSection(m.og_announcements())}
-
-{@html renderGuideSection(m.og_timer())}
-
-<!-- The clock counts in minutes, not hours, and runs past zero into a negative
-     count-up. Pause swaps places with Start depending on whether it is running. -->
-<ExampleBox>
-  <div class="space-y-3 max-w-sm">
-    <div class="flex gap-4 justify-center">
-      <div class="text-center">
-        <span class="font-mono text-2xl font-bold tabular-nums text-info">83:45</span>
-        <p class="text-xs text-ink-faint mt-1">Time remaining</p>
-      </div>
-      <div class="text-center">
-        <span class="font-mono text-2xl font-bold tabular-nums text-warn">4:30</span>
-        <p class="text-xs text-ink-faint mt-1">&lt; 5 minutes</p>
-      </div>
-      <div class="text-center">
-        <span class="font-mono text-2xl font-bold tabular-nums text-link">-0:12</span>
-        <p class="text-xs text-ink-faint mt-1">Expired</p>
-      </div>
-    </div>
-    <div class="flex gap-2 justify-center">
-      <span class="inline-flex items-center justify-center gap-1 px-2 py-1 text-xs bg-surface-hover text-ink-bright rounded-lg">
-        <Pause class="w-3 h-3" />
-        Pause
-      </span>
-      <span class="inline-flex items-center justify-center gap-1 px-2 py-1 text-xs rounded-lg border border-line-strong text-ink">
-        <RotateCcw class="w-3 h-3" />
-        Reset
-      </span>
-    </div>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_timer_controls())}
-
-<ExampleBox>
-  <div class="space-y-2 max-w-sm">
-    <div class="text-xs text-ink-muted">+2:00 extra</div>
-    <div class="flex flex-wrap gap-1">
-      {#each ["+1min", "+2min", "+5min", "+10min"] as label}
-        <span class="inline-flex items-center justify-center gap-1 px-2 py-1 text-xs rounded-lg border border-line-strong text-ink">{label}</span>
-      {/each}
-    </div>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_timer_extensions())}
-
-<!-- og_timer_extensions ends by introducing Payment Tracking — keep adjacent. -->
-<ExampleBox>
-  <div class="space-y-3 max-w-sm">
-    <!-- The badge IS the control — tapping it toggles the player's status. -->
-    <div class="flex gap-2 items-center">
-      <span class="text-ink text-sm">Alice</span>
-      <button type="button" tabindex="-1" class="px-2 py-0.5 text-xs rounded badge-pending">Pending</button>
-      <span class="text-ink text-sm ml-3">Bob</span>
-      <button type="button" tabindex="-1" class="px-2 py-0.5 text-xs rounded badge-success">Paid</button>
-    </div>
-    <div>
-      <span class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-surface-hover text-ink-bright rounded-lg"><MoreHorizontal class="w-4 h-4" /> More</span>
-      <div class="mt-1 min-w-[12rem] max-w-xs rounded-lg border border-line-strong bg-surface-muted py-1 shadow-lg">
-        <span class="flex w-full items-center gap-2 px-3 py-2 text-sm text-ink-bright"><Banknote class="w-4 h-4 shrink-0" /> Mark All Paid</span>
-      </div>
-    </div>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_payment_tip())}
-
-<ExampleBox>
-  <div class="flex flex-wrap gap-2 items-center">
-    <span class="inline-flex items-center justify-center px-3 py-1.5 text-sm bg-surface-hover text-ink-bright rounded-lg whitespace-nowrap">
-      <Dice3 class="w-4 h-4 inline mr-1" />
-      Random toss
-    </span>
-    <span class="inline-flex items-center justify-center px-3 py-1.5 text-sm bg-surface-hover text-ink-bright rounded-lg whitespace-nowrap">
-      Edit toss
-    </span>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_finals_toss())}
-
-{@html renderGuideSection(m.og_winner_deck_missing())}
-
-<ExampleBox>
-  <div class="banner-warn border rounded-lg p-3 flex items-start gap-2 text-sm max-w-sm">
-    <TriangleAlert class="w-4 h-4 mt-0.5 shrink-0" />
-    <span class="min-w-0">Winner's decklist is missing. Please remind Alice to upload their deck.</span>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_finish_no_finals())}
-
-<ExampleBox>
-  <!-- The Tools sheet's Wrap up group. Reopen Tournament takes this row's place
-       once the event is Finished — the two never show together. -->
-  <div class="rounded-lg border border-line max-w-xs overflow-hidden">
-    <div class="flex items-center gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted"><ChevronDown class="w-4 h-4" /> Wrap up</div>
-    <div class="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-ink-bright">
-      <TriangleAlert class="w-4 h-4 shrink-0" />
-      Finish Tournament
-    </div>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_reopen())}
-
-<ExampleBox>
-  <div class="space-y-3">
-    <div>
-      <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-line-strong text-ink">
-        <Share2 class="w-4 h-4" />
-        Share
-      </span>
-    </div>
-    <div class="rounded-lg border border-line max-w-xs overflow-hidden">
-      <div class="flex items-center gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted"><ChevronDown class="w-4 h-4" /> Wrap up</div>
-      <div class="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-ink-bright">
-        <ClipboardCopy class="w-4 h-4 shrink-0" />
-        Copy results
-      </div>
-      <div class="flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-ink-bright">
-        <Download class="w-4 h-4 shrink-0" />
-        Download a copy of the event
-      </div>
-    </div>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_sharing_details())}
-
-<ExampleBox>
-  <!-- A labelled single-column form; each pool carries its eligible count. The
-       optional Prize picker is left out here — it only lists promos you have
-       already configured. -->
-  <div class="space-y-3 max-w-sm">
-    <div>
-      <span class="block text-sm text-ink-muted mb-1">Draw name</span>
-      <input type="text" value="Raffle 1" tabindex="-1"
-        class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-hover border border-line-strong rounded-lg text-ink-strong" />
-    </div>
-    <div>
-      <span class="block text-sm text-ink-muted mb-1">Draw from</span>
-      <select tabindex="-1" class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-hover border border-line-strong rounded-lg text-ink-strong">
-        <option>All players (12)</option>
-        <option>Non-finalists (7)</option>
-        <option>Game winners (4)</option>
-        <option>No game win (8)</option>
-        <option>No victory point (3)</option>
-      </select>
-    </div>
-    <div>
-      <span class="block text-sm text-ink-muted mb-1">Winners</span>
-      <div class="flex items-center gap-1.5">
-        <span class="min-w-[44px] min-h-[44px] flex items-center justify-center bg-surface-hover border border-line-strong rounded-lg text-ink-strong">&minus;</span>
-        <input type="number" value="1" tabindex="-1" class="w-16 px-2 py-2 min-h-[44px] text-sm text-center bg-surface-hover border border-line-strong rounded-lg text-ink-strong" />
-        <span class="min-w-[44px] min-h-[44px] flex items-center justify-center bg-surface-hover border border-line-strong rounded-lg text-ink-strong">+</span>
-      </div>
-    </div>
-    <div class="flex items-center gap-1.5 py-2 min-h-[44px] text-sm text-ink">
-      <input type="checkbox" tabindex="-1" class="rounded border-line-strong" />
-      Exclude previous winners
-    </div>
-    <div class="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm bg-accent-strong text-white rounded-lg">
-      <Dices class="w-4 h-4" />
-      Draw 1 winner
-    </div>
-    <div class="flex flex-wrap items-center gap-2">
-      <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-line-strong text-ink">
-        <Undo2 class="w-3.5 h-3.5" />
-        Undo last draw
-      </span>
-      <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm btn-danger rounded-lg">
-        <Trash2 class="w-3.5 h-3.5" />
-        Clear all draws
-      </span>
-    </div>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_offline())}
-
-<ExampleBox>
-  <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-line-strong text-ink">
-    <WifiOff class="w-4 h-4" />
-    Go Offline
-  </span>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_offline_prepare())}
-
-<ExampleBox>
-  <!-- One banner: the way back online rides inside it, not underneath. -->
-  <div class="banner-warn border rounded-lg p-4 flex items-center justify-between gap-4 max-w-md">
-    <div class="flex items-center gap-2 min-w-0">
-      <WifiOff class="w-5 h-5 shrink-0" />
-      <div class="min-w-0">
-        <span class="text-warn font-medium text-sm">OFFLINE MODE — Changes are stored locally</span>
-        <span class="text-xs text-ink-muted ml-2">Last saved: 14:32</span>
-      </div>
-    </div>
-    <span class="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-accent-strong text-white rounded-lg">
-      <Wifi class="w-4 h-4" />
-      Go Back Online
-    </span>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_force_takeover())}
-
-{@html renderGuideSection(m.og_discord())}
+{@html renderGuideSection(m.og_reference())}
 
 {@html renderGuideSection(m.og_community_curation())}
 
-{@html renderGuideSection(m.og_reference())}
+{@html renderGuideSection(m.og_faq_heading())}
 
 <div class="not-prose my-6 space-y-1">
   {#each faqs as faq, i}

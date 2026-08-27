@@ -172,6 +172,7 @@ lint-check:
     just public-api-isolation
     just model-drift
     just migration-pairing
+    just help-mockups
 
 # Fail when a role literal is used for gating outside the engine's capability
 # table — the drift this repo's permission model keeps re-growing without it.
@@ -210,6 +211,11 @@ model-drift:
 migration-pairing:
     uv run python3 scripts/check_migration_pairing.py
 
+# Fail when a help-guide mockup hand-rolls a Button/Badge or hard-codes a live UI
+# label — the drawings of the console rot silently as the real screens move.
+help-mockups:
+    uv run python3 scripts/check_help_mockups.py
+
 # Lint and auto-fix all code
 lint:
     uv run ruff check --fix . && uv run ruff format .
@@ -222,6 +228,7 @@ lint:
     just public-api-isolation
     just model-drift
     just migration-pairing
+    just help-mockups
 
 # Warn (never fail) when the hand-synced backup scripts drift from server-setup's
 # copies (script headers document the contract). Comment wording and the

@@ -2,24 +2,14 @@
   import { renderGuideSection } from "$lib/markdown";
   import * as m from "$lib/paraglide/messages.js";
   import ExampleBox from "./ExampleBox.svelte";
+  import VpInput from "$lib/components/VpInput.svelte";
   import { KeyRound, Mail, UserPlus, Link, Unlink, QrCode, Gavel, Calendar, Copy, RefreshCw, Trophy, Lock, Monitor, Sun, Moon, Bell, Users, ChevronDown, Pin } from "@lucide/svelte";
   import DiscordIcon from "$lib/components/DiscordIcon.svelte";
   import GithubIcon from "$lib/components/GithubIcon.svelte";
 </script>
 
-<!-- VpInput is chips, not a dropdown. -->
 {#snippet vpChips(selected: number)}
-  <div class="flex flex-wrap items-center gap-1">
-    {#each [0, 1, 2, 3, 4] as opt}
-      <button
-        class="h-11 min-w-11 px-2 rounded-lg border text-sm font-semibold tabular-nums transition-colors
-          {opt === selected
-            ? 'bg-accent-strong text-white border-accent-strong-hover ring-2 ring-accent'
-            : 'bg-surface-hover text-ink-strong border-line-strong'}"
-      >{opt}</button>
-    {/each}
-    <button class="h-11 min-w-11 px-2 ml-1 rounded-lg border text-sm font-semibold tabular-nums transition-colors bg-surface-hover text-ink-strong border-line-strong">+½</button>
-  </div>
+  <VpInput value={selected} options={[0, 0.5, 1, 1.5, 2, 3, 4]} onchange={() => {}} />
 {/snippet}
 
 {@html renderGuideSection(m.pg_intro())}
