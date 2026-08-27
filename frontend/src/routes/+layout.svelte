@@ -22,8 +22,7 @@
   // Not onMount: that delays the fetch by a full mount cycle.
   const engineInit = initEngine();
 
-  // Resolved by the app.html head script from the hostname; read here rather than
-  // re-derived, and after mount because the shell is prerendered.
+  // After mount, because the shell is prerendered.
   let isBeta = $state(false);
   let isOnline = $state(navigator.onLine);
   let isSyncing = $state(true);

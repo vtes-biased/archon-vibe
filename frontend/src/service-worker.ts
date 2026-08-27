@@ -100,8 +100,6 @@ sw.addEventListener('message', (event) => {
   }
 });
 
-// The worker has no DOM, so it re-resolves the environment app.html resolved for
-// the page: a beta push in the shade must not read as a production one.
 const beta = self.location.hostname === 'archon.krcg.org';
 
 // Backend payload: { title, body, url, tag }. iOS revokes permission if a push

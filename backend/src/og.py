@@ -6,6 +6,7 @@ projection dict, so this stays unit-testable and can't over-expose member fields
 
 import html
 from datetime import datetime
+from urllib.parse import urlparse
 
 SITE_TITLE = "Archon"
 BETA_SITE_TITLE = "Archon Beta"
@@ -19,9 +20,7 @@ ICON_W, ICON_H = 512, 512
 
 
 def _is_beta(base_url: str) -> bool:
-    """One deployment serves both hosts, so the environment is the host we were
-    reached on — the same resolution the frontend head script makes."""
-    return BETA_HOST in base_url
+    return urlparse(base_url).hostname == BETA_HOST
 
 
 def _site_title(base_url: str) -> str:
@@ -96,8 +95,6 @@ def _render_stub(
     else:
         image, img_w, img_h = f"{base_url}{fallback}", ICON_W, ICON_H
         card = "summary"
-    # A banner makes the card indistinguishable from production otherwise, and the
-    # results of an event recorded on beta never reach VEKN.
     if beta and not title.endswith(BETA_SITE_TITLE):
         title = f"{title} — {BETA_SITE_TITLE}"
 

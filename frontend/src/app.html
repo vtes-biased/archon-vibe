@@ -6,15 +6,13 @@
     <link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
     <link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
     <script>
-      // One artifact serves both hosts, so build-time env vars are out: beta is
-      // resolved from the hostname, and before first paint — the manifest is read
-      // at install time, so a later swap would name the home-screen icon Archon.
+      // Before first paint: the manifest is read at install time, so a later swap
+      // would still name the home-screen icon Archon.
       if (location.hostname === 'archon.krcg.org') {
         document.documentElement.dataset.env = 'beta';
         document.querySelector('link[rel=manifest]').href = '/manifest-beta.webmanifest';
         document.querySelector('link[rel=icon]').href = '/favicon-beta.svg';
         document.querySelector('link[rel=apple-touch-icon]').href = '/apple-touch-icon-beta.png';
-        document.title = 'Archon Beta';
       }
     </script>
     <meta name="theme-color" content="#DC143C" />

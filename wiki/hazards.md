@@ -568,7 +568,8 @@ types ([sync](sync.md#adding-a-new-object-type)).
 reinstalled.** The manifest is read at install time, so resolving beta's identity
 before first paint reaches new installs only; every phone that installed beta
 before this shipped still shows a crimson mark reading "Archon" on the home
-screen, and only the in-app rail chip and its push notifications tell it apart.
+screen. Everything served rather than installed — the rail chip, push
+notifications, link previews — still reads beta correctly.
 There is no way to re-prompt an install from the page, so this is recorded, not
 solved — a beta user reporting two identical icons is asked to reinstall
 ([design](design.md#beta-identity)).

@@ -15,13 +15,24 @@ ROOT = Path(__file__).resolve().parent.parent
 
 MAX_LINES = 3
 
-LINE_MARKER = {".py": "#", ".rs": "//", ".ts": "//", ".svelte": "//"}
+LINE_MARKER = {
+    ".py": "#",
+    ".rs": "//",
+    ".ts": "//",
+    ".svelte": "//",
+    ".html": "//",
+    ".css": "//",
+    ".j2": "#",
+}
 
 BLOCK_MARKERS = {
     ".py": (),
     ".rs": (("/*", "*/"),),
     ".ts": (("/*", "*/"),),
     ".svelte": (("/*", "*/"), ("<!--", "-->")),
+    ".html": (("<!--", "-->"),),
+    ".css": (("/*", "*/"),),
+    ".j2": (("{#", "#}"),),
 }
 
 TYPESCRIPT_DIRECTIVE = "/// <reference"

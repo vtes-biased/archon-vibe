@@ -95,11 +95,8 @@ server {
     proxy_pass http://127.0.0.1:{{ r.backend_port }};
   }
 
-  # Humans get the static SPA shell; social crawlers are proxied to FastAPI's
-  # og stubs instead, since they don't run JS. `if`+`return` is the safe escape
-  # from a location (NOT proxy_pass inside if); @og_stub does the actual proxy.
-  # The short event link — the form actually pasted into chat, so it needs the
-  # card as much as the uid form. Codes are alphanumeric, never a uuid.
+  # `if`+`return` is the safe escape from a location — NOT proxy_pass inside if;
+  # the named locations do the actual proxy.
   location ~ ^/t/[0-9a-zA-Z]+$ {
     error_page 418 = @og_stub;
     if ($is_social_bot) { return 418; }
@@ -118,9 +115,8 @@ server {
     try_files $uri $uri.html /200.html;
     add_header Cache-Control "public, must-revalidate, max-age=0";
   }
-  # The bare app link — what gets pasted to point someone at an environment, so
-  # it must carry that environment's card. Its own named location: preserving the
-  # URI would reach the backend's `/` health check.
+  # Its own named location: preserving the URI would reach the backend's `/`
+  # health check.
   location = / {
     error_page 418 = @og_site;
     if ($is_social_bot) { return 418; }

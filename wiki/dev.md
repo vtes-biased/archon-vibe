@@ -32,7 +32,8 @@ the same seven gates:
 - `just permission-drift` — a role literal used to gate outside the engine's
   capability table.
 - `just comment-blocks` — a contiguous comment block over three lines, in every
-  tracked `.py`, `.rs`, `.ts` and `.svelte` file ([dogmas](dogmas.md#code)).
+  tracked `.py`, `.rs`, `.ts`, `.svelte`, `.html`, `.css` and `.j2` file
+  ([dogmas](dogmas.md#code)).
   `#`, `//`, `///`, `/* … */` and `<!-- … -->` all count, so the ceiling is not a
   question of which one the narration is written in. Two things it does not see:
   TypeScript's `/// <reference>`, which is compiler input rather than prose, and
@@ -151,10 +152,11 @@ Beta's identity assets ship in the same artifact under `-beta` names —
 generated from `favicon-beta.svg` onto the `#2A2520` ground; they are committed
 assets, not a build step.
 
-Social crawlers reach an og stub through the nginx UA-split, which now covers the
-bare `/` as well as the object and help paths. `/` proxies to the backend's
-`/og/site` rather than preserving the URI, because the backend's own `/` is the
-health check.
+Social crawlers reach an og stub through the nginx UA-split, which covers the bare
+`/`, the tournament, short-link, league and help paths — and only those; every
+other route previews from `app.html`'s static tags, which name production on both
+hosts. `/` proxies to the backend's `/og/site` rather than preserving the URI,
+because the backend's own `/` is the health check.
 
 ### Backups
 

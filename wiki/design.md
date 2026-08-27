@@ -116,8 +116,10 @@ on beta never reach VEKN, and the mistake surfaces long after the event. The two
 deployments are one release artifact, so the environment is resolved at runtime
 from the hostname ([dev](dev.md#environment-identity)) and every identity surface
 reads it — home-screen icon and name (`Archon Beta`, the name the mail and WebAuthn
-configuration already use), push notification icon, link-preview card, and the rail
-mark with its `BETA` chip. Below `sm` there is no rail: the home-screen icon and
+configuration already use), push notification icon, the rail mark with its `BETA`
+chip, and the link-preview card on the paths that have a crawler stub. A link to a
+route with no stub still previews from `app.html`'s static tags, which name
+production on both hosts. Below `sm` there is no rail: the home-screen icon and
 name are the whole signal, which is why they carry it rather than an in-app banner.
 
 ### Badges

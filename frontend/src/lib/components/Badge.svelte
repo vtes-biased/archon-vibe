@@ -9,9 +9,7 @@
   /** Status tones carry meaning; categorical tones are arbitrary labels (roles, platforms). */
   export type BadgeTone =
     | "neutral" | "info" | "pending" | "danger" | "highlight"
-    | "blue" | "amethyst" | "fuchsia" | "crimson" | "slate" | "accent"
-    /** Reserved to the beta environment mark — green is off-palette everywhere else. */
-    | "beta";
+    | "blue" | "amethyst" | "fuchsia" | "crimson" | "slate" | "accent" | "beta";
 
   const TONE: Record<BadgeTone, string> = {
     neutral: "bg-surface-muted text-ink-muted",
