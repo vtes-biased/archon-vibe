@@ -480,6 +480,12 @@ Decisions already taken, not to be re-litigated:
 - **No Start Finals CTA in an empty Finals tab.** Finishing without a final is
   legitimate ([rules §3.1.6](domain/tournament-rules.md)), so a CTA there would
   frame finals as the expected path.
+- **Finished spends its primary on promo reporting**, the one state whose button
+  budget was empty. The CTA deep-links into the Tools promos panel rather than
+  moving the form out of it: `ReportPromos` carries no state gate and raffled
+  promos feed the report from check-in on
+  ([tournaments](tournaments.md#engine-event-catalog)), so Tools stays the
+  any-state path while the bar names the moment.
 - **The description drops out of the organizer view only** — organizers wrote it,
   players still need it.
 - **The fold cleanup rides this pass**, console or not: the profile's

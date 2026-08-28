@@ -20,6 +20,7 @@
     doAction,
     onImportArchon,
     onAddBanner,
+    onRecordPromos,
   }: {
     tournament: Tournament;
     standings: StandingEntry[];
@@ -29,6 +30,7 @@
     doAction: (action: TournamentEventType, body?: any) => Promise<string | null>;
     onImportArchon: () => void;
     onAddBanner: () => void;
+    onRecordPromos: () => void;
   } = $props();
 
   let showQrCode = $state(false);
@@ -136,6 +138,13 @@
         if (isFinals) return { label: m.finals_finish(), onclick: () => doAction("FinishFinals"), disabled: !finalsTableFinished };
         if (!hasParallelRounds) return { label: m.rounds_end_round(), onclick: () => doAction("FinishRound", { round: activeRoundIdx }), disabled: !allTablesFinished };
         return tournament.online ? { label: nextRoundLabel, onclick: () => doAction("StartRound"), disabled: !canStartNextOnline } : null;
+      case "Finished": {
+        const recorded = tournament.promos_distributed?.length ?? 0;
+        return {
+          label: recorded > 0 ? m.promos_recorded_edit({ count: String(recorded) }) : m.promos_record_cta(),
+          onclick: onRecordPromos,
+        };
+      }
       default:
         return null;
     }

@@ -958,6 +958,7 @@ import TournamentModals from "./TournamentModals.svelte";
             {doAction}
             onImportArchon={() => (showArchonImport = true)}
             onAddBanner={() => bannerComp?.openCropper()}
+            onRecordPromos={() => openTools('promos')}
           />
 
           <TabStrip {tabs} bind:active={activeTab} />

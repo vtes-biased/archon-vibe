@@ -7,7 +7,7 @@
   import InlineNotice from "$lib/components/InlineNotice.svelte";
   import VpInput from "$lib/components/VpInput.svelte";
   import {
-    QrCode, WifiOff, Wifi, Share2, ClipboardCopy, Download, Dices, Dice3, Undo2, Trash2,
+    QrCode, WifiOff, Wifi, Share2, ClipboardCopy, Download, Dices, Dice3, Ticket, Gift, Undo2, Trash2,
     Pause, RotateCcw, ChevronDown, ChevronRight, Plus, SquarePlus, ArrowRightLeft,
     ShieldCheck, TriangleAlert, Gavel, X, Ban, Wrench, Users, Swords, Upload, Settings2,
     CheckCheck, MoreHorizontal, Ellipsis, Banknote, FileX, UserMinus, Printer, Image,
@@ -372,10 +372,11 @@
        optional Prize picker is left out here — it only lists promos you have
        already configured. -->
   <div class="space-y-3 max-w-sm">
+    <Button variant="primary" size="lg">{m.promos_record_cta()}</Button>
     <div class="rounded-lg border border-line overflow-hidden">
       {@render sheetGroup(m.tools_group_wrapup(), true)}
-      {@render sheetRow(m.promos_title(), Dices)}
-      {@render sheetRow(m.raffle_title(), Dices)}
+      {@render sheetRow(m.raffle_title(), Ticket)}
+      {@render sheetRow(m.promos_title(), Gift)}
     </div>
     <div>
       <span class="block text-sm text-ink-muted mb-1">{m.raffle_name_label()}</span>

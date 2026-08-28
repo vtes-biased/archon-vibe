@@ -91,7 +91,7 @@
     {/if}
   {/if}
 
-  <!-- This panel states the result; other actions (copy, export, promos, reopen)
+  <!-- This panel states the result; other actions (copy, export, reopen)
        live in the Tools sheet. Import is the exception, shown only when there's
        nothing yet to state. -->
   {#if !hasStandings}
