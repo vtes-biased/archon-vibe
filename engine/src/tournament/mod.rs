@@ -2383,8 +2383,7 @@ fn apply_event(
 
             tournament[tournament::FINALS] = json::Null;
             // "" (not null): the backend Tournament model types `winner` as `str`, so a
-            // null fails msgspec validation and 500s the action. Left set, it would be
-            // the archival shape compute_final_standings still ranks 1st.
+            // null fails msgspec validation and 500s the action.
             tournament[tournament::WINNER] = "".into();
             tournament[tournament::STATE] = "Waiting".into();
             update_standings(tournament, sanctions);
