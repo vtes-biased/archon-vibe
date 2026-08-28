@@ -156,12 +156,19 @@ Both checks run on this app's own SQL, since the isolation lint forbids the
 shape asserted in two places
 ([hazards](hazards.md#two-implementations-of-one-gate)).
 
-**A third party only ever types one hostname.** `/oauth/token` and
+**A daemon only ever types one hostname.** `/oauth/token` and
 `/oauth/revoke` are the app's endpoints, not the API's, but the API's vhost
 proxies them ([deployment](#deployment)) so minting, revoking and reading share
 one authority. The minting flow itself is a member account plus the DEV role an
 IC grants, then a self-registered client: the reference page states that rather
 than telling a reader to ask us.
+
+**A login client types the app's hostname instead**, for the whole
+authorization-code flow. Only those two endpoints are proxied here, so
+`/oauth/authorize` and `/oauth/userinfo` exist on the app alone — and the
+member's browser has to reach the consent screen there in any case, which makes
+the app's hostname the one a login client already has. An app that signs members
+in *and* reads `/v1` legitimately types both.
 
 `/docs` and `/openapi.json` are open. The owner's "no anonymous" decision was
 about the data; a reference page nobody can read before registering is a barrier
@@ -205,6 +212,29 @@ never returns — and a reader, a generator or Scalar's preview would believe it
 The line shape is spelled out in the page's own introduction as well, because it
 is the first thing a consumer needs and the last place they should have to look
 for it is a response schema.
+
+The description is a **raw** string, because every shell example ends its lines
+with a backslash and a normal string splices those away.
+
+**Both grants are documented, not just the daemon one.** The reference walks
+"Login with Archon" end to end — client registration, PKCE, `/consent`, the
+callback, `/oauth/token`, `/oauth/userinfo`, refresh rotation, `/oauth/revoke` —
+with a runnable example per step, because the audience for the flow is a third
+party who has no other source for it. Two things the endpoints do not say
+themselves carry their own paragraphs: that the client secret is required
+*alongside* the PKCE verifier rather than instead of it — every client here is
+confidential, and an RFC-habituated reader expects the public-client variant that
+does not exist — and what each delegating scope actually costs the member who
+approves it, `profile:read` being identity alone against `user:impersonate`'s
+one-event authority ([access](access.md#oauth2-provider)).
+
+A recipe section closes the page, for the deck-archive and statistics apps this
+API exists for: `/v1/decks` and `/v1/export`, and the publication contract they
+turn on — a deck is served only once its event is Finished, only as far as
+`decklists_mode` allows, and a reopen withdraws it, so an absence is a correction
+in progress rather than a deletion
+([architecture](architecture.md#cards-and-decks)). Attribution runs through
+`user_uid`, the api projection carrying no author name.
 
 `test_public_api.py` holds both halves: a maximal object of each type is projected
 through `compute_api` and its key set must equal the documented properties, and

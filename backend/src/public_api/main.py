@@ -15,7 +15,7 @@ SITE_URL = os.getenv("SITE_URL_BASE", "http://localhost:8000")
 API_URL = os.getenv("PUBLIC_API_URL_BASE", "http://localhost:8001")
 
 DESCRIPTION = (
-    """
+    r"""
 Read-only access to Archon's organizational data: tournaments, leagues, published
 decks, member ratings and community links.
 
@@ -69,6 +69,15 @@ when you need it, or take `/v1/export` for the whole corpus in one gzipped pass.
 
 ## Getting a token
 
+Every request needs `Authorization: Bearer <token>`; there is no anonymous read.
+Two kinds of token are accepted here, and answered identically. **Your own
+app's token** is the ordinary one: it names your application and nobody else.
+**A member's token**, granted through Login with Archon below, is accepted at
+any scope; it unlocks no extra data here, and exists so an app that already
+signs members in need not hold a second identity.
+
+### Your own app's token
+
 You need an Archon account with your VEKN membership, plus the DEV role, which an
 IC grants. With it, open Developer in [your profile]({site}/profile), register a
 client, tick `api:read` and keep the secret: it is shown once. A client that only
@@ -84,6 +93,192 @@ curl -X POST {api}/oauth/token \
 Form-encoded as RFC 6749 specifies, or a JSON body with the same keys, whichever
 your client prefers. There is no refresh token: mint another when it expires.
 Send it as `Authorization: Bearer <token>` on every request.
+
+## Login with Archon
+
+Sign members in with their Archon account, and — if you run events for them —
+act on their behalf. Authorization code with PKCE, RFC 6749 and RFC 7636, so any
+OAuth library will do the work; what follows is the same flow in curl.
+
+**This flow runs against the main site, {site}, not against this host.** The
+member's browser has to go there for the consent screen, and the same endpoints
+answer there, so a login app types one hostname. `/oauth/token` and
+`/oauth/revoke` also answer on {api}, for a daemon that knows no other hostname.
+An app that both signs members in and reads this API uses both.
+
+### 1. Register your application
+
+Same Developer section of [your profile]({site}/profile), and the same DEV role.
+Tick `profile:read`; tick `user:impersonate` too only if your app runs events for
+members. Declare every redirect URI you will send members back to — the match is
+exact, so `https://example.com/callback` will not accept a trailing slash — and
+keep the secret, which is shown once.
+
+### 2. Build a PKCE challenge
+
+One fresh verifier per authorization, and its SHA-256 digest as the challenge.
+`S256` is the only method accepted; `plain` is refused.
+
+```
+code_verifier=$(openssl rand -base64 60 | tr -d '\n=+/' | cut -c1-64)
+code_challenge=$(printf %s "$code_verifier" | openssl dgst -binary -sha256 \
+  | openssl base64 | tr '+/' '-_' | tr -d '=\n')
+```
+
+Keep the verifier; you send it in step 5.
+
+### 3. Send the member to the consent screen
+
+```
+{site}/consent?response_type=code&client_id=$CLIENT_ID&redirect_uri=https%3A%2F%2Fexample.com%2Fcallback&scope=profile%3Aread&state=$STATE&code_challenge=$CODE_CHALLENGE&code_challenge_method=S256
+```
+
+Navigate to `/consent`, the page on the site — not to `/oauth/authorize`
+underneath it, which is first-party only and answers your app 403.
+
+`state` is yours and comes back untouched; check it on the callback. A member who
+is not signed in is sent to login and returns here afterwards. A member who has
+already approved these scopes never sees the prompt: they bounce straight back to
+your redirect URI with a code.
+
+For `user:impersonate`, add `&tournament=<tournament uid>`. The scope is granted
+for one named event, the consent screen names it to the member, and a request
+carrying the scope without an event is refused.
+
+### 4. Take the callback
+
+```
+https://example.com/callback?code=6mB3...&state=$STATE
+```
+
+or, if the member declined:
+
+```
+https://example.com/callback?error=access_denied&state=$STATE
+```
+
+The code is single-use and lives 60 seconds.
+
+### 5. Exchange the code for tokens
+
+```
+curl -X POST {site}/oauth/token \
+  -d grant_type=authorization_code \
+  -d client_id=$CLIENT_ID -d client_secret=$CLIENT_SECRET \
+  -d code=6mB3... \
+  -d redirect_uri=https://example.com/callback \
+  -d code_verifier=$CODE_VERIFIER
+```
+
+**The client secret is required here as well as the PKCE verifier, not instead of
+it.** Every client is confidential and PKCE sits on top, so there is no public
+variant to ship inside a browser bundle or a mobile binary: keep the secret on
+your server and run this exchange there. `redirect_uri` must be the same string
+you sent in step 3.
+
+```json
+{"access_token":"eyJ...","refresh_token":"eyJ...","token_type":"Bearer",
+ "expires_in":3600,"scope":"profile:read"}
+```
+
+### 6. Ask who the member is
+
+```
+curl {site}/oauth/userinfo -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+```json
+{"sub":"019f6a65-01d4-7214-bcc9-4e46534b9d62","vekn_id":"1000123",
+ "roles":["Prince"],"capabilities":["create_tournament","sponsor_member"]}
+```
+
+`sub` is the member's uid — the same uid `/v1/users/{uid}` takes on this API, and
+the one a tournament's `players`, `standings` and `winner` carry. `capabilities`
+is what the member may do anywhere, so your app need not carry its own copy of
+the role matrix.
+
+This endpoint needs `profile:read` and 403s without it, a `user:impersonate`-only
+token included. An app that wants both asks for both:
+`scope=profile%3Aread%20user%3Aimpersonate`.
+
+### 7. Refresh before the hour is out
+
+```
+curl -X POST {site}/oauth/token \
+  -d grant_type=refresh_token \
+  -d client_id=$CLIENT_ID -d client_secret=$CLIENT_SECRET \
+  -d refresh_token=eyJ...
+```
+
+Access tokens last an hour, refresh tokens 30 days, and **refreshing rotates**:
+the answer carries a new refresh token and the one you sent is dead. Store the
+new one before you spend the new access token. Presenting a refresh token that
+has already been rotated is read as a stolen one and kills the entire lineage —
+every token descended from step 5, at once — and the member has to authorize
+again.
+
+Refresh re-checks the grant, so it can fail for reasons your code did not cause:
+the member withdrew your app from Authorized apps in their profile, or a
+`user:impersonate` grant's event has finished. Neither is retryable; start again
+at step 3, and for a finished event only for a different one.
+
+### 8. Hand the tokens back
+
+```
+curl -X POST {site}/oauth/revoke \
+  -d client_id=$CLIENT_ID -d client_secret=$CLIENT_SECRET -d token=eyJ...
+```
+
+Either half of the pair kills the other and takes the whole rotation lineage with
+it; an expired access token still names its live refresh sibling. The answer is
+`200` whatever you send, an unknown or malformed token included, so it is no
+oracle for which tokens exist.
+
+Revoking tokens is not withdrawing consent — the member's approval stands, and
+your next authorization is a silent one-click. Withdrawing consent is theirs to
+do, from Authorized apps in their profile, and it cuts live tokens with it.
+
+### What each scope asks of the member
+
+`profile:read` is identity and only identity: the uid, VEKN ID, roles and
+capabilities above, from `/oauth/userinfo` and from nowhere else — a token
+holding it alone reaches no other endpoint on the site. This is what Login with
+Archon means, and it is a light thing to consent to.
+
+`user:impersonate` is heavy, and bounded so that it can be. Your app acts *as*
+the member on **one event**, named up front and shown on the consent screen: it
+may register players, run rounds and record results there, exactly as far as that
+member could in Archon itself. Every other event and every route outside that
+tournament is refused, and so is the infrastructure of owning an event — deleting
+it, changing its organizers, publishing it to VEKN, taking it offline — even
+inside it. The grant ends with the event: once it is Finished, neither a fresh
+authorization nor a refresh will work.
+
+`api:read` is the daemon scope and is refused in this flow. It delegates nobody's
+authority, so there is nothing for a member to consent to.
+
+## Building a deck archive or a statistics site
+
+Two endpoints carry it. `/v1/decks` streams every published deck, newest first,
+and `tournament=<uid>` narrows it to one event. `/v1/export` is the whole corpus
+— tournaments, members, decks, leagues, links — as one gzipped file, which is the
+cheapest way to take everything and the cheapest way to take it again later.
+
+**A deck is served only once its event is finished**, and then only as far as the
+organizer chose when they configured it. That choice is the tournament's own
+`decklists_mode`, which you can read off its row: `Winner` publishes the winner's
+deck, `Finalists` the finalists' and the winner's, `All` every deck played.
+Nothing is served before the event finishes, whatever the mode.
+
+Publication is derived from that state rather than stored, so **an organizer who
+reopens a finished event to correct it withdraws its decks** until it is finished
+again. Treat a deck's disappearance as provisional: it is far more often a
+correction in progress than a deletion.
+
+**Decks carry no author name** — this API publishes none. Attribution runs
+through `user_uid`: hand it to `/v1/users/{uid}` for the member's VEKN ID. The
+same uid appears in the tournament's `players`, `standings` and `winner`, so one
+lookup attributes a deck and the result it earned together.
 """.strip()
     .replace("{site}", SITE_URL)
     .replace("{api}", API_URL)
