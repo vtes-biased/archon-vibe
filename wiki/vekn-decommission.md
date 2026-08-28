@@ -48,7 +48,8 @@ real event entered twice on vekn.net with both vekn ids live. Soft-delete plus
 vekn-id transplant is the recipe. Done when each group below has one live copy.
 
 Data gathered 2026-08-08 from `dedup_tournaments.py --probe-vekn` on prod, plus
-direct vekn.net reads for the PennyBridge pair.
+direct vekn.net reads for the PennyBridge pair, and re-confirmed by the
+2026-08-28 run — same set, one addition.
 
 **Why this is blocked.** These are pairs where one real event was entered twice
 on vekn.net and **both** event ids are still live. The standard recipe
@@ -72,8 +73,9 @@ Two exits, either one sufficient:
 **Prior art (already done, do not redo).** On 2026-08-08 an `--apply` run
 resolved 7 groups where exactly one id was live — AMICI NOCTIS, Alexandre Koch,
 Vozhd of Szczecin, François Villon, Draft that Was Promised (adopted vekn
-13137), 8th Tragic Love Affair, Cearense 2026. The mixed-vekn class (some but
-not all copies hold a vekn id) reports **zero** groups on prod — fully resolved.
+13137), 8th Tragic Love Affair, Cearense 2026. That emptied the mixed-vekn class
+(some but not all copies hold a vekn id), and the archive backfill refilled it
+with a class of its own — see [archive reconstructions] below.
 
 #### Strong candidates — one copy carries no results
 
@@ -81,15 +83,17 @@ Near-certain double-entries: the empty copy is the accidental second entry.
 
 | Event | Date | Keep | Delete (empty) |
 |---|---|---|---|
+| Itaquaquecetubense 2026 | 2026-08-16 | **13478** (27 players, standings) | 13477 (0 players) |
 | 5ª Jornada Liga Levante Norte | 2026-03-29 | **13151** (26 players, 3 rounds) | 13152 (0 players) |
 | Sangrando por un sueño | 2026-01-25 | **12972** (5 players) | 12971 (0 players) |
 | Primeiro campeonato online Inconnu do home office | 2026-01-18 | **12979** (12 players) | 12931 (0 players) |
 | PennyBridge - Charisma III | 2026-05-22 / 05-23 | **13048** (12 players, results) | 13046 (0 players) |
 
-Player counts for the first three come from the earlier dedup pass's record;
-PennyBridge was verified directly (both ids fetched live on vekn.net: same name,
-same venue Brickebacken/Örebro, same "3 + Final" format, only 13048 carries
-results).
+Player counts for the middle three come from the earlier dedup pass's record.
+Itaquaquecetubense was read off the corpus on 2026-08-28 — the empty copy carries
+no country and no winner either. PennyBridge was verified directly (both ids
+fetched live on vekn.net: same name, same venue Brickebacken/Örebro, same
+"3 + Final" format, only 13048 carries results).
 
 #### Needs judgement — per-copy results not yet pulled
 
@@ -118,7 +122,7 @@ pulled yet.
 - **70 groups over 4 copies**, skipped by `PROBE_GROUP_CAP` — placeholder-shaped
   by the same logic.
 
-98 + 10 named = the 108 "all ids live" lines the probe reported.
+98 + 11 named = the 109 "all ids live" lines the probe reported.
 
 #### The day-boundary detection blind spot
 
@@ -327,11 +331,94 @@ full-rebuild branch would wipe the correction on its next run.
 The Brazilian pair are two distinct live members whose names differ by four
 letters, so that one is as likely a transcription slip upstream as a wrong result.
 
+Two more disagreements of the same kind, reached from the archive side instead of
+the Hall of Fame's, are recorded under [archive reconstructions] below; each
+carries a reconstruction to delete as well as a winner to settle.
+
 Found 2026-08-16 by the Hall of Fame winner-identity bootstrap, which reads each
 TWDA entry's submitter against the resolved winner of the tournament it attached
 to: 3 of 1156 names mapped to two members, and these are the two that are not
 genuine homonyms. The third — two live members both named `Pedro Paulo`, in
 Fortaleza and Campina Grande — is a real homonym and needs nothing.
+
+### Archive reconstructions of an event we already hold
+
+[archive reconstructions]: #archive-reconstructions-of-an-event-we-already-hold
+
+**Deferred ask** — settle the eight pairs below: where the reconstruction is the
+same event, soft-delete it and transplant its archive key onto the survivor as
+`external_ids.twda_entry`; where it is a distinct event, leave both live and
+record which. Done when no pair below is ambiguous and the mixed-vekn class of
+`dedup_tournaments.py` reports only pairs it can propose.
+
+**The archive backfill creates this class.** `reconcile_twda.py` reconstructs an
+entry when no held copy answers for it, and a held copy whose standings yield no
+winner name answers for nothing — so the backfill mints a `players=1, decks=1`
+row beside the full vekn-linked copy of the same name and day. On prod
+2026-08-28 the report found 30 such pairs; 22 were resolved the same day and the
+8 here were not.
+
+**What separates them is whether the survivor can receive the deck back.**
+Applying a decision soft-deletes the reconstruction, and that cascades the
+archive's winning decklist — the only one we hold for these events, every
+survivor carrying `decks=0`. The transplanted key is what returns it:
+`_tournaments_by_twda_id` then resolves the entry to the survivor and
+`_import_decks` re-creates the deck there. But it writes that deck for the
+**survivor's** `winner`, and skips the row entirely when there is none. So a pair
+is safe to apply only where both copies name the same member, which is what the
+22 had and none of these eight do.
+
+#### The survivor names no winner
+
+Deleting the reconstruction loses the decklist for good: `_import_decks` skips a
+tournament whose `winner` is empty, and writing one onto a vekn-linked row is
+what the section above unblocks. The archive's winner is in our roster, so these
+are the same event and the correction is known — only the guard is in the way.
+
+| Event | Date | Held (vekn) | Players | Archive entry | Archive winner |
+|---|---|---|---|---|---|
+| Shell Game | 2006-03-05 CA | `019f1a02-033a-72c2-a31e-6f587bb89e0f` (836) | 14 | `2k6sgquebec` | François Nadeau |
+| Czestochowa by Night | 2009-03-21 PL | `019f1a06-f70c-75ca-8628-29f8b90883b1` (4026) | 23 | `2k9czestochowa` | Tomasz Pietkiewicz |
+
+Reconstructions: `01a028a7-0c3a-707d-9ab7-958f44db7050`,
+`01a028a7-60bd-7485-9760-1fe29744a65b`.
+
+#### The two copies disagree about who won
+
+Worse than losing the deck: applying would re-create the archive's decklist under
+**our** winner's name, crediting a player with a TWDA deck and a Hall of Fame win
+the archive gives to someone else. Both archive winners are in our roster, so one
+of the two results is wrong rather than describing another event — the same
+question as the two rows above, reached from the other direction.
+
+| Event | Date | Held (vekn) | Our winner | The archive's | Archive entry |
+|---|---|---|---|---|---|
+| Mind of a Killer | 2006-07-30 CA | `019f1a05-db59-76dd-80c6-8c36656dc444` (1137) | Yan Blondin | Marc Desaulniers | `2k6moakquebec` |
+| Buffet Contre les Vampires | 2007-08-04 FR | `019f1a06-f737-756e-a552-c37d657a2c55` (4028) | Arnaud Baigts | Reyda Seddiki | `2k7parisbclv` |
+
+Reconstructions: `01a028a7-031b-72dd-92a4-a81b15c2e1eb`,
+`01a028a7-2578-7494-a7b9-1c1c480a4af4`.
+
+#### The archive's winner is not in our roster
+
+Identity is unresolved, and two explanations fit the same evidence: a genuinely
+distinct event sharing a name and a day, or a member we never linked — the VEKN
+tournament sync drops players whose VEKN id we do not hold, so our roster is not
+proof of who played. `Urban Jungle: Vitoria` is the clearest warning against
+reading these as distinct events: our winner is recorded under the nickname
+`Mineirinho`, which is a member-identity gap, not a second tournament.
+
+| Event | Date | Held (vekn) | Our winner | The archive's | Archive entry |
+|---|---|---|---|---|---|
+| Kindred Society Games | 2007-11-04 IT | `019f1a07-0bc3-7120-8066-5992a6da9027` (4307) | Miro Albertazzi | Mirko Anconitani | `2k7luccaitaly` |
+| The Eldest Command Undeath | 2007-11-17 ZA | `019f1a06-6683-720d-a33d-4a7a65da3099` (2535) | Eric August | Daniel Boud | `2k7capetownnovember` |
+| Urban Jungle: Vitoria | 2008-06-28 BR | `019f1a06-f00f-72ca-828c-7b63c1678f85` (3927) | Mineirinho | Leonardo Ribeiro | `2k8ujvitoria` |
+| Catch the infernal | 2013-04-07 ES | `019f1a18-a438-7280-8e61-8cf4b9b177a6` (7106) | José Manuel Escobar | Sebastià Giralt | `2013ctims` |
+
+Reconstructions: `01a028a7-1cf7-72e2-840c-fb514352ede1`,
+`01a028a7-1459-7269-bfc6-bef3725ae9aa`,
+`01a028a7-4f22-7589-8a2d-b5419892b1b3`,
+`01a028a5-fafe-71c6-8df4-974e6545d144`.
 
 ## Trigger: stage 2 — the member roster sync retires
 
