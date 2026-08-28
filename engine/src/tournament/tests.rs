@@ -1851,9 +1851,12 @@ fn test_finish_tournament_preserves_dq() {
 }
 
 #[test]
-fn test_reopen_tournament_preserves_dq() {
+fn test_reopen_tournament_without_finals() {
+    // No final to return to: back to check-in, and the winner an archival import
+    // set without one survives.
     let mut tournament = make_tournament();
     tournament["state"] = "Finished".into();
+    tournament["winner"] = "p1".into();
     tournament["players"] = json::array![
         { user_uid: "p1", state: "Finished", payment_status: "Pending", toss: 0 },
         { user_uid: "p2", state: "Disqualified", payment_status: "Pending", toss: 0 },
@@ -1863,13 +1866,122 @@ fn test_reopen_tournament_preserves_dq() {
     let result = run_event(&tournament, &event, &actor);
     assert!(result.is_ok());
     let updated = json::parse(&result.unwrap()).unwrap();
+    assert_eq!(updated["state"].as_str(), Some("Waiting"));
     assert_eq!(updated["players"][0]["state"].as_str(), Some("Checked-in"));
     assert_eq!(
         updated["players"][1]["state"].as_str(),
         Some("Disqualified")
     ); // preserved
-       // winner cleared to "" (not null): backend types it `str`, a null 500s the action
-    assert_eq!(updated["winner"].as_str(), Some(""));
+    assert_eq!(updated["winner"].as_str(), Some("p1"));
+}
+
+/// A tournament finished on a played final: p1-p5 the finalists, p6 at the
+/// three-round cap, p7 and p8 one round in.
+fn finished_with_finals() -> JsonValue {
+    let mut t = make_tournament();
+    t["state"] = "Finished".into();
+    t["winner"] = "p1".into();
+    t["decklists_mode"] = "Winner".into();
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Finished", payment_status: "Pending", toss: 0, finalist: true },
+        { user_uid: "p2", state: "Finished", payment_status: "Pending", toss: 0, finalist: true },
+        { user_uid: "p3", state: "Finished", payment_status: "Pending", toss: 0, finalist: true },
+        { user_uid: "p4", state: "Finished", payment_status: "Pending", toss: 0, finalist: true },
+        { user_uid: "p5", state: "Finished", payment_status: "Pending", toss: 0, finalist: true },
+        { user_uid: "p6", state: "Finished", payment_status: "Pending", toss: 0, finalist: false },
+        { user_uid: "p7", state: "Finished", payment_status: "Pending", toss: 0, finalist: false },
+        { user_uid: "p8", state: "Finished", payment_status: "Pending", toss: 0, finalist: false },
+    ];
+    let table = |a: &str, b: &str, c: &str, d: &str| {
+        json::object! {
+            seating: [
+                { player_uid: a, result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+                { player_uid: b, result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+                { player_uid: c, result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+                { player_uid: d, result: { gw: 0, vp: 0.0, tp: 0 }, judge_uid: "" },
+            ],
+            state: "Finished",
+            override: json::Null,
+        }
+    };
+    t["rounds"] = json::array![
+        [table("p1", "p2", "p3", "p4"), table("p5", "p6", "p7", "p8")],
+        [table("p1", "p2", "p5", "p6")],
+        [table("p1", "p2", "p5", "p6")],
+    ];
+    t["finals"] = json::object! {
+        seating: [
+            { player_uid: "p1", result: { gw: 1, vp: 3.0, tp: 60 }, judge_uid: "" },
+            { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p3", result: { gw: 0, vp: 1.0, tp: 36 }, judge_uid: "" },
+            { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 12 }, judge_uid: "" },
+            { player_uid: "p5", result: { gw: 0, vp: 0.0, tp: 12 }, judge_uid: "" },
+        ],
+        state: "Finished",
+        override: json::Null,
+        seed_order: ["p1", "p2", "p3", "p4", "p5"],
+    };
+    t
+}
+
+#[test]
+fn test_reopen_tournament_keeps_the_final() {
+    let tournament = finished_with_finals();
+    let decks = json::array![
+        { uid: "d1", user_uid: "p1", tournament_uid: "test-tournament", round: 3, public: true },
+    ];
+    let event = json::object! { type: "ReopenTournament" };
+    let (updated_json, deck_ops) =
+        run_event_with_decks(&tournament, &event, &make_organizer(), &decks.dump()).unwrap();
+    let updated = json::parse(&updated_json).unwrap();
+
+    assert_eq!(updated["state"].as_str(), Some("Playing"));
+    assert_eq!(updated["winner"].as_str(), Some("p1"));
+    assert_eq!(updated["finals"]["seating"].len(), 5);
+    assert_eq!(updated["finals"]["state"].as_str(), Some("Finished"));
+    for uid in ["p1", "p2", "p3", "p4", "p5"] {
+        assert_eq!(player_state(&updated, uid), "Playing");
+    }
+    assert!(updated["players"][0]["finalist"].as_bool().unwrap_or(false));
+    assert_eq!(player_state(&updated, "p6"), "Completed"); // at the max_rounds cap
+    assert_eq!(player_state(&updated, "p7"), "Checked-in");
+
+    // The finals stamp survives — only CancelFinals releases it.
+    assert!(!deck_ops
+        .members()
+        .any(|op| op["op"].as_str() == Some("set_round")));
+    let publics: Vec<bool> = deck_ops
+        .members()
+        .filter(|op| op["op"].as_str() == Some("set_public"))
+        .map(|op| op["public"].as_bool().unwrap_or(true))
+        .collect();
+    assert_eq!(publics, vec![false]);
+}
+
+#[test]
+fn test_finish_finals_publishes_the_winner_deck() {
+    // Publication is derived from the Finished state, so it must come back when the
+    // organizer re-finishes a final they reopened to correct.
+    let mut tournament = finished_with_finals();
+    tournament["state"] = "Playing".into();
+    let decks = json::array![
+        { uid: "d1", user_uid: "p1", tournament_uid: "test-tournament", round: 3, public: false },
+        { uid: "d2", user_uid: "p2", tournament_uid: "test-tournament", round: 3, public: false },
+    ];
+    let event = json::object! { type: "FinishFinals" };
+    let (updated_json, deck_ops) =
+        run_event_with_decks(&tournament, &event, &make_organizer(), &decks.dump()).unwrap();
+    let updated = json::parse(&updated_json).unwrap();
+
+    assert_eq!(updated["state"].as_str(), Some("Finished"));
+    assert_eq!(updated["winner"].as_str(), Some("p1"));
+    let published: Vec<&str> = deck_ops
+        .members()
+        .filter(|op| op["op"].as_str() == Some("set_public"))
+        .filter(|op| op["public"].as_bool().unwrap_or(false))
+        .filter_map(|op| op["deck_uid"].as_str())
+        .collect();
+    assert_eq!(published, vec!["d1"]); // decklists_mode Winner
 }
 
 /// Build a tournament in Playing state with one round of 2 tables of 4

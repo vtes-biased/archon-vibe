@@ -417,20 +417,43 @@ fn apply_event(
         TournamentEvent::ReopenTournament => {
             require_organizer(actor)?;
             require_state(state, TournamentState::Finished)?;
-            tournament[tournament::STATE] = "Waiting".into();
-            // winner is "" (not null): the backend Tournament model types it `str`
-            // (""=no winner), so a null fails msgspec validation and 500s the action.
-            tournament[tournament::FINALS] = json::Null;
-            tournament[tournament::WINNER] = "".into();
+            // A played final returns to the table the organizer needs to correct;
+            // CancelFinals is the only path that discards one.
+            let has_finals = !tournament[tournament::FINALS].is_null();
+            tournament[tournament::STATE] = if has_finals { "Playing" } else { "Waiting" }.into();
+
+            let max_rounds = tournament[tournament::MAX_ROUNDS].as_usize().unwrap_or(0);
+            let capped: std::collections::HashSet<String> = if max_rounds > 0 {
+                tournament[tournament::PLAYERS]
+                    .members()
+                    .filter_map(|p| p[player::USER_UID].as_str().map(String::from))
+                    .filter(|uid| count_player_rounds_played(tournament, uid) >= max_rounds)
+                    .collect()
+            } else {
+                std::collections::HashSet::new()
+            };
             let players = &mut tournament[tournament::PLAYERS];
             for i in 0..players.len() {
-                if players[i][player::STATE].as_str() == Some("Finished") {
-                    players[i][player::STATE] = "Checked-in".into();
+                if players[i][player::STATE].as_str() != Some("Finished") {
+                    continue;
                 }
-                players[i][player::FINALIST] = false.into();
-                // Disqualified players stay Disqualified (no reset)
+                let uid = players[i][player::USER_UID]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
+                let finalist = players[i][player::FINALIST].as_bool().unwrap_or(false);
+                players[i][player::STATE] = if has_finals && finalist {
+                    "Playing"
+                } else if capped.contains(&uid) {
+                    "Completed"
+                } else {
+                    "Checked-in"
+                }
+                .into();
             }
             update_standings(tournament, sanctions);
+            // Publication is derived from the Finished state, so it withdraws here and
+            // the finish that follows recomputes it.
             for d in decks.members() {
                 let deck_uid = d[deck_object::UID].as_str().unwrap_or("");
                 if !deck_uid.is_empty() {
@@ -442,12 +465,6 @@ fn apply_event(
                     let _ = deck_ops.push(op);
                 }
             }
-            release_stamped_decks(
-                decks,
-                deck_ops,
-                &[tournament[tournament::ROUNDS].len()],
-                None,
-            );
             Ok(())
         }
 
@@ -2310,6 +2327,22 @@ fn apply_event(
             }
 
             update_standings(tournament, sanctions);
+
+            for d in decks.members() {
+                let user_uid = d[deck_object::USER_UID].as_str().unwrap_or("");
+                if user_uid.is_empty() {
+                    continue;
+                }
+                let is_public = compute_deck_public(tournament, user_uid);
+                if is_public {
+                    let op = json::object! {
+                        arg::OP => "set_public",
+                        arg::DECK_UID => d[deck_object::UID].as_str().unwrap_or(""),
+                        arg::PUBLIC => true,
+                    };
+                    let _ = deck_ops.push(op);
+                }
+            }
 
             Ok(())
         }

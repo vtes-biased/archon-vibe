@@ -22,7 +22,7 @@ server (PyO3) behave identically.
 | `open_rounds` | bool | the non-VEKN house format, below |
 | `self_organized_rounds` | bool | players seat their own pods |
 | `standings_mode` | Private / Cutoff / Top 10 / Public | display default during play |
-| `decklists_mode` | Winner / Finalists / All | applied after finish |
+| `decklists_mode` | Winner / Finalists / All | applied by `FinishFinals`, `FinishTournament` and a later edit of the field |
 | `round_time`, `finals_time` | seconds; `round_time` 0 = untimed, `finals_time` 0 = use `round_time` | the shared timer |
 | `table_rooms` | named rooms over table ranges | labels in seating, print and player views |
 
@@ -94,6 +94,8 @@ set-restricted results from ratings is not applied automatically.
 
 ```
 Planned ──open──> Registration ──close──> Waiting ⇄ Playing ──finish──> Finished
+                                             ^          ^                  |
+                                             └──────────┴─────reopen───────┘
 ```
 
 | State | What it means | Key actions |
@@ -103,6 +105,17 @@ Planned ──open──> Registration ──close──> Waiting ⇄ Playing �
 | `Waiting` | between rounds, check-in active | CheckIn, CheckInAll, StartRound, StartFinals, FinishTournament, ReopenRegistration |
 | `Playing` | round in progress | SetScore, Override, FinishRound, CancelRound, seating edits |
 | `Finished` | complete | ReopenTournament, organizer SetScore/Override, deck uploads |
+
+**`ReopenTournament` destroys nothing.** An event finished on a played final
+returns to `Playing` with that final, its winner, the finalist flags and the deck
+stamps all intact, so the organizer lands back in the table they need to correct
+and re-runs `FinishFinals` when done; `CancelFinals` is the one path that discards
+a final, and it is reachable from there. An event finished without one returns to
+`Waiting`, having no final to come back to, and keeps the winner an archival import
+may have set. Players released from `Finished` return to `Playing` if they were
+finalists, else to `Completed` when they are at the per-player `max_rounds` cap and
+`Checked-in` otherwise. Decklists unpublish, since publication is derived from the
+finished state and both finish paths recompute it.
 
 `UpdateConfig`, `ReportPromos` and Delete are available in any state.
 `SetScore`/`Override`/`Unoverride` are open to players only during `Playing`, and
@@ -528,8 +541,8 @@ is the tournament's own index — `len(rounds)` the finals, as
 `StartRound`, `SelfOrganizeRound`, `SeatPlayer`, `AlterSeating` and `StartFinals`
 stamp the pending deck of everyone seated in the round they touch — not only the
 seat that moved — one deck per player per round, and `UnseatPlayer`, a tail
-`CancelRound`, `CancelFinals` and `ReopenTournament` release what the round they
-removed held. A single-deck event's registered deck is never stamped. Stamping at
+`CancelRound` and `CancelFinals` release what the round they removed held. A
+single-deck event's registered deck is never stamped. Stamping at
 seating rather than at upload is what makes the index the tournament's: a deck is
 uploaded before the round it will be played in exists, so nothing earlier could
 name one.
