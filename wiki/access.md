@@ -224,9 +224,11 @@ token pair for the merged uid, so reaching it turns a delegated grant into a
 full session.
 
 **Barred inside the token's own tournament**, whatever the user may do: delete,
-`organizers` add/remove, `push-vekn`, and the offline-lock family (`go-offline`,
-`go-online`, `force-takeover`, `force-unlock`, `sync-offline`). These are the
-infrastructure of owning an event, not of running one.
+`organizers` add/remove, `push-vekn`, the offline-lock family (`go-offline`,
+`go-online`, `force-takeover`, `force-unlock`, `sync-offline`), and the two bulk
+door routes `qr-checkin` and `archon-import`. These are the infrastructure of
+owning an event, not of running one — and the door routes admit a roster wholesale
+rather than a player at a time, which a delegated app has no business doing.
 
 `GET /api/tournaments/{uid}/decks` is the delegated read a play platform needs
 once a round starts — [sync](sync.md#delegated-third-party-reads).

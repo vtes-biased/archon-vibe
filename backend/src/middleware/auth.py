@@ -21,6 +21,8 @@ _OAUTH_BARRED_SUBPATHS = frozenset(
         "force-takeover",
         "force-unlock",
         "sync-offline",
+        "qr-checkin",
+        "archon-import",
     }
 )
 

@@ -19,7 +19,10 @@ sys.path.insert(0, str(ROOT))
 
 from backend.src.main import app as site_app  # noqa: E402
 from backend.src.middleware.auth import _OAUTH_BARRED_SUBPATHS  # noqa: E402
-from backend.src.public_api.main import _IMPERSONATE_ROUTES  # noqa: E402
+from backend.src.public_api.main import (  # noqa: E402
+    _IMPERSONATE_ROUTES,
+    _IMPERSONATE_SCHEMAS,
+)
 
 # Reachable outside the granted tournament's own prefix, from `_oauth_allows`.
 # `/oauth/*` is documented in prose, not as endpoints: those are the token's own
@@ -71,16 +74,39 @@ def reachable() -> set[tuple[str, str]]:
     return found
 
 
+def schema_drift() -> list[str]:
+    """Each documented request body is a hand-copy of an app model; pair them by
+    name and require the same fields."""
+    from backend.src.routes import sanctions, tournaments
+
+    problems = []
+    for name, schema in _IMPERSONATE_SCHEMAS.items():
+        model = getattr(tournaments, name, None) or getattr(sanctions, name, None)
+        if model is None:
+            problems.append(f"{name}: no app model of that name")
+            continue
+        documented = set(schema.get("properties", {}))
+        actual = set(model.model_fields)
+        for field in sorted(actual - documented):
+            problems.append(f"{name}.{field}: on the model, not in the schema")
+        for field in sorted(documented - actual):
+            problems.append(f"{name}.{field}: in the schema, not on the model")
+    return problems
+
+
 def main() -> int:
     documented = {(method, path) for method, path, *_ in _IMPERSONATE_ROUTES}
     expected = reachable()
 
     missing = expected - documented
     extra = documented - expected
-    if not missing and not extra:
+    drift = schema_drift()
+    if not missing and not extra and not drift:
         return 0
 
     print("Impersonate Access documentation is out of step with the allowlist:\n")
+    for problem in drift:
+        print(f"  request schema: {problem}")
     for method, path in sorted(missing):
         print(f"  reachable but undocumented: {method.upper():7s} {path}")
     for method, path in sorted(extra):

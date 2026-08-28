@@ -19,7 +19,7 @@ DESCRIPTION = (
     r"""
 Two APIs live here. They share this page, one OAuth client, and nothing else.
 
-|  | Public API | Impersonate Access |
+| &nbsp; | Public API | Impersonate Access |
 | --- | --- | --- |
 | **Serves** | read-only VTES data | one tournament, read and write |
 | **Host** | `{api}` | `{site}` |
@@ -268,7 +268,8 @@ No other event, and nothing outside a tournament.
 
 **Owning the event is barred even inside your own**: `organizers`, `push-vekn`,
 `go-offline`, `go-online`, `force-takeover`, `force-unlock`, `sync-offline`,
-`DELETE` on the tournament itself, and the `ReopenTournament` action. What remains
+`qr-checkin`, `archon-import`, `DELETE` on the tournament itself, and the
+`ReopenTournament` action. What remains
 is running it, and the engine gates that on the event's state exactly as it does
 for the member in Archon.
 
@@ -359,14 +360,6 @@ _IMPERSONATE_ROUTES: list[tuple[str, str, str, str, str, str]] = [
     ),
     (
         "post",
-        f"{_EVENT}/qr-checkin",
-        "Redeem a check-in code",
-        "200",
-        "The updated tournament.",
-        "Checks a player in from the code their own device shows.",
-    ),
-    (
-        "post",
         f"{_EVENT}/call-judge",
         "Call a judge",
         "204",
@@ -440,14 +433,6 @@ _IMPERSONATE_ROUTES: list[tuple[str, str, str, str, str, str]] = [
         "Removes the banner image.",
     ),
     (
-        "post",
-        f"{_EVENT}/archon-import",
-        "Import a legacy Archon file",
-        "200",
-        "The imported tournament.",
-        "Ingests a legacy Archon spreadsheet into this event.",
-    ),
-    (
         "get",
         "/stream",
         "The event's live feed",
@@ -477,6 +462,136 @@ _IMPERSONATE_ROUTES: list[tuple[str, str, str, str, str, str]] = [
 ]
 
 
+_STR = {"type": "string"}
+_INT = {"type": "integer"}
+_BOOL = {"type": "boolean"}
+
+# Hand-written: the app's Pydantic models are on the far side of the isolation
+# line. `check_impersonate_coverage.py` pairs each with the model it names.
+_IMPERSONATE_SCHEMAS: dict[str, dict] = {
+    "TournamentActionRequest": {
+        "type": "object",
+        "required": ["type"],
+        "description": (
+            "One tournament event. `type` selects it; every other field belongs to"
+            " some subset of the types and is omitted otherwise."
+        ),
+        "properties": {
+            "type": {**_STR, "description": "The event, e.g. `StartRound`."},
+            "user_uid": {**_STR, "description": "Register, AddPlayer, RemovePlayer."},
+            "player_uid": {**_STR, "description": "CheckIn and the seat actions."},
+            "display_name": {**_STR, "maxLength": 32, "description": "Display only."},
+            "round": {**_INT, "description": "Zero-based index into `rounds`."},
+            "table": {**_INT, "description": "Zero-based index within the round."},
+            "table1": _INT,
+            "seat1": _INT,
+            "table2": _INT,
+            "seat2": _INT,
+            "seat": _INT,
+            "scores": {
+                "type": "array",
+                "description": "SetScore: one entry per seat at the table.",
+                "items": {
+                    "type": "object",
+                    "properties": {"player_uid": _STR, "vp": {"type": "number"}},
+                },
+            },
+            "comment": {**_STR, "description": "Override."},
+            "toss": {**_INT, "description": "SetToss."},
+            "status": {**_STR, "description": "SetPaymentStatus."},
+            "non_competing": _BOOL,
+            "waitlisted": _BOOL,
+            "seating": {
+                "type": "array",
+                "description": "AlterSeating: player uids, one array per table.",
+                "items": {"type": "array", "items": _STR},
+            },
+            "player_uids": {
+                "type": "array",
+                "items": _STR,
+                "description": "SelfOrganizeRound: the chosen pod.",
+            },
+            "config": {"type": "object", "description": "UpdateConfig: partial."},
+            "deck": {"type": "object", "description": "UpsertDeck."},
+            "multideck": _BOOL,
+            "label": _STR,
+            "pool": _STR,
+            "exclude_drawn": _BOOL,
+            "count": _INT,
+            "seed": _INT,
+            "winner": {**_STR, "description": "SetArchivalResults; empty clears."},
+            "players": {"type": "array", "items": _STR},
+            "reported_player_count": _INT,
+        },
+    },
+    "AnnounceRequest": {
+        "type": "object",
+        "required": ["body"],
+        "properties": {"body": {**_STR, "description": "The message text."}},
+    },
+    "BulkRegisterRow": {
+        "type": "object",
+        "properties": {
+            "vekn_id": _STR,
+            "email": _STR,
+            "name": {**_STR, "description": "Display only, for unmatched rows."},
+            "paid": {**_BOOL, "description": "Omit to take `default_paid`."},
+        },
+    },
+    "BulkRegisterRequest": {
+        "type": "object",
+        "required": ["rows"],
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {"$ref": "#/components/schemas/BulkRegisterRow"},
+            },
+            "default_paid": {**_BOOL, "default": True},
+        },
+    },
+    "JudgeCallRequest": {
+        "type": "object",
+        "required": ["table"],
+        "properties": {"table": {**_INT, "description": "Zero-based table index."}},
+    },
+    "AddTimeRequest": {
+        "type": "object",
+        "required": ["table", "seconds"],
+        "properties": {
+            "table": {**_STR, "description": "Table index, as a string key."},
+            "seconds": _INT,
+        },
+    },
+    "CreateSanctionRequest": {
+        "type": "object",
+        "required": ["user_uid", "level", "category", "description"],
+        "properties": {
+            "user_uid": _STR,
+            "level": {**_STR, "description": "See `/sanctions/reference`."},
+            "category": {**_STR, "description": "See `/sanctions/reference`."},
+            "subcategory": _STR,
+            "round_number": _INT,
+            "description": _STR,
+            "expires_at": {**_STR, "description": "`YYYY-MM-DD`."},
+            "tournament_uid": {
+                **_STR,
+                "description": "Must be the granted tournament.",
+            },
+        },
+    },
+}
+
+# Which body each endpoint takes. Endpoints absent from this map take none.
+_IMPERSONATE_BODIES: dict[str, str] = {
+    f"{_EVENT}/action": "TournamentActionRequest",
+    f"{_EVENT}/announce": "AnnounceRequest",
+    f"{_EVENT}/bulk-register": "BulkRegisterRequest",
+    f"{_EVENT}/call-judge": "JudgeCallRequest",
+    f"{_EVENT}/timer/add-time": "AddTimeRequest",
+    "/sanctions/": "CreateSanctionRequest",
+}
+
+
 def _impersonate_paths() -> dict:
     paths: dict = {}
     for method, path, summary, code, responds, description in _IMPERSONATE_ROUTES:
@@ -487,6 +602,31 @@ def _impersonate_paths() -> dict:
             "servers": [{"url": SITE_URL}],
             "responses": {code: {"description": responds}},
         }
+        schema = _IMPERSONATE_BODIES.get(path)
+        if schema and method == "post":
+            operation["requestBody"] = {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {"$ref": f"#/components/schemas/{schema}"}
+                    }
+                },
+            }
+        elif method == "post" and path.endswith("/banner"):
+            operation["requestBody"] = {
+                "required": True,
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["file"],
+                            "properties": {
+                                "file": {"type": "string", "format": "binary"}
+                            },
+                        }
+                    }
+                },
+            }
         names = re.findall(r"{(\w+)}", path)
         if names:
             operation["parameters"] = [
@@ -545,7 +685,7 @@ def _openapi() -> dict:
             routes=app.routes,
         )
         components = schema.setdefault("components", {})
-        components.setdefault("schemas", {}).update(COMPONENTS)
+        components.setdefault("schemas", {}).update(COMPONENTS | _IMPERSONATE_SCHEMAS)
         components["securitySchemes"] = {
             "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
         }
