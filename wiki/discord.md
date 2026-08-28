@@ -51,6 +51,16 @@ belong to the **same application** as `DISCORD_CLIENTID`.
    cold click from Discord carries no session, so the URL must log the user in
    *and* push metadata; the `?link=true` variant is only for an already
    authenticated profile link and would 401 here.
+3. Installation → Default Install Settings: Guild Install, scopes `bot` and
+   `applications.commands`, permissions `8861518864` (Manage Channels, Manage
+   Roles, Manage Events, View Channels, Send Messages, Connect, Speak).
+
+The organizer guide hands out the parameterless install link
+`https://discord.com/oauth2/authorize?client_id={client_id}`, which carries no
+scopes of its own: Discord derives them from step 3, so the link is inert until
+those settings are saved. It is **hard-coded to the production app id** — one CI
+frontend artifact ships to every domain (`frontend/.env.production`), so beta's
+copy of the guide points at the production bot too.
 
 Then in any server: Server Settings → Roles → a role → Links → Add requirement.
 Members opt in through the server menu → Linked Roles → Connect.
