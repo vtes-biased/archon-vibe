@@ -1,4 +1,5 @@
 import os
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -16,56 +17,28 @@ API_URL = os.getenv("PUBLIC_API_URL_BASE", "http://localhost:8001")
 
 DESCRIPTION = (
     r"""
+Two APIs live in this reference. Which one you want depends on what you are
+building, and they share nothing but this page and an OAuth client.
+
+**The Public API** serves read-only VTES data over `{api}` — tournaments,
+leagues, published decks, member ratings and community links. It is what a deck
+archive, a statistics site or a ratings page wants, and a daemon token opens it.
+
+**Impersonate Access** writes to **one tournament** over `{site}`, acting as the
+member who granted it. It is what a Discord bot, a judge aid or an online-play
+platform wants, and a member's Login with Archon grant opens it.
+
+An app may legitimately use both: read the corpus from one, run its event through
+the other. Getting a token is the same errand either way and is documented once,
+below.
+
+
 Read-only access to Archon's organizational data: tournaments, leagues, published
 decks, member ratings and community links.
 
 Members are published by **VEKN ID, never by name**. No name, contact, city or
 avatar is served here, and sanctions are never served. Card data belongs to
 [krcg](https://v4.api.krcg.org/docs), not to us.
-
-A single object comes back as JSON. A collection comes back as **JSON Lines**:
-one object per line, opened by a `header` line and closed by an `eof` line.
-
-```
-{"type":"header","generated_at":"2026-08-22T15:04:05.123456"}
-{"type":"tournament","data":{ … }}
-{"type":"eof","count":1}
-```
-
-## Reading a list
-
-A list endpoint streams, and its response is not a JSON document: it will not
-parse as one. Read it line by line and decode each line on its own. Most clients
-have this built in and most of them do not use it by default, which for
-`/v1/tournaments` means holding tens of megabytes in memory for nothing. Ask for
-the streaming variant: `iter_lines()` on a `stream=True` request in Python's
-requests or httpx, the response body as an async iterator in Node,
-`curl --no-buffer`.
-
-Three consequences worth knowing:
-
-* **There is no pagination.** Read as far as you want, then close the
-  connection. For the ten most recently created tournaments, read ten lines and
-  hang up. Nothing is lost and nothing needs resuming.
-* **Check for the `eof` line before you trust what came before it.** A response
-  cut short mid-flight looks exactly like a short one until the trailer is
-  missing, and by then you have already written rows.
-* **The server reads in blocks of 250 rows**, holding no database connection
-  between them, which is why a slow reader costs nothing. You never see those
-  boundaries: they are not chunks, not packets, and not something to align on.
-
-## Ordering and freshness
-
-Lists arrive **newest first**, ordered by `uid`. Uids are UUIDv7, so they sort by
-the moment a record was created, which is not the same as when the event
-happened: a decade-old tournament imported last week sorts as new. Select by
-event date with `start_after` and `start_before` instead.
-
-A record's `uid` never changes, so a record never moves while you are reading.
-It also means **there is no way to ask what changed since when**. That is
-deliberate rather than missing: deleted records are not served, so anyone
-diffing by date would accumulate rows that no longer exist. Read what you need
-when you need it, or take `/v1/export` for the whole corpus in one gzipped pass.
 
 ## Getting a token
 
@@ -257,6 +230,59 @@ authorization nor a refresh will work.
 
 `api:read` is the daemon scope and is refused in this flow. It delegates nobody's
 authority, so there is nothing for a member to consent to.
+""".strip()
+    .replace("{site}", SITE_URL)
+    .replace("{api}", API_URL)
+)
+
+PUBLIC_API_TAG = (
+    r"""
+Read-only, `{api}`, no writes of any kind. Every endpoint here answers a
+daemon token; none of them can change anything.
+
+A single object comes back as JSON. A collection comes back as **JSON Lines**:
+one object per line, opened by a `header` line and closed by an `eof` line.
+
+```
+{"type":"header","generated_at":"2026-08-22T15:04:05.123456"}
+{"type":"tournament","data":{ … }}
+{"type":"eof","count":1}
+```
+
+## Reading a list
+
+A list endpoint streams, and its response is not a JSON document: it will not
+parse as one. Read it line by line and decode each line on its own. Most clients
+have this built in and most of them do not use it by default, which for
+`/v1/tournaments` means holding tens of megabytes in memory for nothing. Ask for
+the streaming variant: `iter_lines()` on a `stream=True` request in Python's
+requests or httpx, the response body as an async iterator in Node,
+`curl --no-buffer`.
+
+Three consequences worth knowing:
+
+* **There is no pagination.** Read as far as you want, then close the
+  connection. For the ten most recently created tournaments, read ten lines and
+  hang up. Nothing is lost and nothing needs resuming.
+* **Check for the `eof` line before you trust what came before it.** A response
+  cut short mid-flight looks exactly like a short one until the trailer is
+  missing, and by then you have already written rows.
+* **The server reads in blocks of 250 rows**, holding no database connection
+  between them, which is why a slow reader costs nothing. You never see those
+  boundaries: they are not chunks, not packets, and not something to align on.
+
+## Ordering and freshness
+
+Lists arrive **newest first**, ordered by `uid`. Uids are UUIDv7, so they sort by
+the moment a record was created, which is not the same as when the event
+happened: a decade-old tournament imported last week sorts as new. Select by
+event date with `start_after` and `start_before` instead.
+
+A record's `uid` never changes, so a record never moves while you are reading.
+It also means **there is no way to ask what changed since when**. That is
+deliberate rather than missing: deleted records are not served, so anyone
+diffing by date would accumulate rows that no longer exist. Read what you need
+when you need it, or take `/v1/export` for the whole corpus in one gzipped pass.
 
 ## Building a deck archive or a statistics site
 
@@ -281,26 +307,29 @@ correction in progress than a deletion.
 through `user_uid`: hand it to `/v1/users/{uid}` for the member's VEKN ID. The
 same uid appears in the tournament's `players`, `standings` and `winner`, so one
 lookup attributes a deck and the result it earned together.
+""".strip()
+    .replace("{site}", SITE_URL)
+    .replace("{api}", API_URL)
+)
 
-## Running an event from your app
+IMPERSONATE_TAG = (
+    r"""
+**This is the write half, and it is not on `{api}`.** With `user:impersonate`
+your app acts *as* the member on **one tournament**, against the app host
+`{site}` — the same endpoints the Archon client itself calls. Ask for the scope
+the way Login with Archon's step 3 does, adding `tournament=<uid>` beside it, and
+send the access token back as an ordinary bearer token.
 
-Everything above this line is read-only and lives on `{api}`. This section is
-neither. With `user:impersonate` your app **writes**, as the member, to **one
-tournament**, against the app host `{site}` — the same endpoints the Archon client
-itself calls. Ask for the scope exactly as step 3 does, adding `tournament=<uid>`
-beside it, and send the access token you get back as an ordinary bearer token.
+Every path below is on `{site}`. Nothing here is reachable with a daemon token,
+and nothing in the Public API is reachable with this one.
 
-### What the grant reaches
+## What the grant reaches
 
-The boundary is an allowlist, so anything not named here is refused — including
-routes Archon grows later. Your token reaches:
-
-- every route under `{site}/api/tournaments/<the granted uid>/`, minus the
-  exclusions below;
-- `{site}/stream?tournament=<the granted uid>`, the event's live feed;
-- `{site}/sanctions/` to file a sanction, and `{site}/sanctions/reference` for the
-  categories and levels — a sanction naming any other tournament is refused;
-- the `/oauth/*` endpoints, for `userinfo`, refresh and revocation.
+The boundary is an allowlist, so anything not listed on this page is refused —
+including routes Archon grows later. Beyond the endpoints below, the token reaches
+`/oauth/token` and `/oauth/revoke` for its own refresh and revocation, and nothing
+else: `/oauth/userinfo` wants `profile:read`, which this scope does not imply, and
+the consent and client-management endpoints refuse third-party tokens outright.
 
 It reaches no other event, and nothing outside a tournament at all.
 
@@ -311,71 +340,48 @@ It reaches no other event, and nothing outside a tournament at all.
 that on the event's state exactly as it does for the member in Archon — your app
 can do what they could do, and no more.
 
-### Reading the state
+## Reading the state
 
 **There is no `GET` for the tournament document.** Two things hand it to you
 instead, and between them you never need one.
 
 Every action returns the whole updated tournament as JSON, so the write you just
 sent is also your read. And for everything you did not do — a co-organizer seating
-a table, a player checking in at the door — open the event's stream:
+a table, a player checking in at the door — open the event's stream, which replays
+current state on connect and then stays open for changes.
 
-```
-curl -N -H "Authorization: Bearer $ACCESS_TOKEN" \
-  "{site}/stream?tournament=$TOURNAMENT_UID"
-```
+## Sending an action
 
-It is Server-Sent Events: `data:` lines carrying one JSON object each, the
-tournament among them, restricted to this event and its sanctions. The connection
-opens with a catch-up burst of current state and then stays open for live changes,
-so a client that reconnects has missed nothing.
-
-### Sending an action
-
-One endpoint runs the event. It takes a `type` and whatever fields that type needs:
-
-```
-curl -X POST "{site}/api/tournaments/$TOURNAMENT_UID/action" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"type":"Register","user_uid":"'$MEMBER_UID'"}'
-```
-
-A tournament's life runs through the same endpoint — open registration, register
-and check players in, start the round, record each table, close it:
+One endpoint runs the event, taking a `type` and whatever fields that type needs.
+A tournament's life runs through it in order — the state machine is real, and each
+step is refused from the wrong state:
 
 ```
 {"type":"OpenRegistration"}
+{"type":"Register","user_uid":"…"}
+{"type":"CloseRegistration"}
 {"type":"CheckIn","player_uid":"…"}
 {"type":"StartRound"}
-{"type":"SetScore","round":1,"table":1,"scores":[{"player_uid":"…","vp":2.5}]}
+{"type":"SetScore","round":0,"table":0,"scores":[{"player_uid":"…","vp":2.5}]}
 {"type":"FinishRound"}
 {"type":"FinishTournament"}
 ```
 
-Each returns the updated tournament, so you can drive the next step off the answer
-rather than guessing at it. An action the event's current state does not allow
-comes back refused, which makes the state the authority on what to send next.
+`CloseRegistration` is not optional bookkeeping: it is what moves the event from
+`Registration` to `Waiting`, and neither `CheckIn` nor `StartRound` is accepted
+before it.
+
+**`round` and `table` are zero-based indices** into the tournament's own
+`rounds` array — the first table of the first round is `{"round":0,"table":0}`,
+and the finals are the index one past the last preliminary round.
+
+Each action returns the updated tournament, so you can drive the next step off the
+answer rather than guessing at it.
 
 **The full command set is the engine's, and it moves with the engine.** The types
 above are stable because they are the spine of every event; the rest of the
 vocabulary — seating, tosses, overrides, raffles, archival results — is documented
 by what Archon itself sends, and is not frozen here as a contract.
-
-### Around the table
-
-The rest of the reachable routes are the ones an organizer's app tends to want.
-`POST .../announce` posts a message to everyone watching the event and
-`DELETE .../announce/{announcement_id}` takes it back down. `POST .../call-judge`
-raises a judge from a table. The timer is four routes — `.../timer/start`,
-`.../timer/pause`, `.../timer/add-time` and `.../timer/reset`. `GET .../decks`
-returns the decks of the round being played, which is a different thing from the
-published archive above: it serves the current round to someone running the event,
-where `/v1/decks` serves finished events to everyone.
-
-For getting a crowd in, `POST .../bulk-register` takes a roster in one call,
-`POST .../qr-checkin` redeems a self-check-in code, and `POST .../archon-import`
-ingests a legacy Archon file.
 """.strip()
     .replace("{site}", SITE_URL)
     .replace("{api}", API_URL)
@@ -389,6 +395,204 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         await close_pool()
+
+
+_EVENT = "/api/tournaments/{uid}"
+
+# The app's endpoints, not this API's: each needs its own `servers`, and
+# `check_impersonate_coverage.py` fails when this list and the allowlist disagree.
+_IMPERSONATE_ROUTES: list[tuple[str, str, str, str, str, str]] = [
+    (
+        "post",
+        f"{_EVENT}/action",
+        "Run the event",
+        "200",
+        "The updated tournament.",
+        "Every state change of a tournament — registration, check-in, rounds, scores,"
+        " finals — is one `type` sent here. See the section intro for the sequence.",
+    ),
+    (
+        "post",
+        f"{_EVENT}/announce",
+        "Post an announcement",
+        "200",
+        "The updated tournament.",
+        "Puts a message in front of everyone watching the event.",
+    ),
+    (
+        "delete",
+        f"{_EVENT}/announce/{{announcement_id}}",
+        "Delete an announcement",
+        "200",
+        "The updated tournament.",
+        "Takes a posted announcement back down.",
+    ),
+    (
+        "post",
+        f"{_EVENT}/bulk-register",
+        "Register a roster",
+        "200",
+        "The updated tournament.",
+        "Registers many players in one call, for a roster you already hold.",
+    ),
+    (
+        "post",
+        f"{_EVENT}/qr-checkin",
+        "Redeem a check-in code",
+        "200",
+        "The updated tournament.",
+        "Checks a player in from the code their own device shows.",
+    ),
+    (
+        "post",
+        f"{_EVENT}/call-judge",
+        "Call a judge",
+        "204",
+        "No content.",
+        "Raises a judge from a table.",
+    ),
+    (
+        "get",
+        f"{_EVENT}/decks",
+        "Decks of the round in play",
+        "200",
+        "Every seated player's deck for the round being played.",
+        "The delegated read an online-play platform makes once a round starts. This"
+        " is the live round, not the published archive: `/v1/decks` serves finished"
+        " events to everyone, this serves the current round to whoever runs it.",
+    ),
+    (
+        "post",
+        f"{_EVENT}/timer/start",
+        "Start the round timer",
+        "200",
+        "The updated tournament.",
+        "Starts the clock on the round in play.",
+    ),
+    (
+        "post",
+        f"{_EVENT}/timer/pause",
+        "Pause the round timer",
+        "200",
+        "The updated tournament.",
+        "Holds the clock where it is.",
+    ),
+    (
+        "post",
+        f"{_EVENT}/timer/add-time",
+        "Add time to the round",
+        "200",
+        "The updated tournament.",
+        "Extends the round.",
+    ),
+    (
+        "post",
+        f"{_EVENT}/timer/reset",
+        "Reset the round timer",
+        "200",
+        "The updated tournament.",
+        "Puts the clock back to the round's full length.",
+    ),
+    (
+        "post",
+        f"{_EVENT}/banner",
+        "Upload the event banner",
+        "200",
+        '`{"success": true}`.',
+        "Replaces the event's banner image.",
+    ),
+    (
+        "get",
+        f"{_EVENT}/banner",
+        "Get the event banner",
+        "200",
+        "The image bytes.",
+        "Serves the banner. A versioned (`?v=`) URL is immutable and cacheable.",
+    ),
+    (
+        "delete",
+        f"{_EVENT}/banner",
+        "Delete the event banner",
+        "200",
+        '`{"success": true}`.',
+        "Removes the banner image.",
+    ),
+    (
+        "post",
+        f"{_EVENT}/archon-import",
+        "Import a legacy Archon file",
+        "200",
+        "The imported tournament.",
+        "Ingests a legacy Archon spreadsheet into this event.",
+    ),
+    (
+        "get",
+        "/stream",
+        "The event's live feed",
+        "200",
+        "An endless `text/event-stream` of `data:` lines, one JSON object each.",
+        "Pass `tournament=<the granted uid>`; any other value is refused. The"
+        " connection replays the event's current state, then stays open for changes,"
+        " so a client that reconnects has missed nothing.",
+    ),
+    (
+        "post",
+        "/sanctions/",
+        "File a sanction",
+        "201",
+        "The created sanction.",
+        "Records a judge's ruling against a player. The sanction must name the"
+        " granted tournament; any other is refused.",
+    ),
+    (
+        "get",
+        "/sanctions/reference",
+        "Sanction categories and levels",
+        "200",
+        "The categories, subcategories and levels a sanction may carry.",
+        "The vocabulary `/sanctions/` accepts.",
+    ),
+]
+
+
+def _impersonate_paths() -> dict:
+    paths: dict = {}
+    for method, path, summary, code, responds, description in _IMPERSONATE_ROUTES:
+        operation = {
+            "tags": ["Impersonate Access"],
+            "summary": summary,
+            "description": description,
+            "servers": [{"url": SITE_URL}],
+            "responses": {code: {"description": responds}},
+        }
+        names = re.findall(r"{(\w+)}", path)
+        if names:
+            operation["parameters"] = [
+                {
+                    "name": name,
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string"},
+                    "description": (
+                        "The tournament the token was granted for."
+                        if name == "uid"
+                        else ""
+                    ),
+                }
+                for name in names
+            ]
+        if path == "/stream":
+            operation["parameters"] = [
+                {
+                    "name": "tournament",
+                    "in": "query",
+                    "required": True,
+                    "schema": {"type": "string"},
+                    "description": "The tournament the token was granted for.",
+                }
+            ]
+        paths.setdefault(path, {})[method] = operation
+    return paths
 
 
 app = FastAPI(
@@ -432,6 +636,17 @@ def _openapi() -> dict:
                 content = operation["responses"]["200"]["content"]
                 if len(content) > 1:
                     content.pop("application/json", None)
+        schema["tags"] = [
+            {"name": "Public API", "description": PUBLIC_API_TAG},
+            {"name": "Impersonate Access", "description": IMPERSONATE_TAG},
+        ]
+        schema["x-tagGroups"] = [
+            {"name": "Public API", "tags": ["Public API"]},
+            {"name": "Impersonate Access", "tags": ["Impersonate Access"]},
+        ]
+        # After the pruning loop above: these carry no `content` for it to prune.
+        for path, operations in _impersonate_paths().items():
+            schema["paths"].setdefault(path, {}).update(operations)
         app.openapi_schema = schema
     return app.openapi_schema
 

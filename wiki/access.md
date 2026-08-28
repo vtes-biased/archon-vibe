@@ -231,6 +231,12 @@ infrastructure of owning an event, not of running one.
 `GET /api/tournaments/{uid}/decks` is the delegated read a play platform needs
 once a round starts — [sync](sync.md#delegated-third-party-reads).
 
+**This allowlist is published**: the public API reference lists what it admits as
+the Impersonate Access endpoints, so widening or narrowing it changes a third
+party's documented boundary. `check_impersonate_coverage.py` fails the build when
+the two disagree, which is what keeps the reference from quietly lying
+([public-api](public-api.md#documentation)).
+
 Security: PKCE S256 required, Argon2-hashed client secrets, refresh-token rotation
 with a revocation chain, single-use authorization codes, consent persistence, and a
 `revoked` flag on access tokens honored by the auth middleware.

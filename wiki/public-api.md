@@ -238,15 +238,26 @@ in progress rather than a deletion
 ([architecture](architecture.md#cards-and-decks)). Attribution runs through
 `user_uid`, the api projection carrying no author name.
 
-**The `user:impersonate` surface is documented as its boundary, not as a command
-list.** A closing section covers writing to one event against the *app* host: the
-allowlist in `middleware/auth.py` restated as what the grant reaches, the seven
-barred subpaths and `ReopenTournament` named as what it never does, and — because
-there is no `GET` for the tournament document — that state comes from the action's
-own response and the tournament-scoped stream. The engine's full action vocabulary
-is deliberately not published: the spine of an event is worked through as an
-example and the rest is declared to move with the engine, because publishing it
-would bind the engine's internal event set to third-party consumers as a contract
+**The reference is two APIs, split by `x-tagGroups`.** A reader arrives at a
+chooser — read-only data on the API host, or writing to one event on the app host
+— and the two stand as separate top-level groups, each with its own endpoints
+listed. One page carrying only `/v1` operations left the impersonation surface as
+prose a reader had to already know to look for, which is the failure this
+structure answers. Mode-specific material lives in each group's tag description,
+where Scalar gives it no sub-navigation; only what both modes need — the token
+errand, the scope weights — stays in the introduction, whose headings do get it.
+
+**The Impersonate Access group documents the app's endpoints, not this API's.**
+Each path item carries its own `servers`, so a generated client targets the app
+rather than the API, and none of them reuses a `/v1` component: the action answers
+with the organizer-level tournament, not the pruned api projection this page
+publishes elsewhere. That listing *is* the published boundary, so
+`check_impersonate_coverage.py` asserts it equals what `_oauth_allows` admits, in
+both directions — a new tournament sub-route fails the build until the reference
+names it or the allowlist bars it. The engine's full action vocabulary stays
+unpublished: the spine of an event is worked through as an example and the rest is
+declared to move with the engine, because publishing it would bind the engine's
+internal event set to third-party consumers as a contract
 ([access](access.md#impersonation-is-per-event)).
 
 `test_public_api.py` holds both halves: a maximal object of each type is projected

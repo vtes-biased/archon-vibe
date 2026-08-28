@@ -12,7 +12,11 @@ from .auth import require_api_token
 from .db import get_connection
 from .schemas import NDJSON, responds, streams
 
-router = APIRouter(prefix="/v1", dependencies=[Depends(require_api_token)])
+router = APIRouter(
+    prefix="/v1",
+    tags=["Public API"],
+    dependencies=[Depends(require_api_token)],
+)
 
 _BATCH = 250
 _VISIBLE = '"api" IS NOT NULL AND deleted_at IS NULL'
