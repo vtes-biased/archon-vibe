@@ -622,8 +622,8 @@
       <div><dt class="text-ink inline font-medium">{m.og_cfg_max_players()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_max_players_desc()}</dd></div>
       <div><dt class="text-ink inline font-medium">{m.og_cfg_open_rounds()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_open_rounds_desc()}</dd></div>
       <div><dt class="text-ink inline font-medium">{m.og_cfg_self_organized()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_self_organized_desc()}</dd></div>
-      <div><dt class="text-ink inline font-medium">{m.og_cfg_round_time()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_round_time_desc()} ({m.og_cfg_timer_online_only()})</dd></div>
-      <div><dt class="text-ink inline font-medium">{m.og_cfg_finals_time()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_finals_time_desc()} ({m.og_cfg_timer_online_only()})</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_round_time()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_round_time_desc()}</dd></div>
+      <div><dt class="text-ink inline font-medium">{m.og_cfg_finals_time()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_finals_time_desc()}</dd></div>
     </dl>
   </div>
   <div class="rounded-lg border border-line-strong bg-surface-muted/40 p-4">
