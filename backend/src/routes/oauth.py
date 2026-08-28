@@ -715,7 +715,7 @@ async def revoke_consent(client_id: str, user: CurrentUser, request: Request):
     return {"status": "revoked", "client_id": client_id, "tokens_revoked": revoked}
 
 
-# Client management is IC or DEV, and first-party only — one gate, four routes.
+# One gate, four routes.
 async def _require_oauth_admin(request: Request, user: CurrentUser) -> User:
     _require_first_party(request, "Client management requires a first-party session")
     if not permissions.can_manage_oauth_clients(user):
@@ -727,8 +727,8 @@ RequireOauthAdmin = Depends(_require_oauth_admin)
 
 
 class RegisterClientRequest(BaseModel):
-    """POST /clients body (DEV role). Fields default empty so missing values
-    fail the endpoint's own 400s, not as a 422."""
+    """Fields default empty so missing values fail the endpoint's own 400s,
+    not as a 422."""
 
     name: str = ""
     redirect_uris: list[str] = []

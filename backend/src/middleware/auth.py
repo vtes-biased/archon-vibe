@@ -1,6 +1,5 @@
 """Authentication middleware and dependencies."""
 
-from collections.abc import Callable
 from typing import Annotated
 
 import jwt
@@ -142,18 +141,6 @@ async def get_optional_user(
         return await get_current_user(request, authorization)
     except HTTPException:
         return None
-
-
-def require_permission(check: Callable[[User], bool], detail: str):
-    """Only for capabilities that need nothing but the actor — anything scoped
-    to a target or resource is checked inside the handler instead."""
-
-    async def gate(user: User = Depends(get_current_user)) -> User:
-        if not check(user):
-            raise HTTPException(status_code=403, detail=detail)
-        return user
-
-    return gate
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
