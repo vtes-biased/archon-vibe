@@ -368,9 +368,8 @@
 {@html renderGuideSection(m.og_step_promos())}
 
 <ExampleBox>
-  <!-- A labelled single-column form; each pool carries its eligible count. The
-       optional Prize picker is left out here — it only lists promos you have
-       already configured. -->
+  <!-- The optional Prize picker is left out here — it only lists promos you
+       have already configured. -->
   <div class="space-y-3 max-w-sm">
     <Button variant="primary" size="lg">{m.promos_record_cta()}</Button>
     <div class="rounded-lg border border-line overflow-hidden">
