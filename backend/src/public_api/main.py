@@ -262,8 +262,10 @@ authority, so there is nothing for a member to consent to.
 
 Two endpoints carry it. `/v1/decks` streams every published deck, newest first,
 and `tournament=<uid>` narrows it to one event. `/v1/export` is the whole corpus
-— tournaments, members, decks, leagues, links — as one gzipped file, which is the
-cheapest way to take everything and the cheapest way to take it again later.
+— tournaments, members, decks and leagues — as one gzipped file, which is the
+cheapest way to take everything and the cheapest way to take it again later. A
+member's community links ride inside their row rather than as lines of their
+own; `/v1/community-links` is what serves them one per line.
 
 **A deck is served only once its event is finished**, and then only as far as the
 organizer chose when they configured it. That choice is the tournament's own
@@ -271,9 +273,8 @@ organizer chose when they configured it. That choice is the tournament's own
 deck, `Finalists` the finalists' and the winner's, `All` every deck played.
 Nothing is served before the event finishes, whatever the mode.
 
-Publication is derived from that state rather than stored, so **an organizer who
-reopens a finished event to correct it withdraws its decks** until it is finished
-again. Treat a deck's disappearance as provisional: it is far more often a
+**An organizer who reopens a finished event to correct it withdraws its decks**
+until it is finished again. Treat a deck's disappearance as provisional: it is far more often a
 correction in progress than a deletion.
 
 **Decks carry no author name** — this API publishes none. Attribution runs
