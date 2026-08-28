@@ -118,15 +118,13 @@ def _parse_scopes(scope_str: str) -> list[OAuthScope]:
 
 
 async def _grant_tournament(scopes: list[OAuthScope], tournament_uid: str):
-    """Resolve the event a `user:impersonate` grant is scoped to, refusing a
-    finished one. Returns the Tournament, or None when the grant carries no
-    impersonation. Every impersonate grant names exactly one event."""
-    if OAuthScope.USER_IMPERSONATE not in scopes:
-        if tournament_uid:
-            raise HTTPException(400, "tournament requires the user:impersonate scope")
-        return None
+    """Resolve the event an `event:run` grant is scoped to, refusing a finished
+    one. Returns None for a grant that names no event: identity only, whatever
+    scopes it carries."""
+    if OAuthScope.EVENT_RUN not in scopes and tournament_uid:
+        raise HTTPException(400, "tournament requires the event:run scope")
     if not tournament_uid:
-        raise HTTPException(400, "user:impersonate must name a tournament")
+        return None
     tournament = await get_tournament_by_uid(tournament_uid)
     if not tournament:
         raise HTTPException(400, "Unknown tournament")
@@ -205,7 +203,7 @@ async def authorize_get(
         "scopes": [s.value for s in requested_scopes],
         "scope_descriptions": {
             OAuthScope.PROFILE_READ.value: "Read your basic profile (roles, VEKN ID)",
-            OAuthScope.USER_IMPERSONATE.value: "Act on your behalf on this event",
+            OAuthScope.EVENT_RUN.value: "Act on your behalf on this event",
         },
         "redirect_uri": redirect_uri,
         "state": state,
@@ -483,7 +481,7 @@ async def _handle_refresh_token(body: TokenRequest, client: OAuthClient) -> dict
     # token (e.g. a partial revoke) still can't mint new access tokens.
     tournament_uid = payload.get("tournament")
     scope_values = payload.get("scope", "").split()
-    if OAuthScope.USER_IMPERSONATE.value in scope_values and not tournament_uid:
+    if OAuthScope.EVENT_RUN.value in scope_values and not tournament_uid:
         raise HTTPException(400, "Unscoped impersonation grants are no longer issued")
 
     if not await get_oauth_consent(payload["sub"], client.client_id, tournament_uid):
@@ -659,8 +657,10 @@ async def userinfo(user: CurrentUser, request: Request):
     oauth_scopes = getattr(request.state, "oauth_scopes", None)
     if oauth_scopes is None:
         pass
-    elif OAuthScope.PROFILE_READ.value not in oauth_scopes:
-        raise HTTPException(403, "Requires profile:read scope")
+    elif not {OAuthScope.PROFILE_READ.value, OAuthScope.EVENT_RUN.value} & set(
+        oauth_scopes
+    ):
+        raise HTTPException(403, "Requires profile:read or event:run scope")
 
     return {
         "sub": user.uid,

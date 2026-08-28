@@ -33,7 +33,7 @@
   // Friendly per-scope text, reusing the developer-facing scope descriptions.
   const scopeDesc: Record<string, () => string> = {
     "profile:read": m.developer_scope_profile_read_desc,
-    "user:impersonate": m.developer_scope_impersonate_desc,
+    "event:run": m.developer_scope_event_run_desc,
   };
 
   async function loadApps() {

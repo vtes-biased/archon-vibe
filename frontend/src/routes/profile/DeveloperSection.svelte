@@ -193,11 +193,11 @@
                   </div>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={newScopes.includes("user:impersonate")} onchange={() => toggleScope("user:impersonate")}
+                  <input type="checkbox" checked={newScopes.includes("event:run")} onchange={() => toggleScope("event:run")}
                     class="w-3.5 h-3.5 rounded border-line-strong bg-surface-muted text-accent focus:ring-accent-strong-hover" />
                   <div>
-                    <span class="text-ink-strong text-xs">user:impersonate</span>
-                    <span class="text-ink-faint text-xs ml-1">— {m.developer_scope_impersonate_desc()}</span>
+                    <span class="text-ink-strong text-xs">event:run</span>
+                    <span class="text-ink-faint text-xs ml-1">— {m.developer_scope_event_run_desc()}</span>
                   </div>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">

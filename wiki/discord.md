@@ -79,13 +79,13 @@ embed web apps *inside* Discord, the wrong direction.
 A standalone process in `bot/` managing online tournaments inside Discord servers.
 It is a **pure OAuth client** to the backend: no DB access, no business logic, no
 role matrix of its own, and it never holds privileged backend credentials. All
-mutations go through the same action endpoint using `user:impersonate` tokens on
+mutations go through the same action endpoint using `event:run` tokens on
 behalf of real users, and `/oauth/userinfo` reports the capabilities the holder
 has, so `/sanction` simply surfaces the API's refusal. Single process only —
 `sse_listener.py` holds module-level state.
 
 **It is the first consumer of the per-event grant model**
-([access](access.md#impersonation-is-per-event)). Its token store is keyed
+([access](access.md#event-access-is-per-event)). Its token store is keyed
 `(discord_id, tournament_uid)` and so is every API call, every refresh lock and
 every SSE subscription; `/setup` and the player commands mint a fresh grant per
 event, and the consent page names that event to the user. A member playing two
@@ -116,7 +116,7 @@ TTL carrying the event it is for); `archon_api.py`;
 ### The SSE listener
 
 Subscribes to a **tournament-scoped** stream with the organizer's
-`user:impersonate` token, one connection per active guild-tournament pair,
+`event:run` token, one connection per active guild-tournament pair,
 delivering only that tournament, its sanctions and its judge calls — see
 [sync](sync.md#the-sse-endpoint).
 
@@ -185,7 +185,7 @@ The cover image is the tournament banner transcoded webp→PNG. It needs the
 **MANAGE_EVENTS** bot permission and degrades gracefully without it, logging and
 posting a one-time hint to #judges.
 
-**OAuth flow** — `/setup` initiates PKCE, the user authorizes `user:impersonate`
+**OAuth flow** — `/setup` initiates PKCE, the user authorizes `event:run`
 **for that tournament**, the local callback server receives the redirect, and the
 token is stored in SQLite under that event for its API calls and SSE
 subscription. Refresh clears the stored pair **only on 400/401**, an invalid

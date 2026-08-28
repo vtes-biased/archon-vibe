@@ -171,19 +171,26 @@ exist; only a bad client secret (401) and a missing `token` (400) fail. Consent
 survives: revoking tokens is not revoking the grant, which is
 `DELETE /oauth/consents/{client_id}`.
 
-Scopes: `profile:read` (limited to `/oauth/*`) and `user:impersonate` (one
-tournament, below) delegate a *user's* authority; `api:read` delegates nobody's
+Scopes: `profile:read` (limited to `/oauth/*`) and `event:run` (one named
+tournament, or identity only when it names none — below) delegate a *user's*
+authority; `api:read` delegates nobody's
 and is refused at `/authorize` for that reason — it is the daemon grant's scope
 and only that.
 
-### Impersonation is per event
+### Event access is per event
 
-**`user:impersonate` is granted for exactly one tournament.** The authorize
+**`event:run` is granted for exactly one tournament.** The authorize
 request carries `tournament=<uid>` beside the scope, the consent page names the
 event to the user, and the grant is stored and keyed on the triple
 **(client, user, tournament)** — a returning user gets a one-click approve for
-each new event and never a silent cross-event auto-approve. A token with the
-scope and no tournament is refused outright; there is no unscoped regime.
+each new event and never a silent cross-event auto-approve.
+
+**A request naming no tournament is not refused — it yields an identity-only
+token.** That token carries `event:run` with no `tournament` claim, answers
+`/oauth/userinfo`, and reaches no event at all, its holder's own included: the
+middleware treats a missing claim exactly as it treats a missing scope. It is how
+an app that runs events signs a member in before there is an event to name. There
+is no unscoped regime for *running* one.
 
 The tournament rides the JWT as its **own `tournament` claim, never as a member
 of `scope`** — the scope string round-trips through the `OAuthScope` enum on
@@ -234,8 +241,8 @@ rather than a player at a time, which a delegated app has no business doing.
 once a round starts — [sync](sync.md#delegated-third-party-reads).
 
 **This allowlist is published**: the public API reference lists what it admits as
-the Impersonate Access endpoints, so widening or narrowing it changes a third
-party's documented boundary. `check_impersonate_coverage.py` fails the build when
+the Member API endpoints, so widening or narrowing it changes a third
+party's documented boundary. `check_event_run_coverage.py` fails the build when
 the two disagree, which is what keeps the reference from quietly lying
 ([public-api](public-api.md#documentation)).
 

@@ -17,37 +17,33 @@ API_URL = os.getenv("PUBLIC_API_URL_BASE", "http://localhost:8001")
 
 DESCRIPTION = (
     r"""
-Two APIs live here. They share this page, one OAuth client, and nothing else.
+There are two APIs.
 
-| &nbsp; | Public API | Impersonate Access |
+| &nbsp; | Public API | Member API |
 | --- | --- | --- |
 | **Serves** | read-only VTES data | one tournament, read and write |
 | **Host** | `{api}` | `{site}` |
-| **Token** | your app's own | a member's, one per event |
+| **Token** | your app's | a member's, one per event |
 | **For** | archives, statistics, ratings | bots, judge aids, play platforms |
 
 An app may use both: read the corpus with one token, run its event with the other.
 
-**Impersonate Access cannot use an app token.** `client_credentials` grants
-`api:read` and nothing else, and `api:read` is refused at `/authorize`. Writing to
-an event always means a member's grant.
-
-**Consent is per event.** A grant is keyed to (app, member, tournament). Every new
-tournament needs its own approval; there is no global "always allow". Returning to
-an event already approved is silent.
-
-Members are published by **VEKN ID, never by name**. No name, contact, city or
-avatar is served here, and sanctions are never served. Card data belongs to
-[krcg](https://v4.api.krcg.org/docs), not to us.
-
-Every request needs `Authorization: Bearer <token>`. There is no anonymous read.
-
-## App token
-
-Opens the Public API. You need an Archon account carrying your VEKN membership and
+In both cases, you need an Archon account carrying your VEKN membership and
 the DEV role, which an IC grants. Open Developer in [your profile]({site}/profile),
-register a client with `api:read`, keep the secret — it is shown once. No redirect
-URI to declare.
+register a client app, keep the secret — it is shown only once.
+
+Select the grants your app needs:
+
+- `api:read`: lets your app use the Public API. Does not require a callback URL.
+- `profile:read`: lets you identify the member (`/oauth/userinfo`)
+- `event:run`: gives you access on the member's behalf
+
+**Note** `event:run` needs consent for each tournament you want to run on behalf of the member.
+
+**Configuration: Register a callback URL** for `profile:read` and `event:run`.
+The match is exact, so `https://example.com/callback` will not accept a trailing slash.
+
+## Public API App token
 
 ```
 curl -X POST {api}/oauth/token \
@@ -56,26 +52,14 @@ curl -X POST {api}/oauth/token \
 
 Good for an hour. No refresh token: mint another.
 
-## Login with Archon
+## Member API tokens
 
-Signs members in, and opens Impersonate Access. Authorization code with PKCE
-(RFC 6749, RFC 7636) — any OAuth library will do this for you; below is the same
-flow in curl.
+Authorization code with PKCE (RFC 6749, RFC 7636) — any OAuth library will do this for you;
+below is an example of the flow in curl.
 
-**It runs against `{site}`, not this host.** The member's browser has to go there
-for the consent screen, and the same endpoints answer there.
+**It runs against `{site}`.** The member's browser has to go there for the consent screen.
 
-Ask for `profile:read` to learn who the member is. Add `user:impersonate` only to
-run an event for them — it is the heavy one, bounded to a single tournament.
-
-### 1. Register your application
-
-Developer in [your profile]({site}/profile), DEV role again. Tick the scopes you
-need. Declare every redirect URI: the match is exact, so
-`https://example.com/callback` will not accept a trailing slash. The secret is
-shown once.
-
-### 2. Build a PKCE challenge
+**Build a PKCE challenge**
 
 One fresh verifier per authorization. `S256` only; `plain` is refused.
 
@@ -85,23 +69,20 @@ code_challenge=$(printf %s "$code_verifier" | openssl dgst -binary -sha256 \
   | openssl base64 | tr '+/' '-_' | tr -d '=\n')
 ```
 
-Keep the verifier for step 5.
+Keep the verifier for the exchange below.
 
-### 3. Send the member to the consent screen
+**Send the member to the consent screen** (in browser)
 
 ```
 {site}/consent?response_type=code&client_id=$CLIENT_ID&redirect_uri=https%3A%2F%2Fexample.com%2Fcallback&scope=profile%3Aread&state=$STATE&code_challenge=$CODE_CHALLENGE&code_challenge_method=S256
 ```
 
-Send them to `/consent`, not to `/oauth/authorize` underneath it — that one is
-first-party and answers your app 403.
+For `event:run`, add `&tournament=<tournament uid>`; if you don't, the token you'll get will **only** give you access
+to the `/oauth/userinfo` endpoint, not to all the event endpoints.
 
-For `user:impersonate`, add `&tournament=<tournament uid>`; the screen names the
-event, and the scope without an event is refused.
+`state` comes back untouched — check it.
 
-`state` comes back untouched — check it. An unsigned-in member logs in first.
-
-### 4. Take the callback
+**They land back on your callback** (in browser)
 
 ```
 https://example.com/callback?code=6mB3...&state=$STATE
@@ -110,7 +91,7 @@ https://example.com/callback?error=access_denied&state=$STATE
 
 The code is single-use and lives 60 seconds.
 
-### 5. Exchange the code for tokens
+**Exchange the code for tokens** server-side:
 
 ```
 curl -X POST {site}/oauth/token \
@@ -126,30 +107,9 @@ curl -X POST {site}/oauth/token \
  "expires_in":3600,"scope":"profile:read"}
 ```
 
-**The client secret is required as well as the verifier, not instead of it.** Every
-client here is confidential, so there is no public variant for a browser bundle or
-a mobile binary: run this exchange on your server. `redirect_uri` must be the
-string you sent in step 3.
+`redirect_uri` must be the exact string you sent to the consent screen.
 
-### 6. Ask who the member is
-
-```
-curl {site}/oauth/userinfo -H "Authorization: Bearer $ACCESS_TOKEN"
-```
-
-```json
-{"sub":"019f6a65-01d4-7214-bcc9-4e46534b9d62","vekn_id":"1000123",
- "roles":["Prince"],"capabilities":["create_tournament","sponsor_member"]}
-```
-
-`sub` is the member's uid — what `/v1/users/{uid}` takes, and what a tournament's
-`players`, `standings` and `winner` carry. `capabilities` saves you a copy of the
-role matrix.
-
-Needs `profile:read`; a `user:impersonate`-only token gets 403. For both, ask for
-both: `scope=profile%3Aread%20user%3Aimpersonate`.
-
-### 7. Refresh before the hour is out
+**Refresh before the hour is out**, server-side too:
 
 ```
 curl -X POST {site}/oauth/token \
@@ -159,27 +119,16 @@ curl -X POST {site}/oauth/token \
 ```
 
 Access tokens last an hour, refresh tokens 30 days, and **refreshing rotates**:
-store the new refresh token before spending the new access token. Replaying a
-rotated one reads as theft and kills the whole lineage.
+store the new refresh token before spending the new access token.
 
-Refresh re-checks the grant, so it can fail through no fault of yours: the member
-withdrew your app, or an impersonated event finished. Neither is retryable — start
-again at step 3.
-
-### 8. Hand the tokens back
+**Hand the tokens back** (optional):
 
 ```
 curl -X POST {site}/oauth/revoke \
   -d client_id=$CLIENT_ID -d client_secret=$CLIENT_SECRET -d token=eyJ...
 ```
 
-Either half kills the other and the whole lineage with it. The answer is `200`
-whatever you send, so it is no oracle for which tokens exist.
-
-Revoking tokens is not withdrawing consent: the approval stands and your next
-authorization is silent. Withdrawing is the member's to do, from Authorized apps
-in their profile, and it cuts live tokens with it.
-
+The answer is `200` whatever you send, so it is no hint for which tokens exist.
 """.strip()
     .replace("{site}", SITE_URL)
     .replace("{api}", API_URL)
@@ -246,23 +195,24 @@ result it earned.
     .replace("{api}", API_URL)
 )
 
-IMPERSONATE_TAG = (
+MEMBER_API_TAG = (
     r"""
-Write access to **one tournament**, on `{site}` — the same endpoints the Archon
-client itself calls. Get the token through Login with Archon with
-`&tournament=<uid>`, and send it as an ordinary bearer token.
+Everything a member's token reaches, on `{site}`. `/oauth/userinfo` answers any
+such token. The rest is the event itself, and needs an `event:run` token that
+names one: ask for the scope with `&tournament=<uid>`, and send the token back as
+an ordinary bearer token.
 
-Every path below is on `{site}`, and a daemon token reaches none of them. The
-reverse does not hold: the Public API accepts any member's token, whatever scope
-it carries.
+**A token that names no event reaches `/oauth/userinfo` and nothing else here** —
+that is the identity-only mode, and asking for `event:run` without a tournament is
+how you get it. A daemon token reaches none of this. The reverse does not hold:
+the Public API accepts any member's token, whatever scope it carries.
 
 ## What the grant reaches
 
 An allowlist — anything not listed on this page is refused, including routes
 Archon grows later. Beyond the endpoints below the token reaches `/oauth/token`
-and `/oauth/revoke`, for its own refresh and revocation. Not `/oauth/userinfo`,
-which wants `profile:read` and this scope does not imply it; not consent or
-client management, which refuse third-party tokens outright.
+and `/oauth/revoke`, for its own refresh and revocation; consent and client
+management refuse third-party tokens outright.
 
 No other event, and nothing outside a tournament.
 
@@ -324,7 +274,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 _EVENT = "/api/tournaments/{uid}"
 
-_IMPERSONATE_ROUTES: list[tuple[str, str, str, str, str, str]] = [
+_EVENT_RUN_ROUTES: list[tuple[str, str, str, str, str, str]] = [
     (
         "post",
         f"{_EVENT}/action",
@@ -453,6 +403,18 @@ _IMPERSONATE_ROUTES: list[tuple[str, str, str, str, str, str]] = [
     ),
     (
         "get",
+        "/oauth/userinfo",
+        "Who the member is",
+        "200",
+        "The member's uid, VEKN ID, roles and capabilities.",
+        "`sub` is the member's uid — what `/v1/users/{uid}` takes on the Public API,"
+        " and what a tournament's `players`, `standings` and `winner` carry."
+        " `capabilities` is what the member may do anywhere, so your app need not"
+        " carry its own copy of the role matrix. Answers a `profile:read` or an"
+        " `event:run` token, whether or not it names an event.",
+    ),
+    (
+        "get",
         "/sanctions/reference",
         "Sanction categories and levels",
         "200",
@@ -467,8 +429,8 @@ _INT = {"type": "integer"}
 _BOOL = {"type": "boolean"}
 
 # Hand-written: the app's Pydantic models are on the far side of the isolation
-# line. `check_impersonate_coverage.py` pairs each with the model it names.
-_IMPERSONATE_SCHEMAS: dict[str, dict] = {
+# line. `check_event_run_coverage.py` pairs each with the model it names.
+_EVENT_RUN_SCHEMAS: dict[str, dict] = {
     "TournamentActionRequest": {
         "type": "object",
         "required": ["type"],
@@ -588,7 +550,7 @@ _RESPONSE_MEDIA: dict[tuple[str, str], str] = {
 }
 
 # Which body each endpoint takes. Endpoints absent from this map take none.
-_IMPERSONATE_BODIES: dict[str, str] = {
+_EVENT_RUN_BODIES: dict[str, str] = {
     f"{_EVENT}/action": "TournamentActionRequest",
     f"{_EVENT}/announce": "AnnounceRequest",
     f"{_EVENT}/bulk-register": "BulkRegisterRequest",
@@ -598,11 +560,11 @@ _IMPERSONATE_BODIES: dict[str, str] = {
 }
 
 
-def _impersonate_paths() -> dict:
+def _event_run_paths() -> dict:
     paths: dict = {}
-    for method, path, summary, code, responds, description in _IMPERSONATE_ROUTES:
+    for method, path, summary, code, responds, description in _EVENT_RUN_ROUTES:
         operation = {
-            "tags": ["Impersonate Access"],
+            "tags": ["Member API"],
             "summary": summary,
             "description": description,
             "servers": [{"url": SITE_URL}],
@@ -619,7 +581,7 @@ def _impersonate_paths() -> dict:
                     }
                 }
             }
-        schema = _IMPERSONATE_BODIES.get(path)
+        schema = _EVENT_RUN_BODIES.get(path)
         if schema and method == "post":
             operation["requestBody"] = {
                 "required": True,
@@ -702,7 +664,7 @@ def _openapi() -> dict:
             routes=app.routes,
         )
         components = schema.setdefault("components", {})
-        components.setdefault("schemas", {}).update(COMPONENTS | _IMPERSONATE_SCHEMAS)
+        components.setdefault("schemas", {}).update(COMPONENTS | _EVENT_RUN_SCHEMAS)
         components["securitySchemes"] = {
             "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
         }
@@ -717,14 +679,14 @@ def _openapi() -> dict:
                     content.pop("application/json", None)
         schema["tags"] = [
             {"name": "Public API", "description": PUBLIC_API_TAG},
-            {"name": "Impersonate Access", "description": IMPERSONATE_TAG},
+            {"name": "Member API", "description": MEMBER_API_TAG},
         ]
         schema["x-tagGroups"] = [
             {"name": "Public API", "tags": ["Public API"]},
-            {"name": "Impersonate Access", "tags": ["Impersonate Access"]},
+            {"name": "Member API", "tags": ["Member API"]},
         ]
         # After the pruning loop above: these carry no `content` for it to prune.
-        for path, operations in _impersonate_paths().items():
+        for path, operations in _event_run_paths().items():
             schema["paths"].setdefault(path, {}).update(operations)
         app.openapi_schema = schema
     return app.openapi_schema

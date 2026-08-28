@@ -200,7 +200,7 @@ streamer's because each row now carries four projections.
 `/stream` and `/snapshot` accept credentials two ways, resolved by
 `_resolve_viewer()`: the browser's `EventSource` cannot set headers, so it passes
 `token=` as a query parameter; the Discord bot sends an `Authorization: Bearer`
-header, resolved revocation-aware with `oauth_access` and `user:impersonate`
+header, resolved revocation-aware with `oauth_access` and `event:run`
 support.
 
 **The two ways are not equivalent, and must not be.** The header path runs
@@ -260,7 +260,7 @@ carve-out: a REST endpoint answering an OAuth actor a question the stream
 deliberately cannot. Do not "fix" one of these back onto the stream.
 
 `GET /api/tournaments/{uid}/decks` is the first. An online-play platform holding a
-per-event `user:impersonate` grant needs each seated player's deck once a round
+per-event `event:run` grant needs each seated player's deck once a round
 starts; it sees the round start on the scoped stream (the member projection
 already carries rounds and seating) and pulls the decks once. It answers per
 **ongoing** round — any round holding an `In Progress` table, so open and parallel

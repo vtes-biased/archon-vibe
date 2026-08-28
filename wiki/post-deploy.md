@@ -30,6 +30,58 @@ answers whether a given deploy has made it actionable — the same check
 gates it and why, what to run, what proves it worked, and what it owes afterwards:
 people to tell, and the wiki text that dies with it.
 
+## Rewrite the stored `user:impersonate` scope
+
+**Gated on** the commit that renames the scope to `event:run` — findable as
+`git log -1 --format=%h --grep='Rename the impersonation scope'`. The rename is a
+value change, not a schema one: `OAuthScope` no longer decodes
+`"user:impersonate"`, so any stored row still carrying it fails to decode the
+moment the new code reads it. Running this **before** the deploy breaks the
+running code instead, which is why it is here and not in a migration.
+
+**Run it immediately after the deploy, not at leisure.** Between the two, an
+existing member token's `oauth_tokens` row no longer decodes, and the lookup
+raises rather than answering 401 — the window is a 500 for anyone holding a live
+grant, so keep it to minutes.
+
+Three tables carry the string, each inside a `data` JSONB array. Run on beta
+first, then production once beta is verified:
+
+```sql
+UPDATE oauth_clients  SET data = jsonb_set(data, '{scopes}', (
+    SELECT jsonb_agg(CASE WHEN v = '"user:impersonate"'::jsonb
+                          THEN '"event:run"'::jsonb ELSE v END)
+    FROM jsonb_array_elements(data->'scopes') v))
+  WHERE data->'scopes' @> '["user:impersonate"]'::jsonb;
+
+UPDATE oauth_consents SET data = jsonb_set(data, '{scopes}', (
+    SELECT jsonb_agg(CASE WHEN v = '"user:impersonate"'::jsonb
+                          THEN '"event:run"'::jsonb ELSE v END)
+    FROM jsonb_array_elements(data->'scopes') v))
+  WHERE data->'scopes' @> '["user:impersonate"]'::jsonb;
+
+UPDATE oauth_tokens   SET data = jsonb_set(data, '{scopes}', (
+    SELECT jsonb_agg(CASE WHEN v = '"user:impersonate"'::jsonb
+                          THEN '"event:run"'::jsonb ELSE v END)
+    FROM jsonb_array_elements(data->'scopes') v))
+  WHERE data->'scopes' @> '["user:impersonate"]'::jsonb;
+```
+
+**Proves it worked** — all three answer 0:
+
+```sql
+SELECT count(*) FROM oauth_clients  WHERE data->'scopes' @> '["user:impersonate"]'::jsonb;
+SELECT count(*) FROM oauth_consents WHERE data->'scopes' @> '["user:impersonate"]'::jsonb;
+SELECT count(*) FROM oauth_tokens   WHERE data->'scopes' @> '["user:impersonate"]'::jsonb;
+```
+
+**Owes afterwards**: access tokens live an hour and refresh tokens thirty days, so
+a client holding one minted before the rename keeps a JWT whose `scope` claim
+still reads `user:impersonate`; that claim is compared as a raw string in the
+middleware and will simply stop matching, so the app re-authorizes. Tell whoever
+runs the Discord bot to expect one re-authorization. Delete this section once both
+databases answer 0.
+
 ## Trim the production box
 
 **Gated on** the commit that prunes the provisioning role — findable as

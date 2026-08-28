@@ -37,7 +37,7 @@ _UNDOCUMENTED = ("/docs", "/openapi.json")
 
 
 def _paths() -> list[str]:
-    # The document also carries the app's Impersonate Access endpoints, which this
+    # The document also carries the app's Member API endpoints, which this
     # app does not serve — asserting on those would only exercise its 404 handler.
     documented = [
         re.sub(r"\{[^}]+\}", "x", path)

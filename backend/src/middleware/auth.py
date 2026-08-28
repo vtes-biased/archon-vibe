@@ -28,7 +28,7 @@ _OAUTH_BARRED_SUBPATHS = frozenset(
 
 
 def _oauth_allows(request: Request, tournament_uid: str) -> bool:
-    """The whole reach of a tournament-scoped `user:impersonate` token. An
+    """The whole reach of a tournament-scoped `event:run` token. An
     allowlist, so a route added anywhere else in the app is refused until it is
     named here."""
     path = request.url.path
@@ -53,9 +53,9 @@ async def get_current_user(
     request: Request,
     authorization: Annotated[str | None, Header()] = None,
 ) -> User:
-    """Resolves both regular access tokens and OAuth access tokens; a
-    profile:read token reaches /oauth/* only, and a user:impersonate token is
-    scoped to one tournament and the allowlist above."""
+    """Resolves both regular access tokens and OAuth access tokens. A token that
+    names no event reaches /oauth/* only, whatever its scopes; an event:run token
+    that names one reaches that tournament through the allowlist above."""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=401,
@@ -95,13 +95,13 @@ async def get_current_user(
             request.state.oauth_client_id = client_id
             request.state.oauth_tournament = tournament_uid
 
-            if "user:impersonate" not in scopes:
+            if "event:run" not in scopes or not tournament_uid:
                 if not request.url.path.startswith("/oauth/"):
                     raise HTTPException(
                         status_code=403,
-                        detail="This token only grants access to OAuth endpoints (profile:read)",
+                        detail="This token names no event: it reaches the OAuth endpoints only",
                     )
-            elif not tournament_uid or not _oauth_allows(request, tournament_uid):
+            elif not _oauth_allows(request, tournament_uid):
                 raise HTTPException(
                     status_code=403,
                     detail="This token acts only on the tournament it was granted for",

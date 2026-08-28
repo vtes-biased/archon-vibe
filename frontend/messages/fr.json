@@ -477,7 +477,7 @@
   "developer_redirect_uris": "URI de redirection (une par ligne)",
   "developer_scopes": "Portées",
   "developer_scope_profile_read_desc": "Lire le profil de base (rôles, VEKN ID)",
-  "developer_scope_impersonate_desc": "Agir au nom de l'utilisateur, sur un seul tournoi qu'il désigne",
+  "developer_scope_event_run_desc": "Agir au nom de l'utilisateur, sur un seul tournoi qu'il désigne",
   "developer_scope_api_read_desc": "Lire l'API de données publiques en tant que démon (sans utilisateur)",
   "profile_authorized_apps_section": "Applications autorisées",
   "authorized_apps_subtitle": "Applications tierces auxquelles vous avez accordé l'accès à votre compte Archon.",

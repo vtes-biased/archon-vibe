@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Fail the build when the public API's Impersonate Access section and the app's
-`user:impersonate` allowlist disagree.
+"""Fail the build when the public API's Member API section and the app's
+`event:run` allowlist disagree.
 
 The reference documents endpoints the API does not serve, so nothing about a
 route rename or a new tournament sub-route would otherwise reach it: the listing
@@ -8,7 +8,7 @@ route rename or a new tournament sub-route would otherwise reach it: the listing
 allowlist in `middleware/auth.py` is the authority; this asserts the docs match it
 exactly, in both directions.
 
-Run: just impersonate-coverage
+Run: just event-run-coverage
 """
 
 import sys
@@ -20,17 +20,18 @@ sys.path.insert(0, str(ROOT))
 from backend.src.main import app as site_app  # noqa: E402
 from backend.src.middleware.auth import _OAUTH_BARRED_SUBPATHS  # noqa: E402
 from backend.src.public_api.main import (  # noqa: E402
-    _IMPERSONATE_ROUTES,
-    _IMPERSONATE_SCHEMAS,
+    _EVENT_RUN_ROUTES,
+    _EVENT_RUN_SCHEMAS,
 )
 
 # Reachable outside the granted tournament's own prefix, from `_oauth_allows`.
-# `/oauth/*` is documented in prose, not as endpoints: those are the token's own
-# lifecycle rather than the event's surface.
+# `/oauth/token` and `/oauth/revoke` stay prose: they are the token's own
+# lifecycle, not the event's surface.
 _OFF_PREFIX = {
     ("get", "/stream"),
     ("post", "/sanctions/"),
     ("get", "/sanctions/reference"),
+    ("get", "/oauth/userinfo"),
 }
 
 _PREFIX = "/api/tournaments/{uid}"
@@ -80,7 +81,7 @@ def schema_drift() -> list[str]:
     from backend.src.routes import sanctions, tournaments
 
     problems = []
-    for name, schema in _IMPERSONATE_SCHEMAS.items():
+    for name, schema in _EVENT_RUN_SCHEMAS.items():
         model = getattr(tournaments, name, None) or getattr(sanctions, name, None)
         if model is None:
             problems.append(f"{name}: no app model of that name")
@@ -95,7 +96,7 @@ def schema_drift() -> list[str]:
 
 
 def main() -> int:
-    documented = {(method, path) for method, path, *_ in _IMPERSONATE_ROUTES}
+    documented = {(method, path) for method, path, *_ in _EVENT_RUN_ROUTES}
     expected = reachable()
 
     missing = expected - documented
@@ -104,7 +105,7 @@ def main() -> int:
     if not missing and not extra and not drift:
         return 0
 
-    print("Impersonate Access documentation is out of step with the allowlist:\n")
+    print("Member API documentation is out of step with the allowlist:\n")
     for problem in drift:
         print(f"  request schema: {problem}")
     for method, path in sorted(missing):
@@ -113,7 +114,7 @@ def main() -> int:
         print(f"  documented but unreachable: {method.upper():7s} {path}")
     print(
         "\nThe public API reference publishes this set as the boundary of a"
-        " `user:impersonate`\ngrant. Add the route to `_IMPERSONATE_ROUTES` in"
+        " `event:run`\ngrant. Add the route to `_EVENT_RUN_ROUTES` in"
         " backend/src/public_api/main.py, or\nbar it in `_OAUTH_BARRED_SUBPATHS`"
         " — deciding which is the point of this failure."
     )

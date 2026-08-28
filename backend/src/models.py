@@ -937,7 +937,7 @@ class Promo(BaseObject, kw_only=True):
 
 class OAuthScope(StrEnum):
     PROFILE_READ = "profile:read"
-    USER_IMPERSONATE = "user:impersonate"
+    EVENT_RUN = "event:run"
     API_READ = "api:read"
 
 
@@ -965,7 +965,7 @@ class OAuthAuthorizationCode(BaseObject, kw_only=True):
     scopes: list[OAuthScope]
     tournament_uid: Annotated[
         str | None,
-        msgspec.Meta(description="The event user:impersonate is scoped to."),
+        msgspec.Meta(description="The event event:run is scoped to."),
     ] = None
     code_challenge: Annotated[str, msgspec.Meta(description="S256 PKCE challenge.")]
     expires_at: Annotated[
@@ -981,7 +981,7 @@ class OAuthToken(BaseObject, kw_only=True):
     scopes: list[OAuthScope]
     tournament_uid: Annotated[
         str | None,
-        msgspec.Meta(description="The event user:impersonate is scoped to."),
+        msgspec.Meta(description="The event event:run is scoped to."),
     ] = None
     token_type: Annotated[
         str, msgspec.Meta(description='Either "access" or "refresh".')
@@ -1002,5 +1002,5 @@ class OAuthConsent(BaseObject, kw_only=True):
     scopes: list[OAuthScope]
     tournament_uid: Annotated[
         str | None,
-        msgspec.Meta(description="The event user:impersonate is scoped to."),
+        msgspec.Meta(description="The event event:run is scoped to."),
     ] = None

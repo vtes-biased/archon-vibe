@@ -168,7 +168,7 @@ authorization-code flow. Only those two endpoints are proxied here, so
 `/oauth/authorize` and `/oauth/userinfo` exist on the app alone — and the
 member's browser has to reach the consent screen there in any case, which makes
 the app's hostname the one a login client already has. So is everything a
-`user:impersonate` token writes: the tournament routes, its scoped stream and
+`event:run` token writes: the tournament routes, its scoped stream and
 `/sanctions/` are not proxied here at all. An app that signs members in *and*
 reads `/v1` legitimately types both.
 
@@ -227,7 +227,7 @@ themselves carry their own paragraphs: that the client secret is required
 *alongside* the PKCE verifier rather than instead of it — every client here is
 confidential, and an RFC-habituated reader expects the public-client variant that
 does not exist — and what each delegating scope actually costs the member who
-approves it, `profile:read` being identity alone against `user:impersonate`'s
+approves it, `profile:read` being identity alone against `event:run`'s
 one-event authority ([access](access.md#oauth2-provider)).
 
 A recipe section closes the page, for the deck-archive and statistics apps this
@@ -241,24 +241,25 @@ in progress rather than a deletion
 **The reference is two APIs, split by `x-tagGroups`.** A reader arrives at a
 chooser — read-only data on the API host, or writing to one event on the app host
 — and the two stand as separate top-level groups, each with its own endpoints
-listed. One page carrying only `/v1` operations left the impersonation surface as
+listed. One page carrying only `/v1` operations left the member-token surface as
 prose a reader had to already know to look for, which is the failure this
-structure answers. Mode-specific material lives in each group's tag description,
+structure answers. `/oauth/userinfo` is listed there too, being the one endpoint a
+member's token reaches whether or not it names an event. Mode-specific material lives in each group's tag description,
 where Scalar gives it no sub-navigation; only what both modes need — the token
 errand, the scope weights — stays in the introduction, whose headings do get it.
 
-**The Impersonate Access group documents the app's endpoints, not this API's.**
+**The Member API group documents the app's endpoints, not this API's.**
 Each path item carries its own `servers`, so a generated client targets the app
 rather than the API, and none of them reuses a `/v1` component: the action answers
 with the organizer-level tournament, not the pruned api projection this page
 publishes elsewhere. That listing *is* the published boundary, so
-`check_impersonate_coverage.py` asserts it equals what `_oauth_allows` admits, in
+`check_event_run_coverage.py` asserts it equals what `_oauth_allows` admits, in
 both directions — a new tournament sub-route fails the build until the reference
 names it or the allowlist bars it. The engine's full action vocabulary stays
 unpublished: the spine of an event is worked through as an example and the rest is
 declared to move with the engine, because publishing it would bind the engine's
 internal event set to third-party consumers as a contract
-([access](access.md#impersonation-is-per-event)).
+([access](access.md#event-access-is-per-event)).
 
 `test_public_api.py` holds both halves: a maximal object of each type is projected
 through `compute_api` and its key set must equal the documented properties, and

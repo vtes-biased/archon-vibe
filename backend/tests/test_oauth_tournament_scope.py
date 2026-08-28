@@ -1,7 +1,7 @@
-"""A `user:impersonate` token reaches one tournament and nothing else.
+"""A `event:run` token reaches one tournament and nothing else.
 
 Regression guarded: the OAuth gate used to be a denylist of `/auth/*` and
-`/admin/*`, so an impersonate token reached `/snapshot` and the unscoped
+`/admin/*`, so an event:run token reached `/snapshot` and the unscoped
 `/stream` — the granting organizer's whole corpus, private decks included — and
 every other event they run. Nothing else in the suite exercises OAuth-token
 access to these paths, so this is the only net.
@@ -32,9 +32,13 @@ GRANTED = "trn-scope-granted"
 OTHER = "trn-scope-other"
 
 
-async def _scoped_token(user_uid: str, tournament_uid: str | None) -> str:
+async def _scoped_token(
+    user_uid: str,
+    tournament_uid: str | None,
+    scopes: list[OAuthScope] | None = None,
+) -> str:
     jti = str(uuid7())
-    scopes = [OAuthScope.PROFILE_READ, OAuthScope.USER_IMPERSONATE]
+    scopes = scopes or [OAuthScope.PROFILE_READ, OAuthScope.EVENT_RUN]
     await insert_oauth_token(
         OAuthToken(
             uid=str(uuid7()),
@@ -104,7 +108,7 @@ async def test_scoped_token_reaches_its_event_and_nothing_else(
                 {
                     "client_id": "play-platform",
                     "redirect_uri": "https://play.test/cb",
-                    "scope": "user:impersonate",
+                    "scope": "event:run",
                     "code_challenge": "x" * 43,
                     "tournament": OTHER,
                     "approved": True,
@@ -115,10 +119,42 @@ async def test_scoped_token_reaches_its_event_and_nothing_else(
             ("POST", f"/api/tournaments/{GRANTED}/push-vekn", {}),
             ("POST", f"/api/tournaments/{GRANTED}/organizers", {"user_uid": "x"}),
             ("POST", f"/api/tournaments/{GRANTED}/go-offline", {"device_id": "d"}),
+            ("POST", f"/api/tournaments/{GRANTED}/qr-checkin", {"code": "x"}),
             ("DELETE", f"/api/tournaments/{GRANTED}", {}),
         ):
             resp = await test_client.request(method, path, headers=auth, json=body)
             assert resp.status_code in (401, 403), f"{method} {path}"
+
+        # Sent with a real body: a missing file 422s before auth resolves, which
+        # would pass this assertion without exercising the bar.
+        resp = await test_client.post(
+            f"/api/tournaments/{GRANTED}/archon-import",
+            headers=auth,
+            files={"file": ("roster.xlsx", b"not-a-real-workbook")},
+        )
+        assert resp.status_code in (401, 403), resp.status_code
+    finally:
+        await _drop_events()
+
+
+@pytest.mark.asyncio
+async def test_a_token_naming_no_event_is_identity_only(
+    test_client: AsyncClient, test_db
+):
+    """`event:run` without a tournament is the identity-only grant: it answers
+    `/oauth/userinfo` and reaches no event, its own granted one included."""
+    await _seed_organizer_with_two_events()
+    token = await _scoped_token("org-scope", None, [OAuthScope.EVENT_RUN])
+    auth = {"Authorization": f"Bearer {token}"}
+    try:
+        assert (
+            await test_client.get("/oauth/userinfo", headers=auth)
+        ).status_code == 200
+        for path in (
+            f"/api/tournaments/{GRANTED}/decks",
+            f"/stream?tournament={GRANTED}",
+        ):
+            assert (await test_client.get(path, headers=auth)).status_code in (401, 403)
     finally:
         await _drop_events()
 

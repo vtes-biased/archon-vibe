@@ -170,7 +170,7 @@ lint-check:
     just dark-variant
     just locale-parity
     just public-api-isolation
-    just impersonate-coverage
+    just event-run-coverage
     just model-drift
     just migration-pairing
     just help-mockups
@@ -202,9 +202,9 @@ public-api-isolation:
     uv run python3 scripts/check_public_api_isolation.py
 
 # Fail when the public API's Impersonate Access section and the app's
-# `user:impersonate` allowlist disagree — the listing is the published boundary.
-impersonate-coverage:
-    uv run python3 scripts/check_impersonate_coverage.py
+# `event:run` allowlist disagree — the listing is the published boundary.
+event-run-coverage:
+    uv run python3 scripts/check_event_run_coverage.py
 
 # Fail when models.py and types.ts disagree on a field name or an enum value —
 # nothing generates one from the other, so a one-sided change ships silently.
@@ -232,7 +232,7 @@ lint:
     just dark-variant
     just locale-parity
     just public-api-isolation
-    just impersonate-coverage
+    just event-run-coverage
     just model-drift
     just migration-pairing
     just help-mockups
