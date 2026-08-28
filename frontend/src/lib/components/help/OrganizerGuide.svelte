@@ -508,30 +508,6 @@
 
 {@html renderGuideSection(m.og_adv_banner())}
 
-{@html renderGuideSection(m.og_deck_management())}
-
-<ExampleBox>
-  <Button variant="secondary" size="md"><QrCode class="w-4 h-4" /> {m.deck_upload_scan_qr()}</Button>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_announcements())}
-
-<ExampleBox>
-  <div class="flex gap-2 items-start max-w-sm">
-    <textarea tabindex="-1" rows="2" placeholder={m.announcement_composer_placeholder()}
-      class="flex-1 bg-surface-hover text-ink-strong text-sm rounded-lg px-3 py-2 border border-line-strong resize-none"></textarea>
-    <Button variant="primary" size="md">{m.announcement_post()}</Button>
-  </div>
-</ExampleBox>
-
-{@html renderGuideSection(m.og_co_organizers())}
-
-{@html renderGuideSection(m.og_proxy_players())}
-
-<!-- ==================== Online events ==================== -->
-
-{@html renderGuideSection(m.og_online_intro())}
-
 {@html renderGuideSection(m.og_timer())}
 
 <!-- The clock counts in minutes, not hours, and runs past zero into a negative
@@ -588,6 +564,30 @@
 <ExampleBox>
   <Button variant="secondary" size="md"><RotateCcw class="w-4 h-4" /> {m.overview_reset_checkin()}</Button>
 </ExampleBox>
+
+{@html renderGuideSection(m.og_deck_management())}
+
+<ExampleBox>
+  <Button variant="secondary" size="md"><QrCode class="w-4 h-4" /> {m.deck_upload_scan_qr()}</Button>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_announcements())}
+
+<ExampleBox>
+  <div class="flex gap-2 items-start max-w-sm">
+    <textarea tabindex="-1" rows="2" placeholder={m.announcement_composer_placeholder()}
+      class="flex-1 bg-surface-hover text-ink-strong text-sm rounded-lg px-3 py-2 border border-line-strong resize-none"></textarea>
+    <Button variant="primary" size="md">{m.announcement_post()}</Button>
+  </div>
+</ExampleBox>
+
+{@html renderGuideSection(m.og_co_organizers())}
+
+{@html renderGuideSection(m.og_proxy_players())}
+
+<!-- ==================== Online events ==================== -->
+
+{@html renderGuideSection(m.og_online_intro())}
 
 {@html renderGuideSection(m.og_discord())}
 
