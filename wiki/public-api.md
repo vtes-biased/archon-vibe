@@ -167,8 +167,10 @@ than telling a reader to ask us.
 authorization-code flow. Only those two endpoints are proxied here, so
 `/oauth/authorize` and `/oauth/userinfo` exist on the app alone — and the
 member's browser has to reach the consent screen there in any case, which makes
-the app's hostname the one a login client already has. An app that signs members
-in *and* reads `/v1` legitimately types both.
+the app's hostname the one a login client already has. So is everything a
+`user:impersonate` token writes: the tournament routes, its scoped stream and
+`/sanctions/` are not proxied here at all. An app that signs members in *and*
+reads `/v1` legitimately types both.
 
 `/docs` and `/openapi.json` are open. The owner's "no anonymous" decision was
 about the data; a reference page nobody can read before registering is a barrier
@@ -216,7 +218,7 @@ for it is a response schema.
 The description is a **raw** string, because every shell example ends its lines
 with a backslash and a normal string splices those away.
 
-**Both grants are documented, not just the daemon one.** The reference walks
+**All three grants are documented, not just the daemon one.** The reference walks
 "Login with Archon" end to end — client registration, PKCE, `/consent`, the
 callback, `/oauth/token`, `/oauth/userinfo`, refresh rotation, `/oauth/revoke` —
 with a runnable example per step, because the audience for the flow is a third
@@ -235,6 +237,17 @@ turn on — a deck is served only once its event is Finished, only as far as
 in progress rather than a deletion
 ([architecture](architecture.md#cards-and-decks)). Attribution runs through
 `user_uid`, the api projection carrying no author name.
+
+**The `user:impersonate` surface is documented as its boundary, not as a command
+list.** A closing section covers writing to one event against the *app* host: the
+allowlist in `middleware/auth.py` restated as what the grant reaches, the seven
+barred subpaths and `ReopenTournament` named as what it never does, and — because
+there is no `GET` for the tournament document — that state comes from the action's
+own response and the tournament-scoped stream. The engine's full action vocabulary
+is deliberately not published: the spine of an event is worked through as an
+example and the rest is declared to move with the engine, because publishing it
+would bind the engine's internal event set to third-party consumers as a contract
+([access](access.md#impersonation-is-per-event)).
 
 `test_public_api.py` holds both halves: a maximal object of each type is projected
 through `compute_api` and its key set must equal the documented properties, and

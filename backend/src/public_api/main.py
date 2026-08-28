@@ -281,6 +281,101 @@ correction in progress than a deletion.
 through `user_uid`: hand it to `/v1/users/{uid}` for the member's VEKN ID. The
 same uid appears in the tournament's `players`, `standings` and `winner`, so one
 lookup attributes a deck and the result it earned together.
+
+## Running an event from your app
+
+Everything above this line is read-only and lives on `{api}`. This section is
+neither. With `user:impersonate` your app **writes**, as the member, to **one
+tournament**, against the app host `{site}` — the same endpoints the Archon client
+itself calls. Ask for the scope exactly as step 3 does, adding `tournament=<uid>`
+beside it, and send the access token you get back as an ordinary bearer token.
+
+### What the grant reaches
+
+The boundary is an allowlist, so anything not named here is refused — including
+routes Archon grows later. Your token reaches:
+
+- every route under `{site}/api/tournaments/<the granted uid>/`, minus the
+  exclusions below;
+- `{site}/stream?tournament=<the granted uid>`, the event's live feed;
+- `{site}/sanctions/` to file a sanction, and `{site}/sanctions/reference` for the
+  categories and levels — a sanction naming any other tournament is refused;
+- the `/oauth/*` endpoints, for `userinfo`, refresh and revocation.
+
+It reaches no other event, and nothing outside a tournament at all.
+
+**The infrastructure of owning the event is barred even inside your own**:
+`organizers`, `push-vekn`, `go-offline`, `go-online`, `force-takeover`,
+`force-unlock` and `sync-offline`, along with `DELETE` on the tournament and the
+`ReopenTournament` action. What remains is running the event, and the engine gates
+that on the event's state exactly as it does for the member in Archon — your app
+can do what they could do, and no more.
+
+### Reading the state
+
+**There is no `GET` for the tournament document.** Two things hand it to you
+instead, and between them you never need one.
+
+Every action returns the whole updated tournament as JSON, so the write you just
+sent is also your read. And for everything you did not do — a co-organizer seating
+a table, a player checking in at the door — open the event's stream:
+
+```
+curl -N -H "Authorization: Bearer $ACCESS_TOKEN" \
+  "{site}/stream?tournament=$TOURNAMENT_UID"
+```
+
+It is Server-Sent Events: `data:` lines carrying one JSON object each, the
+tournament among them, restricted to this event and its sanctions. The connection
+opens with a catch-up burst of current state and then stays open for live changes,
+so a client that reconnects has missed nothing.
+
+### Sending an action
+
+One endpoint runs the event. It takes a `type` and whatever fields that type needs:
+
+```
+curl -X POST "{site}/api/tournaments/$TOURNAMENT_UID/action" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"Register","user_uid":"'$MEMBER_UID'"}'
+```
+
+A tournament's life runs through the same endpoint — open registration, register
+and check players in, start the round, record each table, close it:
+
+```
+{"type":"OpenRegistration"}
+{"type":"CheckIn","player_uid":"…"}
+{"type":"StartRound"}
+{"type":"SetScore","round":1,"table":1,"scores":[{"player_uid":"…","vp":2.5}]}
+{"type":"FinishRound"}
+{"type":"FinishTournament"}
+```
+
+Each returns the updated tournament, so you can drive the next step off the answer
+rather than guessing at it. An action the event's current state does not allow
+comes back refused, which makes the state the authority on what to send next.
+
+**The full command set is the engine's, and it moves with the engine.** The types
+above are stable because they are the spine of every event; the rest of the
+vocabulary — seating, tosses, overrides, raffles, archival results — is documented
+by what Archon itself sends, and is not frozen here as a contract.
+
+### Around the table
+
+The rest of the reachable routes are the ones an organizer's app tends to want.
+`POST .../announce` posts a message to everyone watching the event and
+`DELETE .../announce/{announcement_id}` takes it back down. `POST .../call-judge`
+raises a judge from a table. The timer is four routes — `.../timer/start`,
+`.../timer/pause`, `.../timer/add-time` and `.../timer/reset`. `GET .../decks`
+returns the decks of the round being played, which is a different thing from the
+published archive above: it serves the current round to someone running the event,
+where `/v1/decks` serves finished events to everyone.
+
+For getting a crowd in, `POST .../bulk-register` takes a roster in one call,
+`POST .../qr-checkin` redeems a self-check-in code, and `POST .../archon-import`
+ingests a legacy Archon file.
 """.strip()
     .replace("{site}", SITE_URL)
     .replace("{api}", API_URL)
