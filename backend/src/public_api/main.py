@@ -32,10 +32,6 @@ An app may legitimately use both: read the corpus from one, run its event throug
 the other. Getting a token is the same errand either way and is documented once,
 below.
 
-
-Read-only access to Archon's organizational data: tournaments, leagues, published
-decks, member ratings and community links.
-
 Members are published by **VEKN ID, never by name**. No name, contact, city or
 avatar is served here, and sanctions are never served. Card data belongs to
 [krcg](https://v4.api.krcg.org/docs), not to us.
