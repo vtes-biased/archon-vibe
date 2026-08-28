@@ -42,17 +42,12 @@ PRIMITIVE_SIGNATURES = {
 # Literals that match a catalog value but are not that label. Each needs a reason.
 LITERAL_ALLOW = {
     "Standard": "the format enum renders raw in the app too (Badge{tournament.format})",
+    "Discord": "the platform name is hard-coded on LinkedAccounts too, not a key",
     "Alice": "sample player",
     "Bob": "sample player",
     "Charlie": "sample player",
     "Diana": "sample player",
     "Erik": "sample player",
-}
-
-# Not yet converted. Its mockups predate the rule and are a board line of their own;
-# the gate covers what has been converted rather than waiting for all of it.
-EXEMPT_FILES = {
-    "PlayerGuide.svelte": "hand-built mockups not yet bound to the components",
 }
 
 
@@ -75,8 +70,6 @@ def main() -> int:
 
     for path in sorted(GUIDES.glob("*.svelte")):
         rel = path.relative_to(ROOT)
-        if path.name in EXEMPT_FILES:
-            continue
         src = path.read_text()
 
         for lineno, line in enumerate(src.splitlines(), 1):

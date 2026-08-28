@@ -1,27 +1,40 @@
 <script lang="ts">
   import { renderGuideSection } from "$lib/markdown";
   import * as m from "$lib/paraglide/messages.js";
+  import { formatScore } from "$lib/utils";
+  import { getRoleTone } from "$lib/roles";
   import ExampleBox from "./ExampleBox.svelte";
+  import Button from "$lib/components/Button.svelte";
+  import Badge from "$lib/components/Badge.svelte";
   import VpInput from "$lib/components/VpInput.svelte";
-  import { KeyRound, Mail, UserPlus, Link, Unlink, QrCode, Gavel, Calendar, Copy, RefreshCw, Trophy, Lock, Monitor, Sun, Moon, Bell, Users, ChevronDown, Pin } from "@lucide/svelte";
+  import CommunityLinkPills from "$lib/components/CommunityLinkPills.svelte";
+  import { KeyRound, Mail, UserPlus, Link, Unlink, QrCode, Gavel, Calendar, Copy, RefreshCw, Trophy, Lock, Monitor, Sun, Moon, Bell, Users, ChevronDown } from "@lucide/svelte";
   import DiscordIcon from "$lib/components/DiscordIcon.svelte";
   import GithubIcon from "$lib/components/GithubIcon.svelte";
+
+  const linkClass = "text-link hover:text-link-soft underline";
+  const consentHtml = m.login_consent_html({
+    terms: `<a href="/legal/terms" class="${linkClass}">${m.legal_terms_title()}</a>`,
+    privacy: `<a href="/legal/privacy" class="${linkClass}">${m.legal_privacy_title()}</a>`,
+  });
 </script>
 
 {#snippet vpChips(selected: number)}
   <VpInput value={selected} options={[0, 0.5, 1, 1.5, 2, 3, 4]} onchange={() => {}} />
 {/snippet}
 
+<!-- Segmented controls: the app fills the selected half with the primary Button and leaves the
+     others as bare text on the group's own surface. -->
+{#snippet unselectedTab(label: string)}
+  <span class="flex-1 py-2 px-4 text-center text-sm font-medium text-ink-muted">{label}</span>
+{/snippet}
+
 {@html renderGuideSection(m.pg_intro())}
 
 <ExampleBox>
   <div class="flex bg-surface-muted rounded-lg p-1 max-w-xs">
-    <button class="flex-1 py-2 px-4 rounded-md text-sm font-medium text-ink-muted hover:text-ink-bright">
-      Login
-    </button>
-    <button class="flex-1 py-2 px-4 rounded-md text-sm font-medium bg-accent-strong text-white">
-      Sign Up
-    </button>
+    {@render unselectedTab(m.login_tab_login())}
+    <Button variant="primary" size="lg" class="flex-1 rounded-md">{m.login_tab_signup()}</Button>
   </div>
 </ExampleBox>
 
@@ -32,16 +45,12 @@
     <!-- Gates every signup method. -->
     <div class="flex items-start gap-2 text-xs text-ink leading-snug">
       <input type="checkbox" class="mt-0.5 shrink-0 w-5 h-5 accent-accent-strong-hover" tabindex="-1" />
-      <span>
-        I agree to the <span class="text-link underline">Terms of Service</span> and
-        <span class="text-link underline">Privacy Policy</span>. I am 16 or older, or a parent or
-        guardian consenting on behalf of a younger player.
-      </span>
+      <span>{@html consentHtml}</span>
     </div>
-    <button class="inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">
+    <Button variant="primary" size="lg" block>
       <KeyRound class="w-5 h-5" />
-      Create Account with Passkey
-    </button>
+      {m.login_passkey_signup()}
+    </Button>
   </div>
 </ExampleBox>
 
@@ -50,7 +59,7 @@
 <ExampleBox>
   <button class="w-full max-w-xs py-3 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
     <DiscordIcon class="w-5 h-5" />
-    Sign Up with Discord
+    {m.login_discord_signup()}
   </button>
 </ExampleBox>
 
@@ -60,14 +69,14 @@
   <div class="max-w-xs space-y-3">
     <input
       type="email"
-      placeholder="Enter your email"
+      placeholder={m.login_placeholder_signup_email()}
       class="w-full px-4 py-3 bg-surface-muted border border-line-strong rounded-lg text-ink-strong placeholder-ink-faint"
       tabindex="-1"
     />
-    <button class="inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium bg-surface-hover text-ink-bright transition-colors">
+    <Button variant="secondary" size="lg" block>
       <Mail class="w-5 h-5" />
-      Continue with Email
-    </button>
+      {m.login_email_signup()}
+    </Button>
   </div>
 </ExampleBox>
 
@@ -77,29 +86,27 @@
   <div class="max-w-xs space-y-4">
     <div class="space-y-3">
       <div>
-        <label for="ex-email" class="block text-sm text-ink-muted mb-1">Email</label>
-        <input id="ex-email" type="email" placeholder="you@example.com" class="w-full px-4 py-3 bg-surface-muted border border-line-strong rounded-lg text-ink-strong placeholder-ink-faint" tabindex="-1" />
+        <label for="ex-email" class="block text-sm text-ink-muted mb-1">{m.common_email()}</label>
+        <input id="ex-email" type="email" placeholder={m.login_placeholder_email()} class="w-full px-4 py-3 bg-surface-muted border border-line-strong rounded-lg text-ink-strong placeholder-ink-faint" tabindex="-1" />
       </div>
       <div>
-        <label for="ex-password" class="block text-sm text-ink-muted mb-1">Password</label>
-        <input id="ex-password" type="password" placeholder="Enter your password" class="w-full px-4 py-3 bg-surface-muted border border-line-strong rounded-lg text-ink-strong placeholder-ink-faint" tabindex="-1" />
+        <label for="ex-password" class="block text-sm text-ink-muted mb-1">{m.common_password()}</label>
+        <input id="ex-password" type="password" placeholder={m.login_placeholder_password()} class="w-full px-4 py-3 bg-surface-muted border border-line-strong rounded-lg text-ink-strong placeholder-ink-faint" tabindex="-1" />
       </div>
-      <button class="inline-flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">
-        Sign In
-      </button>
+      <Button variant="primary" size="lg" block>{m.login_sign_in()}</Button>
     </div>
-    <button class="w-full text-sm text-ink-muted hover:text-ink-bright">Forgot password?</button>
+    <button class="w-full text-sm text-ink-muted hover:text-ink-bright">{m.login_forgot_password()}</button>
     <div class="relative my-2">
       <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-line-strong"></div></div>
-      <div class="relative flex justify-center text-sm"><span class="px-2 bg-surface-card text-ink-faint">or</span></div>
+      <div class="relative flex justify-center text-sm"><span class="px-2 bg-surface-card text-ink-faint">{m.common_or()}</span></div>
     </div>
-    <button class="inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium bg-surface-hover text-ink-bright transition-colors">
+    <Button variant="secondary" size="lg" block>
       <KeyRound class="w-5 h-5" />
-      Sign in with Passkey
-    </button>
+      {m.login_passkey_login()}
+    </Button>
     <button class="w-full py-3 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
       <DiscordIcon class="w-5 h-5" />
-      Continue with Discord
+      {m.login_discord_login()}
     </button>
   </div>
 </ExampleBox>
@@ -108,16 +115,16 @@
 
 <ExampleBox>
   <div class="bg-surface-card border border-line rounded-lg p-4 max-w-sm">
-    <p class="text-sm text-ink mb-3">No VEKN ID</p>
+    <p class="text-sm text-ink mb-3">{m.vekn_no_id()}</p>
     <div class="flex flex-wrap gap-2">
-      <button class="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">
+      <Button variant="primary" size="md">
         <UserPlus class="w-3.5 h-3.5" />
-        Sponsor
-      </button>
-      <button class="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm bg-surface-hover text-ink-bright transition-colors">
+        {m.vekn_sponsor()}
+      </Button>
+      <Button variant="secondary" size="md">
         <Link class="w-3.5 h-3.5" />
-        Link VEKN
-      </button>
+        {m.vekn_link_btn()}
+      </Button>
     </div>
   </div>
 </ExampleBox>
@@ -126,10 +133,8 @@
 
 <ExampleBox>
   <div class="flex justify-between items-center max-w-sm">
-    <span class="text-ink-muted">VEKN ID</span>
-    <button class="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">
-      Claim VEKN ID
-    </button>
+    <span class="text-ink-muted">{m.add_player_vekn_id_label()}</span>
+    <Button variant="primary" size="md">{m.profile_claim_vekn_title()}</Button>
   </div>
 </ExampleBox>
 
@@ -138,17 +143,17 @@
 <ExampleBox>
   <div class="bg-surface-card border border-line rounded-lg shadow-xl max-w-sm">
     <div class="p-6 border-b border-line">
-      <h3 class="text-xl font-medium text-ink-strong">Claim VEKN ID</h3>
-      <p class="mt-2 text-sm text-ink-muted">Enter your VEKN ID to link it to your account. The ID must exist and not be claimed by another user.</p>
+      <h3 class="text-xl font-medium text-ink-strong">{m.profile_claim_vekn_title()}</h3>
+      <p class="mt-2 text-sm text-ink-muted">{m.profile_claim_vekn_description()}</p>
     </div>
     <div class="p-6 space-y-4">
       <div>
-        <label for="ex-vekn-id" class="block text-sm font-medium text-ink-muted mb-1">VEKN ID</label>
+        <label for="ex-vekn-id" class="block text-sm font-medium text-ink-muted mb-1">{m.add_player_vekn_id_label()}</label>
         <input id="ex-vekn-id" type="text" placeholder="1234567" class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright" tabindex="-1" />
       </div>
       <div class="flex gap-2">
-        <button class="flex-1 inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">Claim</button>
-        <button class="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium bg-surface-hover text-ink-bright transition-colors">Cancel</button>
+        <Button variant="primary" size="lg" class="flex-1">{m.profile_claim_btn()}</Button>
+        <Button variant="secondary" size="lg">{m.common_cancel()}</Button>
       </div>
     </div>
   </div>
@@ -158,10 +163,10 @@
 
 <ExampleBox>
   <div class="flex justify-between items-center max-w-sm">
-    <span class="text-ink-muted">VEKN ID</span>
+    <span class="text-ink-muted">{m.add_player_vekn_id_label()}</span>
     <div class="flex items-center gap-2">
       <span class="text-ink-strong font-mono">1234567</span>
-      <button class="p-1 text-ink-faint hover:text-link transition-colors" aria-label="Unlink VEKN ID">
+      <button class="p-1 text-ink-faint hover:text-link transition-colors" title={m.profile_abandon_vekn_tooltip()}>
         <Unlink class="w-4 h-4" />
       </button>
     </div>
@@ -173,38 +178,29 @@
 <ExampleBox>
   <div class="max-w-sm space-y-4">
     <div class="space-y-2">
-      <span class="block text-sm text-ink-muted">Theme</span>
+      <span class="block text-sm text-ink-muted">{m.profile_theme_label()}</span>
       <div class="flex gap-2">
-        <button class="flex items-center gap-2 px-3 py-2 rounded text-sm bg-surface-hover text-ink hover:bg-surface-active">
-          <Monitor class="w-4 h-4" />
-          Auto
-        </button>
-        <button class="flex items-center gap-2 px-3 py-2 rounded text-sm bg-surface-hover text-ink hover:bg-surface-active">
-          <Sun class="w-4 h-4" />
-          Light
-        </button>
-        <button class="flex items-center gap-2 px-3 py-2 rounded text-sm bg-accent-strong text-white">
-          <Moon class="w-4 h-4" />
-          Dark
-        </button>
+        <Button variant="secondary" size="md"><Monitor class="w-4 h-4" /> {m.theme_system()}</Button>
+        <Button variant="secondary" size="md"><Sun class="w-4 h-4" /> {m.theme_light()}</Button>
+        <Button variant="primary" size="md"><Moon class="w-4 h-4" /> {m.theme_dark()}</Button>
       </div>
     </div>
     <div class="space-y-2">
-      <span class="block text-sm text-ink-muted">Language</span>
+      <span class="block text-sm text-ink-muted">{m.profile_language_label()}</span>
       <div class="flex gap-2 flex-wrap">
-        <button class="flex items-center gap-1.5 px-3 py-2 rounded text-sm bg-accent-strong text-white"><span>🇬🇧</span>EN</button>
-        <button class="flex items-center gap-1.5 px-3 py-2 rounded text-sm bg-surface-hover text-ink hover:bg-surface-active"><span>🇫🇷</span>FR</button>
-        <button class="flex items-center gap-1.5 px-3 py-2 rounded text-sm bg-surface-hover text-ink hover:bg-surface-active"><span>🇪🇸</span>ES</button>
-        <button class="flex items-center gap-1.5 px-3 py-2 rounded text-sm bg-surface-hover text-ink hover:bg-surface-active"><span>🇵🇹</span>PT</button>
-        <button class="flex items-center gap-1.5 px-3 py-2 rounded text-sm bg-surface-hover text-ink hover:bg-surface-active"><span>🇮🇹</span>IT</button>
+        <Button variant="primary" size="md"><span>🇬🇧</span>EN</Button>
+        <Button variant="secondary" size="md"><span>🇫🇷</span>FR</Button>
+        <Button variant="secondary" size="md"><span>🇪🇸</span>ES</Button>
+        <Button variant="secondary" size="md"><span>🇵🇹</span>PT</Button>
+        <Button variant="secondary" size="md"><span>🇮🇹</span>IT</Button>
       </div>
     </div>
     <div class="space-y-2">
-      <span class="block text-sm text-ink-muted">Push notifications</span>
-      <button class="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">
+      <span class="block text-sm text-ink-muted">{m.notifications_label()}</span>
+      <Button variant="primary" size="md">
         <Bell class="w-4 h-4" />
-        Enable
-      </button>
+        {m.notifications_enable()}
+      </Button>
     </div>
   </div>
 </ExampleBox>
@@ -213,16 +209,16 @@
 
 <ExampleBox>
   <div class="max-w-md space-y-4">
-    <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">Linked Accounts</h3>
+    <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.profile_linked_accounts()}</h3>
     <div class="flex items-center justify-between gap-3">
       <div class="flex items-center gap-3 min-w-0">
         <Mail class="w-5 h-5 text-ink-muted shrink-0" />
         <div class="min-w-0">
-          <p class="text-ink-strong">Email &amp; Password</p>
-          <p class="text-sm text-ink-muted">Not set up</p>
+          <p class="text-ink-strong">{m.profile_email_password()}</p>
+          <p class="text-sm text-ink-muted">{m.profile_passkey_not_setup()}</p>
         </div>
       </div>
-      <button class="inline-flex shrink-0 items-center justify-center rounded-lg px-4 py-2 text-sm font-medium bg-surface-hover text-ink-bright transition-colors">Set up</button>
+      <Button variant="secondary" size="lg" class="shrink-0">{m.profile_email_setup()}</Button>
     </div>
     <div class="flex items-center justify-between gap-3">
       <div class="flex items-center gap-3 min-w-0">
@@ -232,42 +228,42 @@
           <p class="text-sm text-ink-muted">janedoe</p>
         </div>
       </div>
-      <span class="shrink-0 px-3 py-1 text-sm rounded badge-success">Linked</span>
+      <span class="shrink-0 px-3 py-1 text-sm rounded badge-success">{m.profile_linked()}</span>
     </div>
     <div class="flex items-center justify-between gap-3">
       <div class="flex items-center gap-3 min-w-0">
         <GithubIcon class="w-5 h-5 text-ink-strong shrink-0" />
         <div class="min-w-0">
           <p class="text-ink-strong">GitHub</p>
-          <p class="text-sm text-ink-muted">Link so we can mention you on your feedback issues</p>
+          <p class="text-sm text-ink-muted">{m.profile_github_hint()}</p>
         </div>
       </div>
-      <button class="shrink-0 px-4 py-2 bg-[#24292e] hover:bg-[#1b1f23] text-white rounded font-medium transition-colors">Link</button>
+      <button class="shrink-0 px-4 py-2 bg-[#24292e] hover:bg-[#1b1f23] text-white rounded font-medium transition-colors">{m.profile_link()}</button>
     </div>
     <div class="flex items-center justify-between gap-3">
       <div class="flex items-center gap-3 min-w-0">
         <KeyRound class="w-5 h-5 text-ink-muted shrink-0" />
         <div class="min-w-0">
           <p class="text-ink-strong">Passkey</p>
-          <p class="text-sm text-ink-muted">Face ID, Touch ID, or security key</p>
+          <p class="text-sm text-ink-muted">{m.profile_passkey_configured()}</p>
         </div>
       </div>
-      <span class="shrink-0 px-3 py-1 text-sm rounded badge-success">Active</span>
+      <span class="shrink-0 px-3 py-1 text-sm rounded badge-success">{m.profile_passkey_active()}</span>
     </div>
 
     <div class="pt-4 border-t border-line space-y-4">
-      <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">Data</h3>
+      <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.profile_data()}</h3>
       <div class="flex items-center justify-between gap-3">
         <div class="min-w-0">
-          <p class="text-ink-strong">Resync local data</p>
-          <p class="text-sm text-ink-muted">Clear local database and re-download all data from server</p>
+          <p class="text-ink-strong">{m.profile_resync_title()}</p>
+          <p class="text-sm text-ink-muted">{m.profile_resync_description()}</p>
         </div>
-        <button class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">
+        <Button variant="primary" size="lg" class="shrink-0">
           <RefreshCw class="w-4 h-4" />
-          Resync
-        </button>
+          {m.profile_resync_btn()}
+        </Button>
       </div>
-      <button class="inline-flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm font-medium bg-surface-hover text-ink-bright transition-colors">Sign Out</button>
+      <Button variant="secondary" size="lg" block>{m.profile_sign_out()}</Button>
     </div>
   </div>
 </ExampleBox>
@@ -283,23 +279,21 @@
         <div class="flex items-center gap-2">
           <span class="text-lg">🇫🇷</span>
           <span class="font-medium text-ink-strong">France</span>
-          <span class="px-2 py-0.5 text-xs rounded bg-accent-soft/40 text-link">Your country</span>
+          <span class="px-2 py-0.5 text-xs rounded bg-accent-soft/40 text-link">{m.community_your_country()}</span>
           <span class="text-xs text-ink-faint">(3)</span>
         </div>
         <ChevronDown class="w-5 h-5 text-ink-faint" />
       </button>
       <div class="border-t border-line divide-y divide-line/50">
         <div class="p-4 space-y-2">
-          <h3 class="text-sm font-medium text-ink-strong">Pinned</h3>
-          <span class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium badge-amethyst">
-            <Pin class="w-3 h-3" /> VTES France
-          </span>
+          <h3 class="text-sm font-medium text-ink-strong">{m.community_card_pinned()}</h3>
+          <CommunityLinkPills links={[{ type: "discord", url: "https://discord.gg/vtes-france", label: "VTES France", moderation: "national" }]} />
         </div>
         <div class="p-4 space-y-2">
-          <h3 class="text-sm font-medium text-ink-strong">Officials</h3>
+          <h3 class="text-sm font-medium text-ink-strong">{m.community_card_officials()}</h3>
           <div class="flex items-center gap-2 flex-wrap">
             <span class="font-medium text-ink-strong">Jane Doe</span>
-            <span class="inline-flex items-center gap-1 rounded text-xs font-medium px-2 py-0.5 badge-crimson">NC</span>
+            <Badge tone={getRoleTone("NC")}>NC</Badge>
           </div>
           <div class="text-sm text-ink-muted">Paris</div>
           <div class="flex flex-wrap gap-3 text-xs text-ink-muted">
@@ -316,10 +310,10 @@
 
 <ExampleBox>
   <div class="max-w-md">
-    <h3 class="text-xl font-medium text-ink-strong mb-1">Standings</h3>
+    <h3 class="text-xl font-medium text-ink-strong mb-1">{m.league_col_standings()}</h3>
     <p class="text-sm text-ink-muted mb-3">
-      <span class="font-medium text-ink">Rating Points</span>
-      — VEKN rating points earned at each event, summed across ALL league events — unlike profile ratings, the season total has no best-8 or 18-month cap.
+      <span class="font-medium text-ink">{m.league_standings_rtp()}</span>
+      — {m.league_mode_hint_rtp()}
     </p>
     <div class="bg-surface-card rounded-lg shadow overflow-hidden border border-line divide-y divide-line">
       <div class="flex items-center gap-3 px-4 py-3 ring-1 ring-inset ring-accent/40 bg-accent-soft/10">
@@ -327,16 +321,16 @@
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-1.5 min-w-0">
             <span class="truncate text-sm text-ink-strong">Alice</span>
-            <span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">You</span>
+            <span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.league_standings_you()}</span>
           </div>
           <div class="mt-0.5 flex items-center gap-3 text-xs text-ink-faint">
-            <span class="whitespace-nowrap">3GW 11VP 198TP</span>
+            <span class="whitespace-nowrap">{formatScore(3, 11, 198)}</span>
             <span class="inline-flex items-center gap-1"><Trophy class="w-3 h-3" />4</span>
           </div>
         </div>
         <div class="shrink-0 text-right">
           <div class="text-sm font-semibold text-ink-strong leading-tight">75</div>
-          <div class="text-[10px] uppercase tracking-wide text-ink-faint">RtP</div>
+          <div class="text-[10px] uppercase tracking-wide text-ink-faint">{m.league_points_rtp()}</div>
         </div>
       </div>
       <div class="flex items-center gap-3 px-4 py-3">
@@ -346,13 +340,13 @@
             <span class="truncate text-sm text-ink-strong">Bob</span>
           </div>
           <div class="mt-0.5 flex items-center gap-3 text-xs text-ink-faint">
-            <span class="whitespace-nowrap">2GW 9VP 174TP</span>
+            <span class="whitespace-nowrap">{formatScore(2, 9, 174)}</span>
             <span class="inline-flex items-center gap-1"><Trophy class="w-3 h-3" />4</span>
           </div>
         </div>
         <div class="shrink-0 text-right">
           <div class="text-sm font-semibold text-ink-strong leading-tight">60</div>
-          <div class="text-[10px] uppercase tracking-wide text-ink-faint">RtP</div>
+          <div class="text-[10px] uppercase tracking-wide text-ink-faint">{m.league_points_rtp()}</div>
         </div>
       </div>
       <div class="flex items-center gap-3 px-4 py-3">
@@ -362,13 +356,13 @@
             <span class="truncate text-sm text-ink-strong">Charlie</span>
           </div>
           <div class="mt-0.5 flex items-center gap-3 text-xs text-ink-faint">
-            <span class="whitespace-nowrap">1GW 8VP 156TP</span>
+            <span class="whitespace-nowrap">{formatScore(1, 8, 156)}</span>
             <span class="inline-flex items-center gap-1"><Trophy class="w-3 h-3" />3</span>
           </div>
         </div>
         <div class="shrink-0 text-right">
           <div class="text-sm font-semibold text-ink-strong leading-tight">48</div>
-          <div class="text-[10px] uppercase tracking-wide text-ink-faint">RtP</div>
+          <div class="text-[10px] uppercase tracking-wide text-ink-faint">{m.league_points_rtp()}</div>
         </div>
       </div>
     </div>
@@ -380,29 +374,23 @@
 <ExampleBox>
   <div class="space-y-3 max-w-sm">
     <div class="flex bg-surface-card rounded-lg border border-line p-1 w-fit">
-      <button class="px-4 py-2 text-sm font-medium rounded-md bg-accent-strong text-white">
-        Your Agenda
-      </button>
-      <button class="px-4 py-2 text-sm font-medium rounded-md text-ink-muted hover:text-ink-bright">
-        All Tournaments
-      </button>
+      <Button variant="primary" size="lg" class="rounded-md">{m.tournaments_view_agenda()}</Button>
+      {@render unselectedTab(m.tournaments_view_all())}
     </div>
     <!-- Two moments, in order: generate the feed once, then subscribe either way. -->
-    <button class="inline-flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-xs bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">
-      Generate link
-    </button>
+    <Button variant="primary" size="sm">{m.tournaments_calendar_generate()}</Button>
     <div class="border-t border-line pt-3 space-y-1.5">
       <div class="flex items-center gap-2 flex-wrap">
-        <a href="/api/calendar/tournaments.ics" tabindex="-1" class="inline-flex items-center justify-center gap-1 px-2 py-1 text-xs rounded-lg border border-line-strong text-ink hover:bg-surface-hover/50 hover:text-ink-strong transition-colors">
+        <Button variant="ghost" size="sm" href="/api/calendar/tournaments.ics" tabindex="-1">
           <Calendar class="h-3 w-3" />
-          Open in calendar app
-        </a>
-        <button class="inline-flex items-center justify-center gap-1 rounded-lg px-2 py-1 text-xs border border-line-strong text-ink hover:bg-surface-hover/50 hover:text-ink-strong transition-colors">
+          {m.tournaments_calendar_webcal()}
+        </Button>
+        <Button variant="ghost" size="sm">
           <Copy class="h-3 w-3" />
-          Copy link
-        </button>
+          {m.tournaments_calendar_copy()}
+        </Button>
       </div>
-      <p class="text-xs text-ink-faint">Calendar for: your personal agenda</p>
+      <p class="text-xs text-ink-faint">{m.tournaments_calendar_scope_label({ scope: m.tournaments_calendar_scope_agenda() })}</p>
     </div>
   </div>
 </ExampleBox>
@@ -410,9 +398,7 @@
 {@html renderGuideSection(m.pg_calendar_feed())}
 
 <ExampleBox>
-  <button class="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">
-    Register
-  </button>
+  <Button variant="primary" size="lg">{m.tournament_register_btn()}</Button>
 </ExampleBox>
 
 {@html renderGuideSection(m.pg_registration_warning())}
@@ -420,57 +406,49 @@
 <ExampleBox>
   <div class="space-y-3 max-w-sm">
     <div class="flex gap-2 flex-wrap">
-      <button class="px-3 py-1.5 text-sm rounded-lg bg-accent-strong-hover text-white transition-colors">
-        From URL
-      </button>
-      <button class="px-3 py-1.5 text-sm rounded-lg bg-surface-hover text-ink transition-colors">
-        Paste Deck
-      </button>
-      <button class="px-3 py-1.5 text-sm rounded-lg bg-surface-hover text-ink transition-colors">
-        Scan QR
-      </button>
+      <Button variant="primary" size="md">{m.deck_upload_from_url()}</Button>
+      <Button variant="secondary" size="md">{m.deck_upload_paste()}</Button>
+      <Button variant="secondary" size="md">{m.deck_upload_scan_qr()}</Button>
     </div>
     <input
       type="text"
-      placeholder="Deck name (optional)"
+      placeholder={m.deck_upload_name_placeholder()}
       class="w-full px-3 py-2 text-sm bg-surface-muted border border-line-strong rounded-lg text-ink-bright placeholder-ink-faint"
       tabindex="-1"
     />
     <input
       type="url"
-      placeholder="VDB, VTESDecks, or Amaranth URL"
+      placeholder={m.deck_upload_url_placeholder()}
       class="w-full px-3 py-2 text-sm bg-surface-muted border border-line-strong rounded-lg text-ink-bright placeholder-ink-faint"
       tabindex="-1"
     />
-    <p class="text-xs text-ink-faint">Supported: vdb.im, vtesdecks.com, amaranth.vtes.co.nz</p>
+    <p class="text-xs text-ink-faint">{m.deck_upload_supported_sites()}</p>
     <div class="flex items-center gap-3 text-sm flex-wrap">
-      <span class="text-ink-muted">Attribution:</span>
+      <span class="text-ink-muted">{m.deck_upload_attribution()}:</span>
       <label class="flex items-center gap-1 text-ink-bright">
         <input type="radio" name="ex-attribution" checked class="accent-accent" tabindex="-1" />
-        Your deck
+        {m.deck_upload_attr_self()}
       </label>
       <label class="flex items-center gap-1 text-ink-bright">
         <input type="radio" name="ex-attribution" class="accent-accent" tabindex="-1" />
-        Anonymous
+        {m.deck_upload_attr_anonymous()}
       </label>
       <label class="flex items-center gap-1 text-ink-bright">
         <input type="radio" name="ex-attribution" class="accent-accent" tabindex="-1" />
-        Other
+        {m.deck_upload_attr_other()}
       </label>
     </div>
-    <button class="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">
-      Upload Deck
-    </button>
+    <Button variant="primary" size="lg">{m.deck_upload_submit()}</Button>
   </div>
 </ExampleBox>
 
 {@html renderGuideSection(m.pg_deck_methods())}
 
 <ExampleBox>
-  <button class="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm border border-line-strong text-ink hover:bg-surface-hover/50 hover:text-ink-strong transition-colors">
+  <Button variant="ghost" size="md">
     <QrCode class="w-4 h-4" />
-    Scan QR to Check In
-  </button>
+    {m.checkin_qr_scan_btn()}
+  </Button>
 </ExampleBox>
 
 {@html renderGuideSection(m.pg_checkin_details())}
@@ -478,16 +456,16 @@
 <ExampleBox>
   <div class="max-w-sm border-t border-line pt-4">
     <div class="flex items-center justify-between mb-2">
-      <h3 class="text-sm font-medium text-ink-strong">Your Table (Table 3)</h3>
-      <span class="text-xs px-2 py-0.5 rounded badge-pending">In Progress</span>
+      <h3 class="text-sm font-medium text-ink-strong">{m.tournament_your_table({ label: m.rounds_table_n({ n: "3" }) })}</h3>
+      <span class="text-xs px-2 py-0.5 rounded badge-pending">{m.table_state_in_progress()}</span>
     </div>
     <div class="space-y-1.5">
       <div class="px-2.5 -mx-2.5 py-2 rounded-md">
         <div class="flex items-center justify-between gap-2 mb-1.5 text-sm">
           <span class="min-w-0 inline-flex items-center gap-1.5">
-            <span class="text-ink-faint text-xs tabular-nums shrink-0">Seat 1</span>
+            <span class="text-ink-faint text-xs tabular-nums shrink-0">{m.tournament_seat_n({ n: "1" })}</span>
             <span class="text-ink truncate min-w-0">Alice</span>
-            <span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">Predator</span>
+            <span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_predator()}</span>
           </span>
           <span class="text-ink-faint text-xs shrink-0">0GW 42TP</span>
         </div>
@@ -496,9 +474,9 @@
       <div class="px-2.5 -mx-2.5 py-2 rounded-md ring-1 ring-inset ring-accent/40 bg-accent-soft/10">
         <div class="flex items-center justify-between gap-2 mb-1.5 text-sm">
           <span class="min-w-0 inline-flex items-center gap-1.5">
-            <span class="text-ink-faint text-xs tabular-nums shrink-0">Seat 2</span>
+            <span class="text-ink-faint text-xs tabular-nums shrink-0">{m.tournament_seat_n({ n: "2" })}</span>
             <span class="text-ink truncate min-w-0">Bob</span>
-            <span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">You</span>
+            <span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_you()}</span>
           </span>
           <span class="text-ink-faint text-xs shrink-0">1GW 60TP</span>
         </div>
@@ -507,9 +485,9 @@
       <div class="px-2.5 -mx-2.5 py-2 rounded-md">
         <div class="flex items-center justify-between gap-2 mb-1.5 text-sm">
           <span class="min-w-0 inline-flex items-center gap-1.5">
-            <span class="text-ink-faint text-xs tabular-nums shrink-0">Seat 3</span>
+            <span class="text-ink-faint text-xs tabular-nums shrink-0">{m.tournament_seat_n({ n: "3" })}</span>
             <span class="text-ink truncate min-w-0">Charlie</span>
-            <span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">Prey</span>
+            <span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_prey()}</span>
           </span>
           <span class="text-ink-faint text-xs shrink-0">0GW 24TP</span>
         </div>
@@ -518,7 +496,7 @@
       <div class="px-2.5 -mx-2.5 py-2 rounded-md">
         <div class="flex items-center justify-between gap-2 mb-1.5 text-sm">
           <span class="min-w-0 inline-flex items-center gap-1.5">
-            <span class="text-ink-faint text-xs tabular-nums shrink-0">Seat 4</span>
+            <span class="text-ink-faint text-xs tabular-nums shrink-0">{m.tournament_seat_n({ n: "4" })}</span>
             <span class="text-ink truncate min-w-0">Diana</span>
           </span>
           <span class="text-ink-faint text-xs shrink-0">0GW 42TP</span>
@@ -532,10 +510,10 @@
 {@html renderGuideSection(m.pg_override_judge())}
 
 <ExampleBox>
-  <button class="inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium min-h-[44px] bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">
+  <Button variant="primary" size="lg" block class="max-w-sm min-h-[44px]">
     <Gavel class="w-5 h-5" />
-    Call Judge
-  </button>
+    {m.judge_call_btn()}
+  </Button>
 </ExampleBox>
 
 {@html renderGuideSection(m.pg_self_organize())}
@@ -545,13 +523,11 @@
     <div class="flex items-start gap-2">
       <Users class="w-4 h-4 mt-0.5 text-link shrink-0" />
       <div class="min-w-0">
-        <h3 class="text-sm font-medium text-ink-strong">Self-organize a round</h3>
-        <p class="text-xs text-ink-muted mt-0.5">Gather 4 or 5 registered players and start your own table — no organizer needed.</p>
+        <h3 class="text-sm font-medium text-ink-strong">{m.self_organize_title()}</h3>
+        <p class="text-xs text-ink-muted mt-0.5">{m.self_organize_tip()}</p>
       </div>
     </div>
-    <button class="inline-flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm font-medium min-h-[44px] bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">
-      Self-organize a round
-    </button>
+    <Button variant="primary" size="lg" block class="min-h-[44px]">{m.self_organize_start_btn()}</Button>
   </div>
 </ExampleBox>
 
@@ -563,7 +539,7 @@
   <div class="bg-surface-muted/50 border border-line-strong rounded-lg p-4 max-w-sm">
     <div class="flex items-center gap-2">
       <Lock class="w-5 h-5 text-ink-muted shrink-0" />
-      <span class="text-ink text-sm">This tournament is offline on another device. Updates will resume when the organizer goes back online.</span>
+      <span class="text-ink text-sm">{m.offline_locked_banner()}</span>
     </div>
   </div>
 </ExampleBox>
