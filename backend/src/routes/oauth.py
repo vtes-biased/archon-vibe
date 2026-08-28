@@ -38,7 +38,6 @@ from ..middleware.auth import (
     JWT_ALGORITHM,
     JWT_SECRET,
     CurrentUser,
-    require_permission,
 )
 from ..models import (
     OAuthAuthorizationCode,
@@ -53,14 +52,6 @@ from ..models import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/oauth", tags=["oauth"])
-
-# Client management is IC or DEV — one gate, four routes.
-RequireOauthAdmin = Depends(
-    require_permission(
-        permissions.can_manage_oauth_clients,
-        "Only IC or DEV can manage OAuth clients",
-    )
-)
 
 ph = PasswordHasher()
 
@@ -159,7 +150,7 @@ async def authorize_get(
 ):
     """Validate OAuth authorization request parameters. Returns JSON with authorization details
     or redirects with code if consent already exists."""
-    _require_first_party(request)
+    _require_first_party(request, "Consent management requires a first-party session")
 
     if response_type != "code":
         raise HTTPException(400, "Only response_type=code is supported")
@@ -242,7 +233,7 @@ class AuthorizeApprovalRequest(BaseModel):
 async def authorize_post(
     user: CurrentUser, body: AuthorizeApprovalRequest, request: Request
 ):
-    _require_first_party(request)
+    _require_first_party(request, "Consent management requires a first-party session")
 
     client_id = body.client_id
     redirect_uri = body.redirect_uri
@@ -680,18 +671,16 @@ async def userinfo(user: CurrentUser, request: Request):
     }
 
 
-def _require_first_party(request: Request) -> None:
-    """Consent is self-service only. A third-party OAuth token must not enumerate
-    or revoke the user's grants to other apps — nor *grant* one: a client holding
-    a token for one event would otherwise POST its own approval for another and
-    key itself a fresh consent, with no consent page and no one-click approve."""
+def _require_first_party(request: Request, detail: str) -> None:
+    """The middleware admits a scoped token to every `/oauth/*` path, so each
+    self-service endpoint under the prefix re-checks that it is not a third party."""
     if getattr(request.state, "oauth_scopes", None) is not None:
-        raise HTTPException(403, "Consent management requires a first-party session")
+        raise HTTPException(403, detail)
 
 
 @router.get("/consents")
 async def list_consents(user: CurrentUser, request: Request):
-    _require_first_party(request)
+    _require_first_party(request, "Consent management requires a first-party session")
     consents = await get_oauth_consents_by_user(user.uid)
     out = []
     for c in consents:
@@ -718,12 +707,23 @@ async def list_consents(user: CurrentUser, request: Request):
 async def revoke_consent(client_id: str, user: CurrentUser, request: Request):
     """Tokens revoked first (cuts access immediately), then consent dropped — a
     failure in between leaves a re-revokable consent that can't mint new tokens."""
-    _require_first_party(request)
+    _require_first_party(request, "Consent management requires a first-party session")
     revoked = await revoke_oauth_tokens_for_user_client(user.uid, client_id)
     deleted = await delete_oauth_consent(user.uid, client_id)
     if not deleted and not revoked:
         raise HTTPException(404, "No authorization found for this app")
     return {"status": "revoked", "client_id": client_id, "tokens_revoked": revoked}
+
+
+# Client management is IC or DEV, and first-party only — one gate, four routes.
+async def _require_oauth_admin(request: Request, user: CurrentUser) -> User:
+    _require_first_party(request, "Client management requires a first-party session")
+    if not permissions.can_manage_oauth_clients(user):
+        raise HTTPException(403, "Only IC or DEV can manage OAuth clients")
+    return user
+
+
+RequireOauthAdmin = Depends(_require_oauth_admin)
 
 
 class RegisterClientRequest(BaseModel):

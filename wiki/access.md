@@ -151,11 +151,14 @@ response whose header list is empty. While the auto-approve path returned a 302 
 page navigated to the empty string, which reloads the consent page, which calls
 `/authorize` again — a returning user looped forever instead of reaching the app.
 
-Endpoints `/oauth/{authorize,token,revoke,userinfo}`; client CRUD and secret
-regeneration under `/oauth/clients` (DEV role); `GET /oauth/consents` lists
-authorized apps and is **first-party session only**, rejecting OAuth tokens with
-403; `DELETE /oauth/consents/{client_id}` revokes consent and immediately revokes
-live tokens for that client, across every event it holds.
+Endpoints `/oauth/{authorize,token,revoke,userinfo}`; `GET /oauth/consents` lists
+authorized apps; `DELETE /oauth/consents/{client_id}` revokes consent and
+immediately revokes live tokens for that client, across every event it holds; and
+client CRUD plus secret regeneration under `/oauth/clients` (IC or DEV). The four
+`/oauth/clients` routes are **first-party session only** like the consent
+endpoints, rejecting OAuth tokens with 403 — the role gate alone would let an app
+a DEV or IC member signed in with `profile:read` deactivate that member's clients
+and read a regenerated `client_secret` out of the response.
 
 `POST /oauth/revoke` (RFC 7009) is how a client hands a pair back without sending
 the user to their profile page. It takes the token itself rather than a jti, and
