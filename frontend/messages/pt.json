@@ -477,7 +477,7 @@
   "developer_redirect_uris": "URIs de Redirecionamento (uma por linha)",
   "developer_scopes": "Escopos",
   "developer_scope_profile_read_desc": "Ler perfil básico (funções, VEKN ID)",
-  "developer_scope_event_run_desc": "Agir em nome do usuário, em um único torneio que ele indicar",
+  "developer_scope_event_run_desc": "Agir em nome do usuário em um torneio que ele indicar — apenas identidade se nenhum for indicado",
   "developer_scope_api_read_desc": "Ler a API de dados públicos como daemon (sem usuário)",
   "profile_authorized_apps_section": "Aplicativos autorizados",
   "authorized_apps_subtitle": "Aplicativos de terceiros aos quais você concedeu acesso à sua conta Archon.",

@@ -75,12 +75,14 @@ SELECT count(*) FROM oauth_consents WHERE data->'scopes' @> '["user:impersonate"
 SELECT count(*) FROM oauth_tokens   WHERE data->'scopes' @> '["user:impersonate"]'::jsonb;
 ```
 
-**Owes afterwards**: access tokens live an hour and refresh tokens thirty days, so
-a client holding one minted before the rename keeps a JWT whose `scope` claim
-still reads `user:impersonate`; that claim is compared as a raw string in the
-middleware and will simply stop matching, so the app re-authorizes. Tell whoever
-runs the Discord bot to expect one re-authorization. Delete this section once both
-databases answer 0.
+**Owes afterwards**: refresh tokens live thirty days, so a client can still
+present a JWT whose `scope` claim reads `user:impersonate` after the rows are
+rewritten. On the access path the middleware compares that claim as a raw string,
+so it stops matching and the token degrades to identity-only; on refresh the scope
+no longer parses and the endpoint answers 400, which is one of the two statuses
+[the bot clears its stored pair on](discord.md#the-tournament-bot) — so it re-authorizes
+rather than retrying. Tell whoever runs the Discord bot to expect that once.
+Delete this section once both databases answer 0.
 
 ## Trim the production box
 

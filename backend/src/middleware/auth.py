@@ -10,8 +10,6 @@ from ..db_oauth import get_oauth_token_by_jti
 from ..jwt_config import JWT_ALGORITHM, JWT_SECRET
 from ..models import User
 
-# Sub-routes of the token's own tournament an OAuth actor never reaches, whatever
-# the user's capabilities: the infrastructure of running the event, not running it.
 _OAUTH_BARRED_SUBPATHS = frozenset(
     {
         "organizers",

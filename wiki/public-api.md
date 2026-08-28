@@ -218,17 +218,18 @@ for it is a response schema.
 The description is a **raw** string, because every shell example ends its lines
 with a backslash and a normal string splices those away.
 
-**All three grants are documented, not just the daemon one.** The reference walks
-"Login with Archon" end to end — client registration, PKCE, `/consent`, the
-callback, `/oauth/token`, `/oauth/userinfo`, refresh rotation, `/oauth/revoke` —
-with a runnable example per step, because the audience for the flow is a third
-party who has no other source for it. Two things the endpoints do not say
-themselves carry their own paragraphs: that the client secret is required
-*alongside* the PKCE verifier rather than instead of it — every client here is
-confidential, and an RFC-habituated reader expects the public-client variant that
-does not exist — and what each delegating scope actually costs the member who
-approves it, `profile:read` being identity alone against `event:run`'s
-one-event authority ([access](access.md#oauth2-provider)).
+**All three grants are documented, not just the daemon one.** The introduction is
+a chooser and two token errands — the app token for the Public API, Login with
+Archon for a member's — with a runnable example per step, because the audience for
+the flow is a third party who has no other source for it. It is deliberately
+spare: the owner cut it back once for reading like generated prose, so what
+survives is the flow and the traps, not the commentary. Two traps a reader would
+otherwise meet at runtime stay: that `/consent` is the page to send a member to
+and `/oauth/authorize` beneath it answers a third party 403, and that replaying a
+rotated refresh token kills the whole lineage. The privacy contract — VEKN ID
+never a name, no sanctions — and the no-anonymous-read rule sit in the Public API
+section, which is what they govern
+([access](access.md#oauth2-provider)).
 
 A recipe section closes the page, for the deck-archive and statistics apps this
 API exists for: `/v1/decks` and `/v1/export`, and the publication contract they
@@ -255,7 +256,10 @@ with the organizer-level tournament, not the pruned api projection this page
 publishes elsewhere. That listing *is* the published boundary, so
 `check_event_run_coverage.py` asserts it equals what `_oauth_allows` admits, in
 both directions — a new tournament sub-route fails the build until the reference
-names it or the allowlist bars it. The engine's full action vocabulary stays
+names it or the allowlist bars it. The same check pairs every documented request
+body with the app model it is named after and requires the same field set: those
+schemas are hand-copied, the isolation line forbidding the import that would
+generate them, so nothing but that pairing keeps them honest. The engine's full action vocabulary stays
 unpublished: the spine of an event is worked through as an example and the rest is
 declared to move with the engine, because publishing it would bind the engine's
 internal event set to third-party consumers as a contract

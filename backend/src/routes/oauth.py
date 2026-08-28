@@ -203,7 +203,11 @@ async def authorize_get(
         "scopes": [s.value for s in requested_scopes],
         "scope_descriptions": {
             OAuthScope.PROFILE_READ.value: "Read your basic profile (roles, VEKN ID)",
-            OAuthScope.EVENT_RUN.value: "Act on your behalf on this event",
+            OAuthScope.EVENT_RUN.value: (
+                "Act on your behalf on this event"
+                if tournament_uid
+                else "Identify you — no event access, none is named"
+            ),
         },
         "redirect_uri": redirect_uri,
         "state": state,
@@ -480,9 +484,6 @@ async def _handle_refresh_token(body: TokenRequest, client: OAuthClient) -> dict
     # Consent is authoritative: revoking it deletes the row, so a surviving refresh
     # token (e.g. a partial revoke) still can't mint new access tokens.
     tournament_uid = payload.get("tournament")
-    scope_values = payload.get("scope", "").split()
-    if OAuthScope.EVENT_RUN.value in scope_values and not tournament_uid:
-        raise HTTPException(400, "Unscoped impersonation grants are no longer issued")
 
     if not await get_oauth_consent(payload["sub"], client.client_id, tournament_uid):
         raise HTTPException(400, "Consent has been revoked")
@@ -510,7 +511,14 @@ async def _handle_refresh_token(body: TokenRequest, client: OAuthClient) -> dict
 
     # Chain the new pair to the same parent — preserves rotation lineage for reuse detection.
     parent = token_record.parent_token_uid or token_record.uid
-    scopes = [OAuthScope(s) for s in payload.get("scope", "").split()]
+    try:
+        scopes = [OAuthScope(s) for s in payload.get("scope", "").split()]
+    except ValueError as err:
+        # A token minted before a scope was renamed: 400 so a client clears the
+        # pair and re-authorizes, where the raw ValueError would 500 and strand it.
+        raise HTTPException(
+            400, "Token carries a scope this build no longer issues"
+        ) from err
 
     return await _issue_token_pair(
         user_uid=payload["sub"],

@@ -201,7 +201,7 @@ locale-parity:
 public-api-isolation:
     uv run python3 scripts/check_public_api_isolation.py
 
-# Fail when the public API's Impersonate Access section and the app's
+# Fail when the public API's Member API section and the app's
 # `event:run` allowlist disagree — the listing is the published boundary.
 event-run-coverage:
     uv run python3 scripts/check_event_run_coverage.py

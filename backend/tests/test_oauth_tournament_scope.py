@@ -21,9 +21,21 @@ from uuid import uuid7
 import pytest
 from httpx import AsyncClient
 from src import db
-from src.db_oauth import insert_oauth_token
-from src.models import OAuthScope, OAuthToken, Tournament, User
-from src.routes.oauth import ACCESS_TOKEN_LIFETIME, _create_oauth_jwt
+from src.db_oauth import insert_oauth_client, insert_oauth_token, upsert_oauth_consent
+from src.models import (
+    OAuthClient,
+    OAuthConsent,
+    OAuthScope,
+    OAuthToken,
+    Tournament,
+    User,
+)
+from src.routes.oauth import (
+    ACCESS_TOKEN_LIFETIME,
+    _create_oauth_jwt,
+    _issue_token_pair,
+    ph,
+)
 
 from tests.conftest import seed_tournament
 
@@ -174,3 +186,55 @@ async def test_oauth_token_is_not_a_stream_query_credential(
             assert (await test_client.get(path)).status_code == 401, path
     finally:
         await _drop_events()
+
+
+@pytest.mark.asyncio
+async def test_an_identity_only_grant_refreshes(test_client: AsyncClient, test_db):
+    """The grant that names no event is renewable like any other. Refresh used to
+    refuse it outright, which capped it at one hour with no way to renew."""
+    secret = "identity-grant-secret"
+    user = User(uid=str(uuid7()), modified=NOW, name="Member")
+    await db.save_user(user)
+    client = OAuthClient(
+        uid=str(uuid7()),
+        modified=NOW,
+        name="Event app",
+        client_id=f"identity-{uuid7()}",
+        client_secret_hash=ph.hash(secret),
+        redirect_uris=["https://example.test/cb"],
+        scopes=[OAuthScope.EVENT_RUN],
+        created_by_uid=user.uid,
+    )
+    await insert_oauth_client(client)
+    await upsert_oauth_consent(
+        OAuthConsent(
+            uid=str(uuid7()),
+            modified=NOW,
+            user_uid=user.uid,
+            client_id=client.client_id,
+            scopes=[OAuthScope.EVENT_RUN],
+        )
+    )
+    pair = await _issue_token_pair(
+        user_uid=user.uid,
+        client_id=client.client_id,
+        scopes=[OAuthScope.EVENT_RUN],
+        tournament_uid=None,
+        parent_token_uid=None,
+    )
+    response = await test_client.post(
+        "/oauth/token",
+        data={
+            "client_id": client.client_id,
+            "client_secret": secret,
+            "grant_type": "refresh_token",
+            "refresh_token": pair["refresh_token"],
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert (
+        await test_client.get(
+            "/oauth/userinfo",
+            headers={"Authorization": f"Bearer {response.json()['access_token']}"},
+        )
+    ).status_code == 200
