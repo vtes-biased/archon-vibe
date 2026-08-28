@@ -1959,6 +1959,28 @@ fn test_reopen_tournament_keeps_the_final() {
 }
 
 #[test]
+fn test_cancel_finals_uncrowns_the_reopened_event() {
+    // Discarding the final must take the winner with it: a winner standing over a
+    // null finals is the archival shape, which compute_final_standings ranks 1st.
+    let reopened = json::parse(
+        &run_event(
+            &finished_with_finals(),
+            &json::object! { type: "ReopenTournament" },
+            &make_organizer(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let event = json::object! { type: "CancelFinals" };
+    let updated = json::parse(&run_event(&reopened, &event, &make_organizer()).unwrap()).unwrap();
+
+    assert_eq!(updated["state"].as_str(), Some("Waiting"));
+    assert!(updated["finals"].is_null());
+    assert_eq!(updated["winner"].as_str(), Some(""));
+    assert!(!updated["players"][0]["finalist"].as_bool().unwrap_or(true));
+}
+
+#[test]
 fn test_finish_finals_publishes_the_winner_deck() {
     // Publication is derived from the Finished state, so it must come back when the
     // organizer re-finishes a final they reopened to correct.

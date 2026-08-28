@@ -110,9 +110,10 @@ Planned ──open──> Registration ──close──> Waiting ⇄ Playing �
 returns to `Playing` with that final, its winner, the finalist flags and the deck
 stamps all intact, so the organizer lands back in the table they need to correct
 and re-runs `FinishFinals` when done; `CancelFinals` is the one path that discards
-a final, and it is reachable from there. An event finished without one returns to
-`Waiting`, having no final to come back to, and keeps the winner an archival import
-may have set. Players released from `Finished` return to `Playing` if they were
+a final, reachable from there, and it takes the winner with it — a winner standing
+over a null `finals` is the archival shape `compute_final_standings` ranks first.
+An event finished without one returns to `Waiting`, having no final to come back
+to, and keeps the winner an archival import may have set. Players released from `Finished` return to `Playing` if they were
 finalists, else to `Completed` when they are at the per-player `max_rounds` cap and
 `Checked-in` otherwise. Decklists unpublish, since publication is derived from the
 finished state and both finish paths recompute it.

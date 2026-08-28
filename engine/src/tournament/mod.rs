@@ -417,8 +417,6 @@ fn apply_event(
         TournamentEvent::ReopenTournament => {
             require_organizer(actor)?;
             require_state(state, TournamentState::Finished)?;
-            // A played final returns to the table the organizer needs to correct;
-            // CancelFinals is the only path that discards one.
             let has_finals = !tournament[tournament::FINALS].is_null();
             tournament[tournament::STATE] = if has_finals { "Playing" } else { "Waiting" }.into();
 
@@ -452,8 +450,6 @@ fn apply_event(
                 .into();
             }
             update_standings(tournament, sanctions);
-            // Publication is derived from the Finished state, so it withdraws here and
-            // the finish that follows recomputes it.
             for d in decks.members() {
                 let deck_uid = d[deck_object::UID].as_str().unwrap_or("");
                 if !deck_uid.is_empty() {
@@ -2386,6 +2382,10 @@ fn apply_event(
             }
 
             tournament[tournament::FINALS] = json::Null;
+            // "" (not null): the backend Tournament model types `winner` as `str`, so a
+            // null fails msgspec validation and 500s the action. Left set, it would be
+            // the archival shape compute_final_standings still ranks 1st.
+            tournament[tournament::WINNER] = "".into();
             tournament[tournament::STATE] = "Waiting".into();
             update_standings(tournament, sanctions);
             release_stamped_decks(
