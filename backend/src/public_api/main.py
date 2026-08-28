@@ -581,6 +581,12 @@ _IMPERSONATE_SCHEMAS: dict[str, dict] = {
     },
 }
 
+# Endpoints that answer with something other than JSON.
+_RESPONSE_MEDIA: dict[tuple[str, str], str] = {
+    ("get", "/stream"): "text/event-stream",
+    ("get", f"{_EVENT}/banner"): "image/*",
+}
+
 # Which body each endpoint takes. Endpoints absent from this map take none.
 _IMPERSONATE_BODIES: dict[str, str] = {
     f"{_EVENT}/action": "TournamentActionRequest",
@@ -602,6 +608,17 @@ def _impersonate_paths() -> dict:
             "servers": [{"url": SITE_URL}],
             "responses": {code: {"description": responds}},
         }
+        # Without a media type Scalar renders a 200 as "No Body"; the app's own
+        # response shapes stay out of this document, so the schema is left open.
+        if code != "204":
+            media = _RESPONSE_MEDIA.get((method, path), "application/json")
+            operation["responses"][code]["content"] = {
+                media: {
+                    "schema": {
+                        "type": "string" if media != "application/json" else "object"
+                    }
+                }
+            }
         schema = _IMPERSONATE_BODIES.get(path)
         if schema and method == "post":
             operation["requestBody"] = {
