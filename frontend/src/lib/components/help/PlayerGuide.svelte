@@ -12,10 +12,10 @@
   import DiscordIcon from "$lib/components/DiscordIcon.svelte";
   import GithubIcon from "$lib/components/GithubIcon.svelte";
 
-  const linkClass = "text-link hover:text-link-soft underline";
+  const linkClass = "text-link hover:text-link-soft focus-visible:text-link-soft underline";
   const consentHtml = m.login_consent_html({
-    terms: `<a href="/legal/terms" class="${linkClass}">${m.legal_terms_title()}</a>`,
-    privacy: `<a href="/legal/privacy" class="${linkClass}">${m.legal_privacy_title()}</a>`,
+    terms: `<a href="/legal/terms" target="_blank" rel="noopener noreferrer" class="${linkClass}">${m.legal_terms_title()}</a>`,
+    privacy: `<a href="/legal/privacy" target="_blank" rel="noopener noreferrer" class="${linkClass}">${m.legal_privacy_title()}</a>`,
   });
 </script>
 
@@ -23,8 +23,6 @@
   <VpInput value={selected} options={[0, 0.5, 1, 1.5, 2, 3, 4]} onchange={() => {}} />
 {/snippet}
 
-<!-- Segmented controls: the app fills the selected half with the primary Button and leaves the
-     others as bare text on the group's own surface. -->
 {#snippet unselectedTab(label: string)}
   <span class="flex-1 py-2 px-4 text-center text-sm font-medium text-ink-muted">{label}</span>
 {/snippet}
