@@ -241,17 +241,18 @@ do, from Authorized apps in their profile, and it cuts live tokens with it.
 ### What each scope asks of the member
 
 `profile:read` is identity and only identity: the uid, VEKN ID, roles and
-capabilities above, from `/oauth/userinfo` and from nowhere else — a token
-holding it alone reaches no other endpoint on the site. This is what Login with
-Archon means, and it is a light thing to consent to.
+capabilities above. It admits your token to the `/oauth/*` endpoints and to no
+other part of the site — not the member's tournaments, not their decks, not
+their account — which is what makes Login with Archon a light thing for a member
+to approve.
 
 `user:impersonate` is heavy, and bounded so that it can be. Your app acts *as*
 the member on **one event**, named up front and shown on the consent screen: it
 may register players, run rounds and record results there, exactly as far as that
 member could in Archon itself. Every other event and every route outside that
 tournament is refused, and so is the infrastructure of owning an event — deleting
-it, changing its organizers, publishing it to VEKN, taking it offline — even
-inside it. The grant ends with the event: once it is Finished, neither a fresh
+it, changing its organizers, publishing it to VEKN, taking it offline, reopening
+it once finished — even inside it. The grant ends with the event: once it is Finished, neither a fresh
 authorization nor a refresh will work.
 
 `api:read` is the daemon scope and is refused in this flow. It delegates nobody's
