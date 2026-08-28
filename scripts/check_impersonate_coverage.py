@@ -33,11 +33,22 @@ _OFF_PREFIX = {
 _PREFIX = "/api/tournaments/{uid}"
 
 
+def _walk(router) -> list:
+    """Every route, including `include_in_schema=False` ones the OpenAPI document
+    omits — the middleware admits a route whether or not it is published."""
+    routes = []
+    for route in router.routes:
+        inner = getattr(route, "original_router", None)
+        routes.extend(_walk(inner) if inner is not None else [route])
+    return routes
+
+
 def reachable() -> set[tuple[str, str]]:
     found = set()
-    # The generated document, not `app.routes`: the paths a consumer is given.
-    for path, operations in site_app.openapi()["paths"].items():
-        for method in operations:
+    routes = _walk(site_app)
+    for route in routes:
+        path = getattr(route, "path", "")
+        for method in {m.lower() for m in getattr(route, "methods", ())}:
             if method not in {"get", "post", "put", "patch", "delete"}:
                 continue
             if (method, path) in _OFF_PREFIX:
@@ -46,8 +57,6 @@ def reachable() -> set[tuple[str, str]]:
             if not path.startswith(_PREFIX):
                 continue
             tail = path[len(_PREFIX) :].strip("/")
-            # DELETE on the tournament itself is barred; so is each sub-route named
-            # in the frozenset, whatever the method.
             if not tail:
                 if method != "delete":
                     found.add((method, path))
@@ -55,6 +64,10 @@ def reachable() -> set[tuple[str, str]]:
             if tail.split("/")[0] in _OAUTH_BARRED_SUBPATHS:
                 continue
             found.add((method, path))
+    # FastAPI's lazy router wrappers are an internal shape; if a version change
+    # breaks the walk, fail here rather than pass on an empty set.
+    if not found:
+        raise SystemExit(f"route walk found nothing in {len(routes)} routes")
     return found
 
 
