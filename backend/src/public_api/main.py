@@ -80,9 +80,6 @@ Keep the verifier for the exchange below.
 For `event:run`, add `&tournament=<tournament uid>`; if you don't, the token you'll get will **only** give you access
 to the `/oauth/userinfo` endpoint, not to all the event endpoints.
 
-Send them to `/consent`, not to `/oauth/authorize` underneath it — that one is
-first-party and answers your app 403.
-
 `state` comes back untouched — check it.
 
 **They land back on your callback** (in browser)
@@ -141,10 +138,7 @@ The answer is `200` whatever you send, so it is no hint for which tokens exist.
 PUBLIC_API_TAG = (
     r"""
 Read-only, on `{api}`. Nothing here changes anything, and there is no anonymous
-read: every request needs `Authorization: Bearer <token>`.
-
-Members are published by **VEKN ID, never by name**. No name, contact, city or
-avatar is served here, and sanctions are never served. Card data belongs to
+read: every request needs `Authorization: Bearer <token>`. Card data belongs to
 [krcg](https://v4.api.krcg.org/docs), not to us.
 
 A single object comes back as JSON. A collection comes back as **JSON Lines**:

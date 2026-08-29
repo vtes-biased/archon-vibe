@@ -221,15 +221,16 @@ with a backslash and a normal string splices those away.
 **All three grants are documented, not just the daemon one.** The introduction is
 a chooser and two token errands — the app token for the Public API, Login with
 Archon for a member's — with a runnable example per step, because the audience for
-the flow is a third party who has no other source for it. It is deliberately
-spare: the owner cut it back once for reading like generated prose, so what
-survives is the flow and the traps, not the commentary. Two traps a reader would
-otherwise meet at runtime stay: that `/consent` is the page to send a member to
-and `/oauth/authorize` beneath it answers a third party 403, and that replaying a
-rotated refresh token kills the whole lineage. The privacy contract — VEKN ID
-never a name, no sanctions — and the no-anonymous-read rule sit in the Public API
-section, which is what they govern
-([access](access.md#oauth2-provider)).
+the flow is a third party who has no other source for it.
+
+**The reference carries the flow and its runtime traps; policy stays here.** It is
+deliberately spare — it was cut back once for reading like generated prose — and
+what a reader cannot discover by making the call earns its place: that the client
+secret is wanted *alongside* the PKCE verifier, that replaying a rotated refresh
+token kills the lineage. What the API will and will not publish, and which routes
+are first-party, are decisions about Archon rather than instructions to a
+consumer: they live on this page and on [access](access.md#oauth2-provider), and
+putting them in the reference too only gives them a second place to go stale.
 
 A recipe section closes the page, for the deck-archive and statistics apps this
 API exists for: `/v1/decks` and `/v1/export`, and the publication contract they
