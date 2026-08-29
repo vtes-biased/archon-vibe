@@ -1,6 +1,9 @@
 """Real rows from the live corpus, projected through `access_levels` at the
 moment they were captured, so a reader sees actual values rather than a shape
-full of nulls. The league is constructed: there is none to capture yet."""
+full of nulls. The league and the Member API block are constructed — there is no
+league to capture yet, and a live event mid-round is not a row anyone holds."""
+
+import json
 
 TOURNAMENT = {
     "uid": "019fea18-1364-7549-8f9a-70dcc09a03d9",
@@ -450,3 +453,429 @@ LEAGUE = {
     "parent_uid": None,
     "open_to_country_princes": True,
 }
+
+
+# Member API: the app's own documents, not the projection above.
+# `test_public_api.py` decodes them back into their models, so a model change that
+# outdates one fails there.
+
+MEMBER_TOURNAMENT = {
+    "uid": "019ff0c2-51e8-7a6d-b58c-4e9a2f7d1c03",
+    "modified": "2026-05-02T14:31:07.481Z",
+    "deleted_at": None,
+    "name": "Rome Monthly",
+    "format": "Standard",
+    "rank": "",
+    "online": False,
+    "start": "2026-05-02T10:00:00",
+    "finish": None,
+    "timezone": "Europe/Rome",
+    "country": "IT",
+    "league_uid": None,
+    "state": "Playing",
+    "organizers_uids": ["019f6a5e-a1b7-7c40-b0e2-63dd51ba7a10"],
+    "venue": "Ludoteca Trastevere",
+    "venue_url": "",
+    "address": "Via della Lungaretta 12, Roma",
+    "map_url": "",
+    "proxies": False,
+    "multideck": False,
+    "decklist_required": False,
+    "description": "",
+    "standings_mode": "Private",
+    "decklists_mode": "Winner",
+    "max_rounds": 3,
+    "max_players": 0,
+    "open_rounds": False,
+    "self_organized_rounds": False,
+    "table_rooms": [],
+    "round_time": 120,
+    "finals_time": 150,
+    "banner_path": None,
+    "external_ids": {},
+    "event_code": "RM-2605",
+    "checkin_code": "Qk9tYVJvbWFNb250aGx5",
+    "players": [
+        {
+            "user_uid": "019f6a5e-dc94-77b5-814d-20920477f87d",
+            "state": "Playing",
+            "payment_status": "Pending",
+            "toss": 0,
+            "result": {"gw": 1, "vp": 3.0, "tp": 42},
+            "finalist": False,
+            "display_name": None,
+            "non_competing": False,
+            "missing_decklist": False,
+            "waitlisted": False,
+        },
+        {
+            "user_uid": "019f6a5e-d5dd-74b9-9aab-00919d4de7dc",
+            "state": "Playing",
+            "payment_status": "Pending",
+            "toss": 0,
+            "result": {"gw": 0, "vp": 1.0, "tp": 30},
+            "finalist": False,
+            "display_name": None,
+            "non_competing": False,
+            "missing_decklist": False,
+            "waitlisted": False,
+        },
+        {
+            "user_uid": "019f6a5e-b052-7550-8422-1cc8e42309b2",
+            "state": "Playing",
+            "payment_status": "Pending",
+            "toss": 0,
+            "result": {"gw": 0, "vp": 1.0, "tp": 24},
+            "finalist": False,
+            "display_name": None,
+            "non_competing": False,
+            "missing_decklist": False,
+            "waitlisted": False,
+        },
+        {
+            "user_uid": "019f6a5e-f546-7049-8f16-2d81aa97eac3",
+            "state": "Playing",
+            "payment_status": "Pending",
+            "toss": 0,
+            "result": {"gw": 0, "vp": 0.0, "tp": 12},
+            "finalist": False,
+            "display_name": None,
+            "non_competing": False,
+            "missing_decklist": False,
+            "waitlisted": False,
+        },
+        {
+            "user_uid": "019f6a5e-e0e8-7702-a583-c1a6f6a005fe",
+            "state": "Playing",
+            "payment_status": "Pending",
+            "toss": 0,
+            "result": {"gw": 0, "vp": 0.0, "tp": 0},
+            "finalist": False,
+            "display_name": None,
+            "non_competing": False,
+            "missing_decklist": False,
+            "waitlisted": False,
+        },
+    ],
+    "rounds": [
+        [
+            {
+                "seating": [
+                    {
+                        "player_uid": "019f6a5e-dc94-77b5-814d-20920477f87d",
+                        "result": {"gw": 1, "vp": 3.0, "tp": 42},
+                        "judge_uid": "",
+                    },
+                    {
+                        "player_uid": "019f6a5e-d5dd-74b9-9aab-00919d4de7dc",
+                        "result": {"gw": 0, "vp": 1.0, "tp": 30},
+                        "judge_uid": "",
+                    },
+                    {
+                        "player_uid": "019f6a5e-b052-7550-8422-1cc8e42309b2",
+                        "result": {"gw": 0, "vp": 1.0, "tp": 24},
+                        "judge_uid": "",
+                    },
+                    {
+                        "player_uid": "019f6a5e-f546-7049-8f16-2d81aa97eac3",
+                        "result": {"gw": 0, "vp": 0.0, "tp": 12},
+                        "judge_uid": "",
+                    },
+                    {
+                        "player_uid": "019f6a5e-e0e8-7702-a583-c1a6f6a005fe",
+                        "result": {"gw": 0, "vp": 0.0, "tp": 0},
+                        "judge_uid": "",
+                    },
+                ],
+                "state": "Finished",
+                "override": None,
+                "organized_by": None,
+            }
+        ]
+    ],
+    "finals": None,
+    "winner": "",
+    "standings": [],
+    "reported_player_count": 0,
+    "raffles": [],
+    "promos_distributed": [],
+    "promo_stock_source_uid": "",
+    "vekn_pushed_at": None,
+    "vekn_results_stale": False,
+    "twda_status": None,
+    "offline_mode": False,
+    "offline_device_id": "",
+    "offline_user_uid": "",
+    "offline_since": None,
+    "timer": {
+        "started_at": "2026-05-02T14:20:00Z",
+        "elapsed_before_pause": 0.0,
+        "paused": False,
+    },
+    "table_extra_time": {},
+    "announcements": [
+        {
+            "id": "019ff0c3-0a11-7e42-9d6b-8f2c4a1b73ee",
+            "body": "Round 2 seating is up — tables in the back room.",
+            "created_at": "2026-05-02T14:31:00Z",
+            "author_uid": "019f6a5e-a1b7-7c40-b0e2-63dd51ba7a10",
+            "author_name": "Marco Rossi",
+        }
+    ],
+}
+
+ROUND_DECKS = {
+    "rounds": [
+        {
+            "round": 0,
+            "decks": [
+                {
+                    "uid": "019ff0c4-77aa-7b19-9e30-5c1d8e6f2a44",
+                    "modified": "2026-05-02T13:58:12.006Z",
+                    "deleted_at": None,
+                    "tournament_uid": "019ff0c2-51e8-7a6d-b58c-4e9a2f7d1c03",
+                    "user_uid": "019f6a5e-dc94-77b5-814d-20920477f87d",
+                    "round": 0,
+                    "name": "Nephandus Toolbox",
+                    "author": "Giulia Bianchi",
+                    "comments": "",
+                    "cards": {"100001": 4, "100638": 2, "101453": 10, "102079": 12},
+                    "attribution": None,
+                    "public": False,
+                }
+            ],
+        }
+    ]
+}
+
+SANCTION = {
+    "uid": "019ff0c5-1d3e-7f08-8a72-11b9c0d4e6f7",
+    "modified": "2026-05-02T14:22:03.114Z",
+    "deleted_at": None,
+    "user_uid": "019f6a5e-f546-7049-8f16-2d81aa97eac3",
+    "issued_by_uid": "019f6a5e-a1b7-7c40-b0e2-63dd51ba7a10",
+    "tournament_uid": "019ff0c2-51e8-7a6d-b58c-4e9a2f7d1c03",
+    "level": "warning",
+    "category": "tournament_error",
+    "subcategory": "slow_play",
+    "round_number": 0,
+    "description": "Repeated slow play after a first caution.",
+    "issued_at": "2026-05-02T14:22:03.114Z",
+    "expires_at": None,
+    "lifted_at": None,
+    "lifted_by_uid": None,
+}
+
+STREAM_SANCTION = {
+    "uid": "019ff0c5-1d3e-7f08-8a72-11b9c0d4e6f7",
+    "modified": "2026-05-02T14:22:03.114Z",
+    "deleted_at": None,
+    "user_uid": "019f6a5e-f546-7049-8f16-2d81aa97eac3",
+    "issued_by_uid": "019f6a5e-a1b7-7c40-b0e2-63dd51ba7a10",
+    "tournament_uid": "019ff0c2-51e8-7a6d-b58c-4e9a2f7d1c03",
+    "level": "warning",
+    "category": "tournament_error",
+    "subcategory": "slow_play",
+    "round_number": 0,
+    "description": "Repeated slow play after a first caution.",
+    "issued_at": "2026-05-02T14:22:03.114Z",
+    "expires_at": None,
+    "lifted_at": None,
+    "lifted_by_uid": None,
+}
+
+STREAM_PARTICIPANT = {
+    "uid": "019f6a5e-dc94-77b5-814d-20920477f87d",
+    "modified": "2026-04-11T09:02:44.318Z",
+    "deleted_at": None,
+    "name": "Giulia Bianchi",
+    "country": "IT",
+    "vekn_id": "1002346",
+    "city": None,
+    "city_geoname_id": None,
+    "state": None,
+    "nickname": None,
+    "roles": [],
+    "avatar_path": None,
+    "discord_id": None,
+    "deceased_at": None,
+    "vekn_prefix": None,
+    "constructed_online": None,
+    "constructed_offline": None,
+    "limited_online": None,
+    "limited_offline": None,
+    "wins": [],
+}
+
+USERINFO = {
+    "sub": "019f6a5e-a1b7-7c40-b0e2-63dd51ba7a10",
+    "roles": ["Prince", "Judge"],
+    "vekn_id": "1002345",
+    "capabilities": ["sponsor_member", "create_tournament"],
+}
+
+SANCTION_REFERENCE = {
+    "categories": [
+        {
+            "key": "procedural_error",
+            "label": "Procedural Error",
+            "subcategories": [
+                {
+                    "key": "missed_mandatory_effect",
+                    "label": "Missed Mandatory Effect",
+                    "baseline": "caution",
+                },
+                {
+                    "key": "card_access_error",
+                    "label": "Card Access Error",
+                    "baseline": "caution",
+                },
+                {
+                    "key": "game_rule_violation",
+                    "label": "Game Rule Violation",
+                    "baseline": "caution",
+                },
+                {
+                    "key": "failure_to_maintain_game_state",
+                    "label": "Failure to Maintain Game State",
+                    "baseline": "standings_adjustment",
+                },
+            ],
+        },
+        {
+            "key": "tournament_error",
+            "label": "Tournament Error",
+            "subcategories": [
+                {
+                    "key": "illegal_decklist",
+                    "label": "Illegal Decklist",
+                    "baseline": "warning",
+                },
+                {
+                    "key": "illegal_main_deck_legal_decklist",
+                    "label": "Illegal Main Deck (Legal Decklist)",
+                    "baseline": "standings_adjustment",
+                },
+                {
+                    "key": "illegal_main_deck_no_decklist",
+                    "label": "Illegal Main Deck (No Decklist)",
+                    "baseline": "standings_adjustment",
+                },
+                {
+                    "key": "outside_assistance",
+                    "label": "Outside Assistance",
+                    "baseline": "standings_adjustment",
+                },
+                {"key": "slow_play", "label": "Slow Play", "baseline": "caution"},
+                {
+                    "key": "limited_procedure_violation",
+                    "label": "Limited Procedure Violation",
+                    "baseline": "caution",
+                },
+                {
+                    "key": "public_info_miscommunication",
+                    "label": "Public Info Miscommunication",
+                    "baseline": "warning",
+                },
+                {
+                    "key": "obscuring_game_state",
+                    "label": "Obscuring Game State",
+                    "baseline": "caution",
+                },
+                {"key": "marked_cards", "label": "Marked Cards", "baseline": "warning"},
+                {
+                    "key": "insufficient_shuffling",
+                    "label": "Insufficient Shuffling",
+                    "baseline": "warning",
+                },
+            ],
+        },
+        {
+            "key": "unsportsmanlike_conduct",
+            "label": "Unsportsmanlike Conduct",
+            "subcategories": [
+                {"key": "minor", "label": "Minor", "baseline": "warning"},
+                {"key": "major", "label": "Major", "baseline": "standings_adjustment"},
+                {
+                    "key": "aggressive_behaviour",
+                    "label": "Aggressive Behaviour",
+                    "baseline": "disqualification",
+                },
+                {
+                    "key": "bribery_and_wagering",
+                    "label": "Bribery and Wagering",
+                    "baseline": "disqualification",
+                },
+                {
+                    "key": "theft_of_tournament_material",
+                    "label": "Theft of Tournament Material",
+                    "baseline": "disqualification",
+                },
+                {
+                    "key": "stalling",
+                    "label": "Stalling",
+                    "baseline": "disqualification",
+                },
+                {
+                    "key": "cheating",
+                    "label": "Cheating",
+                    "baseline": "disqualification",
+                },
+                {"key": "fraud", "label": "Fraud", "baseline": "disqualification"},
+                {
+                    "key": "collusion",
+                    "label": "Collusion",
+                    "baseline": "disqualification",
+                },
+                {
+                    "key": "health_and_safety_disruption",
+                    "label": "Health and Safety Disruption",
+                    "baseline": "warning",
+                },
+                {
+                    "key": "rage_quitting",
+                    "label": "Rage Quitting",
+                    "baseline": "disqualification",
+                },
+                {
+                    "key": "failure_to_play_to_win",
+                    "label": "Failure to Play to Win",
+                    "baseline": "warning",
+                },
+            ],
+        },
+    ],
+    "levels": [
+        {"key": "caution", "label": "Caution"},
+        {"key": "warning", "label": "Warning"},
+        {"key": "standings_adjustment", "label": "Standings Adjustment"},
+        {"key": "disqualification", "label": "Disqualification"},
+    ],
+    "escalation": [
+        "caution",
+        "caution",
+        "warning",
+        "warning",
+        "standings_adjustment",
+        "standings_adjustment",
+        "disqualification",
+    ],
+}
+
+
+def _frame(obj_type: str, payload, **extra) -> str:
+    body = json.dumps(payload, separators=(",", ":"))
+    tail = "".join(f',"{k}":"{v}"' for k, v in extra.items())
+    return f'data: {{"type":"{obj_type}","data":{body}{tail}}}\n\n'
+
+
+# Catch-up in full, then the frames a running event pushes. `ts` rides the live
+# ones only: it is the cursor a reconnecting client would resume from.
+STREAM = (
+    ": connected\n\n"
+    + _frame("tournament", MEMBER_TOURNAMENT)
+    + _frame("sanctions", [STREAM_SANCTION])
+    + _frame("user", STREAM_PARTICIPANT)
+    + 'data: {"type":"sync_complete","timestamp":"2026-05-02T14:31:07.481Z"}\n\n'
+    + _frame("tournament", MEMBER_TOURNAMENT, ts="2026-05-02T14:33:19.702Z")
+)

@@ -9,6 +9,14 @@ from fastapi.openapi.utils import get_openapi
 from scalar_fastapi import get_scalar_api_reference
 
 from .db import close_pool, open_pool
+from .examples import (
+    MEMBER_TOURNAMENT,
+    ROUND_DECKS,
+    SANCTION,
+    SANCTION_REFERENCE,
+    STREAM,
+    USERINFO,
+)
 from .schemas import COMPONENTS
 from .v1 import router
 
@@ -257,9 +265,11 @@ neither `CheckIn` nor `StartRound` is accepted before it.
 array — first table of the first round is `{"round":0,"table":0}`. The finals are
 the index one past the last preliminary round.
 
-**The command set is the engine's, and moves with it.** The types above are the
-spine of every event; the rest — seating, tosses, overrides, raffles, archival
-results — is not frozen here as a contract.
+**Every type is listed with its own fields** under the endpoint's request body —
+pick one and you get exactly what it takes, not the union of everything. Four of
+the engine's are missing on purpose: `ReopenTournament` is barred for a
+third-party token, `ReportPromos` needs a field this endpoint cannot carry, and
+`UploadDeck` and `UpdateDeck` are spellings of `UpsertDeck`.
 """.strip()
     .replace("{site}", SITE_URL)
     .replace("{api}", API_URL)
@@ -285,7 +295,8 @@ _EVENT_RUN_ROUTES: list[tuple[str, str, str, str, str, str]] = [
         "200",
         "The updated tournament.",
         "Every state change of a tournament — registration, check-in, rounds, scores,"
-        " finals — is one `type` sent here. See the section intro for the sequence.",
+        " finals — is one `type` sent here, and each type is its own model below."
+        " Answers with the whole updated tournament, so the write is also the read.",
     ),
     (
         "post",
@@ -431,64 +442,278 @@ _STR = {"type": "string"}
 _INT = {"type": "integer"}
 _BOOL = {"type": "boolean"}
 
+# Fields the action variants draw on, described once each. `_ACTIONS` below says
+# which type takes which; nothing outside this table can be sent, because
+# `TournamentActionRequest` in the app carries no other field.
+_ACTION_FIELDS: dict[str, dict] = {
+    "user_uid": {
+        **_STR,
+        "description": "The member, as `/oauth/userinfo` reports `sub`.",
+    },
+    "player_uid": {
+        **_STR,
+        "description": "The player — the same member uid: a roster seat carries no id of its own.",
+    },
+    "display_name": {
+        **_STR,
+        "maxLength": 32,
+        "description": "Shown instead of the member's name. Display only; identity stays the account's.",
+    },
+    "round": {
+        **_INT,
+        "description": "Zero-based index into `rounds`. The finals are the index one past the last.",
+    },
+    "table": {**_INT, "description": "Zero-based index within the round."},
+    "table1": {**_INT, "description": "Zero-based, as `table`."},
+    "seat1": {**_INT, "description": "Zero-based seat at `table1`."},
+    "table2": {**_INT, "description": "Zero-based, as `table`."},
+    "seat2": {**_INT, "description": "Zero-based seat at `table2`."},
+    "seat": {**_INT, "description": "Zero-based seat at the table."},
+    "scores": {
+        "type": "array",
+        "description": "One entry per seat at the table.",
+        "items": {
+            "type": "object",
+            "required": ["player_uid", "vp"],
+            "properties": {"player_uid": _STR, "vp": {"type": "number"}},
+        },
+    },
+    "comment": {
+        **_STR,
+        "description": "Why the table was closed by hand. Not optional: an empty one is refused.",
+    },
+    "toss": {**_INT, "description": "Finals seeding draw. 0 is no draw."},
+    "status": {
+        **_STR,
+        "enum": ["Pending", "Paid", "Refunded", "Cancelled"],
+    },
+    "non_competing": {
+        **_BOOL,
+        "description": "A proxy stand-in: excluded from rank, RTP and finals.",
+    },
+    "waitlisted": _BOOL,
+    "seating": {
+        "type": "array",
+        "description": "Player uids, one inner array per table, in seat order.",
+        "items": {"type": "array", "items": _STR},
+    },
+    "player_uids": {
+        "type": "array",
+        "items": _STR,
+        "description": "The pod that chose to sit together.",
+    },
+    "config": {
+        "type": "object",
+        "description": "Only the settings you send; the rest stand.",
+    },
+    "deck": {
+        "type": "object",
+        "description": "The decklist, as `/v1/decks` publishes one.",
+    },
+    "multideck": {
+        **_BOOL,
+        "description": "Address the round's deck rather than the event's single one.",
+    },
+    "label": {**_STR, "description": "What the draw is for, shown with its winners."},
+    "pool": {**_STR, "description": "Who is eligible — the raffle's own pool key."},
+    "exclude_drawn": {
+        **_BOOL,
+        "default": True,
+        "description": "Skip anyone a previous draw already picked.",
+    },
+    "count": {**_INT, "description": "How many to draw."},
+    "seed": {
+        **_INT,
+        "description": "Drives the draw. The same seed redraws the same winners.",
+    },
+    "winner": {**_STR, "description": "Member uid. Empty clears the recorded winner."},
+    "players": {
+        "type": "array",
+        "items": _STR,
+        "description": "The roster that is known.",
+    },
+    "reported_player_count": {
+        **_INT,
+        "description": "What the record claims played, which may exceed the named roster.",
+    },
+}
+
+# The engine's vocabulary (`engine/src/tournament/parsing.rs`), narrowed to the
+# fields the app's request model carries. Required follows the engine: one model
+# serves every type, so on the model itself every field is optional.
+_ACTIONS: dict[str, tuple[str, tuple[str, ...], tuple[str, ...]]] = {
+    "OpenRegistration": ("Take a `Planned` event to `Registration`.", (), ()),
+    "CloseRegistration": (
+        "`Registration` to `Waiting`. This is what opens check-in — neither `CheckIn`"
+        " nor `StartRound` is accepted before it.",
+        (),
+        (),
+    ),
+    "ReopenRegistration": ("Back to `Registration` from `Waiting`.", (), ()),
+    "CancelRegistration": ("Back to `Planned`, roster and all.", (), ()),
+    "Register": (
+        "Put a member on the roster. Their account must carry a VEKN ID — the server"
+        " reads it from the account, never from you, and refuses one without.",
+        ("user_uid",),
+        ("display_name",),
+    ),
+    "Unregister": (
+        "Leave the roster. Self-service: only the member who granted you the token.",
+        ("user_uid",),
+        (),
+    ),
+    "AddPlayer": (
+        "Register someone as the organizer, in any state up to `Finished`, checking"
+        " them in when the event is already `Waiting`. Same VEKN ID rule as `Register`.",
+        ("user_uid",),
+        ("display_name",),
+    ),
+    "RemovePlayer": ("Take a player off the roster.", ("user_uid",), ()),
+    "DropOut": ("Withdraw a player from an event under way.", ("player_uid",), ()),
+    "CheckIn": ("Arm a player for the next round.", ("player_uid",), ("display_name",)),
+    "CheckOut": ("Undo a check-in.", ("player_uid",), ()),
+    "CheckInAll": ("Check in everyone on the roster.", (), ()),
+    "ResetCheckIn": ("Return every checked-in player to `Registered`.", (), ()),
+    "SetPaymentStatus": ("", ("player_uid", "status"), ()),
+    "MarkAllPaid": ("Move every `Pending` player to `Paid`.", (), ()),
+    "SetNonCompeting": ("", ("player_uid", "non_competing"), ()),
+    "SetWaitlisted": (
+        "Promote off the waitlist, or demote onto it.",
+        ("player_uid", "waitlisted"),
+        (),
+    ),
+    "StartRound": (
+        "Seat the checked-in players and start playing. Omit `seating` and the engine"
+        " seats the round itself.",
+        (),
+        ("seating",),
+    ),
+    "FinishRound": (
+        "Close the round. Every table needs a score or an override first. Omit"
+        " `round` for the current one.",
+        (),
+        ("round",),
+    ),
+    "CancelRound": (
+        "Throw a round away. Omit `round` for the current one.",
+        (),
+        ("round",),
+    ),
+    "RestoreRound": (
+        "Put a cancelled round back. Preliminary rounds only.",
+        (),
+        ("round",),
+    ),
+    "SelfOrganizeRound": (
+        "Seat one pod from the players who chose it. Needs the event configured for"
+        " self-organized rounds, and is the one action a player may take unaided.",
+        ("player_uids",),
+        (),
+    ),
+    "SwapSeats": (
+        "Exchange two seats.",
+        ("round", "table1", "seat1", "table2", "seat2"),
+        (),
+    ),
+    "SeatPlayer": (
+        "Put a player in a seat. Omit `round` for the current one.",
+        ("player_uid", "table", "seat"),
+        ("round",),
+    ),
+    "UnseatPlayer": ("Take a player out of their seat.", ("player_uid",), ("round",)),
+    "AddTable": ("Add an empty table to the round.", (), ()),
+    "RemoveTable": ("Remove a table.", ("table",), ()),
+    "SetScore": ("Record a table's victory points.", ("round", "table", "scores"), ()),
+    "Override": (
+        "Close a table on a judge's ruling, against the engine's own reading of the"
+        " scores.",
+        ("round", "table", "comment"),
+        (),
+    ),
+    "Unoverride": ("Lift an override.", ("round", "table"), ()),
+    "SetToss": ("Record one player's finals seeding draw.", ("player_uid", "toss"), ()),
+    "RandomToss": (
+        "Draw for every tied finalist at once. Needs two played rounds.",
+        (),
+        (),
+    ),
+    "StartFinals": ("Seat the finals.", (), ()),
+    "FinishFinals": ("Close the finals.", (), ()),
+    "CancelFinals": ("Throw the finals away.", (), ()),
+    "FinishTournament": (
+        "Close the event. Standings are final and ratings move.",
+        (),
+        (),
+    ),
+    "AlterSeating": ("Replace a round's seating wholesale.", ("round", "seating"), ()),
+    "UpsertDeck": (
+        "Attach a decklist to a player.",
+        ("player_uid", "deck"),
+        ("multideck",),
+    ),
+    "DeleteDeck": (
+        "Drop a player's decklist. It cannot single out one list of a multideck set:"
+        " the engine takes an index this endpoint has no field for.",
+        ("player_uid",),
+        ("multideck",),
+    ),
+    "RaffleDraw": (
+        "Draw prize winners from a pool.",
+        ("label", "pool", "count", "seed"),
+        ("exclude_drawn",),
+    ),
+    "RaffleUndo": ("Undo the last draw.", (), ()),
+    "RaffleClear": ("Clear every draw.", (), ()),
+    "UpdateConfig": ("Change the event's settings.", ("config",), ()),
+    "SetArchivalResults": (
+        "Record the result of an event Archon holds no play data for. IC only.",
+        ("winner", "players", "reported_player_count"),
+        (),
+    ),
+}
+
+# Engine actions this endpoint does not document, and why. `just event-run-coverage`
+# reads it: an action the engine grows lands in `_ACTIONS` or here, never nowhere.
+_UNDOCUMENTED_ACTIONS: dict[str, str] = {
+    "UploadDeck": "spelling of UpsertDeck",
+    "UpdateDeck": "spelling of UpsertDeck",
+    "ReopenTournament": "refused for a third-party token",
+    "ReportPromos": "needs `promos`, which the request model does not carry",
+}
+
+
+def _action_schemas() -> dict[str, dict]:
+    """One schema per action, plus the discriminated union of them all. The union
+    is what the endpoint takes; the variants are what a reader picks from."""
+    schemas: dict[str, dict] = {}
+    for name, (summary, required, optional) in _ACTIONS.items():
+        properties = {"type": {**_STR, "const": name}}
+        for field in (*required, *optional):
+            properties[field] = _ACTION_FIELDS[field]
+        schema = {
+            "title": name,
+            "type": "object",
+            "required": ["type", *required],
+            "properties": properties,
+        }
+        if summary:
+            schema["description"] = summary
+        schemas[f"Action{name}"] = schema
+    ref = "#/components/schemas/Action{name}"
+    schemas["TournamentActionRequest"] = {
+        "description": "One tournament event. `type` picks it, and picks its fields with it.",
+        "oneOf": [{"$ref": ref.format(name=name)} for name in _ACTIONS],
+        "discriminator": {
+            "propertyName": "type",
+            "mapping": {name: ref.format(name=name) for name in _ACTIONS},
+        },
+    }
+    return schemas
+
+
 # Hand-written: the app's Pydantic models are on the far side of the isolation
 # line. `check_event_run_coverage.py` pairs each with the model it names.
 _EVENT_RUN_SCHEMAS: dict[str, dict] = {
-    "TournamentActionRequest": {
-        "type": "object",
-        "required": ["type"],
-        "description": (
-            "One tournament event. `type` selects it; every other field belongs to"
-            " some subset of the types and is omitted otherwise."
-        ),
-        "properties": {
-            "type": {**_STR, "description": "The event, e.g. `StartRound`."},
-            "user_uid": {**_STR, "description": "Register, AddPlayer, RemovePlayer."},
-            "player_uid": {**_STR, "description": "CheckIn and the seat actions."},
-            "display_name": {**_STR, "maxLength": 32, "description": "Display only."},
-            "round": {**_INT, "description": "Zero-based index into `rounds`."},
-            "table": {**_INT, "description": "Zero-based index within the round."},
-            "table1": _INT,
-            "seat1": _INT,
-            "table2": _INT,
-            "seat2": _INT,
-            "seat": _INT,
-            "scores": {
-                "type": "array",
-                "description": "SetScore: one entry per seat at the table.",
-                "items": {
-                    "type": "object",
-                    "properties": {"player_uid": _STR, "vp": {"type": "number"}},
-                },
-            },
-            "comment": {**_STR, "description": "Override."},
-            "toss": {**_INT, "description": "SetToss."},
-            "status": {**_STR, "description": "SetPaymentStatus."},
-            "non_competing": _BOOL,
-            "waitlisted": _BOOL,
-            "seating": {
-                "type": "array",
-                "description": "AlterSeating: player uids, one array per table.",
-                "items": {"type": "array", "items": _STR},
-            },
-            "player_uids": {
-                "type": "array",
-                "items": _STR,
-                "description": "SelfOrganizeRound: the chosen pod.",
-            },
-            "config": {"type": "object", "description": "UpdateConfig: partial."},
-            "deck": {"type": "object", "description": "UpsertDeck."},
-            "multideck": _BOOL,
-            "label": _STR,
-            "pool": _STR,
-            "exclude_drawn": _BOOL,
-            "count": _INT,
-            "seed": _INT,
-            "winner": {**_STR, "description": "SetArchivalResults; empty clears."},
-            "players": {"type": "array", "items": _STR},
-            "reported_player_count": _INT,
-        },
-    },
     "AnnounceRequest": {
         "type": "object",
         "required": ["body"],
@@ -546,10 +771,31 @@ _EVENT_RUN_SCHEMAS: dict[str, dict] = {
     },
 }
 
+
 # Endpoints that answer with something other than JSON.
 _RESPONSE_MEDIA: dict[tuple[str, str], str] = {
     ("get", "/stream"): "text/event-stream",
     ("get", f"{_EVENT}/banner"): "image/*",
+}
+
+# What each answer actually looks like. The tournament document is one object
+# reused, because eight of these endpoints answer with exactly it.
+_RESPONSE_EXAMPLES: dict[tuple[str, str], object] = {
+    ("post", f"{_EVENT}/action"): MEMBER_TOURNAMENT,
+    ("post", f"{_EVENT}/announce"): MEMBER_TOURNAMENT,
+    ("delete", f"{_EVENT}/announce/{{announcement_id}}"): MEMBER_TOURNAMENT,
+    ("post", f"{_EVENT}/bulk-register"): MEMBER_TOURNAMENT,
+    ("post", f"{_EVENT}/timer/start"): MEMBER_TOURNAMENT,
+    ("post", f"{_EVENT}/timer/pause"): MEMBER_TOURNAMENT,
+    ("post", f"{_EVENT}/timer/add-time"): MEMBER_TOURNAMENT,
+    ("post", f"{_EVENT}/timer/reset"): MEMBER_TOURNAMENT,
+    ("get", f"{_EVENT}/decks"): ROUND_DECKS,
+    ("post", f"{_EVENT}/banner"): {"success": True},
+    ("delete", f"{_EVENT}/banner"): {"success": True},
+    ("get", "/stream"): STREAM,
+    ("post", "/sanctions/"): SANCTION,
+    ("get", "/oauth/userinfo"): USERINFO,
+    ("get", "/sanctions/reference"): SANCTION_REFERENCE,
 }
 
 # Which body each endpoint takes. Endpoints absent from this map take none.
@@ -577,13 +823,15 @@ def _event_run_paths() -> dict:
         # response shapes stay out of this document, so the schema is left open.
         if code != "204":
             media = _RESPONSE_MEDIA.get((method, path), "application/json")
-            operation["responses"][code]["content"] = {
-                media: {
-                    "schema": {
-                        "type": "string" if media != "application/json" else "object"
-                    }
+            body = {
+                "schema": {
+                    "type": "string" if media != "application/json" else "object"
                 }
             }
+            example = _RESPONSE_EXAMPLES.get((method, path))
+            if example is not None:
+                body["example"] = example
+            operation["responses"][code]["content"] = {media: body}
         schema = _EVENT_RUN_BODIES.get(path)
         if schema and method == "post":
             operation["requestBody"] = {
@@ -667,7 +915,9 @@ def _openapi() -> dict:
             routes=app.routes,
         )
         components = schema.setdefault("components", {})
-        components.setdefault("schemas", {}).update(COMPONENTS | _EVENT_RUN_SCHEMAS)
+        components.setdefault("schemas", {}).update(
+            COMPONENTS | _EVENT_RUN_SCHEMAS | _action_schemas()
+        )
         components["securitySchemes"] = {
             "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
         }

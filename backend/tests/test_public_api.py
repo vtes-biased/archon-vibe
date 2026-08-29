@@ -24,10 +24,12 @@ from src.models import (
     OAuthScope,
     ObjectType,
     Player,
+    Sanction,
     Tournament,
     User,
 )
 from src.public_api import db as public_db
+from src.public_api.examples import MEMBER_TOURNAMENT, ROUND_DECKS, SANCTION
 from src.public_api.main import app
 from src.public_api.schemas import COMPONENTS
 from src.routes.oauth import ph
@@ -149,6 +151,24 @@ class TestDocumentedSchemaMatchesProjection:
         _, sample = _SAMPLES[ObjectType.TOURNAMENT]
         projected = compute_api(ObjectType.TOURNAMENT, sample)
         assert set(projected["players"][0]) == set(COMPONENTS["Player"]["properties"])
+
+
+class TestPublishedExamples:
+    """The Member API examples are the app's own documents, published from the
+    other side of the isolation line, so nothing else would catch a model change
+    that leaves one describing a shape the app no longer sends."""
+
+    @pytest.mark.parametrize(
+        "struct,payload",
+        [
+            (Tournament, MEMBER_TOURNAMENT),
+            (DeckObject, ROUND_DECKS["rounds"][0]["decks"][0]),
+            (Sanction, SANCTION),
+        ],
+        ids=["tournament", "deck", "sanction"],
+    )
+    def test_an_example_still_decodes_into_its_model(self, struct, payload):
+        msgspec.json.decode(msgspec.json.encode(payload), type=struct)
 
 
 class TestDaemonIdentity:

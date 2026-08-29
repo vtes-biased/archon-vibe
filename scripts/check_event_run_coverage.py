@@ -2,15 +2,17 @@
 """Fail the build when the public API's Member API section and the app's
 `event:run` allowlist disagree.
 
-The reference documents endpoints the API does not serve, so nothing about a
-route rename or a new tournament sub-route would otherwise reach it: the listing
-*is* the published boundary, and a boundary that lies is worse than none. The
-allowlist in `middleware/auth.py` is the authority; this asserts the docs match it
-exactly, in both directions.
+The reference documents endpoints and actions the API does not serve, so nothing
+about a route rename, a new tournament sub-route or an action the engine grows
+would otherwise reach it: the listing *is* the published boundary, and a boundary
+that lies is worse than none. Three authorities, each asserted in both directions:
+the allowlist in `middleware/auth.py` for routes, `TournamentEvent::from_json` for
+which actions exist, and the app's request models for which fields reach one.
 
 Run: just event-run-coverage
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -20,9 +22,14 @@ sys.path.insert(0, str(ROOT))
 from backend.src.main import app as site_app  # noqa: E402
 from backend.src.middleware.auth import _OAUTH_BARRED_SUBPATHS  # noqa: E402
 from backend.src.public_api.main import (  # noqa: E402
+    _ACTION_FIELDS,
+    _ACTIONS,
     _EVENT_RUN_ROUTES,
     _EVENT_RUN_SCHEMAS,
+    _UNDOCUMENTED_ACTIONS,
 )
+
+PARSING = ROOT / "engine" / "src" / "tournament" / "parsing.rs"
 
 # Reachable outside the granted tournament's own prefix, from `_oauth_allows`.
 # `/oauth/token` and `/oauth/revoke` stay prose: they are the token's own
@@ -95,13 +102,56 @@ def schema_drift() -> list[str]:
     return problems
 
 
+def engine_actions() -> set[str]:
+    """The event names `TournamentEvent::from_json` matches on. Its arms are the
+    only authority for what the action endpoint accepts."""
+    body = PARSING.read_text()
+    body = body[body.index("pub fn from_json") :]
+    names = {
+        name
+        for arm in re.findall(r'^\s*((?:"\w+"\s*\|\s*)*"\w+")\s*=>', body, re.M)
+        for name in re.findall(r'"(\w+)"', arm)
+    }
+    # A match-arm shape this regex misses would silently pass every check below.
+    if len(names) < 30:
+        raise SystemExit(f"parsing.rs walk found only {len(names)} action names")
+    return names
+
+
+def action_drift() -> list[str]:
+    """The action variants against their two authorities: the engine decides which
+    types exist, the request model decides which fields can reach one."""
+    from backend.src.routes.tournaments import TournamentActionRequest
+
+    problems = []
+    documented = set(_ACTIONS) | set(_UNDOCUMENTED_ACTIONS)
+    engine = engine_actions()
+    for name in sorted(engine - documented):
+        problems.append(f"{name}: an engine action, neither documented nor excused")
+    for name in sorted(documented - engine):
+        problems.append(f"{name}: documented, but the engine has no such action")
+
+    carried = set(TournamentActionRequest.model_fields) - {"type"}
+    for field in sorted(carried - set(_ACTION_FIELDS)):
+        problems.append(f"{field}: on the request model, described by no action")
+    for field in sorted(set(_ACTION_FIELDS) - carried):
+        problems.append(f"{field}: described, but the request model cannot carry it")
+
+    used = {
+        f for _, required, optional in _ACTIONS.values() for f in (*required, *optional)
+    }
+    for field in sorted(set(_ACTION_FIELDS) - used):
+        problems.append(f"{field}: described, but no action takes it")
+    return problems
+
+
 def main() -> int:
     documented = {(method, path) for method, path, *_ in _EVENT_RUN_ROUTES}
     expected = reachable()
 
     missing = expected - documented
     extra = documented - expected
-    drift = schema_drift()
+    drift = schema_drift() + action_drift()
     if not missing and not extra and not drift:
         return 0
 
@@ -113,10 +163,12 @@ def main() -> int:
     for method, path in sorted(extra):
         print(f"  documented but unreachable: {method.upper():7s} {path}")
     print(
-        "\nThe public API reference publishes this set as the boundary of a"
-        " `event:run`\ngrant. Add the route to `_EVENT_RUN_ROUTES` in"
-        " backend/src/public_api/main.py, or\nbar it in `_OAUTH_BARRED_SUBPATHS`"
-        " — deciding which is the point of this failure."
+        "\nThe public API reference publishes all of this as the boundary of an"
+        " `event:run`\ngrant. In backend/src/public_api/main.py: add the route to"
+        " `_EVENT_RUN_ROUTES` or\nbar it in `_OAUTH_BARRED_SUBPATHS`; add the action"
+        " to `_ACTIONS` or excuse it in\n`_UNDOCUMENTED_ACTIONS`; add the field to"
+        " `_ACTION_FIELDS` and to the actions that\ntake it. Deciding which is the"
+        " point of this failure."
     )
     return 1
 

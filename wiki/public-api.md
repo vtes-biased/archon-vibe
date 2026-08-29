@@ -260,11 +260,28 @@ both directions — a new tournament sub-route fails the build until the referen
 names it or the allowlist bars it. The same check pairs every documented request
 body with the app model it is named after and requires the same field set: those
 schemas are hand-copied, the isolation line forbidding the import that would
-generate them, so nothing but that pairing keeps them honest. The engine's full action vocabulary stays
-unpublished: the spine of an event is worked through as an example and the rest is
-declared to move with the engine, because publishing it would bind the engine's
-internal event set to third-party consumers as a contract
-([access](access.md#event-access-is-per-event)).
+generate them, so nothing but that pairing keeps them honest.
+
+**The action endpoint publishes every type it accepts, one schema each.** A
+discriminated union on `type` means a reader picks `SetScore` and sees the four
+fields `SetScore` takes, where the single model behind them all can only offer the
+union of everything. It is published against three authorities rather than one:
+`TournamentEvent::from_json` decides which types exist, the app's request model
+decides which fields can reach one, and the same lint asserts both — an action the
+engine grows lands in `_ACTIONS` or in `_UNDOCUMENTED_ACTIONS` with a reason, never
+nowhere. Four sit in that second list today: `ReopenTournament` is barred for a
+third-party token, `ReportPromos` wants a field the request model has no room for,
+and `UploadDeck` and `UpdateDeck` are spellings of `UpsertDeck`. Publishing the
+vocabulary does bind it — that is the point, and the lint is what makes the binding
+survive an engine change ([access](access.md#event-access-is-per-event)).
+
+**Every answer carries an example, and the examples are real documents.** They are
+constructed in `public_api/examples.py` and `test_public_api.py` decodes each back
+into the model it claims to be, so a model change that outdates one fails the
+build rather than publishing a shape the app never sends. The tournament document
+is one object reused across the eight endpoints that answer with it, and the
+stream's example is the frame sequence a connection actually receives, catch-up
+frames and live ones both.
 
 `test_public_api.py` holds both halves: a maximal object of each type is projected
 through `compute_api` and its key set must equal the documented properties, and
