@@ -128,7 +128,9 @@ server {
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header Host $http_host;
     proxy_http_version 1.1;
-    proxy_pass http://127.0.0.1:{{ r.backend_port }}/og/site;
+    # A named location refuses a proxy_pass URI, so the path is rewritten here.
+    rewrite ^ /og/site break;
+    proxy_pass http://127.0.0.1:{{ r.backend_port }};
   }
   location @og_stub {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
