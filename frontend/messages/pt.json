@@ -1088,6 +1088,7 @@
   "nda_upload_btn": "Enviar a digitalização assinada",
   "nda_uploaded_toast": "Digitalização do NDA assinado enviada",
   "nda_download_btn": "Baixar",
+  "nda_download_failed": "Não foi possível baixar sua cópia do NDA.",
   "nda_signed_row": "Assinado por {name} em {date}",
   "nda_uploaded_row": "Digitalização em papel enviada em {date}",
   "nda_sign_title": "NDA de playtest",

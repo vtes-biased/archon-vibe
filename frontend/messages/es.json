@@ -1088,6 +1088,7 @@
   "nda_upload_btn": "Subir el escaneo firmado",
   "nda_uploaded_toast": "Escaneo del NDA firmado subido",
   "nda_download_btn": "Descargar",
+  "nda_download_failed": "No se pudo descargar su copia del NDA.",
   "nda_signed_row": "Firmado por {name} el {date}",
   "nda_uploaded_row": "Escaneo en papel subido el {date}",
   "nda_sign_title": "NDA de playtest",

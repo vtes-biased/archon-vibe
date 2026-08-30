@@ -790,11 +790,14 @@ export async function uploadNdaScan(userUid: string, file: File): Promise<void> 
 /** Small PII evidence file: fetched with the auth header and handed over as a
  * Blob, unlike the query-token data export (see design.md, downloads). */
 export async function downloadNdaPdf(userUid: string, recordUid: string): Promise<void> {
-  if (!isOnline()) throw new Error(m.error_action_requires_online());
+  requireOnline();
   const response = await authorizedFetch(
     `${API_URL}/api/users/${userUid}/nda/${recordUid}/pdf`
   );
-  if (!response.ok) throw new ApiError('Download failed', response.status);
+  if (!response.ok) {
+    showToast({ type: 'error', message: m.nda_download_failed() });
+    throw new ApiError(m.nda_download_failed(), response.status);
+  }
   const blob = await response.blob();
   const ext = (response.headers.get('Content-Type') ?? 'application/pdf')
     .split('/')

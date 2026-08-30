@@ -1088,6 +1088,7 @@
   "nda_upload_btn": "Téléverser le scan signé",
   "nda_uploaded_toast": "Scan du NDA signé téléversé",
   "nda_download_btn": "Télécharger",
+  "nda_download_failed": "Impossible de télécharger votre copie du NDA.",
   "nda_signed_row": "Signé par {name} le {date}",
   "nda_uploaded_row": "Scan papier téléversé le {date}",
   "nda_sign_title": "NDA de playtest",

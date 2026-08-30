@@ -88,9 +88,7 @@
   const ndaPending = $derived(!!ndaStatus?.pending);
   const ndaRecords = $derived(ndaStatus?.records.filter((r) => r.status !== "pending") ?? []);
 
-  // One silent online check per visit: NDA records are never synced, so a
-  // pending signature and the member's own signed copies are only discoverable
-  // by asking the server.
+  // One silent online check per visit.
   $effect(() => {
     const u = auth.user;
     if (!u || ndaChecked || !navigator.onLine) return;

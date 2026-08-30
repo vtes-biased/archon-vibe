@@ -1088,6 +1088,7 @@
   "nda_upload_btn": "Carica la scansione firmata",
   "nda_uploaded_toast": "Scansione dell'NDA firmato caricata",
   "nda_download_btn": "Scarica",
+  "nda_download_failed": "Impossibile scaricare la tua copia del NDA.",
   "nda_signed_row": "Firmato da {name} il {date}",
   "nda_uploaded_row": "Scansione cartacea caricata il {date}",
   "nda_sign_title": "NDA di playtest",

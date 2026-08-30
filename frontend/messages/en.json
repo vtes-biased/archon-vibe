@@ -1088,6 +1088,7 @@
   "nda_upload_btn": "Upload signed scan",
   "nda_uploaded_toast": "Signed NDA scan uploaded",
   "nda_download_btn": "Download",
+  "nda_download_failed": "Could not download your NDA copy.",
   "nda_signed_row": "Signed by {name} on {date}",
   "nda_uploaded_row": "Paper scan uploaded on {date}",
   "nda_sign_title": "Playtest NDA",
