@@ -299,7 +299,10 @@ irreversible or externally visible actions gate behind a confirm step.
 its reason, never filtered out of the results: an empty dropdown reads as "no such
 member" and invites minting the duplicate only an IC can merge back. Holds for the
 add-player search and the create-and-register dedup review, and the reason wins
-over any other block on the same row — already registered, then suspended.
+over any other block on the same row — already registered, then suspended. Where
+the list is capped, addable rows rank ahead of blocked ones before the cap, and a
+"no match" branch tests for an addable match rather than an empty list: a blocked
+row must never displace one the organizer can act on, nor stand in for it.
 
 **List view state** — filters belong to the list, not the component instance, in
 three layers:

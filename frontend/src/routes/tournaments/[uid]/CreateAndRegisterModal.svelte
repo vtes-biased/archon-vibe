@@ -131,12 +131,13 @@
       if (createCandidates.length === 0) {
         const country = createCountry || tournament.country || '';
         const search = (c: string | undefined) => getFilteredUsers(c, undefined, createName.trim());
+        const addable = (u: UserListItem) => !registeredUids.has(u.uid);
         let matches = await search(country || undefined);
         // Offline there's no server-side email 409 behind this, so a
         // cross-country duplicate would go uncaught — and a visiting player is
         // exactly who an offline event collects; widen rather than miss them.
-        if (matches.length === 0 && offlineCreate && country) matches = await search(undefined);
-        matches = matches.slice(0, 8);
+        if (!matches.some(addable) && offlineCreate && country) matches = await search(undefined);
+        matches = [...matches.filter(addable), ...matches.filter(u => !addable(u))].slice(0, 8);
         if (matches.length > 0) {
           createCandidates = matches;
           candidateSuspended = await getRegistrationBarredUids();
@@ -274,10 +275,10 @@
         <div class="border border-line-strong rounded-lg divide-y divide-line max-h-56 overflow-y-auto">
           {#each createCandidates as u}
             {@const isRegistered = registeredUids.has(u.uid)}
-            {@const isSuspended = !isRegistered && candidateSuspended.has(u.uid)}
+            {@const isSuspended = candidateSuspended.has(u.uid)}
             <!-- Sponsoring a VEKN-less candidate needs the server, so offline the
                  pick would dead-end on a network failure — show it, don't offer it. -->
-            {@const needsServer = !isRegistered && offlineCreate && !u.vekn_id}
+            {@const needsServer = offlineCreate && !u.vekn_id}
             {@const blocked = isRegistered || isSuspended || needsServer}
             <button
               onclick={() => !blocked && chooseCandidate(u)}

@@ -48,8 +48,6 @@
     // the path to first paint.
     const barred = await getRegistrationBarredUids();
     if (seq !== searchSeq) return;
-    // Blocked rows are listed rather than filtered, so they must not push the
-    // addable match past SEARCH_LIMIT (db.ts sorts alphabetically within a tier).
     const addable = (u: UserListItem) => !registeredUids.has(u.uid) && !barred.has(u.uid);
     const ranked = [...results.filter(addable), ...results.filter(u => !addable(u))];
     searchTotal = ranked.length;
