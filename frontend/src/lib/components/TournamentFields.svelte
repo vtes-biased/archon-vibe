@@ -461,8 +461,6 @@
       <p class="text-xs text-ink-faint -mt-2 ml-8">{m.tfield_open_rounds_desc()}</p>
     {/if}
 
-    <!-- Round count (standard) / per-player cap (open rounds). The VEKN-push
-         build constrains a standard tournament to 2–4 (the count it reports). -->
     <div>
       <label class="block text-sm text-ink-muted mb-1" for={id("max-rounds")}>
         {values.open_rounds ? m.tfield_round_cap() : m.tfield_round_count()}
@@ -487,6 +485,7 @@
           <option value="5">5</option>
         {/if}
       </select>
+      <p class="text-xs text-ink-faint mt-1">{m.tfield_rounds_prelim_hint()}</p>
       {#if disabledFields.has("max_rounds")}
         <p class="text-xs text-ink-faint mt-1">{m.tfield_rounds_locked_hint()}</p>
       {/if}

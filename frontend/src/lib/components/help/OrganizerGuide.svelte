@@ -145,6 +145,7 @@
       <div>
         <span class="block text-sm text-ink-muted mb-1">{m.tfield_round_count()}</span>
         <select tabindex="-1" class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-hover border border-line-strong rounded-lg text-ink-strong"><option>2</option></select>
+        <p class="text-xs text-ink-faint mt-1">{m.tfield_rounds_prelim_hint()}</p>
       </div>
     </div>
   </div>
