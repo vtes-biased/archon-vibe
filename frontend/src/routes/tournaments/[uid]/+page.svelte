@@ -378,8 +378,8 @@ import TournamentModals from "./TournamentModals.svelte";
   let scoreSaving = $state<number | null>(null);
   let scoreSavingSeat = $state<string | null>(null);
 
-  async function setVp(roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) {
-    if (!tournament) return;
+  async function setVp(roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>, opts?: { silent?: boolean }): Promise<string | null> {
+    if (!tournament) return null;
     const scores = seating.map(s => ({
       player_uid: s.player_uid,
       vp: s.player_uid === playerUid ? vp : s.result.vp,
@@ -389,16 +389,19 @@ import TournamentModals from "./TournamentModals.svelte";
     try {
       tournament = await setTableScore(uid, roundIndex, tableIndex, scores);
       await loadPlayerNames();
+      return null;
     } catch (e) {
-      error = toUserMessage(e, m.tournament_error_save_scores());
+      const msg = toUserMessage(e, m.tournament_error_save_scores());
+      if (!opts?.silent) error = msg;
+      return msg;
     } finally {
       scoreSaving = null;
       scoreSavingSeat = null;
     }
   }
 
-  async function setFinalsVp(playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) {
-    if (!tournament) return;
+  async function setFinalsVp(playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>, opts?: { silent?: boolean }): Promise<string | null> {
+    if (!tournament) return null;
     const roundIndex = tournament.rounds!.length;
     const scores = seating.map(s => ({
       player_uid: s.player_uid,
@@ -409,8 +412,11 @@ import TournamentModals from "./TournamentModals.svelte";
     try {
       tournament = await setTableScore(uid, roundIndex, 0, scores);
       await loadPlayerNames();
+      return null;
     } catch (e) {
-      error = toUserMessage(e, m.tournament_error_save_finals());
+      const msg = toUserMessage(e, m.tournament_error_save_finals());
+      if (!opts?.silent) error = msg;
+      return msg;
     } finally {
       scoreSaving = null;
       scoreSavingSeat = null;
@@ -578,8 +584,8 @@ import TournamentModals from "./TournamentModals.svelte";
     } catch { return null; }
   }
 
-  async function dropPlayer(playerUid: string) {
-    await doAction("DropOut", { player_uid: playerUid });
+  async function dropPlayer(playerUid: string): Promise<string | null> {
+    return doAction("DropOut", { player_uid: playerUid }, { silent: true });
   }
 
   // QR self-check-in (?checkin=CODE): strip the code from the address bar and

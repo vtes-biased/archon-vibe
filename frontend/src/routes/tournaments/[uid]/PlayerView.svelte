@@ -56,9 +56,9 @@
     scoreSaving: number | null;
     scoreSavingSeat: string | null;
     doAction: (action: TournamentEventType, body?: any, opts?: { silent?: boolean }) => Promise<string | null>;
-    dropPlayer: (uid: string) => Promise<void>;
-    setVp: (roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;
-    setFinalsVp: (playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;
+    dropPlayer: (uid: string) => Promise<string | null>;
+    setVp: (roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>, opts?: { silent?: boolean }) => Promise<string | null>;
+    setFinalsVp: (playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>, opts?: { silent?: boolean }) => Promise<string | null>;
     tournamentSanctions: Sanction[];
     decksByUser?: Record<string, DeckObject[]>;
   } = $props();
@@ -135,6 +135,16 @@
       .map(p => ({ uid: p.user_uid as string, name: seatDisplayUtil(p.user_uid as string, playerInfo, tournament.online) }))
       .sort((a, b) => a.name.localeCompare(b.name)),
   );
+
+  // The page's banner sits above the whole console; from down here it is scrolled
+  // out of view, so every player action renders its refusal beside its own control.
+  let actionError = $state<string | null>(null);
+  // Keyed by table the way scoreSaving is: parallel rounds put two of these on screen.
+  let scoreError = $state<{ table: number; message: string } | null>(null);
+
+  async function playerAction(action: TournamentEventType, body?: Record<string, unknown>) {
+    actionError = await doAction(action, body, { silent: true });
+  }
 
   let selfOrganizeError = $state<string | null>(null);
   async function submitSelfOrganize(picked: string[]) {
@@ -228,6 +238,12 @@
   const showRating = $derived(isFinished && getAuthState().isAuthenticated);
 </script>
 
+{#snippet refusal(message: string)}
+  <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3">
+    <p class="text-link-soft text-sm">{message}</p>
+  </div>
+{/snippet}
+
 <!-- Warning beside the check-in CTA, not a gate (engine treats missing/invalid
      decklist as non-blocking). No jump-to-deck button: the section is right
      below, and a button here would read as a spurious "upload" action. -->
@@ -292,9 +308,10 @@
       <Button
         variant="primary"
         size="lg"
-        onclick={() => doAction("Register", { user_uid: userUid, vekn_id: userVeknId })}
+        onclick={() => playerAction("Register", { user_uid: userUid, vekn_id: userVeknId })}
         disabled={actionLoading}
       >{m.tournament_register_btn()}</Button>
+      {#if actionError}{@render refusal(actionError)}{/if}
     {/if}
   {:else if tournament.state === "Registration" && currentPlayerEntry}
     <div class="text-sm mb-3 flex items-center justify-between gap-2">
@@ -304,10 +321,11 @@
       </span>
       <Button
         variant="danger"
-        onclick={() => doAction("Unregister", { user_uid: userUid })}
+        onclick={() => playerAction("Unregister", { user_uid: userUid })}
         disabled={actionLoading}
       ><Ban class="w-4 h-4" aria-hidden="true" />{m.tournament_unregister_btn()}</Button>
     </div>
+    {#if actionError}{@render refusal(actionError)}{/if}
   {:else if tournament.state === "Waiting" && !currentPlayerEntry}
     {#if tournament.online}
       {@render onlineJoin()}
@@ -384,7 +402,7 @@
              check-in (at cap: to Completed, mid-round: back to their seat) is enough. -->
         <Button
           variant="ghost"
-          onclick={() => doAction("CheckIn", { player_uid: userUid })}
+          onclick={() => playerAction("CheckIn", { player_uid: userUid })}
           disabled={actionLoading}
         >
           <Undo2 class="w-4 h-4" aria-hidden="true" />
@@ -393,11 +411,12 @@
       {:else if currentPlayerEntry.state !== "Finished" && (tournament.state === "Waiting" || tournament.state === "Playing")}
         <Button
           variant="danger"
-          onclick={() => dropPlayer(userUid)}
+          onclick={async () => { actionError = await dropPlayer(userUid); }}
           disabled={actionLoading}
         ><Trash2 class="w-4 h-4" aria-hidden="true" />{m.tournament_drop_out_btn()}</Button>
       {/if}
     </div>
+    {#if actionError}<div class="mb-3">{@render refusal(actionError)}</div>{/if}
     {/if}
     <!-- Online check-in is server-side (bot self-serve or organizer). The check-in
          call banner above carries the instruction; here we just surface the Join link. -->
@@ -482,7 +501,7 @@
                   label={seatDisplay(seat.player_uid)}
                   disabled={scoreSaving === -1}
                   saving={scoreSavingSeat === seat.player_uid && scoreSaving === -1}
-                  onchange={(v) => setFinalsVp(seat.player_uid, v, tournament.finals!.seating)}
+                  onchange={async (v) => { const e = await setFinalsVp(seat.player_uid, v, tournament.finals!.seating, { silent: true }); scoreError = e ? { table: -1, message: e } : null; }}
                 />
               {:else}
                 <!-- The engine rejects non-finalists' VP edits: read-only, not chips. -->
@@ -494,6 +513,7 @@
             </div>
           {/each}
         </div>
+        {#if scoreError?.table === -1}<div class="mt-2">{@render refusal(scoreError.message)}</div>{/if}
       </div>
     {:else if tournament.state === "Playing" && (tournament.rounds?.length ?? 0) > 0}
       <!-- Idle is uneventful, not an alert. -->
@@ -569,12 +589,13 @@
                       label={seatDisplay(seat.player_uid)}
                       disabled={scoreSaving === myTableIdx}
                       saving={scoreSavingSeat === seat.player_uid && scoreSaving === myTableIdx}
-                      onchange={(v) => setVp(roundIdx, myTableIdx, seat.player_uid, v, myTable.seating)}
+                      onchange={async (v) => { const e = await setVp(roundIdx, myTableIdx, seat.player_uid, v, myTable.seating, { silent: true }); scoreError = e ? { table: myTableIdx, message: e } : null; }}
                     />
                   {/if}
                 </div>
               {/each}
             </div>
+            {#if scoreError?.table === myTableIdx}<div class="mt-2">{@render refusal(scoreError.message)}</div>{/if}
             {#if !tournament.offline_mode && isOnline()}
               <Button
                 variant="primary"

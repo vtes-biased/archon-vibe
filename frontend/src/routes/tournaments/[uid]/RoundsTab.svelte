@@ -36,7 +36,7 @@
     doAction: (action: TournamentEventType, body?: any) => Promise<string | null>;
     loadPlayerNames: () => Promise<void>;
     tournamentSanctions?: Sanction[];
-    setVp: (roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>) => Promise<void>;
+    setVp: (roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>, opts?: { silent?: boolean }) => Promise<string | null>;
     scoreSaving: number | null;
     scoreSavingSeat: string | null;
   } = $props();

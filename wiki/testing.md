@@ -91,9 +91,11 @@ players, check in, upload and replace a decklist, score 2 rounds through the UI
 with a seating change and an in-event caution, random toss, finals, winner banner,
 rating points on the rankings page); `leagues.spec.ts` (creation, detail, list).
 
-**Everything goes through the real UI — no direct API calls.** Mutations are
-optimistic, but server POSTs are serialized per tournament, so chaining UI steps is
-ordering-safe. Tables are scored by giving the first seat all VPs, since a sweep is
+**Everything goes through the real UI — no direct API calls.** The suite drives the
+organizer console throughout, so its mutations are optimistic, and server POSTs are
+serialized per tournament, making chained UI steps ordering-safe. A player's device
+awaits the server instead ([architecture](architecture.md#mutation-pipeline)); no
+test drives one. Tables are scored by giving the first seat all VPs, since a sweep is
 a valid oust order, which also guarantees score ties at the finals cutoff so the
 random toss is always exercised; the toss shuffle is seeded from the tournament
 uid, so the optimistic result and the server agree. The test awaits the

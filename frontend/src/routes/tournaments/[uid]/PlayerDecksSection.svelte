@@ -7,7 +7,6 @@
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { tournamentAction } from "$lib/tournament-actions";
-  import { showToast } from "$lib/stores/toast.svelte";
   import { toUserMessage } from "$lib/errors";
   import { getCards } from "$lib/cards";
   import { ChevronDown, ChevronRight, CircleCheck, Lock, Trash2, Trophy } from "@lucide/svelte";
@@ -104,7 +103,10 @@
     return m.decks_round_label({ n: String(round + 1) });
   }
 
+  let deleteError = $state<string | null>(null);
+
   async function deleteDeck(playerUid: string) {
+    deleteError = null;
     try {
       await tournamentAction(tournament.uid, 'DeleteDeck', {
         player_uid: playerUid,
@@ -112,10 +114,7 @@
         multideck: isMultideck,
       });
     } catch (e) {
-      // Surface to the user: tournamentAction's server-only fallback doesn't
-      // toast, so this is the delete's error surface.
-      console.error('Delete deck error:', e);
-      showToast({ type: 'error', message: toUserMessage(e, m.tournament_error_action()) });
+      deleteError = toUserMessage(e, m.tournament_error_action());
     }
   }
 
@@ -243,6 +242,11 @@
                   </div>
                 </div>
               {/if}
+              {#if deleteError}
+                <div class="mt-2 bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3">
+                  <p class="text-link-soft text-sm">{deleteError}</p>
+                </div>
+              {/if}
               {#if !canModifyPending}
                 <p class="text-sm text-ink-faint">{m.decks_locked()}</p>
               {/if}
@@ -295,6 +299,11 @@
                         onclick={() => confirmDeletePending = false}
                       >{m.common_cancel()}</Button>
                     </div>
+                  </div>
+                {/if}
+                {#if deleteError}
+                  <div class="mt-2 bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3">
+                    <p class="text-link-soft text-sm">{deleteError}</p>
                   </div>
                 {/if}
               {/if}

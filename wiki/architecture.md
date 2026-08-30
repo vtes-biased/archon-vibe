@@ -237,6 +237,16 @@ The owning device's path:
 4. On rejection — no SSE follows and `modified_at` is unchanged — the client rolls
    back to the in-memory pre-action snapshot and surfaces the error.
 
+A player's device instead runs WASM as a pre-flight, awaits the POST on that same
+queue, and writes IndexedDB only once the server has granted the action — so there
+is nothing to roll back. A pre-flight rejection is not final: the action still goes
+to the server and the server's reason is the one shown, because a player's
+IndexedDB is the copy most likely to be stale. The refusal is thrown to the caller
+and rendered by the surface that fired the action, never as a toast — the
+tournament page's banner sits above the console and is scrolled out of view from
+where a player acts. The split is `is_organizer` in the actor context, the same
+`organize_tournament` capability that chooses the console view.
+
 Rollback rather than "SSE will correct" is deliberate: a rejection produces no SSE
 event for that object, so deferring would leave bad optimistic state in IndexedDB
 indefinitely. Rollback also self-heals the ambiguous case — a network error *after*

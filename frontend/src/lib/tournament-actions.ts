@@ -1,5 +1,6 @@
-/** Optimistic mutation: applies a tournament event through WASM locally, then posts to the server
- * (serialized per tournament) and rolls back on rejection. Pure HTTP transport lives in api.ts, which this module builds on one-way. */
+/** Tournament mutation. A device that can own the tournament applies the event through WASM locally,
+ * then posts to the server (serialized per tournament) and rolls back on rejection; a player's device
+ * awaits the server first. Pure HTTP transport lives in api.ts, which this module builds on one-way. */
 
 import * as m from '$lib/paraglide/messages.js';
 import type { Tournament, DeckObject } from '$lib/types';
@@ -30,15 +31,18 @@ import { EngineError } from './error-codes';
 /** Serializes server POSTs per tournament so concurrent requests can't race. */
 const actionQueues = new Map<string, Promise<void>>();
 
-function enqueueServerAction(uid: string, fn: () => Promise<void>): void {
+function enqueueServerAction(uid: string, fn: () => Promise<void>): Promise<void> {
   const prev = actionQueues.get(uid) ?? Promise.resolve();
   const next = prev.then(fn, fn); // Run fn even if previous failed
   actionQueues.set(uid, next);
-  next.finally(() => {
+  // Cleanup rides a swallowed branch: the awaiting caller owns the rejection, and a
+  // second unhandled chain off `next` would surface it again as an unhandled rejection.
+  next.catch(() => {}).finally(() => {
     if (actionQueues.get(uid) === next) {
       actionQueues.delete(uid);
     }
   });
+  return next;
 }
 
 /** Blocks barred players (suspension, league-wide DQ) before the WASM optimistic path.
@@ -111,6 +115,22 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
       }
       const decks = await getDecksByTournament(uid);
       const result = await processTournamentEvent(current, event, actor, sanctions, decks);
+
+      // A device that cannot own the tournament can never mutate offline, so the engine call
+      // above was a pre-flight: nothing is written or reported until the server grants it, and
+      // the rejection reaches the surface that fired the action rather than a detached toast.
+      if (!actor.is_organizer) {
+        await enqueueServerAction(uid, async () => {
+          await apiRequest<Tournament>(`/api/tournaments/${uid}/action`, {
+            method: 'POST',
+            body: JSON.stringify(event),
+          }, { suppressErrorToast: true });
+        });
+        await saveTournament(result.tournament);
+        await applyDeckOps(result.deckOps, uid, decks);
+        return result.tournament;
+      }
+
       await saveTournament(result.tournament);
 
       const affectedDeckUids = await applyDeckOps(result.deckOps, uid, decks);
