@@ -16,35 +16,39 @@ os.environ.setdefault("OAUTH_CLIENT_SECRET", "test-secret")
 from archon_bot.archon_api import ArchonAPI  # noqa: E402
 
 DISCORD_ID = "discord-1"
+TOURNAMENT_UID = "tournament-1"
 ARCHON_UID = "archon-1"
 
 
 class FakeStore:
-    """In-memory stand-in for TokenStore (single organizer)."""
+    """In-memory stand-in for TokenStore, keyed by grant like the real one."""
 
     def __init__(self, tokens: dict) -> None:
-        self._data: dict[str, dict] = {DISCORD_ID: dict(tokens)}
+        self._data: dict[tuple[str, str], dict] = {
+            (DISCORD_ID, TOURNAMENT_UID): dict(tokens)
+        }
 
-    async def get_tokens(self, discord_id: str) -> dict | None:
+    async def get_tokens(self, discord_id: str, tournament_uid: str) -> dict | None:
         await asyncio.sleep(0)  # behave like a real awaitable I/O call
-        t = self._data.get(discord_id)
+        t = self._data.get((discord_id, tournament_uid))
         return dict(t) if t else None
 
     async def store_tokens(
         self,
         discord_id: str,
+        tournament_uid: str,
         archon_uid: str,
         access_token: str,
         refresh_token: str,
     ) -> None:
-        self._data[discord_id] = {
+        self._data[(discord_id, tournament_uid)] = {
             "archon_uid": archon_uid,
             "access_token": access_token,
             "refresh_token": refresh_token,
         }
 
-    async def remove_tokens(self, discord_id: str) -> None:
-        self._data.pop(discord_id, None)
+    async def remove_tokens(self, discord_id: str, tournament_uid: str) -> None:
+        self._data.pop((discord_id, tournament_uid), None)
 
 
 class _Resp:
@@ -122,8 +126,12 @@ class SingleFlightRefreshTest(unittest.IsolatedAsyncioTestCase):
 
         # Both callers captured the same (now-expiring) access token.
         results = await asyncio.gather(
-            api._refresh_tokens(DISCORD_ID, stale_access_token="access-0"),
-            api._refresh_tokens(DISCORD_ID, stale_access_token="access-0"),
+            api._refresh_tokens(
+                DISCORD_ID, TOURNAMENT_UID, stale_access_token="access-0"
+            ),
+            api._refresh_tokens(
+                DISCORD_ID, TOURNAMENT_UID, stale_access_token="access-0"
+            ),
         )
 
         self.assertEqual(backend.post_count, 1, "second refresher must not re-POST")
@@ -133,7 +141,8 @@ class SingleFlightRefreshTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(r["access_token"], "access-1")
             self.assertEqual(r["refresh_token"], "refresh-1")
         self.assertEqual(
-            (await store.get_tokens(DISCORD_ID))["refresh_token"], "refresh-1"
+            (await store.get_tokens(DISCORD_ID, TOURNAMENT_UID))["refresh_token"],
+            "refresh-1",
         )
 
     async def test_high_concurrency_single_flight(self) -> None:
@@ -150,7 +159,9 @@ class SingleFlightRefreshTest(unittest.IsolatedAsyncioTestCase):
 
         results = await asyncio.gather(
             *(
-                api._refresh_tokens(DISCORD_ID, stale_access_token="access-0")
+                api._refresh_tokens(
+                    DISCORD_ID, TOURNAMENT_UID, stale_access_token="access-0"
+                )
                 for _ in range(8)
             )
         )
@@ -171,11 +182,11 @@ class SingleFlightRefreshTest(unittest.IsolatedAsyncioTestCase):
         )
         backend = FakeBackend("refresh-0")
         api = _make_api(backend, store)
-        stale = await store.get_tokens(DISCORD_ID)
+        stale = await store.get_tokens(DISCORD_ID, TOURNAMENT_UID)
 
         # Bypass the lock: two raw refreshes both replaying refresh-0.
-        await api._do_refresh(DISCORD_ID, dict(stale))
-        await api._do_refresh(DISCORD_ID, dict(stale))
+        await api._do_refresh(DISCORD_ID, TOURNAMENT_UID, dict(stale))
+        await api._do_refresh(DISCORD_ID, TOURNAMENT_UID, dict(stale))
 
         self.assertEqual(backend.post_count, 2)
         self.assertTrue(backend.chain_revoked, "replay must trip reuse-detection")
@@ -193,12 +204,16 @@ class SingleFlightRefreshTest(unittest.IsolatedAsyncioTestCase):
         api = _make_api(backend, store)
 
         results = await asyncio.gather(
-            api._refresh_tokens(DISCORD_ID, stale_access_token="access-0"),
-            api._refresh_tokens(DISCORD_ID, stale_access_token="access-0"),
+            api._refresh_tokens(
+                DISCORD_ID, TOURNAMENT_UID, stale_access_token="access-0"
+            ),
+            api._refresh_tokens(
+                DISCORD_ID, TOURNAMENT_UID, stale_access_token="access-0"
+            ),
         )
 
         self.assertTrue(all(r is None for r in results))
-        self.assertIsNone(await store.get_tokens(DISCORD_ID))
+        self.assertIsNone(await store.get_tokens(DISCORD_ID, TOURNAMENT_UID))
         # First POST fails+clears under the lock; the second waiter then finds no
         # tokens and returns without a second POST.
         self.assertEqual(backend.post_count, 1)
@@ -216,17 +231,18 @@ class SingleFlightRefreshTest(unittest.IsolatedAsyncioTestCase):
         backend = FakeBackend("refresh-0", fail_all=True, fail_status=503)
         api = _make_api(backend, store)
 
-        result = await api._refresh_tokens(DISCORD_ID, stale_access_token="access-0")
+        result = await api._refresh_tokens(
+            DISCORD_ID, TOURNAMENT_UID, stale_access_token="access-0"
+        )
 
         self.assertIsNone(result)
-        stored = await store.get_tokens(DISCORD_ID)
+        stored = await store.get_tokens(DISCORD_ID, TOURNAMENT_UID)
         self.assertIsNotNone(stored, "5xx must keep the stored pair")
         self.assertEqual(stored["refresh_token"], "refresh-0")
 
-    async def test_per_discord_id_locks_do_not_serialize_across_organizers(
-        self,
-    ) -> None:
-        """Different organizers get independent locks (both refresh, both rotate)."""
+    async def test_locks_are_per_grant(self) -> None:
+        """Every grant gets its own lock: a second organizer, and the same
+        organizer's second tournament."""
         store = FakeStore(
             {
                 "archon_uid": ARCHON_UID,
@@ -234,7 +250,7 @@ class SingleFlightRefreshTest(unittest.IsolatedAsyncioTestCase):
                 "refresh_token": "refresh-0",
             }
         )
-        store._data["discord-2"] = {
+        store._data[("discord-2", TOURNAMENT_UID)] = {
             "archon_uid": "archon-2",
             "access_token": "b-access-0",
             "refresh_token": "b-refresh-0",
@@ -244,12 +260,14 @@ class SingleFlightRefreshTest(unittest.IsolatedAsyncioTestCase):
         # a single fake backend only tracks one chain, so assert via the lock map.
         api = _make_api(backend, store)
 
-        await api._refresh_tokens(DISCORD_ID, stale_access_token="access-0")
-        self.assertIn(DISCORD_ID, api._refresh_locks)
-        self.assertIsInstance(api._refresh_lock_for("discord-2"), asyncio.Lock)
-        self.assertIsNot(
-            api._refresh_lock_for(DISCORD_ID), api._refresh_lock_for("discord-2")
+        await api._refresh_tokens(
+            DISCORD_ID, TOURNAMENT_UID, stale_access_token="access-0"
         )
+        self.assertIn((DISCORD_ID, TOURNAMENT_UID), api._refresh_locks)
+        own = api._refresh_lock_for(DISCORD_ID, TOURNAMENT_UID)
+        self.assertIsInstance(own, asyncio.Lock)
+        self.assertIsNot(own, api._refresh_lock_for("discord-2", TOURNAMENT_UID))
+        self.assertIsNot(own, api._refresh_lock_for(DISCORD_ID, "tournament-2"))
 
 
 if __name__ == "__main__":
