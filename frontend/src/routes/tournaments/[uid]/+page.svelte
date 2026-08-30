@@ -55,6 +55,7 @@ import TournamentModals from "./TournamentModals.svelte";
   let organizerNames = $state<Record<string, string>>({});
   let loading = $state(true);
   let error = $state<string | null>(null);
+  let isSyncing = $state(!syncManager.isSynced);
   let actionLoading = $state(false);
 
   const auth = $derived(getAuthState());
@@ -435,9 +436,6 @@ import TournamentModals from "./TournamentModals.svelte";
         if (epoch !== loadEpoch) return;
         tournamentSanctions = sanctions;
         organizerNames = orgNames;
-      } else if (!tournament) {
-        // No data in IndexedDB yet — will arrive via SSE
-        error = m.tournament_error_not_synced();
       }
     } catch (e) {
       if (epoch !== loadEpoch) return;
@@ -623,6 +621,15 @@ import TournamentModals from "./TournamentModals.svelte";
     untrack(() => load());
 
     const handleSync = (event: { type: string; data?: any }) => {
+      if (event.type === "syncing") isSyncing = true;
+      if (event.type === "error" || event.type === "disconnected") isSyncing = false;
+      // Snapshot ingest writes the whole corpus in one pass with no per-object
+      // events, so the branches below never fire for a page that mounted empty.
+      if (event.type === "sync_complete") {
+        isSyncing = false;
+        untrack(() => load());
+        getDecksByTournamentGrouped(uid).then(grouped => { decksByUser = grouped; });
+      }
       if (event.type === "tournament") untrack(() => load());
       if (event.type === "deck" && (!event.data?.tournament_uid || event.data.tournament_uid === uid)) {
         getDecksByTournamentGrouped(uid).then(grouped => { decksByUser = grouped; });
@@ -1035,6 +1042,15 @@ import TournamentModals from "./TournamentModals.svelte";
         />
       {/if}
       {/if}
+    {:else if isSyncing}
+      <div class="text-center py-12">
+        <Loader2 class="mx-auto h-12 w-12 text-ink-faint animate-spin" />
+        <p class="text-ink-muted mt-4">{m.tournament_waiting_for_data()}</p>
+      </div>
+    {:else}
+      <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4">
+        <p class="text-link-soft">{m.tournament_not_found()}</p>
+      </div>
     {/if}
   </div>
 </div>

@@ -707,6 +707,14 @@ every client, which no unused index is worth.
 A generic `ObjectSpec` array (`SPECS`) handles all types uniformly in the sync
 manager, and a single `isSynced` flag tracks state.
 
+**Any surface that reads IndexedDB at mount must listen for `sync_complete`.**
+Snapshot ingest writes the whole corpus in one pass and emits no per-object
+events, so a page that mounted against an empty store — which signing in
+guarantees, since `refresh()` clears and refills — otherwise waits for an
+unrelated live edit to wake it, and reloading only restarts the ingest it was
+waiting on. Until `isSynced`, an absent row is a wait and renders as progress;
+only once the corpus has landed is it genuinely missing.
+
 ### The list projections
 
 **A top-level list reads a memory-resident projection, never the whole store.** A
