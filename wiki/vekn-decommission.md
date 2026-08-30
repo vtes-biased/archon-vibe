@@ -77,6 +77,17 @@ Vozhd of Szczecin, François Villon, Draft that Was Promised (adopted vekn
 (some but not all copies hold a vekn id), and the archive backfill refilled it
 with a class of its own — see [archive reconstructions] below.
 
+**A shape the audit cannot see.** Its scope is groups where *some but not all*
+copies hold a vekn id, so two live copies sharing **one** id never surface. Beta
+holds exactly that under `12642`: the event-code backfill gave one copy the code
+`12642` and minted `SCHNJG` for the other, and short links survive it either way
+because `get_tournament_by_event_code` falls back to a vekn external-id lookup.
+Production was never checked for the shape and no dedup run will report it, so
+it needs a direct query — group live tournaments by `external_ids.vekn` and keep
+the counts above one. Locally fixable whenever found: soft-delete the loser and
+the survivor keeps an id that is legitimately live, so no transplant and no
+officials.
+
 #### Strong candidates — one copy carries no results
 
 Near-certain double-entries: the empty copy is the accidental second entry.

@@ -51,13 +51,17 @@ belong to the **same application** as `DISCORD_CLIENTID`.
    cold click from Discord carries no session, so the URL must log the user in
    *and* push metadata; the `?link=true` variant is only for an already
    authenticated profile link and would 401 here.
-3. Installation → Default Install Settings: Guild Install, scopes `bot` and
+3. General Information → Terms of Service and Privacy Policy URLs:
+   `{site_url_base}/legal/terms` and `{site_url_base}/legal/privacy`. Discord
+   surfaces them on the install consent screen, so an app without them asks a
+   server owner to grant permissions with nothing to read first.
+4. Installation → Default Install Settings: Guild Install, scopes `bot` and
    `applications.commands`, permissions `8861518864` (Manage Channels, Manage
    Roles, Manage Events, View Channels, Send Messages, Connect, Speak).
 
 The organizer guide hands out the parameterless install link
 `https://discord.com/oauth2/authorize?client_id={client_id}`, which carries no
-scopes of its own: Discord derives them from step 3, so the link is inert until
+scopes of its own: Discord derives them from step 4, so the link is inert until
 those settings are saved. It is **hard-coded to the production app id** — one CI
 frontend artifact ships to every domain (`frontend/.env.production`), so beta's
 copy of the guide points at the production bot too.
@@ -98,6 +102,19 @@ Archon profile to link one, then back.
 
 **Status: pre-production.** Deployed and running, not yet live on production
 guilds and not yet tested end to end.
+
+**Deferred ask** — run Portal setup above against the production application
+`1495034668469194864`, then install the bot on the production guild(s); which
+servers count as production is part of the ask. Step 1 is believed already
+done — the journal's `pushed metadata for user` lines can only come from a
+working redirect — so confirm it rather than re-adding it. **Done when** Server
+Settings → Roles → Links → Add requirement lists Archon with its three metadata
+fields, and `/setup <tournament url>` in a production guild creates the category
+with its announcement, lobby and judges channels.
+
+**Trigger: the next production release** — and *by* it, not after it. That
+release carries the organizer guide's install link, which is inert until step 4
+is saved, so a release landing first hands every organizer a dead link.
 
 **Commands** — `/setup <url>` probes the tournament's scoped SSE stream before
 creating anything, so a bad or inaccessible uid, or a `Finished` tournament,
