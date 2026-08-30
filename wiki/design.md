@@ -298,10 +298,15 @@ irreversible or externally visible actions gate behind a confirm step.
 **List view state** — filters belong to the list, not the component instance, in
 three layers:
 
-- **URL query string** is canonical: every filter and the page number mirrored with
-  `replaceState`, so Back restores the exact view and a filtered list is shareable.
-  Read `window.location`, never the page store — shallow routing leaves the store
-  behind.
+- **URL query string** is canonical: every filter, the segmented-toggle tab and the
+  page number mirrored with `replaceState`, so Back restores the exact view and a
+  filtered list is shareable. Read `window.location`, never the page store —
+  shallow routing leaves the store behind. **A filter whose control only some
+  viewers can see is excluded**: a shared link would hand everyone else a filter
+  they can neither see nor clear. On `/users` that is the officials-only sponsor
+  and no-VEKN toggles — the sanction toggles render for every signed-in viewer and
+  so are mirrored. An arrival pointer is not a filter and is neither mirrored nor
+  remembered (`/users?sponsor`).
 - **Nav-menu memory** — a bare link back into a list resolves, on click, to the
   view it was left in. sessionStorage, 30-minute inactivity window, so a new or
   stale tab starts clean. The page number and free-text query are deliberately

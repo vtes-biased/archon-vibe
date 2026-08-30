@@ -46,8 +46,8 @@
     "DEV",
   ];
 
-  // Public filters live in the query string (url-filters) so leaving and returning restores the list;
-  // officials-only triage toggles stay local — restoring one for a viewer who can't see its control would filter unaccountably.
+  // Filters every signed-in viewer can see live in the query string (url-filters) so leaving and returning restores the list;
+  // the officials-only sponsor and no-VEKN toggles stay local — restoring one for a viewer who can't see its control would filter unaccountably.
   const urlParams = currentParams();
   let currentPage = $state(readPageParam() + 1);
   let pageSize = 250;
@@ -58,8 +58,8 @@
   let searchQuery = $state(urlParams.get("q") ?? "");
   // Mirrored to the URL only once the search debounce fires, not per keystroke.
   let debouncedSearch = $state(urlParams.get("q") ?? "");
-  let filterHasPastSanctions = $state(false);
-  let filterCurrentlySanctioned = $state(false);
+  let filterHasPastSanctions = $state(urlParams.get("past_sanctions") === "true");
+  let filterCurrentlySanctioned = $state(urlParams.get("sanctioned") === "true");
   // Official-only sponsor-management filters (coopted_by / vekn_id). 'mine' and
   // 'none' are mutually exclusive (a member either was coopted by me or by no one).
   let sponsorFilter = $state<"all" | "mine" | "none">("all");
@@ -110,6 +110,8 @@
       q: debouncedSearch.trim() || null,
       country: selectedCountry === "all" ? null : selectedCountry,
       roles: selectedRoles.length ? selectedRoles.join(",") : null,
+      past_sanctions: filterHasPastSanctions ? "true" : null,
+      sanctioned: filterCurrentlySanctioned ? "true" : null,
       page: pageParam(currentPage - 1),
     });
   });

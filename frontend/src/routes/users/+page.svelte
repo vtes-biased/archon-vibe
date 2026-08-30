@@ -7,6 +7,7 @@
   import { Plus } from '@lucide/svelte';
   import { getAuthState } from '$lib/stores/auth.svelte';
   import { isOfficial } from '$lib/engine';
+  import { syncQueryParams, currentParams } from '$lib/url-filters';
   import * as m from '$lib/paraglide/messages.js';
 
   const auth = $derived(getAuthState());
@@ -17,15 +18,17 @@
     (auth.user.community_links?.length ?? 0) < (isOfficial(auth.user) ? 10 : 5)
   );
 
-  const urlTab = $derived($page.url.searchParams.get('tab'));
+  type Tab = 'community' | 'members' | 'promos';
+  const TAB_VALUES: Tab[] = ['community', 'members', 'promos'];
+
   // Sponsor mode: arrived from a "get sponsored" pointer — focus the officials directory
   const sponsorMode = $derived($page.url.searchParams.get('sponsor') !== null);
-  let activeTab = $state<'community' | 'members' | 'promos'>('community');
+
+  const urlTab = currentParams().get('tab') as Tab | null;
+  let activeTab = $state<Tab>(urlTab && TAB_VALUES.includes(urlTab) ? urlTab : 'community');
 
   $effect(() => {
-    if (urlTab === 'members') activeTab = 'members';
-    else if (urlTab === 'promos') activeTab = 'promos';
-    else if (urlTab === 'community') activeTab = 'community';
+    syncQueryParams({ tab: activeTab === 'community' ? null : activeTab });
   });
 </script>
 

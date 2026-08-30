@@ -6,9 +6,9 @@ import { goto } from "$app/navigation";
 const STORAGE_KEY = "archon:last-view";
 const TTL_MS = 30 * 60 * 1000;
 
-/** Never carried into a list re-entered from the menu — a page number is a position and a search
- * query is an intent, and a restored one makes the list look broken. Back still restores both via the URL. */
-const TRANSIENT = ["page", "q"];
+/** Never carried into a list re-entered from the menu — a page number is a position, and a search query
+ * or an arrival pointer like `sponsor` is an intent; a restored one makes the list look broken. Back still restores them via the URL. */
+const TRANSIENT = ["page", "q", "sponsor"];
 
 interface Entry {
     search: string;
