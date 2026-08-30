@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.0.9 — 2026-08-30
 
 - Playtesters now sign the playtest NDA in the app, and get a signed copy by email.
 - A tournament's registration cap now holds: past it, self-registration joins a waitlist rather than the roster.
