@@ -29,9 +29,9 @@ import { apiRequest, ApiError, requireOnline, isOnline } from './api';
 import { EngineError } from './error-codes';
 
 /** Serializes server POSTs per tournament so concurrent requests can't race. */
-const actionQueues = new Map<string, Promise<void>>();
+const actionQueues = new Map<string, Promise<unknown>>();
 
-function enqueueServerAction(uid: string, fn: () => Promise<void>): Promise<void> {
+function enqueueServerAction<T>(uid: string, fn: () => Promise<T>): Promise<T> {
   const prev = actionQueues.get(uid) ?? Promise.resolve();
   const next = prev.then(fn, fn); // Run fn even if previous failed
   actionQueues.set(uid, next);
@@ -91,6 +91,7 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
 
   const current = await getTournament(uid);
   if (current) {
+    let awaitedServer = false;
     try {
       if (action === 'CheckIn' && data?.player_uid) {
         await checkPlayerBarred(data.player_uid as string, current);
@@ -116,19 +117,17 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
       const decks = await getDecksByTournament(uid);
       const result = await processTournamentEvent(current, event, actor, sanctions, decks);
 
-      // A device that cannot own the tournament can never mutate offline, so the engine call
-      // above was a pre-flight: nothing is written or reported until the server grants it, and
-      // the rejection reaches the surface that fired the action rather than a detached toast.
       if (!actor.is_organizer) {
-        await enqueueServerAction(uid, async () => {
-          await apiRequest<Tournament>(`/api/tournaments/${uid}/action`, {
+        awaitedServer = true;
+        const granted = await enqueueServerAction(uid, () =>
+          apiRequest<Tournament>(`/api/tournaments/${uid}/action`, {
             method: 'POST',
             body: JSON.stringify(event),
-          }, { suppressErrorToast: true });
-        });
-        await saveTournament(result.tournament);
-        await applyDeckOps(result.deckOps, uid, decks);
-        return result.tournament;
+          }, { suppressErrorToast: true }));
+        // Re-read: an SSE frame landing during the round-trip already carries the server's deck
+        // uid, and writing the pre-flight's own would replace it with one no later frame corrects.
+        await applyDeckOps(result.deckOps, uid, await getDecksByTournament(uid));
+        return granted;
       }
 
       await saveTournament(result.tournament);
@@ -183,9 +182,10 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
 
       return result.tournament;
     } catch (e) {
-      // WASM rejected. When this tournament (or the device) is offline, there's no server to defer to —
-      // surface the engine's actual reason. Otherwise fall through to server-only (covers unknown-action drift).
-      if (isOffline(uid) || !isOnline()) throw e;
+      // WASM rejected, or the awaited POST did. Offline there is no server to defer to, so surface
+      // the engine's reason; past `awaitedServer` the server has already answered and falling
+      // through to server-only below would post the action a second time.
+      if (awaitedServer || isOffline(uid) || !isOnline()) throw e;
     }
   }
 

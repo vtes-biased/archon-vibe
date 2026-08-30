@@ -136,11 +136,9 @@
       .sort((a, b) => a.name.localeCompare(b.name)),
   );
 
-  // The page's banner sits above the whole console; from down here it is scrolled
-  // out of view, so every player action renders its refusal beside its own control.
   let actionError = $state<string | null>(null);
-  // Keyed by table the way scoreSaving is: parallel rounds put two of these on screen.
-  let scoreError = $state<{ table: number; message: string } | null>(null);
+  // Keyed by round as well as table: parallel rounds put two tables of the same index on screen.
+  let scoreError = $state<{ round: number; table: number; message: string } | null>(null);
 
   async function playerAction(action: TournamentEventType, body?: Record<string, unknown>) {
     actionError = await doAction(action, body, { silent: true });
@@ -501,7 +499,7 @@
                   label={seatDisplay(seat.player_uid)}
                   disabled={scoreSaving === -1}
                   saving={scoreSavingSeat === seat.player_uid && scoreSaving === -1}
-                  onchange={async (v) => { const e = await setFinalsVp(seat.player_uid, v, tournament.finals!.seating, { silent: true }); scoreError = e ? { table: -1, message: e } : null; }}
+                  onchange={async (v) => { const e = await setFinalsVp(seat.player_uid, v, tournament.finals!.seating, { silent: true }); scoreError = e ? { round: -1, table: -1, message: e } : null; }}
                 />
               {:else}
                 <!-- The engine rejects non-finalists' VP edits: read-only, not chips. -->
@@ -513,7 +511,7 @@
             </div>
           {/each}
         </div>
-        {#if scoreError?.table === -1}<div class="mt-2">{@render refusal(scoreError.message)}</div>{/if}
+        {#if scoreError?.round === -1}<div class="mt-2">{@render refusal(scoreError.message)}</div>{/if}
       </div>
     {:else if tournament.state === "Playing" && (tournament.rounds?.length ?? 0) > 0}
       <!-- Idle is uneventful, not an alert. -->
@@ -589,13 +587,13 @@
                       label={seatDisplay(seat.player_uid)}
                       disabled={scoreSaving === myTableIdx}
                       saving={scoreSavingSeat === seat.player_uid && scoreSaving === myTableIdx}
-                      onchange={async (v) => { const e = await setVp(roundIdx, myTableIdx, seat.player_uid, v, myTable.seating, { silent: true }); scoreError = e ? { table: myTableIdx, message: e } : null; }}
+                      onchange={async (v) => { const e = await setVp(roundIdx, myTableIdx, seat.player_uid, v, myTable.seating, { silent: true }); scoreError = e ? { round: roundIdx, table: myTableIdx, message: e } : null; }}
                     />
                   {/if}
                 </div>
               {/each}
             </div>
-            {#if scoreError?.table === myTableIdx}<div class="mt-2">{@render refusal(scoreError.message)}</div>{/if}
+            {#if scoreError?.round === roundIdx && scoreError.table === myTableIdx}<div class="mt-2">{@render refusal(scoreError.message)}</div>{/if}
             {#if !tournament.offline_mode && isOnline()}
               <Button
                 variant="primary"

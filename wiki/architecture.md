@@ -238,14 +238,19 @@ The owning device's path:
    back to the in-memory pre-action snapshot and surfaces the error.
 
 A player's device instead runs WASM as a pre-flight, awaits the POST on that same
-queue, and writes IndexedDB only once the server has granted the action — so there
-is nothing to roll back. A pre-flight rejection is not final: the action still goes
-to the server and the server's reason is the one shown, because a player's
-IndexedDB is the copy most likely to be stale. The refusal is thrown to the caller
-and rendered by the surface that fired the action, never as a toast — the
-tournament page's banner sits above the console and is scrolled out of view from
-where a player acts. The split is `is_organizer` in the actor context, the same
-`organize_tournament` capability that chooses the console view.
+queue and reports the server's answer, so there is nothing to roll back. It leaves
+the tournament row to SSE and re-applies only the deck ops once the server has
+granted, against a freshly read deck list — the frame carrying the server's deck
+uid may already have landed during the round-trip, and the pre-flight's own uid
+would replace it with one no later frame corrects. A pre-flight rejection is not
+final: the action still goes to the server, whose reason is the one shown, because
+a player's IndexedDB is the copy most likely to be stale. Past that POST the
+reverse holds — the server has already answered, so a failure must reach the caller
+instead of falling through to the server-only path and posting twice. The refusal
+is rendered by the surface that fired the action, never as a toast: the tournament
+page's banner sits above the console, out of view from where a player acts. The
+split is `is_organizer` in the actor context, the same `organize_tournament`
+capability that chooses the console view.
 
 Rollback rather than "SSE will correct" is deliberate: a rejection produces no SSE
 event for that object, so deferring would leave bad optimistic state in IndexedDB
