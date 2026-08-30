@@ -158,8 +158,12 @@ FROM objects WHERE type='tournament' AND deleted_at IS NULL
 **Proves it worked**: the query returns no rows, and each event's `twda_status`
 reads `submitted` with a PR URL on `GiottoVerducci/TWD`.
 
-**Owes afterwards**: nothing to tell anyone — the organizers never saw the failure.
-Delete this section.
+**Owes afterwards**: the organizers did see it — the Finished panel has carried a
+"TWDA submission failed" notice since v1.0.3 — and at least one reacted by having
+the winning deck put into the archive by hand, so **check each event against the
+archive before refiring it**: a re-submission over a deck a human already filed
+opens a pull request against an entry that is already there. Answer the reporters
+whose events this covers, then delete this section.
 
 ## Prove the deck round stamps landed
 
