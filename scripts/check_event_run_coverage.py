@@ -23,13 +23,30 @@ from backend.src.main import app as site_app  # noqa: E402
 from backend.src.middleware.auth import _OAUTH_BARRED_SUBPATHS  # noqa: E402
 from backend.src.public_api.main import (  # noqa: E402
     _ACTION_FIELDS,
+    _ACTION_STATES,
     _ACTIONS,
+    _ANY_STATE,
     _EVENT_RUN_ROUTES,
     _EVENT_RUN_SCHEMAS,
+    _IC_ACTIONS,
+    _PLAYER_ACTIONS,
     _UNDOCUMENTED_ACTIONS,
 )
 
 PARSING = ROOT / "engine" / "src" / "tournament" / "parsing.rs"
+APPLY = ROOT / "engine" / "src" / "tournament" / "mod.rs"
+
+# Arms whose state gate is a shape the walk below cannot read. Each is published
+# from the arm's own body instead, and the reason is what a reader has to re-check
+# by hand when the arm changes.
+_IRREGULAR_GATES = {
+    "StartRound": "an online event takes a second branch admitting Playing",
+    "SetScore": "require_can_edit_results: Playing for anyone, Waiting and"
+    " Finished for the organizer",
+    "Override": "require_can_edit_results",
+    "Unoverride": "require_can_edit_results",
+    "SetNonCompeting": "gated on the finals being seeded as well as on the state",
+}
 
 # Reachable outside the granted tournament's own prefix, from `_oauth_allows`.
 # `/oauth/token` and `/oauth/revoke` stay prose: they are the token's own
@@ -145,13 +162,82 @@ def action_drift() -> list[str]:
     return problems
 
 
+def engine_gates() -> dict[str, tuple[set[str], bool]]:
+    """Each apply arm's state gate and whether it demands the organizer. An arm
+    with no readable gate accepts every state, which is a claim in its own right."""
+    body = APPLY.read_text()
+    body = body[body.index("let event = TournamentEvent::from_json") :]
+    arms = [
+        (m.group(1), m.start())
+        for m in re.finditer(r"^        TournamentEvent::(\w+)", body, re.M)
+    ]
+    if len(arms) < 40:
+        raise SystemExit(f"mod.rs walk found only {len(arms)} apply arms")
+    gates = {}
+    for i, (name, pos) in enumerate(arms):
+        arm = body[pos : arms[i + 1][1] if i + 1 < len(arms) else len(body)]
+        states: set[str] = set()
+        for g in re.finditer(
+            r"require_state(_or_finished)?\(state, TournamentState::(\w+)\)", arm
+        ):
+            states |= {g.group(2)} | ({"Finished"} if g.group(1) else set())
+        for g in re.finditer(
+            r"if state != TournamentState::(\w+)((?:\s*&&\s*state != TournamentState::\w+)*)",
+            arm,
+        ):
+            states |= {g.group(1)} | set(
+                re.findall(r"TournamentState::(\w+)", g.group(2))
+            )
+        for g in re.finditer(
+            r"!matches!\(\s*state,\s*((?:TournamentState::\w+\s*\|?\s*)+)\)", arm
+        ):
+            states |= set(re.findall(r"TournamentState::(\w+)", g.group(1)))
+        gates[name] = (states or set(_ANY_STATE), "require_organizer(actor)" in arm)
+    return gates
+
+
+def state_drift() -> list[str]:
+    """The third authority: the apply arms decide which states accept an action and
+    who may send it, and the reference publishes both."""
+    problems = []
+    gates = engine_gates()
+    for name, (states, dest) in _ACTION_STATES.items():
+        gate = gates.get(name)
+        if gate is None:
+            problems.append(
+                f"{name}: given states, but the engine applies no such action"
+            )
+            continue
+        engine_states, needs_organizer = gate
+        if name not in _IRREGULAR_GATES and set(states) != engine_states:
+            problems.append(
+                f"{name}: documented for {sorted(states)},"
+                f" the engine gate admits {sorted(engine_states)}"
+            )
+        documented_organizer = name not in _PLAYER_ACTIONS and name not in _IC_ACTIONS
+        if needs_organizer != documented_organizer:
+            problems.append(
+                f"{name}: engine {'demands' if needs_organizer else 'does not demand'}"
+                " the organizer, the reference says otherwise"
+            )
+        if dest and dest not in _ANY_STATE:
+            problems.append(f"{name}: leads to {dest}, which is no state")
+    for name in sorted(set(_ACTIONS) - set(_ACTION_STATES)):
+        problems.append(f"{name}: documented as an action, but named in no state")
+    for name in sorted(set(_ACTION_STATES) - set(_ACTIONS)):
+        problems.append(f"{name}: named in a state, but documented as no action")
+    for name in sorted(set(_IRREGULAR_GATES) - set(_ACTION_STATES)):
+        problems.append(f"{name}: excused from the state walk, but documented nowhere")
+    return problems
+
+
 def main() -> int:
     documented = {(method, path) for method, path, *_ in _EVENT_RUN_ROUTES}
     expected = reachable()
 
     missing = expected - documented
     extra = documented - expected
-    drift = schema_drift() + action_drift()
+    drift = schema_drift() + action_drift() + state_drift()
     if not missing and not extra and not drift:
         return 0
 
@@ -166,7 +252,7 @@ def main() -> int:
         "\nThe public API reference publishes all of this as the boundary of an"
         " `event:run`\ngrant. In backend/src/public_api/main.py: add the route to"
         " `_EVENT_RUN_ROUTES` or\nbar it in `_OAUTH_BARRED_SUBPATHS`; add the action"
-        " to `_ACTIONS` or excuse it in\n`_UNDOCUMENTED_ACTIONS`; add the field to"
+        " to `_ACTIONS` and `_ACTION_STATES` or excuse\nit in `_UNDOCUMENTED_ACTIONS`; add the field to"
         " `_ACTION_FIELDS` and to the actions that\ntake it. Deciding which is the"
         " point of this failure."
     )

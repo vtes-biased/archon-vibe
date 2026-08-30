@@ -275,6 +275,18 @@ and `UploadDeck` and `UpdateDeck` are spellings of `UpsertDeck`. Publishing the
 vocabulary does bind it — that is the point, and the lint is what makes the binding
 survive an engine change ([access](access.md#event-access-is-per-event)).
 
+**The state machine is published with it, and the apply arms are its authority.**
+`_ACTION_STATES` gives every action the states that accept it and the state it
+leads to, and `_PLAYER_ACTIONS` says which ones a member who is not the organizer
+may send; the reference generates its state-by-state listing from both rather than
+naming forty actions twice. `check_event_run_coverage.py` walks the `apply` arms in
+`tournament/mod.rs` for the same two facts — the `require_state` family and the
+negative state chains for the gate, `require_organizer` for the actor — and fails
+on any disagreement. Five arms gate on something the walk cannot read (an online
+event's parallel rounds, the `require_can_edit_results` trio, `SetNonCompeting`'s
+finals check); they are excused by name with the reason, which is the list to
+re-read by hand when those arms change.
+
 **Every answer carries an example, and the examples are real documents.** They are
 constructed in `public_api/examples.py` and `test_public_api.py` decodes each back
 into the model it claims to be, so a model change that outdates one fails the

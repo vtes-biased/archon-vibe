@@ -145,9 +145,9 @@ The answer is `200` whatever you send, so it is no hint for which tokens exist.
 
 PUBLIC_API_TAG = (
     r"""
-Read-only, on `{api}`. Nothing here changes anything, and there is no anonymous
-read: every request needs `Authorization: Bearer <token>`. Card data belongs to
-[krcg](https://v4.api.krcg.org/docs), not to us.
+Read-only, on `{api}`. Every request needs `Authorization: Bearer <token>`.
+Cards and TWDA data are available on [krcg](https://v4.api.krcg.org/docs),
+whole datasets for them on [static.krcg](https://static.krcg.org).
 
 A single object comes back as JSON. A collection comes back as **JSON Lines**:
 one object per line, opened by `header` and closed by `eof`.
@@ -160,24 +160,19 @@ one object per line, opened by `header` and closed by `eof`.
 
 ## Reading a list
 
-A list response is not a JSON document and will not parse as one. Read it line by
+A list response is not a valid JSON document. Read it line by
 line: `iter_lines()` on a `stream=True` request in requests or httpx, the body as
-an async iterator in Node, `curl --no-buffer`. Most clients can do this and most
-do not by default — for `/v1/tournaments` that means buffering tens of megabytes
-for nothing.
+an async iterator in Node, `curl --no-buffer`. Most clients offer an option for this.
 
 * **No pagination.** Read what you want, then close the connection. For the ten
   newest tournaments, read ten lines and hang up.
 * **Trust nothing until the `eof` line.** A response cut short mid-flight looks
   exactly like a short one.
-* **Rows come in blocks of 250**, holding no database connection between them, so
-  a slow reader costs nothing. The boundaries are invisible; do not align on them.
 
 ## Ordering and freshness
 
 **Newest first**, ordered by `uid`. Uids are UUIDv7, so they sort by when a record
-was created, not by when the event happened — a decade-old tournament imported
-last week sorts as new. Select by event date with `start_after` and `start_before`.
+was created, not by when they were modified.
 
 A `uid` never changes, so nothing moves while you read. There is also **no "what
 changed since"**: deleted records are not served, so a diff by date would
@@ -187,9 +182,7 @@ accumulate rows that no longer exist. Re-read what you need, or take `/v1/export
 
 `/v1/decks` streams every published deck, newest first; `tournament=<uid>` narrows
 it to one event. `/v1/export` is the whole corpus — tournaments, members, decks and
-leagues — as one gzipped file, the cheapest way to take everything and to take it
-again later. A member's community links ride inside their row; `/v1/community-links`
-serves them one per line.
+leagues — as one gzipped file, the cheapest way to take everything.
 
 **A deck appears only once its event is finished**, and then only as far as the
 tournament's own `decklists_mode` allows: `Winner`, `Finalists` or `All`.
@@ -199,53 +192,176 @@ deck's disappearance is far more often a correction in progress than a deletion.
 
 **Decks carry no author name.** Attribution runs through `user_uid` — hand it to
 `/v1/users/{uid}` for the VEKN ID. The same uid appears in the tournament's
-`players`, `standings` and `winner`, so one lookup attributes a deck and the
-result it earned.
+`players`, `standings` and `winner`.
 """.strip()
     .replace("{site}", SITE_URL)
     .replace("{api}", API_URL)
 )
 
+_ANY_STATE = ("Planned", "Registration", "Waiting", "Playing", "Finished")
+
+# Copied off the engine's apply arms, which cannot be imported across the isolation
+# line: `check_event_run_coverage.py` walks them and fails on any disagreement.
+_ACTION_STATES: dict[str, tuple[tuple[str, ...], str]] = {
+    "OpenRegistration": (("Planned",), "Registration"),
+    "CloseRegistration": (("Registration",), "Waiting"),
+    "CancelRegistration": (("Registration",), "Planned"),
+    "ReopenRegistration": (("Waiting",), "Registration"),
+    "Register": (("Registration",), ""),
+    "Unregister": (("Registration",), ""),
+    "AddPlayer": (_ANY_STATE, ""),
+    "RemovePlayer": (("Planned", "Registration", "Waiting", "Finished"), ""),
+    "DropOut": (("Waiting", "Playing"), ""),
+    "CheckIn": (("Waiting", "Playing", "Finished"), ""),
+    "CheckOut": (("Waiting", "Finished"), ""),
+    "CheckInAll": (("Waiting", "Finished"), ""),
+    "ResetCheckIn": (("Waiting", "Finished"), ""),
+    "SetPaymentStatus": (_ANY_STATE, ""),
+    "SetNonCompeting": (("Planned", "Registration", "Waiting", "Playing"), ""),
+    "SetWaitlisted": (_ANY_STATE, ""),
+    "MarkAllPaid": (_ANY_STATE, ""),
+    "StartRound": (("Waiting", "Finished"), "Playing"),
+    "SelfOrganizeRound": (("Waiting", "Playing"), "Playing"),
+    "FinishRound": (("Playing", "Finished"), "Waiting"),
+    "CancelRound": (("Playing", "Finished"), "Waiting"),
+    "RestoreRound": (("Waiting", "Playing"), "Playing"),
+    "SwapSeats": (("Playing", "Finished"), ""),
+    "AlterSeating": (("Waiting", "Playing", "Finished"), ""),
+    "SeatPlayer": (("Playing", "Finished"), ""),
+    "UnseatPlayer": (("Playing", "Finished"), ""),
+    "AddTable": (("Playing", "Finished"), ""),
+    "RemoveTable": (("Playing", "Finished"), ""),
+    "SetScore": (("Waiting", "Playing", "Finished"), ""),
+    "Override": (("Waiting", "Playing", "Finished"), ""),
+    "Unoverride": (("Waiting", "Playing", "Finished"), ""),
+    "SetToss": (("Waiting", "Finished"), ""),
+    "RandomToss": (("Waiting", "Finished"), ""),
+    "StartFinals": (("Waiting", "Finished"), "Playing"),
+    "FinishFinals": (("Playing", "Finished"), "Finished"),
+    "CancelFinals": (("Playing",), "Waiting"),
+    "FinishTournament": (("Waiting", "Playing", "Finished"), "Finished"),
+    "UpsertDeck": (_ANY_STATE, ""),
+    "DeleteDeck": (_ANY_STATE, ""),
+    "RaffleDraw": (("Waiting", "Playing", "Finished"), ""),
+    "RaffleUndo": (_ANY_STATE, ""),
+    "RaffleClear": (_ANY_STATE, ""),
+    "UpdateConfig": (_ANY_STATE, ""),
+    "SetArchivalResults": (("Finished",), ""),
+}
+
+_PLAYER_ACTIONS = frozenset(
+    {
+        "Register",
+        "Unregister",
+        "DropOut",
+        "CheckIn",
+        "SelfOrganizeRound",
+        "SetScore",
+        "UpsertDeck",
+        "DeleteDeck",
+    }
+)
+
+# Gated on a capability rather than on running the event, so no organizer holds it.
+_IC_ACTIONS = frozenset({"SetArchivalResults"})
+
+_STATE_BLURBS = {
+    "Planned": "Nobody can enter yet. The event exists, and that is all.",
+    "Registration": "The roster is open, and a member may take their own seat.",
+    "Waiting": "The roster is settled and no round is running — between rounds, or"
+    " before the first one.",
+    "Playing": "A round is on the table.",
+    "Finished": "The result stands. What is listed here is re-admitted for"
+    " correction only and moves nothing: a finished event stays finished unless it"
+    " is reopened, and a third-party token may not do that.",
+}
+
+_STATE_NOTES = {
+    "Waiting": "`StartFinals` seeds the finals from the standings, so the toss"
+    " actions belong to this state and not to the one after it.",
+    "Playing": "`FinishRound` returns to **Waiting** only once every table of the"
+    " round is scored; an online event may run rounds in parallel, and there"
+    " `StartRound` is accepted here too.",
+    "Finished": "`SetArchivalResults` is the exception that only exists here — it"
+    " writes the result sheet of a rounds-less legacy import, and the IC role, not"
+    " a scope, is what opens it.",
+}
+
+
+def _state_machine() -> str:
+    """The engine's gate, state by state. An action nearly every state accepts is
+    listed once at the end with its exception, rather than four times over."""
+
+    def tag(name: str) -> str:
+        if name in _IC_ACTIONS:
+            return " *(IC)*"
+        return "" if name in _PLAYER_ACTIONS else " *(organizer)*"
+
+    wide = sorted(n for n, (s, _) in _ACTION_STATES.items() if len(s) >= 4)
+    lines = [
+        "## The event's state machine",
+        "",
+        "Five states, and **an action sent from the wrong one is refused** — the"
+        " engine gates a token exactly as it gates the member in Archon.",
+        "",
+        "```",
+        "Planned  →  Registration  →  Waiting  ⇄  Playing  →  Finished",
+        "```",
+        "",
+        "Back edges exist: `CancelRegistration` returns to **Planned**,"
+        " `ReopenRegistration` to **Registration**, `CancelRound` and"
+        " `CancelFinals` to **Waiting**.",
+        "",
+    ]
+    for state, blurb in _STATE_BLURBS.items():
+        lines += [f"### {state}", "", blurb, ""]
+        for name, (states, dest) in _ACTION_STATES.items():
+            if state not in states or name in wide:
+                continue
+            # Finished re-admits these as corrections; none of them moves the state.
+            arrow = f" → **{dest}**" if dest and state != "Finished" else ""
+            lines.append(f"- `{name}`{arrow}{tag(name)}")
+        lines.append("")
+        if state in _STATE_NOTES:
+            lines += [_STATE_NOTES[state], ""]
+    lines += [
+        "### From any state",
+        "",
+        "The roster, the payments, the decks, the raffle and the event's own"
+        " configuration answer whatever the event is doing. `SetNonCompeting`"
+        " carries a second gate on top of the state: it is refused once the finals"
+        " are seeded, so that a concluded result cannot be rewritten.",
+        "",
+    ]
+    for name in wide:
+        states, _ = _ACTION_STATES[name]
+        missing = [s for s in _ANY_STATE if s not in states]
+        excepted = f" — except in **{missing[0]}**" if missing else ""
+        lines.append(f"- `{name}`{tag(name)}{excepted}")
+    return "\n".join(lines)
+
+
 MEMBER_API_TAG = (
     r"""
-Everything a member's token reaches, on `{site}`. `/oauth/userinfo` answers any
-such token. The rest is the event itself, and needs an `event:run` token that
-names one: ask for the scope with `&tournament=<uid>`, and send the token back as
-an ordinary bearer token.
-
-**A token that names no event reaches `/oauth/userinfo` and nothing else here** —
-that is the identity-only mode, and asking for `event:run` without a tournament is
-how you get it. A daemon token reaches none of this. The reverse does not hold:
-the Public API accepts any member's token, whatever scope it carries.
+Separate API on `{site}`. `/oauth/userinfo` needs only `profile:read` and gives the user's identity.
+The rest is the event itself, and needs `event:run` and a token with specific consent for each event.
+A public API token has no access to this API, on the other hand a Member token has access to the public API.
 
 ## What the grant reaches
 
-An allowlist — anything not listed on this page is refused, including routes
-Archon grows later. Beyond the endpoints below the token reaches `/oauth/token`
-and `/oauth/revoke`, for its own refresh and revocation; consent and client
-management refuse third-party tokens outright.
-
-No other event, and nothing outside a tournament.
-
-**Owning the event is barred even inside your own**: `organizers`, `push-vekn`,
-`go-offline`, `go-online`, `force-takeover`, `force-unlock`, `sync-offline`,
-`qr-checkin`, `archon-import`, `DELETE` on the tournament itself, and the
-`ReopenTournament` action. What remains
-is running it, and the engine gates that on the event's state exactly as it does
-for the member in Archon.
+Beyond the endpoints below the token reaches `/oauth/token` and `/oauth/revoke`, for its own refresh and revocation.
 
 ## Reading the state
 
 **There is no `GET` for the tournament document**, and you never need one. Every
-action returns the whole updated tournament, so your write is also your read. For
-what you did not do — a co-organizer seating a table, a player checking in at the
-door — open the event's stream: it replays current state on connect, then stays
-open for changes.
+action you perform on `/api/tournaments/{uid}/action` sends you back the whole updated tournament,
+any other modification (players and organizers interacting with the app),
+send you the whole updated tournament on the live feed endpoint `/stream?tournament=`.
 
 ## Sending an action
 
-One endpoint runs the event: a `type`, plus whatever fields that type needs. The
-state machine is real, and each step is refused from the wrong state.
+The `/api/tournaments/{uid}/action` endpoint lets you run the event on behalf of the user:
+a `type`, plus whatever fields that type needs.
 
 ```
 {"type":"OpenRegistration"}
@@ -258,21 +374,20 @@ state machine is real, and each step is refused from the wrong state.
 {"type":"FinishTournament"}
 ```
 
-`CloseRegistration` is what moves the event from `Registration` to `Waiting`:
-neither `CheckIn` nor `StartRound` is accepted before it.
+Note if your user is an organizer, you'll have access to all organizers actions,
+but if it's a player, you'll have access only to the actions available to the player.
 
 **`round` and `table` are zero-based** indices into the tournament's own `rounds`
 array — first table of the first round is `{"round":0,"table":0}`. The finals are
 the index one past the last preliminary round.
 
-**Every type is listed with its own fields** under the endpoint's request body —
-pick one and you get exactly what it takes, not the union of everything. Four of
-the engine's are missing on purpose: `ReopenTournament` is barred for a
-third-party token, `ReportPromos` needs a field this endpoint cannot carry, and
-`UploadDeck` and `UpdateDeck` are spellings of `UpsertDeck`.
+**Every type is listed with its own fields** under the endpoint's request body.
+
+{states}
 """.strip()
     .replace("{site}", SITE_URL)
     .replace("{api}", API_URL)
+    .replace("{states}", _state_machine())
 )
 
 
@@ -288,6 +403,28 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 _EVENT = "/api/tournaments/{uid}"
 
 _EVENT_RUN_ROUTES: list[tuple[str, str, str, str, str, str]] = [
+    (
+        "get",
+        "/oauth/userinfo",
+        "Who the member is",
+        "200",
+        "The member's uid, VEKN ID, roles and capabilities.",
+        "`sub` is the member's uid — what `/v1/users/{uid}` takes on the Public API,"
+        " and what a tournament's `players`, `standings` and `winner` carry."
+        " `capabilities` is what the member may do anywhere, so your app need not"
+        " carry its own copy of the role matrix. Answers a `profile:read` or an"
+        " `event:run` token, whether or not it names an event.",
+    ),
+    (
+        "get",
+        "/stream",
+        "The event's live feed",
+        "200",
+        "An endless `text/event-stream` of `data:` lines, one JSON object each.",
+        "Pass `tournament=<the granted uid>`; any other value is refused. The"
+        " connection replays the event's current state, then stays open for changes,"
+        " so a client that reconnects has missed nothing.",
+    ),
     (
         "post",
         f"{_EVENT}/action",
@@ -398,13 +535,11 @@ _EVENT_RUN_ROUTES: list[tuple[str, str, str, str, str, str]] = [
     ),
     (
         "get",
-        "/stream",
-        "The event's live feed",
+        "/sanctions/reference",
+        "Sanction categories and levels",
         "200",
-        "An endless `text/event-stream` of `data:` lines, one JSON object each.",
-        "Pass `tournament=<the granted uid>`; any other value is refused. The"
-        " connection replays the event's current state, then stays open for changes,"
-        " so a client that reconnects has missed nothing.",
+        "The categories, subcategories and levels a sanction may carry.",
+        "The vocabulary `/sanctions/` accepts.",
     ),
     (
         "post",
@@ -414,26 +549,6 @@ _EVENT_RUN_ROUTES: list[tuple[str, str, str, str, str, str]] = [
         "The created sanction.",
         "Records a judge's ruling against a player. The sanction must name the"
         " granted tournament; any other is refused.",
-    ),
-    (
-        "get",
-        "/oauth/userinfo",
-        "Who the member is",
-        "200",
-        "The member's uid, VEKN ID, roles and capabilities.",
-        "`sub` is the member's uid — what `/v1/users/{uid}` takes on the Public API,"
-        " and what a tournament's `players`, `standings` and `winner` carry."
-        " `capabilities` is what the member may do anywhere, so your app need not"
-        " carry its own copy of the role matrix. Answers a `profile:read` or an"
-        " `event:run` token, whether or not it names an event.",
-    ),
-    (
-        "get",
-        "/sanctions/reference",
-        "Sanction categories and levels",
-        "200",
-        "The categories, subcategories and levels a sanction may carry.",
-        "The vocabulary `/sanctions/` accepts.",
     ),
 ]
 
