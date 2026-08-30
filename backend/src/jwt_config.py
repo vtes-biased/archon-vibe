@@ -57,9 +57,7 @@ def _signing_key() -> tuple[Ed25519PrivateKey, str]:
 
 @functools.cache
 def _verification_keys() -> dict[str, Ed25519PublicKey]:
-    """kid -> public key. The signer's own public half is in the set implicitly, so
-    a rotation is: hand the app a new private key and leave the retiring public one
-    in JWT_PUBLIC_KEYS until the last token signed with it has expired."""
+    """kid -> public key."""
     keys: dict[str, Ed25519PublicKey] = {}
     private = _configured_private()
     if private:
@@ -74,17 +72,21 @@ def _verification_keys() -> dict[str, Ed25519PublicKey]:
 
 
 def assert_production_keys(*, signing: bool) -> None:
-    """Both lifespans call this. `signing` is the app, which needs the private
-    half; a verifier needs only public ones."""
+    """Both lifespans call this. `signing` is the app, the only process that may
+    hold the private half."""
     if os.getenv("ENVIRONMENT", "development") == "development":
         return
-    if _kid(_dev_key().public_key()) in _verification_keys() or (
-        signing and not _configured_private()
-    ):
+    if _kid(_dev_key().public_key()) in _verification_keys():
         raise RuntimeError(
             "Refusing to boot on the development signing key. Generate a keypair "
             "with `just jwt-keys`, then set JWT_PRIVATE_KEY (the app) and "
             "JWT_PUBLIC_KEYS (every verifier)."
+        )
+    if signing and not _configured_private():
+        raise RuntimeError("The app mints tokens: set JWT_PRIVATE_KEY.")
+    if not signing and _configured_private():
+        raise RuntimeError(
+            "This process only verifies tokens: it must not hold JWT_PRIVATE_KEY."
         )
 
 

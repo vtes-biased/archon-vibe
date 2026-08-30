@@ -1,14 +1,7 @@
 """Generate the Ed25519 keypair Archon signs its JWTs with.
 
-Emits two single-line, env-var-friendly base64url values:
-  JWT_PRIVATE_KEY  — raw 32-octet seed; the APP ONLY. SECRET, ansible-vault,
-                     never commit.
-  JWT_PUBLIC_KEYS  — raw 32-octet public point; every verifier, the public API
-                     included. Not secret. Space-separated when a rotation leaves
-                     the retiring key in the set.
-
-One keypair per environment (beta/prod each get their own). Rotating INVALIDATES
-every live session unless the retiring public key stays in JWT_PUBLIC_KEYS.
+  JWT_PRIVATE_KEY  — raw 32-octet seed; the app's alone.
+  JWT_PUBLIC_KEYS  — raw 32-octet public point; every verifier.
 
 Usage:  uv run python backend/scripts/gen_jwt_keys.py
 """
