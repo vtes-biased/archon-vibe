@@ -1,6 +1,4 @@
-/** Tournament mutation. A device that can own the tournament applies the event through WASM locally,
- * then posts to the server (serialized per tournament) and rolls back on rejection; a player's device
- * awaits the server first. Pure HTTP transport lives in api.ts, which this module builds on one-way. */
+/** Pure HTTP transport lives in api.ts, which this module builds on one-way. */
 
 import * as m from '$lib/paraglide/messages.js';
 import type { Tournament, DeckObject } from '$lib/types';
@@ -124,8 +122,7 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
             method: 'POST',
             body: JSON.stringify(event),
           }, { suppressErrorToast: true }));
-        // Re-read: an SSE frame landing during the round-trip already carries the server's deck
-        // uid, and writing the pre-flight's own would replace it with one no later frame corrects.
+        // Re-read: a deck uid an SSE frame wrote during the round-trip must not be overwritten.
         await applyDeckOps(result.deckOps, uid, await getDecksByTournament(uid));
         return granted;
       }
@@ -182,9 +179,9 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
 
       return result.tournament;
     } catch (e) {
-      // WASM rejected, or the awaited POST did. Offline there is no server to defer to, so surface
-      // the engine's reason; past `awaitedServer` the server has already answered and falling
-      // through to server-only below would post the action a second time.
+      // WASM rejected. When this tournament (or the device) is offline, there's no server to defer to —
+      // surface the engine's actual reason. Otherwise fall through to server-only (covers unknown-action drift),
+      // never past `awaitedServer`, which would post the action twice.
       if (awaitedServer || isOffline(uid) || !isOnline()) throw e;
     }
   }
