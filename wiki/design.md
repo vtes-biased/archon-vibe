@@ -410,8 +410,9 @@ and roles are the page's subject, not tab content. Below it:
 - **Play record** — ratings, then the wins and the decklists. The
   undocumented-decklist nudge sits between them on `/profile` only: it is
   actionable by the player alone and reads as a reproach on anyone else's page.
-- **Account** — linked accounts, authorized apps, settings, developer,
-  administration, data.
+- **Account** — linked accounts, authorized apps, the member's own playtest NDA
+  records with a re-download of each sealed file, settings, developer,
+  administration, data. The NDA block renders only when a record exists.
 
 Two constraints the structure has to keep. An **OAuth return lands on Account**:
 the Discord and GitHub link confirmations render inside that tab and are invisible

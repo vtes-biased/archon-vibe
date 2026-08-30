@@ -11,7 +11,7 @@
   import { HOF_MIN_WINS } from "$lib/tournament-utils";
   import { registerPasskey } from "$lib/stores/passkeys.svelte";
   import { syncManager } from "$lib/sync";
-  import { claimVeknId, abandonVeknId, uploadAvatar, getNdaStatus } from "$lib/api";
+  import { claimVeknId, abandonVeknId, uploadAvatar, getNdaStatus, type NdaStatus } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
 
   import { User, TriangleAlert, Trophy, FileSignature, IdCard, Swords, Settings } from "@lucide/svelte";
@@ -27,6 +27,7 @@
   import ProfileContact from "./ProfileContact.svelte";
   import LinkedAccounts from "./LinkedAccounts.svelte";
   import AuthorizedApps from "./AuthorizedApps.svelte";
+  import NdaRecords from "./NdaRecords.svelte";
   import AppSettings from "./AppSettings.svelte";
   import DeveloperSection from "./DeveloperSection.svelte";
   import AdminSection from "./AdminSection.svelte";
@@ -82,17 +83,20 @@
   const hasGithub = $derived(!!auth.user?.github_login);
   const githubUsername = $derived(auth.user?.github_login || null);
 
-  let ndaPending = $state(false);
+  let ndaStatus = $state<NdaStatus | null>(null);
   let ndaChecked = $state(false);
+  const ndaPending = $derived(!!ndaStatus?.pending);
+  const ndaRecords = $derived(ndaStatus?.records.filter((r) => r.status !== "pending") ?? []);
 
-  // One silent online check per visit: NDA requests are never synced, so a
-  // pending signature is only discoverable by asking the server.
+  // One silent online check per visit: NDA records are never synced, so a
+  // pending signature and the member's own signed copies are only discoverable
+  // by asking the server.
   $effect(() => {
     const u = auth.user;
     if (!u || ndaChecked || !navigator.onLine) return;
     ndaChecked = true;
     getNdaStatus(u.uid, { suppressErrorToast: true })
-      .then((s) => (ndaPending = !!s.pending))
+      .then((s) => (ndaStatus = s))
       .catch(() => {});
   });
 
@@ -325,6 +329,9 @@
               onRegisterPasskey={handleRegisterPasskey}
             />
             <AuthorizedApps />
+            {#if ndaRecords.length}
+              <NdaRecords userUid={user.uid} records={ndaRecords} />
+            {/if}
             <AppSettings />
             {#if isDev}
               <DeveloperSection />

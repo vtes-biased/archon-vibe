@@ -22,6 +22,16 @@
   let showConfirm = $state(false);
   let signedRecordUid = $state<string | null>(null);
 
+  const onRecord = $derived(status?.records.find((r) => r.status !== "pending") ?? null);
+
+  function fmtDate(iso: string): string {
+    return new Date(iso).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
   onMount(async () => {
     // Root layout's auth hydration fires AFTER this page's onMount; settle it
     // first or a logged-in member reads as anonymous on a direct navigation.
@@ -51,6 +61,7 @@
       phone: phone.trim(),
     });
     signedRecordUid = result.record_uid;
+    status = await getNdaStatus(auth.user.uid, { suppressErrorToast: true }).catch(() => status);
   }
 </script>
 
@@ -69,19 +80,33 @@
       </div>
     {:else if !auth.isAuthenticated || !auth.user}
       <InlineNotice tone="warn">{m.nda_login_required()}</InlineNotice>
-    {:else if signedRecordUid}
+    {:else if signedRecordUid || (!status?.pending && onRecord)}
       <div class="bg-surface-card border border-line rounded-lg p-6 space-y-4">
         <div class="flex items-center gap-2 text-ink-bright">
           <CircleCheck class="w-5 h-5 text-info" aria-hidden="true" />
-          <span class="text-lg font-medium">{m.nda_signed_success()}</span>
+          <span class="text-lg font-medium">
+            {signedRecordUid ? m.nda_signed_success() : m.nda_on_record()}
+          </span>
         </div>
-        {#if email.trim()}
+        {#if signedRecordUid && email.trim()}
           <p class="text-sm text-ink-muted">{m.nda_signed_email_note({ email: email.trim() })}</p>
+        {/if}
+        {#if onRecord}
+          <p class="text-sm text-ink-muted">
+            {#if onRecord.status === "signed"}
+              {m.nda_signed_row({
+                name: onRecord.signer_name ?? "—",
+                date: onRecord.signed_at ? fmtDate(onRecord.signed_at) : "—",
+              })}
+            {:else}
+              {m.nda_uploaded_row({ date: onRecord.signed_at ? fmtDate(onRecord.signed_at) : "—" })}
+            {/if}
+          </p>
         {/if}
         <Button
           variant="primary"
           size="md"
-          onclick={() => downloadNdaPdf(auth.user!.uid, signedRecordUid!)}
+          onclick={() => downloadNdaPdf(auth.user!.uid, signedRecordUid ?? onRecord!.uid)}
           title={m.nda_download_copy_btn()}
         >
           {m.nda_download_copy_btn()}

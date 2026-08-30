@@ -629,6 +629,13 @@ and the current date), `POST /sign` (self-only; requires the pending request),
 `POST /upload` (PTC/IC; paper-scan fallback, PDF or image, 8 MB), `GET
 /{record_uid}/pdf` (the sealed file).
 
+Every read endpoint is *self or PTC/IC*, so the member sees their own evidence:
+the profile's Account tab lists their signed and uploaded records with the
+signature date and a re-download of each sealed file, and `/nda` shows that same
+standing state instead of the no-pending-request dead end once the flow is over.
+The status read is the profile page's one silent per-visit online check —
+records are never synced, so nothing else can surface them.
+
 The document is a versioned constant in `backend/src/nda.py` (`NDA_VERSION`,
 sha256 over the template): each signature pins the exact (version, hash) it was
 shown, so BCP wording changes never orphan old evidence. Signing renders a
