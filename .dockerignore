@@ -1,3 +1,6 @@
+# Patterns anchor at the context root — bare `node_modules/` never matched
+# `frontend/node_modules`. Anything nested needs `**/`, which also matches the root.
+
 # Git
 .git
 .gitignore
@@ -17,8 +20,8 @@ ARCHITECTURE.md
 .idea
 
 # Python
-__pycache__
-*.py[cod]
+**/__pycache__
+**/*.py[cod]
 *$py.class
 *.so
 .Python
@@ -28,7 +31,7 @@ ENV/
 env/
 
 # Node
-node_modules/
+**/node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -45,8 +48,18 @@ engine/target/wheels/
 engine/Cargo.lock
 # Note: engine/pkg/ is INCLUDED for Docker builds (frontend WASM)
 
-# Frontend build
-frontend/dist/
+# Frontend — the image installs and generates its own; the host's copies would be
+# layered over them by `COPY frontend/ ./`. geonames stays out because
+# frontend/Dockerfile.test supplies it from backend/src/data/.
+frontend/build/
+frontend/.svelte-kit/
+frontend/src/lib/paraglide/
+frontend/src/lib/data/geonames/
+
+# Test artifacts
+**/test-results
+**/playwright-report
+**/.e2e-state.json
 
 # OS
 .DS_Store

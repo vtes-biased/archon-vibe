@@ -27,18 +27,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy WASM engine output to where the $engine alias resolves
 COPY --from=wasm-builder /engine/pkg /engine/pkg
 
-# Install dependencies
 COPY frontend/package*.json ./
 RUN npm ci
 
-# Install Playwright browsers
 RUN npx playwright install --with-deps chromium
 
-# Copy frontend source
 COPY frontend/ ./
 
-# Fix geonames: copy actual files instead of broken symlink
-RUN rm -rf src/lib/data/geonames
 COPY backend/src/data/geonames/ src/lib/data/geonames/
 
 # changelog.ts imports this from the repository root, which is three levels above
