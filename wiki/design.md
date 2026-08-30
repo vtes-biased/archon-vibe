@@ -295,6 +295,12 @@ No Cancel affordance on an auto-save form: the exit action is Close or Done, and
 pending debounce is **flushed** on close, never dropped. Only genuinely
 irreversible or externally visible actions gate behind a confirm step.
 
+**Unactionable match** — a member the organizer cannot add is listed disabled with
+its reason, never filtered out of the results: an empty dropdown reads as "no such
+member" and invites minting the duplicate only an IC can merge back. Holds for the
+add-player search and the create-and-register dedup review, and the reason wins
+over any other block on the same row — already registered, then suspended.
+
 **List view state** — filters belong to the list, not the component instance, in
 three layers:
 

@@ -6,7 +6,7 @@
   import { isOffline, addOfflinePlayer } from "$lib/stores/offline.svelte";
   import { getCountryFlag } from "$lib/geonames";
   import Button from "$lib/components/Button.svelte";
-  import { TriangleAlert, Flower2, Ban } from "@lucide/svelte";
+  import { TriangleAlert, Flower2, Ban, UserCheck } from "@lucide/svelte";
   import { sponsorVeknMember, createUser, ApiError } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
   import { toUserMessage } from "$lib/errors";
@@ -57,6 +57,7 @@
   // Deceased look-alikes are addable (backfilling a past event) but must be
   // confirmed — mirror AddPlayerForm's warn-not-block guard on the new add paths.
   let pendingDeceased = $state<UserListItem | null>(null);
+  const registeredUids = $derived(new Set(tournament.players?.map(p => p.user_uid) ?? []));
 
   // Announce the form→review swap to keyboard/SR users by moving focus to the
   // review heading (the DOM changes in place with no navigation otherwise).
@@ -129,9 +130,7 @@
       // unreviewed offline create mints a duplicate account.
       if (createCandidates.length === 0) {
         const country = createCountry || tournament.country || '';
-        const registered = new Set(tournament.players?.map(p => p.user_uid) ?? []);
-        const search = async (c: string | undefined) =>
-          (await getFilteredUsers(c, undefined, createName.trim())).filter(u => !registered.has(u.uid));
+        const search = (c: string | undefined) => getFilteredUsers(c, undefined, createName.trim());
         let matches = await search(country || undefined);
         // Offline there's no server-side email 409 behind this, so a
         // cross-country duplicate would go uncaught — and a visiting player is
@@ -274,15 +273,16 @@
         <p class="text-sm text-ink">{m.create_dedup_message()}</p>
         <div class="border border-line-strong rounded-lg divide-y divide-line max-h-56 overflow-y-auto">
           {#each createCandidates as u}
-            {@const isSuspended = candidateSuspended.has(u.uid)}
+            {@const isRegistered = registeredUids.has(u.uid)}
+            {@const isSuspended = !isRegistered && candidateSuspended.has(u.uid)}
             <!-- Sponsoring a VEKN-less candidate needs the server, so offline the
                  pick would dead-end on a network failure — show it, don't offer it. -->
-            {@const needsServer = offlineCreate && !u.vekn_id}
-            {@const blocked = isSuspended || needsServer}
+            {@const needsServer = !isRegistered && offlineCreate && !u.vekn_id}
+            {@const blocked = isRegistered || isSuspended || needsServer}
             <button
               onclick={() => !blocked && chooseCandidate(u)}
               disabled={blocked}
-              class="w-full min-h-[44px] px-3 py-2 text-left text-sm transition-colors inline-flex items-center gap-1 {blocked ? 'text-ink-faint cursor-not-allowed' : 'text-ink-bright hover:bg-surface-hover'}"
+              class="w-full min-h-[44px] px-3 py-2 text-left text-sm transition-colors inline-flex items-center gap-1 {blocked ? 'text-ink-faint' : 'text-ink-bright hover:bg-surface-hover'}"
             >
               {#if u.country}<span class="mr-1">{getCountryFlag(u.country)}</span>{/if}{u.name}
               {#if u.deceased_at}
@@ -295,7 +295,10 @@
                   <TriangleAlert class="w-3 h-3" />{m.add_player_no_vekn_id()}
                 </span>
               {/if}
-              {#if isSuspended}
+              {#if isRegistered}
+                <UserCheck class="w-3.5 h-3.5 text-ink-muted ml-1" />
+                <span class="text-xs text-ink-muted">{m.err_tournament_already_registered()}</span>
+              {:else if isSuspended}
                 <Ban class="w-3.5 h-3.5 text-link ml-1" />
                 <span class="text-xs text-link">{m.error_suspended_cannot_register()}</span>
               {:else if needsServer}

@@ -48,8 +48,12 @@
     // the path to first paint.
     const barred = await getRegistrationBarredUids();
     if (seq !== searchSeq) return;
-    searchTotal = results.length;
-    searchResults = results.slice(0, SEARCH_LIMIT);
+    // Blocked rows are listed rather than filtered, so they must not push the
+    // addable match past SEARCH_LIMIT (db.ts sorts alphabetically within a tier).
+    const addable = (u: UserListItem) => !registeredUids.has(u.uid) && !barred.has(u.uid);
+    const ranked = [...results.filter(addable), ...results.filter(u => !addable(u))];
+    searchTotal = ranked.length;
+    searchResults = ranked.slice(0, SEARCH_LIMIT);
     suspendedUids = barred;
   }
 
@@ -124,7 +128,7 @@
           aria-disabled={isBlocked}
           onclick={() => !isBlocked && chooseUser(user)}
           disabled={isBlocked}
-          class="w-full px-3 py-2 text-left text-sm transition-colors {isBlocked ? 'text-ink-faint cursor-not-allowed' : 'text-ink-bright'} {i === selectedIndex && !isBlocked ? 'bg-surface-active' : isBlocked ? '' : 'hover:bg-surface-hover'}"
+          class="w-full px-3 py-2 text-left text-sm transition-colors {isBlocked ? 'text-ink-faint' : 'text-ink-bright'} {i === selectedIndex && !isBlocked ? 'bg-surface-active' : isBlocked ? '' : 'hover:bg-surface-hover'}"
         >
           <span class="inline-flex items-center gap-1">
             {#if user.country}<span class="mr-1">{getCountryFlag(user.country)}</span>{/if}{user.name}
