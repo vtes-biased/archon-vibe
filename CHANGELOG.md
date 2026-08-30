@@ -10,6 +10,19 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- Playtesters now sign the playtest NDA in the app, and get a signed copy by email.
+- A tournament's registration cap now holds: past it, self-registration joins a waitlist rather than the roster.
+- The round count on the tournament form now says it counts preliminary rounds only, not the final.
+- Reopening a finished tournament now keeps its final, instead of throwing away the finals table and the winner.
+- A finished tournament now offers promo reporting as its main action, rather than a tap inside Tools.
+- In a multideck tournament, a cancelled round no longer shifts which deck each later round shows.
+- A member's profile is now split into tabs instead of one long page.
+- Creating a member now opens in a dialog, like every other create.
+- Logging in with Discord now returns you to the page you were heading for.
+- Loading and live updates now hold up when hundreds of players connect at once.
+
 ## v1.0.8 — 2026-08-24
 
 - The winner's decklist from a tournament now reaches the TWDA archive.
