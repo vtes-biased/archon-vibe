@@ -55,7 +55,7 @@ import TournamentModals from "./TournamentModals.svelte";
   let organizerNames = $state<Record<string, string>>({});
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let isSyncing = $state(!syncManager.isSynced);
+  let hasSynced = $state(syncManager.isSynced);
   let actionLoading = $state(false);
 
   const auth = $derived(getAuthState());
@@ -621,12 +621,10 @@ import TournamentModals from "./TournamentModals.svelte";
     untrack(() => load());
 
     const handleSync = (event: { type: string; data?: any }) => {
-      if (event.type === "syncing") isSyncing = true;
-      if (event.type === "error" || event.type === "disconnected") isSyncing = false;
       // Snapshot ingest writes the whole corpus in one pass with no per-object
       // events, so the branches below never fire for a page that mounted empty.
       if (event.type === "sync_complete") {
-        isSyncing = false;
+        hasSynced = true;
         untrack(() => load());
         getDecksByTournamentGrouped(uid).then(grouped => { decksByUser = grouped; });
       }
@@ -1042,7 +1040,7 @@ import TournamentModals from "./TournamentModals.svelte";
         />
       {/if}
       {/if}
-    {:else if isSyncing}
+    {:else if !hasSynced}
       <div class="text-center py-12">
         <Loader2 class="mx-auto h-12 w-12 text-ink-faint animate-spin" />
         <p class="text-ink-muted mt-4">{m.tournament_waiting_for_data()}</p>
