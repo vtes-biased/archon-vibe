@@ -46,8 +46,7 @@
     "DEV",
   ];
 
-  // Filters every signed-in viewer can see live in the query string (url-filters) so leaving and returning restores the list;
-  // the officials-only sponsor and no-VEKN toggles stay local — restoring one for a viewer who can't see its control would filter unaccountably.
+  // Deliberately absent from the syncQueryParams call below: the officials-only sponsor and no-VEKN toggles.
   const urlParams = currentParams();
   let currentPage = $state(readPageParam() + 1);
   let pageSize = 250;
