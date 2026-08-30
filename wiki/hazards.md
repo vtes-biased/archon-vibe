@@ -113,6 +113,19 @@ share one. A change to how a token or a client is stored, revoked or deactivated
 must land on `backend/src/public_api/auth.py` as well as `db_oauth.py` — nothing
 points the one editor at the other.
 
+**The public API verifies JWTs and must never be able to sign one.** Its unit
+holds `JWT_PUBLIC_KEYS` and no private key ([access](access.md#authentication)) —
+handing it `JWT_PRIVATE_KEY` silently restores the forge the split exists to
+close. Its environment must also carry `ENVIRONMENT`, because an unconfigured key
+is a *working*, publicly-known one: a process reading the default `"development"`
+boots on it instead of refusing. Both sides come from the app's `backend_env` in
+the inventories, which is the only thing keeping them in step.
+
+**Every JWT decode goes through `jwt_config.decode`**, which picks the key by the
+token's `kid` and pins the `aud` to the calling surface. A hand-rolled
+`jwt.decode` skips both: it would accept the other surface's tokens, and any key
+in the set rather than the one the token names.
+
 **An OAuth token is admitted at three doors, and only one runs the allowlist.**
 `get_current_user` (`middleware/auth.py`) holds the whole gate
 ([access](access.md#the-allowlist)). `_resolve_user_from_token` (`main.py`) backs

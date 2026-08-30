@@ -1,7 +1,7 @@
 """Create throwaway members for loadtest_stream.py and mint their stream tokens.
 
 Runs from the dev repo or inside a deployed wheel's venv (the box), so the
-JWT secret is only ever read where it already lives:
+JWT signing key is only ever read where it already lives:
 
     python loadtest_users.py mint --count 200 --ttl-minutes 120 --out tokens.txt
     python loadtest_users.py cleanup
@@ -22,15 +22,13 @@ from uuid import uuid7
 
 try:
     from backend.src import db
-    from backend.src.jwt_config import JWT_ALGORITHM, JWT_SECRET
+    from backend.src.jwt_config import AUDIENCE_APP, sign
     from backend.src.models import User
 except ImportError:
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from src import db
-    from src.jwt_config import JWT_ALGORITHM, JWT_SECRET
+    from src.jwt_config import AUDIENCE_APP, sign
     from src.models import User
-
-import jwt
 
 NAME_PREFIX = "Load Test "
 
@@ -51,15 +49,14 @@ async def mint(count: int, ttl_minutes: int, out: str) -> None:
             vekn_id=f"99{run:03d}{i:03d}",
         )
         await db.save_user(user)
-        token = jwt.encode(
+        token = sign(
             {
                 "sub": user.uid,
                 "type": "access",
                 "exp": now + timedelta(minutes=ttl_minutes),
                 "iat": now,
             },
-            JWT_SECRET,
-            algorithm=JWT_ALGORITHM,
+            AUDIENCE_APP,
         )
         lines.append(token)
     Path(out).write_text("\n".join(lines) + "\n")

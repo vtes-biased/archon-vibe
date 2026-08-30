@@ -34,11 +34,8 @@ from ..db_oauth import (
     update_oauth_token,
     upsert_oauth_consent,
 )
-from ..middleware.auth import (
-    JWT_ALGORITHM,
-    JWT_SECRET,
-    CurrentUser,
-)
+from ..jwt_config import AUDIENCE_API, AUDIENCE_APP, decode, sign
+from ..middleware.auth import CurrentUser
 from ..models import (
     OAuthAuthorizationCode,
     OAuthClient,
@@ -103,7 +100,10 @@ def _create_oauth_jwt(
     # Never a member of `scope`: that string round-trips through OAuthScope.
     if tournament_uid:
         payload["tournament"] = tournament_uid
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    # The access half is attribution on the public API too; the refresh half is
+    # only ever presented back to this endpoint.
+    audience = [AUDIENCE_APP, AUDIENCE_API] if token_type == "access" else AUDIENCE_APP
+    return sign(payload, audience)
 
 
 def _parse_scopes(scope_str: str) -> list[OAuthScope]:
@@ -457,7 +457,7 @@ async def _handle_refresh_token(body: TokenRequest, client: OAuthClient) -> dict
         raise HTTPException(400, "Missing refresh_token")
 
     try:
-        payload = jwt.decode(refresh_token_str, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = decode(refresh_token_str, AUDIENCE_APP)
     except jwt.ExpiredSignatureError:
         raise HTTPException(400, "Refresh token expired") from None
     except jwt.InvalidTokenError:
@@ -539,7 +539,7 @@ async def _handle_client_credentials(body: TokenRequest, client: OAuthClient) ->
         raise HTTPException(400, "client_credentials grants api:read and nothing else")
 
     now = datetime.now(UTC)
-    token = jwt.encode(
+    token = sign(
         {
             "type": "oauth_client",
             "client_id": client.client_id,
@@ -547,8 +547,7 @@ async def _handle_client_credentials(body: TokenRequest, client: OAuthClient) ->
             "iat": now,
             "exp": now + CLIENT_TOKEN_LIFETIME,
         },
-        JWT_SECRET,
-        algorithm=JWT_ALGORITHM,
+        AUDIENCE_API,
     )
     return {
         "access_token": token,
@@ -642,12 +641,7 @@ async def revoke_token(request: Request):
         raise HTTPException(400, "Missing token")
 
     try:
-        payload = jwt.decode(
-            body.token,
-            JWT_SECRET,
-            algorithms=[JWT_ALGORITHM],
-            options={"verify_exp": False},
-        )
+        payload = decode(body.token, AUDIENCE_APP, verify_exp=False)
     except jwt.InvalidTokenError:
         return {"status": "ok"}
 

@@ -274,6 +274,11 @@ build-geonames:
 vapid-keys:
     uv run python backend/scripts/gen_vapid_keys.py
 
+# Generate the Ed25519 JWT signing keypair. One per env; the private key is the app's
+# alone (ansible-vault), the public key goes to every verifier.
+jwt-keys:
+    uv run python backend/scripts/gen_jwt_keys.py
+
 # Reset dev database (clears all data)
 dev-reset:
     #!/usr/bin/env bash

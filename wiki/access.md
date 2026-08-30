@@ -77,6 +77,23 @@ Every method issues JWT access/refresh token pairs — short-lived access,
 longer-lived refresh. OAuth tokens are a separate `oauth_access` type with scope
 restrictions.
 
+**Tokens are signed asymmetrically — EdDSA (Ed25519), never a shared secret.**
+The app holds the private half and is the only process that can mint; every
+verifier, the [public API](public-api.md#auth) included, holds public keys only,
+so the internet-facing read service cannot forge a first-party session for
+anyone. Both processes refuse to boot outside development on the keypair
+`jwt_config.py` derives from a seed of its own — an unconfigured key is a
+*working*, publicly-known key, so that guard is the whole of the separation
+([hazards](hazards.md#two-implementations-of-one-gate)).
+
+Every token names the surface it is for in `aud` — `archon` for the app,
+`archon-api` for the public API, both for an `oauth_access` token, which is
+attribution on either — and carries its signing key's `kid`, a digest of the
+public half. A verifier holds a set keyed on `kid`, so a rotation is: hand the app
+a new private key and leave the retiring public one in `JWT_PUBLIC_KEYS` until the
+last token signed with it has expired. Dropping it instead is how every live
+session is invalidated on purpose.
+
 | Method | Notes | Key files |
 |---|---|---|
 | Email + password | register or login | `routes/auth.py` |
@@ -247,8 +264,12 @@ the two disagree, which is what keeps the reference from quietly lying
 ([public-api](public-api.md#documentation)).
 
 Security: PKCE S256 required, Argon2-hashed client secrets, refresh-token rotation
-with a revocation chain, single-use authorization codes, consent persistence, and a
-`revoked` flag on access tokens honored by the auth middleware.
+with a revocation chain, single-use authorization codes, consent persistence, a
+`revoked` flag on access tokens honored by the auth middleware, and the asymmetric
+signing above — a daemon token is verifiable on the API and mintable only by the
+app. The two proxied endpoints that run an Argon2 verify per request,
+`/oauth/token` and `/oauth/revoke`, carry their own rate-limit zone on the API's
+vhost rather than the generic read one ([public-api](public-api.md#deployment)).
 
 ### The daemon grant
 

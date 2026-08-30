@@ -7,7 +7,7 @@ from fastapi import Depends, Header, HTTPException, Request
 
 from ..db import get_user_by_uid
 from ..db_oauth import get_oauth_token_by_jti
-from ..jwt_config import JWT_ALGORITHM, JWT_SECRET
+from ..jwt_config import AUDIENCE_APP, decode
 from ..models import User
 
 _OAUTH_BARRED_SUBPATHS = frozenset(
@@ -64,7 +64,7 @@ async def get_current_user(
     token = authorization[7:]
 
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = decode(token, AUDIENCE_APP)
         token_type = payload.get("type")
 
         if token_type == "access":

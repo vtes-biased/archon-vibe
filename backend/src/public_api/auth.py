@@ -1,7 +1,7 @@
 import jwt
 from fastapi import HTTPException, Request
 
-from ..jwt_config import JWT_ALGORITHM, JWT_SECRET
+from ..jwt_config import AUDIENCE_API, decode
 from ..models import OAuthScope
 from .db import get_connection
 
@@ -44,7 +44,7 @@ async def require_api_token(request: Request) -> None:
         raise HTTPException(401, "Missing or invalid authorization header", _CHALLENGE)
 
     try:
-        payload = jwt.decode(authorization[7:], JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = decode(authorization[7:], AUDIENCE_API)
     except jwt.ExpiredSignatureError as err:
         raise HTTPException(401, "Token expired", _CHALLENGE) from err
     except jwt.InvalidTokenError as err:

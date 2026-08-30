@@ -1,4 +1,7 @@
 limit_req_zone $binary_remote_addr zone={{ _zone }}_stream:10m rate=20r/m;
 # Single-row lookups: a client resolving a page of event codes bursts legitimately.
 limit_req_zone $binary_remote_addr zone={{ _zone }}_read:10m rate=600r/m;
+# The two proxied endpoints that run an Argon2 verify per request: a client
+# secret is not something a caller retries at read speed.
+limit_req_zone $binary_remote_addr zone={{ _zone }}_token:10m rate=30r/m;
 limit_conn_zone $binary_remote_addr zone={{ _zone }}_conn:10m;

@@ -147,7 +147,8 @@ Copy `.env.example` to `.env` and configure as needed. **Local dev works without
 | Variable | Default (dev) | Description |
 |----------|---------------|-------------|
 | `DATABASE_URL` | `postgresql://archon:archon_dev_password@localhost:5433/archon` | PostgreSQL connection string |
-| `JWT_SECRET` | `dev-secret-change-in-production!` | JWT signing key. **In production**, generate with `openssl rand -base64 32` |
+| `JWT_PRIVATE_KEY` | derived dev key | Ed25519 signing seed, the app's alone. **Outside development**, generate with `just jwt-keys` |
+| `JWT_PUBLIC_KEYS` | derived dev key | Space-separated public keys every verifier holds, the public API included |
 | `ENVIRONMENT` | `development` | Set to `production` in prod (enforces JWT validation) |
 | `FRONTEND_URL` | `http://localhost:5173` | Public frontend origin. Used for OAuth redirects, calendar links, error pages |
 | `API_BASE_URL` | `http://localhost:8000` | Public backend URL. Used when the backend generates client-facing URLs (e.g. calendar feed links). In prod behind nginx, typically same as `FRONTEND_URL` if same domain |

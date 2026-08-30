@@ -21,9 +21,9 @@ ROOT = Path(__file__).resolve().parent.parent
 
 PACKAGE = "backend/src/public_api/"
 
-# What the API app may take from the app's package: the msgspec models the
-# documented schemas are derived from, the projection field sets that prune them,
-# the shared JWT secret, and the snapshot file's path.
+# What the API app may take: the msgspec models the documented schemas derive from,
+# the projection field sets that prune them, the JWT keys (it verifies, never
+# signs — wiki/public-api.md#auth), and the snapshot file's path.
 ALLOWED_IMPORTS = {"models", "access_levels", "jwt_config", "snapshots"}
 
 _RELATIVE_IMPORT = re.compile(r"^\s*from \.\.([A-Za-z_][A-Za-z0-9_]*)")

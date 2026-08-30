@@ -218,8 +218,10 @@ crawler UA list ([architecture](architecture.md#reports-and-social-sharing)).
 Copy `.env.example` to `.env`. **Local dev works with no `.env` at all** — every
 variable has a sensible default. Production requires explicit configuration.
 
-**Core** — `DATABASE_URL`; `JWT_SECRET` (generate with `openssl rand -base64 32`
-in production); `ENVIRONMENT` (`production` enforces JWT validation);
+**Core** — `DATABASE_URL`; `JWT_PRIVATE_KEY` and `JWT_PUBLIC_KEYS` (`just
+jwt-keys`, one pair per environment, both ansible-vault vars —
+[access](access.md#authentication)); `ENVIRONMENT`, which anything but
+`development` makes those two mandatory;
 `FRONTEND_URL`, the public frontend origin used for OAuth redirects, calendar links
 and error pages; `API_BASE_URL`, the backend's view of its *own* public address for
 URLs it generates; `VITE_API_URL`, the frontend's view of where to reach the

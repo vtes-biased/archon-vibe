@@ -8,9 +8,11 @@
 #                      endpoint and tournament banners straight through)
 # r.user             required
 # r.group            required
-# r.env              required (dict; JWT_SECRET and DATABASE_URL must match the
-#                      app's, and SNAPSHOT_DIR must be the directory the app
-#                      writes, or /v1/export has no file)
+# r.env              required (dict; JWT_PUBLIC_KEYS must carry the public half of
+#                      every key the app signs with, DATABASE_URL must match the
+#                      app's, ENVIRONMENT must be set or the key guard reads
+#                      "development", and SNAPSHOT_DIR must be the directory the
+#                      app writes, or /v1/export has no file)
 # r.server_name      required only when r.manage_nginx (public FQDN, e.g.
 #                      api.archon.vekn.net)
 # r.env_dir          optional (default below)

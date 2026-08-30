@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from scalar_fastapi import get_scalar_api_reference
 
+from ..jwt_config import assert_production_keys
 from .db import close_pool, open_pool
 from .examples import (
     MEMBER_TOURNAMENT,
@@ -393,6 +394,7 @@ the index one past the last preliminary round.
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    assert_production_keys(signing=False)
     await open_pool()
     try:
         yield

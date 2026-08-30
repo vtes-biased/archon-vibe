@@ -62,7 +62,10 @@ backend_env:
   MAIL_FROM: codex.of.the.damned@gmail.com
   MAIL_FROM_NAME: "Archon Beta"
   MAIL_PASSWORD: "{{ vault_mail_password }}"
-  JWT_SECRET: "{{ vault_jwt_secret }}"
+  # The app is the only process holding the private half; every verifier gets
+  # the public one. Per-env pair (beta and prod must NOT share).
+  JWT_PRIVATE_KEY: "{{ vault_jwt_private_key }}"
+  JWT_PUBLIC_KEYS: "{{ vault_jwt_public_keys }}"
   # backend uses CLIENTID/SECRET, not CLIENT_ID/CLIENT_SECRET.
   DISCORD_CLIENTID: "{{ vault_discord_client_id }}"
   DISCORD_SECRET: "{{ vault_discord_client_secret }}"
@@ -105,8 +108,9 @@ backend_env:
 public_api_enabled: true
 
 # The public read API runs as a second unit off the same wheel and venv, so its
-# environment is deliberately derived from the app's: one JWT secret verifies a
-# token minted by the other, and /v1/export serves the snapshot the app writes.
+# environment is deliberately derived from the app's: it verifies with the public
+# half of the app's signing key and can mint nothing, and /v1/export serves the
+# snapshot the app writes.
 public_api_env:
   PYTHONOPTIMIZE: 1
   # Both appear in the reference page: the profile link where a client is
@@ -114,7 +118,10 @@ public_api_env:
   SITE_URL_BASE: "{{ site_url_base }}"
   PUBLIC_API_URL_BASE: "https://{{ domain_api }}"
   DATABASE_URL: "{{ backend_env.DATABASE_URL }}"
-  JWT_SECRET: "{{ backend_env.JWT_SECRET }}"
+  # Without this the guard below reads "development" and boots on the
+  # publicly-known dev keypair.
+  ENVIRONMENT: "{{ backend_env.ENVIRONMENT }}"
+  JWT_PUBLIC_KEYS: "{{ backend_env.JWT_PUBLIC_KEYS }}"
   SNAPSHOT_DIR: "{{ backend_env.SNAPSHOT_DIR }}"
 
 bot_env:

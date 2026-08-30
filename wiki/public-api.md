@@ -156,6 +156,13 @@ Both checks run on this app's own SQL, since the isolation lint forbids the
 shape asserted in two places
 ([hazards](hazards.md#two-implementations-of-one-gate)).
 
+**This process verifies and cannot mint.** It holds the public half of the app's
+EdDSA signing key and no private key at all, and it accepts only tokens whose
+`aud` names it — `archon-api` ([access](access.md#authentication)). A first-party
+session token is refused here on its audience before its type is ever read, and
+nothing reachable on this host can forge one. `/oauth/token` is the app's
+endpoint, merely proxied through this vhost.
+
 **A daemon only ever types one hostname.** `/oauth/token` and
 `/oauth/revoke` are the app's endpoints, not the API's, but the API's vhost
 proxies them ([deployment](#deployment)) so minting, revoking and reading share
@@ -308,8 +315,10 @@ The unit is `PartOf` the backend's, so the deploy that restarts the app for a ne
 wheel restarts this process too; without that it would serve yesterday's code
 after a quick-lane deploy, and the role is untagged precisely because it needs no
 lane of its own. Its environment is derived from the app's in the inventory rather
-than repeated: one `JWT_SECRET` (or no token it is handed ever verifies), one
-`DATABASE_URL`, one `SNAPSHOT_DIR` (or `/v1/export` has no file).
+than repeated: `JWT_PUBLIC_KEYS` off the app's (or no token it is handed ever
+verifies), one `DATABASE_URL`, one `SNAPSHOT_DIR` (or `/v1/export` has no file),
+and the app's `ENVIRONMENT` — without which its key guard reads `"development"`
+([hazards](hazards.md#two-implementations-of-one-gate)).
 
 **Throttling lives on the vhost, never in a handler.** nginx sees the client and
 the app behind a proxy does not, and pacing a stream in Python would hold server
@@ -326,6 +335,7 @@ window.
 | `limit_req` on the six streaming routes | `rate=20r/m burst=10 nodelay` | egress: a whole refresh is five streams and ~7 MB gzipped (tournaments 5.3, users 1.1, decks 0.6, the rest rounding error), so 20r/m is four refreshes a minute, ~28 MB/min or 3.7 Mbit/s sustained from one address. The burst must clear a whole refresh or a legitimate one breaks halfway; ten leaves room for two |
 | `limit_conn` per address | 16 | a suspended stream holds one buffered batch (~1.8 MB) and **no** connection, so concurrency queues on the pool rather than exhausting it. Sixteen is ~29 MB and a four-deep queue |
 | `limit_req` on everything else under `/v1` and on `/docs` | a separate, far more generous zone | single-row lookups; a client resolving a page of event codes bursts legitimately |
+| `limit_req` on the proxied `/oauth/token` and `/oauth/revoke` | `rate=30r/m burst=5 nodelay` | each runs an Argon2 verify of the client secret, so the cost is CPU on the app's box rather than egress here, and a client mints one token an hour. The generous read zone would let an address spend 600 Argon2 verifies a minute guessing a secret |
 | `limit_req_status`, `limit_conn_status` | 429 | nginx defaults to 503, which reads as "outage, retry" rather than "slow down" |
 
 Three locations are proxied to the **app** rather than the API process:

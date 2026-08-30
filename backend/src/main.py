@@ -11,7 +11,6 @@ from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-import jwt
 import msgspec
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -345,14 +344,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     logger.info(f"Archon backend starting (version {__version__})")
 
-    from .jwt_config import JWT_DEFAULT_SECRET, JWT_SECRET
+    from .jwt_config import assert_production_keys
 
-    environment = os.getenv("ENVIRONMENT", "development")
-    if JWT_SECRET == JWT_DEFAULT_SECRET and environment != "development":
-        raise RuntimeError(
-            "JWT_SECRET must be set to a secure value in non-development environments. "
-            "Set the JWT_SECRET environment variable."
-        )
+    assert_production_keys(signing=True)
 
     cards_data, _ = cards._load_cards()
     if cards_data is None:
@@ -693,9 +687,9 @@ async def _resolve_user_from_token(token: str | None) -> User | None:
     if not token:
         return None
     try:
-        from .jwt_config import JWT_ALGORITHM, JWT_SECRET
+        from .jwt_config import AUDIENCE_APP, decode
 
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = decode(token, AUDIENCE_APP)
         if payload.get("type") != "access":
             return None
         user_uid = payload.get("sub")

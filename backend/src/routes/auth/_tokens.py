@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 
 from ...db import get_user_by_uid
-from ...jwt_config import JWT_ALGORITHM, JWT_SECRET
+from ...jwt_config import AUDIENCE_APP, decode, sign
 
 router = APIRouter()
 encoder = msgspec.json.Encoder()
@@ -37,8 +37,7 @@ def create_access_token(user_uid: str) -> tuple[str, int]:
         "exp": expire,
         "iat": datetime.now(UTC),
     }
-    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    return token, int(expires_delta.total_seconds())
+    return sign(payload, AUDIENCE_APP), int(expires_delta.total_seconds())
 
 
 def create_refresh_token(user_uid: str) -> str:
@@ -49,12 +48,12 @@ def create_refresh_token(user_uid: str) -> str:
         "exp": expire,
         "iat": datetime.now(UTC),
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return sign(payload, AUDIENCE_APP)
 
 
 def verify_token(token: str, expected_type: str = "access") -> str:
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = decode(token, AUDIENCE_APP)
         if payload.get("type") != expected_type:
             raise HTTPException(status_code=401, detail="Invalid token type")
         user_uid = payload.get("sub")
