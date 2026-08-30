@@ -218,7 +218,16 @@ re-pull: [sync](sync.md#offline-lifecycle).
 
 ## Mutation pipeline
 
-Tournament actions are optimistic via WASM:
+Tournament actions are optimistic via WASM **on a device that can own the
+tournament** — the organizer console, which offline mode locks to one device
+([online and offline](#online-and-offline)). A player's device can never hold that
+lock and so can never mutate offline: for it the local engine is a pre-flight
+check only, and the action awaits the server before the surface reports any
+outcome. Optimism there would buy nothing and has twice sold a success the server
+refused. The two paths differ in *when the outcome is declared*, not in which
+engine decides.
+
+The owning device's path:
 
 1. WASM processes locally → `{tournament, deck_ops}` → IndexedDB updated → UI
    reacts immediately.

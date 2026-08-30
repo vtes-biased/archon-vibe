@@ -26,9 +26,12 @@ user-visible wrong answer. Export it and call it. When the export is awkward
 because the engine loads asynchronously and the caller is synchronous, fix the
 call site; a copy is not the cheaper option, it is the one whose cost lands later.
 
-**Server always wins.** Mutations apply optimistically in WASM; the server's SSE
-frame is authoritative and overwrites. Apply semantics are overwrite-by-uid,
-never field-merge — a merge would preserve stale optimistic fields forever.
+**Server always wins.** A device that can own the tournament mutates optimistically
+in WASM; the server's SSE frame is authoritative and overwrites. A device that
+never can — any player's — awaits the server before reporting an outcome, because
+optimism there buys nothing an offline console needs and costs a success the
+server never granted. Apply semantics are overwrite-by-uid, never field-merge — a
+merge would preserve stale optimistic fields forever.
 
 **One schemaless table, four pre-computed projections.** All synced objects live
 in `objects` with `public`/`member`/`full` JSONB columns written at write time,
