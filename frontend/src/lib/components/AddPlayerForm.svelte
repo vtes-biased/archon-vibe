@@ -4,7 +4,7 @@
   import type { UserListItem } from "$lib/db";
   import { getFilteredUsers, getRegistrationBarredUids, warmUserIndex } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
-  import { Ban, TriangleAlert, Flower2 } from "@lucide/svelte";
+  import { Ban, TriangleAlert, Flower2, UserCheck } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
   import { dialogPanel } from "$lib/actions/dialog";
 
@@ -24,6 +24,7 @@
   let selectedIndex = $state(-1);
   let suspendedUids = $state<Set<string>>(new Set());
   let pendingDeceased = $state<UserListItem | null>(null);
+  const registeredUids = $derived(new Set(tournament?.players?.map(p => p.user_uid) ?? []));
   const SEARCH_LIMIT = 10;
   const dropdownOpen = $derived(searchResults.length > 0 || playerSearch.trim().length >= 2);
   // See UserPicker: the index build makes early keystrokes slower than later ones,
@@ -43,14 +44,12 @@
     }
     const results = await getFilteredUsers(undefined, undefined, playerSearch.trim());
     if (seq !== searchSeq) return;
-    const registeredUids = new Set(tournament?.players?.map(p => p.user_uid) ?? []);
-    const filtered = results.filter(u => !registeredUids.has(u.uid));
     // One scan for the whole page of results, rather than a lookup per row on
     // the path to first paint.
     const barred = await getRegistrationBarredUids();
     if (seq !== searchSeq) return;
-    searchTotal = filtered.length;
-    searchResults = filtered.slice(0, SEARCH_LIMIT);
+    searchTotal = results.length;
+    searchResults = results.slice(0, SEARCH_LIMIT);
     suspendedUids = barred;
   }
 
@@ -65,7 +64,7 @@
     } else if (e.key === "Enter" && selectedIndex >= 0) {
       e.preventDefault();
       const user = searchResults[selectedIndex];
-      if (user && !suspendedUids.has(user.uid)) chooseUser(user);
+      if (user && !suspendedUids.has(user.uid) && !registeredUids.has(user.uid)) chooseUser(user);
     }
   }
 
@@ -115,15 +114,17 @@
   {#if dropdownOpen}
     <div id="player-search-listbox" role="listbox" class="absolute z-10 mt-1 w-full bg-surface-card border border-line-strong rounded-lg divide-y divide-line max-h-48 overflow-y-auto shadow-lg">
       {#each searchResults as user, i}
-        {@const isSuspended = suspendedUids.has(user.uid)}
+        {@const isRegistered = registeredUids.has(user.uid)}
+        {@const isSuspended = !isRegistered && suspendedUids.has(user.uid)}
+        {@const isBlocked = isRegistered || isSuspended}
         <button
           id="player-search-option-{i}"
           role="option"
           aria-selected={i === selectedIndex}
-          aria-disabled={isSuspended}
-          onclick={() => !isSuspended && chooseUser(user)}
-          disabled={isSuspended}
-          class="w-full px-3 py-2 text-left text-sm transition-colors {isSuspended ? 'text-ink-faint cursor-not-allowed' : 'text-ink-bright'} {i === selectedIndex && !isSuspended ? 'bg-surface-active' : isSuspended ? '' : 'hover:bg-surface-hover'}"
+          aria-disabled={isBlocked}
+          onclick={() => !isBlocked && chooseUser(user)}
+          disabled={isBlocked}
+          class="w-full px-3 py-2 text-left text-sm transition-colors {isBlocked ? 'text-ink-faint cursor-not-allowed' : 'text-ink-bright'} {i === selectedIndex && !isBlocked ? 'bg-surface-active' : isBlocked ? '' : 'hover:bg-surface-hover'}"
         >
           <span class="inline-flex items-center gap-1">
             {#if user.country}<span class="mr-1">{getCountryFlag(user.country)}</span>{/if}{user.name}
@@ -137,6 +138,10 @@
                 <TriangleAlert class="w-3 h-3" />
                 {m.add_player_no_vekn_id()}
               </span>
+            {/if}
+            {#if isRegistered}
+              <UserCheck class="w-3.5 h-3.5 text-ink-muted ml-1" />
+              <span class="text-xs text-ink-muted">{m.err_tournament_already_registered()}</span>
             {/if}
             {#if isSuspended}
               <Ban class="w-3.5 h-3.5 text-link ml-1" />
