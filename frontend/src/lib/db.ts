@@ -861,6 +861,7 @@ export async function getFilteredTournaments(
     includeOnline?: boolean;
     country?: string;
     format?: string;
+    rank?: string;
     search?: string;
     excludePast?: boolean;
   },
@@ -879,6 +880,7 @@ export async function getFilteredTournaments(
     if (filters.country && filters.country !== 'all' && t.country !== filters.country) continue;
     if (filters.includeOnline === false && t.online) continue;
     if (filters.format && filters.format !== 'all' && t.format !== filters.format) continue;
+    if (filters.rank && filters.rank !== 'all' && t.rank !== filters.rank) continue;
     if (q && !normalizeSearch(t.name).includes(q)) continue;
     items.push(t);
   }
@@ -896,7 +898,7 @@ export async function getAgendaTournaments(
   userUid: string,
   userCountry: string,
   continentCountries: string[],
-  filters: { state?: TournamentStateFilter; includeOnline?: boolean; format?: string; search?: string },
+  filters: { state?: TournamentStateFilter; includeOnline?: boolean; format?: string; rank?: string; search?: string },
   page = 0,
   pageSize = 50,
 ): Promise<FilteredTournamentsResult> {
@@ -922,6 +924,7 @@ export async function getAgendaTournaments(
     if (!onAgenda(t)) continue;
     if (filters.state && filters.state !== 'all' && !matchesState(t, filters.state, cutoff)) continue;
     if (filters.format && filters.format !== 'all' && t.format !== filters.format) continue;
+    if (filters.rank && filters.rank !== 'all' && t.rank !== filters.rank) continue;
     if (q && !normalizeSearch(t.name).includes(q)) continue;
     items.push(t);
   }

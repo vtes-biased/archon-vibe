@@ -7,8 +7,8 @@
   import { getAuthState, generateCalendarToken } from "$lib/stores/auth.svelte";
   import { canCreateTournament } from "$lib/engine";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
-  import type { TournamentFormat } from "$lib/types";
-  import { getStateTone, translateTournamentState } from "$lib/tournament-utils";
+  import type { TournamentFormat, TournamentRank } from "$lib/types";
+  import { getStateTone, translateTournamentState, rankBadgeLabel } from "$lib/tournament-utils";
   import Badge from "$lib/components/Badge.svelte";
   import { zonedDate } from "$lib/utils";
   import { syncQueryParams, currentParams, readPageParam, pageParam } from "$lib/url-filters";
@@ -88,6 +88,11 @@
   );
   let selectedCountry = $state<string>(urlParams.get("country") ?? "all");
   let selectedFormat = $state<string>(urlParams.get("format") ?? "all");
+  const RANK_FILTERS: TournamentRank[] = ["National Championship", "Continental Championship"];
+  const urlRank = urlParams.get("rank");
+  let selectedRank = $state<string>(
+    RANK_FILTERS.includes(urlRank as TournamentRank) ? (urlRank as string) : "all",
+  );
   let includeOnline = $state(urlParams.get("online") !== "false");
 
   let calendarLoading = $state(false);
@@ -140,7 +145,7 @@
           user.uid,
           user.country!,
           continentCountries,
-          { state: selectedState, includeOnline, format: selectedFormat, search: debouncedSearch },
+          { state: selectedState, includeOnline, format: selectedFormat, rank: selectedRank, search: debouncedSearch },
           page,
           PAGE_SIZE,
         );
@@ -154,6 +159,7 @@
             includeOnline,
             country: selectedCountry,
             format: selectedFormat,
+            rank: selectedRank,
             search: debouncedSearch,
             // Logged-out visitors see current + upcoming only, not past events.
             excludePast: !auth.isAuthenticated,
@@ -193,6 +199,7 @@
     const _o = selectedState;
     const _c = selectedCountry;
     const _f = selectedFormat;
+    const _r = selectedRank;
     const _io = includeOnline;
     const _vm = viewMode;
     const _p = page;
@@ -201,14 +208,14 @@
   });
 
   const filterKey = $derived(
-    [debouncedSearch, selectedState, selectedCountry, selectedFormat, includeOnline, viewMode].join("|"),
+    [debouncedSearch, selectedState, selectedCountry, selectedFormat, selectedRank, includeOnline, viewMode].join("|"),
   );
 
   // includeOnline counts: it hides data like any other filter, so an empty list
   // under it must read as filtered, not as "no tournaments yet".
   const hasFilters = $derived(
     !!searchQuery.trim() || selectedState !== "all" || selectedCountry !== "all"
-      || selectedFormat !== "all" || !includeOnline,
+      || selectedFormat !== "all" || selectedRank !== "all" || !includeOnline,
   );
 
   function clearFilters() {
@@ -216,6 +223,7 @@
     selectedState = "all";
     selectedCountry = "all";
     selectedFormat = "all";
+    selectedRank = "all";
     includeOnline = true;
   }
 
@@ -247,6 +255,7 @@
       state: selectedState === "all" ? null : selectedState,
       country: selectedCountry === "all" ? null : selectedCountry,
       format: selectedFormat === "all" ? null : selectedFormat,
+      rank: selectedRank === "all" ? null : selectedRank,
       online: includeOnline ? null : "false",
       view: canUseAgenda ? viewMode : null,
       page: pageParam(page),
@@ -382,6 +391,20 @@
             <option value="all">{m.tournaments_all_formats()}</option>
             {#each formats as f}
               <option value={f}>{f}</option>
+            {/each}
+          </select>
+        </div>
+
+        <div class="min-w-[130px]">
+          <label for="rank-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.tfield_rank()}</label>
+          <select
+            id="rank-filter"
+            bind:value={selectedRank}
+            class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
+          >
+            <option value="all">{m.tournaments_all_ranks()}</option>
+            {#each RANK_FILTERS as r}
+              <option value={r}>{rankBadgeLabel(r)}</option>
             {/each}
           </select>
         </div>

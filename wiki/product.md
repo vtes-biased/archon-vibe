@@ -101,7 +101,8 @@ dual-audience user may get both for the same event — deliberate, no dedup.
 
 **Social and discovery** — shareable finished-tournament image and text,
 per-tournament and per-league Open Graph crawler stubs, iCal feeds (personal,
-country, global), agenda matching, list filters.
+country, global), agenda matching, list filters including National/Continental
+championship rank.
 
 **Help and feedback** — in-app rulebook, VEKN tournament rules, Judges Guide v2,
 Code of Ethics, and player/organizer guides; members with a VEKN ID can
