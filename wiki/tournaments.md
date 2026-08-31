@@ -448,7 +448,8 @@ participation over winners by design, so crediting one there cuts against the
 format. The stance bites only where **nothing** is flagged: `vekn_tournament_sync`
 stamps `finalist` on positions 1–5 whether or not a final was played, because the
 upstream record does not say, so a VEKN import keeps vekn.net's answer and only a
-locally crowned seat loses the credit. The question is with the Rules Director.
+locally crowned seat loses the credit. The question is with the Rules Director —
+see the deferred section below.
 
 **A no-final finish is allowed at any size, deliberately.** §3.1.6 permits omitting
 the final only below 8 players, but force majeure cuts real events short — a venue
@@ -457,12 +458,56 @@ what actually happened rather than refuse it. The §3.1.6 constraint on admittin
 players between rounds is likewise not enforced.
 
 Whether such an event should then count toward rankings is the genuinely open
-question, and it is on the board with the Rules Director.
+question, and it is the second one deferred below.
 
 The pre-finals panel deliberately carries no Start Finals button: the action bar
 owns every state transition and the toss-needed warning, and finishing without a
 final is a legitimate exit — a panel-level launch button would present the final
 as mandatory and bypass the toss warning.
+
+### Trigger: the Rules Director answers on no-final rating credit
+
+*Asked 2026-08. The interim stance above is owner-approved and shipped; what is
+left is out of our hands, so it waits here rather than on the board.*
+
+**Deferred ask** — record the answers in `wiki/domain/` (§3.1.6's reading in
+[tournament rules](domain/tournament-rules.md), the A.2/A.2.1 credit in
+[VEKN](domain/vekn.md)), then either change the engine or leave the stance above
+citing the ruling. The three writers that must end up saying the same thing are
+`FinishTournament`, `vekn_tournament_sync` and `archon_import.py`.
+
+The questions put:
+
+1. **Is the credit intended?** For a §3.1.6 no-final event, should the standings
+   leader get the winner bonus (90·coef) and the +1 winner GW, and ranks 2–5 the
+   finalist bonus (30·coef) — as vekn.net does — or is that an implementation
+   accident against a rules-literal zero?
+2. **An event that lost its final to force majeure.** §3.1.6 covers only a
+   *planned* no-final event under 8 players. Does a 20-player event that played
+   two rounds and never reached its final count toward ratings at all? Plausible
+   answers: credited like a §3.1.6 event, unranked entirely, or rated for
+   participation and VP with no winner or finalist bonus.
+3. **Finalist semantics** — is "finalist" top-5 by final standings, exactly
+   `min(5, N)`, and is a tie at 5th resolved by toss like the finals cut or are
+   all tied players credited?
+4. **Winner determination** — the standings leader under GW > VP > TP, taking the
+   same +1 GW a finals winner gets?
+5. **Push encoding** — does vekn.net recompute `rtp` from positions/GW/VP or store
+   the pushed per-player value verbatim? Riders: does a results re-upload replace
+   or append, and is the Hall of Fame convention IRL-only wins? (Ours counts
+   online wins.) This one must resolve before the
+   [decommission cutover](vekn-decommission.md) whatever the rules answer is,
+   because it decides whether the difference is display-only or a real divergence
+   into the system of record.
+
+Q1 and Q2 decide the engine. If the answer credits no-final events, three traps
+come with implementing it: the Q2 gate has to distinguish a deliberate §3.1.6
+finish from a truncated event or half-finished tournaments get credited, likely
+wanting its own action or flag rather than overloading `FinishTournament`; the
+`finalist` flag means "played the final table" to every UI surface, so rating and
+push derivation need a distinct standings-finalist concept rather than a widened
+meaning; and a credited no-final event with ≥8 players is then **ranked**, so the
+ranked/unranked badge has to be reconciled.
 
 ## Engine event catalog
 

@@ -21,6 +21,13 @@ This trigger is a **window**, not an instant. It opens when the decommission is
 greenlit and closes when vekn.net stops answering — the work below needs both
 conditions at once, and produces nothing afterwards.
 
+One question deferred elsewhere gates the cutover from this side too: whether
+vekn.net recomputes a pushed `rtp` or stores it verbatim, and whether a results
+re-upload replaces or appends — Q5 of the
+[no-final rating questions](tournaments.md#trigger-the-rules-director-answers-on-no-final-rating-credit).
+It decides whether our no-final stance is a display difference or a divergence
+into the system of record, and it holds whatever the rules answer turns out to be.
+
 ### Reconcile our tournaments against the vekn.net record
 
 **Deferred ask** — reconcile app tournaments against the vekn.net API record and

@@ -77,7 +77,8 @@ line gets one of four verdicts, and no line is skipped twice:
 - **drop** — it is no longer wanted; delete it.
 
 Then check the **deferred items** parked in the wiki (`wiki/vekn-decommission.md`,
-`wiki/post-deploy.md`, plus the deferred note on `dev.md`): has a trigger fired? A
+`wiki/post-deploy.md`, the Rules Director trigger on `wiki/tournaments.md`, plus
+the deferred note on `dev.md`): has a trigger fired? A
 fired trigger sends the item through `/intake` as an ordinary line at its ranked
 position, which may push the list to its limit — resolve that here rather than at
 the next intake. And give each deferred item the same verdict as a line: still
