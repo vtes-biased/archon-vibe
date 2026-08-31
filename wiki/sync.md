@@ -671,9 +671,10 @@ tombstones, no static card data. `pg_dump` remains the backup tool.
 One `tournaments` store holds all data levels — there is no separate details store.
 A DB-version upgrade deletes all stores and recreates them fresh, triggering a full
 resync. **Exception**: unsynced offline-tournament data — the offline tournament
-row, its temp player stubs, offline sanctions and decks, and the `offline_*`
-metadata — is rescued within the upgrade transaction and written back, since it
-isn't re-fetchable from SSE. Both the upgrade path and the sync manager's
+row, its temp player stubs, offline sanctions and decks, the `offline_*` metadata,
+and the console's `outbox:` entries (which embed their own snapshots, so they are
+kept even with no offline tournament) — is rescued within the upgrade transaction
+and written back, since it isn't re-fetchable from SSE. Both the upgrade path and the sync manager's
 clear-all-stores path wipe the stores, and **both must rescue the full offline
 set**.
 

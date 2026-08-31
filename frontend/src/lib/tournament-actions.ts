@@ -13,9 +13,9 @@ import {
   deleteDeck,
   addOfflineDeckUid,
   getPendingActions,
-  getPendingActionTournamentUids,
+  getAllPendingActions,
   appendPendingAction,
-  shiftPendingAction,
+  removePendingActions,
   type PendingAction,
 } from './db';
 import {
@@ -65,44 +65,43 @@ syncManager.addEventListener((event) => {
 });
 
 /** Claims a queue slot per pending tournament at module load, before any console tap can enqueue
- * behind it: a replay reading the outbox later would find that tap's own entry and post it twice. */
+ * behind it: an action posted ahead of the replay would reach the server out of order. */
 const outboxSeeded = (async () => {
-  let uids: string[];
+  let outbox: Map<string, PendingAction[]>;
   try {
-    uids = await getPendingActionTournamentUids();
+    outbox = await getAllPendingActions();
   } catch (e) {
     console.error('Failed to read the action outbox:', e);
     return;
   }
-  for (const uid of uids) {
+  for (const [uid, entries] of outbox) {
+    // Only what already existed at launch. An entry appended later belongs to a POST some tab
+    // still has in flight, and replaying it would be the second send of the same action.
+    const claimed = new Set(entries.map((e) => e.id));
     const gate = new Promise<void>((resolve) => replayGates.set(uid, resolve));
-    void enqueueServerAction(uid, () => replayPendingActions(uid, gate)).catch(() => {});
+    void enqueueServerAction(uid, () => replayPendingActions(uid, claimed, gate)).catch(() => {});
   }
   // Re-checked after the gates exist: a sync_complete during the read above found an empty map.
-  if (caughtUp || syncManager.hasCaughtUp()) markCaughtUp();
+  if (caughtUp || syncManager.isSynced) markCaughtUp();
 })();
 
-/** Removes what the replay read, head first — never the whole key: an action fired meanwhile
- * appends at the tail outside this lock, and clearing would drop it before its POST is answered. */
-async function dropReplayed(uid: string, count: number): Promise<void> {
-  for (let i = 0; i < count; i++) await shiftPendingAction(uid);
-}
-
-/** Only a local copy level with the server separates an action it never saw from one it committed
- * as the tab died, so the catch-up gates the replay — re-posting a committed StartRound would open
- * a second round. Under a web lock so two tabs launching together replay it once. */
-async function replayPendingActions(uid: string, gate: Promise<void>): Promise<void> {
+async function replayPendingActions(uid: string, claimed: Set<string>, gate: Promise<void>): Promise<void> {
   await gate;
   await navigator.locks.request(`outbox:${uid}`, async () => {
-    const pending = await getPendingActions(uid);
+    // Re-read under the lock: the owning tab removes its entry as its POST settles, so one that
+    // survived to here has no live sender left.
+    const pending = (await getPendingActions(uid)).filter((e) => claimed.has(e.id));
     if (pending.length === 0) return;
+    const drop = (from: number) => removePendingActions(uid, pending.slice(from).map((e) => e.id));
+
+    if (pending[0]!.user !== (getAuthState().user?.uid ?? '')) {
+      await drop(0);
+      return;
+    }
 
     const stored = caughtUp ? await getTournament(uid) : undefined;
     if (!stored || stored.modified !== pending[0]!.modified) {
-      // Either the catch-up never landed, or the tournament moved while we were away — by this
-      // action or a co-judge's, and nothing here can tell those apart. Dropping beats a second
-      // apply, and the entry cannot stay: the next action's completion shifts the head off.
-      await dropReplayed(uid, pending.length);
+      await drop(0);
       showToast({ type: 'warning', message: m.tournament_action_unconfirmed() });
       return;
     }
@@ -116,14 +115,16 @@ async function replayPendingActions(uid: string, gate: Promise<void>): Promise<v
         });
       } catch (e) {
         console.error('Server rejected replayed action, rolling back optimistic update:', e);
-        await rollbackTournamentAction(uid, entry);
-        await dropReplayed(uid, pending.length - i);
+        // Newest first: each entry's snapshot precedes the next one's optimistic write, so
+        // unwinding forward would leave the later entries' deck writes standing.
+        for (let j = pending.length - 1; j >= i; j--) await rollbackTournamentAction(uid, pending[j]!);
+        await drop(i);
         if (!(e instanceof ApiError)) {
           showToast({ type: 'error', message: m.tournament_action_reverted() });
         }
         return;
       }
-      await shiftPendingAction(uid);
+      await removePendingActions(uid, [entry.id]);
     }
   });
 }
@@ -163,8 +164,6 @@ async function checkPlayerBarred(playerUid: string, tournament: Tournament): Pro
 
 export async function tournamentAction(uid: string, action: TournamentEventType, data?: Record<string, unknown>): Promise<Tournament> {
   await outboxSeeded;
-  // A tap releases this tournament's own replay: at a venue with no uplink the catch-up never
-  // lands, and the action must not queue behind a replay still waiting for it.
   replayGates.get(uid)?.();
   replayGates.delete(uid);
 
@@ -240,9 +239,9 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
       }
 
       const hadDeckOps = (result.deckOps?.length ?? 0) > 0;
-      // Snapshot our optimistic 'modified' stamps so rollback can tell our own write apart from a
-      // foreign SSE update (co-judge action, server job) landed between the optimistic write and the rejection.
       const entry: PendingAction = {
+        id: crypto.randomUUID(),
+        user: getAuthState().user?.uid ?? '',
         event: serverEvent,
         modified: result.tournament.modified,
         tournament: current,
@@ -251,10 +250,8 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
           ? Object.fromEntries((await getDecksByTournament(uid)).map((d) => [d.uid, d.modified]))
           : undefined,
       };
-      // Durable before the POST leaves: everything from here to the shift below dies with a locked
-      // screen or a killed tab, and only the stored entry lets the next launch finish it.
       await appendPendingAction(uid, entry);
-      enqueueServerAction(uid, async () => {
+      enqueueServerAction(uid, () => navigator.locks.request(`outbox:${uid}`, async () => {
         try {
           await apiRequest<Tournament>(`/api/tournaments/${uid}/action`, {
             method: 'POST',
@@ -276,8 +273,8 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
         }
         // After the rollback, never before: an entry dropped first leaves the optimistic write
         // standing with nothing left to correct it.
-        await shiftPendingAction(uid);
-      });
+        await removePendingActions(uid, [entry.id]);
+      }));
 
       return result.tournament;
     } catch (e) {

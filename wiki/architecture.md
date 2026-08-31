@@ -238,26 +238,39 @@ The owning device's path:
    back to the pre-action snapshot and surfaces the error, then drops the entry.
 
 **The owning device's queue is durable.** The outbox entry is the whole rollback
-closure — the event, the pre-action tournament and decks, the optimistic `modified`
-stamps — stored before the POST leaves and removed only after that POST has been
-answered and any rollback has landed. A reload, a locked phone or an app killed in
-that window therefore replays the action on the next launch instead of dropping it
-with no request, no rollback and no frame that would ever correct it.
+closure — the event, the pre-action tournament and decks, the optimistic
+`modified` stamps — stored before the POST leaves and removed only after that
+POST has been answered and any rollback has landed. A reload, a locked phone or
+an app killed in that window therefore replays the action on the next launch
+instead of dropping it with no request, no rollback and no frame that would ever
+correct it.
 
-The replay waits for the first catch-up, then runs only while the tournament's
-stored `modified` still equals the entry's: unchanged means the server never saw
+The replay claims only the entries present at launch, by id: anything appended
+later belongs to a POST some tab still has in flight. It waits for the first
+catch-up, re-reads under a web lock the live POST also takes — an entry
+surviving both has no live sender left — and runs only while the tournament's
+stored `modified` still equals the entry's. Unchanged means the server never saw
 the action, because the engine leaves `modified` alone and every server commit
-bumps it. Any other value is ambiguous from the outside — this action committed as
-the tab died, or a co-judge moved the tournament — so the entry is dropped with a
-warning rather than applied twice — `StartRound` is not idempotent. A web lock
-keeps two tabs launching together from replaying the same entry, and a console tap
-on that tournament releases the replay, so an action never queues behind a catch-up
-that a venue with no uplink may never deliver. An unload flush was rejected for the same
-reason the gate exists: a `keepalive` POST on `pagehide` cannot tell an in-flight
-request from a committed one. A server-side idempotency key would settle it
-outright, at the price of a field on `TournamentActionRequest` — one of the
-enumerating sites [hazards](hazards.md#fields-silently-dropped) names — to turn a
-rare ambiguous drop into a rare ambiguous replay.
+bumps it. Entries are removed by id rather than position, since a replay and a
+live POST settle different entries of one outbox.
+
+Three cases drop an entry unreplayed. A `modified` mismatch is ambiguous from
+the outside — this action committed as the tab died, or a co-judge moved the
+tournament — so it is dropped rather than applied twice; `StartRound` is not
+idempotent. A console tap before the first catch-up releases the replay, so an
+action never queues behind a catch-up that a venue with no uplink may never
+deliver. Both warn. An entry whose account is not the one signed in is dropped
+silently, since logout clears the synced stores but not the outbox and the
+action is not this user's to report. A drop leaves the optimistic write
+standing, neither posted nor rolled back: with no confirmed server state there
+is nothing to judge it against, and the next full resync is what corrects it.
+
+An unload flush was rejected for the same reason the gate exists: a `keepalive`
+POST on `pagehide` cannot tell an in-flight request from a committed one. A
+server-side idempotency key would settle it outright, at the price of a field on
+`TournamentActionRequest` — one of the enumerating sites
+[hazards](hazards.md#fields-silently-dropped) names — to turn a rare ambiguous
+drop into a rare ambiguous replay.
 
 A player's device instead runs WASM as a pre-flight, awaits the POST on that same
 queue and reports the server's answer, so there is nothing to roll back. It leaves

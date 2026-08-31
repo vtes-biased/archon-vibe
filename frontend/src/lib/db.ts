@@ -108,6 +108,7 @@ async function rescueOfflineData(db: IDBPDatabase<ArchonDB>, tx: UpgradeTx): Pro
   const [keys, values] = await Promise.all([metaStore.getAllKeys(), metaStore.getAll()]);
 
   const metadata: [string, string][] = [];
+  const outbox: [string, string][] = [];
   const tournamentUids = new Set<string>();
   const userUids = new Set<string>();
   const sanctionUids = new Set<string>();
@@ -116,7 +117,14 @@ async function rescueOfflineData(db: IDBPDatabase<ArchonDB>, tx: UpgradeTx): Pro
   for (let i = 0; i < keys.length; i++) {
     const key = keys[i];
     const value = values[i];
-    if (typeof key !== 'string' || !key.startsWith('offline_') || typeof value !== 'string') continue;
+    if (typeof key !== 'string' || typeof value !== 'string') continue;
+    // Each entry embeds its own tournament and deck snapshots, so it needs no store rows —
+    // and it is kept even with no offline tournament, which the early return below drops.
+    if (key.startsWith('outbox:')) {
+      outbox.push([key, value]);
+      continue;
+    }
+    if (!key.startsWith('offline_')) continue;
     metadata.push([key, value]);
     if (key.startsWith('offline_tournament:')) {
       tournamentUids.add(key.slice('offline_tournament:'.length));
@@ -133,7 +141,7 @@ async function rescueOfflineData(db: IDBPDatabase<ArchonDB>, tx: UpgradeTx): Pro
   }
 
   // No offline tournaments → nothing to keep (drop any stray offline_* metadata).
-  if (tournamentUids.size === 0) return EMPTY_RESCUE;
+  if (tournamentUids.size === 0) return { ...EMPTY_RESCUE, metadata: outbox };
 
   // Issue every row read in one synchronous burst, then await once: a sequential await-per-row loop
   // can let the versionchange transaction go inactive between awaits (idb's documented hazard).
@@ -153,7 +161,7 @@ async function rescueOfflineData(db: IDBPDatabase<ArchonDB>, tx: UpgradeTx): Pro
   ]);
 
   return {
-    metadata,
+    metadata: [...metadata, ...outbox],
     tournaments: tournaments.filter((t): t is Tournament => !!t),
     users: users.filter((u): u is User => !!u),
     sanctions: sanctions.filter((s): s is Sanction => !!s),
@@ -1127,9 +1135,9 @@ export async function addOfflineDeckUid(tournamentUid: string, deckUid: string):
   await setMetadata(`offline_decks:${tournamentUid}`, JSON.stringify(uids));
 }
 
-/** One console action posted optimistically and not yet confirmed by the server: the whole rollback
- * closure, durable, so a reload replays it instead of dropping it with the tab that fired it. */
 export interface PendingAction {
+  id: string;
+  user: string;
   event: TournamentEvent;
   modified: string;
   tournament: Tournament;
@@ -1143,9 +1151,9 @@ export async function getPendingActions(tournamentUid: string): Promise<PendingA
   return JSON.parse(raw);
 }
 
-export async function getPendingActionTournamentUids(): Promise<string[]> {
+export async function getAllPendingActions(): Promise<Map<string, PendingAction[]>> {
   const entries = await getMetadataByPrefix('outbox:');
-  return [...entries.keys()].map(key => key.slice('outbox:'.length));
+  return new Map([...entries].map(([key, raw]) => [key.slice('outbox:'.length), JSON.parse(raw)]));
 }
 
 /** Read-modify-write inside one transaction: the next action is enqueued without waiting for this
@@ -1161,14 +1169,16 @@ export async function appendPendingAction(tournamentUid: string, action: Pending
   await tx.done;
 }
 
-export async function shiftPendingAction(tournamentUid: string): Promise<void> {
+/** By id, never by position: the replay and a live POST settle different entries of the same
+ * outbox, and whoever finished first would otherwise drop the other's. */
+export async function removePendingActions(tournamentUid: string, ids: string[]): Promise<void> {
   const db = await getDB();
   const tx = db.transaction('metadata', 'readwrite');
   const key = `outbox:${tournamentUid}`;
   const raw = await tx.store.get(key);
   const actions: PendingAction[] = raw ? JSON.parse(raw) : [];
-  actions.shift();
-  if (actions.length) await tx.store.put(JSON.stringify(actions), key);
+  const remaining = actions.filter((a) => !ids.includes(a.id));
+  if (remaining.length) await tx.store.put(JSON.stringify(remaining), key);
   else await tx.store.delete(key);
   await tx.done;
 }
