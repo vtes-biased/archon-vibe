@@ -29,7 +29,14 @@ export interface StandingEntry {
 /** Player display info keyed by user uid (built from User records + per-tournament display_name). */
 export type PlayerInfoMap = Record<
   string,
-  { name: string; nickname: string | null; vekn: string | null; display_name?: string | null }
+  {
+    name: string;
+    nickname: string | null;
+    vekn: string | null;
+    display_name?: string | null;
+    country?: string | null;
+    region?: string | null;
+  }
 >;
 
 /** The state is the one STATUS badge in the header — the only chip allowed a meaning-bearing colour.

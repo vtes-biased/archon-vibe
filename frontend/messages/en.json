@@ -1006,6 +1006,7 @@
   "tools_group_setup": "Set up",
   "tools_group_door": "At the door",
   "tools_group_wrapup": "Wrap up",
+  "tools_export_players": "Export the player list (CSV)",
   "tools_details": "Settings",
   "tools_copy_results": "Copy results",
   "tools_download_event": "Download a copy of the event",

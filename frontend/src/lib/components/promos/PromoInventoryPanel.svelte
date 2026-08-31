@@ -5,7 +5,7 @@
   import { getUser } from "$lib/db";
   import { getPromoLedger } from "$lib/api";
   import { holdingRows } from "$lib/promo-utils";
-  import { buildCsv, downloadCsv } from "$lib/promo-csv";
+  import { buildCsv, downloadCsv } from "$lib/csv";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
   import Button from "$lib/components/Button.svelte";
   import PromoLedgerList from "./PromoLedgerList.svelte";

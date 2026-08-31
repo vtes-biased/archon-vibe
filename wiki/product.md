@@ -56,7 +56,8 @@ state machine with reopen, registration and check-in, simulated-annealing seatin
 over nine priorities including staggered seatings for impossible player counts,
 VP entry with oust-order validation, automatic GW/TP, judge override, standings,
 finals qualification and toss, seating edits, round and tournament reopen/cancel,
-delete. Details: [tournaments](tournaments.md).
+delete, roster CSV export carrying each player's name, VEKN id, country and
+region. Details: [tournaments](tournaments.md).
 
 **Open rounds** — a non-VEKN house format gaining traction online: each player
 plays up to `max_rounds` rounds of a continuously-run pool, so the event may run

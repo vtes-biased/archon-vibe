@@ -1006,6 +1006,7 @@
   "tools_group_setup": "Préparation",
   "tools_group_door": "À l'accueil",
   "tools_group_wrapup": "Clôture",
+  "tools_export_players": "Exporter la liste des joueurs (CSV)",
   "tools_details": "Paramètres",
   "tools_copy_results": "Copier les résultats",
   "tools_download_event": "Télécharger une copie de l'événement",

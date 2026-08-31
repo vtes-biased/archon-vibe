@@ -15,6 +15,8 @@
   import FinishConfirmModal from "./FinishConfirmModal.svelte";
   import Button from "$lib/components/Button.svelte";
   import { copyResults, downloadResults } from "$lib/copy-results";
+  import { buildCsv, downloadCsv } from "$lib/csv";
+  import { getCountry } from "$lib/geonames";
   import { playedPlayerUids, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import { canSetArchivalResults } from "$lib/engine";
   import { getAuthState } from "$lib/stores/auth.svelte";
@@ -93,6 +95,27 @@
     && !tournament.external_ids?.vekn
     && canSetArchivalResults(getAuthState().user).allowed
   );
+
+  // The roster, not the standings: an organizer watching sign-ups come in needs
+  // this long before anything is played.
+  const hasRoster = $derived((tournament.players?.length ?? 0) > 0);
+
+  function exportPlayers() {
+    const rows: string[][] = [
+      ["name", "vekn_id", "country", "region"],
+      ...(tournament.players ?? []).map((p) => {
+        const info = p.user_uid ? playerInfo[p.user_uid] : undefined;
+        const code = info?.country;
+        return [
+          info?.name ?? p.display_name ?? "",
+          info?.vekn ?? "",
+          code ? getCountry(code)?.name ?? code : "",
+          info?.region ?? "",
+        ];
+      }),
+    ];
+    downloadCsv(buildCsv(rows), `${tournament.event_code || tournament.uid}-players.csv`);
+  }
 
   // Which group the current moment belongs to. Order never changes; this only
   // decides what is already unfolded when the sheet opens.
@@ -209,6 +232,9 @@
           {@render actionRow(bannerItem, Image)}
           {@render actionRow(csvImportItem, Upload)}
           {@render actionRow(archonImportItem, Upload)}
+          {#if hasRoster}
+            {@render actionRow({ label: m.tools_export_players(), onclick: exportPlayers }, Download)}
+          {/if}
           {#if syncVeknItem?.group === "setup"}{@render actionRow(syncVeknItem, CloudUpload)}{/if}
         {/if}
 

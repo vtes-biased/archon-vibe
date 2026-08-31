@@ -263,6 +263,8 @@ import TournamentModals from "./TournamentModals.svelte";
         nickname: user?.nickname ?? null,
         vekn: user?.vekn_id ?? null,
         display_name: displayNames[u] ?? null,
+        country: user?.country ?? null,
+        region: user?.state ?? null,
       };
     });
     playerInfo = info;
