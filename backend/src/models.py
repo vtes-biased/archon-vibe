@@ -755,7 +755,8 @@ class TwdaStatus(msgspec.Struct, kw_only=True):
     reason: Annotated[
         str,
         msgspec.Meta(
-            description="Skip reason code, mapped to a message frontend-side."
+            description="Skip reason code, or `step[:http-status]` for a "
+            "failure, mapped to a message frontend-side."
         ),
     ] = ""
     pr_url: str = ""

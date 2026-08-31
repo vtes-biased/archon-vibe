@@ -444,16 +444,16 @@ async def maybe_submit_twda(tournament: Tournament) -> None:
             if not deck_text:
                 outcome = (TwdaOutcome.SKIPPED, "no_deck", "")
             else:
-                pr_url = await submit_twda_pr(
+                pr_url, reason = await submit_twda_pr(
                     tournament.event_code, deck_text, tournament.name
                 )
                 if pr_url:
                     outcome = (TwdaOutcome.SUBMITTED, "", pr_url)
                 else:
-                    outcome = (TwdaOutcome.FAILED, "", "")
+                    outcome = (TwdaOutcome.FAILED, reason, "")
         except Exception:
             logger.exception("Failed to submit TWDA PR")
-            outcome = (TwdaOutcome.FAILED, "", "")
+            outcome = (TwdaOutcome.FAILED, "deck", "")
 
     try:
         await _record_twda_status(tournament.uid, *outcome)

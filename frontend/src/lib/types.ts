@@ -314,7 +314,7 @@ export type TwdaOutcome = "submitted" | "skipped" | "failed";
 
 export interface TwdaStatus {
   outcome: TwdaOutcome;
-  reason: string; // skip reason code → twda_reason_* i18n keys
+  reason: string; // skip reason code, or `step[:http-status]` when failed
   pr_url: string;
   at: string | null;
 }

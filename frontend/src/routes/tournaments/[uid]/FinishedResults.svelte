@@ -44,6 +44,30 @@
       default: return code;
     }
   }
+
+  function twdaFailStep(step: string): string {
+    switch (step) {
+      case "deck": return m.twda_failed_deck();
+      case "config": return m.twda_failed_config();
+      case "auth": return m.twda_failed_auth();
+      case "fork_sync": return m.twda_failed_fork_sync();
+      case "fork_ref": return m.twda_failed_fork_ref();
+      case "branch": return m.twda_failed_branch();
+      case "commit": return m.twda_failed_commit();
+      case "pull_request": return m.twda_failed_pull_request();
+      case "internal": return m.twda_failed_internal();
+      default: return m.twda_failed_unknown();
+    }
+  }
+
+  // Rows written before the reason carried a step arrive as "".
+  function twdaFailure(reason: string): { text: string; retry: boolean } {
+    const [step = "", code = ""] = reason.split(":");
+    const status = Number(code) || 0;
+    const text = status ? `${twdaFailStep(step)} (HTTP ${status})` : twdaFailStep(step);
+    const transient = status ? status >= 500 || status === 408 || status === 429 : step !== "config";
+    return { text, retry: transient };
+  }
 </script>
 
 <div class="space-y-3">
@@ -85,7 +109,11 @@
         {/if}
       </InlineNotice>
     {:else if ts.outcome === "failed"}
-      <InlineNotice tone="warn" icon={TriangleAlert}>{m.twda_status_failed()}</InlineNotice>
+      {@const failure = twdaFailure(ts.reason)}
+      <InlineNotice tone="warn" icon={TriangleAlert}>
+        {m.twda_status_failed({ reason: failure.text })}
+        {#if failure.retry}{m.twda_status_failed_retry()}{/if}
+      </InlineNotice>
     {:else if ts.outcome === "skipped"}
       <InlineNotice>{m.twda_status_skipped({ reason: twdaSkipReason(ts.reason) })}</InlineNotice>
     {/if}

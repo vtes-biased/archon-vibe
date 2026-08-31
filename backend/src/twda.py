@@ -46,17 +46,19 @@ async def submit_twda_pr(
     event_key: str,
     deck_text: str,
     tournament_name: str,
-) -> str | None:
+) -> tuple[str, str]:
     """Create or update a PR on GiottoVerducci/TWD with the winner's deck.
 
-    Returns the PR URL on success, None on failure.
+    Returns `(pr_url, "")` on success, `("", "step[:http-status]")` on failure —
+    the code the organizer's failure notice reads back.
     """
-    if not is_configured():
-        logger.info("TWDA GitHub App not configured, skipping PR submission")
-        return None
-
     try:
         private_key = github_app.load_private_key(TWDA_GITHUB_PRIVATE_KEY)
+    except Exception:
+        logger.exception("Failed to load the TWDA GitHub App private key")
+        return "", "config"
+
+    try:
         fork_token = await github_app.get_installation_token(
             TWDA_GITHUB_CLIENT_ID,
             private_key,
@@ -69,9 +71,12 @@ async def submit_twda_pr(
             TWDA_GITHUB_INSTALLATION_ID,
             {"pull_requests": "write"},
         )
+    except github_app.InstallationTokenError as exc:
+        logger.exception("Failed to get TWDA GitHub installation tokens")
+        return "", f"auth:{exc.status}"
     except Exception:
         logger.exception("Failed to get TWDA GitHub installation tokens")
-        return None
+        return "", "auth"
 
     branch = f"archon/{event_key}"
     file_path = f"decks/{event_key}.txt"
@@ -106,14 +111,14 @@ async def submit_twda_pr(
             )
             if sync_status != 200:
                 logger.error(f"Failed to sync TWD fork: {sync_status} {sync_text}")
-                return None
+                return "", f"fork_sync:{sync_status}"
 
             status, text = await _req(
                 "GET", f"/repos/{TWDA_FORK_REPO}/git/refs/heads/master", fork_token
             )
             if status != 200:
                 logger.error(f"Failed to get TWD fork master ref: {status}")
-                return None
+                return "", f"fork_ref:{status}"
             base_sha = json.loads(text)["object"]["sha"]
 
             ref_status, _ = await _req(
@@ -122,12 +127,15 @@ async def submit_twda_pr(
                 fork_token,
             )
             if ref_status == 200:
-                await _req(
+                reset_status, reset_text = await _req(
                     "PATCH",
                     f"/repos/{TWDA_FORK_REPO}/git/refs/heads/{branch}",
                     fork_token,
                     json={"sha": base_sha, "force": True},
                 )
+                if reset_status != 200:
+                    logger.error(f"Failed to reset branch: {reset_status} {reset_text}")
+                    return "", f"branch:{reset_status}"
             else:
                 create_status, create_text = await _req(
                     "POST",
@@ -139,7 +147,7 @@ async def submit_twda_pr(
                     logger.error(
                         f"Failed to create branch: {create_status} {create_text}"
                     )
-                    return None
+                    return "", f"branch:{create_status}"
 
             file_status, file_text = await _req(
                 "GET",
@@ -147,6 +155,12 @@ async def submit_twda_pr(
                 fork_token,
                 params={"ref": branch},
             )
+            # A GET failure that is not the file's absence would drop the sha and
+            # turn the update into a 422 the organizer would read as a refusal.
+            if file_status not in (200, 404):
+                logger.error(f"Failed to read deck file: {file_status} {file_text}")
+                return "", f"commit:{file_status}"
+
             content_b64 = base64.b64encode(deck_text.encode()).decode()
             file_data: dict = {
                 "message": f"Add TWD: {tournament_name}",
@@ -165,7 +179,7 @@ async def submit_twda_pr(
             )
             if put_status not in (200, 201):
                 logger.error(f"Failed to commit deck file: {put_status} {put_text}")
-                return None
+                return "", f"commit:{put_status}"
 
             pr_status, pr_text = await _req(
                 "GET",
@@ -180,7 +194,7 @@ async def submit_twda_pr(
                     logger.info(
                         f"TWDA PR already open, updated via branch push: {pr_url}"
                     )
-                    return pr_url
+                    return pr_url, ""
 
             pr_create_status, pr_create_text = await _req(
                 "POST",
@@ -201,13 +215,13 @@ async def submit_twda_pr(
             if pr_create_status == 201:
                 pr_url = json.loads(pr_create_text)["html_url"]
                 logger.info(f"TWDA PR created: {pr_url}")
-                return pr_url
+                return pr_url, ""
 
             logger.error(
                 f"Failed to create TWDA PR: {pr_create_status} {pr_create_text}"
             )
-            return None
+            return "", f"pull_request:{pr_create_status}"
 
         except Exception:
             logger.exception("TWDA PR submission failed")
-            return None
+            return "", "internal"

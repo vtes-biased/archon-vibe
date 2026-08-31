@@ -393,8 +393,14 @@ PR URL, `skipped` with a reason code — no winner, Limited format (draft and se
 decks aren't archived), fewer than 10 players played, unranked per the engine's
 `ranking_eligibility` (the same predicate as the ranked badge — the championship
 rank axis never gates TWDA), no event code yet, GitHub App unconfigured, or the
-winner has no deck — or `failed`. It is organizer/full projection only and shows as
-a status line on the finished-tournament organizer view.
+winner has no deck — or `failed`, whose reason is `step[:http-status]`: the call
+that failed (`deck`, `config`, `auth`, `fork_sync`, `fork_ref`, `branch`,
+`commit`, `pull_request`, or `internal` for an unexpected error) and what the API
+answered. It is organizer/full projection only and shows as a status line on the
+finished-tournament organizer view, which names the failing step and offers the
+re-save retry **only** for a transient answer — 5xx, 408, 429, or no status at
+all except `config`. A 4xx is a refusal and an unreadable App key a
+misconfiguration: both repeat identically, so neither offers the retry.
 
 **Designer credit**: the winner's name is always in the header; a separate optional
 `Created by: <name>` line is emitted only when the deck is attributed to someone

@@ -13,6 +13,15 @@ logger = logging.getLogger(__name__)
 GH_API_VERSION = "2022-11-28"
 
 
+class InstallationTokenError(ValueError):
+    """A non-201 from the token exchange, carrying GitHub's status so a caller
+    can tell a permanent misconfiguration from a transient refusal."""
+
+    def __init__(self, status: int, body: str) -> None:
+        super().__init__(f"Failed to get installation token: {status} {body}")
+        self.status = status
+
+
 def load_private_key(key: str) -> str:
     """Resolve a GitHub App private key from an env value: inline PEM, or a path
     to a .pem file (the multi-line secret is vault-delivered to a runtime path).
@@ -51,8 +60,8 @@ async def get_installation_token(
 ) -> str:
     """Exchange an App JWT for a scoped installation access token (1h TTL).
 
-    Raises ValueError on a non-201 response; aiohttp.ClientError / TimeoutError
-    propagate to the caller's transport handling.
+    Raises InstallationTokenError on a non-201 response; aiohttp.ClientError /
+    TimeoutError propagate to the caller's transport handling.
     """
     app_jwt = create_jwt(client_id, private_key)
     async with aiohttp.ClientSession(
@@ -69,8 +78,6 @@ async def get_installation_token(
             json={"permissions": permissions},
         ) as resp:
             if resp.status != 201:
-                raise ValueError(
-                    f"Failed to get installation token: {resp.status} {(await resp.text())[:500]}"
-                )
+                raise InstallationTokenError(resp.status, (await resp.text())[:500])
             data = await resp.json(content_type=None)
             return data["token"]
