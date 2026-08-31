@@ -1571,6 +1571,7 @@
   "common_link_copied": "Link copiato",
   "table_rooms_error_save": "Impossibile salvare le sale.",
   "tournament_action_reverted": "Impossibile salvare l'azione — ripristinato allo stato precedente.",
+  "tournament_action_unconfirmed": "Un'azione della tua ultima sessione non è stata confermata — controlla lo stato del torneo.",
   "deck_error_upload": "Caricamento fallito.",
   "deck_url_import_failed": "Impossibile leggere quel link. Assicurati che sia un link per condividere un mazzo da vdb.im, vtesdecks.com, o Amaranth — oppure passa a Incolla Deck, che funziona sempre.",
   "deck_error_camera": "Impossibile accedere alla fotocamera.",

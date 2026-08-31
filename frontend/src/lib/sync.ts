@@ -657,6 +657,11 @@ class SyncManager {
     return this.eventSource !== null && this.eventSource.readyState === EventSource.OPEN;
   }
 
+  /** True once a catch-up has streamed and flushed, so IndexedDB is level with the server. */
+  hasCaughtUp(): boolean {
+    return this.isSynced;
+  }
+
   async reset(): Promise<void> {
     await this.disconnect();
     await this.clearAllStores();

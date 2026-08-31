@@ -12,6 +12,11 @@ import {
   saveDeck,
   deleteDeck,
   addOfflineDeckUid,
+  getPendingActions,
+  getPendingActionTournamentUids,
+  appendPendingAction,
+  shiftPendingAction,
+  type PendingAction,
 } from './db';
 import {
   processTournamentEvent,
@@ -24,6 +29,7 @@ import { showToast } from '$lib/stores/toast.svelte';
 import { getAuthState } from '$lib/stores/auth.svelte';
 import { isOffline, scheduleSyncOffline } from '$lib/stores/offline.svelte';
 import { apiRequest, ApiError, requireOnline, isOnline } from './api';
+import { syncManager } from './sync';
 import { EngineError } from './error-codes';
 
 /** Serializes server POSTs per tournament so concurrent requests can't race. */
@@ -41,6 +47,85 @@ function enqueueServerAction<T>(uid: string, fn: () => Promise<T>): Promise<T> {
     }
   });
   return next;
+}
+
+/** One release per tournament holding an unconfirmed action, claimed at module load. Whichever
+ * comes first decides the replay: the catch-up, or a console tap on that same tournament. */
+const replayGates = new Map<string, () => void>();
+let caughtUp = false;
+
+function markCaughtUp(): void {
+  caughtUp = true;
+  for (const release of replayGates.values()) release();
+  replayGates.clear();
+}
+
+syncManager.addEventListener((event) => {
+  if (event.type === 'sync_complete') markCaughtUp();
+});
+
+/** Claims a queue slot per pending tournament at module load, before any console tap can enqueue
+ * behind it: a replay reading the outbox later would find that tap's own entry and post it twice. */
+const outboxSeeded = (async () => {
+  let uids: string[];
+  try {
+    uids = await getPendingActionTournamentUids();
+  } catch (e) {
+    console.error('Failed to read the action outbox:', e);
+    return;
+  }
+  for (const uid of uids) {
+    const gate = new Promise<void>((resolve) => replayGates.set(uid, resolve));
+    void enqueueServerAction(uid, () => replayPendingActions(uid, gate)).catch(() => {});
+  }
+  // Re-checked after the gates exist: a sync_complete during the read above found an empty map.
+  if (caughtUp || syncManager.hasCaughtUp()) markCaughtUp();
+})();
+
+/** Removes what the replay read, head first — never the whole key: an action fired meanwhile
+ * appends at the tail outside this lock, and clearing would drop it before its POST is answered. */
+async function dropReplayed(uid: string, count: number): Promise<void> {
+  for (let i = 0; i < count; i++) await shiftPendingAction(uid);
+}
+
+/** Only a local copy level with the server separates an action it never saw from one it committed
+ * as the tab died, so the catch-up gates the replay — re-posting a committed StartRound would open
+ * a second round. Under a web lock so two tabs launching together replay it once. */
+async function replayPendingActions(uid: string, gate: Promise<void>): Promise<void> {
+  await gate;
+  await navigator.locks.request(`outbox:${uid}`, async () => {
+    const pending = await getPendingActions(uid);
+    if (pending.length === 0) return;
+
+    const stored = caughtUp ? await getTournament(uid) : undefined;
+    if (!stored || stored.modified !== pending[0]!.modified) {
+      // Either the catch-up never landed, or the tournament moved while we were away — by this
+      // action or a co-judge's, and nothing here can tell those apart. Dropping beats a second
+      // apply, and the entry cannot stay: the next action's completion shifts the head off.
+      await dropReplayed(uid, pending.length);
+      showToast({ type: 'warning', message: m.tournament_action_unconfirmed() });
+      return;
+    }
+
+    for (let i = 0; i < pending.length; i++) {
+      const entry = pending[i]!;
+      try {
+        await apiRequest<Tournament>(`/api/tournaments/${uid}/action`, {
+          method: 'POST',
+          body: JSON.stringify(entry.event),
+        });
+      } catch (e) {
+        console.error('Server rejected replayed action, rolling back optimistic update:', e);
+        await rollbackTournamentAction(uid, entry);
+        await dropReplayed(uid, pending.length - i);
+        if (!(e instanceof ApiError)) {
+          showToast({ type: 'error', message: m.tournament_action_reverted() });
+        }
+        return;
+      }
+      await shiftPendingAction(uid);
+    }
+  });
 }
 
 /** Blocks barred players (suspension, league-wide DQ) before the WASM optimistic path.
@@ -77,6 +162,12 @@ async function checkPlayerBarred(playerUid: string, tournament: Tournament): Pro
 }
 
 export async function tournamentAction(uid: string, action: TournamentEventType, data?: Record<string, unknown>): Promise<Tournament> {
+  await outboxSeeded;
+  // A tap releases this tournament's own replay: at a venue with no uplink the catch-up never
+  // lands, and the action must not queue behind a replay still waiting for it.
+  replayGates.get(uid)?.();
+  replayGates.delete(uid);
+
   const event: Record<string, unknown> & { type: TournamentEventType } = { type: action, ...data };
 
   // Inject vekn_id for CheckIn auto-registration (WASM engine requires it)
@@ -151,21 +242,29 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
       const hadDeckOps = (result.deckOps?.length ?? 0) > 0;
       // Snapshot our optimistic 'modified' stamps so rollback can tell our own write apart from a
       // foreign SSE update (co-judge action, server job) landed between the optimistic write and the rejection.
-      const optimisticModified = result.tournament.modified;
-      const optimisticDeckMods = hadDeckOps
-        ? new Map((await getDecksByTournament(uid)).map((d) => [d.uid, d.modified]))
-        : undefined;
+      const entry: PendingAction = {
+        event: serverEvent,
+        modified: result.tournament.modified,
+        tournament: current,
+        decks: hadDeckOps ? decks : undefined,
+        deckMods: hadDeckOps
+          ? Object.fromEntries((await getDecksByTournament(uid)).map((d) => [d.uid, d.modified]))
+          : undefined,
+      };
+      // Durable before the POST leaves: everything from here to the shift below dies with a locked
+      // screen or a killed tab, and only the stored entry lets the next launch finish it.
+      await appendPendingAction(uid, entry);
       enqueueServerAction(uid, async () => {
         try {
           await apiRequest<Tournament>(`/api/tournaments/${uid}/action`, {
             method: 'POST',
-            body: JSON.stringify(serverEvent),
+            body: JSON.stringify(entry.event),
           });
         } catch (e) {
           // A rejected action emits no SSE event, so the optimistic IDB write
           // won't self-correct — roll back to the pre-action state locally.
           console.error('Server rejected action, rolling back optimistic update:', e);
-          await rollbackTournamentAction(uid, current, decks, hadDeckOps, optimisticModified, optimisticDeckMods);
+          await rollbackTournamentAction(uid, entry);
           // apiRequest already toasts HTTP errors with the server's reason;
           // surface network-level failures (which don't toast) too.
           if (!(e instanceof ApiError)) {
@@ -175,6 +274,9 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
             });
           }
         }
+        // After the rollback, never before: an entry dropped first leaves the optimistic write
+        // standing with nothing left to correct it.
+        await shiftPendingAction(uid);
       });
 
       return result.tournament;
@@ -260,37 +362,30 @@ async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, existingDe
 
 /** A rejected action emits no SSE event, so optimistic IDB writes would persist forever; server actions
  * are transactional, so the pre-action state IS the post-rejection state — restore it, unless a foreign SSE write (co-judge, server job) already replaced our stored `modified` first. */
-async function rollbackTournamentAction(
-  uid: string,
-  preActionTournament: Tournament,
-  preActionDecks: DeckObject[],
-  hadDeckOps: boolean,
-  optimisticModified: string,
-  optimisticDeckMods?: Map<string, string>,
-): Promise<void> {
+async function rollbackTournamentAction(uid: string, entry: PendingAction): Promise<void> {
   try {
     const stored = await getTournament(uid);
-    if (!stored || stored.modified === optimisticModified) {
-      await saveTournament(preActionTournament);
+    if (!stored || stored.modified === entry.modified) {
+      await saveTournament(entry.tournament);
     }
   } catch (e) {
     console.error('Failed to roll back optimistic tournament state:', e);
   }
-  if (!hadDeckOps) return;
+  if (!entry.decks) return;
   try {
     const current = await getDecksByTournament(uid);
-    const originalUids = new Set(preActionDecks.map((d) => d.uid));
+    const originalUids = new Set(entry.decks.map((d) => d.uid));
     // Remove decks the optimistic op newly created — unless a foreign update
     // has since replaced our optimistic write for that deck.
     for (const d of current) {
       if (originalUids.has(d.uid)) continue;
-      if (optimisticDeckMods?.get(d.uid) === d.modified) await deleteDeck(d.uid);
+      if (entry.deckMods?.[d.uid] === d.modified) await deleteDeck(d.uid);
     }
     // Restore prior versions (also re-creates any optimistically deleted decks),
     // skipping decks a foreign update has since replaced.
-    for (const d of preActionDecks) {
+    for (const d of entry.decks) {
       const storedDeck = current.find((c) => c.uid === d.uid);
-      if (!storedDeck || optimisticDeckMods?.get(d.uid) === storedDeck.modified) {
+      if (!storedDeck || entry.deckMods?.[d.uid] === storedDeck.modified) {
         await saveDeck(d);
       }
     }

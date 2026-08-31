@@ -231,11 +231,33 @@ The owning device's path:
 
 1. WASM processes locally → `{tournament, deck_ops}` → IndexedDB updated → UI
    reacts immediately.
-2. The server POST is sent async, serialized per tournament
-   (`enqueueServerAction`).
+2. The action is written to a durable outbox, then the server POST is sent async,
+   serialized per tournament (`enqueueServerAction`).
 3. On success, SSE delivers authoritative state and overwrites if different.
 4. On rejection — no SSE follows and `modified_at` is unchanged — the client rolls
-   back to the in-memory pre-action snapshot and surfaces the error.
+   back to the pre-action snapshot and surfaces the error, then drops the entry.
+
+**The owning device's queue is durable.** The outbox entry is the whole rollback
+closure — the event, the pre-action tournament and decks, the optimistic `modified`
+stamps — stored before the POST leaves and removed only after that POST has been
+answered and any rollback has landed. A reload, a locked phone or an app killed in
+that window therefore replays the action on the next launch instead of dropping it
+with no request, no rollback and no frame that would ever correct it.
+
+The replay waits for the first catch-up, then runs only while the tournament's
+stored `modified` still equals the entry's: unchanged means the server never saw
+the action, because the engine leaves `modified` alone and every server commit
+bumps it. Any other value is ambiguous from the outside — this action committed as
+the tab died, or a co-judge moved the tournament — so the entry is dropped with a
+warning rather than applied twice — `StartRound` is not idempotent. A web lock
+keeps two tabs launching together from replaying the same entry, and a console tap
+on that tournament releases the replay, so an action never queues behind a catch-up
+that a venue with no uplink may never deliver. An unload flush was rejected for the same
+reason the gate exists: a `keepalive` POST on `pagehide` cannot tell an in-flight
+request from a committed one. A server-side idempotency key would settle it
+outright, at the price of a field on `TournamentActionRequest` — one of the
+enumerating sites [hazards](hazards.md#fields-silently-dropped) names — to turn a
+rare ambiguous drop into a rare ambiguous replay.
 
 A player's device instead runs WASM as a pre-flight, awaits the POST on that same
 queue and reports the server's answer, so there is nothing to roll back. It leaves

@@ -1,6 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, type StoreNames } from 'idb';
 import type { User, Role, Sanction, Tournament, DeckObject, League, Promo, VtesCard, OfflinePlayer,
   CommunityLink, RatingCategory, TournamentFormat, TournamentRank, TournamentState } from '$lib/types';
+import type { TournamentEvent } from './engine';
 import { expandRolesForFilter } from './roles';
 import { normalizeSearch, searchTokens } from './utils';
 
@@ -1124,6 +1125,52 @@ export async function addOfflineDeckUid(tournamentUid: string, deckUid: string):
   const uids = await getOfflineDeckUids(tournamentUid);
   uids.push(deckUid);
   await setMetadata(`offline_decks:${tournamentUid}`, JSON.stringify(uids));
+}
+
+/** One console action posted optimistically and not yet confirmed by the server: the whole rollback
+ * closure, durable, so a reload replays it instead of dropping it with the tab that fired it. */
+export interface PendingAction {
+  event: TournamentEvent;
+  modified: string;
+  tournament: Tournament;
+  decks?: DeckObject[];
+  deckMods?: Record<string, string>;
+}
+
+export async function getPendingActions(tournamentUid: string): Promise<PendingAction[]> {
+  const raw = await getMetadata(`outbox:${tournamentUid}`);
+  if (!raw) return [];
+  return JSON.parse(raw);
+}
+
+export async function getPendingActionTournamentUids(): Promise<string[]> {
+  const entries = await getMetadataByPrefix('outbox:');
+  return [...entries.keys()].map(key => key.slice('outbox:'.length));
+}
+
+/** Read-modify-write inside one transaction: the next action is enqueued without waiting for this
+ * write, and a second read of the pre-append value would drop whichever entry lost the race. */
+export async function appendPendingAction(tournamentUid: string, action: PendingAction): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction('metadata', 'readwrite');
+  const key = `outbox:${tournamentUid}`;
+  const raw = await tx.store.get(key);
+  const actions: PendingAction[] = raw ? JSON.parse(raw) : [];
+  actions.push(action);
+  await tx.store.put(JSON.stringify(actions), key);
+  await tx.done;
+}
+
+export async function shiftPendingAction(tournamentUid: string): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction('metadata', 'readwrite');
+  const key = `outbox:${tournamentUid}`;
+  const raw = await tx.store.get(key);
+  const actions: PendingAction[] = raw ? JSON.parse(raw) : [];
+  actions.shift();
+  if (actions.length) await tx.store.put(JSON.stringify(actions), key);
+  else await tx.store.delete(key);
+  await tx.done;
 }
 
 export interface VenueInfo {

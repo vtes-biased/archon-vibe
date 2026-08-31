@@ -1571,6 +1571,7 @@
   "common_link_copied": "Enlace copiado",
   "table_rooms_error_save": "No se pudieron guardar las salas.",
   "tournament_action_reverted": "La acción no se pudo guardar — se revirtió al estado anterior.",
+  "tournament_action_unconfirmed": "Una acción de tu última sesión no se pudo confirmar — revisa el estado del torneo.",
   "deck_error_upload": "Error al cargar.",
   "deck_url_import_failed": "No se pudo leer ese enlace. Asegúrese de que sea un enlace para compartir un mazo desde vdb.im, vtesdecks.com o Amaranth — o cambie a Pegar Deck, que siempre funciona.",
   "deck_error_camera": "No se pudo acceder a la cámara.",

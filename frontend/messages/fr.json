@@ -1571,6 +1571,7 @@
   "common_link_copied": "Lien copié",
   "table_rooms_error_save": "Impossible d'enregistrer les salles.",
   "tournament_action_reverted": "L'action n'a pas pu être enregistrée — retour à l'état précédent.",
+  "tournament_action_unconfirmed": "Une action de votre dernière session n'a pas pu être confirmée — vérifiez l'état du tournoi.",
   "deck_error_upload": "Échec du téléchargement.",
   "deck_url_import_failed": "Impossible de lire ce lien. Vérifiez qu'il s'agit bien d'un lien de partage de deck depuis vdb.im, vtesdecks.com, ou Amaranth — ou passez à Coller un Deck, qui fonctionne toujours.",
   "deck_error_camera": "Impossible d'accéder à la caméra.",
