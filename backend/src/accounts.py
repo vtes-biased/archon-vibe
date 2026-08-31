@@ -63,19 +63,23 @@ async def reassign_sanctions(
 async def reassign_decks(from_user_uid: str, to_user_uid: str) -> list[BroadcastData]:
     async with get_connection() as conn:
         result = await conn.execute(
-            """SELECT "full"::text FROM objects
-            WHERE type = 'deck' AND "full"->>'user_uid' = %s""",
+            """SELECT d."full"::text,
+                      coalesce(t."full"->'organizers_uids', '[]'::jsonb)
+            FROM objects d
+            LEFT JOIN objects t
+              ON t.type = 'tournament' AND t.uid = d."full"->>'tournament_uid'
+            WHERE d.type = 'deck' AND d."full"->>'user_uid' = %s""",
             (from_user_uid,),
         )
         rows = await result.fetchall()
     broadcasts = []
     for row in rows:
         deck = msgspec.json.decode(row[0].encode(), type=DeckObject)
-        broadcasts.append(
-            await save_object_from_model(
-                ObjectType.DECK, msgspec.structs.replace(deck, user_uid=to_user_uid)
-            )
+        bd = await save_object_from_model(
+            ObjectType.DECK, msgspec.structs.replace(deck, user_uid=to_user_uid)
         )
+        bd.org_uids = row[1]
+        broadcasts.append(bd)
     return broadcasts
 
 

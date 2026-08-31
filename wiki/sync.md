@@ -302,9 +302,12 @@ just-added organizer or player is one message stale. Catch-up is safe.
 
 One `broadcast_precomputed()` handles all object types. `BroadcastData` carries
 `tournament_uid` — the tournament a sanction or deck belongs to — so scoped
-connections can be routed without re-reading the DB. It is **not** auto-populated
-for decks, which have no `organizers_uids` field; the deck-ops processor stamps
-`org_uids` manually after save, and that is the correct pattern.
+connections can be routed without re-reading the DB. `org_uids` is **not**
+auto-populated for decks, which carry no `organizers_uids` of their own, so every
+path that writes a deck stamps it manually after the save: the deck-ops processor,
+the go-online replay, the TWDA import, and the account merge that reassigns a
+deck. An unstamped deck frame projects at member level, where a non-public deck is
+`None`, so the tournament's organizer sees nothing until their next reconnect.
 
 Each connection has a bounded `CoalescingQueue` (maxsize 30) keeping only the
 **latest frame per `(type, uid)`**, so successive whole-object snapshots of one
