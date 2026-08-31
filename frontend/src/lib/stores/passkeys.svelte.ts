@@ -1,6 +1,6 @@
 import * as m from '$lib/paraglide/messages.js';
 import { toUserMessage } from '$lib/errors';
-import { getAccessToken, getAuthState, setAuthState, storeTokens, fetchCurrentUser } from './auth.svelte';
+import { authorizedFetch, getAuthState, setAuthState, storeTokens, fetchCurrentUser } from './auth.svelte';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -44,16 +44,9 @@ export async function registerPasskey(): Promise<boolean> {
     return false;
   }
 
-  const token = getAccessToken();
-  if (!token) {
-    setAuthState({ error: m.auth_error_not_authenticated() });
-    return false;
-  }
-
   try {
-    const optionsResponse = await fetch(`${API_BASE}/auth/passkey/register/options`, {
+    const optionsResponse = await authorizedFetch(`${API_BASE}/auth/passkey/register/options`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
     });
 
     if (!optionsResponse.ok) {
@@ -95,12 +88,9 @@ export async function registerPasskey(): Promise<boolean> {
       },
     };
 
-    const verifyResponse = await fetch(`${API_BASE}/auth/passkey/register/verify`, {
+    const verifyResponse = await authorizedFetch(`${API_BASE}/auth/passkey/register/verify`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ credential: credentialData }),
     });
 

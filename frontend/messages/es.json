@@ -100,7 +100,6 @@
   "auth_verify_error_session_expired": "Sesión expirada. Por favor, solicite un nuevo enlace.",
   "oauth_page_title": "Autorizar aplicación",
   "oauth_subtitle": "Solicitud de autorización",
-  "oauth_error_not_authenticated": "No autenticado",
   "oauth_error_load_failed": "Error al cargar detalles de autorización",
   "oauth_return_to_archon": "Volver a Archon",
   "oauth_wants_access": "quiere acceder a su cuenta de Archon",

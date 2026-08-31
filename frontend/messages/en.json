@@ -100,7 +100,6 @@
   "auth_verify_error_session_expired": "Session expired. Please request a new link.",
   "oauth_page_title": "Authorize Application",
   "oauth_subtitle": "Authorization Request",
-  "oauth_error_not_authenticated": "Not authenticated",
   "oauth_error_load_failed": "Failed to load authorization details",
   "oauth_return_to_archon": "Return to Archon",
   "oauth_wants_access": "wants to access your Archon account",

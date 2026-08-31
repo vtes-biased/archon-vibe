@@ -77,6 +77,15 @@ Every method issues JWT access/refresh token pairs — short-lived access,
 longer-lived refresh. OAuth tokens are a separate `oauth_access` type with scope
 restrictions.
 
+**No frontend code builds an `Authorization` header except `authorizedFetch`**,
+which attaches the bearer and, on a 401, refreshes once and retries — the recovery
+a member needs when the app has sat open past the access token's life. Two calls
+stand outside it and must: the refresh request, which posts the refresh token in
+the body and cannot lean on the wrapper it exists to repair, and the magic-link
+request, which attaches the bearer only when linking an address to a signed-in
+account. The sync transport authenticates by query parameter instead
+([sync](sync.md#credentials)) and is a separate door on purpose.
+
 **Tokens are signed asymmetrically — EdDSA (Ed25519), never a shared secret.**
 The app holds the private half and is the only process that can mint; every
 verifier, the [public API](public-api.md#auth) included, holds public keys only,

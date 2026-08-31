@@ -3,7 +3,7 @@
   import { goto, replaceState } from "$app/navigation";
   import { onMount } from "svelte";
   import {
-    getAuthState, getAccessToken, logout,
+    authorizedFetch, getAuthState, getAccessToken, logout,
     initAuth, storeTokensFromCallback,
     requestMagicLink,
   } from "$lib/stores/auth.svelte";
@@ -181,14 +181,8 @@
   async function handleUnlinkGithub() {
     githubMessage = "";
     githubError = "";
-    const token = getAccessToken();
-    if (!token) {
-      githubError = m.profile_not_authenticated();
-      return;
-    }
-    const res = await fetch(`${API_BASE}/auth/github/unlink`, {
+    const res = await authorizedFetch(`${API_BASE}/auth/github/unlink`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
       githubMessage = m.profile_github_unlinked();

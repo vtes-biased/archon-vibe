@@ -3,7 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
-  import { getAuthState, getAccessToken, initAuth } from "$lib/stores/auth.svelte";
+  import { authorizedFetch, getAuthState, initAuth } from "$lib/stores/auth.svelte";
   import { Loader2, CircleAlert, ShieldCheck, CircleCheck } from '@lucide/svelte';
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
@@ -42,17 +42,10 @@
     }
 
     const params = new URLSearchParams(window.location.search);
-    const token = getAccessToken();
-    if (!token) {
-      error = m.oauth_error_not_authenticated();
-      loading = false;
-      return;
-    }
 
     try {
-      const response = await fetch(
+      const response = await authorizedFetch(
         `${API_BASE}/oauth/authorize?${params.toString()}`,
-        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       if (!response.ok) {
@@ -87,15 +80,11 @@
 
   async function handleApprove() {
     submitting = true;
-    const token = getAccessToken();
 
     try {
-      const response = await fetch(`${API_BASE}/oauth/authorize`, {
+      const response = await authorizedFetch(`${API_BASE}/oauth/authorize`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           client_id: clientId,
           redirect_uri: redirectUri,
@@ -124,15 +113,11 @@
 
   async function handleDeny() {
     submitting = true;
-    const token = getAccessToken();
 
     try {
-      const response = await fetch(`${API_BASE}/oauth/authorize`, {
+      const response = await authorizedFetch(`${API_BASE}/oauth/authorize`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           client_id: clientId,
           redirect_uri: redirectUri,
