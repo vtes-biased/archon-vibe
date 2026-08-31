@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import msgspec
 from archon_engine import PyEngine
 from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from .. import permissions
@@ -1067,7 +1067,10 @@ async def fetch_deck_proxy(
     try:
         result = await fetch_deck_from_url(url)
     except DeckFetchError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        return JSONResponse(
+            status_code=400,
+            content={"detail": str(e), "code": e.code, "params": e.params},
+        )
     except Exception as e:
         logger.exception("Failed to fetch deck from URL")
         raise HTTPException(status_code=400, detail=f"Failed to fetch deck: {e}") from e

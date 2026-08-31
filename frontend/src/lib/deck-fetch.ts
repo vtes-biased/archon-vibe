@@ -1,7 +1,9 @@
 // URL fetching routes through the backend `/fetch-deck` proxy — only the backend (via krcg) can map
 // provider-native card ids to VEKN ids (notably Amaranth's), so every url/QR import goes server-side and needs a connection. Text parsing uses the WASM engine locally, offline-capable.
 
+import { ApiError, apiRequest } from './api';
 import { callEngine, initEngine } from './engine-instance';
+import * as m from './paraglide/messages.js';
 
 export interface ParsedDeck {
   name: string;
@@ -11,25 +13,29 @@ export interface ParsedDeck {
   warnings?: string[];
 }
 
-/** URL import failed (bad link, unsupported provider, provider error). The server detail is developer
- * English — callers show one friendly localized message instead and nudge toward Paste, which always works. */
+/** URL import failed. The message is already localized — the server's developer-English detail
+ * goes to the console instead. */
 export class DeckFetchError extends Error {}
 
 export async function fetchDeckFromUrl(url: string): Promise<ParsedDeck> {
-  const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
-  const { getAccessToken } = await import('./stores/auth.svelte');
-  const token = getAccessToken();
-  const resp = await fetch(
-    `${API_URL}/api/tournaments/fetch-deck?url=${encodeURIComponent(url)}`,
-    { headers: token ? { Authorization: `Bearer ${token}` } : {} },
-  );
-  if (!resp.ok) {
-    const data = await resp.json().catch(() => ({}));
-    // Keep the real cause findable without surfacing dev copy to the player.
-    console.warn('[deck-fetch]', resp.status, data.detail);
-    throw new DeckFetchError(data.detail || `Failed to fetch deck (${resp.status})`);
+  try {
+    return await apiRequest<ParsedDeck>(
+      `/api/tournaments/fetch-deck?url=${encodeURIComponent(url)}`,
+      {},
+      { suppressErrorToast: true },
+    );
+  } catch (e) {
+    // Status 0 (offline) and a transport failure already localize through `toUserMessage`.
+    if (!(e instanceof ApiError) || e.status === 0) throw e;
+    console.warn('[deck-fetch]', e.status, e.detail);
+    // A 401 survived authorizedFetch's refresh-and-retry, so the refresh token is dead too.
+    if (e.status === 401) throw new DeckFetchError(m.auth_error_session_expired());
+    if (e.code === 'deck_fetch.provider_unavailable') {
+      throw new DeckFetchError(m.deck_url_import_provider_down({ provider: e.params?.provider ?? '' }));
+    }
+    if (e.code === 'deck_fetch.bad_link') throw new DeckFetchError(m.deck_url_import_failed());
+    throw new DeckFetchError(m.err_internal());
   }
-  return resp.json();
 }
 
 export async function parseDeckText(text: string): Promise<ParsedDeck> {

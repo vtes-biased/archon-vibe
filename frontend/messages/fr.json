@@ -1574,6 +1574,7 @@
   "tournament_action_unconfirmed": "Une action de votre dernière session n'a pas pu être confirmée — vérifiez l'état du tournoi.",
   "deck_error_upload": "Échec du téléchargement.",
   "deck_url_import_failed": "Impossible de lire ce lien. Vérifiez qu'il s'agit bien d'un lien de partage de deck depuis vdb.im, vtesdecks.com, ou Amaranth — ou passez à Coller un Deck, qui fonctionne toujours.",
+  "deck_url_import_provider_down": "{provider} n'a pas répondu. Réessayez dans un instant, ou passez à Coller un Deck, qui fonctionne toujours.",
   "deck_error_camera": "Impossible d'accéder à la caméra.",
   "deck_error_save": "Impossible d'enregistrer le deck.",
   "deck_validation_unavailable": "Impossible de vérifier la légalité de ce deck pour le moment — les données des cartes sont encore en cours de chargement.",

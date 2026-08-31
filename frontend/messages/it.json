@@ -1574,6 +1574,7 @@
   "tournament_action_unconfirmed": "Un'azione della tua ultima sessione non è stata confermata — controlla lo stato del torneo.",
   "deck_error_upload": "Caricamento fallito.",
   "deck_url_import_failed": "Impossibile leggere quel link. Assicurati che sia un link per condividere un mazzo da vdb.im, vtesdecks.com, o Amaranth — oppure passa a Incolla Deck, che funziona sempre.",
+  "deck_url_import_provider_down": "{provider} non ha risposto. Riprova tra un momento, oppure passa a Incolla Deck, che funziona sempre.",
   "deck_error_camera": "Impossibile accedere alla fotocamera.",
   "deck_error_save": "Impossibile salvare il mazzo.",
   "deck_validation_unavailable": "Non è stato ancora possibile verificare la legalità di questo mazzo — i dati delle carte sono ancora in fase di caricamento.",

@@ -29,8 +29,9 @@ export async function apiRequest<T>(
   // and HTTP errors. Callers that surface the error themselves pass this to avoid a duplicate toast.
   { suppressErrorToast = false }: { suppressErrorToast?: boolean } = {}
 ): Promise<T> {
-  // Offline guard: every apiRequest is a mutation (reads are offline-first from IndexedDB), so there's
-  // no point attempting the fetch. Toast + throw (status 0 = never left the device) so callers can distinguish it.
+  // Offline guard: an apiRequest is a mutation or a server-only proxy read (ordinary reads are
+  // offline-first from IndexedDB), so there's no point attempting the fetch. Toast + throw
+  // (status 0 = never left the device) so callers can distinguish it.
   if (!isOnline()) {
     const message = m.error_action_requires_online();
     if (!suppressErrorToast) showToast({ type: 'error', message });

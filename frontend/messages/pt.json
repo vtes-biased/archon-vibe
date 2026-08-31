@@ -1574,6 +1574,7 @@
   "tournament_action_unconfirmed": "Uma ação da sua última sessão não pôde ser confirmada — verifique o estado do torneio.",
   "deck_error_upload": "Falha no envio.",
   "deck_url_import_failed": "Não foi possível ler esse link. Verifique se é um link de compartilhamento de deck do vdb.im, vtesdecks.com, ou Amaranth — ou mude para Colar Deck, que sempre funciona.",
+  "deck_url_import_provider_down": "{provider} não respondeu. Tente novamente em instantes ou mude para Colar Deck, que sempre funciona.",
   "deck_error_camera": "Não foi possível acessar a câmera.",
   "deck_error_save": "Não foi possível salvar o deck.",
   "deck_validation_unavailable": "Ainda não foi possível verificar a legalidade deste deck — os dados das cartas ainda estão carregando.",

@@ -15,7 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 class DeckFetchError(Exception):
-    pass
+    def __init__(self, message: str, code: str, params: dict[str, str] | None = None):
+        super().__init__(message)
+        self.code = code
+        self.params = params or {}
 
 
 # krcg's card DB, loaded once (offline pickle/local) and reused across requests.
@@ -81,12 +84,25 @@ async def fetch_deck_from_url(url: str) -> dict:
             elif netloc == "vtesdecks.com":
                 deck = await providers.fetch_vtesdecks(session, parsed, cards)
             else:
-                raise DeckFetchError(f"Unsupported deck URL provider: {parsed.netloc}")
+                raise DeckFetchError(
+                    f"Unsupported deck URL provider: {parsed.netloc}",
+                    "deck_fetch.bad_link",
+                )
     except DeckFetchError:
         raise
     except KeyError as e:
         # A referenced card id isn't in krcg's DB (unknown/storyline/counter card).
-        raise DeckFetchError(f"Deck references an unknown card ({e})") from e
-    except (ValueError, aiohttp.ClientError) as e:
-        raise DeckFetchError(f"Could not fetch deck from {parsed.netloc}: {e}") from e
+        raise DeckFetchError(
+            f"Deck references an unknown card ({e})", "deck_fetch.bad_link"
+        ) from e
+    except ValueError as e:
+        raise DeckFetchError(
+            f"Could not read the deck at {parsed.netloc}: {e}", "deck_fetch.bad_link"
+        ) from e
+    except (aiohttp.ClientError, TimeoutError) as e:
+        raise DeckFetchError(
+            f"Could not fetch deck from {parsed.netloc}: {e}",
+            "deck_fetch.provider_unavailable",
+            {"provider": netloc},
+        ) from e
     return _deck_to_dict(deck)
