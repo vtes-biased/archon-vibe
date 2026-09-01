@@ -25,4 +25,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 
 Board changes ride the commit that earns them.
 
-- Send registrants to the platform that actually takes their registration: a tournament carries an external registration URL, distinct from `venue_url` (already the online join link), and a player registering in Archon is pointed at it instead of being left to think they are done. **Done when** an organizer can set the link on the creation and edit forms, a registering player is sent to it, the wizard's "collected in advance, somewhere else" answer prefills nothing but names the field in its guidance, and `wiki/tournaments.md` carries the field with `wiki/product.md` recording what a registration means when the link is set. The link's presence is also the signal that sign-ups arrive from outside, so the paid-registrations CSV import surfaces in the action bar during Registration rather than only in the tools sheet.

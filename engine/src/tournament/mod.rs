@@ -56,7 +56,7 @@ pub fn table_label(table_rooms: &JsonValue, table_idx: usize) -> Option<String> 
     None
 }
 
-pub const CONFIG_FIELDS: [&str; 26] = [
+pub const CONFIG_FIELDS: [&str; 27] = [
     tournament_config::NAME,
     tournament_config::FORMAT,
     tournament_config::RANK,
@@ -69,6 +69,7 @@ pub const CONFIG_FIELDS: [&str; 26] = [
     tournament_config::VENUE_URL,
     tournament_config::ADDRESS,
     tournament_config::MAP_URL,
+    tournament_config::REGISTRATION_URL,
     tournament_config::PROXIES,
     tournament_config::MULTIDECK,
     tournament_config::DECKLIST_REQUIRED,
@@ -243,6 +244,7 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
         tournament::VENUE_URL => config[tournament_config::VENUE_URL].as_str().unwrap_or(""),
         tournament::ADDRESS => config[tournament_config::ADDRESS].as_str().unwrap_or(""),
         tournament::MAP_URL => config[tournament_config::MAP_URL].as_str().unwrap_or(""),
+        tournament::REGISTRATION_URL => config[tournament_config::REGISTRATION_URL].as_str().unwrap_or(""),
         tournament::PROXIES => config[tournament_config::PROXIES].as_bool().unwrap_or(false),
         tournament::MULTIDECK => config[tournament_config::MULTIDECK].as_bool().unwrap_or(false),
         tournament::DECKLIST_REQUIRED => config[tournament_config::DECKLIST_REQUIRED].as_bool().unwrap_or(false),

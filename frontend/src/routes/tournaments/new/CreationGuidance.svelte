@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Component } from "svelte";
-  import { Banknote, Bot, DoorOpen, Layers, LayoutGrid, MessageSquare, QrCode, Split, Upload, Users, WifiOff } from "@lucide/svelte";
+  import { Banknote, Bot, DoorOpen, Layers, LayoutGrid, MessageSquare, QrCode, Split, Ticket, Upload, Users, WifiOff } from "@lucide/svelte";
   import type { WizardAnswers } from "./CreationWizard.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -58,6 +58,16 @@
           section: m.rooms_title(),
           venue: m.tfield_section_location(),
           tab: m.tools_group_setup(),
+        }),
+      });
+    }
+    if (irl && answers.doors === "advance") {
+      out.push({
+        icon: Ticket,
+        title: m.tournament_wiz_tip_reglink_t(),
+        body: m.tournament_wiz_tip_reglink_b({
+          field: m.tfield_registration_url(),
+          venue: m.tfield_section_location(),
         }),
       });
     }

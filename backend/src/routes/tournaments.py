@@ -831,6 +831,7 @@ class CreateTournamentRequest(BaseModel):
     venue_url: str = ""
     address: str = ""
     map_url: str = ""
+    registration_url: str = ""
     proxies: bool = False
     multideck: bool = False
     decklist_required: bool = False

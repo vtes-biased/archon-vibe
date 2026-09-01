@@ -254,6 +254,7 @@ pub mod tournament {
     pub const PROXIES: &str = "proxies";
     pub const RAFFLES: &str = "raffles";
     pub const RANK: &str = "rank";
+    pub const REGISTRATION_URL: &str = "registration_url";
     pub const REPORTED_PLAYER_COUNT: &str = "reported_player_count";
     pub const ROUND_TIME: &str = "round_time";
     pub const ROUNDS: &str = "rounds";
@@ -289,6 +290,7 @@ pub mod tournament_config {
     pub const OPEN_ROUNDS: &str = "open_rounds";
     pub const PROXIES: &str = "proxies";
     pub const RANK: &str = "rank";
+    pub const REGISTRATION_URL: &str = "registration_url";
     pub const ROUND_TIME: &str = "round_time";
     pub const SELF_ORGANIZED_ROUNDS: &str = "self_organized_rounds";
     pub const STANDINGS_MODE: &str = "standings_mode";

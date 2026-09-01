@@ -274,6 +274,17 @@
   {/if}
 {/snippet}
 
+{#snippet externalRegistration()}
+  <div class="space-y-2">
+    <p class="text-sm text-ink-muted">{m.tournament_external_registration_notice()}</p>
+    <a href={tournament.registration_url} target="_blank" rel="noopener"
+       class="inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium min-h-[44px] bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">
+      <ExternalLink class="w-4 h-4" aria-hidden="true" />
+      {m.tournament_external_registration_btn()}
+    </a>
+  </div>
+{/snippet}
+
 <div class="bg-surface-card rounded-lg shadow border border-line mb-6 p-6 space-y-4">
   {#if iAmWaitlisted}
     <div class="banner-warn border rounded-lg p-3 text-sm flex items-start gap-2">
@@ -309,6 +320,7 @@
         onclick={() => playerAction("Register", { user_uid: userUid, vekn_id: userVeknId })}
         disabled={actionLoading}
       >{m.tournament_register_btn()}</Button>
+      {#if tournament.registration_url}{@render externalRegistration()}{/if}
       {#if actionError}{@render refusal(actionError)}{/if}
     {/if}
   {:else if tournament.state === "Registration" && currentPlayerEntry}
@@ -323,6 +335,7 @@
         disabled={actionLoading}
       ><Ban class="w-4 h-4" aria-hidden="true" />{m.tournament_unregister_btn()}</Button>
     </div>
+    {#if tournament.registration_url}{@render externalRegistration()}{/if}
     {#if actionError}{@render refusal(actionError)}{/if}
   {:else if tournament.state === "Waiting" && !currentPlayerEntry}
     {#if tournament.online}

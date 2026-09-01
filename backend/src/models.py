@@ -533,6 +533,12 @@ class TournamentConfig(TournamentMinimal, kw_only=True):
     venue_url: str = ""
     address: str = ""
     map_url: str = ""
+    registration_url: Annotated[
+        str,
+        msgspec.Meta(
+            description="External page taking the sign-ups, empty when Archon takes them."
+        ),
+    ] = ""
     proxies: bool = False
     multideck: bool = False
     decklist_required: bool = False

@@ -643,6 +643,7 @@ _TOURNAMENT_MEMBER_VISIBLE = {
     "venue_url",
     "address",
     "map_url",
+    "registration_url",
     "proxies",
     "multideck",
     "decklist_required",

@@ -6,7 +6,7 @@
   import QrCheckinDisplay from "$lib/components/QrCheckinDisplay.svelte";
   import FinishedResults from "./FinishedResults.svelte";
   import InlineNotice from "$lib/components/InlineNotice.svelte";
-  import { Undo2, CheckCheck, Banknote, RotateCcw } from "@lucide/svelte";
+  import { Undo2, CheckCheck, Banknote, RotateCcw, Upload } from "@lucide/svelte";
   import { translateTournamentState, seatDisplay, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -19,6 +19,7 @@
     actionLoading,
     doAction,
     onImportArchon,
+    onImportCsv,
     onAddBanner,
     onRecordPromos,
   }: {
@@ -29,6 +30,7 @@
     actionLoading: boolean;
     doAction: (action: TournamentEventType, body?: any) => Promise<string | null>;
     onImportArchon: () => void;
+    onImportCsv: () => void;
     onAddBanner: () => void;
     onRecordPromos: () => void;
   } = $props();
@@ -234,6 +236,9 @@
     {/if}
 
     {#if tournament.state === "Registration"}
+      {#if tournament.registration_url}
+        <Button variant="secondary" size="md" disabled={actionLoading} onclick={onImportCsv}><Upload class="w-4 h-4" aria-hidden="true" />{m.csv_import_title()}</Button>
+      {/if}
       <ActionMenu label={m.common_more()} items={[
         { label: m.overview_back_to_planning(), icon: Undo2, onclick: () => doAction("CancelRegistration"), disabled: actionLoading },
       ]} />

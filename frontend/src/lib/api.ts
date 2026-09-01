@@ -433,6 +433,7 @@ export interface CreateTournamentData {
   venue_url?: string;
   address?: string;
   map_url?: string;
+  registration_url?: string;
   description?: string;
   max_rounds?: number;
   open_rounds?: boolean;

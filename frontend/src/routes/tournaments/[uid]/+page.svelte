@@ -970,6 +970,7 @@ import TournamentModals from "./TournamentModals.svelte";
             {actionLoading}
             {doAction}
             onImportArchon={() => (showArchonImport = true)}
+            onImportCsv={() => (showCsvImport = true)}
             onAddBanner={() => bannerComp?.openCropper()}
             onRecordPromos={() => openTools('promos')}
           />

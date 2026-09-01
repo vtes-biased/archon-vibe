@@ -50,6 +50,7 @@
     venue_url: tournament.venue_url ?? "",
     address: tournament.address ?? "",
     map_url: tournament.map_url ?? "",
+    registration_url: tournament.registration_url ?? "",
     start: tournament.start ? tournament.start.slice(0, 16) : "",
     finish: tournament.finish ? tournament.finish.slice(0, 16) : "",
     timezone: tournament.timezone,
@@ -83,6 +84,7 @@
         venue_url: t.venue_url ?? "",
         address: t.address ?? "",
         map_url: t.map_url ?? "",
+        registration_url: t.registration_url ?? "",
         start: t.start ? t.start.slice(0, 16) : "",
         finish: t.finish ? t.finish.slice(0, 16) : "",
         timezone: t.timezone,
@@ -147,7 +149,7 @@
     debounceTimer = setTimeout(() => save(field, value), 500);
   }
 
-  const debouncedFields = new Set(["name", "venue", "venue_url", "address", "map_url", "description"]);
+  const debouncedFields = new Set(["name", "venue", "venue_url", "address", "map_url", "registration_url", "description"]);
 
   function handleFieldChange(field: string, value: any) {
     if (field === "open_rounds") {

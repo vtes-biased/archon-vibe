@@ -145,6 +145,7 @@ _TOURNAMENT_PUBLIC_FIELDS = {
     "venue_url",
     "address",
     "map_url",
+    "registration_url",
     "description",
     "external_ids",  # public ids only (vekn event, legacy archon uid)
     "event_code",  # an anonymous visitor following a short URL must resolve it

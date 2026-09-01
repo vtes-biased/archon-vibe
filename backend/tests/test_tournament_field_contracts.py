@@ -30,6 +30,7 @@ SAMPLE_CONFIG = {
     "venue_url": "https://example.invalid/venue",
     "address": "1 Sample Street",
     "map_url": "https://example.invalid/map",
+    "registration_url": "https://example.invalid/tickets",
     "proxies": True,
     "multideck": True,
     "decklist_required": True,

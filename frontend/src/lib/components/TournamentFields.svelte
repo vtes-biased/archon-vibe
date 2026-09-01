@@ -26,6 +26,7 @@
     venue_url: string;
     address: string;
     map_url: string;
+    registration_url: string;
     start: string;
     finish: string;
     timezone: string;
@@ -403,6 +404,20 @@
       class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
       placeholder="https://..."
     />
+  </div>
+
+  <div>
+    <label class="block text-sm text-ink-muted mb-1" for={id("registration-url")}>{m.tfield_registration_url()}</label>
+    <input
+      id={id("registration-url")}
+      type="url"
+      value={values.registration_url}
+      {disabled}
+      oninput={(e) => handleInput("registration_url", (e.target as HTMLInputElement).value)}
+      class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
+      placeholder="https://..."
+    />
+    <p class="text-xs text-ink-faint mt-1">{m.tfield_registration_url_desc()}</p>
   </div>
 
   {#if !values.online}

@@ -17,6 +17,7 @@ server (PyO3) behave identically.
 | Multideck | yes/no | Standard rank only |
 | Decklist required | yes/no | organizer choice |
 | Online | yes/no | the venue URL is the meeting place |
+| `registration_url` | URL, empty = none | the external page taking the sign-ups; its presence is the signal that they arrive from outside, which is what surfaces the paid-registrations CSV import in the action bar |
 | `max_rounds` | int, 0 = uncapped | per-player round cap |
 | `max_players` | int, 0 = none | venue capacity: the engine never blocks a registration, it waitlists it — below |
 | `open_rounds` | bool | the non-VEKN house format, below |

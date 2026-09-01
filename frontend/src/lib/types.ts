@@ -340,6 +340,7 @@ export interface Tournament extends BaseObject {
   venue_url?: string;
   address?: string;
   map_url?: string;
+  registration_url?: string;
   proxies?: boolean;
   multideck?: boolean;
   decklist_required?: boolean;

@@ -508,6 +508,7 @@ _FROM_OFFLINE_SNAPSHOT = {
     "venue_url",
     "address",
     "map_url",
+    "registration_url",
     "proxies",
     "multideck",
     "decklist_required",
