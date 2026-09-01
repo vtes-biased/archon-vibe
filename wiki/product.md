@@ -116,6 +116,24 @@ The rules themselves live in [domain](domain/tournament-rules.md); how the app
 implements them, and where it differs, is [tournaments](tournaments.md). What
 follows is the app's own behavior, chosen rather than inherited.
 
+**Tournament creation starts from the event, not the fields.** `/tournaments/new`
+asks where it is played, what kind of event it is, where the games happen or what
+happens at the door, and the deck rules — then hands over the ordinary
+configuration form prefilled for that archetype, followed by the steps that need a
+tournament to exist first. The plain form stays one click away. The long-running
+open-round archetype is an **open series**, never a league: `/leagues` is a
+different object. **There is no payment-tracking flag** — per-player payment
+status is always present, and "paid or free" only steers the guidance, so a stored
+flag would buy nothing but a hidden column.
+
+**Rounds in parallel is the async-platform archetype.** Every round is live at
+once and the same player sits in all of them, because a single round on a
+play-by-email platform runs for weeks. It is not `open_rounds` — that flag is the
+house format, and parallel seating has never needed it — and it leaves the round
+timer off, a clock being meaningless over that span. Starting the next round
+merely because a table finished early is possible and is not how the feature is
+used.
+
 **The door stays open mid-round.** Check-in is allowed while a round is `Playing`
 and enrolls a never-registered player; it records presence, never seats. Whether a
 late arrival joins a short table now or waits is the organizer's call — **the app

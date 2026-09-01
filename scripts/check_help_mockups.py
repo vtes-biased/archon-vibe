@@ -27,6 +27,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 GUIDES = ROOT / "frontend" / "src" / "lib" / "components" / "help"
+# Draws no console, but names live controls the same way, so rule 2 must reach it.
+EXTRA_DRAWINGS = (ROOT / "frontend/src/routes/tournaments/new/CreationGuidance.svelte",)
 CATALOG = ROOT / "frontend" / "messages" / "en.json"
 
 # Class fragments that mean "this is a Button/Badge someone re-drew by hand".
@@ -68,7 +70,7 @@ def main() -> int:
     catalog = set(json.loads(CATALOG.read_text()).values())
     violations: list[str] = []
 
-    for path in sorted(GUIDES.glob("*.svelte")):
+    for path in sorted(GUIDES.glob("*.svelte")) + list(EXTRA_DRAWINGS):
         rel = path.relative_to(ROOT)
         src = path.read_text()
 

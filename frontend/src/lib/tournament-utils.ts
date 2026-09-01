@@ -4,6 +4,10 @@ import { attestedPlayerCount, computeRatingPoints, computeRatingVpGw, displaySta
 import { formatScore } from "./utils";
 import * as m from './paraglide/messages.js';
 
+export const OFFICIAL_DISCORD_VENUE = "VEKN Discord";
+export const OFFICIAL_DISCORD_INVITE =
+  "https://discord.com/invite/vampire-the-eternal-struggle-official-887471681277399091";
+
 export interface StandingEntry {
   user_uid: string;
   gw: number;

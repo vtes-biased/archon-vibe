@@ -385,6 +385,24 @@ fallback.
 (TournamentFields' `mode` prop) keeps the same sections but differs in what starts
 expanded: creation opens what must be filled, editing opens nothing.
 
+**A wizard fronts a form, it never replaces one.** Tournament creation asks four
+archetype questions and then reveals the ordinary create form prefilled, rather
+than collecting the fields itself: one submit path, one set of validations, one set
+of field labels. The count is fixed at four whichever branch is taken, so it never
+moves under the reader; single-choice steps advance on tap, steps carrying several
+controls end in Next; and an organizer who already knows what they want skips
+straight to the form, bookmarkable at `?form`. A wizard writing into the values
+bypasses the field handlers that enforce their invariants, so the prefill owes them
+itself — online clears proxies, dropping open rounds clears self-organized.
+
+**Guidance names the real label, and only once.** The closing panel covers what the
+app cannot automate — the Discord bot, co-organizers, table rooms, the CSV import,
+offline mode, decklists, QR self-check-in, payment at the door, parallel rounds,
+latecomers — and interpolates every control it names from that control's own
+message key, the rule the [help mockups](i18n.md#guide-mockups) already run on. It
+stays silent where the form beneath it speaks: the open-rounds warning and the
+self-organized description belong to the fields.
+
 **Country display** — flag then name in body text (`🇫🇷 France`), name then flag in
 `<select>` options (`France 🇫🇷`) so browser type-ahead works.
 

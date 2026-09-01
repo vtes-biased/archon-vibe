@@ -6,9 +6,7 @@
   import TableRoomsEditor from "./TableRoomsEditor.svelte";
   import { RefreshCw, Check } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
-
-  const DISCORD_VENUE = "Official Discord";
-  const DISCORD_URL = "https://discord.com/invite/vampire-the-eternal-struggle-official-887471681277399091";
+  import { OFFICIAL_DISCORD_INVITE, OFFICIAL_DISCORD_VENUE } from "$lib/tournament-utils";
 
   let {
     tournament = $bindable(),
@@ -192,7 +190,7 @@
         address: tournament.address ?? "",
         map_url: tournament.map_url ?? "",
       };
-      const restored = stashedOnline ?? { venue: DISCORD_VENUE, venue_url: DISCORD_URL };
+      const restored = stashedOnline ?? { venue: OFFICIAL_DISCORD_VENUE, venue_url: OFFICIAL_DISCORD_INVITE };
       stashedOnline = null;
       await saveMultiple({
         online: true,

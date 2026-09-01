@@ -1,9 +1,12 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
-  import { goto } from "$app/navigation";
+  import { goto, replaceState } from "$app/navigation";
+  import { currentParams } from "$lib/url-filters";
   import { createTournament, createTournamentOffline, isOnline } from "$lib/api";
   import { saveTournament } from "$lib/db";
   import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
+  import CreationWizard, { type WizardAnswers } from "./CreationWizard.svelte";
+  import CreationGuidance from "./CreationGuidance.svelte";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { canCreateTournament } from "$lib/engine";
   import Button from '$lib/components/Button.svelte';
@@ -42,6 +45,10 @@
     round_time: 7200,
     finals_time: 0,
   });
+
+  let answers = $state<WizardAnswers>({ setting: "", kind: "", home: "", doors: "", offlineVenue: false });
+  let showForm = $state(currentParams().has("form"));
+  let answered = $state(false);
 
   let isSubmitting = $state(false);
   let error = $state<string | null>(null);
@@ -149,8 +156,34 @@
       <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4">
         <p class="text-link-soft">{m.tournament_new_no_permission()}</p>
       </div>
+    {:else if !showForm}
+      <CreationWizard
+        bind:answers
+        bind:values
+        oncomplete={() => { answered = true; showForm = true; }}
+        onskip={() => {
+          showForm = true;
+          const url = new URL(window.location.href);
+          url.searchParams.set("form", "");
+          replaceState(url.pathname + url.search, {});
+        }}
+      />
     {:else}
       <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-6">
+        {#if answered}
+          <div class="bg-surface-card rounded-lg shadow p-6 border border-line space-y-2">
+            <h2 class="text-xl font-medium text-ink-strong">{m.tournament_wiz_ready_title()}</h2>
+            <p class="text-sm text-ink-muted">{m.tournament_wiz_ready_desc()}</p>
+            <button
+              type="button"
+              onclick={() => { showForm = false; answered = false; }}
+              class="text-sm text-link hover:underline"
+            >
+              {m.tournament_wiz_ready_redo()}
+            </button>
+          </div>
+        {/if}
+
         <div class="bg-surface-card rounded-lg shadow p-6 border border-line space-y-4">
           {#if offline}
             <div class="banner-warn border rounded-lg p-3 flex items-start gap-2">
@@ -166,6 +199,10 @@
 
           <TournamentFields bind:values disabled={isSubmitting} mode="create" />
         </div>
+
+        {#if answered}
+          <CreationGuidance {answers} decklistRequired={values.decklist_required} />
+        {/if}
 
         <div class="flex flex-col items-end gap-1.5">
           {#if missingFields.length > 0}

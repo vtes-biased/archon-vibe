@@ -6,6 +6,7 @@
   import { getAllLeagues } from "$lib/db";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { canLinkTournamentToLeague } from "$lib/engine";
+  import { OFFICIAL_DISCORD_INVITE, OFFICIAL_DISCORD_VENUE } from "$lib/tournament-utils";
   import VenueAutocomplete from "./VenueAutocomplete.svelte";
   import FoldableSection from "./FoldableSection.svelte";
   import { Info } from "@lucide/svelte";
@@ -350,8 +351,8 @@
           handleInput("proxies", false);
         }
         if (checked && !values.venue) {
-          handleInput("venue", "VEKN Discord");
-          handleInput("venue_url", "https://discord.com/invite/vampire-the-eternal-struggle-official-887471681277399091");
+          handleInput("venue", OFFICIAL_DISCORD_VENUE);
+          handleInput("venue_url", OFFICIAL_DISCORD_INVITE);
         }
       }}
       class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"

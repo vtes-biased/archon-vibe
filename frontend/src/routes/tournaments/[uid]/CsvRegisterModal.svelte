@@ -57,8 +57,7 @@
     return out;
   }
 
-  const HEADER_ALIASES: Record<keyof Row, string[]> = {
-    vekn_id: ["vekn", "vekn_id", "vekn id", "veknid"],
+  const HEADER_ALIASES: Record<"email" | "name" | "paid", string[]> = {
     email: ["email", "e-mail", "mail"],
     name: ["name", "player", "player name", "attendee"],
     paid: ["paid", "payment", "payment status"],
@@ -80,10 +79,10 @@
         return;
       }
       const header = (records[0] ?? []).map(h => h.trim().toLowerCase());
-      const colOf = (key: keyof Row) =>
+      const colOf = (key: keyof typeof HEADER_ALIASES) =>
         header.findIndex(h => HEADER_ALIASES[key].includes(h));
       const cols = {
-        vekn_id: colOf("vekn_id"),
+        vekn_id: header.findIndex(h => h.includes("vekn")),
         email: colOf("email"),
         name: colOf("name"),
         paid: colOf("paid"),

@@ -89,7 +89,9 @@ the same eight gates:
   draws it for real, and it bans any literal that matches an `en.json` value,
   because that literal is a copy of a live label. Sample data — a player name, a
   clock face, a VEKN ID — never appears in the catalog, so the label rule does not
-  see it; the few that collide are listed in the script with their reason.
+  see it; the few that collide are listed in the script with their reason. The
+  label rule also covers the creation wizard's guidance panel, which draws no
+  console but names the same live controls.
 
 In dev only the **database** runs in Docker; backend and frontend run natively. The
 compose file is **not** production-hardened — uvicorn reload, a default password.
