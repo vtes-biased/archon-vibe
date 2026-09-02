@@ -478,9 +478,8 @@ the browse affordance, and a chrome-free variant would be the only route in the 
 that escapes the shell.
 
 **Two ways in, one primary.** Sign up is the crimson `primary` and points at
-`/login?mode=signup` — that parameter is what makes a "sign up" CTA open the signup
-tab instead of the login one. Browse events is `secondary`; returning members get a
-quiet text link.
+[`/login?mode=signup`](access.md#authentication). Browse events is `secondary`;
+returning members get a quiet text link.
 
 **The ring is the only bold thing.** No feature grid, no numbered steps, no
 motion — the surface exists to name the app and offer the two doors, and a card row

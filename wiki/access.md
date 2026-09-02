@@ -119,6 +119,9 @@ OAuth state and back onto the callback's `/login` URL. The consent page sends
 its own path and query there, so a third-party OAuth login — the Discord bot's
 `login_hint=discord` links included — resumes the authorization after login.
 
+**`/login?mode=signup` opens the signup tab**; the page otherwise starts on login,
+so a "sign up" link without it lands the reader on the wrong one.
+
 **Magic-link lifetimes are per purpose**: 15 minutes for signup and password
 reset, 7 days for an invite — its recipient did not ask for the email and has no
 reason to be watching their inbox. Clicking any of them mints a separate

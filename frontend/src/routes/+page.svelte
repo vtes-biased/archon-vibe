@@ -5,9 +5,7 @@
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
-  // The stored token, never `isAuthenticated`: initAuth() reports false whenever
-  // /auth/me is unreachable, and this route is the PWA's start_url, so reading
-  // auth state would drop a signed-in organizer onto the landing page offline.
+  // `isAuthenticated` is false whenever /auth/me is unreachable, offline included.
   const signedIn = getAccessToken() !== null;
 
   onMount(() => {
@@ -37,7 +35,6 @@
         viewBox="0 0 200 200"
         class="w-36 h-36 sm:w-44 sm:h-44 mx-auto mb-8 text-accent"
         aria-hidden="true"
-        focusable="false"
       >
         <defs>
           <marker id="prey" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="4" markerHeight="4" orient="auto">
