@@ -278,7 +278,16 @@ Design for touch first, then enhance for desktop.
 - **Global focus ring**: a crimson `:focus-visible` outline in `@layer base`. Form
   inputs may opt out with `focus:outline-none` **only** if they provide their own
   visible crimson indicator.
-- **Navigation**: bottom nav or hamburger, not top-heavy headers.
+- **Navigation**: bottom nav or hamburger, not top-heavy headers. Below `sm` the
+  six destinations are icon-only — labels truncate to ambiguity in `es`/`pt`, so
+  the name lives in `aria-label` and `title` — and each icon must be shape-distinct
+  from the other five at 24px: `/tournaments` `Trophy`, `/leagues` `CalendarRange`,
+  `/rankings` `ListOrdered`, `/users` `Users`, `/help` `BookOpen`, `/profile`
+  `CircleUser`. Rankings stays out of the award cluster `Trophy` owns and profile
+  out of community's glyph — `User` beside `Users` is one shape at that size — and
+  an ordered list is what all five locales' labels name outright (*Classifiche*,
+  *Clasificaciones*). `/tournaments` and `/leagues` repeat their nav icon in their
+  own empty state.
 - **Forms**: large inputs, no complex multi-column layouts on mobile.
 - **Containers**: full width on mobile, max-width on larger screens.
 - **Tables must reflow to cards** on mobile — the player table is the canonical

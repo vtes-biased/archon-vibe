@@ -7,7 +7,7 @@
   import { canManageLeagues } from "$lib/engine";
   import { normalizeSearch } from "$lib/utils";
   import type { League, LeagueStandingsMode } from "$lib/types";
-  import { Loader2, BarChart3, Plus } from "@lucide/svelte";
+  import { Loader2, CalendarRange, Plus } from "@lucide/svelte";
   import Badge from "$lib/components/Badge.svelte";
   import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -258,7 +258,7 @@
     {:else}
       <div class="text-center py-12">
         <div class="text-ink-faint mb-4">
-          <BarChart3 class="mx-auto h-12 w-12" />
+          <CalendarRange class="mx-auto h-12 w-12" />
         </div>
         <h3 class="text-lg font-medium text-ink-strong mb-2">{m.league_no_results()}</h3>
         <p class="text-ink-muted">

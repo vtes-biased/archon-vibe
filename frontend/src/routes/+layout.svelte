@@ -9,7 +9,7 @@
   import { initOfflineState, getOfflineTournamentUids } from '$lib/stores/offline.svelte';
   import { reconcilePush } from '$lib/stores/push.svelte';
   import { onMount } from 'svelte';
-  import { Wifi, WifiOff, RefreshCw, Download, TriangleAlert, Trophy, BarChart3, Medal, Users, User, BookOpen } from '@lucide/svelte';
+  import { Wifi, WifiOff, RefreshCw, Download, TriangleAlert, Trophy, CalendarRange, ListOrdered, Users, CircleUser, BookOpen } from '@lucide/svelte';
   import Badge from '$lib/components/Badge.svelte';
   import Toast from '$lib/components/Toast.svelte';
   import WhatsNewModal from '$lib/components/WhatsNewModal.svelte';
@@ -34,12 +34,12 @@
   let hasOfflineLocked = $state(false);
 
   const navItems = [
-    { href: '/tournaments', labelFn: () => m.nav_tournaments(), icon: 'trophy' },
-    { href: '/leagues', labelFn: () => m.nav_leagues(), icon: 'chart' },
-    { href: '/rankings', labelFn: () => m.nav_rankings(), icon: 'ranking' },
-    { href: '/users', labelFn: () => m.nav_community(), icon: 'users' },
-    { href: '/help', labelFn: () => m.nav_help(), icon: 'help' },
-    { href: '/profile', labelFn: () => m.nav_profile(), icon: 'user' },
+    { href: '/tournaments', labelFn: () => m.nav_tournaments(), icon: Trophy },
+    { href: '/leagues', labelFn: () => m.nav_leagues(), icon: CalendarRange },
+    { href: '/rankings', labelFn: () => m.nav_rankings(), icon: ListOrdered },
+    { href: '/users', labelFn: () => m.nav_community(), icon: Users },
+    { href: '/help', labelFn: () => m.nav_help(), icon: BookOpen },
+    { href: '/profile', labelFn: () => m.nav_profile(), icon: CircleUser },
   ];
 
   function isActive(href: string, currentPath: string): boolean {
@@ -118,22 +118,6 @@
   });
 </script>
 
-{#snippet navIcon(icon: string, size: string)}
-  {#if icon === 'trophy'}
-    <Trophy class={size} />
-  {:else if icon === 'chart'}
-    <BarChart3 class={size} />
-  {:else if icon === 'ranking'}
-    <Medal class={size} />
-  {:else if icon === 'users'}
-    <Users class={size} />
-  {:else if icon === 'help'}
-    <BookOpen class={size} />
-  {:else if icon === 'user'}
-    <User class={size} />
-  {/if}
-{/snippet}
-
 <!-- dvh, not vh: on iOS 100vh is the LARGE viewport (bar hidden), so the shell
      overflows and leaves dead scroll under the fixed nav. -->
 <div class="min-h-dvh bg-surface pt-safe-t pb-navbar sm:pb-safe-b">
@@ -192,6 +176,7 @@
     <div class="flex h-full justify-around">
       {#each navItems as item}
         {@const active = isActive(item.href, $page.url.pathname)}
+        {@const Icon = item.icon}
         <!-- Icon-only: labels truncate to ambiguity in longer locales (es/pt),
              so the destination name lives in aria-label/title. -->
         <a
@@ -202,7 +187,7 @@
           title={item.labelFn()}
           class="flex items-center justify-center py-3 px-1 flex-1 border-t-2 {active ? 'border-link text-link' : 'border-transparent text-ink-muted hover:text-ink-bright'}"
         >
-          {@render navIcon(item.icon, 'w-6 h-6')}
+          <Icon class="w-6 h-6" />
         </a>
       {/each}
     </div>
@@ -222,13 +207,14 @@
     <div class="flex-1 flex flex-col gap-2 w-full">
       {#each navItems as item}
         {@const active = isActive(item.href, $page.url.pathname)}
+        {@const Icon = item.icon}
         <a
           href={item.href}
           onclick={(e) => openLastView(e, item.href)}
           class="flex flex-col items-center py-3 px-2 rounded-lg transition-colors {active ? 'bg-accent-soft/50 text-link' : 'text-ink-muted hover:text-ink-bright hover:bg-surface-hover/50'}"
           title={item.labelFn()}
         >
-          {@render navIcon(item.icon, 'w-6 h-6')}
+          <Icon class="w-6 h-6" />
           <span class="text-xs mt-1">{item.labelFn()}</span>
         </a>
       {/each}
