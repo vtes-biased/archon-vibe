@@ -24,5 +24,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
-
-- Give a league page its standings without a scroll: `product.md` calls auto-updating standings the league's headline feature, but they sit below an unbounded event list and a card spending 210px on one date range, so on a phone three events push the Standings heading under the fold and four put it 82px under — and the league that prompted this plans four. **Done when** `/leagues/[uid]` carries the app's tab strip over Events and Standings with the child-leagues block joining it on a meta-league, the league's identity — name, kind, badges and date range — stays above the strip and the Dates card is gone, the strip never opens on the empty standings a league with no play yet renders, and `wiki/design.md` adds the league page to the surfaces its tab-strip rule names and records the tab set the way the member profile's is recorded.

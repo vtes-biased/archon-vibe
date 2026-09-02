@@ -18,7 +18,8 @@
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from '$lib/components/Button.svelte';
   import Badge from '$lib/components/Badge.svelte';
-  import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X, Trophy, Calendar, Crown, Flag } from "@lucide/svelte";
+  import TabStrip from "$lib/components/TabStrip.svelte";
+  import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X, Trophy, Calendar, Crown, Flag, ListOrdered, FlagTriangleRight } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const uid = $derived(page.params.uid);
@@ -94,6 +95,24 @@
   const canAttach = $derived(league ? canLinkTournamentToLeague(auth.user, league) : false);
   // Crowned on a finished league; ties share rank 1 (co-champions).
   const champions = $derived(standings.filter(e => e.rank === 1));
+
+  type TabId = 'leagues' | 'tournaments' | 'standings';
+  let activeTab = $state<TabId>('tournaments');
+  const tabs = $derived.by(() => {
+    const t: { id: TabId; label: string; icon: typeof Trophy }[] = [];
+    if (league?.kind === "Meta-League") {
+      t.push({ id: 'leagues', label: m.league_child_leagues(), icon: FlagTriangleRight });
+    }
+    t.push({ id: 'tournaments', label: m.league_tournaments_heading(), icon: Trophy });
+    t.push({ id: 'standings', label: m.league_col_standings(), icon: ListOrdered });
+    return t;
+  });
+
+  // The Leagues tab vanishes when a child league reuses this route.
+  $effect(() => {
+    if (!tabs.some(t => t.id === activeTab)) activeTab = 'tournaments';
+  });
+  let landedUid: string | null = null;
 
   function standingsModeLabel(mode: LeagueStandingsMode): string {
     switch (mode) {
@@ -203,6 +222,14 @@
       }
     } else {
       standings = [];
+    }
+
+    // Only on arrival: a sync reload must not yank the reader off their tab.
+    if (landedUid !== uid) {
+      landedUid = uid;
+      activeTab = standings.length > 0
+        ? 'standings'
+        : l.kind === "Meta-League" ? 'leagues' : 'tournaments';
     }
 
     loaded = true;
@@ -349,11 +376,12 @@
           </a>
           <div>
             <h1 class="text-3xl font-semibold text-accent">{league.name}</h1>
-            <div class="flex gap-2 mt-1 text-sm text-ink-muted">
+            <div class="flex flex-wrap items-center gap-2 mt-1 text-sm text-ink-muted">
               <Badge kind="status" tone={isActive() ? "info" : "slate"}>
                 {isActive() ? m.league_status_active() : m.league_status_finished()}
               </Badge>
-              <span>{standingsModeLabel(league.standings_mode)}</span>
+              <span>{formatDate(league.start)} – {league.finish ? formatDate(league.finish) : m.league_ongoing()}</span>
+              <span>· {standingsModeLabel(league.standings_mode)}</span>
               {#if league.format}
                 <span>· {league.format}</span>
               {/if}
@@ -479,111 +507,98 @@
         </div>
       {/if}
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <div class="bg-surface-card rounded-lg shadow p-4 border border-line">
-          <div class="text-sm text-ink-muted">{m.league_col_dates()}</div>
-          <div class="text-ink-strong mt-1">{formatDate(league.start)} – {league.finish ? formatDate(league.finish) : m.league_ongoing()}</div>
+      <!-- Stripped from the public projection — hide, don't show it empty. -->
+      {#if league.organizers_uids}
+        <div class="bg-surface-card rounded-lg shadow p-4 border border-line mb-6">
+          <div class="text-sm text-ink-muted mb-1">{m.league_organizers_label()}</div>
+          {#if isOrganizer}
+            <OrganizerManager
+              organizerUids={league.organizers_uids}
+              onadd={async (userUid) => { await addLeagueOrganizer(league!.uid, userUid); await loadLeague(); }}
+              onremove={async (userUid) => { await removeLeagueOrganizer(league!.uid, userUid); await loadLeague(); }}
+            />
+          {:else}
+            <div class="text-ink-strong">
+              {#each league.organizers_uids as ouid}
+                <span class="inline-block mr-2">{organizerNames[ouid] || "..."}</span>
+              {/each}
+            </div>
+          {/if}
         </div>
-        <!-- Stripped from the public projection — hide, don't show it empty. -->
-        {#if league.organizers_uids}
-          <div class="bg-surface-card rounded-lg shadow p-4 border border-line">
-            <div class="text-sm text-ink-muted mb-1">{m.league_organizers_label()}</div>
-            {#if isOrganizer}
-              <OrganizerManager
-                organizerUids={league.organizers_uids}
-                onadd={async (userUid) => { await addLeagueOrganizer(league!.uid, userUid); await loadLeague(); }}
-                onremove={async (userUid) => { await removeLeagueOrganizer(league!.uid, userUid); await loadLeague(); }}
-              />
-            {:else}
-              <div class="text-ink-strong">
-                {#each league.organizers_uids as ouid}
-                  <span class="inline-block mr-2">{organizerNames[ouid] || "..."}</span>
-                {/each}
-              </div>
-            {/if}
-          </div>
-        {/if}
-      </div>
+      {/if}
 
       {#if league.description}
         <FoldableDescription description={league.description} title={league.name} />
       {/if}
 
-      {#if league.kind === "Meta-League"}
-        <div class="mb-6">
-          <h2 class="text-xl font-medium text-ink-strong mb-3">{m.league_child_leagues()}</h2>
-          {#if isOrganizer && orphanLeagues.length > 0}
-            <div class="flex gap-2 mb-3">
-              <select bind:value={addChildUid}
-                class="flex-1 px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright text-sm">
-                <option value="">{m.league_add_child_placeholder()}</option>
-                {#each orphanLeagues as ol (ol.uid)}
-                  <option value={ol.uid}>{ol.name}</option>
-                {/each}
-              </select>
-              <Button variant="primary" size="lg" onclick={addChildLeague} disabled={!addChildUid}>
-                <Plus class="w-4 h-4 inline -mt-0.5" /> {m.common_add()}
-              </Button>
-            </div>
-          {/if}
-          {#if childLeagues.length > 0}
-            <div class="bg-surface-card rounded-lg shadow overflow-hidden border border-line">
-              <div class="divide-y divide-line">
-                {#each childLeagues as child (child.uid)}
-                  {@const childOver = !!child.finish && new Date(child.finish) < new Date()}
-                  <div class="flex items-center justify-between px-6 py-3 hover:bg-surface-muted/50 transition-colors">
-                    <a href="/leagues/{child.uid}" class="flex-1 min-w-0">
-                      <div class="font-semibold text-ink-strong truncate">{child.name}</div>
-                      <div class="text-sm text-ink-muted flex items-center gap-2 flex-wrap">
-                        {#if child.country}
-                          <span>{getCountryFlag(child.country)} {countries[child.country]?.name}</span>
-                        {/if}
-                        <span class="px-1.5 py-0.5 rounded text-xs {childOver ? 'bg-surface-hover text-ink-muted' : 'badge-success'}">
-                          {childOver ? m.league_status_finished() : m.league_status_active()}
-                        </span>
-                        <span class="text-xs text-ink-faint">{standingsModeLabel(child.standings_mode)}</span>
-                      </div>
-                    </a>
-                    {#if isOrganizer}
-                      <button onclick={() => removeChildLeague(child.uid)}
-                        class="ml-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-ink-faint hover:text-link transition-colors" title={m.league_remove_child_title()}>
-                        <X class="w-4 h-4" />
-                      </button>
-                    {/if}
-                  </div>
-                {/each}
-              </div>
-            </div>
-          {:else}
-            <div class="bg-surface-card rounded-lg shadow p-8 border border-line text-center">
-              <p class="text-ink-muted">{m.league_no_children()}</p>
-            </div>
-          {/if}
-        </div>
-      {/if}
+      <TabStrip {tabs} bind:active={activeTab} />
 
-      <div class="mb-6">
-        <div class="flex items-center justify-between gap-2 mb-3 flex-wrap">
-          <h2 class="text-xl font-medium text-ink-strong">
-            {m.league_tournaments_heading({ count: leagueTournaments.length })}
-          </h2>
-          <div class="flex items-center gap-2">
-            {#if canAttach && league.kind === "League"}
-              <Button variant="secondary" size="sm" onclick={() => (addEventOpen ? (addEventOpen = false) : openAddEvent())}>
-                <Plus class="h-3 w-3" aria-hidden="true" />
-                {m.league_add_event()}
-              </Button>
-            {/if}
-            <!-- Per-league .ics feed: subscribers get this league's events only.
-                 Hidden offline — webcal makes the OS calendar fetch immediately. -->
-            {#if isBrowserOnline()}
-              <a href={leagueWebcalUrl}
-                 class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-line-strong text-ink hover:bg-surface-hover/50 hover:text-ink-strong transition-colors">
-                <Calendar class="h-3 w-3" aria-hidden="true" />
-                {m.league_calendar_subscribe()}
-              </a>
-            {/if}
+      <div class="mt-6">
+      {#if activeTab === 'leagues'}
+        {#if isOrganizer && orphanLeagues.length > 0}
+          <div class="flex gap-2 mb-3">
+            <select bind:value={addChildUid}
+              class="flex-1 px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright text-sm">
+              <option value="">{m.league_add_child_placeholder()}</option>
+              {#each orphanLeagues as ol (ol.uid)}
+                <option value={ol.uid}>{ol.name}</option>
+              {/each}
+            </select>
+            <Button variant="primary" size="lg" onclick={addChildLeague} disabled={!addChildUid}>
+              <Plus class="w-4 h-4 inline -mt-0.5" /> {m.common_add()}
+            </Button>
           </div>
+        {/if}
+        {#if childLeagues.length > 0}
+          <div class="bg-surface-card rounded-lg shadow overflow-hidden border border-line">
+            <div class="divide-y divide-line">
+              {#each childLeagues as child (child.uid)}
+                {@const childOver = !!child.finish && new Date(child.finish) < new Date()}
+                <div class="flex items-center justify-between px-6 py-3 hover:bg-surface-muted/50 transition-colors">
+                  <a href="/leagues/{child.uid}" class="flex-1 min-w-0">
+                    <div class="font-semibold text-ink-strong truncate">{child.name}</div>
+                    <div class="text-sm text-ink-muted flex items-center gap-2 flex-wrap">
+                      {#if child.country}
+                        <span>{getCountryFlag(child.country)} {countries[child.country]?.name}</span>
+                      {/if}
+                      <span class="px-1.5 py-0.5 rounded text-xs {childOver ? 'bg-surface-hover text-ink-muted' : 'badge-success'}">
+                        {childOver ? m.league_status_finished() : m.league_status_active()}
+                      </span>
+                      <span class="text-xs text-ink-faint">{standingsModeLabel(child.standings_mode)}</span>
+                    </div>
+                  </a>
+                  {#if isOrganizer}
+                    <button onclick={() => removeChildLeague(child.uid)}
+                      class="ml-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-ink-faint hover:text-link transition-colors" title={m.league_remove_child_title()}>
+                      <X class="w-4 h-4" />
+                    </button>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          </div>
+        {:else}
+          <div class="bg-surface-card rounded-lg shadow p-8 border border-line text-center">
+            <p class="text-ink-muted">{m.league_no_children()}</p>
+          </div>
+        {/if}
+      {:else if activeTab === 'tournaments'}
+        <div class="flex items-center justify-end gap-2 mb-3 flex-wrap">
+          {#if canAttach && league.kind === "League"}
+            <Button variant="secondary" size="sm" onclick={() => (addEventOpen ? (addEventOpen = false) : openAddEvent())}>
+              <Plus class="h-3 w-3" aria-hidden="true" />
+              {m.league_add_event()}
+            </Button>
+          {/if}
+          <!-- Per-league .ics feed: subscribers get this league's events only.
+               Hidden offline — webcal makes the OS calendar fetch immediately. -->
+          {#if isBrowserOnline()}
+            <a href={leagueWebcalUrl}
+               class="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-line-strong text-ink hover:bg-surface-hover/50 hover:text-ink-strong transition-colors">
+              <Calendar class="h-3 w-3" aria-hidden="true" />
+              {m.league_calendar_subscribe()}
+            </a>
+          {/if}
         </div>
         {#if addEventOpen}
           <div class="bg-surface-card rounded-lg shadow border border-line p-4 mb-3">
@@ -642,19 +657,14 @@
             {/if}
           </div>
         {/if}
-      </div>
-
-      <div>
-        <h2 class="text-xl font-medium text-ink-strong mb-1">{m.league_col_standings()}</h2>
-        {#if league}
-          <p class="text-sm text-ink-muted mb-3">
-            <span class="font-medium text-ink">{standingsModeLabel(league.standings_mode)}</span>
-            — {league.standings_mode === "RTP" ? m.league_mode_hint_rtp() : league.standings_mode === "GP" ? m.league_mode_hint_gp() : m.league_mode_hint_score()}
-            {#if league.kind === "Meta-League"}
-              {m.league_meta_mode_note()}
-            {/if}
-          </p>
-        {/if}
+      {:else}
+        <p class="text-sm text-ink-muted mb-3">
+          <span class="font-medium text-ink">{standingsModeLabel(league.standings_mode)}</span>
+          — {league.standings_mode === "RTP" ? m.league_mode_hint_rtp() : league.standings_mode === "GP" ? m.league_mode_hint_gp() : m.league_mode_hint_score()}
+          {#if league.kind === "Meta-League"}
+            {m.league_meta_mode_note()}
+          {/if}
+        </p>
         {#if standings.length > 0}
           {#if !isActive() && champions.length > 0}
             <div class="bg-surface-card rounded-lg shadow border border-line p-4 mb-3 flex items-center gap-3">
@@ -738,6 +748,7 @@
             <p class="text-ink-muted">{m.league_standings_empty()}</p>
           </div>
         {/if}
+      {/if}
       </div>
     {/if}
   </div>

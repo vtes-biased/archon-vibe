@@ -1836,7 +1836,7 @@
   "league_add_child_placeholder": "Seleziona un campionato da aggiungere...",
   "league_remove_child_title": "Rimuovi dal meta-campionato",
   "league_no_children": "Nessun campionato figlio ancora.",
-  "league_tournaments_heading": "Tornei ({count})",
+  "league_tournaments_heading": "Tornei",
   "league_no_tournaments": "Nessun torneo in questo campionato ancora.",
   "league_no_tournaments_hint": "Collega i tuoi eventi con «Aggiungi evento» qui sopra — oppure da Strumenti → Impostazioni di ogni torneo.",
   "league_add_event": "Aggiungi evento",

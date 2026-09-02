@@ -17,7 +17,9 @@ test.describe('League lifecycle', () => {
     // createLeague is a real API call; redirect happens on success
     await expect(page).toHaveURL(/\/leagues\/[a-f0-9-]+/, { timeout: 5_000 });
     await expect(page.locator('h1')).toContainText('E2E Test League');
+    // A league with no play opens on Tournaments, never on empty standings.
     await expect(page.getByText('No tournaments in this league yet.')).toBeVisible();
+    await page.getByRole('button', { name: 'Standings' }).click();
     await expect(page.getByText('Standings will appear when tournaments finish.')).toBeVisible();
 
     // List page shows it (no finish date → active, the default filter).

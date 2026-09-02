@@ -361,7 +361,8 @@ icon always, the label spelled out on the **active tab only** below `sm`,
 one, and the row scrolls rather than wraps. The active-only label is what makes
 three or four tabs survive five locales at 360px; a text-shrinking fix is fragile
 there, where the overflow is worse than English suggests. The strip carries the
-tournament console, the member profile and the public member page.
+tournament console, the member profile, the public member page and the league
+page.
 
 **One fold grammar.** `FoldableSection` is the app's single disclosure shell —
 muted box, chevron right closed and down open, the whole header a 44px target, a
@@ -525,6 +526,28 @@ names**, never below the decklists — tabs already put it one gesture deep, whi
 this structure's accepted cost. The count and the wins behind it stay together for
 the same reason [tournaments](tournaments.md) states: the number is auditable
 rather than asserted.
+
+## League page
+
+Auto-updating standings are the league's headline feature
+([product](product.md#capabilities)), and an unbounded event list above them put
+the Standings heading under the fold on a phone from the third event on, so
+`/leagues/[uid]` is tabbed.
+
+**Identity stays above the strip**: name, status, date range, standings mode,
+format, country, meta and parent badges, the organizer actions, the organizers card
+and the description fold.
+
+| Surface | Tabs |
+|---|---|
+| a league | Tournaments · Standings |
+| a meta-league | Child Leagues · Tournaments · Standings |
+
+The strip **opens on Standings when the league has any**, otherwise on the first
+tab — a league with no play yet would land the reader on an empty panel. The tabs
+name their panels, so none repeats its name as a heading: the standings mode line
+leads Standings, and the add-event and calendar-subscribe controls head
+Tournaments.
 
 ## Console surfaces
 

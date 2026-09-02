@@ -1836,7 +1836,7 @@
   "league_add_child_placeholder": "Seleccionar una liga para añadir...",
   "league_remove_child_title": "Eliminar de la meta-liga",
   "league_no_children": "Aún no hay ligas hijas.",
-  "league_tournaments_heading": "Torneos ({count})",
+  "league_tournaments_heading": "Torneos",
   "league_no_tournaments": "Aún no hay torneos en esta liga.",
   "league_no_tournaments_hint": "Vincule sus eventos con «Añadir evento» arriba — o desde Herramientas → Ajustes de cada torneo.",
   "league_add_event": "Añadir evento",
