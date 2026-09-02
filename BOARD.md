@@ -24,5 +24,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
-
-Make an external registration link replace Archon's own sign-up: with a registration URL set, the engine refuses a self-service registration and the player is shown the link instead, the organizer's CSV import being how the roster fills — **Done when** such an event offers no Register button in the app and refuses the bot's `/register` from the engine with a message that names the link, an imported player still sees their own registration and can upload a decklist, the field help and wizard tip say so in all five catalogs, and the doc-impact listed in `board/external-registration.md` is discharged.

@@ -131,6 +131,49 @@ fn test_register_without_vekn_id_rejected() {
 }
 
 #[test]
+fn test_external_registration_refuses_self_service() {
+    let mut tournament = make_tournament();
+    tournament["state"] = "Registration".into();
+    tournament["registration_url"] = "https://tickets.example/e".into();
+
+    let actor = make_player("player-1");
+    let register = json::object! {
+        type: "Register",
+        user_uid: "player-1",
+        vekn_id: "1000001",
+    };
+    assert_eq!(
+        run_event(&tournament, &register, &actor).unwrap_err(),
+        EngineError::ExternalRegistration {
+            url: "https://tickets.example/e".to_string()
+        }
+    );
+
+    tournament["players"] = json::array![json::object! {
+        user_uid: "player-1",
+        state: "Registered",
+    }];
+    let unregister = json::object! {
+        type: "Unregister",
+        user_uid: "player-1",
+    };
+    assert_eq!(
+        run_event(&tournament, &unregister, &actor).unwrap_err(),
+        EngineError::ExternalRegistration {
+            url: "https://tickets.example/e".to_string()
+        }
+    );
+
+    let organizer = make_organizer();
+    let add = json::object! {
+        type: "AddPlayer",
+        user_uid: "player-2",
+        vekn_id: "1000002",
+    };
+    assert!(run_event(&tournament, &add, &organizer).is_ok());
+}
+
+#[test]
 fn test_add_player_without_vekn_id_rejected() {
     let mut tournament = make_tournament();
     tournament["state"] = "Registration".into();

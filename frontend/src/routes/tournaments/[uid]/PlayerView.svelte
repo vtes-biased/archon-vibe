@@ -296,6 +296,8 @@
   {#if tournament.state === "Registration" && !currentPlayerEntry}
     {#if userSuspended}
       <div class="text-sm text-link">{m.error_suspended_cannot_register()}</div>
+    {:else if tournament.registration_url}
+      {@render externalRegistration()}
     {:else if !userVeknId}
       <div class="banner-warn border rounded-lg p-3 text-sm">
         <div class="flex items-center gap-2">
@@ -321,7 +323,6 @@
         onclick={() => playerAction("Register", { user_uid: userUid, vekn_id: userVeknId })}
         disabled={actionLoading}
       >{m.tournament_register_btn()}</Button>
-      {#if tournament.registration_url}{@render externalRegistration()}{/if}
       {#if actionError}{@render refusal(actionError)}{/if}
     {/if}
   {:else if tournament.state === "Registration" && currentPlayerEntry}
@@ -330,11 +331,13 @@
         <span class="sr-only">{m.tournament_your_status()}</span>
         {translatePlayerState(currentPlayerEntry.state)}
       </span>
-      <Button
-        variant="danger"
-        onclick={() => playerAction("Unregister", { user_uid: userUid })}
-        disabled={actionLoading}
-      ><Ban class="w-4 h-4" aria-hidden="true" />{m.tournament_unregister_btn()}</Button>
+      {#if !tournament.registration_url}
+        <Button
+          variant="danger"
+          onclick={() => playerAction("Unregister", { user_uid: userUid })}
+          disabled={actionLoading}
+        ><Ban class="w-4 h-4" aria-hidden="true" />{m.tournament_unregister_btn()}</Button>
+      {/if}
     </div>
     {#if tournament.registration_url}{@render externalRegistration()}{/if}
     {#if actionError}{@render refusal(actionError)}{/if}

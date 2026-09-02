@@ -40,6 +40,7 @@ const ENGINE_MESSAGES: Record<string, (p: Record<string, string>) => string> = {
   'tournament.score_set_by_organizer': () => m.err_tournament_score_set_by_organizer(),
   'tournament.league_link_forbidden': () => m.err_tournament_league_link_forbidden(),
   'tournament.vekn_id_required': () => m.err_tournament_vekn_id_required(),
+  'tournament.external_registration': (p) => m.err_tournament_external_registration({ url: p.url ?? '' }),
   'tournament.already_registered': () => m.err_tournament_already_registered(),
   'tournament.not_registered': () => m.err_tournament_not_registered(),
   'tournament.player_disqualified': () => m.err_tournament_player_disqualified(),

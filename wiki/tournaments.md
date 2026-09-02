@@ -17,7 +17,7 @@ server (PyO3) behave identically.
 | Multideck | yes/no | Standard rank only |
 | Decklist required | yes/no | organizer choice |
 | Online | yes/no | the venue URL is the meeting place |
-| `registration_url` | URL, empty = none | the external page taking the sign-ups; its presence is the signal that they arrive from outside, which is what surfaces the paid-registrations CSV import in the action bar |
+| `registration_url` | URL, empty = none | the external page taking the sign-ups; setting it closes Archon's own sign-up — the engine refuses `Register` and self-`Unregister`, below — and surfaces the paid-registrations CSV import in the action bar |
 | `max_rounds` | int, 0 = uncapped | per-player round cap |
 | `max_players` | int, 0 = none | venue capacity: the engine never blocks a registration, it waitlists it — below |
 | `open_rounds` | bool | the non-VEKN house format, below |
@@ -189,31 +189,41 @@ VPs are real, they were earned against real opponents, and a blanked row makes t
 table look wrong. This is the opposite of the DQ treatment, where zeroing *is* the
 point.
 
-`waitlisted` is the second such flag, and the registration cap's only teeth.
-Registration is never refused: past `max_players` a self-service `Register` lands
-the player waitlisted, and they cannot check in until an organizer clears the flag
-with `SetWaitlisted`. The cap counts unwaitlisted players only, so the waitlist
-grows behind a full roster rather than inflating it. A waitlisted player *is*
-`Registered` — inert to seating, scoring and standings for free. `SetWaitlisted`
-refuses to waitlist anyone further along, and seating clears the flag, below, so
-nothing reaches a table still carrying it. `DropOut` is the one path that leaves a
-waitlisted player `Finished` with the flag set, deliberately: clearing it there
-would count someone who never got in against the cap forever.
+`waitlisted` is the second such flag, and the registration cap's only teeth. The
+cap never refuses a registration: past `max_players` a self-service `Register`
+lands the player waitlisted, and they cannot check in until an organizer clears
+the flag with `SetWaitlisted`. The cap counts unwaitlisted players only, so the
+waitlist grows behind a full roster rather than inflating it. A waitlisted
+player *is* `Registered` — inert to seating, scoring and standings for free.
+`SetWaitlisted` refuses to waitlist anyone further along, and seating clears the
+flag, below, so nothing reaches a table still carrying it. `DropOut` is the one
+path that leaves a waitlisted player `Finished` with the flag set, deliberately:
+clearing it there would count someone who never got in against the cap forever.
 
 **Only a self-service sign-up waitlists.** `AddPlayer` never does — an organizer
 adding a player is a deliberate act — except that the bulk CSV import passes
 `waitlist_past_cap`, its rows being registrations the players made themselves at a
-ticketing source. Its `paid` column keeps setting payment status as before, and
-payment never reorders the waitlist: promoting a paid waitlister over an unpaid
-registrant is venue policy that differs per event, so the roster shows registration
-order and payment status side by side, sortable by either, and the organizer
-decides. The walk-in check-in path enrols un-waitlisted: an event past its cap is
-past registration, and the person is at the door.
+ticketing source. On an event carrying a `registration_url` that import is the only
+path that waitlists at all, `Register` being refused there. The import's `paid`
+column keeps setting payment status as before, and payment never reorders the
+waitlist: promoting a paid waitlister over an unpaid registrant is venue policy that
+differs per event, so the roster shows registration order and payment status side by
+side, sortable by either, and the organizer decides. The walk-in check-in path
+enrols un-waitlisted: an event past its cap is past registration, and the person
+is at the door.
 
 **Entering the tournament at all requires a `vekn_id`.** `Register`, `AddPlayer`
 and the `CheckIn` walk-in path each reject an empty one, so an official sponsors or
 links the account first. Offline play is the exception — it mints `TEMP-` ids that
 go-online resolves or turns into real members ([vekn](vekn.md#push-constraints)).
+
+**A `registration_url` closes self-service registration.** `Register` and
+self-`Unregister` are refused on such an event with
+`tournament.external_registration`, whose message carries the link, so the web
+button, the bot's `/register` and the API shut in one place rather than three.
+`AddPlayer`, `RemovePlayer` and the walk-in `CheckIn` path stay open: the
+organizer's CSV import is how the roster fills, and a seat bought at a ticket shop
+is cancelled at its source, not here.
 
 Barriers to check-in: sitting on the waitlist, a required decklist not uploaded, a
 VEKN ban, a disqualification from this event, or reaching the per-player round cap.

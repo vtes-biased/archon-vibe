@@ -145,16 +145,19 @@ late arrival joins a short table now or waits is the organizer's call — **the 
 has no default and must not decide**. Mechanics and edge cases:
 [tournaments](tournaments.md#player-states).
 
-**An Archon registration is not always the entry.** An organizer who sells entry
-on a ticketing platform sets `registration_url`, and a player who registers in the
-app is then told so and sent there — the app records them for the organizer, it
-does not book their seat. Nothing is prefilled from the wizard's "collected in
+**A registration link replaces Archon's sign-up.** An organizer who sells entry
+on a ticketing platform sets `registration_url`, and the app then takes no sign-ups
+of its own: the engine refuses `Register` and self-`Unregister` on that event, so
+the web button, the bot's `/register` and the API close together and the player is
+shown the link instead. The organizer's CSV import is how the roster fills, and
+walk-in check-in stays open — that is how a latecomer, or a row the import could
+not match, still gets in. Nothing is prefilled from the wizard's "collected in
 advance, somewhere else" answer: the link is a per-event fact the organizer
 supplies, and the wizard only names the field. The same link is what tells the
 console the paid list will arrive as a file, so the CSV import — always in the
 tools sheet — also stands on the action bar for as long as registration is open.
 
-**A registration is never refused.** Past the venue cap a sign-up lands on a
+**The cap never refuses a registration.** Past the venue cap a sign-up lands on a
 waitlist instead — barred from check-in until an organizer promotes it — and the
 app never reorders that queue itself: it shows registration order and payment
 status side by side and the organizer decides, because paid-but-waitlisted against

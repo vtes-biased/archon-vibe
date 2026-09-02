@@ -481,6 +481,15 @@ fn apply_event(
         } => {
             require_state(state, TournamentState::Registration)?;
 
+            let external = tournament[tournament::REGISTRATION_URL]
+                .as_str()
+                .unwrap_or("");
+            if !external.is_empty() {
+                return Err(EngineError::ExternalRegistration {
+                    url: external.to_string(),
+                });
+            }
+
             if vekn_id.as_ref().is_none_or(|v| v.is_empty()) {
                 return Err(EngineError::VeknIdRequired);
             }
@@ -518,6 +527,15 @@ fn apply_event(
 
         TournamentEvent::Unregister { user_uid } => {
             require_state(state, TournamentState::Registration)?;
+
+            let external = tournament[tournament::REGISTRATION_URL]
+                .as_str()
+                .unwrap_or("");
+            if !external.is_empty() {
+                return Err(EngineError::ExternalRegistration {
+                    url: external.to_string(),
+                });
+            }
 
             if actor.uid != *user_uid {
                 return Err(EngineError::UnregisterOnlySelf);

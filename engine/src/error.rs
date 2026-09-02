@@ -18,6 +18,7 @@ pub enum EngineError {
     ScoreSetByOrganizer,
     LeagueLinkForbidden,
     VeknIdRequired,
+    ExternalRegistration { url: String },
     AlreadyRegistered,
     NotRegistered,
     PlayerDisqualified,
@@ -123,6 +124,7 @@ impl EngineError {
             ScoreSetByOrganizer => "tournament.score_set_by_organizer",
             LeagueLinkForbidden => "tournament.league_link_forbidden",
             VeknIdRequired => "tournament.vekn_id_required",
+            ExternalRegistration { .. } => "tournament.external_registration",
             AlreadyRegistered => "tournament.already_registered",
             NotRegistered => "tournament.not_registered",
             PlayerDisqualified => "tournament.player_disqualified",
@@ -230,6 +232,7 @@ impl EngineError {
                 ("reported", reported.to_string()),
                 ("listed", listed.to_string()),
             ],
+            ExternalRegistration { url } => vec![("url", url.clone())],
             Internal { detail } => vec![("detail", detail.clone())],
             _ => vec![],
         }
@@ -271,6 +274,9 @@ impl fmt::Display for EngineError {
                 )
             }
             VeknIdRequired => write!(f, "Player must have a VEKN ID"),
+            ExternalRegistration { url } => {
+                write!(f, "Registration for this tournament is handled at {}", url)
+            }
             AlreadyRegistered => write!(f, "Already registered"),
             NotRegistered => write!(f, "Player is not registered in this tournament"),
             PlayerDisqualified => write!(f, "Player is disqualified and cannot participate"),
