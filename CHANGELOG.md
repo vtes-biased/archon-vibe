@@ -12,41 +12,19 @@ these are player-facing lines, not developer notes.
 
 ## Unreleased
 
-- Clicking the Archon logo now takes signed-out visitors to the front page instead of the tournament list.
-- A member's profile now links back to the members list.
-- Storyline tournaments now have a format of their own: they take no decklist and are never ranked or rated.
-- Storyline tournaments synced from vekn.net no longer show as Limited.
-
-## v1.1.0 — 2026-09-02
-
-- Signed-out visitors now land on a front page that says what Archon is, with a way to sign up or browse tournaments without an account.
-- Creating a tournament now starts with a few questions about it, then a form prefilled to match.
-- A tournament can now link the platform that takes its registrations, and players who register in the app are pointed there.
-- The tournament list now filters by championship rank, and its other filters sit behind one control.
-- A tournament's player list can now be exported as CSV, with each player's country and region.
-- Opening a tournament on a fresh device no longer says it does not exist while its data is still loading.
-- A player's registration or decklist no longer shows as accepted when the server has refused it.
-- Importing a deck by link or QR code now works after the app has sat open long enough for the session to expire.
-- An organizer's console action now survives a locked phone or a closed tab, and is sent once the app reopens.
-- When adding a player, a look-alike who is already registered now shows in the search instead of an empty list.
-- When a winning decklist fails to reach the TWDA, the tournament page now says at which step and why.
+- Storyline tournaments.
+- New front page for signed-out visitors.
+- Tournament creation wizard.
+- A tournament can now link the platform that takes its registrations.
+- The tournament list now filters by championship rank.
+- A tournament's players list can now be exported (CSV) with players' country and region.
+- When adding a player, an already registered look-alike now shows in the search.
+- Fixed TWDA sync.
 - A tournament that vekn.net has since removed can now be deleted by its organizer.
-- A league's standings now sit in a tab at the top of its page instead of below the tournament list.
-- Going back to the member list from a profile now keeps the filters you had set.
-- Playtesters now see their signed NDA on their profile, and can download the sealed copy again.
-
-## v1.0.9 — 2026-08-30
-
-- Playtesters now sign the playtest NDA in the app, and get a signed copy by email.
-- A tournament's registration cap now holds: past it, self-registration joins a waitlist rather than the roster.
-- The round count on the tournament form now says it counts preliminary rounds only, not the final.
-- Reopening a finished tournament now keeps its final, instead of throwing away the finals table and the winner.
-- A finished tournament now offers promo reporting as its main action, rather than a tap inside Tools.
-- In a multideck tournament, a cancelled round no longer shifts which deck each later round shows.
+- (testing) Playtesters NDA in-app.
+- Self-registration over a tournament's cap now joins a waitlist.
 - A member's profile is now split into tabs instead of one long page.
-- Creating a member now opens in a dialog, like every other create.
-- Logging in with Discord now returns you to the page you were heading for.
-- Loading and live updates now hold up when hundreds of players connect at once.
+- Fixed a number of navigation, sync, and performance issues.
 
 ## v1.0.8 — 2026-08-24
 
