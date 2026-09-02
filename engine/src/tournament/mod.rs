@@ -89,7 +89,11 @@ pub const CONFIG_FIELDS: [&str; 27] = [
 /// Shared between `UpdateConfig` and `CreateTournament`.
 fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
     if let Some(f) = config[tournament_config::FORMAT].as_str() {
-        validate_enum(f, &["Standard", "V5", "Limited"], tournament_config::FORMAT)?;
+        validate_enum(
+            f,
+            &["Standard", "V5", "Limited", "Storyline"],
+            tournament_config::FORMAT,
+        )?;
     }
     if let Some(r) = config[tournament_config::RANK].as_str() {
         validate_enum(
@@ -226,12 +230,15 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
         .unwrap_or("")
         .to_string();
     let now = config[arg::NOW].as_str().unwrap_or("").to_string();
+    let format = config[tournament_config::FORMAT]
+        .as_str()
+        .unwrap_or("Standard");
 
     let tournament = json::object! {
         tournament::UID => if uid.is_empty() { json::JsonValue::Null } else { uid.into() },
         tournament::MODIFIED => if now.is_empty() { json::JsonValue::Null } else { now.clone().into() },
         tournament::NAME => name,
-        tournament::FORMAT => config[tournament_config::FORMAT].as_str().unwrap_or("Standard"),
+        tournament::FORMAT => format,
         tournament::RANK => config[tournament_config::RANK].as_str().unwrap_or(""),
         tournament::ONLINE => config[tournament_config::ONLINE].as_bool().unwrap_or(false),
         tournament::START => config[tournament_config::START].clone(),
@@ -247,7 +254,8 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
         tournament::REGISTRATION_URL => config[tournament_config::REGISTRATION_URL].as_str().unwrap_or(""),
         tournament::PROXIES => config[tournament_config::PROXIES].as_bool().unwrap_or(false),
         tournament::MULTIDECK => config[tournament_config::MULTIDECK].as_bool().unwrap_or(false),
-        tournament::DECKLIST_REQUIRED => config[tournament_config::DECKLIST_REQUIRED].as_bool().unwrap_or(false),
+        tournament::DECKLIST_REQUIRED => format != "Storyline"
+            && config[tournament_config::DECKLIST_REQUIRED].as_bool().unwrap_or(false),
         tournament::DESCRIPTION => config[tournament_config::DESCRIPTION].as_str().unwrap_or(""),
         tournament::STANDINGS_MODE => config[tournament_config::STANDINGS_MODE].as_str().unwrap_or("Private"),
         tournament::DECKLISTS_MODE => config[tournament_config::DECKLISTS_MODE].as_str().unwrap_or("Winner"),
@@ -2441,6 +2449,9 @@ fn apply_event(
             deck,
             multideck,
         } => {
+            if tournament[tournament::FORMAT].as_str() == Some("Storyline") {
+                return Err(EngineError::FormatForbidsDecks);
+            }
             if !actor.is_organizer && actor.uid != *player_uid {
                 return Err(EngineError::DeckUploadForbidden);
             }
@@ -2705,6 +2716,15 @@ fn apply_event(
             for field in CONFIG_FIELDS {
                 if config.has_key(field) {
                     tournament[field] = config[field].clone();
+                }
+            }
+
+            // Storyline takes no deck at all, so a surviving flag or check-in stamp
+            // would strand check-in with nothing able to clear it — UpsertDeck refuses.
+            if tournament[tournament::FORMAT].as_str() == Some("Storyline") {
+                tournament[tournament::DECKLIST_REQUIRED] = false.into();
+                for p in tournament[tournament::PLAYERS].members_mut() {
+                    p.remove(player::MISSING_DECKLIST);
                 }
             }
 

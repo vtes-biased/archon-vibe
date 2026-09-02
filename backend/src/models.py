@@ -456,6 +456,7 @@ class TournamentFormat(StrEnum):
     Standard = "Standard"
     V5 = "V5"
     Limited = "Limited"
+    Storyline = "Storyline"
 
 
 class TournamentRank(StrEnum):

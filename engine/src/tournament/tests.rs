@@ -852,6 +852,23 @@ fn test_player_upsert_deck_before_playing() {
 }
 
 #[test]
+fn test_storyline_refuses_deck_upload() {
+    let mut tournament = tournament_with_player("Waiting");
+    tournament["format"] = "Storyline".into();
+    let event = json::object! {
+        type: "UpsertDeck",
+        player_uid: "player-1",
+        deck: { name: "Test", author: "", comments: "", cards: {} },
+        multideck: false,
+    };
+    // The organizer is the wider actor: refusing them refuses every path.
+    let actor = make_organizer();
+    let result = run_event_with_decks(&tournament, &event, &actor, "[]");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("no decklist"));
+}
+
+#[test]
 fn test_player_blocked_during_playing_with_existing_deck() {
     let tournament = tournament_with_player("Playing");
     let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;

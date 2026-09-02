@@ -83,6 +83,7 @@ pub enum EngineError {
     RankForbidsProxies,
     RankForbidsMultideck,
     FormatForbidsRank,
+    FormatForbidsDecks,
     VeknFrozenField { field: String },
     DeckNoCards,
     SeatingMinPlayers,
@@ -187,6 +188,7 @@ impl EngineError {
             RankForbidsProxies => "tournament.rank_forbids_proxies",
             RankForbidsMultideck => "tournament.rank_forbids_multideck",
             FormatForbidsRank => "tournament.format_forbids_rank",
+            FormatForbidsDecks => "tournament.format_forbids_decks",
             VeknFrozenField { .. } => "tournament.vekn_frozen_field",
             DeckNoCards => "deck.no_cards",
             SeatingMinPlayers => "seating.min_players",
@@ -387,8 +389,13 @@ impl fmt::Display for EngineError {
             FormatForbidsRank => write!(
                 f,
                 "Only Standard and Limited events can be National or Continental \
-                 championships: vekn.net has no V5 championship event type, so the \
-                 results could never be reported"
+                 championships: vekn.net has no championship event type for the \
+                 other formats, so the results could never be reported"
+            ),
+            FormatForbidsDecks => write!(
+                f,
+                "Storyline events take no decklist: they run under per-storyline \
+                 special rules and custom cards no decklist can express"
             ),
             VeknFrozenField { field } => write!(
                 f,

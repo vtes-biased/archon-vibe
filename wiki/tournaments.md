@@ -11,7 +11,7 @@ server (PyO3) behave identically.
 
 | Setting | Values | Notes |
 |---|---|---|
-| Format | Standard, V5, Limited | V5 has its own decklist validation; Limited checks only unknown cards, the banned list and the 90-card library maximum (§7.2.1 ties the minimums to the booster count and drops the group rule), so draft events run as Limited |
+| Format | Standard, V5, Limited, Storyline | V5 has its own decklist validation; Limited checks only unknown cards, the banned list and the 90-card library maximum (§7.2.1 ties the minimums to the booster count and drops the group rule), so draft events run as Limited; Storyline takes no decklist at all — below |
 | Rank | Standard, National, Continental | National and Continental earn the rating coefficient bonus and are engine-blocked from proxies and multideck, at create and at config edit |
 | Proxies | yes/no | Standard rank only |
 | Multideck | yes/no | Standard rank only |
@@ -32,8 +32,9 @@ predicate behind the rating inclusion filter, the ranked/unranked badge and the
 RtP column: at least 8 players who played **and** a final — a finals table or a
 named winner, which is a wider test than the `final_played` the rating bonus and
 the tournament-win GW are gated on ([hazards](hazards.md)) — never for
-open-rounds or self-organized events, and never for a row with no play data at all
-(`no_results` — an archival record carries a winner but nothing that was played).
+open-rounds or self-organized events, never for a Storyline event (`storyline`),
+and never for a row with no play data at all (`no_results` — an archival record
+carries a winner but nothing that was played).
 
 **Two counts, two questions.** `players_with_rounds` answers *who played* — seats
 across rounds and finals, or, on a rounds-less import, standings rows carrying a
@@ -48,11 +49,12 @@ and WASM; nothing re-derives them.
 `ranking_eligibility` by design — unifying them would silently rewrite
 membership. Five wins make a member, and a win counts when the event would have
 qualified for the TWDA *and* the winning deck is on record: finished and not
-soft-deleted, not online, not open-rounds or self-organized, not Limited, a
-`winner` set, at least `TWDA_MIN_PLAYERS` by `attested_player_count`, and a live
-`DeckObject` for that winner on that tournament. The floor is the submission
-floor of 10, not the rating floor of 8: the Hall of Fame is defined by deck
-submission, so it inherits the threshold that governs submission. One exception —
+soft-deleted, not online, not open-rounds or self-organized, not Limited and not
+Storyline, a `winner` set, at least `TWDA_MIN_PLAYERS` by
+`attested_player_count`, and a live `DeckObject` for that winner on that
+tournament. The floor is the submission floor of 10, not the rating floor of 8:
+the Hall of Fame is defined by deck submission, so it inherits the threshold
+that governs submission. One exception —
 an archive entry that never carried a player count and holds no play data of its
 own (`no_results`) clears the floor anyway, because the archive accepting the
 entry is itself the attestation, and gating on the blank costs five genuine
@@ -90,7 +92,34 @@ Revisit if a Grand Prix ever acquires real structural differences.
 modelled.** Such an event is entered as Limited, which is close enough in practice
 and already skips the construction minimums and the group rule. The cost is that
 the rules' exclusion of set-restricted results from ratings is not applied
-automatically.
+automatically. **Storyline is the exception** and is modelled, because it earns
+more than a label: no decklist at all, no rating, no ranked badge, no Hall of Fame
+count, and a faithful round-trip to VEKN event type 9.
+
+**Storyline removes the decklist rather than loosening validation**, the Judge's
+Guide naming storyline events as its case of events where decklists are not used
+([domain](domain/tournament-rules.md#formats)). `UpsertDeck` is the single
+submission entry point and refuses under Storyline, so one rule covers the player,
+the organizer and the public API. `decklist_required` is forced false by the
+engine — on create, and after every `UpdateConfig` apply, which also clears the
+`missing_decklist` stamps: the flag reaches the engine from the public API as well
+as the form, and left true on a format that accepts no deck it strands check-in
+behind a warning nothing can clear. Storyline is Basic-only,
+`validate_rank_legality` already admitting Standard and Limited alone.
+`ranking_eligibility` returns
+`storyline`, which is what withholds the ranked badge and the RtP column; ratings
+exclude it for a separate reason, `ratings.py` selecting by an explicit format
+list. `rating_category` still calls Storyline constructed on purpose — the format
+never reaches the rating set, and that answer is what points a post-switch
+recompute at the category the event is leaving. Revisit the whole stance if
+organizer-authored custom cards arrive: a decklist able to name them brings
+decklists back.
+
+**`UpdateConfig` can turn a tournament holding decks into a Storyline one, and
+nothing locks it.** Those decks stay visible and stop being editable. That edge is
+why the Hall of Fame predicate and the TWDA skip name Storyline explicitly instead
+of resting on "a Storyline event has no winning deck" — a switched event has one,
+and so does an imported type-9 event that arrived with one.
 
 ## State machine
 

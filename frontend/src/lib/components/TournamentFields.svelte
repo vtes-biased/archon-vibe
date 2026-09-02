@@ -178,9 +178,10 @@
         disabled={disabled || disabledFields.has("format")}
         onchange={(e) => {
           const format = (e.target as HTMLSelectElement).value;
-          // No V5 championship type on vekn.net (engine-enforced). Clear locally
-          // only — persistence is the parent's, same as the rank clears below.
-          if (format === "V5") values.rank = "";
+          // vekn.net has a championship event type for Standard and Limited only
+          // (engine-enforced). Clear locally only — persistence is the parent's,
+          // same as the rank clears below.
+          if (format === "V5" || format === "Storyline") values.rank = "";
           handleInput("format", format);
         }}
         class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
@@ -188,9 +189,12 @@
         <option value="Standard">Standard</option>
         <option value="V5">V5</option>
         <option value="Limited">Limited</option>
+        <option value="Storyline">Storyline</option>
       </select>
       {#if disabledFields.has("format")}
         <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
+      {:else if values.format === "Storyline"}
+        <p class="text-xs text-ink-faint mt-1">{m.tfield_format_storyline_hint()}</p>
       {/if}
     </div>
     <div>
@@ -198,7 +202,7 @@
       <select
         id={id("rank")}
         value={values.rank}
-        disabled={disabled || disabledFields.has("rank") || values.format === "V5"}
+        disabled={disabled || disabledFields.has("rank") || values.format === "V5" || values.format === "Storyline"}
         onchange={(e) => {
           const rank = (e.target as HTMLSelectElement).value;
           // Championships forbid proxies/multideck (engine-enforced): clear the local values only —
@@ -219,6 +223,8 @@
         <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
       {:else if values.format === "V5"}
         <p class="text-xs text-ink-faint mt-1">{m.tfield_rank_v5_hint()}</p>
+      {:else if values.format === "Storyline"}
+        <p class="text-xs text-ink-faint mt-1">{m.tfield_rank_storyline_hint()}</p>
       {/if}
     </div>
   </div>
@@ -326,16 +332,18 @@
     {#if values.rank}
       <p class="text-xs text-ink-faint ml-8 -mt-2">{m.tfield_ranked_no_proxies_hint()}</p>
     {/if}
-    <label class="flex items-center gap-3 cursor-pointer">
-      <input
-        type="checkbox"
-        checked={values.decklist_required}
-        {disabled}
-        onchange={(e) => handleInput("decklist_required", (e.target as HTMLInputElement).checked)}
-        class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
-      />
-      <span class="text-sm text-ink-bright">{m.tfield_decklist_required()}</span>
-    </label>
+    {#if values.format !== "Storyline"}
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={values.decklist_required}
+          {disabled}
+          onchange={(e) => handleInput("decklist_required", (e.target as HTMLInputElement).checked)}
+          class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
+        />
+        <span class="text-sm text-ink-bright">{m.tfield_decklist_required()}</span>
+      </label>
+    {/if}
   </div>
 </FoldableSection>
 
@@ -600,21 +608,23 @@
       </select>
       <p class="text-xs text-ink-faint mt-1">{standingsHelp(values.standings_mode)}</p>
     </div>
-    <div>
-      <label class="block text-sm text-ink-muted mb-1" for={id("decklists")}>{m.tfield_decklists_visibility()}</label>
-      <select
-        id={id("decklists")}
-        value={values.decklists_mode}
-        {disabled}
-        onchange={(e) => handleInput("decklists_mode", (e.target as HTMLSelectElement).value)}
-        class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
-      >
-        <option value="Winner">{m.tfield_decklists_winner()}</option>
-        <option value="Finalists">{m.tfield_decklists_finalists()}</option>
-        <option value="All">{m.tfield_decklists_all()}</option>
-      </select>
-      <p class="text-xs text-ink-faint mt-1">{decklistsHelp(values.decklists_mode)}</p>
-    </div>
+    {#if values.format !== "Storyline"}
+      <div>
+        <label class="block text-sm text-ink-muted mb-1" for={id("decklists")}>{m.tfield_decklists_visibility()}</label>
+        <select
+          id={id("decklists")}
+          value={values.decklists_mode}
+          {disabled}
+          onchange={(e) => handleInput("decklists_mode", (e.target as HTMLSelectElement).value)}
+          class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
+        >
+          <option value="Winner">{m.tfield_decklists_winner()}</option>
+          <option value="Finalists">{m.tfield_decklists_finalists()}</option>
+          <option value="All">{m.tfield_decklists_all()}</option>
+        </select>
+        <p class="text-xs text-ink-faint mt-1">{decklistsHelp(values.decklists_mode)}</p>
+      </div>
+    {/if}
   </div>
 </FoldableSection>
 

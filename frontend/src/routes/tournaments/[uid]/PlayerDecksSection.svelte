@@ -89,12 +89,19 @@
     }
   }
 
-  const canModifyPending = $derived(tournament.state !== 'Finished');
+  // Only a format switch can have left a deck on a Storyline event, and the
+  // engine freezes it: UpsertDeck refuses.
+  const isStoryline = $derived(tournament.format === 'Storyline');
+  const canModifyPending = $derived(tournament.state !== 'Finished' && !isStoryline);
 
   // Post-tournament recovery aside, a single-deck event's registered deck is
   // frozen once play starts — the engine's own rule.
   const singleDeckEditable = $derived(
-    tournament.state === 'Playing' ? false : tournament.state !== 'Finished' || myDecks.length === 0,
+    isStoryline
+      ? false
+      : tournament.state === 'Playing'
+        ? false
+        : tournament.state !== 'Finished' || myDecks.length === 0,
   );
 
   function roundLabel(round: number | null): string {
@@ -170,7 +177,7 @@
     {/if}
   {/if}
 
-  {#if tournament.state === 'Finished' && winnerUid && !winnerHasDeck}
+  {#if !isStoryline && tournament.state === 'Finished' && winnerUid && !winnerHasDeck}
     {#if isWinner}
       <div class="bg-accent-soft/30 border border-accent-strong/50 rounded-lg p-3 text-sm text-link-soft">
         {m.decks_winner_nudge_self()}
@@ -178,7 +185,7 @@
     {/if}
   {/if}
 
-  {#if isPlayer}
+  {#if isPlayer && (!isStoryline || myDecks.length > 0)}
     {#if isMultideck}
       <div class="bg-surface-muted/50 rounded-lg p-3 sm:p-4 space-y-2">
         <h3 class="text-sm font-semibold text-ink-strong">{m.decks_my_decks()}</h3>

@@ -391,7 +391,9 @@ map's identity and rebuilds the map only when the served ETag differs from the o
 it stored, so a session re-hands the catalog only when the catalog itself changed.
 
 **Deck validation** is `validate_deck` in `engine/src/deck.rs`: unknown cards,
-the banned list and a library over 90 are errors whatever the format. The rest of
+the banned list and a library over 90 are errors whatever the format. Storyline
+never reaches it: the format has no decks at all rather than lax ones, the engine
+refusing the upload ([tournaments](tournaments.md#configuration)). The rest of
 the construction rules — crypt of at least 12, library of at least 60, one group
 or two consecutive ones ([the game](domain/vtes.md#deck-structure)) — apply under
 Standard and V5 only, Limited having no group rule and minimums that depend on the

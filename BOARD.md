@@ -24,5 +24,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
-
-Add a Storyline format for VEKN's narrative events, which carry their own deck rules and custom cards: no decklist is submitted at all, and the event counts toward no rating or record — **Done when** a Storyline tournament can be created and run with no decklist affordance anywhere for player or organizer, the engine refuses a deck upload on it, the format shows no ranked badge and enters no rating or Hall of Fame count, VEKN's own Storyline event type round-trips instead of arriving as Limited, and the doc-impact listed in `board/storyline-format.md` is discharged.

@@ -32,6 +32,7 @@
     switch (code) {
       case "no_winner": return m.twda_reason_no_winner();
       case "limited": return m.twda_reason_limited();
+      case "storyline": return m.twda_reason_storyline();
       case "unranked":
       case "unsanctioned": // legacy stored reason from the pre-fix rank gate
         return m.twda_reason_unranked();

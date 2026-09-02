@@ -118,9 +118,9 @@ async def list_tournaments(
 ) -> StreamingResponse:
     """Every tournament, newest first.
 
-    `country` is an ISO 3166-1 alpha-2 code. `format` is `Standard`, `Limited`
-    or `V5`. `state` is `Planned`, `Registration`, `Waiting`, `Playing` or
-    `Finished`.
+    `country` is an ISO 3166-1 alpha-2 code. `format` is `Standard`, `Limited`,
+    `V5` or `Storyline`. `state` is `Planned`, `Registration`, `Waiting`,
+    `Playing` or `Finished`.
 
     `start_after` and `start_before` are ISO-8601 dates or datetimes carrying no
     timezone. Each tournament is compared in its own local time, so

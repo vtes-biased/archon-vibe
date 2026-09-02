@@ -1276,6 +1276,7 @@ _HOF_WINS_QUERY = """
       AND (t."full"->>'open_rounds') IS DISTINCT FROM 'true'
       AND (t."full"->>'self_organized_rounds') IS DISTINCT FROM 'true'
       AND (t."full"->>'format') IS DISTINCT FROM 'Limited'
+      AND (t."full"->>'format') IS DISTINCT FROM 'Storyline'
       AND EXISTS (
           SELECT 1 FROM objects d
           WHERE d.type = 'deck'

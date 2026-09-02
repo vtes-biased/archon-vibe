@@ -208,7 +208,7 @@ export interface PromoLedgerEntry {
 }
 
 export type TournamentState = "Planned" | "Registration" | "Waiting" | "Playing" | "Finished";
-export type TournamentFormat = "Standard" | "V5" | "Limited";
+export type TournamentFormat = "Standard" | "V5" | "Limited" | "Storyline";
 export type TournamentRank = "" | "National Championship" | "Continental Championship";
 export type StandingsMode = "Private" | "Cutoff" | "Top 10" | "Public";
 export type DeckListsMode = "Winner" | "Finalists" | "All";

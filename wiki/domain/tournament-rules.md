@@ -212,6 +212,18 @@ A player who has received sealed product may not leave before the first round en
 doing so means returning the product, a "Loss" for the round and being dropped
 (§7.2.6).
 
+**Storyline** events are worldwide narrative events whose results feed an ongoing
+World of Darkness plot. The rules glossary lists storyline tournaments under
+**Premier Events**; they run under constructed rules **plus** per-storyline special
+rules — a 75%-single-clan crypt is the recurring one — carry custom promo cards
+minted for the storyline, and often add adversaries, reward mechanics and a
+two-hour cap
+([vekn.net](https://www.vekn.net/storyline-events/official-storyline-events)).
+**No decklist is submitted**: the Judge's Guide names storyline events as its
+example of events where decklists are not used (`reference/judges-guide-v2.md`
+§3.1.3), which is why the app removes the decklist rather than loosening its
+validation — see [implementation](../tournaments.md).
+
 ## Cards
 
 All cards must be genuine VTES or Jyhad cards, or official VEKN-issued cards from

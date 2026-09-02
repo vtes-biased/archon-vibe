@@ -156,6 +156,7 @@
                 <option value="Standard">Standard</option>
                 <option value="V5">V5</option>
                 <option value="Limited">Limited</option>
+                <option value="Storyline">Storyline</option>
               </select>
             </div>
 

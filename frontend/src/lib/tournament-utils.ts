@@ -185,12 +185,13 @@ export function eventUrl(baseUrl: string, t: { uid: string; event_code?: string 
 
 export type RankedStatus =
   | { ranked: true }
-  | { ranked: false; reason: "few_players" | "no_final" | "open_rounds" | "no_results" }
+  | { ranked: false; reason: "few_players" | "no_final" | "open_rounds" | "no_results" | "storyline" }
   | null;
 
 /** VEKN rules 3.1/3.1.6: ranked needs ≥8 players AND a played final, decided by the engine's
  * ranking_eligibility (same predicate backend ratings.py inclusion-filters on). null = indeterminate. */
 export function rankedStatus(t: Tournament): RankedStatus {
+  if (t.format === "Storyline") return { ranked: false, reason: "storyline" };
   if (t.open_rounds || t.self_organized_rounds) return { ranked: false, reason: "open_rounds" };
   if (t.state === "Finished") {
     // Length, not presence: imported rows often carry empty arrays.
@@ -198,7 +199,7 @@ export function rankedStatus(t: Tournament): RankedStatus {
     const verdict = rankingEligibility(t);
     if (verdict === null) return null;
     if (verdict === "eligible") return { ranked: true };
-    return { ranked: false, reason: verdict as "few_players" | "no_final" | "open_rounds" | "no_results" };
+    return { ranked: false, reason: verdict as "few_players" | "no_final" | "open_rounds" | "no_results" | "storyline" };
   }
   if (t.state === "Waiting" || t.state === "Playing") {
     if (!t.players) return null;

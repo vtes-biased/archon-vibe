@@ -59,6 +59,7 @@ FORMAT_RANK_TO_VEKN_TYPE: dict[tuple[TournamentFormat, TournamentRank], int] = {
     (TournamentFormat.Limited, TournamentRank.NC): 13,  # Limited NC
     (TournamentFormat.Limited, TournamentRank.CC): 14,  # Limited CC
     (TournamentFormat.V5, TournamentRank.BASIC): 16,  # V5 Constructed
+    (TournamentFormat.Storyline, TournamentRank.BASIC): 9,  # Storyline
 }
 
 

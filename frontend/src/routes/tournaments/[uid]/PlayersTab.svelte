@@ -173,6 +173,15 @@
   }
 
   const isMultideck = $derived(!!tournament.multideck);
+  // Storyline takes no deck; a switched-away event keeps the ones it already had,
+  // read-only, so the column survives exactly while there is something to read.
+  const isStoryline = $derived(tournament.format === "Storyline");
+  const canEditDecks = $derived(isOrganizer && !isStoryline);
+  const showDeckColumn = $derived(
+    isStoryline
+      ? Object.values(decksByUser).some(d => d.length > 0)
+      : tournament.decklist_required || isOrganizer,
+  );
   const roundCount = $derived(tournament.rounds?.length ?? 0);
   // Accordion key: a stamped deck's round, or PENDING for the not-yet-played one.
   const PENDING = -1;
@@ -570,7 +579,7 @@
   {#snippet deckPanel(puid: string)}
     {@const playerDecks = getPlayerDecks(puid)}
     {@const errors = validationCache[puid] ?? []}
-    {#if isOrganizer && uploadingFor === puid}
+    {#if canEditDecks && uploadingFor === puid}
       <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={uploadingRound} multideck={isMultideck} onuploaded={onUploaded} />
     {:else if isMultideck || playerDecks.length > 0}
       {#if isMultideck}
@@ -593,14 +602,16 @@
                 <EyeOff class="w-4 h-4 shrink-0" />
                 {m.decks_hidden_until_round()}
               </p>
-              <Button
-                variant="secondary"
-                size="lg"
-                onclick={() => { uploadingFor = puid; uploadingRound = slot.round ?? undefined; }}
-              >{m.decks_replace()}</Button>
+              {#if canEditDecks}
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  onclick={() => { uploadingFor = puid; uploadingRound = slot.round ?? undefined; }}
+                >{m.decks_replace()}</Button>
+              {/if}
             {:else if slot.deck}
-              <DeckDisplay deck={slot.deck} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = slot.round ?? undefined; } : undefined} />
-            {:else if isOrganizer}
+              <DeckDisplay deck={slot.deck} onreplace={canEditDecks ? () => { uploadingFor = puid; uploadingRound = slot.round ?? undefined; } : undefined} />
+            {:else if canEditDecks}
               <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={slot.round ?? undefined} multideck onuploaded={onUploaded} />
             {:else}
               <p class="text-sm text-ink-muted">{m.players_no_deck()}</p>
@@ -613,7 +624,7 @@
             <EyeOff class="w-4 h-4 shrink-0" />
             {m.decks_hidden_until_round()}
           </p>
-          {#if isOrganizer}
+          {#if canEditDecks}
             <Button
               variant="secondary"
               size="lg"
@@ -621,7 +632,7 @@
             >{m.decks_replace()}</Button>
           {/if}
         {:else}
-          <DeckDisplay deck={playerDecks[0]} onreplace={isOrganizer ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined} />
+          <DeckDisplay deck={playerDecks[0]} onreplace={canEditDecks ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined} />
         {/if}
       {/if}
       {#if errors.length > 0 && playerDecks.some(d => !isDeckHiddenFromOrganizer(d.round))}
@@ -637,7 +648,7 @@
     {:else}
       <p class="text-sm text-ink-muted">{m.players_no_deck()}</p>
     {/if}
-    {#if isOrganizer && !archivalUids.has(puid) && playerDecks.length === 0 && !isMultideck && uploadingFor !== puid}
+    {#if canEditDecks && !archivalUids.has(puid) && playerDecks.length === 0 && !isMultideck && uploadingFor !== puid}
       <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} onuploaded={onUploaded} />
     {/if}
   {/snippet}
@@ -821,7 +832,7 @@
                   {/if}
                 </Button>
               {/if}
-              {#if tournament.decklist_required || isOrganizer}
+              {#if showDeckColumn}
                 {@const deckStatus = getDeckStatus(puid)}
                 <Button variant="ghost" size="sm" class="min-h-[44px]" onclick={() => togglePlayer(puid)} title={player.non_competing ? m.proxy_hint() : m.players_view_deck()}>
                   {#if player.non_competing}<Dices class="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" /><span class="text-ink-muted">{m.proxy_random_deck()}</span>
@@ -891,7 +902,7 @@
             {#if isOrganizer}
               <th class="text-center py-1.5 px-2">{m.payment_column()}</th>
             {/if}
-            {#if tournament.decklist_required || isOrganizer}
+            {#if showDeckColumn}
               <th class="text-center py-1.5 px-2">{m.tournament_col_deck()}</th>
             {/if}
             {#if isOrganizer}<th></th>{/if}
@@ -986,7 +997,7 @@
                   {/if}
                 </td>
               {/if}
-              {#if tournament.decklist_required || isOrganizer}
+              {#if showDeckColumn}
                 {@const deckStatus = getDeckStatus(puid)}
                 <td class="text-center py-1.5 px-2">
                   <button onclick={() => togglePlayer(puid)} class="p-1 hover:bg-surface-hover rounded transition-colors" title={player.non_competing ? m.proxy_hint() : m.players_view_deck()}>

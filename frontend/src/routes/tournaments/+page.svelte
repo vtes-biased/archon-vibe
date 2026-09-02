@@ -108,7 +108,7 @@
 
   const countries = getCountries();
   const sortedCountries = getSortedCountries();
-  const formats: TournamentFormat[] = ["Standard", "V5", "Limited"];
+  const formats: TournamentFormat[] = ["Standard", "V5", "Limited", "Storyline"];
   // Finished is authenticated-only: logged-out viewers are restricted to
   // current + upcoming (excludePast below), so it would always come up empty.
   const stateOptions = $derived<{ value: TournamentStateFilter; label: string }[]>([

@@ -52,7 +52,7 @@ EVENT_TYPE_MAP: dict[int, tuple[TournamentFormat, TournamentRank]] = {
     6: (TournamentFormat.Standard, TournamentRank.CC),  # Continental Championship
     7: (TournamentFormat.Standard, TournamentRank.BASIC),  # National Qualifier
     8: (TournamentFormat.Standard, TournamentRank.NC),  # National Championship
-    9: (TournamentFormat.Limited, TournamentRank.BASIC),  # Storyline
+    9: (TournamentFormat.Storyline, TournamentRank.BASIC),  # Storyline
     10: (TournamentFormat.Limited, TournamentRank.BASIC),  # Launch Event
     11: (TournamentFormat.Limited, TournamentRank.BASIC),  # BYOS
     12: (TournamentFormat.Limited, TournamentRank.BASIC),  # Unsanctioned

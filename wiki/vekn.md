@@ -106,7 +106,7 @@ with `vpf` separate — see the double-count warning in
 [domain](domain/vekn.md#never-chase-veknnets-stored-rtp).
 
 Format and rank map to a VEKN event type id: Standard/Basic 2, Standard/NC 8,
-Standard/CC 6, Limited/Basic 3, V5/Basic 16.
+Standard/CC 6, Limited/Basic 3, V5/Basic 16, Storyline/Basic 9.
 
 ### Push constraints
 
@@ -427,7 +427,9 @@ only just arrived; and go-online for a tournament finished offline.
 
 Every attempt records its outcome on `Tournament.twda_status`: `submitted` with the
 PR URL, `skipped` with a reason code — no winner, Limited format (draft and sealed
-decks aren't archived), fewer than 10 players played, unranked per the engine's
+decks aren't archived), Storyline format (a deck can only be there from a
+pre-switch format, outside what the archive describes), fewer than 10 players
+played, unranked per the engine's
 `ranking_eligibility` (the same predicate as the ranked badge — the championship
 rank axis never gates TWDA), no event code yet, GitHub App unconfigured, or the
 winner has no deck — or `failed`, whose reason is `step[:http-status]`: the call

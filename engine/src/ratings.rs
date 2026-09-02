@@ -37,6 +37,9 @@ pub fn compute_rating_points(
 /// blocking reason. The single source: ratings.py and the frontend badge read
 /// it, and must never re-derive it.
 pub fn ranking_eligibility(t: &json::JsonValue) -> &'static str {
+    if t[tournament::FORMAT].as_str() == Some("Storyline") {
+        return "storyline";
+    }
     if t[tournament::OPEN_ROUNDS].as_bool().unwrap_or(false)
         || t[tournament::SELF_ORGANIZED_ROUNDS]
             .as_bool()
@@ -167,6 +170,11 @@ mod tests {
             "winner" => "a",
         };
         assert_eq!(ranking_eligibility(&eligible), "eligible");
+
+        // Storyline is never rated, regardless of size/finals.
+        let mut storyline = eligible.clone();
+        storyline["format"] = "Storyline".into();
+        assert_eq!(ranking_eligibility(&storyline), "storyline");
 
         // House format is never rated, regardless of size/finals.
         let mut open = eligible.clone();
