@@ -26,3 +26,5 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 Board changes ride the commit that earns them.
 
 Coming back from a member's profile returns to the members tab it was opened from, not the community tab — **Done when** an official who opens a member from the members list and navigates back lands on that list with its tab and filters intact, in the browser and in the installed app, and `wiki/design.md` states the mechanism that makes it true.
+
+Give the dev database a fixed, known-credentials IC-role account so members management can be exercised signed in — **Done when** a standalone script creates it with constant credentials, re-running it changes nothing, it deletes and modifies no existing row, it refuses any database but the local dev one, its VEKN id sits outside the e2e seed cleanup's range, no frontend affordance or backend endpoint is added, and `wiki/dev.md` carries the credentials and records that a dev login is never an app feature.
