@@ -323,8 +323,8 @@ row must never displace one the organizer can act on, nor stand in for it.
 **The first viewport shows the work.** A list surface reaches its first rows
 without scrolling on a 393×852 phone: the search field and the view toggle stay in
 the open, and every select folds behind a single control naming how many filters
-are active. This is the console's own first-viewport rule ([the redesign
-pass](#the-redesign-pass)) generalized — apparatus is what moves, never the content
+are active. This is the console's own first-viewport rule ([the
+workbench](#the-workbench)) generalized — apparatus is what moves, never the content
 it filters. `/tournaments` is the only surface that follows it: `/leagues`, the
 `/users` member list and the public tournament masthead each still open on a filter
 card with every select showing.
@@ -553,38 +553,38 @@ dumping ground; every config field lives in the section its subject belongs to.
 reader must *do*, not by severity theatre. Config sections fold through the
 app-wide [fold grammar](#patterns).
 
-### The redesign pass
+### The workbench
 
-**Planned, unscheduled**: a pass bringing the console back to the three rules,
-and/or a simple mode for organizers who run small events and need none of the
-apparatus. The console drifted because each feature was added where it was first
-needed, as an inline labelled button — Raffle, promo recording, Archon import,
-Share Image, Print standings. None was wrong alone; the sum is a surface where
-reference material and tools outweigh the work, worst on a phone in the Finished
-state, where six inline buttons bury a single line of content. Rule 2 is therefore
-a policy for *future* features, not only a cleanup backlog.
+The console reached this shape in a pass closed 2026-08-17, driven by a phone
+review of a finished 8-player event. It had drifted because each feature was added
+where it was first needed, as an inline labelled button — Raffle, promo recording,
+Archon import, Share Image, Print standings. None was wrong alone; the sum was a
+surface where reference material and tools outweighed the work, worst on a phone in
+the Finished state, where six inline buttons buried a single line of content. Rule
+2 is a policy for *future* features, not the cleanup backlog that was worked off.
 
-The direction, from a phone review of a finished 8-player event (2026-08-07/08):
-the working surface starts inside the first viewport, the action bar sits **above**
-the tabs so its guidance line is visible on every tab, reference material leaves
-the masthead from check-in on, and everything rarer than the current moment sits
-one tap deep in a Tools sheet opened from the masthead — grouped and ordered
-**like the event runs** (set up · at the door · wrap up), because an event's
-chronology is fixed and muscle memory holds. The grouping axis is the moment you
-reach for a thing, not the subsystem it belongs to: promo distribution is
-end-of-event, CSV import is setup and has nothing to do with VEKN.
+The shape it settled on: the working surface starts inside the first viewport, the
+action bar sits **above** the tabs so its guidance line is visible on every tab,
+reference material leaves the masthead once the event is under way, and everything
+rarer than the current moment sits one tap deep in a Tools sheet opened from the
+masthead — grouped and ordered **like the event runs** (set up · at the door · wrap
+up), because an event's chronology is fixed and muscle memory holds. Only which
+group starts open follows state. The grouping axis is the moment you reach for a
+thing, not the subsystem it belongs to: promo distribution is end-of-event, CSV
+import is setup and has nothing to do with VEKN.
 
-Decisions already taken, not to be re-litigated:
+Standing decisions:
 
 - **Share Image is deleted, not moved** — `backend/src/og.py` server-renders a
   per-tournament `og:image` from the banner, so pasting the link already yields a
-  cover. The banner therefore matters *more* after the pass, and needs a real home.
+  cover. The banner therefore matters *more*, and needs a real home.
 - **Go Offline stays in the masthead button row** (owner, 2026-08-08: "always
   accessible and obvious") — state-dependent and time-critical, and the masthead is
   the one surface present on every tab.
 - **No Start Finals CTA in an empty Finals tab.** Finishing without a final is
   legitimate ([rules §3.1.6](domain/tournament-rules.md)), so a CTA there would
-  frame finals as the expected path.
+  frame finals as the expected path; the action lives in the action bar, where
+  state governs it.
 - **Finished spends its primary on promo reporting**, the one state whose button
   budget was empty. The CTA deep-links into the Tools promos panel rather than
   moving the form out of it: `ReportPromos` carries no state gate and raffled
@@ -600,3 +600,10 @@ already says it and rule 3 forbids the second voice; **a flat Tools dropdown**,
 the hamburger trap where finding anything means reading all of it; and **Tools in
 the tab row**, since it opens a sheet rather than swapping a panel and would spend
 the width the redesign just recovered.
+
+**Left open by that pass**: a simple mode for organizers who run small events and
+need none of the apparatus. Nothing shipped answers it — self-organized rounds let
+*players* seat their own pod in an open-rounds event, a seating mechanism rather
+than a reduction of organizer apparatus, and the creation wizard prefills the
+ordinary form without touching the console. Whether it is still warranted is an
+open scope question, not deferred work.
