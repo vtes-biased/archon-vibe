@@ -670,28 +670,28 @@
     {/if}
     {#if previousRounds.length > 0}
       <FoldableSection title={m.tournament_previous_rounds()} bind:open={showPreviousRounds}>
-            {#each previousRounds as prev}
-              <div class="border-t border-line pt-3">
-                <h4 class="text-xs font-medium text-ink-muted mb-1.5">{m.tournament_round_table({ round: String(prev.round), table: prev.tableLabel })}</h4>
-                {#if prev.table.override}
-                  <p class="text-xs text-warn mb-1.5">
-                    <ShieldCheck class="w-3.5 h-3.5 inline mr-1" aria-hidden="true" />
-                    {m.override_overridden({ comment: prev.table.override.comment })}
-                  </p>
-                {/if}
-                <div class="divide-y divide-line">
-                  {#each prev.table.seating as seat, j}
-                    {@const tVps = prev.table.seating.map(s => s.result.vp)}
-                    {@const preview = previewScoresSync(tournament, tournamentSanctions, prev.roundIdx, prev.tableIdx, tVps)}
-                    {@const tGws = preview ? preview.gw : prev.table.seating.map(s => s.result.gw)}
-                    {@const tTps = preview ? preview.tp : prev.table.seating.map(s => s.result.tp)}
-                    <div class="py-1 flex items-center justify-between text-sm {seat.player_uid === userUid ? 'text-ink-strong' : 'text-ink-muted'}">
-                      <span>{seatDisplay(seat.player_uid)}</span>
-                      <span class="text-xs">{seat.result.vp}VP {tGws[j]}GW {tTps[j]}TP</span>
-                    </div>
-                  {/each}
+        {#each previousRounds as prev}
+          <div class="border-t border-line pt-3">
+            <h4 class="text-xs font-medium text-ink-muted mb-1.5">{m.tournament_round_table({ round: String(prev.round), table: prev.tableLabel })}</h4>
+            {#if prev.table.override}
+              <p class="text-xs text-warn mb-1.5">
+                <ShieldCheck class="w-3.5 h-3.5 inline mr-1" aria-hidden="true" />
+                {m.override_overridden({ comment: prev.table.override.comment })}
+              </p>
+            {/if}
+            <div class="divide-y divide-line">
+              {#each prev.table.seating as seat, j}
+                {@const tVps = prev.table.seating.map(s => s.result.vp)}
+                {@const preview = previewScoresSync(tournament, tournamentSanctions, prev.roundIdx, prev.tableIdx, tVps)}
+                {@const tGws = preview ? preview.gw : prev.table.seating.map(s => s.result.gw)}
+                {@const tTps = preview ? preview.tp : prev.table.seating.map(s => s.result.tp)}
+                <div class="py-1 flex items-center justify-between text-sm {seat.player_uid === userUid ? 'text-ink-strong' : 'text-ink-muted'}">
+                  <span>{seatDisplay(seat.player_uid)}</span>
+                  <span class="text-xs">{seat.result.vp}VP {tGws[j]}GW {tTps[j]}TP</span>
                 </div>
-              </div>
+              {/each}
+            </div>
+          </div>
         {/each}
       </FoldableSection>
     {/if}

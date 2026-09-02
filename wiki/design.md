@@ -305,8 +305,11 @@ typography, a 4px spacing grid, 4–8px rounded corners.
 
 **Auto-save** — no explicit save buttons; changes save on input with clear feedback.
 No Cancel affordance on an auto-save form: the exit action is Close or Done, and a
-pending debounce is **flushed** on close, never dropped. Only genuinely
-irreversible or externally visible actions gate behind a confirm step.
+pending debounce is **flushed** on close, never dropped. Nor does such a form close
+a section on the reader: its folds open **independently** and stay open, never as
+an exclusive accordion, which would take away the feedback that is the edit's only
+confirmation. Only genuinely irreversible or externally visible actions gate behind
+a confirm step.
 
 **Unactionable match** — a member the organizer cannot add is listed disabled with
 its reason, never filtered out of the results: an empty dropdown reads as "no such

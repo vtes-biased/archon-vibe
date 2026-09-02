@@ -10,9 +10,12 @@ Two rules:
 
 1. A chevron that rotates is the dead second idiom, whatever it sits on. It has
    no allowlist: a fold points right closed and down open.
-2. A chevron drawn outside `FoldableSection.svelte` must be listed below with the
-   structural reason it cannot be a section. The reasons are the exception list
-   `wiki/design.md` carries in its fold grammar rule; the two move together.
+2. A chevron drawn outside `FoldableSection.svelte` must be listed below with its
+   reason, and two kinds land there. A **fold** that cannot be a section is also
+   stated as an exception in `wiki/design.md`'s fold grammar rule, and the two
+   move together. An affordance that is **not a fold** — a pagination arrow, a
+   reorder control, a mockup drawing one — is listed here only: the page states
+   the grammar for folds, and these are not folds.
 
 Run: just fold-grammar
 """
@@ -111,15 +114,16 @@ def main() -> int:
         for rel, lineno in sorted(undeclared.items()):
             print(f"  {rel}:{lineno}")
         print(
-            "\nFold it through `FoldableSection`, or, if it structurally cannot be a\n"
-            "section, add it to ALLOW here with the reason and to the exception list\n"
-            "in wiki/design.md's fold grammar rule.\n"
+            "\nFold it through `FoldableSection`. A fold that structurally cannot be a\n"
+            "section goes in ALLOW here *and* in the exception list in wiki/design.md's\n"
+            "fold grammar rule. Something that is not a fold — an arrow, a mockup —\n"
+            "goes in ALLOW here only.\n"
         )
     if stale:
         print("Allowed but no longer drawing a chevron:\n")
         for rel in stale:
             print(f"  {rel}")
-        print("\nDrop the entry here and its line in wiki/design.md.")
+        print("\nDrop the entry here, and its line in wiki/design.md if it has one.")
     return 1
 
 

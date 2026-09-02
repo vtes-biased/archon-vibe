@@ -8,6 +8,7 @@
   import type { CommunityLink } from "$lib/types";
   import type { UserListItem } from "$lib/db";
   import { ChevronDown, ChevronRight, Pencil } from "@lucide/svelte";
+  import FoldableSection from "$lib/components/FoldableSection.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   interface LinkEntry { user: UserListItem; link: CommunityLink }
@@ -144,25 +145,16 @@
             </div>
           {/if}
           {#if princes.length > 0}
-            <button
-              onclick={() => { princesOpen = !princesOpen; }}
-              class="w-full flex items-center gap-2 min-h-11 text-left"
-            >
-              {#if princesOpen}
-                <ChevronDown class="w-4 h-4 text-ink-faint" />
-              {:else}
-                <ChevronRight class="w-4 h-4 text-ink-faint" />
-              {/if}
-              <Badge tone={getRoleTone("Prince")}>Prince</Badge>
-              <span class="text-xs text-ink-faint">({princes.length})</span>
-            </button>
-            {#if princesOpen}
+            <FoldableSection title="Prince" bind:open={princesOpen}>
+              {#snippet header()}
+                <span class="text-xs text-ink-faint">({princes.length})</span>
+              {/snippet}
               <div class="divide-y divide-line/50">
                 {#each princes as official}
                   {@render officialRow(official)}
                 {/each}
               </div>
-            {/if}
+            </FoldableSection>
           {/if}
         </div>
       {/if}
