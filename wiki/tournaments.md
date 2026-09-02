@@ -11,7 +11,7 @@ server (PyO3) behave identically.
 
 | Setting | Values | Notes |
 |---|---|---|
-| Format | Standard, V5, Limited | V5 has its own decklist validation; Limited has no deck check, so draft events run as Limited |
+| Format | Standard, V5, Limited | V5 has its own decklist validation; Limited checks only unknown cards, the banned list and the 90-card library maximum (§7.2.1 ties the minimums to the booster count and drops the group rule), so draft events run as Limited |
 | Rank | Standard, National, Continental | National and Continental earn the rating coefficient bonus and are engine-blocked from proxies and multideck, at create and at config edit |
 | Proxies | yes/no | Standard rank only |
 | Multideck | yes/no | Standard rank only |
@@ -88,8 +88,9 @@ Revisit if a Grand Prix ever acquires real structural differences.
 
 **Card-set restrictions (§6.1.1) and the Restricted format (§7.9) are not
 modelled.** Such an event is entered as Limited, which is close enough in practice
-and already carries no deck check. The cost is that the rules' exclusion of
-set-restricted results from ratings is not applied automatically.
+and already skips the construction minimums and the group rule. The cost is that
+the rules' exclusion of set-restricted results from ratings is not applied
+automatically.
 
 ## State machine
 

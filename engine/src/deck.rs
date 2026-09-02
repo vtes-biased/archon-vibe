@@ -430,18 +430,20 @@ pub fn validate_deck(deck: &Deck, card_map: &CardMap, format: &str) -> Vec<Valid
     let crypt_count = deck.crypt_count(card_map);
     let library_count = deck.library_count(card_map);
 
-    if crypt_count < 12 {
-        errors.push(ValidationError {
-            severity: Severity::Error,
-            message: format!("Crypt has {crypt_count} cards (minimum 12)"),
-        });
-    }
+    if format != "Limited" {
+        if crypt_count < 12 {
+            errors.push(ValidationError {
+                severity: Severity::Error,
+                message: format!("Crypt has {crypt_count} cards (minimum 12)"),
+            });
+        }
 
-    if library_count < 60 {
-        errors.push(ValidationError {
-            severity: Severity::Error,
-            message: format!("Library has {library_count} cards (minimum 60)"),
-        });
+        if library_count < 60 {
+            errors.push(ValidationError {
+                severity: Severity::Error,
+                message: format!("Library has {library_count} cards (minimum 60)"),
+            });
+        }
     }
     if library_count > 90 {
         errors.push(ValidationError {
@@ -461,33 +463,34 @@ pub fn validate_deck(deck: &Deck, card_map: &CardMap, format: &str) -> Vec<Valid
         }
     }
 
-    // Check group rule: crypt cards must be from at most 2 consecutive groups
-    let mut groups: Vec<u32> = Vec::new();
-    for &id in deck.cards.keys() {
-        if let Some(card) = card_map.by_id(id) {
-            if card.kind == CardKind::Crypt && card.group != "any" {
-                if let Ok(g) = card.group.parse::<u32>() {
-                    if !groups.contains(&g) {
-                        groups.push(g);
+    if format != "Limited" {
+        let mut groups: Vec<u32> = Vec::new();
+        for &id in deck.cards.keys() {
+            if let Some(card) = card_map.by_id(id) {
+                if card.kind == CardKind::Crypt && card.group != "any" {
+                    if let Ok(g) = card.group.parse::<u32>() {
+                        if !groups.contains(&g) {
+                            groups.push(g);
+                        }
                     }
                 }
             }
         }
-    }
-    groups.sort();
-    if groups.len() > 2 {
-        errors.push(ValidationError {
-            severity: Severity::Error,
-            message: format!("Crypt uses {} groups (maximum 2 consecutive)", groups.len()),
-        });
-    } else if groups.len() == 2 && groups[1] - groups[0] > 1 {
-        errors.push(ValidationError {
-            severity: Severity::Error,
-            message: format!(
-                "Crypt groups {} and {} are not consecutive",
-                groups[0], groups[1]
-            ),
-        });
+        groups.sort();
+        if groups.len() > 2 {
+            errors.push(ValidationError {
+                severity: Severity::Error,
+                message: format!("Crypt uses {} groups (maximum 2 consecutive)", groups.len()),
+            });
+        } else if groups.len() == 2 && groups[1] - groups[0] > 1 {
+            errors.push(ValidationError {
+                severity: Severity::Error,
+                message: format!(
+                    "Crypt groups {} and {} are not consecutive",
+                    groups[0], groups[1]
+                ),
+            });
+        }
     }
 
     // V5 format: only V5-legal cards (legality precomputed at build time from the
@@ -835,6 +838,24 @@ mod tests {
         let errors = validate_deck(&deck, &cm, "Standard");
         assert!(errors.iter().any(|e| e.message.contains("Crypt")));
         assert!(errors.iter().any(|e| e.message.contains("Library")));
+    }
+
+    #[test]
+    fn test_limited_format_skips_construction_rules() {
+        let cm = CardMap::load(test_cards_json()).unwrap();
+        let mut deck = Deck::new();
+        deck.cards.insert(200001, 4);
+        deck.cards.insert(200002, 4);
+        deck.cards.insert(201693, 4);
+        deck.cards.insert(100001, 40);
+        assert!(
+            validate_deck(&deck, &cm, "Limited").is_empty(),
+            "Limited accepts a 40-card library across three groups"
+        );
+        assert!(
+            !validate_deck(&deck, &cm, "Standard").is_empty(),
+            "Standard rejects the same deck"
+        );
     }
 
     #[test]

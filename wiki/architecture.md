@@ -390,10 +390,12 @@ deck call passes a deck alone. The frontend memoizes that hand-off on the card
 map's identity and rebuilds the map only when the served ETag differs from the one
 it stored, so a session re-hands the catalog only when the catalog itself changed.
 
-**Deck validation** is `validate_deck` in `engine/src/deck.rs`: the game's
-construction rules — crypt of at least 12, library of 60 to 90, one group or two
-consecutive ones ([the game](domain/vtes.md#deck-structure)) — and the banned
-list are errors whatever the format; under V5, a card outside that set is a
+**Deck validation** is `validate_deck` in `engine/src/deck.rs`: unknown cards,
+the banned list and a library over 90 are errors whatever the format. The rest of
+the construction rules — crypt of at least 12, library of at least 60, one group
+or two consecutive ones ([the game](domain/vtes.md#deck-structure)) — apply under
+Standard and V5 only, Limited having no group rule and minimums that depend on the
+booster count the app does not record. Under V5, a card outside that set is a
 warning.
 
 **Three name forms**, all four fields being engine parser lookup keys:
