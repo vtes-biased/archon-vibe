@@ -12,7 +12,7 @@
   import Badge from "$lib/components/Badge.svelte";
   import { zonedDate } from "$lib/utils";
   import { syncQueryParams, currentParams, readPageParam, pageParam } from "$lib/url-filters";
-  import { Loader2, Trophy, Calendar, Copy, Check, Plus } from "@lucide/svelte";
+  import { Loader2, Trophy, Calendar, Copy, Check, Plus, SlidersHorizontal, X } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
@@ -97,6 +97,11 @@
 
   let calendarLoading = $state(false);
   let copied = $state(false);
+  let filtersOpen = $state(false);
+
+  function focusOnMount(node: HTMLElement) {
+    node.focus();
+  }
 
   let page = $state(readPageParam());
   const PAGE_SIZE = 50;
@@ -209,6 +214,16 @@
 
   const filterKey = $derived(
     [debouncedSearch, selectedState, selectedCountry, selectedFormat, selectedRank, includeOnline, viewMode].join("|"),
+  );
+
+  // The badge counts what the sheet holds: search sits outside it, and the
+  // country select is absent in agenda mode.
+  const activeFilterCount = $derived(
+    (selectedState !== "all" ? 1 : 0)
+      + (viewMode !== "agenda" && selectedCountry !== "all" ? 1 : 0)
+      + (selectedFormat !== "all" ? 1 : 0)
+      + (selectedRank !== "all" ? 1 : 0)
+      + (includeOnline ? 0 : 1),
   );
 
   // includeOnline counts: it hides data like any other filter, so an empty list
@@ -368,86 +383,29 @@
       </div>
     {/if}
 
-    <div class="bg-surface-card rounded-lg shadow p-4 mb-4 border border-line">
-      <div class="flex flex-wrap gap-4 items-end">
-        <div class="flex-1 min-w-[200px]">
-          <label for="search" class="block text-sm font-medium text-ink-muted mb-1">{m.common_search()}</label>
-          <input
-            id="search"
-            type="text"
-            bind:value={searchQuery}
-            placeholder={m.tournaments_search_placeholder()}
-            class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright placeholder:text-ink-faint"
-          />
-        </div>
-
-        <div class="min-w-[130px]">
-          <label for="format-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.tournaments_format()}</label>
-          <select
-            id="format-filter"
-            bind:value={selectedFormat}
-            class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
-          >
-            <option value="all">{m.tournaments_all_formats()}</option>
-            {#each formats as f}
-              <option value={f}>{f}</option>
-            {/each}
-          </select>
-        </div>
-
-        <div class="min-w-[130px]">
-          <label for="rank-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.tfield_rank()}</label>
-          <select
-            id="rank-filter"
-            bind:value={selectedRank}
-            class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
-          >
-            <option value="all">{m.tournaments_all_ranks()}</option>
-            {#each RANK_FILTERS as r}
-              <option value={r}>{rankBadgeLabel(r)}</option>
-            {/each}
-          </select>
-        </div>
-
-        {#if viewMode !== "agenda"}
-          <div class="min-w-[180px]">
-            <label for="country-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.common_country()}</label>
-            <select
-              id="country-filter"
-              bind:value={selectedCountry}
-              class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
-            >
-              <option value="all">{m.tournaments_all_countries()}</option>
-              {#each sortedCountries as country}
-                <option value={country.iso_code}>{country.name} {getCountryFlag(country.iso_code)}</option>
-              {/each}
-            </select>
-          </div>
+    <div class="flex items-center gap-2 mb-4">
+      <input
+        id="search"
+        type="text"
+        bind:value={searchQuery}
+        aria-label={m.common_search()}
+        placeholder={m.tournaments_search_placeholder()}
+        class="flex-1 min-w-0 px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright placeholder:text-ink-faint"
+      />
+      <Button
+        variant="ghost"
+        size="lg"
+        onclick={() => (filtersOpen = true)}
+        aria-label={activeFilterCount > 0
+          ? m.filters_active_count({ count: String(activeFilterCount) })
+          : m.filters_title()}
+      >
+        <SlidersHorizontal class="w-4 h-4" aria-hidden="true" />
+        {m.filters_title()}
+        {#if activeFilterCount > 0}
+          <span class="rounded-full bg-accent-strong px-1.5 text-xs text-white" aria-hidden="true">{activeFilterCount}</span>
         {/if}
-
-        <div class="min-w-[130px]">
-          <label for="state-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.tournaments_col_state()}</label>
-          <select
-            id="state-filter"
-            bind:value={selectedState}
-            class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
-          >
-            {#each stateOptions as option}
-              <option value={option.value}>{option.label}</option>
-            {/each}
-          </select>
-        </div>
-
-        <div class="flex items-center gap-3 pb-1">
-          <label class="inline-flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" bind:checked={includeOnline} class="sr-only peer" />
-            <div class="relative w-11 h-6 bg-surface-active rounded-full peer-checked:bg-accent-strong transition-colors">
-              <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform" class:translate-x-5={includeOnline}></div>
-            </div>
-            <span class="text-sm text-ink">{m.tournaments_include_online()}</span>
-          </label>
-        </div>
-      </div>
+      </Button>
     </div>
 
     <!-- Hidden offline: token generation is an API call, and webcal makes the
@@ -637,3 +595,102 @@
     {/if}
   </div>
 </div>
+
+{#if filtersOpen}
+  <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <button type="button" class="absolute inset-0 bg-black/60" aria-label={m.common_close()} onclick={() => (filtersOpen = false)}></button>
+
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="filters-title"
+      tabindex="-1"
+      use:focusOnMount
+      onkeydown={(e) => { if (e.key === "Escape") filtersOpen = false; }}
+      class="relative flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-line bg-surface-card shadow-xl pb-safe-b sm:pb-0 sm:max-w-md sm:rounded-2xl"
+    >
+      <div class="flex items-center justify-between border-b border-line px-4 py-3">
+        <h2 id="filters-title" class="text-sm font-semibold text-ink-strong">{m.filters_title()}</h2>
+        <button type="button" onclick={() => (filtersOpen = false)} aria-label={m.common_close()} class="rounded-lg p-1.5 text-ink-muted hover:bg-surface-hover hover:text-ink-bright">
+          <X class="w-5 h-5" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div class="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
+        <div>
+          <label for="format-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.tournaments_format()}</label>
+          <select
+            id="format-filter"
+            bind:value={selectedFormat}
+            class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
+          >
+            <option value="all">{m.tournaments_all_formats()}</option>
+            {#each formats as f}
+              <option value={f}>{f}</option>
+            {/each}
+          </select>
+        </div>
+
+        <div>
+          <label for="rank-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.tfield_rank()}</label>
+          <select
+            id="rank-filter"
+            bind:value={selectedRank}
+            class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
+          >
+            <option value="all">{m.tournaments_all_ranks()}</option>
+            {#each RANK_FILTERS as r}
+              <option value={r}>{rankBadgeLabel(r)}</option>
+            {/each}
+          </select>
+        </div>
+
+        {#if viewMode !== "agenda"}
+          <div>
+            <label for="country-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.common_country()}</label>
+            <select
+              id="country-filter"
+              bind:value={selectedCountry}
+              class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
+            >
+              <option value="all">{m.tournaments_all_countries()}</option>
+              {#each sortedCountries as country}
+                <option value={country.iso_code}>{country.name} {getCountryFlag(country.iso_code)}</option>
+              {/each}
+            </select>
+          </div>
+        {/if}
+
+        <div>
+          <label for="state-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.tournaments_col_state()}</label>
+          <select
+            id="state-filter"
+            bind:value={selectedState}
+            class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
+          >
+            {#each stateOptions as option}
+              <option value={option.value}>{option.label}</option>
+            {/each}
+          </select>
+        </div>
+
+        <label class="inline-flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" bind:checked={includeOnline} class="sr-only peer" />
+          <div class="relative w-11 h-6 bg-surface-active rounded-full peer-checked:bg-accent-strong transition-colors">
+            <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform" class:translate-x-5={includeOnline}></div>
+          </div>
+          <span class="text-sm text-ink">{m.tournaments_include_online()}</span>
+        </label>
+      </div>
+
+      <div class="flex items-center justify-between gap-2 border-t border-line px-4 py-3">
+        <Button variant="ghost" size="md" disabled={!hasFilters} onclick={clearFilters}>
+          {m.filters_clear()}
+        </Button>
+        <Button variant="primary" size="md" onclick={() => (filtersOpen = false)}>
+          {m.common_close()}
+        </Button>
+      </div>
+    </div>
+  </div>
+{/if}

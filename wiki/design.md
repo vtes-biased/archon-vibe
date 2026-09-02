@@ -313,6 +313,14 @@ the list is capped, addable rows rank ahead of blocked ones before the cap, and 
 "no match" branch tests for an addable match rather than an empty list: a blocked
 row must never displace one the organizer can act on, nor stand in for it.
 
+**The first viewport shows the work.** A list surface reaches its first rows
+without scrolling on a 393×852 phone: the search field and the view toggle stay in
+the open, every select folds behind a single control naming how many filters are
+active, and what is left above the rows is the header and that row. This is the
+console's own first-viewport rule ([the redesign pass](#the-redesign-pass))
+generalized — apparatus is what moves, never the content it filters. The public
+tournament masthead still owes it.
+
 **List view state** — filters belong to the list, not the component instance, in
 three layers:
 
