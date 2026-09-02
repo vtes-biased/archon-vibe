@@ -342,7 +342,9 @@
     {#if tournament.registration_url}{@render externalRegistration()}{/if}
     {#if actionError}{@render refusal(actionError)}{/if}
   {:else if tournament.state === "Waiting" && !currentPlayerEntry}
-    {#if tournament.online}
+    {#if tournament.registration_url}
+      {@render externalRegistration()}
+    {:else if tournament.online}
       {@render onlineJoin()}
       <p class="text-sm text-ink-muted">{m.tournament_online_checkin_unregistered()}</p>
     {:else}

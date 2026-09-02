@@ -684,6 +684,14 @@ fn apply_event(
                     if state != TournamentState::Waiting && state != TournamentState::Playing {
                         return Err(EngineError::PlayerNotFound);
                     }
+                    let external = tournament[tournament::REGISTRATION_URL]
+                        .as_str()
+                        .unwrap_or("");
+                    if !actor.is_organizer && !external.is_empty() {
+                        return Err(EngineError::ExternalRegistration {
+                            url: external.to_string(),
+                        });
+                    }
                     if vekn_id.as_ref().is_none_or(|v| v.is_empty()) {
                         return Err(EngineError::VeknIdRequired);
                     }

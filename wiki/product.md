@@ -139,19 +139,21 @@ timer off, a clock being meaningless over that span. Starting the next round
 merely because a table finished early is possible and is not how the feature is
 used.
 
-**The door stays open mid-round.** Check-in is allowed while a round is `Playing`
-and enrolls a never-registered player; it records presence, never seats. Whether a
-late arrival joins a short table now or waits is the organizer's call — **the app
-has no default and must not decide**. Mechanics and edge cases:
-[tournaments](tournaments.md#player-states).
+**The door stays open mid-round.** Check-in is allowed while a round is
+`Playing` and enrolls a never-registered player, though on an event with a
+registration link only the organizer's check-in does that (below); it records
+presence, never seats. Whether a late arrival joins a short table now or waits
+is the organizer's call — **the app has no default and must not decide**.
+Mechanics and edge cases: [tournaments](tournaments.md#player-states).
 
 **A registration link replaces Archon's sign-up.** An organizer who sells entry
 on a ticketing platform sets `registration_url`, and the app then takes no sign-ups
 of its own: the engine refuses `Register` and self-`Unregister` on that event, so
 the web button, the bot's `/register` and the API close together and the player is
 shown the link instead. The organizer's CSV import is how the roster fills, and
-walk-in check-in stays open — that is how a latecomer, or a row the import could
-not match, still gets in. Nothing is prefilled from the wizard's "collected in
+the organizer's walk-in check-in stays open — that is how a latecomer, or a row
+the import could not match, still gets in, while self-check-in stops enrolling a
+stranger who never paid. Nothing is prefilled from the wizard's "collected in
 advance, somewhere else" answer: the link is a per-event fact the organizer
 supplies, and the wizard only names the field. The same link is what tells the
 console the paid list will arrive as a file, so the CSV import — always in the

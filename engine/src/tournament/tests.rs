@@ -174,6 +174,38 @@ fn test_external_registration_refuses_self_service() {
 }
 
 #[test]
+fn test_external_registration_refuses_self_enrolment_at_check_in() {
+    let mut tournament = make_tournament();
+    tournament["state"] = "Waiting".into();
+    tournament["registration_url"] = "https://tickets.example/e".into();
+    tournament["players"] = json::array![json::object! {
+        user_uid: "player-1",
+        state: "Registered",
+    }];
+
+    let checkin = json::object! {
+        type: "CheckIn",
+        player_uid: "player-1",
+        vekn_id: "1000001",
+    };
+    assert!(run_event(&tournament, &checkin, &make_player("player-1")).is_ok());
+
+    let self_enrol = json::object! {
+        type: "CheckIn",
+        player_uid: "player-9",
+        vekn_id: "1000009",
+    };
+    assert_eq!(
+        run_event(&tournament, &self_enrol, &make_player("player-9")).unwrap_err(),
+        EngineError::ExternalRegistration {
+            url: "https://tickets.example/e".to_string()
+        }
+    );
+
+    assert!(run_event(&tournament, &self_enrol, &make_organizer()).is_ok());
+}
+
+#[test]
 fn test_add_player_without_vekn_id_rejected() {
     let mut tournament = make_tournament();
     tournament["state"] = "Registration".into();

@@ -221,9 +221,14 @@ go-online resolves or turns into real members ([vekn](vekn.md#push-constraints))
 self-`Unregister` are refused on such an event with
 `tournament.external_registration`, whose message carries the link, so the web
 button, the bot's `/register` and the API shut in one place rather than three.
-`AddPlayer`, `RemovePlayer` and the walk-in `CheckIn` path stay open: the
-organizer's CSV import is how the roster fills, and a seat bought at a ticket shop
-is cancelled at its source, not here.
+`CheckIn` refuses the same way when it would *enrol* someone not on the roster and
+the actor is not an organizer — the QR self-check-in and the bot's `/checkin` are
+otherwise a fourth way past the ticket shop, and that arm enrols un-waitlisted. An
+imported player still checks themselves in, being already on the roster.
+`AddPlayer`, `RemovePlayer` and the organizer's own door check-in stay open: the
+CSV import is how the roster fills, a latecomer or a row the import could not match
+still gets in, and a seat bought at a ticket shop is cancelled at its source, not
+here.
 
 Barriers to check-in: sitting on the waitlist, a required decklist not uploaded, a
 VEKN ban, a disqualification from this event, or reaching the per-player round cap.
@@ -231,14 +236,16 @@ VEKN ban, a disqualification from this event, or reaching the per-player round c
 `SelfOrganizeRound` refuses them — self-seating past the cap would make it advisory
 again.
 
-**The door stays open mid-round** — check-in is allowed while a round is `Playing`,
-and a player never registered is enrolled by it. Checking someone in never seats
-them; whether a late arrival joins a short table now or waits is the organizer's
-call, taken as a separate seating action. **The app has no default and must not
-decide.** A round turns `Playing` the moment it is seated, while players are still
-finding seats, so an arrival in that gap can often still be seated; once play has
-begun they usually wait. The same path reverses a drop-out, who returns to `Playing` if their seat
-is still live — dropping out never vacates a seat, which is why Drop Out carries no
+**The door stays open mid-round** — check-in is allowed while a round is
+`Playing`, and a player never registered is enrolled by it, though on an event
+with a registration link only the organizer's check-in does that (above).
+Checking someone in never seats them; whether a late arrival joins a short table
+now or waits is the organizer's call, taken as a separate seating action. **The
+app has no default and must not decide.** A round turns `Playing` the moment it
+is seated, while players are still finding seats, so an arrival in that gap can
+often still be seated; once play has begun they usually wait. The same path
+reverses a drop-out, who returns to `Playing` if their seat is still live —
+dropping out never vacates a seat, which is why Drop Out carries no
 confirmation. Only `Planned` and `Registration` refuse a check-in; a `Finished`
 tournament accepts one only for post-hoc correction.
 
