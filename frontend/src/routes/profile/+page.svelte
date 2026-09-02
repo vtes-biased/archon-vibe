@@ -14,7 +14,7 @@
   import { claimVeknId, abandonVeknId, uploadAvatar, getNdaStatus, type NdaStatus } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
 
-  import { User, TriangleAlert, Trophy, FileSignature, IdCard, Swords, Settings } from "@lucide/svelte";
+  import { CircleUser, TriangleAlert, Trophy, FileSignature, IdCard, Swords, Settings } from "@lucide/svelte";
   import InlineNotice from "$lib/components/InlineNotice.svelte";
   import AvatarCropper from "$lib/components/AvatarCropper.svelte";
   import PlayerRatings from "$lib/components/PlayerRatings.svelte";
@@ -248,7 +248,7 @@
     {:else if !auth.isAuthenticated || !auth.user}
       <div class="bg-surface-card rounded-lg shadow p-8 border border-line text-center">
         <div class="text-ink-faint mb-4">
-          <User class="mx-auto h-16 w-16" />
+          <CircleUser class="mx-auto h-16 w-16" />
         </div>
         <h2 class="text-xl font-medium text-ink-strong mb-2">{m.profile_sign_in_required()}</h2>
         <p class="text-ink-muted mb-6">{m.profile_sign_in_msg()}</p>

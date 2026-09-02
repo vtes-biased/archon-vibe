@@ -9,7 +9,7 @@
   import { initOfflineState, getOfflineTournamentUids } from '$lib/stores/offline.svelte';
   import { reconcilePush } from '$lib/stores/push.svelte';
   import { onMount } from 'svelte';
-  import { Wifi, WifiOff, RefreshCw, Download, TriangleAlert, Trophy, CalendarRange, ListOrdered, Users, CircleUser, BookOpen } from '@lucide/svelte';
+  import { Wifi, WifiOff, RefreshCw, Download, TriangleAlert, Trophy, FlagTriangleRight, ListOrdered, Users, CircleUser, BookOpen } from '@lucide/svelte';
   import Badge from '$lib/components/Badge.svelte';
   import Toast from '$lib/components/Toast.svelte';
   import WhatsNewModal from '$lib/components/WhatsNewModal.svelte';
@@ -35,7 +35,7 @@
 
   const navItems = [
     { href: '/tournaments', labelFn: () => m.nav_tournaments(), icon: Trophy },
-    { href: '/leagues', labelFn: () => m.nav_leagues(), icon: CalendarRange },
+    { href: '/leagues', labelFn: () => m.nav_leagues(), icon: FlagTriangleRight },
     { href: '/rankings', labelFn: () => m.nav_rankings(), icon: ListOrdered },
     { href: '/users', labelFn: () => m.nav_community(), icon: Users },
     { href: '/help', labelFn: () => m.nav_help(), icon: BookOpen },
@@ -177,8 +177,6 @@
       {#each navItems as item}
         {@const active = isActive(item.href, $page.url.pathname)}
         {@const Icon = item.icon}
-        <!-- Icon-only: labels truncate to ambiguity in longer locales (es/pt),
-             so the destination name lives in aria-label/title. -->
         <a
           href={item.href}
           onclick={(e) => openLastView(e, item.href)}
