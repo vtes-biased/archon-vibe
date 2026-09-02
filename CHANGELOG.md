@@ -10,6 +10,24 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- Signed-out visitors now land on a front page that says what Archon is, with a way to sign up or browse tournaments without an account.
+- Creating a tournament now starts with a few questions about it, then a form prefilled to match.
+- A tournament can now link the platform that takes its registrations, and players who register in the app are pointed there.
+- The tournament list now filters by championship rank, and its other filters sit behind one control.
+- A tournament's player list can now be exported as CSV, with each player's country and region.
+- Opening a tournament on a fresh device no longer says it does not exist while its data is still loading.
+- A player's registration or decklist no longer shows as accepted when the server has refused it.
+- Importing a deck by link or QR code now works after the app has sat open long enough for the session to expire.
+- An organizer's console action now survives a locked phone or a closed tab, and is sent once the app reopens.
+- When adding a player, a look-alike who is already registered now shows in the search instead of an empty list.
+- When a winning decklist fails to reach the TWDA, the tournament page now says at which step and why.
+- A tournament that vekn.net has since removed can now be deleted by its organizer.
+- A league's standings now sit in a tab at the top of its page instead of below the tournament list.
+- Going back to the member list from a profile now keeps the filters you had set.
+- Playtesters now see their signed NDA on their profile, and can download the sealed copy again.
+
 ## v1.0.9 — 2026-08-30
 
 - Playtesters now sign the playtest NDA in the app, and get a signed copy by email.
