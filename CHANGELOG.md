@@ -10,6 +10,13 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- Clicking the Archon logo now takes signed-out visitors to the front page instead of the tournament list.
+- A member's profile now links back to the members list.
+- Storyline tournaments now have a format of their own: they take no decklist and are never ranked or rated.
+- Storyline tournaments synced from vekn.net no longer show as Limited.
+
 ## v1.1.0 — 2026-09-02
 
 - Signed-out visitors now land on a front page that says what Archon is, with a way to sign up or browse tournaments without an account.
