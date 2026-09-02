@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.1.0 — 2026-09-02
 
 - Signed-out visitors now land on a front page that says what Archon is, with a way to sign up or browse tournaments without an account.
 - Creating a tournament now starts with a few questions about it, then a form prefilled to match.
