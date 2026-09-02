@@ -32,7 +32,6 @@ omitted from the rows below.
 | `issue_restricted_sanction`, `lift_restricted_sanction`, `modify_sanction`, `delete_any_sanction` | Ethics — global |
 | `issue_tournament_sanction` | Ethics — global; tournament organizer |
 | `lift_tournament_sanction` | Rulemonger — global; NC — the tournament's country |
-| `lift_league_disqualification` | league organizer |
 | `delete_organizer_sanction` | tournament organizer, while the tournament is unfinished |
 | `record_promo_intake`, `view_full_promo_ledger` | NC — global (the inventory chain is not country-scoped) |
 | `manage_oauth_clients` | DEV — global |

@@ -184,7 +184,10 @@ type annotation.
 disqualification sanction. Audit every consumer for the combined signal, and make
 any DQ create, lift or delete recompute standings. A **producer** owes both halves:
 the VEKN sync writes an imported `dq` onto the standings row *and* the player state,
-because the rating path reads the state and the placement path reads the row.
+because the rating path reads the state and the placement path reads the row. The
+sanction half is **scoped to its own event**, and only the payload's producer can
+scope it: the engine matches a DQ on user and level alone, so any list handed to it
+that carries another tournament's DQ zeroes that player here too.
 
 **The players array's order is the registration order**, and nothing enforces it.
 `Register` appends, `Unregister` uses `array_remove`, the CSV import appends in file

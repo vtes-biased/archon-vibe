@@ -11,7 +11,6 @@ from pydantic import BaseModel
 from .. import permissions
 from ..broadcast import broadcast_precomputed
 from ..db import (
-    get_league_by_uid,
     get_sanction_by_uid,
     get_sanctions_for_tournament,
     get_tournament_by_uid,
@@ -39,6 +38,11 @@ encoder = msgspec.json.Encoder()
 _engine = PyEngine()
 
 MAX_EXPIRY_MONTHS = 18
+# The engine's reference lists exactly the tournament-scoped levels.
+TOURNAMENT_LEVELS = frozenset(
+    SanctionLevel(lv["key"])
+    for lv in json.loads(_engine.sanction_reference())["levels"]
+)
 
 
 @router.get("/reference")
@@ -61,14 +65,7 @@ async def _can_lift_sanction(user, sanction: Sanction) -> bool:
         if sanction.tournament_uid
         else None
     )
-    league = None
-    if (
-        sanction.level == SanctionLevel.DISQUALIFICATION
-        and tournament
-        and tournament.league_uid
-    ):
-        league = await get_league_by_uid(tournament.league_uid)
-    return permissions.can_lift_sanction(user, sanction, tournament, league)
+    return permissions.can_lift_sanction(user, sanction, tournament)
 
 
 async def _can_delete_sanction(user, sanction: Sanction) -> bool:
@@ -78,6 +75,20 @@ async def _can_delete_sanction(user, sanction: Sanction) -> bool:
         else None
     )
     return permissions.can_delete_sanction(user, sanction, tournament)
+
+
+def _validate_binding(level: SanctionLevel, tournament_uid: str | None) -> None:
+    """A sanction's scope is the event it was issued for, or the membership."""
+    if level in TOURNAMENT_LEVELS and not tournament_uid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A {level.value} must be issued against a tournament",
+        )
+    if level not in TOURNAMENT_LEVELS and tournament_uid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A {level.value} is membership-level and takes no tournament",
+        )
 
 
 def _validate_expiry(
@@ -253,6 +264,8 @@ async def create_sanction(
             detail=f"Invalid level: {request.level}. Valid: {[lv.value for lv in SanctionLevel]}",
         ) from e
 
+    _validate_binding(level, request.tournament_uid)
+
     try:
         category = SanctionCategory(request.category)
     except ValueError as e:
@@ -322,10 +335,8 @@ async def create_sanction(
 
     # One active DQ per player per tournament: a second is meaningless and, once one
     # is lifted, would strand the player zeroed. Re-DQ after a lift is still allowed.
-    if (
-        level == SanctionLevel.DISQUALIFICATION
-        and request.tournament_uid
-        and await _has_active_dq(request.tournament_uid, request.user_uid)
+    if level == SanctionLevel.DISQUALIFICATION and await _has_active_dq(
+        request.tournament_uid, request.user_uid
     ):
         raise HTTPException(
             status_code=409,
@@ -354,13 +365,13 @@ async def create_sanction(
     )
 
     # A sanction is not a TournamentEvent, so it needs its own recompute call.
-    if level == SanctionLevel.DISQUALIFICATION and request.tournament_uid:
+    if level == SanctionLevel.DISQUALIFICATION:
         await _apply_sanction_to_tournament(
             request.tournament_uid,
             dq_user_uid=request.user_uid,
             dq_state=PlayerState.DISQUALIFIED,
         )
-    elif level == SanctionLevel.STANDINGS_ADJUSTMENT and request.tournament_uid:
+    elif level == SanctionLevel.STANDINGS_ADJUSTMENT:
         await _apply_sanction_to_tournament(request.tournament_uid)
 
     broadcast_precomputed(bd)
@@ -426,6 +437,7 @@ async def update_sanction_endpoint(
                 status_code=400,
                 detail=f"Invalid level: {request.level}",
             ) from e
+        _validate_binding(level, sanction.tournament_uid)
 
     if request.category is not None:
         try:

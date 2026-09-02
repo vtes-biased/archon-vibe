@@ -42,7 +42,7 @@ export function previewScoresSync(
   try {
     const config = JSON.stringify({
       tournament,
-      sanctions: JSON.parse(buildSanctionsPayload(sanctions ?? [])),
+      sanctions: JSON.parse(buildSanctionsPayload(sanctions ?? [], tournament.uid)),
       round,
       table,
       vps,
@@ -174,10 +174,13 @@ export interface ActorContext {
   now?: string; // request timestamp (ISO-8601 UTC); resolves suspension expiry in the engine
 }
 
-export function buildSanctionsPayload(sanctions: Sanction[]): string {
+/** The engine matches a DQ on user and level alone, so a sanction from another
+ * event that rides along would zero the player here: keep only this tournament's. */
+export function buildSanctionsPayload(sanctions: Sanction[], tournamentUid: string): string {
   return JSON.stringify(
     sanctions
       .filter(s => !s.deleted_at)
+      .filter(s => s.tournament_uid === tournamentUid || s.level === 'suspension')
       .map(s => ({
         user_uid: s.user_uid,
         level: s.level,
@@ -229,7 +232,7 @@ export async function processTournamentEvent(
   const tournamentJson = JSON.stringify(tournament);
   const eventJson = JSON.stringify(event);
   const actorJson = JSON.stringify(actor);
-  const sanctionsJson = buildSanctionsPayload(sanctions);
+  const sanctionsJson = buildSanctionsPayload(sanctions, tournament.uid);
   const decksJson = buildDecksPayload(decks);
 
   const resultJson = callEngine(() =>
@@ -250,7 +253,7 @@ export async function updateStandings(
 ): Promise<Tournament> {
   const engine = await initEngine();
   const tournamentJson = JSON.stringify(tournament);
-  const sanctionsJson = buildSanctionsPayload(sanctions);
+  const sanctionsJson = buildSanctionsPayload(sanctions, tournament.uid);
   const resultJson = callEngine(() => engine.updateStandings(tournamentJson, sanctionsJson));
   return JSON.parse(resultJson) as Tournament;
 }
@@ -590,13 +593,11 @@ export async function computeLeagueStandings(
   return JSON.parse(resultJson);
 }
 
-/** `sanctions` must be this tournament's own: a DQ from another event is not one here,
- * and the payload carries no `tournament_uid` for the engine to filter on. */
 export function displayStandings(
   tournament: Tournament,
   sanctions: Sanction[]
 ): Array<{ user_uid: string; gw: number; vp: number; tp: number; toss: number; rank: number; finalist: boolean; finalist_position: number; disqualified: boolean; non_competing: boolean; no_show: boolean; finals?: { gw: number; vp: number; tp: number } }> {
-  const config = JSON.stringify({ tournament, sanctions: JSON.parse(buildSanctionsPayload(sanctions)) });
+  const config = JSON.stringify({ tournament, sanctions: JSON.parse(buildSanctionsPayload(sanctions, tournament.uid)) });
   return JSON.parse(callEngine(() => getEngine().displayStandings(config)));
 }
 

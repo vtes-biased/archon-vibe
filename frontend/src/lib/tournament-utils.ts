@@ -1,6 +1,6 @@
 import type { Sanction, Tournament, TournamentState, TournamentRank } from "./types";
 import type { BadgeTone } from "./components/Badge.svelte";
-import { attestedPlayerCount, computeRatingPoints, computeRatingVpGw, displayStandings, rankingEligibility } from "./engine";
+import { attestedPlayerCount, buildSanctionsPayload, computeRatingPoints, computeRatingVpGw, displayStandings, rankingEligibility } from "./engine";
 import { formatScore } from "./utils";
 import * as m from './paraglide/messages.js';
 
@@ -225,7 +225,7 @@ export function ratingContext(tournament: Tournament, sanctions: Sanction[] | un
     played,
     fieldSize: attestedPlayerCount(tournament),
     tournamentJson: JSON.stringify(tournament),
-    sanctionsJson: JSON.stringify(sanctions ?? []),
+    sanctionsJson: buildSanctionsPayload(sanctions ?? [], tournament.uid),
     eligible: rankingEligibility(tournament) === "eligible",
   };
 }

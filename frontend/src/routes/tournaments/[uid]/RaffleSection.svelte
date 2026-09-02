@@ -70,7 +70,7 @@
   }
 
   const tournamentJson = $derived(JSON.stringify(tournament));
-  const sanctionsJson = $derived(buildSanctionsPayload(sanctions));
+  const sanctionsJson = $derived(buildSanctionsPayload(sanctions, tournament.uid));
 
   function eligibleForPool(p: RafflePool): number {
     return rafflePool(tournamentJson, sanctionsJson, p, excludeDrawn).length;

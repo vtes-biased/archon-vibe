@@ -138,6 +138,38 @@ async def _build_decks_json(tournament_uid: str, conn=None) -> str:
     ).decode()
 
 
+async def _build_sanctions_json(
+    tournament_uid: str, user_uids: set[str], conn=None
+) -> str:
+    """This tournament's own sanctions plus the players' active VEKN suspensions.
+    A sanction from another event must never ride along: `has_dq_sanction` matches
+    on user and level alone, so a foreign DQ would zero the player here too."""
+    sanctions = await get_sanctions_for_tournament(tournament_uid, conn=conn)
+    seen = {s.uid for s in sanctions}
+    for s in await get_sanctions_for_users(user_uids, conn=conn):
+        if s.uid in seen or s.deleted_at or s.lifted_at:
+            continue
+        if s.level == SanctionLevel.SUSPENSION:
+            sanctions.append(s)
+            seen.add(s.uid)
+    return msgspec.json.encode(
+        [
+            {
+                "user_uid": s.user_uid,
+                "level": s.level.value,
+                "round_number": s.round_number,
+                "lifted_at": s.lifted_at.isoformat() if s.lifted_at else None,
+                "deleted_at": s.deleted_at.isoformat() if s.deleted_at else None,
+                # UTC-canonical to match actor.now's format for the engine's expiry compare.
+                "expires_at": (
+                    s.expires_at.astimezone(UTC).isoformat() if s.expires_at else None
+                ),
+            }
+            for s in sanctions
+        ]
+    ).decode()
+
+
 async def _process_deck_ops(
     deck_ops: list,
     tournament_uid: str,
@@ -492,14 +524,10 @@ async def _get_user_organizable_league_uids(user, conn=None) -> list[str]:
     ]
 
 
-async def _check_player_barred(
-    player_uid: str, tournament_uid: str, tournament: Tournament, conn=None
-) -> None:
-    """Raises EngineRejection if the player is suspended, or DQ'd in a
-    sibling league tournament (league-wide DQ)."""
-    user_sanctions = await get_sanctions_for_user(player_uid, conn=conn)
+async def _check_player_barred(player_uid: str, conn=None) -> None:
+    """Raises EngineRejection if the player holds an active VEKN suspension."""
     now = datetime.now(UTC)
-    for s in user_sanctions:
+    for s in await get_sanctions_for_user(player_uid, conn=conn):
         if s.deleted_at or s.lifted_at:
             continue
         if s.level == SanctionLevel.SUSPENSION:
@@ -508,18 +536,6 @@ async def _check_player_barred(
                     "Player is suspended and cannot participate",
                     code="tournament.player_suspended",
                 )
-
-    if tournament.league_uid:
-        for s in user_sanctions:
-            if s.deleted_at or s.lifted_at:
-                continue
-            if s.level == SanctionLevel.DISQUALIFICATION and s.tournament_uid:
-                dq_tournament = await get_tournament_by_uid(s.tournament_uid, conn=conn)
-                if dq_tournament and dq_tournament.league_uid == tournament.league_uid:
-                    raise EngineRejection(
-                        "Player is disqualified from a league tournament and cannot participate",
-                        code="tournament.player_disqualified",
-                    )
 
 
 class OrganizerAction(BaseModel):
@@ -1324,21 +1340,7 @@ async def bulk_register(
         actor_json = msgspec.json.encode(
             _build_actor_context(current_user, tournament)
         ).decode("utf-8")
-        sanctions_data = [
-            {
-                "user_uid": s.user_uid,
-                "level": s.level.value,
-                "round_number": s.round_number,
-                "lifted_at": s.lifted_at.isoformat() if s.lifted_at else None,
-                "deleted_at": s.deleted_at.isoformat() if s.deleted_at else None,
-                "expires_at": (
-                    s.expires_at.astimezone(UTC).isoformat() if s.expires_at else None
-                ),
-            }
-            for s in await get_sanctions_for_users(seen_uids, conn=tx_conn)
-            if not s.deleted_at and not s.lifted_at
-        ]
-        sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
+        sanctions_json = await _build_sanctions_json(uid, seen_uids, conn=tx_conn)
         decks_json = await _build_decks_json(uid, conn=tx_conn)
 
         t_data = msgspec.to_builtins(tournament)
@@ -1348,7 +1350,7 @@ async def bulk_register(
                 already.append(user.name)
                 continue
             try:
-                await _check_player_barred(user.uid, uid, tournament, conn=tx_conn)
+                await _check_player_barred(user.uid, conn=tx_conn)
             except EngineRejection as e:
                 failed.append({"name": user.name, "reason": e.message})
                 continue
@@ -1549,35 +1551,6 @@ async def tournament_action(
             )
         actor_data = _build_actor_context(current_user, tournament, can_organize)
 
-        # Tournament sanctions plus user-level suspension/DQ for all players
-        # (needed for CheckInAll etc.)
-        tournament_sanctions = await get_sanctions_for_tournament(uid, conn=tx_conn)
-        seen_uids = {s.uid for s in tournament_sanctions}
-        player_uids = {p.user_uid for p in tournament.players if p.user_uid}
-        for s in await get_sanctions_for_users(player_uids, conn=tx_conn):
-            if s.uid in seen_uids or s.deleted_at or s.lifted_at:
-                continue
-            if s.level in (
-                SanctionLevel.SUSPENSION,
-                SanctionLevel.DISQUALIFICATION,
-            ):
-                tournament_sanctions.append(s)
-                seen_uids.add(s.uid)
-        sanctions_data = [
-            {
-                "user_uid": s.user_uid,
-                "level": s.level.value,
-                "round_number": s.round_number,
-                "lifted_at": s.lifted_at.isoformat() if s.lifted_at else None,
-                "deleted_at": s.deleted_at.isoformat() if s.deleted_at else None,
-                # UTC-canonical to match actor.now's format for the engine's expiry compare.
-                "expires_at": (
-                    s.expires_at.astimezone(UTC).isoformat() if s.expires_at else None
-                ),
-            }
-            for s in tournament_sanctions
-        ]
-
         # vekn_id comes only from the resolved user — the request model has no
         # vekn_id field, so a fabricated id can never reach the engine.
         target_uid = None
@@ -1596,13 +1569,14 @@ async def tournament_action(
         tournament_json = encoder.encode(tournament).decode("utf-8")
         event_json = msgspec.json.encode(event_data).decode("utf-8")
         actor_json = msgspec.json.encode(actor_data).decode("utf-8")
-        sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
+        player_uids = {p.user_uid for p in tournament.players if p.user_uid}
+        sanctions_json = await _build_sanctions_json(uid, player_uids, conn=tx_conn)
         decks_json = await _build_decks_json(uid, conn=tx_conn)
 
         if request.type in ("CheckIn", "Register", "AddPlayer"):
             player_uid = request.player_uid or request.user_uid
             if player_uid:
-                await _check_player_barred(player_uid, uid, tournament, conn=tx_conn)
+                await _check_player_barred(player_uid, conn=tx_conn)
 
         engine = _engine
         try:

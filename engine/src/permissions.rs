@@ -188,7 +188,6 @@ pub enum Capability {
     IssueTournamentSanction,
     LiftRestrictedSanction,
     LiftTournamentSanction,
-    LiftLeagueDisqualification,
     ModifySanction,
     DeleteAnySanction,
     DeleteOrganizerSanction,
@@ -425,16 +424,6 @@ pub const CAPABILITIES: &[Rule] = &[
         same_country: &[NC],
         self_service: false,
         organizer: false,
-        deny: "You don't have permission to lift this sanction",
-        deny_scope: None,
-    },
-    Rule {
-        capability: Capability::LiftLeagueDisqualification,
-        name: "lift_league_disqualification",
-        global: &[],
-        same_country: &[],
-        self_service: false,
-        organizer: true,
         deny: "You don't have permission to lift this sanction",
         deny_scope: None,
     },
@@ -819,14 +808,13 @@ pub fn can_link_tournament_to_league(
 }
 
 /// Context for a sanction lift/delete decision: the sanction level plus the
-/// relevant fields of the (caller-fetched) tournament and league.
+/// relevant fields of the (caller-fetched) tournament.
 #[derive(Debug, Clone, Default)]
 pub struct SanctionContext {
     pub level: String,
     pub tournament_country: Option<String>,
     pub tournament_state: String,
     pub tournament_organizers_uids: Vec<String>,
-    pub league_organizers_uids: Vec<String>,
 }
 
 impl SanctionContext {
@@ -844,17 +832,6 @@ impl SanctionContext {
                 .members()
                 .filter_map(|v| v.as_str().map(|s| s.to_string()))
                 .collect(),
-            league_organizers_uids: value[arg::LEAGUE_ORGANIZERS_UIDS]
-                .members()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect(),
-        }
-    }
-
-    fn league(&self) -> OwnedResource {
-        OwnedResource {
-            organizers_uids: self.league_organizers_uids.clone(),
-            ..Default::default()
         }
     }
 
@@ -897,8 +874,8 @@ pub fn can_issue_sanction(
     )
 }
 
-/// Restricted levels are the Ethics chain's alone; otherwise the
-/// tournament-level grant applies, widened for a DQ to the league organizers.
+/// Restricted levels are the Ethics chain's alone; every other level falls to
+/// the tournament-level grant.
 pub fn can_lift_sanction(
     user: &UserContext,
     user_uid: &str,
@@ -910,17 +887,9 @@ pub fn can_lift_sanction(
             &Request::new(user, user_uid),
         );
     }
-    let result = check(
+    check(
         Capability::LiftTournamentSanction,
         &Request::new(user, user_uid).target_country(ctx.tournament_country.as_deref()),
-    );
-    if result.allowed || ctx.level != "disqualification" {
-        return result;
-    }
-    let league = ctx.league();
-    check(
-        Capability::LiftLeagueDisqualification,
-        &Request::new(user, user_uid).resource(&league),
     )
 }
 
@@ -987,8 +956,8 @@ mod tests {
     fn test_ic_holds_every_capability() {
         let ic = ctx(vec![IC], Some("US"));
         for rule in CAPABILITIES {
-            // Role-less rows (lift_league_disqualification, delete_organizer_sanction)
-            // grant nobody anything by role — they only widen an organizer's reach.
+            // Role-less rows (delete_organizer_sanction) grant nobody anything by
+            // role — they only widen an organizer's reach.
             if rule.global.is_empty() && rule.same_country.is_empty() {
                 continue;
             }
@@ -1438,56 +1407,38 @@ mod tests {
 
     #[test]
     fn test_can_lift_sanction() {
-        let lift = |roles, country, uid: &str, level: &str, t_country, league_orgs: Vec<&str>| {
+        let lift = |roles, country, uid: &str, level: &str, t_country| {
             can_lift_sanction(
                 &ctx(roles, country),
                 uid,
                 &SanctionContext {
                     level: level.to_string(),
                     tournament_country: t_country,
-                    league_organizers_uids: league_orgs.iter().map(|s| s.to_string()).collect(),
                     ..Default::default()
                 },
             )
             .allowed
         };
-        assert!(lift(vec![IC], None, "x", "suspension", None, vec![]));
-        assert!(lift(vec![Ethics], None, "x", "probation", None, vec![]));
-        assert!(!lift(
-            vec![Rulemonger],
-            None,
-            "x",
-            "suspension",
-            None,
-            vec![]
-        ));
-        assert!(lift(vec![Rulemonger], None, "x", "caution", None, vec![]));
+        assert!(lift(vec![IC], None, "x", "suspension", None));
+        assert!(lift(vec![Ethics], None, "x", "probation", None));
+        assert!(!lift(vec![Rulemonger], None, "x", "suspension", None));
+        assert!(lift(vec![Rulemonger], None, "x", "caution", None));
         assert!(lift(
             vec![NC],
             Some("FR"),
             "x",
             "warning",
-            Some("FR".to_string()),
-            vec![]
+            Some("FR".to_string())
         ));
         assert!(!lift(
             vec![NC],
             Some("US"),
             "x",
             "warning",
-            Some("FR".to_string()),
-            vec![]
+            Some("FR".to_string())
         ));
-        assert!(lift(
-            vec![],
-            None,
-            "org-1",
-            "disqualification",
-            None,
-            vec!["org-1"]
-        ));
-        assert!(!lift(vec![], None, "org-1", "warning", None, vec!["org-1"]));
-        assert!(!lift(vec![], None, "nobody", "caution", None, vec![]));
+        assert!(!lift(vec![], None, "org-1", "disqualification", None));
+        assert!(!lift(vec![], None, "nobody", "caution", None));
     }
 
     #[test]

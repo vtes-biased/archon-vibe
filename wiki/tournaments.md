@@ -432,11 +432,11 @@ The screen hands `compute_final_standings` that resolved row while the backend
 hands it the stored sheet; the two agree because every producer writes the sheet
 flag from finals membership, not because the stamp reconciles them.
 
-Its `sanctions` argument must hold **this tournament's own** sanctions and no
-others. `has_dq_sanction` matches on user and level alone — the payload carries no
-`tournament_uid` to filter on — so a list gathered for player context, as
-`getTournamentContextSanctions` gathers 18 months of it, zeroes a player here for a
-DQ they took at another event.
+Its `sanctions` argument holds **this tournament's own** sanctions plus the
+players' VEKN suspensions, and nothing else. Each side builds that payload in one
+place — `_build_sanctions_json` in the backend, `buildSanctionsPayload` in the
+frontend — because `has_dq_sanction` matches on user and level alone: a foreign DQ
+that reaches the engine zeroes the player here.
 
 ## Finals
 
@@ -765,13 +765,25 @@ issue them are [domain](domain/judging.md); the app's visibility rules are here.
 The filtering is a **display rule**: all sanction records sync to every member's
 client at member level. IC and Ethics see every level on every surface.
 
+**A sanction is bound to its scope at issuance**: Caution, Warning, Standings
+Adjustment and Disqualification are issued against a tournament and carry its
+`tournament_uid`; Suspension and Probation are membership-level and carry none.
+The engine's `LEVELS` reference is that tournament-scoped list. Both the create
+and the update endpoint refuse either pairing the other way round, so no re-level
+moves a sanction across the binding, and the profile's edit modal offers only the
+levels its binding permits.
+
+A member's profile names the tournament behind each sanction that has one, as a
+link. A tournament missing from the client's local index leaves the row as it is —
+no name, no dead link.
+
 Expired sanctions are soft-deleted daily after 18 months and hard-deleted 30 days
 later, so a mistaken organizer delete stays IC-recoverable in that window.
 
 | Action | Caution / Warning / SA / DQ | Suspension / Probation |
 |---|---|---|
 | Issue | IC, Ethics, or an organizer of the tournament | IC, Ethics |
-| Lift | IC, Rulemonger, the NC of the tournament's country; a league organizer for a DQ in their league event | IC, Ethics |
+| Lift | IC, Rulemonger, the NC of the tournament's country | IC, Ethics |
 | Edit fields | IC, Ethics | IC, Ethics |
 | Delete (soft) | IC, Ethics — plus the tournament's own organizer **while the event is not Finished**, for mistake correction by delete-and-reissue (organizers cannot edit) | IC, Ethics |
 
@@ -852,6 +864,11 @@ stay online-only.
 The DQ signal is `player.state == "Disqualified"` **or** an active
 `disqualification` sanction — either is sufficient, and every consumer must check
 the combined signal.
+
+**A DQ is confined to the tournament it was issued at.** It bars check-in, zeroes
+standings and kills the rating there, and reaches no other event — not a sibling
+league tournament, not a concurrent one. The player registers, checks in and
+scores normally everywhere else.
 
 - **Standings row**: sorted last, flagged disqualified, VP/GW/TP shown as 0
   (forfeited), no numeric rank. Opponents keep everything they earned at the table.

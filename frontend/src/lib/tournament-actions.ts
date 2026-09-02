@@ -129,9 +129,9 @@ async function replayPendingActions(uid: string, claimed: Set<string>, gate: Pro
   });
 }
 
-/** Blocks barred players (suspension, league-wide DQ) before the WASM optimistic path.
+/** Blocks suspended players before the WASM optimistic path.
  * Mirrors backend _check_player_barred(). */
-async function checkPlayerBarred(playerUid: string, tournament: Tournament): Promise<void> {
+async function checkPlayerBarred(playerUid: string): Promise<void> {
   const sanctions = await getSanctionsForUser(playerUid);
   const now = new Date();
   for (const s of sanctions) {
@@ -143,21 +143,6 @@ async function checkPlayerBarred(playerUid: string, tournament: Tournament): Pro
         {},
         'Player is suspended and cannot participate'
       );
-    }
-  }
-  if (tournament.league_uid) {
-    for (const s of sanctions) {
-      if (s.deleted_at || s.lifted_at) continue;
-      if (s.level === 'disqualification' && s.tournament_uid) {
-        const dqTournament = await getTournament(s.tournament_uid);
-        if (dqTournament && dqTournament.league_uid === tournament.league_uid) {
-          throw new EngineError(
-            'tournament.player_disqualified',
-            {},
-            'Player is disqualified from a league tournament and cannot participate'
-          );
-        }
-      }
     }
   }
 }
@@ -182,13 +167,13 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
     let awaitedServer = false;
     try {
       if (action === 'CheckIn' && data?.player_uid) {
-        await checkPlayerBarred(data.player_uid as string, current);
+        await checkPlayerBarred(data.player_uid as string);
       } else if ((action === 'Register' || action === 'AddPlayer') && data?.user_uid) {
-        await checkPlayerBarred(data.user_uid as string, current);
+        await checkPlayerBarred(data.user_uid as string);
       }
       const actor = await buildActorContext(getAuthState().user ?? null, current, action);
-      // Combine tournament-scoped sanctions with user-level suspension/DQ
-      // sanctions for all tournament players (needed for CheckInAll etc.)
+      // This tournament's own sanctions plus the players' VEKN suspensions
+      // (needed for CheckInAll etc.) — the twin of backend _build_sanctions_json.
       const sanctions = await getSanctionsForTournament(uid);
       const seenUids = new Set(sanctions.map(s => s.uid));
       const playerUids = new Set((current.players ?? []).map(p => p.user_uid));
@@ -196,7 +181,7 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
         if (!puid) continue;
         for (const s of await getSanctionsForUser(puid)) {
           if (seenUids.has(s.uid) || s.deleted_at || s.lifted_at) continue;
-          if (s.level === 'suspension' || s.level === 'disqualification') {
+          if (s.level === 'suspension') {
             sanctions.push(s);
             seenUids.add(s.uid);
           }

@@ -279,8 +279,7 @@ import TournamentModals from "./TournamentModals.svelte";
     return Object.fromEntries(uids.map((u, i) => [u, users[i]?.name || u.slice(0, 8)]));
   }
 
-  const ownSanctions = $derived(tournamentSanctions.filter(s => s.tournament_uid === uid));
-  const standings = $derived(computeStandings(tournament, ownSanctions));
+  const standings = $derived(computeStandings(tournament, tournamentSanctions));
   const finalsQual = $derived(finalsQualification(tournament, standings));
 
 
@@ -1093,7 +1092,7 @@ import TournamentModals from "./TournamentModals.svelte";
     isOrganizer={true}
     {playerInfo}
     {standings}
-    sanctions={ownSanctions}
+    sanctions={tournamentSanctions}
     {decksByUser}
     {doAction}
     {actionLoading}

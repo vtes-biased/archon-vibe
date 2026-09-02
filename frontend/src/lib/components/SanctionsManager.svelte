@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { User, Sanction, SanctionLevel, SanctionCategory } from "$lib/types";
   import { createSanction, updateSanction, deleteSanctionApi } from "$lib/api";
-  import { getActiveSanctionsForUser } from "$lib/db";
+  import { getActiveSanctionsForUser, getTournamentListItems } from "$lib/db";
   import { visibleSanctions } from "$lib/utils";
   import { showToast } from "$lib/stores/toast.svelte";
   import SanctionBadge from "./SanctionBadge.svelte";
@@ -43,6 +43,13 @@
     });
   });
 
+  let tournamentNames = $state<Map<string, string>>(new Map());
+  $effect(() => {
+    getTournamentListItems().then((items) => {
+      tournamentNames = new Map(items.map((t) => [t.uid, t.name]));
+    });
+  });
+
   // Cautions are private to their tournament — never surfaced in the directory.
   const shownSanctions = $derived(visibleSanctions(userSanctions));
 
@@ -51,6 +58,9 @@
 
   const expiryRequired = $derived(sanctionLevel === "probation");
   const expiryAllowed = $derived(sanctionLevel === "suspension" || sanctionLevel === "probation");
+
+  // The backend refuses a re-level across the binding, so offer neither half.
+  const editLevelsBound = $derived(!!editingSanction?.tournament_uid);
 
   const editExpiryRequired = $derived(editSanctionLevel === "probation");
   const editExpiryAllowed = $derived(editSanctionLevel === "suspension" || editSanctionLevel === "probation");
@@ -216,40 +226,35 @@
         {#if shownSanctions.length > 0}
           <div class="space-y-2 {canIssueSanctions ? 'mb-4' : ''}">
             {#each shownSanctions as sanction (sanction.uid)}
-              {#if canIssueSanctions}
-                <button
-                  type="button"
-                  onclick={() => openEditSanctionModal(sanction)}
-                  class="w-full flex items-center justify-between gap-2 p-3 bg-surface-muted rounded border border-line-strong hover:border-line-strong transition-colors text-left"
-                >
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2">
-                      <SanctionBadge {sanction} />
-                      <span class="text-sm text-ink truncate">{sanction.description}</span>
-                    </div>
-                    <div class="text-xs text-ink-faint mt-1">
-                      {formatDate(sanction.issued_at)}
-                      {#if sanction.expires_at}
-                        → {formatDate(sanction.expires_at)}
-                      {/if}
-                    </div>
-                  </div>
-                  <Pencil class="w-4 h-4 text-ink-faint flex-shrink-0" />
-                </button>
-              {:else}
-                <div class="p-3 bg-surface-muted rounded border border-line-strong">
+              <div class="flex items-center justify-between gap-2 p-3 bg-surface-muted rounded border border-line-strong">
+                <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
                     <SanctionBadge {sanction} />
-                    <span class="text-sm text-ink">{sanction.description}</span>
+                    <span class="text-sm text-ink truncate">{sanction.description}</span>
                   </div>
                   <div class="text-xs text-ink-faint mt-1">
                     {formatDate(sanction.issued_at)}
                     {#if sanction.expires_at}
                       → {formatDate(sanction.expires_at)}
                     {/if}
+                    {#if sanction.tournament_uid && tournamentNames.has(sanction.tournament_uid)}
+                      · <a href="/tournaments/{sanction.tournament_uid}" class="underline hover:text-ink">
+                        {tournamentNames.get(sanction.tournament_uid)}
+                      </a>
+                    {/if}
                   </div>
                 </div>
-              {/if}
+                {#if canIssueSanctions}
+                  <button
+                    type="button"
+                    onclick={() => openEditSanctionModal(sanction)}
+                    aria-label={m.common_edit()}
+                    class="flex-shrink-0 p-1 rounded hover:bg-surface-card transition-colors"
+                  >
+                    <Pencil class="w-4 h-4 text-ink-faint" />
+                  </button>
+                {/if}
+              </div>
             {/each}
           </div>
         {/if}
@@ -425,12 +430,15 @@
             disabled={!!editingSanction.lifted_at}
             class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-50"
           >
-            <option value="caution">{m.sanction_level_caution()}</option>
-            <option value="warning">{m.sanction_level_warning()}</option>
-            <option value="standings_adjustment">{m.sanction_level_standings_adjustment()}</option>
-            <option value="disqualification">{m.sanction_level_disqualification()}</option>
-            <option value="probation">{m.sanction_level_probation()}</option>
-            <option value="suspension">{m.sanction_level_suspension()}</option>
+            {#if editLevelsBound}
+              <option value="caution">{m.sanction_level_caution()}</option>
+              <option value="warning">{m.sanction_level_warning()}</option>
+              <option value="standings_adjustment">{m.sanction_level_standings_adjustment()}</option>
+              <option value="disqualification">{m.sanction_level_disqualification()}</option>
+            {:else}
+              <option value="probation">{m.sanction_level_probation()}</option>
+              <option value="suspension">{m.sanction_level_suspension()}</option>
+            {/if}
           </select>
         </div>
 

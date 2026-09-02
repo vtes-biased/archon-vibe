@@ -201,14 +201,12 @@ def can_lift_sanction(
     user: User,
     sanction: Sanction,
     tournament: Tournament | None,
-    league: League | None,
 ) -> bool:
-    """Lift a sanction — level plus the tournament/league it hangs off."""
+    """Lift a sanction — level plus the tournament it hangs off."""
     ctx = json.dumps(
         {
             "level": str(sanction.level),
             "tournament_country": tournament.country if tournament else None,
-            "league_organizers_uids": league.organizers_uids if league else [],
         }
     )
     result = _engine.can_lift_sanction(json.dumps(user_to_context(user)), user.uid, ctx)
