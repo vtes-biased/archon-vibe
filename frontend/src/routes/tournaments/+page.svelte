@@ -598,7 +598,7 @@
 
 {#if filtersOpen}
   <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-    <button type="button" class="absolute inset-0 bg-black/60" aria-label={m.common_close()} onclick={() => (filtersOpen = false)}></button>
+    <button type="button" class="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-label={m.common_close()} onclick={() => (filtersOpen = false)}></button>
 
     <div
       role="dialog"
