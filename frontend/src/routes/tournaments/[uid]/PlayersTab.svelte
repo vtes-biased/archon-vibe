@@ -13,7 +13,7 @@
   import ConfirmActionModal from "$lib/components/ConfirmActionModal.svelte";
   import { UserPlus, Dice3, CircleCheck, CircleHelp, TriangleAlert, CircleX, FileX, X, EyeOff, Trash2, Ellipsis, Dices, Printer, SlidersHorizontal, ChevronDown, ChevronRight, Banknote } from "@lucide/svelte";
   import ActionMenu from "$lib/components/ActionMenu.svelte";
-  import DeckAccordion from "$lib/components/DeckAccordion.svelte";
+  import FoldableSection from "$lib/components/FoldableSection.svelte";
   import CreateAndRegisterModal from "./CreateAndRegisterModal.svelte";
   import Button from "$lib/components/Button.svelte";
   import Badge from "$lib/components/Badge.svelte";
@@ -576,16 +576,16 @@
       {#if isMultideck}
         {#each getMultideckSlots(puid) as slot}
           {@const key = slot.round ?? PENDING}
-          <DeckAccordion
-            expanded={expandedDeckRound === key}
+          <FoldableSection
+            open={expandedDeckRound === key}
             ontoggle={() => expandedDeckRound = expandedDeckRound === key ? null : key}
-            roundLabel={slot.round === null
+            title={slot.round === null
               ? m.decks_next_round()
               : slot.round < roundCount
                 ? m.decks_round_label({ n: String(slot.round + 1) })
                 : m.tournament_finals_heading()}
           >
-            {#snippet headerExtra()}
+            {#snippet header()}
               <span class="text-ink-faint truncate">{slot.deck ? (slot.deck.name || m.decks_unnamed()) : m.players_no_deck()}</span>
             {/snippet}
             {#if slot.deck && isDeckHiddenFromOrganizer(slot.round)}
@@ -605,7 +605,7 @@
             {:else}
               <p class="text-sm text-ink-muted">{m.players_no_deck()}</p>
             {/if}
-          </DeckAccordion>
+          </FoldableSection>
         {/each}
       {:else if playerDecks[0]}
         {#if isDeckHiddenFromOrganizer(null)}

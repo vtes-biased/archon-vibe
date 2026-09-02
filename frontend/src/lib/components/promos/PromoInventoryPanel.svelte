@@ -10,7 +10,8 @@
   import Button from "$lib/components/Button.svelte";
   import PromoLedgerList from "./PromoLedgerList.svelte";
   import RecordMovementModal from "./RecordMovementModal.svelte";
-  import { Boxes, ChevronDown, ChevronRight, Download } from "@lucide/svelte";
+  import { Boxes, Download } from "@lucide/svelte";
+  import FoldableSection from "$lib/components/FoldableSection.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -150,24 +151,12 @@
     </div>
   {/if}
 
-  <!-- Ledger (collapsed by default; online-only fetch) -->
-  <div class="mt-4 border-t border-line pt-3">
-    <button
-      type="button"
-      onclick={() => (ledgerOpen = !ledgerOpen)}
-      disabled={!online}
-      class="flex items-center gap-1.5 min-h-[44px] text-sm font-medium text-ink-muted enabled:hover:text-ink-strong transition-colors disabled:opacity-40"
-    >
-      {#if ledgerOpen}
-        <ChevronDown class="w-4 h-4" aria-hidden="true" />
-      {:else}
-        <ChevronRight class="w-4 h-4" aria-hidden="true" />
+  <div class="mt-4">
+    <FoldableSection title={m.promo_ledger_title()} bind:open={ledgerOpen} disabled={!online}>
+      {#if online}
+        <PromoLedgerList {promos} refreshKey={ledgerRefreshKey} />
       {/if}
-      {ledgerOpen ? m.promo_ledger_hide() : m.promo_ledger_show()}
-    </button>
-    {#if ledgerOpen && online}
-      <PromoLedgerList {promos} refreshKey={ledgerRefreshKey} />
-    {/if}
+    </FoldableSection>
   </div>
 </div>
 

@@ -1,7 +1,8 @@
 <script lang="ts">
   import { apiRequest } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { ChevronDown, Loader2, AppWindow, TriangleAlert } from "@lucide/svelte";
+  import { Loader2, AppWindow, TriangleAlert } from "@lucide/svelte";
+  import FoldableSection from "$lib/components/FoldableSection.svelte";
   import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
   import { dialogPanel } from "$lib/actions/dialog";
@@ -87,51 +88,45 @@
 </script>
 
 <div class="p-3 sm:p-6">
-  <button onclick={toggle} class="flex items-center justify-between w-full text-left">
-    <h3 class="text-sm font-medium text-ink-muted uppercase tracking-wide">{m.profile_authorized_apps_section()}</h3>
-    <ChevronDown class="w-4 h-4 text-ink-muted transition-transform {expanded ? 'rotate-180' : ''}" />
-  </button>
-  {#if expanded}
-    <div class="mt-4 space-y-4">
-      <p class="text-ink-muted text-sm">{m.authorized_apps_subtitle()}</p>
+  <FoldableSection title={m.profile_authorized_apps_section()} open={expanded} ontoggle={toggle}>
+    <p class="text-ink-muted text-sm">{m.authorized_apps_subtitle()}</p>
 
-      {#if loading}
-        <div class="flex items-center justify-center py-8">
-          <Loader2 class="w-6 h-6 animate-spin text-ink-muted" />
-        </div>
-      {:else if apps.length === 0}
-        <div class="text-center py-6">
-          <AppWindow class="w-10 h-10 text-ink-faint mx-auto mb-3" />
-          <p class="text-ink-muted text-sm">{m.authorized_apps_none()}</p>
-          <p class="text-ink-faint text-xs mt-1">{m.authorized_apps_none_hint()}</p>
-        </div>
-      {:else}
-        <div class="space-y-3">
-          {#each apps as app}
-            <div class="bg-surface-muted rounded-lg border border-line-strong p-4">
-              <div class="flex items-start justify-between gap-3">
-                <div class="flex-1 min-w-0">
-                  <h4 class="text-ink-strong font-medium text-sm">{app.name}</h4>
-                  <ul class="mt-1.5 space-y-0.5">
-                    {#each app.scopes as scope}
-                      <li class="text-xs text-ink">• {scopeDesc[scope] ? scopeDesc[scope]() : scope}</li>
-                    {/each}
-                  </ul>
-                  {#if app.events.length}
-                    <div class="text-xs text-ink-muted mt-1.5">{m.authorized_apps_for_events({ events: app.events.join(", ") })}</div>
-                  {/if}
-                  <div class="text-xs text-ink-faint mt-1.5">{m.authorized_apps_granted({ date: formatDate(app.granted_at) })}</div>
-                </div>
-                <Button variant="secondary" size="md" class="shrink-0" onclick={() => (confirmRevoke = app)}>
-                  {m.authorized_apps_revoke()}
-                </Button>
+    {#if loading}
+      <div class="flex items-center justify-center py-8">
+        <Loader2 class="w-6 h-6 animate-spin text-ink-muted" />
+      </div>
+    {:else if apps.length === 0}
+      <div class="text-center py-6">
+        <AppWindow class="w-10 h-10 text-ink-faint mx-auto mb-3" />
+        <p class="text-ink-muted text-sm">{m.authorized_apps_none()}</p>
+        <p class="text-ink-faint text-xs mt-1">{m.authorized_apps_none_hint()}</p>
+      </div>
+    {:else}
+      <div class="space-y-3">
+        {#each apps as app}
+          <div class="bg-surface-muted rounded-lg border border-line-strong p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex-1 min-w-0">
+                <h4 class="text-ink-strong font-medium text-sm">{app.name}</h4>
+                <ul class="mt-1.5 space-y-0.5">
+                  {#each app.scopes as scope}
+                    <li class="text-xs text-ink">• {scopeDesc[scope] ? scopeDesc[scope]() : scope}</li>
+                  {/each}
+                </ul>
+                {#if app.events.length}
+                  <div class="text-xs text-ink-muted mt-1.5">{m.authorized_apps_for_events({ events: app.events.join(", ") })}</div>
+                {/if}
+                <div class="text-xs text-ink-faint mt-1.5">{m.authorized_apps_granted({ date: formatDate(app.granted_at) })}</div>
               </div>
+              <Button variant="secondary" size="md" class="shrink-0" onclick={() => (confirmRevoke = app)}>
+                {m.authorized_apps_revoke()}
+              </Button>
             </div>
-          {/each}
-        </div>
-      {/if}
-    </div>
-  {/if}
+          </div>
+        {/each}
+      </div>
+    {/if}
+  </FoldableSection>
 </div>
 
 {#if confirmRevoke}

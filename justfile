@@ -168,6 +168,7 @@ lint-check:
     just permission-drift
     just comment-blocks
     just dark-variant
+    just fold-grammar
     just locale-parity
     just public-api-isolation
     just event-run-coverage
@@ -190,6 +191,11 @@ comment-blocks:
 # disagree.
 dark-variant:
     uv run python3 scripts/check_dark_variant.py
+
+# Fail when a disclosure is drawn outside `FoldableSection` — the app's one fold
+# grammar, whose exceptions are listed in the script and in wiki/design.md.
+fold-grammar:
+    uv run python3 scripts/check_fold_grammar.py
 
 # Fail when a locale's message catalog disagrees with the base one — Paraglide
 # falls back silently, so a forgotten translation ships as English with no error.
@@ -230,6 +236,7 @@ lint:
     just permission-drift
     just comment-blocks
     just dark-variant
+    just fold-grammar
     just locale-parity
     just public-api-isolation
     just event-run-coverage

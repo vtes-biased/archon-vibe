@@ -6,6 +6,7 @@
   import Badge from "$lib/components/Badge.svelte";
   import InlineNotice from "$lib/components/InlineNotice.svelte";
   import VpInput from "$lib/components/VpInput.svelte";
+  import FoldableSection from "$lib/components/FoldableSection.svelte";
   import {
     QrCode, WifiOff, Wifi, Share2, ClipboardCopy, Download, Dices, Dice3, Ticket, Gift, Undo2, Trash2,
     Pause, RotateCcw, ChevronDown, ChevronRight, Plus, SquarePlus, ArrowRightLeft,
@@ -670,23 +671,14 @@
 
 <div class="not-prose my-6 space-y-1">
   {#each faqs as faq, i}
-    <div class="border border-line-strong rounded-lg overflow-hidden">
-      <button
-        class="w-full px-4 py-3 flex items-center gap-2 text-left text-sm font-medium text-ink-strong hover:bg-surface-muted/50 transition-colors"
-        onclick={() => openFaq = openFaq === i ? null : i}
-      >
-        {#if openFaq === i}
-          <ChevronDown class="w-4 h-4 text-ink-muted shrink-0" />
-        {:else}
-          <ChevronRight class="w-4 h-4 text-ink-muted shrink-0" />
-        {/if}
-        {faq.q}
-      </button>
-      {#if openFaq === i}
-        <div class="px-4 pb-3 text-sm text-ink doc-prose prose max-w-none">
-          {@html renderGuideSection(faq.a)}
-        </div>
-      {/if}
-    </div>
+    <FoldableSection
+      title={faq.q}
+      open={openFaq === i}
+      ontoggle={() => openFaq = openFaq === i ? null : i}
+    >
+      <div class="text-sm text-ink doc-prose prose max-w-none">
+        {@html renderGuideSection(faq.a)}
+      </div>
+    </FoldableSection>
   {/each}
 </div>

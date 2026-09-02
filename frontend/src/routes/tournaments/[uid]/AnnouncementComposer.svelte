@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { Tournament } from "$lib/types";
   import { postAnnouncement, deleteAnnouncement } from "$lib/api";
-  import { Megaphone, Trash2, Send, ChevronDown, ChevronRight } from "@lucide/svelte";
+  import { Trash2, Send } from "@lucide/svelte";
+  import FoldableSection from "$lib/components/FoldableSection.svelte";
   import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -54,28 +55,14 @@
   }
 </script>
 
-<div class="bg-surface-card rounded-lg shadow border border-line mb-4">
-  <button
-    type="button"
-    onclick={() => (composing = !composing)}
-    aria-expanded={composing}
-    class="flex w-full items-center gap-2 px-3 sm:px-4 py-3 min-h-[44px] text-left"
-  >
-    <Megaphone class="w-4 h-4 text-ink-muted shrink-0" aria-hidden="true" />
-    <span class="text-sm font-medium text-ink-strong">{m.announcement_composer_title()}</span>
-    {#if sorted.length > 0}
-      <span class="text-xs px-2 py-0.5 rounded bg-surface-active text-ink-muted">{sorted.length}</span>
-    {/if}
-    <span class="flex-1"></span>
-    {#if composing}
-      <ChevronDown class="w-4 h-4 shrink-0 text-ink-faint" aria-hidden="true" />
-    {:else}
-      <ChevronRight class="w-4 h-4 shrink-0 text-ink-faint" aria-hidden="true" />
-    {/if}
-  </button>
-
-  {#if composing}
-    <div class="px-3 sm:px-4 pb-3">
+<div class="mb-4 space-y-2">
+  <FoldableSection title={m.announcement_composer_title()} bind:open={composing}>
+    {#snippet header()}
+      {#if sorted.length > 0}
+        <span class="text-xs px-2 py-0.5 rounded bg-surface-active text-ink-muted">{sorted.length}</span>
+      {/if}
+    {/snippet}
+    <div>
       <textarea
         bind:value={text}
         rows="2"
@@ -93,10 +80,10 @@
         </Button>
       </div>
     </div>
-  {/if}
+  </FoldableSection>
 
   {#if sorted.length > 0}
-    <div class="px-3 sm:px-4 pb-3 pt-3 space-y-1.5 border-t border-line">
+    <div class="bg-surface-card rounded-lg shadow border border-line px-3 sm:px-4 py-3 space-y-1.5">
       {#each sorted as a (a.id)}
         <div class="flex items-start justify-between gap-2 text-sm">
           <div class="min-w-0">

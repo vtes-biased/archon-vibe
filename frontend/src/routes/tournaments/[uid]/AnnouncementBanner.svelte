@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { Announcement } from "$lib/types";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { Megaphone, X, ChevronDown, ChevronUp } from "@lucide/svelte";
+  import { Megaphone, X } from "@lucide/svelte";
+  import FoldableSection from "$lib/components/FoldableSection.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -109,20 +110,17 @@
     {/each}
 
     {#if rest.length > 0}
-      <button onclick={() => showHistory = !showHistory} class="flex items-center gap-1 text-xs text-ink-muted hover:text-ink-bright transition-colors">
-        {#if showHistory}<ChevronUp class="w-3.5 h-3.5" />{:else}<ChevronDown class="w-3.5 h-3.5" />{/if}
-        {m.announcement_history({ count: String(rest.length) })}
-      </button>
-      {#if showHistory}
-        <div class="space-y-1.5">
-          {#each rest as a (a.id)}
-            <div class="border border-line rounded-lg p-2.5 opacity-70">
-              <p class="text-sm text-ink whitespace-pre-wrap break-words">{a.body}</p>
-              <p class="text-xs text-ink-faint mt-0.5">{a.author_name} &middot; {formatTime(a.created_at)}</p>
-            </div>
-          {/each}
-        </div>
-      {/if}
+      <FoldableSection
+        title={m.announcement_history({ count: String(rest.length) })}
+        bind:open={showHistory}
+      >
+        {#each rest as a (a.id)}
+          <div class="border border-line rounded-lg p-2.5 opacity-70">
+            <p class="text-sm text-ink whitespace-pre-wrap break-words">{a.body}</p>
+            <p class="text-xs text-ink-faint mt-0.5">{a.author_name} &middot; {formatTime(a.created_at)}</p>
+          </div>
+        {/each}
+      </FoldableSection>
     {/if}
   </div>
 {/if}

@@ -27,7 +27,7 @@ just dev-reset # reset the dev database
 
 `just lint` auto-fixes formatting, then runs the checks nothing can fix for you;
 `just lint-check` is the read-only half and is what `just test` calls. Both end on
-the same eight gates:
+the same nine gates:
 
 - `just permission-drift` — a role literal used to gate outside the engine's
   capability table.
@@ -43,6 +43,12 @@ the same eight gates:
   which tracks the OS preference rather than the app's theme
   ([design](design.md#palette)). A `dark:` followed by a space is an object key
   or a type annotation and passes.
+- `just fold-grammar` — a chevron drawn outside `FoldableSection`, the app's one
+  disclosure shell ([design](design.md#patterns)). A rotating chevron fails
+  outright: it was the second idiom and has no exception. Every other file that
+  draws one is listed in the script with the structural reason it cannot be a
+  section, and the gate also fails on a listed file that has stopped drawing one,
+  so the list cannot outlive what it excuses.
 - `just locale-parity` — a message catalog whose keys disagree with the base
   locale's, in either direction ([i18n](i18n.md)). Paraglide resolves a missing
   key by falling back to the base locale, so an untranslated string ships as
@@ -51,7 +57,7 @@ the same eight gates:
   locale is covered without touching the gate.
 - `just public-api-isolation` — the app naming the public API, or the API
   importing the app's machinery ([public-api](public-api.md#isolation)). It runs
-  in CI too, unlike the two gates above it.
+  in CI too, unlike the three gates above it.
 - `just migration-pairing` — a stored-value migration with no proof section in
   [post-deploy](post-deploy.md), or a section proving an entry that no longer
   exists ([architecture](architecture.md#stored-value-migrations)). Nothing in

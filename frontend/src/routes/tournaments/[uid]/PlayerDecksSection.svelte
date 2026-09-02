@@ -11,7 +11,7 @@
   import { getCards } from "$lib/cards";
   import { ChevronDown, ChevronRight, CircleCheck, Lock, Trash2, Trophy } from "@lucide/svelte";
   import { slide } from "svelte/transition";
-  import DeckAccordion from "$lib/components/DeckAccordion.svelte";
+  import FoldableSection from "$lib/components/FoldableSection.svelte";
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
@@ -184,29 +184,27 @@
         <h3 class="text-sm font-semibold text-ink-strong">{m.decks_my_decks()}</h3>
         {#each myStamped as deck (deck.uid)}
           {@const isExpanded = expandedRoundIdx === deck.round}
-          <DeckAccordion
-            expanded={isExpanded}
+          <FoldableSection
+            open={isExpanded}
             ontoggle={() => expandedRoundIdx = isExpanded ? null : deck.round}
-            roundLabel={roundLabel(deck.round)}
-            bgClass="bg-surface-muted/30"
+            title={roundLabel(deck.round)}
           >
-            {#snippet headerExtra()}
+            {#snippet header()}
               <Lock class="w-3 h-3 text-ink-faint" />
               <CircleCheck class="w-3.5 h-3.5 text-info" />
             {/snippet}
             <DeckDisplay {deck} tournamentUid={tournament.uid} format={tournament.format} />
             <p class="text-sm text-ink-faint">{m.decks_locked()}</p>
-          </DeckAccordion>
+          </FoldableSection>
         {/each}
         {#if showPendingSlot}
           {@const isExpanded = expandedRoundIdx === PENDING}
-          <DeckAccordion
-            expanded={isExpanded}
+          <FoldableSection
+            open={isExpanded}
             ontoggle={() => expandedRoundIdx = isExpanded ? null : PENDING}
-            roundLabel={m.decks_next_round()}
-            bgClass="bg-surface-muted/30"
+            title={m.decks_next_round()}
           >
-            {#snippet headerExtra()}
+            {#snippet header()}
               {#if myPending}
                 <CircleCheck class="w-3.5 h-3.5 text-info" />
               {:else}
@@ -259,27 +257,21 @@
             {:else}
               <p class="text-sm text-ink-faint">{m.decks_no_deck()}</p>
             {/if}
-          </DeckAccordion>
+          </FoldableSection>
         {/if}
       </div>
     {:else}
-      <div class="bg-surface-muted/50 rounded-lg">
+      <div>
         {#if myDecks.length > 0 && myDecks[0]}
           <!-- Folded by default, never auto-expanded: keeps a nearby opponent
                from glancing at the decklist. The check-in "Fix your deck" CTA
                scrolls here but leaves it collapsed. -->
-          <button
-            class="w-full flex items-center gap-3 p-3 sm:p-4 text-left min-h-[44px]"
-            onclick={() => { const next = new Set(expandedDecks); if (next.has('my')) next.delete('my'); else next.add('my'); expandedDecks = next; }}
-            aria-expanded={expandedDecks.has('my')}
+          <FoldableSection
+            title={m.decks_my_deck()}
+            open={expandedDecks.has('my')}
+            ontoggle={() => toggleDeck('my')}
           >
-            <span class="text-ink-muted shrink-0">
-              {#if expandedDecks.has('my')}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
-            </span>
-            <span class="text-sm font-semibold text-ink-strong">{m.decks_my_deck()}</span>
-          </button>
-          {#if expandedDecks.has('my')}
-            <div class="px-3 pb-3 sm:px-4 sm:pb-4" transition:slide={{ duration: 150 }}>
+            <div>
               {#if uploadingFor === myUid && singleDeckEditable}
                 <DeckUpload tournamentUid={tournament.uid} onuploaded={onUploaded} />
               {:else}
@@ -308,11 +300,11 @@
                 {/if}
               {/if}
             </div>
-          {/if}
+          </FoldableSection>
         {:else if singleDeckEditable}
           <!-- The uploader is a screenful, so it waits behind its own button. -->
           {@const uploading = uploadingFor === myUid}
-          <div class="p-3 sm:p-4 space-y-3">
+          <div class="bg-surface-muted/50 rounded-lg p-3 sm:p-4 space-y-3">
             <div class="flex items-center justify-between gap-2">
               <h3 class="text-sm font-semibold text-ink-strong">{m.decks_my_deck()}</h3>
               <Button
@@ -325,7 +317,7 @@
             {/if}
           </div>
         {:else}
-          <p class="p-3 sm:p-4 text-sm text-ink-muted">{m.decks_no_deck_yet()}</p>
+          <p class="bg-surface-muted/50 rounded-lg p-3 sm:p-4 text-sm text-ink-muted">{m.decks_no_deck_yet()}</p>
         {/if}
       </div>
     {/if}

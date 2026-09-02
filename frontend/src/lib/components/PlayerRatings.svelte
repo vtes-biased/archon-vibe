@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { User, RatingCategory, CategoryRating, TournamentRatingEntry } from "$lib/types";
-  import { ChevronDown } from "@lucide/svelte";
+  import FoldableSection from "$lib/components/FoldableSection.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
   import { getLocale } from '$lib/paraglide/runtime.js';
   import * as m from '$lib/paraglide/messages.js';
@@ -59,66 +59,56 @@
     {#each availableCategories as cat}
       {@const catRating = user?.[cat] as CategoryRating}
       {@const isExpanded = expandedCategories.has(cat)}
-      <div class="bg-surface-card border border-line rounded-lg overflow-hidden">
-        <button
-          class="w-full flex items-center justify-between px-4 py-3 hover:bg-surface-hover/30 transition-colors"
-          onclick={() => toggleCategory(cat)}
-        >
-          <span class="font-medium text-ink-bright">{categoryLabelFns[cat]()}</span>
-          <div class="flex items-center gap-3">
-            <span class="text-lg font-bold text-link">{catRating.total}</span>
-            <ChevronDown
-              class="w-4 h-4 text-ink-faint transition-transform {isExpanded ? 'rotate-180' : ''}"
-            />
-          </div>
-        </button>
-
-        {#if isExpanded}
-          {@const sorted = sortedByDate(catRating.tournaments)}
-          {@const topUids = top8Uids(catRating.tournaments)}
-          <div class="border-t border-line px-4 py-2">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="text-ink-faint text-xs">
-                  <th class="py-1 text-left">{m.user_detail_col_tournament()}</th>
-                  <th class="py-1 pl-3 text-right">{m.user_detail_col_vp()}</th>
-                  <th class="py-1 pl-3 text-right">{m.user_detail_col_gw()}</th>
-                  <th class="py-1 pl-3 text-right">{m.user_detail_col_pts()}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each sorted as entry}
-                  {@const isTop8 = topUids.has(entry.tournament_uid)}
-                  <!-- Rows written before `position` existed fall back to finalist_position (the
-                       placement for a winner/finalist); non-finalists stay bare until the nightly recompute backfills them. -->
-                  {@const place = entry.position || entry.finalist_position}
-                  <tr class="{isTop8 ? 'text-ink-bright' : 'text-ink-faint'}">
-                    <td class="py-1">
-                      <a href="/tournaments/{entry.tournament_uid}" class="hover:text-link">
-                        {#if isTop8}
-                          <span class="font-medium">{entry.tournament_name}</span>
-                        {:else}
-                          {entry.tournament_name}
-                        {/if}
-                      </a>
-                      {#if place > 0}
-                        <span class="text-xs text-ink-muted font-medium ml-1">·
-                          <RankCell rank={place} finalist={entry.finalist_position > 0} hash total={entry.player_count} />
-                        </span>
-                      {/if}
-                      <span class="text-xs text-ink-faint ml-1">· {entry.date}</span>
-                      <span class="text-xs text-ink-faint ml-1">· {m.user_detail_expires({ date: expiryMonth(entry.date) })}</span>
-                    </td>
-                    <td class="py-1 pl-3 text-right">{entry.vp}</td>
-                    <td class="py-1 pl-3 text-right">{entry.gw}</td>
-                    <td class="py-1 pl-3 text-right font-medium">{entry.points}</td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-        {/if}
-      </div>
+      <FoldableSection
+        title={categoryLabelFns[cat]()}
+        open={isExpanded}
+        ontoggle={() => toggleCategory(cat)}
+      >
+        {#snippet header()}
+          <span class="ml-auto text-lg font-bold text-link">{catRating.total}</span>
+        {/snippet}
+        {@const sorted = sortedByDate(catRating.tournaments)}
+        {@const topUids = top8Uids(catRating.tournaments)}
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-ink-faint text-xs">
+              <th class="py-1 text-left">{m.user_detail_col_tournament()}</th>
+              <th class="py-1 pl-3 text-right">{m.user_detail_col_vp()}</th>
+              <th class="py-1 pl-3 text-right">{m.user_detail_col_gw()}</th>
+              <th class="py-1 pl-3 text-right">{m.user_detail_col_pts()}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each sorted as entry}
+              {@const isTop8 = topUids.has(entry.tournament_uid)}
+              <!-- Rows written before `position` existed fall back to finalist_position (the
+                   placement for a winner/finalist); non-finalists stay bare until the nightly recompute backfills them. -->
+              {@const place = entry.position || entry.finalist_position}
+              <tr class="{isTop8 ? 'text-ink-bright' : 'text-ink-faint'}">
+                <td class="py-1">
+                  <a href="/tournaments/{entry.tournament_uid}" class="hover:text-link">
+                    {#if isTop8}
+                      <span class="font-medium">{entry.tournament_name}</span>
+                    {:else}
+                      {entry.tournament_name}
+                    {/if}
+                  </a>
+                  {#if place > 0}
+                    <span class="text-xs text-ink-muted font-medium ml-1">·
+                      <RankCell rank={place} finalist={entry.finalist_position > 0} hash total={entry.player_count} />
+                    </span>
+                  {/if}
+                  <span class="text-xs text-ink-faint ml-1">· {entry.date}</span>
+                  <span class="text-xs text-ink-faint ml-1">· {m.user_detail_expires({ date: expiryMonth(entry.date) })}</span>
+                </td>
+                <td class="py-1 pl-3 text-right">{entry.vp}</td>
+                <td class="py-1 pl-3 text-right">{entry.gw}</td>
+                <td class="py-1 pl-3 text-right font-medium">{entry.points}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </FoldableSection>
     {/each}
   </div>
 {:else if user === undefined}

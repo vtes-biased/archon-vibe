@@ -3,7 +3,7 @@
   import type { TournamentListItem } from "$lib/db";
   import { getTournamentListItems, getDecksByUser, getTournament } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
-  import DeckAccordion from "$lib/components/DeckAccordion.svelte";
+  import FoldableSection from "$lib/components/FoldableSection.svelte";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
   import { Trophy, TriangleAlert } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -100,13 +100,12 @@
     <div class="space-y-2">
       {#each decks as { deck, tournament } (deck.uid)}
         {@const label = deck.name || tournament?.name || day(tournament)}
-        <DeckAccordion
-          expanded={expandedDeck === deck.uid}
+        <FoldableSection
+          open={expandedDeck === deck.uid}
           ontoggle={() => expandedDeck = expandedDeck === deck.uid ? null : deck.uid}
-          roundLabel={label}
-          bgClass="bg-surface-card border border-line"
+          title={label}
         >
-          {#snippet headerExtra()}
+          {#snippet header()}
             <span class="text-xs text-ink-faint ml-auto whitespace-nowrap">{day(tournament)}</span>
           {/snippet}
           {#if tournament}
@@ -117,7 +116,7 @@
           <!-- No `format`: validation is read-only noise here, and a 2005 archive
                deck fails today's legality rules for reasons its player cannot act on. -->
           <DeckDisplay {deck} />
-        </DeckAccordion>
+        </FoldableSection>
       {/each}
     </div>
   </section>

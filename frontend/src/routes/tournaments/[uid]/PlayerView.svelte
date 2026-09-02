@@ -5,7 +5,7 @@
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { formatScore } from "$lib/utils";
   import { previewScoresSync, tableLabel, type ValidationError, type TournamentEventType } from "$lib/engine";
-  import { TriangleAlert, ChevronDown, ChevronRight, QrCode, Gavel, Ban, Trash2, ExternalLink, Users, Lock, ShieldCheck, Undo2 } from "@lucide/svelte";
+  import { TriangleAlert, QrCode, Gavel, Ban, Trash2, ExternalLink, Users, Lock, ShieldCheck, Undo2 } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SelfOrganizeDialog from "./SelfOrganizeDialog.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
@@ -16,6 +16,7 @@
   import Button from '$lib/components/Button.svelte';
   import TimerDisplay from "./TimerDisplay.svelte";
   import VpInput from "$lib/components/VpInput.svelte";
+  import FoldableSection from "$lib/components/FoldableSection.svelte";
   import PlayerDecksSection from "./PlayerDecksSection.svelte";
   import RaffleSection from "./RaffleSection.svelte";
   import { callJudge } from "$lib/api";
@@ -668,16 +669,7 @@
       </div>
     {/if}
     {#if previousRounds.length > 0}
-      <div>
-        <button
-          onclick={() => showPreviousRounds = !showPreviousRounds}
-          class="text-sm text-ink-muted hover:text-ink-bright transition-colors flex items-center gap-1"
-        >
-          {#if showPreviousRounds}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
-          {m.tournament_previous_rounds()}
-        </button>
-        {#if showPreviousRounds}
-          <div class="mt-2 space-y-3">
+      <FoldableSection title={m.tournament_previous_rounds()} bind:open={showPreviousRounds}>
             {#each previousRounds as prev}
               <div class="border-t border-line pt-3">
                 <h4 class="text-xs font-medium text-ink-muted mb-1.5">{m.tournament_round_table({ round: String(prev.round), table: prev.tableLabel })}</h4>
@@ -700,10 +692,8 @@
                   {/each}
                 </div>
               </div>
-            {/each}
-          </div>
-        {/if}
-      </div>
+        {/each}
+      </FoldableSection>
     {/if}
   {:else if tournament.state === "Finished"}
     <!-- Results render right below; no misleading registration copy. -->
@@ -731,15 +721,11 @@
     {@const registered = tournament.players!.filter(p => p.state === "Registered" && !p.waitlisted)}
     {#if registered.length > 0}
       <div class="mt-4">
-        <button
-          onclick={() => showRegisteredPlayers = !showRegisteredPlayers}
-          class="text-sm text-ink-muted hover:text-ink-bright transition-colors flex items-center gap-1"
+        <FoldableSection
+          title={m.tournament_registered_players({ count: String(registered.length) })}
+          bind:open={showRegisteredPlayers}
         >
-          {#if showRegisteredPlayers}<ChevronDown class="w-4 h-4" />{:else}<ChevronRight class="w-4 h-4" />{/if}
-          {m.tournament_registered_players({ count: String(registered.length) })}
-        </button>
-        {#if showRegisteredPlayers}
-          <div class="mt-2 flex flex-wrap gap-2">
+          <div class="flex flex-wrap gap-2">
             {#each registered as player}
               {@const puid = player.user_uid ?? ""}
               <span class="px-2 py-1 text-sm bg-surface-hover rounded text-ink-bright">
@@ -747,7 +733,7 @@
               </span>
             {/each}
           </div>
-        {/if}
+        </FoldableSection>
       </div>
     {/if}
   {/if}

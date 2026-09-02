@@ -359,13 +359,28 @@ there, where the overflow is worse than English suggests. The strip carries the
 tournament console, the member profile and the public member page.
 
 **One fold grammar.** `FoldableSection` is the app's single disclosure shell —
-muted box, chevron right closed and down open, the whole header a 44px target —
-and anything that folds uses it, inside the console and out. Four chevron patterns
-exist today for that one gesture, and the three that are not `FoldableSection` are
-drift rather than alternatives: the uppercase header with a rotating chevron in the
-profile's authorized-apps, developer and administration sections; the card with its
-count in the header in `PlayerRatings`; and `DeckAccordion` in `PlayerRecord`. The
-[console redesign pass](#the-redesign-pass) is where they collapse.
+muted box, chevron right closed and down open, the whole header a 44px target, a
+150ms slide — and a **section** that folds uses it, inside the console and out. It
+takes a `header` snippet for a count or a total, an `ontoggle` for a parent that
+owns the state (an exclusive accordion, a body that loads on first open), and a
+`disabled` for a body that cannot be fetched. It takes no styling props: a fold
+that wants its own box is a fold that has drifted. A chevron points **right closed
+and down open** everywhere — a rotating one is not an alternative and has no
+exception. `just fold-grammar` ([dev](dev.md#lint-gates)) holds both halves.
+
+Six surfaces fold outside the shell, for a structural reason and not a visual
+preference:
+
+- **A list row folds in place** — the whole row is the target and the chevron
+  trails a multi-part summary of the row's own subject, which a titled section
+  would have to throw away: `PlayersTab`'s player card, `PlayerDecksSection`'s
+  visible decks, and `CommunityCountryCard`. `RoundsTab`'s round and table headers
+  fold this way too because their rows carry sibling action buttons, which cannot
+  nest inside the shell's own button.
+- **`ToolsSheet`** — the sheet's grammar is full-bleed menu rows, and a boxed
+  section inside it breaks the rhythm the sheet is scanned by.
+- **`FoldableDescription`** — closed, it renders the excerpt instead of hiding the
+  body, so it is a preview rather than a disclosure.
 
 **Modals** — `fixed inset-0 z-50` with backdrop blur, `role="dialog"`,
 `aria-modal`, `aria-labelledby`, Escape handling and a focus-on-mount action.
@@ -541,9 +556,6 @@ Decisions already taken, not to be re-litigated:
   any-state path while the bar names the moment.
 - **The description drops out of the organizer view only** — organizers wrote it,
   players still need it.
-- **The fold cleanup rides this pass**, console or not: the profile's
-  authorized-apps, developer and administration sections, `PlayerRatings` and
-  `DeckAccordion` all move onto `FoldableSection` ([fold grammar](#patterns)).
 
 Rejected, with the reason that killed each: **per-tab status counts** and **a
 masthead reporting live round state**, both because the action bar's guidance line
