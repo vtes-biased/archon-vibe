@@ -159,6 +159,13 @@ subsystem page holds the standing fact, not the runbook. If the remaining work
 carries judgment rather than execution — output to review, membership to diff — it
 is a board line with a production step, not a post-deploy item.
 
+**Run the comment pass yourself before committing.** Read every comment line the
+diff adds or leaves beside changed code — `git diff | grep -E '^\+.*(#|//|<!--)'`
+is a start — and delete any that states what the wiki (including the page this
+change edits), another comment or the code already says. The reviewer runs the
+same pass by name; a comment it has to trim is a review round you could have
+skipped.
+
 **Commit.** One commit carrying all three. Reference a GitHub issue as
 `Reported in #N.` when the work fixes a user-reported one; never a closing keyword,
 and never a board reference.

@@ -11,7 +11,7 @@ traps that have bitten.
 | Rust engine | inline `#[cfg(test)]` in `engine/src/` | the authoritative logic suite — seating, deck parse and validate, tournament lifecycle, ratings, permissions, league scoring |
 | Backend | `backend/tests/test_*.py` | SSE filtering, access-level projections across role permutations, organizer access, the profile-update security boundary, ratings helpers, account surgery, the TWDA designer credit, the public API's read-only gate and schema drift |
 | Frontend E2E | `frontend/tests/e2e/*.spec.ts` | full user arcs through the real UI |
-| Bot | `bot/` | validated fakes over a nonexistent backend and Discord, guarded against hikari's real signatures |
+| Bot | `bot/` | validated fakes over the backend and Discord, neither of which its process can run, guarded against hikari's real signatures |
 
 There is **no frontend unit-test framework** — Playwright E2E only.
 
@@ -204,9 +204,10 @@ one other counts one, not two.
 is the discriminator, since `vp` doesn't move. The GW threshold is `>= 2.0`,
 inclusive. Cancel a **non-last** round to obtain a `Cancelled` table.
 
-**A fake is legitimate only for a system we neither own nor can run** — Discord,
-the VEKN registry, GitHub — and only paired with a guard test pinning it to the
-real contract ([dogmas](dogmas.md#testing)). `bot/tests/test_rest_fakes_match_hikari.py`
+**A fake is legitimate only for a system the test context cannot run** — Discord,
+the VEKN registry, GitHub, our own backend seen from the bot's process — and only
+paired with a guard test pinning it to the real contract
+([dogmas](dogmas.md#testing)). `bot/tests/test_rest_fakes_match_hikari.py`
 binds every REST call shape the bot uses against the real `RESTClientImpl` and
 against each fake, and `test_refresh_single_flight.py` proves its backend fake
 reproduces the bug it stands for. `test_discord_login_redirect.py` fakes Discord
@@ -214,10 +215,11 @@ at the HTTP boundary (`DISCORD_API_BASE`) with no contract pin — none is
 constructible without a local library encoding Discord's HTTP API, and its
 invariant is our redirect round-trip, not Discord's response shape; that backend
 arc is deliberately where the post-login redirect is pinned, the frontend legs
-being marshalling. Faking our own engine, database or modules is
-the banned case itself: the TWDA credit suite runs the real route helper against
-the real DB and engine, and the archondata suite finishes a real tournament
-through the engine rather than hand-typing a standings sheet.
+being marshalling. Where the stack can run its dependencies, faking our own
+engine, database or modules is the banned case itself: the TWDA credit suite runs
+the real route helper against the real DB and engine, and the archondata suite
+finishes a real tournament through the engine rather than hand-typing a standings
+sheet.
 
 **The bot startup smoke test earns its keep** (`bot/tests/test_startup.py`): the
 lightbulb v2→v3 `.d`/`.di` migration crash-looped 69 times in production while CI

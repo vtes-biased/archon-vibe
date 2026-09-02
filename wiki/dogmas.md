@@ -10,8 +10,11 @@ silently is not.
 directly, or through a memory-resident projection maintained over it
 ([sync](sync.md#the-list-projections)) — never from the network. The
 backend API exists for mutations. SSE pushes state changes per user at the
-role-appropriate level. The sanctioned exceptions are enumerated, and each must
-meet four conditions — [sync](sync.md#online-only-rest-reads).
+role-appropriate level. Every network read that remains is registered in one
+place — [sync](sync.md#online-only-rest-reads): display data reaches the network
+only through the enumerated carve-out, each entry meeting four conditions, and
+the two classes that sit outside the rule — substrate and account management —
+are named there and may not grow to cover anything a projection could deliver.
 
 **All business logic lives in the shared Rust engine**, compiled to WASM
 (frontend) and PyO3 (backend), so online and offline paths cannot diverge. No
@@ -107,11 +110,12 @@ refactors.
   a wiki claim is evicted.
 - **Mocks are banned by default** — a mock that mirrors the code tests the code
   against itself. Use real dependencies (containers, temp files) or don't test
-  that path. The one carve-out is a system we neither own nor can run — Discord,
-  the VEKN registry, GitHub — where a validated fake paired with a guard test
-  pinning it to the real contract is legitimate. It never reaches our own code:
-  faking the engine, the database or one of our own modules is the banned case
-  itself, not an instance of the exception.
+  that path. The one carve-out is a system the test context cannot run — Discord,
+  the VEKN registry, GitHub, and our own backend seen from the bot's process —
+  where a validated fake paired with a guard test pinning it to the real contract
+  is legitimate. Inside a stack that can run its dependencies it never reaches our
+  own code: the backend's tests faking the engine, the database or one of their
+  own modules is the banned case itself, not an instance of the exception.
 - Property-style tests are for genuinely hazardous invariants — parsing, money,
   concurrency — the same spots KISS flags.
 - Never encode engine-impossible states: VP sums equal table size, tables are 4–5
@@ -128,9 +132,10 @@ dropped — it is fixed in the same change, or becomes a board line through
 ingress. The counterweight is a reviewer with no quota: "looks good" is a common
 verdict, and report-everything must not become find-something.
 
-Egress runs a named **comment pass** over every diff that touches code, deleting
-any comment the wiki, another comment, or the code itself already states. The
-three-line ceiling above catches the bulk; the pass catches the duplication.
+A named **comment pass** runs over every diff that touches code, deleting any
+comment the wiki, another comment, or the code itself already states — first by
+the author before egress, then by the reviewer. The three-line ceiling above
+catches the bulk; the pass catches the duplication.
 
 ## Product
 
