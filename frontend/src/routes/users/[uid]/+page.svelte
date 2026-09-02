@@ -15,7 +15,8 @@
   import PlayerRecord from "$lib/components/PlayerRecord.svelte";
   import UserContact from "$lib/components/UserContact.svelte";
   import TabStrip from "$lib/components/TabStrip.svelte";
-  import { Loader2, Share2, Check, IdCard, Swords } from "@lucide/svelte";
+  import { lastView, openLastView } from "$lib/last-view";
+  import { ArrowLeft, Loader2, Share2, Check, IdCard, Swords } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let copied = $state(false);
@@ -26,6 +27,11 @@
     { id: 'profile', label: m.profile_tab_profile(), icon: IdCard },
     { id: 'record', label: m.profile_tab_record(), icon: Swords },
   ];
+
+  function backToMembers(event: MouseEvent): void {
+    const remembered = new URL(lastView("/users"), window.location.origin);
+    if (remembered.searchParams.get("tab") === "members") openLastView(event, "/users");
+  }
 
   async function shareProfile() {
     if (!user) return;
@@ -202,14 +208,20 @@
 </svelte:head>
 
 <div class="max-w-3xl mx-auto px-4 py-6">
+  {#if auth.isAuthenticated}
+    <a href="/users?tab=members" onclick={backToMembers} class="inline-flex items-center gap-2 text-ink-muted hover:text-ink-bright mb-4">
+      <ArrowLeft class="w-4 h-4" />
+      {m.community_tab_members()}
+    </a>
+  {/if}
+
   {#if !user}
     <div class="text-center text-ink-muted py-8">
       <Loader2 class="w-6 h-6 animate-spin inline-block" />
       <span class="ml-2">{m.common_loading()}</span>
     </div>
   {:else}
-    <div class="flex items-center justify-between mb-2">
-      <div></div>
+    <div class="flex items-center justify-end mb-2">
       <button
         onclick={shareProfile}
         class="p-2 text-ink-faint hover:text-link transition-colors"

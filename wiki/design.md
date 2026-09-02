@@ -521,6 +521,16 @@ and roles are the page's subject, not tab content. Below it:
   records with a re-download of each sealed file, settings, developer,
   administration, data. The NDA block renders only when a record exists.
 
+**`/users/[uid]` carries a back link to the members directory**, its parent list and
+— with no browser chrome — the installed app's only dependable way back to it. The
+nav-menu memory is keyed on the bare `/users` path, so it holds whichever tab was
+last left: the link takes it only when that is the members view, which is what
+brings the filters back. Everything else falls to the link's `href`, `/users?tab=members` — a
+Community or Promos memory, a stale one, a tab that never wrote one. A profile is
+reachable from the Community tab too, so the link goes where its label says rather
+than wherever the viewer came from. Signed-out viewers do not get it: the directory
+is sign-in gated, so it would lead them to a prompt.
+
 Two constraints the structure has to keep. An **OAuth return lands on Account**:
 the Discord and GitHub link confirmations render inside that tab and are invisible
 anywhere else. And the **undocumented-decklist nudge sits beside the wins it

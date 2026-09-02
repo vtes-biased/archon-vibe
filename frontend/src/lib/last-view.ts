@@ -36,7 +36,7 @@ export function rememberView(path: string, search: string): void {
 }
 
 /** The URL a link to `path` should open — the remembered view while fresh, the bare route otherwise. */
-function lastView(path: string): string {
+export function lastView(path: string): string {
     const entry = load()[path];
     if (!entry || Date.now() - entry.at > TTL_MS) return path;
     return path + entry.search;
