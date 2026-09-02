@@ -28,64 +28,7 @@ class Migration:
     rewrite: Callable[..., None]
 
 
-def _stamp_deck_round(full: dict, round_index: int | None) -> None:
-    full["round"] = round_index
-
-
-MIGRATIONS: tuple[Migration, ...] = (
-    Migration(
-        name="deck-round-stamp",
-        obj_type=ObjectType.DECK,
-        pending="""
-            WITH multideck_deck AS (
-                SELECT o.uid,
-                       o."full"->>'user_uid'     AS user_uid,
-                       (o."full"->>'round')::int AS slot,
-                       t."full"                  AS trn
-                FROM objects o
-                JOIN objects t
-                  ON t.uid = o."full"->>'tournament_uid' AND t.type = 'tournament'
-                WHERE o.type = 'deck'
-                  AND o.modified_at < TIMESTAMP '2026-08-27'
-                  AND o."full"->>'round' IS NOT NULL
-                  AND (t."full"->>'multideck')::boolean
-            ),
-            counted AS (
-                SELECT d.uid,
-                       r.ord - 1 AS round_index,
-                       row_number() OVER (PARTITION BY d.uid ORDER BY r.ord) - 1 AS nth
-                FROM multideck_deck d
-                CROSS JOIN LATERAL jsonb_array_elements(d.trn->'rounds')
-                    WITH ORDINALITY AS r(round, ord)
-                WHERE EXISTS (
-                    SELECT 1 FROM jsonb_array_elements(r.round) tbl
-                    WHERE tbl->>'state' <> 'Cancelled'
-                      AND EXISTS (
-                          SELECT 1 FROM jsonb_array_elements(tbl->'seating') s
-                          WHERE s->>'player_uid' = d.user_uid
-                      )
-                )
-            )
-            SELECT d.uid,
-                   COALESCE(
-                       (SELECT c.round_index FROM counted c
-                        WHERE c.uid = d.uid AND c.nth = d.slot),
-                       CASE WHEN jsonb_typeof(d.trn->'finals') = 'object'
-                             AND d.slot = (SELECT count(*) FROM counted c WHERE c.uid = d.uid)
-                             AND EXISTS (
-                                 SELECT 1
-                                 FROM jsonb_array_elements(d.trn->'finals'->'seating') fs
-                                 WHERE fs->>'player_uid' = d.user_uid
-                             )
-                            THEN jsonb_array_length(d.trn->'rounds')
-                       END
-                   ) AS round_index
-            FROM multideck_deck d
-            ORDER BY d.uid
-        """,
-        rewrite=_stamp_deck_round,
-    ),
-)
+MIGRATIONS: tuple[Migration, ...] = ()
 
 _LOCK_ROW = 'SELECT "full", deleted_at FROM objects WHERE uid = %s FOR UPDATE'
 

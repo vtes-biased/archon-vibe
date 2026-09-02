@@ -30,60 +30,6 @@ answers whether a given deploy has made it actionable — the same check
 gates it and why, what to run, what proves it worked, and what it owes afterwards:
 people to tell, and the wiki text that dies with it.
 
-## Rewrite the stored `user:impersonate` scope
-
-**Gated on** the commit that renames the scope to `event:run` — findable as
-`git log -1 --format=%h --grep='Rename the impersonation scope'`. The rename is a
-value change, not a schema one: `OAuthScope` no longer decodes
-`"user:impersonate"`, so any stored row still carrying it fails to decode the
-moment the new code reads it. Running this **before** the deploy breaks the
-running code instead, which is why it is here and not in a migration.
-
-**Run it immediately after the deploy, not at leisure.** Between the two, an
-existing member token's `oauth_tokens` row no longer decodes, and the lookup
-raises rather than answering 401 — the window is a 500 for anyone holding a live
-grant, so keep it to minutes.
-
-Three tables carry the string, each inside a `data` JSONB array. Run on beta
-first, then production once beta is verified:
-
-```sql
-UPDATE oauth_clients  SET data = jsonb_set(data, '{scopes}', (
-    SELECT jsonb_agg(CASE WHEN v = '"user:impersonate"'::jsonb
-                          THEN '"event:run"'::jsonb ELSE v END)
-    FROM jsonb_array_elements(data->'scopes') v))
-  WHERE data->'scopes' @> '["user:impersonate"]'::jsonb;
-
-UPDATE oauth_consents SET data = jsonb_set(data, '{scopes}', (
-    SELECT jsonb_agg(CASE WHEN v = '"user:impersonate"'::jsonb
-                          THEN '"event:run"'::jsonb ELSE v END)
-    FROM jsonb_array_elements(data->'scopes') v))
-  WHERE data->'scopes' @> '["user:impersonate"]'::jsonb;
-
-UPDATE oauth_tokens   SET data = jsonb_set(data, '{scopes}', (
-    SELECT jsonb_agg(CASE WHEN v = '"user:impersonate"'::jsonb
-                          THEN '"event:run"'::jsonb ELSE v END)
-    FROM jsonb_array_elements(data->'scopes') v))
-  WHERE data->'scopes' @> '["user:impersonate"]'::jsonb;
-```
-
-**Proves it worked** — all three answer 0:
-
-```sql
-SELECT count(*) FROM oauth_clients  WHERE data->'scopes' @> '["user:impersonate"]'::jsonb;
-SELECT count(*) FROM oauth_consents WHERE data->'scopes' @> '["user:impersonate"]'::jsonb;
-SELECT count(*) FROM oauth_tokens   WHERE data->'scopes' @> '["user:impersonate"]'::jsonb;
-```
-
-**Owes afterwards**: refresh tokens live thirty days, so a client can still
-present a JWT whose `scope` claim reads `user:impersonate` after the rows are
-rewritten. On the access path the middleware compares that claim as a raw string,
-so it stops matching and the token degrades to identity-only; on refresh the scope
-no longer parses and the endpoint answers 400, which is one of the two statuses
-[the bot clears its stored pair on](discord.md#the-tournament-bot) — so it re-authorizes
-rather than retrying. Tell whoever runs the Discord bot to expect that once.
-Delete this section once both databases answer 0.
-
 ## Trim the production box
 
 **Gated on** the commit that prunes the provisioning role — findable as
@@ -164,42 +110,3 @@ the winning deck put into the archive by hand, so **check each event against the
 archive before refiring it**: a re-submission over a deck a human already filed
 opens a pull request against an entry that is already there. Answer the reporters
 whose events this covers, then delete this section.
-
-## Prove the deck round stamps landed
-
-**Migration** `deck-round-stamp`
-
-**Gated on** the commit that stamps a multideck deck with the round it was played
-in — findable as `git log -1 --format=%h --grep='Stamp a multideck deck'`. There
-is nothing to run: the entry rewrote every stored `deck.round` from the player's
-i-th counted round to the tournament's own round index before the process served.
-Its guard is a single date literal, and deliberately so: every row the rewrite
-touches leaves the guard behind it, and no row the new build writes can ever enter
-it, so the entry is a strict one-shot whose safety rests on nothing the engine
-does. A guard that instead asked whether a stamp *looks* stale would have to know
-that a stamp survives a soft-cancel, and would re-stamp correct decks at every
-process start when it did not.
-
-That date is the **commit** date, so a multideck deck uploaded on production
-between this commit and the deploy keeps its old per-player slot. Deploying
-promptly is what keeps that window shut; anything that falls in it is one
-organizer re-upload.
-
-**Run**: nothing. To read the guard without the app,
-`uv run python -m backend.src.migrations --dsn "$DATABASE_URL"`.
-
-**Proves it worked**: that report answers `deck-round-stamp: 0 row(s) to rewrite`
-on every long-lived database — it counts what is still pending, so it answers 0
-both before the rewrite has anything to do and after it is done. The rewrite
-itself is proved by the shape the old per-player slot produced whenever a round
-was voided being absent: no player holding two decks stamped with one round.
-
-```sql
-SELECT "full"->>'tournament_uid', "full"->>'user_uid', "full"->>'round'
-FROM objects
-WHERE type = 'deck' AND deleted_at IS NULL AND "full"->>'round' IS NOT NULL
-GROUP BY 1, 2, 3 HAVING count(*) > 1;
-```
-
-**Owes afterwards**: nothing to tell anyone. Delete this section and the
-`deck-round-stamp` entry in `backend/src/migrations.py` in one commit.
