@@ -684,7 +684,7 @@
   "tfield_venue_placeholder": "Venue name",
   "tfield_venue_url": "Venue URL",
   "tfield_registration_url": "Registration URL",
-  "tfield_registration_url_desc": "The page that actually takes the sign-ups — a ticket shop or a form. Players who register here are sent to it to finish. Leave it empty when Archon takes the registrations.",
+  "tfield_registration_url_desc": "The page that actually takes the sign-ups — a ticket shop or a form. Players who register here are sent there to finish, and the paid list comes back as a CSV you import while registration is open. Leave it empty when Archon takes the registrations.",
   "tfield_address": "Address",
   "tfield_address_placeholder": "Street address",
   "tfield_map_url": "Map URL",

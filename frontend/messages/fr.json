@@ -684,7 +684,7 @@
   "tfield_venue_placeholder": "Nom du lieu",
   "tfield_venue_url": "URL du lieu",
   "tfield_registration_url": "URL d'inscription",
-  "tfield_registration_url_desc": "La page qui reçoit réellement les inscriptions — une billetterie ou un formulaire. Les joueurs qui s'inscrivent ici y sont renvoyés pour finaliser. Laissez vide si Archon reçoit les inscriptions.",
+  "tfield_registration_url_desc": "La page qui reçoit réellement les inscriptions — une billetterie ou un formulaire. Les joueurs qui s'inscrivent ici y sont renvoyés pour finaliser, et la liste des payants revient en CSV que vous importez tant que les inscriptions sont ouvertes. Laissez vide si Archon reçoit les inscriptions.",
   "tfield_address": "Adresse",
   "tfield_address_placeholder": "Adresse postale",
   "tfield_map_url": "URL de la carte",

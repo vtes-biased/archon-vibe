@@ -684,7 +684,7 @@
   "tfield_venue_placeholder": "Nome do local",
   "tfield_venue_url": "URL do Local",
   "tfield_registration_url": "URL de inscrição",
-  "tfield_registration_url_desc": "A página que realmente recebe as inscrições — uma bilheteria ou um formulário. Os jogadores que se inscrevem aqui são enviados para ela para concluir. Deixe vazio se o Archon receber as inscrições.",
+  "tfield_registration_url_desc": "A página que realmente recebe as inscrições — uma bilheteria ou um formulário. Os jogadores que se inscrevem aqui são enviados para ela para concluir, e a lista de pagantes volta como um CSV que você importa enquanto as inscrições estão abertas. Deixe vazio se o Archon receber as inscrições.",
   "tfield_address": "Endereço",
   "tfield_address_placeholder": "Endereço completo",
   "tfield_map_url": "URL do Mapa",

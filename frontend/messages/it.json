@@ -684,7 +684,7 @@
   "tfield_venue_placeholder": "Nome della sede",
   "tfield_venue_url": "URL Sede",
   "tfield_registration_url": "URL di iscrizione",
-  "tfield_registration_url_desc": "La pagina che riceve davvero le iscrizioni — una biglietteria o un modulo. I giocatori che si iscrivono qui vi vengono indirizzati per completare. Lascia vuoto se le iscrizioni le riceve Archon.",
+  "tfield_registration_url_desc": "La pagina che riceve davvero le iscrizioni — una biglietteria o un modulo. I giocatori che si iscrivono qui vi vengono indirizzati per completare, e l'elenco dei paganti torna come CSV che importi finché le iscrizioni sono aperte. Lascia vuoto se le iscrizioni le riceve Archon.",
   "tfield_address": "Indirizzo",
   "tfield_address_placeholder": "Indirizzo",
   "tfield_map_url": "URL Mappa",
