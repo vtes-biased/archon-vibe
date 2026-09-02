@@ -471,7 +471,9 @@ file.
 
 `/` is the signed-out front door and the PWA's `start_url`. A visitor with no
 stored token gets the landing page; everyone else is forwarded to `/tournaments`,
-which is where a plain login also lands them.
+which is where a plain login also lands them. **The rail mark points at `/`**, not
+at `/tournaments`: the app's own logo is the one link that must reach the front
+door.
 
 **The forward reads the stored token, never `isAuthenticated`.** `initAuth()`
 reports false whenever `/auth/me` is unreachable, so auth state would drop a

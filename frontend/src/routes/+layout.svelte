@@ -195,7 +195,7 @@
        top/bottom (iPad standalone), w-rail+pl-safe-l keeps icons off the notch
        on landscape phones (>=640px, so rail not bottom nav). -->
   <nav class="hidden sm:flex fixed left-0 top-0 bottom-0 w-rail pl-safe-l bg-surface-card border-r border-line flex-col items-center pt-[calc(1rem+var(--spacing-safe-t))] pb-[calc(1rem+var(--spacing-safe-b))] z-40">
-    <a href="/tournaments" onclick={(e) => openLastView(e, '/tournaments')} class="mb-6 flex flex-col items-center gap-1 text-link hover:text-link-soft" title={m.nav_home()}>
+    <a href="/" class="mb-6 flex flex-col items-center gap-1 text-link hover:text-link-soft" title={m.nav_home()}>
       <img src={isBeta ? '/favicon-beta.svg' : '/favicon.svg'} alt={isBeta ? 'Archon Beta' : 'Archon'} class="w-16 h-16" />
       {#if isBeta}
         <Badge kind="identity" tone="beta">BETA</Badge>
