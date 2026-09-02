@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Fail when a disclosure is drawn outside the app's one fold grammar.
 
-`FoldableSection` is the single shell a section folds through. A chevron drawn
-anywhere else is either a fold that drifted or an affordance that is not a fold
-at all, and the two are told apart by hand here — there is no way to read intent
-off the markup.
+`FoldableSection` is the single shell a section folds through. A chevron or a
+native `<details>` drawn anywhere else is either a fold that drifted or an
+affordance that is not a fold at all, and the two are told apart by hand here —
+there is no way to read intent off the markup.
 
 Two rules:
 
 1. A chevron that rotates is the dead second idiom, whatever it sits on. It has
    no allowlist: a fold points right closed and down open.
-2. A chevron drawn outside `FoldableSection.svelte` must be listed below with its
+2. A disclosure drawn outside `FoldableSection.svelte` must be listed below with its
    reason, and two kinds land there. A **fold** that cannot be a section is also
    stated as an exception in `wiki/design.md`'s fold grammar rule, and the two
    move together. An affordance that is **not a fold** — a pagination arrow, a
@@ -29,6 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SHELL = "frontend/src/lib/components/FoldableSection.svelte"
 
 CHEVRON = re.compile(r"<Chevron(?:Down|Right|Up|Left)\b")
+DETAILS = re.compile(r"<details\b")
 ROTATING = re.compile(r"\brotate-\d")
 
 # Why this file draws a chevron of its own. Folds that are not sections first,
@@ -51,6 +52,9 @@ ALLOW = {
     ),
     "frontend/src/routes/tournaments/[uid]/RoundsTab.svelte": (
         "the header row carries sibling action buttons, which cannot nest in the shell's button"
+    ),
+    "frontend/src/lib/components/ScoreLegend.svelte": (
+        "a native <details>: closed it is an icon, open it floats over the row beside it"
     ),
     "frontend/src/routes/rankings/+page.svelte": "pagination arrows, not a disclosure",
     "frontend/src/routes/tournaments/[uid]/TableRoomsEditor.svelte": (
@@ -87,9 +91,10 @@ def main() -> int:
         except (OSError, UnicodeDecodeError):
             continue
         for lineno, line in enumerate(lines, 1):
-            if not CHEVRON.search(line):
+            chevron = CHEVRON.search(line)
+            if not chevron and not DETAILS.search(line):
                 continue
-            if ROTATING.search(line):
+            if chevron and ROTATING.search(line):
                 rotating.append(f"{rel}:{lineno}: {line.strip()}")
             if rel == SHELL:
                 continue
@@ -110,7 +115,7 @@ def main() -> int:
             "header was the second idiom and it is gone — do not bring it back.\n"
         )
     if undeclared:
-        print("A chevron drawn outside FoldableSection:\n")
+        print("A disclosure drawn outside FoldableSection:\n")
         for rel, lineno in sorted(undeclared.items()):
             print(f"  {rel}:{lineno}")
         print(

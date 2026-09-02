@@ -367,13 +367,15 @@ tournament console, the member profile and the public member page.
 muted box, chevron right closed and down open, the whole header a 44px target, a
 150ms slide — and a **section** that folds uses it, inside the console and out. It
 takes a `header` snippet for a count or a total, an `ontoggle` for a parent that
-owns the state (an exclusive accordion, a body that loads on first open), and a
-`disabled` for a body that cannot be fetched. It takes no styling props: a fold
-that wants its own box is a fold that has drifted. A chevron points **right closed
+owns the state (an exclusive accordion, a body that loads on first open), a
+`disabled` for a body that cannot be fetched, and a `level` where the header is a
+heading — only the caller knows how deep it sits, so the shell renders one only
+when asked. It takes no styling props: a fold that wants its own box is a fold
+that has drifted. A chevron points **right closed
 and down open** everywhere — a rotating one is not an alternative and has no
 exception. `just fold-grammar` ([dev](dev.md#lint-gates)) holds both halves.
 
-Six surfaces fold outside the shell, for a structural reason and not a visual
+Seven surfaces fold outside the shell, for a structural reason and not a visual
 preference:
 
 - **A list row folds in place** — the whole row is the target and the chevron
@@ -386,6 +388,9 @@ preference:
   section inside it breaks the rhythm the sheet is scanned by.
 - **`FoldableDescription`** — closed, it renders the excerpt instead of hiding the
   body, so it is a preview rather than a disclosure.
+- **`ScoreLegend`** — a native `<details>`: closed it is an icon, and open it
+  floats over the row it sits beside rather than pushing it apart, so it is a
+  legend attached to a score and not a section of the page.
 
 **Modals** — `fixed inset-0 z-50` with backdrop blur, `role="dialog"`,
 `aria-modal`, `aria-labelledby`, Escape handling and a focus-on-mount action.

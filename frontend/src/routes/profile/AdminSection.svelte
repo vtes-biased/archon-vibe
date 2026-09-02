@@ -96,7 +96,7 @@
 </script>
 
 <div class="p-3 sm:p-6">
-  <FoldableSection title={m.profile_admin_section()} open={expanded} ontoggle={toggle}>
+  <FoldableSection title={m.profile_admin_section()} open={expanded} ontoggle={toggle} level={3}>
     <div class="bg-surface-muted rounded-lg border border-line-strong p-4">
       <div class="flex items-center justify-between gap-3">
         <div class="min-w-0">

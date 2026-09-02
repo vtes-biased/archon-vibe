@@ -88,7 +88,7 @@
 </script>
 
 <div class="p-3 sm:p-6">
-  <FoldableSection title={m.profile_authorized_apps_section()} open={expanded} ontoggle={toggle}>
+  <FoldableSection title={m.profile_authorized_apps_section()} open={expanded} ontoggle={toggle} level={3}>
     <p class="text-ink-muted text-sm">{m.authorized_apps_subtitle()}</p>
 
     {#if loading}

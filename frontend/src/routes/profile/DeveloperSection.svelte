@@ -123,7 +123,7 @@
 </script>
 
 <div class="p-3 sm:p-6">
-  <FoldableSection title={m.profile_developer_section()} open={expanded} ontoggle={toggle}>
+  <FoldableSection title={m.profile_developer_section()} open={expanded} ontoggle={toggle} level={3}>
     <div class="flex items-center justify-between">
       <p class="text-ink-muted text-sm">{m.developer_subtitle()}</p>
       <Button variant="primary" size="lg" onclick={() => (showRegister = !showRegister)}>

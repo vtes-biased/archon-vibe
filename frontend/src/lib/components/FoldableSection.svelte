@@ -8,6 +8,7 @@
     open = $bindable(false),
     ontoggle,
     disabled = false,
+    level,
     header,
     children,
   }: {
@@ -15,13 +16,14 @@
     open?: boolean;
     ontoggle?: () => void;
     disabled?: boolean;
+    level?: 2 | 3 | 4;
     header?: Snippet;
     children: Snippet;
   } = $props();
 </script>
 
 <div class="bg-surface-muted/30 rounded-lg p-4">
-  <h3>
+  <svelte:element this={level ? `h${level}` : "div"}>
     <button
       type="button"
       {disabled}
@@ -33,7 +35,7 @@
       <span class="min-w-0">{title}</span>
       {#if header}{@render header()}{/if}
     </button>
-  </h3>
+  </svelte:element>
   {#if open}
     <div class="mt-3 space-y-4" transition:slide={{ duration: 150 }}>
       {@render children()}
