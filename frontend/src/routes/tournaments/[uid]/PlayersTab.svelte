@@ -173,8 +173,6 @@
   }
 
   const isMultideck = $derived(!!tournament.multideck);
-  // Storyline takes no deck; a switched-away event keeps the ones it already had,
-  // read-only, so the column survives exactly while there is something to read.
   const isStoryline = $derived(tournament.format === "Storyline");
   const canEditDecks = $derived(isOrganizer && !isStoryline);
   const showDeckColumn = $derived(

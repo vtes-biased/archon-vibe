@@ -99,21 +99,25 @@ count, and a faithful round-trip to VEKN event type 9.
 **Storyline removes the decklist rather than loosening validation**, the Judge's
 Guide naming storyline events as its case of events where decklists are not used
 ([domain](domain/tournament-rules.md#formats)). `UpsertDeck` is the single
-submission entry point and refuses under Storyline, so one rule covers the player,
-the organizer and the public API. `decklist_required` is forced false by the
-engine — on create, and after every `UpdateConfig` apply, which also clears the
-`missing_decklist` stamps: the flag reaches the engine from the public API as well
-as the form, and left true on a format that accepts no deck it strands check-in
-behind a warning nothing can clear. Storyline is Basic-only,
-`validate_rank_legality` already admitting Standard and Limited alone.
-`ranking_eligibility` returns
-`storyline`, which is what withholds the ranked badge and the RtP column; ratings
-exclude it for a separate reason, `ratings.py` selecting by an explicit format
-list. `rating_category` still calls Storyline constructed on purpose — the format
-never reaches the rating set, and that answer is what points a post-switch
-recompute at the category the event is leaving. Revisit the whole stance if
-organizer-authored custom cards arrive: a decklist able to name them brings
-decklists back.
+submission entry point and refuses under Storyline, so one rule covers the
+player, the organizer and the public API. `decklist_required` is forced false by
+the engine on create and on every `UpdateConfig` apply, the latter also clearing
+the `missing_decklist` stamps: the flag reaches the engine from the public API as
+well as the form, and left true on a format that accepts no deck it strands
+check-in behind a warning nothing can clear. **The VEKN sync carries the same
+coercion**, because reclassifying an existing row writes `format` without the
+engine — `msgspec.structs.replace` over the stored event would otherwise forward
+an Archon-created event's flag and stamps into a format that refuses every deck.
+
+Storyline is Basic-only, `validate_rank_legality` already admitting Standard and
+Limited alone. `ranking_eligibility` returns `storyline`, which is what withholds
+the ranked badge and the RtP column; ratings exclude it for a separate reason,
+`ratings.py` selecting by an explicit format list. `rating_category` still calls
+Storyline constructed rather than gaining a bucket of its own: the format never
+reaches the rating set, and a format switch recomputes the old and the new
+category either way, so a Storyline bucket would have nothing to compute. Revisit
+the whole stance if organizer-authored custom cards arrive: a decklist able to
+name them brings decklists back.
 
 **`UpdateConfig` can turn a tournament holding decks into a Storyline one, and
 nothing locks it.** Those decks stay visible and stop being editable. That edge is

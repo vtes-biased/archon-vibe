@@ -221,8 +221,7 @@ two-hour cap
 ([vekn.net](https://www.vekn.net/storyline-events/official-storyline-events)).
 **No decklist is submitted**: the Judge's Guide names storyline events as its
 example of events where decklists are not used (`reference/judges-guide-v2.md`
-§3.1.3), which is why the app removes the decklist rather than loosening its
-validation — see [implementation](../tournaments.md).
+§3.1.3).
 
 ## Cards
 

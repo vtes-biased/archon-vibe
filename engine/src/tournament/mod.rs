@@ -2719,8 +2719,6 @@ fn apply_event(
                 }
             }
 
-            // Storyline takes no deck at all, so a surviving flag or check-in stamp
-            // would strand check-in with nothing able to clear it — UpsertDeck refuses.
             if tournament[tournament::FORMAT].as_str() == Some("Storyline") {
                 tournament[tournament::DECKLIST_REQUIRED] = false.into();
                 for p in tournament[tournament::PLAYERS].members_mut() {

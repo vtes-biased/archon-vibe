@@ -118,7 +118,7 @@ pub fn attested_player_count(t: &json::JsonValue) -> usize {
 pub fn rating_category(format: &str, online: bool) -> &'static str {
     let constructed = match format {
         "Limited" => false,
-        _ => true, // Standard, V5 → Constructed
+        _ => true, // Standard, V5, Storyline → Constructed
     };
     match (constructed, online) {
         (true, true) => "constructed_online",

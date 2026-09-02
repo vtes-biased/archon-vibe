@@ -524,6 +524,20 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                                 proxies=tournament.proxies,
                                 organizers_uids=merged_organizers,
                             )
+                            if updated.format == TournamentFormat.Storyline:
+                                # Reclassification writes `format` without the engine,
+                                # so UpdateConfig's coercion never runs and a checked-in
+                                # player keeps a warning no upload can clear.
+                                updated = msgspec.structs.replace(
+                                    updated,
+                                    decklist_required=False,
+                                    players=[
+                                        msgspec.structs.replace(
+                                            p, missing_decklist=False
+                                        )
+                                        for p in updated.players
+                                    ],
+                                )
                             bd = await save_tournament(updated, conn=tx_conn)
                             stats["updated"] += 1
                         else:

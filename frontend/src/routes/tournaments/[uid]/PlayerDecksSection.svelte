@@ -89,8 +89,6 @@
     }
   }
 
-  // Only a format switch can have left a deck on a Storyline event, and the
-  // engine freezes it: UpsertDeck refuses.
   const isStoryline = $derived(tournament.format === 'Storyline');
   const canModifyPending = $derived(tournament.state !== 'Finished' && !isStoryline);
 

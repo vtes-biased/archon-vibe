@@ -431,8 +431,6 @@ async def maybe_submit_twda(tournament: Tournament) -> None:
         # don't belong in a constructed-deck archive.
         outcome = (TwdaOutcome.SKIPPED, "limited", "")
     elif tournament.format == TournamentFormat.Storyline:
-        # A deck here can only predate a format switch, and the archive does not
-        # describe storyline play.
         outcome = (TwdaOutcome.SKIPPED, "storyline", "")
     elif _played_player_count(tournament) < TWDA_MIN_PLAYERS:
         outcome = (TwdaOutcome.SKIPPED, "too_few_players", "")
