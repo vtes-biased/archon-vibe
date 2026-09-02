@@ -555,13 +555,13 @@ app-wide [fold grammar](#patterns).
 
 ### The workbench
 
-The console reached this shape in a pass closed 2026-08-17, driven by a phone
-review of a finished 8-player event. It had drifted because each feature was added
-where it was first needed, as an inline labelled button — Raffle, promo recording,
-Archon import, Share Image, Print standings. None was wrong alone; the sum was a
-surface where reference material and tools outweighed the work, worst on a phone in
-the Finished state, where six inline buttons buried a single line of content. Rule
-2 is a policy for *future* features, not the cleanup backlog that was worked off.
+The console reached this shape after a phone review of a finished 8-player event
+(2026-08-07/08). It had drifted because each feature was added where it was first
+needed, as an inline labelled button — Raffle, promo recording, Archon import,
+Share Image, Print standings. None was wrong alone; the sum was a surface where
+reference material and tools outweighed the work, worst on a phone in the Finished
+state, where six inline buttons buried a single line of content. Rule 2 is a
+policy for *future* features, not the cleanup backlog that was worked off.
 
 The shape it settled on: the working surface starts inside the first viewport, the
 action bar sits **above** the tabs so its guidance line is visible on every tab,
