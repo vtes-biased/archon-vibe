@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.1.2 — 2026-09-02
 
 - A disqualification now applies only to the tournament it was issued at.
 - Sanctions on a profile now link to their tournament.
