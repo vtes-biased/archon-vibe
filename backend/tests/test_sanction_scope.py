@@ -1,6 +1,6 @@
 """A sanction's reach, asserted at the action endpoint: a DQ stops at the
-tournament it was issued for — even a league sibling — while an active VEKN
-suspension bars entry everywhere (wiki/tournaments.md, Sanctions).
+tournament it was issued for, even for a league sibling, while an active VEKN
+suspension bars entry to every tournament.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -9,6 +9,7 @@ from uuid import uuid7
 import pytest
 import src.db as db
 from src.models import (
+    Player,
     PlayerState,
     Role,
     Sanction,
@@ -22,7 +23,7 @@ from src.models import (
 from tests.conftest import make_auth_header, seed_tournament
 
 
-async def _setup(level: SanctionLevel, tournament_uid: str | None, league_uid: str):
+async def _actors() -> tuple[User, User]:
     ic = User(uid=str(uuid7()), modified=datetime.now(UTC), name="IC", roles=[Role.IC])
     target = User(
         uid=str(uuid7()),
@@ -32,16 +33,15 @@ async def _setup(level: SanctionLevel, tournament_uid: str | None, league_uid: s
     )
     await db.save_user(ic)
     await db.save_user(target)
+    return ic, target
 
-    other = Tournament(
-        uid=str(uuid7()),
-        modified=datetime.now(UTC),
-        name="Elsewhere",
-        state=TournamentState.REGISTRATION,
-        organizers_uids=[ic.uid],
-        league_uid=league_uid,
-    )
-    await seed_tournament(other)
+
+async def _save_sanction(
+    ic: User,
+    target: User,
+    level: SanctionLevel,
+    tournament_uid: str | None,
+) -> None:
     await db.save_sanction(
         Sanction(
             uid=str(uuid7()),
@@ -53,15 +53,16 @@ async def _setup(level: SanctionLevel, tournament_uid: str | None, league_uid: s
             category=SanctionCategory.UNSPORTSMANLIKE_CONDUCT,
             description="test",
             issued_at=datetime.now(UTC),
-            expires_at=datetime.now(UTC) + timedelta(days=30)
-            if level == SanctionLevel.SUSPENSION
-            else None,
+            expires_at=(
+                datetime.now(UTC) + timedelta(days=30)
+                if level == SanctionLevel.SUSPENSION
+                else None
+            ),
         )
     )
-    return ic, target, other
 
 
-async def _cleanup():
+async def _cleanup() -> None:
     async with db.get_connection() as conn:
         await conn.execute(
             "DELETE FROM objects WHERE type IN ('sanction', 'tournament')"
@@ -69,23 +70,43 @@ async def _cleanup():
 
 
 @pytest.mark.asyncio
-async def test_dq_does_not_bar_entry_to_a_league_sibling(test_client):
+async def test_dq_does_not_bar_check_in_at_a_league_sibling(test_client):
+    """Both leak paths land here: the retired league bar rejected the check-in
+    outright, and a DQ left in the engine payload disqualifies the player again."""
     league_uid = str(uuid7())
-    dq_tournament_uid = str(uuid7())
     try:
-        ic, target, other = await _setup(
-            SanctionLevel.DISQUALIFICATION, dq_tournament_uid, league_uid
+        ic, target = await _actors()
+        dq_event = Tournament(
+            uid=str(uuid7()),
+            modified=datetime.now(UTC),
+            name="Where the DQ happened",
+            state=TournamentState.FINISHED,
+            organizers_uids=[ic.uid],
+            league_uid=league_uid,
         )
+        sibling = Tournament(
+            uid=str(uuid7()),
+            modified=datetime.now(UTC),
+            name="Sibling",
+            state=TournamentState.WAITING,
+            organizers_uids=[ic.uid],
+            league_uid=league_uid,
+            players=[Player(user_uid=target.uid, state=PlayerState.REGISTERED)],
+        )
+        await seed_tournament(dq_event)
+        await seed_tournament(sibling)
+        await _save_sanction(ic, target, SanctionLevel.DISQUALIFICATION, dq_event.uid)
+
         resp = await test_client.post(
-            f"/api/tournaments/{other.uid}/action",
-            json={"type": "AddPlayer", "user_uid": target.uid},
+            f"/api/tournaments/{sibling.uid}/action",
+            json={"type": "CheckIn", "player_uid": target.uid},
             headers=make_auth_header(ic.uid),
         )
         assert resp.status_code == 200, resp.text
 
-        updated = await db.get_tournament_by_uid(other.uid)
+        updated = await db.get_tournament_by_uid(sibling.uid)
         entry = next(p for p in updated.players if p.user_uid == target.uid)
-        assert entry.state != PlayerState.DISQUALIFIED
+        assert entry.state == PlayerState.CHECKED_IN
     finally:
         await _cleanup()
 
@@ -93,7 +114,17 @@ async def test_dq_does_not_bar_entry_to_a_league_sibling(test_client):
 @pytest.mark.asyncio
 async def test_active_suspension_bars_entry_to_any_tournament(test_client):
     try:
-        ic, target, other = await _setup(SanctionLevel.SUSPENSION, None, str(uuid7()))
+        ic, target = await _actors()
+        other = Tournament(
+            uid=str(uuid7()),
+            modified=datetime.now(UTC),
+            name="Elsewhere",
+            state=TournamentState.REGISTRATION,
+            organizers_uids=[ic.uid],
+        )
+        await seed_tournament(other)
+        await _save_sanction(ic, target, SanctionLevel.SUSPENSION, None)
+
         resp = await test_client.post(
             f"/api/tournaments/{other.uid}/action",
             json={"type": "AddPlayer", "user_uid": target.uid},

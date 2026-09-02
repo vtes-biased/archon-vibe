@@ -60,14 +60,14 @@
   const expiryAllowed = $derived(sanctionLevel === "suspension" || sanctionLevel === "probation");
 
   const editLevelsBound = $derived(!!editingSanction?.tournament_uid);
-  // An imported row can hold a tournament level with no tournament: read-only
-  // history, and a re-level here would silently rewrite it into a VEKN sanction.
-  const editLevelLocked = $derived(
-    !!editingSanction &&
-      !editingSanction.tournament_uid &&
-      editingSanction.level !== "probation" &&
-      editingSanction.level !== "suspension"
-  );
+  // An imported row can violate the binding either way — a tournament level with
+  // no tournament, or a VEKN one carrying one. Re-levelling would rewrite history.
+  const editLevelLocked = $derived.by(() => {
+    if (!editingSanction) return false;
+    const membershipLevel =
+      editingSanction.level === "probation" || editingSanction.level === "suspension";
+    return membershipLevel === !!editingSanction.tournament_uid;
+  });
 
   const editExpiryRequired = $derived(editSanctionLevel === "probation");
   const editExpiryAllowed = $derived(editSanctionLevel === "suspension" || editSanctionLevel === "probation");
