@@ -24,3 +24,5 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
+
+Coming back from a member's profile returns to the members tab it was opened from, not the community tab — **Done when** an official who opens a member from the members list and navigates back lands on that list with its tab and filters intact, in the browser and in the installed app, and `wiki/design.md` states the mechanism that makes it true.
