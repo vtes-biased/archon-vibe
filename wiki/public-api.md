@@ -48,7 +48,7 @@ carries the snapshot format `version` a PWA client refuses a file on; here the
 connection advances a cursor on every event, and a stream here has no cursor to
 advance at all.
 
-**No pagination** ([dogmas](dogmas.md#data-and-sync)): a consumer reads as far as
+**No pagination** ([dogmas](dogmas.md#architecture)): a consumer reads as far as
 it wants and closes the connection. That is the whole answer to "give me the ten
 most recent" — every stream is ordered, so read ten lines and hang up. Handlers
 batch

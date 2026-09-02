@@ -70,7 +70,7 @@ The criterion is the owner's to set: the VEKN rules define no Hall of Fame. Ours
 restates `vekn.fr`'s "five IRL wins posted to the forum" in terms that survive
 the vekn.net decommission, and it reads the same for both corpora, differing only
 in the evidence each supplies. `User.wins` is server-computed and
-member-projected; no `hall_of_fame` flag is ever stored, because rule 8.6 lets a
+member-projected; no `hall_of_fame` flag is ever stored, because rule 9.4 lets a
 result be invalidated and a stamped badge would outlive the correction.
 
 `UpdateConfig` is available in **any** state — mid-event typo fixes matter — with
@@ -524,8 +524,9 @@ status.
 
 **Players** — `Register` / `Unregister` (self), `AddPlayer` / `RemovePlayer`
 (organizer; RemovePlayer is for a player who has not played — use `DropOut`
-otherwise), `DropOut` (preserves scores), `CheckIn`, `CheckInAll`, `ResetCheckIn`,
-`SetPaymentStatus`, `MarkAllPaid`, `SetNonCompeting`, `SetWaitlisted`.
+otherwise), `DropOut` (preserves scores), `CheckIn`, `CheckOut` (one checked-in
+player back to `Registered`), `CheckInAll`, `ResetCheckIn`, `SetPaymentStatus`,
+`MarkAllPaid`, `SetNonCompeting`, `SetWaitlisted`.
 
 **Rounds and seating**
 
@@ -736,7 +737,7 @@ later, so a mistaken organizer delete stays IC-recoverable in that window.
 | Action | Caution / Warning / SA / DQ | Suspension / Probation |
 |---|---|---|
 | Issue | IC, Ethics, or an organizer of the tournament | IC, Ethics |
-| Lift | IC, Rulemonger, the NC of the tournament's country; a league organizer for a DQ in their league event | IC (Ethics to modify) |
+| Lift | IC, Rulemonger, the NC of the tournament's country; a league organizer for a DQ in their league event | IC, Ethics |
 | Edit fields | IC, Ethics | IC, Ethics |
 | Delete (soft) | IC, Ethics — plus the tournament's own organizer **while the event is not Finished**, for mistake correction by delete-and-reissue (organizers cannot edit) | IC, Ethics |
 
@@ -777,14 +778,14 @@ has not yet played contributes nothing until they do. The UI auto-computes the
 round; there is no free round picker, so a later round starting cannot migrate an
 existing SA.
 
-> **Diverges from the rules, deliberately.** JG v2 §1.1.3's third case — an SA
-> issued **before round 1 pairings are announced** applies to round 1 — is not
-> implemented, and will not be: the backend requires an existing round, so the
-> judge issues the SA once round 1 is seated instead. The outcome is identical,
-> because round targeting picks the highest round the player is seated in and
-> that is round 1. Building it would mean a penalty parked on a round that does
-> not exist yet — the one case where the guide does that — with a migration path
-> to write and a state to reason about, to save a judge a few minutes' wait.
+**An SA before round 1 waits for the seating, deliberately.** JG v2 §1.1.3's
+third case — an SA issued **before round 1 pairings are announced** applies to
+round 1 — is not implemented: the backend requires an existing round, so the
+judge issues the SA once round 1 is seated instead. The outcome is identical,
+because round targeting picks the highest round the player is seated in and that
+is round 1. Building it would mean a penalty parked on a round that does not
+exist yet — the one case where the guide does that — with a migration path to
+write and a state to reason about, to save a judge a few minutes' wait.
 
 **Finals-round SA** penalizes the finals result rather than the preliminary totals:
 prelim standings exclude finals-round SAs from their VP penalty, and the −1 VP

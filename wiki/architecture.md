@@ -390,6 +390,12 @@ deck call passes a deck alone. The frontend memoizes that hand-off on the card
 map's identity and rebuilds the map only when the served ETag differs from the one
 it stored, so a session re-hands the catalog only when the catalog itself changed.
 
+**Deck validation** is `validate_deck` in `engine/src/deck.rs`: the game's
+construction rules — crypt of at least 12, library of 60 to 90, one group or two
+consecutive ones ([the game](domain/vtes.md#deck-structure)) — and the banned
+list are errors whatever the format; under V5, a card outside that set is a
+warning.
+
 **Three name forms**, all four fields being engine parser lookup keys:
 `printed_name` (bare, frontend display), `unique_name` (minimal group/advanced
 disambiguator, used for text decklist export), `full_name` (always group/advanced

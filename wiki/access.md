@@ -45,7 +45,7 @@ NC curates every link serving their country wherever its owner lives
 
 `set_archival_results` is IC-only rather than organizer, because the rows it
 applies to have no real organizer: a TWDA reconstruction has none at all, and an
-import's is whatever upstream claimed. Invalidation authority is IC's anyway (8.6).
+import's is whatever upstream claimed. Invalidation authority is IC's anyway (9.4).
 
 Two rows carry a security rationale. `merge_accounts` is IC-only because a merge
 **unions both accounts' roles** — anyone who could merge could land a role by

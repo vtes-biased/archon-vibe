@@ -11,7 +11,7 @@ separate axis from the authorization predicates in [access](access.md).
 | Level | Viewer | Gets |
 |---|---|---|
 | `public` | no token, or no `vekn_id` | Prince/NC users with base64-obfuscated contact, the event-page fields of every tournament, leagues minus their organizer roster, no sanctions |
-| `member` | has a `vekn_id` | all users without contact, all sanctions, tournaments with standings and filtered decks |
+| `member` | has a `vekn_id` | all users without contact — except an NC's or Prince's published one ([access](access.md#the-email-of-record)) — all sanctions, tournaments with standings and filtered decks |
 | `full` | IC, NC of the same country, organizer | everything, including rounds, finals, `checkin_code` |
 
 A fourth column, `api`, is not a viewer level: it is what third-party consumers
@@ -24,7 +24,7 @@ through the separate API process ([public-api](public-api.md)).
 
 | Type | `public` | `member` | `full` | `api` |
 |---|---|---|---|---|
-| user | NC/Prince with contact + community links; IC without contact; any other user with non-empty community links as a minimal no-name row (country, roles, links) | all users — no contact, no `deceased_by_uid`, no `github_login`/`github_id`; `deceased_at` included; anyone with non-empty community links gets those included | everything except `calendar_token` | only users holding a `vekn_id`: uid, the id, country, roles, the four `CategoryRating` fields, `wins`, community links with their moderation value — no name, nickname, contact, city or avatar |
+| user | NC/Prince with contact + community links; IC without contact; any other user with non-empty community links as a minimal no-name row (country, roles, links) | all users — no contact except an NC's or Prince's published one, no `deceased_by_uid`, no `github_login`/`github_id`; `deceased_at` included; anyone with non-empty community links gets those included | everything except `calendar_token` | only users holding a `vekn_id`: uid, the id, country, roles, the four `CategoryRating` fields, `wins`, community links with their moderation value — no name, nickname, contact, city or avatar |
 | tournament | the event-page fields — config, venue/address/map, description, rules flags, `banner_path`: everything an unauthenticated visitor needs to decide whether to attend | all except `checkin_code`, `vekn_pushed_at`, `vekn_results_stale`, `vekn_event_absent_at`, `twda_status` | everything | the member projection minus `announcements`, `raffles`, `promos_distributed`, `promo_stock_source_uid`, `offline_device_id`, and minus each player's `display_name`, `missing_decklist`, `payment_status` and `waitlisted` |
 | sanction | none | full data | full data | none, permanently |
 | deck | none | full data when `public = true`, else none | full data | the member rule minus `author` and minus `public`, which the rule already pins to `true` and so carries no information at this level. `attribution` carries the designer credit: a VEKN id, the sentinel `"twda"` (credit lives in the archive, not in our `author`), or null for anonymous |
@@ -289,9 +289,10 @@ would duplicate shields, coalescing and participant refresh.
 
 *Participant identities* — the bot has no User store but needs seated players'
 names, and the scope filter drops generic user broadcasts. So the scoped stream
-emits the **`member`-level** User (name, nickname, no contact — deliberately not
-`entitled_level`, so contacts never leak into the Discord process) for every player
-and organizer alongside the tournament. Catch-up seeds them; live, a tournament
+emits the **`member`-level** User (name, nickname, and no contact beyond the
+published NC/Prince address — deliberately not `entitled_level`, so no private
+contact reaches the Discord process) for every player and organizer alongside the
+tournament. Catch-up seeds them; live, a tournament
 delivery flags a refresh and the loop pushes any not-yet-sent identities, so late
 registrants still resolve.
 
@@ -916,9 +917,10 @@ state.
 4. **Entitlement** in `entitled_level()` — add a branch only for non-standard
    visibility, and mirror it in the overlay frames if it is a non-country,
    non-own-object full grant.
-5. **Broadcast** after mutations. No registration step: the stream types derive
-   from `list(ObjectType)` and snapshot generation reads whatever the single corpus
-   scan returns, so both pick up the new type automatically.
+5. **Mutation routes** in `routes/<type>.py`, included from `main.py`, each
+   broadcasting after its write. No registration step for the stream: its types
+   derive from `list(ObjectType)` and snapshot generation reads whatever the
+   single corpus scan returns, so both pick up the new type automatically.
 6. **Frontend type** in `types.ts` — `just model-drift` fails until it exists.
 7. **IndexedDB store** in `db.ts` — bump the version, which triggers a full clear.
 8. **Add to `SPECS`** in `sync.ts`.

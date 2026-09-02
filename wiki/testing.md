@@ -155,13 +155,14 @@ rendering belongs in Playwright, and the TypeScript in between is marshalling th
 `svelte-check` plus the E2E lifecycle spec already covers.
 
 **A fixture's VP vector must be one a table could really produce**, unless the
-invalid vector *is* what the test is about. `check_table_vps` is a loose proxy —
-its ceil-sum accepts vectors no game reaches, `[2.0, 0, 0.5, 0.5]` among them, so
-passing it is not the standard. Derive the vector instead: seats sit in
-predator-prey order, ousting your prey scores 1 VP and you inherit their prey, the
-last player standing takes an extra VP for the game win, and at time-out every
-survivor takes 0.5. Four seats have 35 reachable vectors and five have 126, all of
-which `check_table_vps` accepts. Two traps sit next door: a fixture table that
+invalid vector *is* what the test is about. `check_table_vps` decides against the
+enumerated reachable sheets
+([tournaments](tournaments.md#oust-order-validation)), so a vector it accepts is
+one a game can reach — but derive it anyway rather than searching for one that
+passes: seats sit in predator-prey order, ousting your prey scores 1 VP and you
+inherit their prey, a withdrawal scores 0.5, the last player standing takes an
+extra VP for the game win, and at time-out every survivor takes 0.5. Two traps
+sit next door: a fixture table that
 omits `state` scores nothing at all, which reads as a broken assertion rather than
 a broken fixture; and stored per-seat `gw`/`tp` are overwritten by the recompute,
 so asserting on them tests nothing. An unseeded mock once fabricated VEKN-less
