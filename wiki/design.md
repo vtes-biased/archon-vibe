@@ -287,9 +287,9 @@ Design for touch first, then enhance for desktop.
   `BookOpen`, `/profile` `CircleUser`. Each is picked by what the other five
   already own: the award cluster is `Trophy`'s, so rankings takes the numbered
   ladder its labels name outright (*Classifiche*, *Clasificaciones*); the calendar
-  family is the row date glyph on both lists and `Shield` is the judge mark, so
-  leagues takes the pennant clubs exchange (*gagliardetto*, *banderín*) rather
-  than a season; and `User` beside community's `Users` is one shape at that size,
+  family is the row date glyph on both lists and the shield family is spoken for
+  by the code of ethics and judge overrides, so leagues takes the pennant clubs
+  exchange (*gagliardetto*, *banderín*) rather than a season; and `User` beside community's `Users` is one shape at that size,
   so profile takes the circled bust. `/tournaments`, `/leagues` and `/profile`
   repeat their nav icon in their own empty state.
 - **Forms**: large inputs, no complex multi-column layouts on mobile.
