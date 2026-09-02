@@ -24,3 +24,5 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
+
+Point the desktop rail logo at the front door so a signed-out visitor gets the landing page, not the tournament list — **Done when** the rail mark's link is `/`, a signed-out click lands on the landing page and a signed-in one still ends on `/tournaments` via the existing forward, and the rail mark's target is stated in `wiki/design.md` §Landing.
