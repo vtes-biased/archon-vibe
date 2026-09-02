@@ -29,3 +29,31 @@ answers whether a given deploy has made it actionable — the same check
 `/post-deploy` already runs against a feedback issue's fix. An item states what
 gates it and why, what to run, what proves it worked, and what it owes afterwards:
 people to tell, and the wiki text that dies with it.
+
+## Count the sanctions that predate the scope binding
+
+Gated by `4fe04791`. Rows written before it can hold a tournament level with no
+tournament — `backend/scripts/migrate_from_archon.py` falls back to a null one on
+import — or a VEKN-wide level carrying one. Both are now refused on the issue and
+the edit paths, so what is left is history. Run it only once that commit is live:
+until then an unbound DQ still bleeds into every event, and the count reads as
+work to do rather than as a closed record.
+
+```sql
+SELECT "full"->>'level' AS level,
+       ("full"->>'tournament_uid' IS NOT NULL) AS has_tournament,
+       count(*) AS rows
+FROM objects
+WHERE type = 'sanction'
+  AND "full"->>'deleted_at' IS NULL
+  AND ( ("full"->>'level' IN ('caution','warning','standings_adjustment','disqualification')
+         AND "full"->>'tournament_uid' IS NULL)
+     OR ("full"->>'level' IN ('suspension','probation')
+         AND "full"->>'tournament_uid' IS NOT NULL) )
+GROUP BY 1, 2
+ORDER BY 1;
+```
+
+Nothing to rewrite either way: an imported record stays as it was filed, and the
+rows are inert once the bleed is closed. Report the counts to the owner and delete
+this section.

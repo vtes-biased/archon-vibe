@@ -78,7 +78,6 @@ async def _can_delete_sanction(user, sanction: Sanction) -> bool:
 
 
 def _validate_binding(level: SanctionLevel, tournament_uid: str | None) -> None:
-    """A sanction's scope is the event it was issued for, or the membership."""
     if level in TOURNAMENT_LEVELS and not tournament_uid:
         raise HTTPException(
             status_code=400,

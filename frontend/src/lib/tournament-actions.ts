@@ -172,8 +172,8 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
         await checkPlayerBarred(data.user_uid as string);
       }
       const actor = await buildActorContext(getAuthState().user ?? null, current, action);
-      // This tournament's own sanctions plus the players' VEKN suspensions
-      // (needed for CheckInAll etc.) — the twin of backend _build_sanctions_json.
+      // Widened with the players' VEKN suspensions, needed for CheckInAll etc.;
+      // buildSanctionsPayload is what keeps another event's sanctions out.
       const sanctions = await getSanctionsForTournament(uid);
       const seenUids = new Set(sanctions.map(s => s.uid));
       const playerUids = new Set((current.players ?? []).map(p => p.user_uid));

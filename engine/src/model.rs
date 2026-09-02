@@ -43,7 +43,6 @@ pub mod arg {
     pub const KEY: &str = "key";
     pub const KIND: &str = "kind";
     pub const LABEL: &str = "label";
-    pub const LEAGUE_ORGANIZERS_UIDS: &str = "league_organizers_uids";
     pub const LEVEL: &str = "level";
     pub const LEVELS: &str = "levels";
     pub const MEAN_TRANSFERS: &str = "mean_transfers";

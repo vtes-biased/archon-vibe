@@ -433,10 +433,11 @@ hands it the stored sheet; the two agree because every producer writes the sheet
 flag from finals membership, not because the stamp reconciles them.
 
 Its `sanctions` argument holds **this tournament's own** sanctions plus the
-players' VEKN suspensions, and nothing else. Each side builds that payload in one
-place — `_build_sanctions_json` in the backend, `buildSanctionsPayload` in the
-frontend — because `has_dq_sanction` matches on user and level alone: a foreign DQ
-that reaches the engine zeroes the player here.
+players' VEKN suspensions, and nothing else. `has_dq_sanction` matches on user and
+level alone, so a foreign DQ that reaches the engine zeroes the player here. Every
+frontend engine call funnels through `buildSanctionsPayload`, which scopes the list
+itself; on the backend `_build_sanctions_json` covers the two `/action`-path
+producers, and every other site passes `get_sanctions_for_tournament` alone.
 
 ## Finals
 

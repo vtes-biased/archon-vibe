@@ -59,8 +59,15 @@
   const expiryRequired = $derived(sanctionLevel === "probation");
   const expiryAllowed = $derived(sanctionLevel === "suspension" || sanctionLevel === "probation");
 
-  // The backend refuses a re-level across the binding, so offer neither half.
   const editLevelsBound = $derived(!!editingSanction?.tournament_uid);
+  // An imported row can hold a tournament level with no tournament: read-only
+  // history, and a re-level here would silently rewrite it into a VEKN sanction.
+  const editLevelLocked = $derived(
+    !!editingSanction &&
+      !editingSanction.tournament_uid &&
+      editingSanction.level !== "probation" &&
+      editingSanction.level !== "suspension"
+  );
 
   const editExpiryRequired = $derived(editSanctionLevel === "probation");
   const editExpiryAllowed = $derived(editSanctionLevel === "suspension" || editSanctionLevel === "probation");
@@ -420,26 +427,31 @@
       </div>
       <div class="p-6 space-y-4">
         <div>
-          <label for="edit-sanction-level" class="block text-sm font-medium text-ink-muted mb-1">
-            {m.common_level()}
-          </label>
-          <select
-            id="edit-sanction-level"
-            bind:value={editSanctionLevel}
-            onchange={handleLevelChange}
-            disabled={!!editingSanction.lifted_at}
-            class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-50"
-          >
-            {#if editLevelsBound}
-              <option value="caution">{m.sanction_level_caution()}</option>
-              <option value="warning">{m.sanction_level_warning()}</option>
-              <option value="standings_adjustment">{m.sanction_level_standings_adjustment()}</option>
-              <option value="disqualification">{m.sanction_level_disqualification()}</option>
-            {:else}
-              <option value="probation">{m.sanction_level_probation()}</option>
-              <option value="suspension">{m.sanction_level_suspension()}</option>
-            {/if}
-          </select>
+          {#if editLevelLocked}
+            <div class="block text-sm font-medium text-ink-muted mb-1">{m.common_level()}</div>
+            <SanctionBadge sanction={editingSanction} />
+          {:else}
+            <label for="edit-sanction-level" class="block text-sm font-medium text-ink-muted mb-1">
+              {m.common_level()}
+            </label>
+            <select
+              id="edit-sanction-level"
+              bind:value={editSanctionLevel}
+              onchange={handleLevelChange}
+              disabled={!!editingSanction.lifted_at}
+              class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-50"
+            >
+              {#if editLevelsBound}
+                <option value="caution">{m.sanction_level_caution()}</option>
+                <option value="warning">{m.sanction_level_warning()}</option>
+                <option value="standings_adjustment">{m.sanction_level_standings_adjustment()}</option>
+                <option value="disqualification">{m.sanction_level_disqualification()}</option>
+              {:else}
+                <option value="probation">{m.sanction_level_probation()}</option>
+                <option value="suspension">{m.sanction_level_suspension()}</option>
+              {/if}
+            </select>
+          {/if}
         </div>
 
         <div>
