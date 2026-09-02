@@ -29,23 +29,3 @@ answers whether a given deploy has made it actionable — the same check
 `/post-deploy` already runs against a feedback issue's fix. An item states what
 gates it and why, what to run, what proves it worked, and what it owes afterwards:
 people to tell, and the wiki text that dies with it.
-
-## Confirm the off-box backup retention prunes
-
-**Gated on** the commit that groups `restic forget` by host — findable as
-`git log -1 --format=%h --grep='Group restic forget by host'`. Until it is
-deployed, every run re-applies the broken default grouping: each timestamp-named
-dump is its own group, so nothing is ever forgotten and the snapshot count grows
-by one per repository per day. Running the check earlier only observes that.
-
-**Run**: nothing, or `systemctl start postgres-backup.service` to skip waiting
-for the 03:00 timer. The first fixed run's `forget --prune` removes weeks of
-accumulated snapshots per repository, so it runs noticeably longer than usual —
-expected, not a failure.
-
-**Proves it worked**: for each repository (per database, plus `globals`),
-`restic snapshots` lists at most 7 daily + 4 weekly + 12 monthly snapshots —
-fewer where buckets overlap — and the July snapshots are gone. The next day's
-run adds none net.
-
-**Owes afterwards**: nothing to tell anyone. Delete this section.
