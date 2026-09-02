@@ -116,6 +116,12 @@ The rules themselves live in [domain](domain/tournament-rules.md); how the app
 implements them, and where it differs, is [tournaments](tournaments.md). What
 follows is the app's own behavior, chosen rather than inherited.
 
+**The front door names the app before it filters it.** `/` is a landing page for a
+signed-out visitor — what Archon is, and the two ways in: create an account, or
+browse events without one. A visitor who already has a session goes straight to the
+tournament list, as does the installed app on launch. Shape and the decisions
+behind it: [design](design.md#landing).
+
 **Tournament creation starts from the event, not the fields.** `/tournaments/new`
 asks where it is played, what kind of event it is, where the games happen or what
 happens at the door, and the deck rules — then hands over the ordinary

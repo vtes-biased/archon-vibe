@@ -25,4 +25,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 
 Board changes ride the commit that earns them.
 
-- Tell a first-time visitor what Archon is before handing them a filter card: `/` redirects straight to the tournament list, so a player told to sign up arrives at search controls that never name the app. **Done when** a signed-out visitor to `/` gets a page naming what Archon does and the two ways in — sign up, or browse events — a signed-in one still resolves to the list as today, the surface takes the `frontend-design` skill's full process that `wiki/design.md` reserves for it, and the durable decisions fold back into `wiki/design.md` with `wiki/product.md` naming the new surface.

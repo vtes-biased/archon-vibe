@@ -4,9 +4,10 @@ The pinned visual direction. The gothic VTES system below *is* the brief — the
 `frontend-design` skill contributes craft process and a quality floor, but its
 "pick a bespoke palette, take an aesthetic risk" guidance does not apply to
 surfaces inside the app; the skill defers to a pinned brief by its own rule. A
-genuinely new standalone surface with no precedent here — a landing or onboarding
-page — earns the skill's full process, after which the durable decisions fold back
-into this page. **Consistency with this system beats novelty.**
+genuinely new standalone surface with no precedent here earns the skill's full
+process, after which the durable decisions fold back into this page —
+[the landing page](#landing) is the one surface that has run it.
+**Consistency with this system beats novelty.**
 
 ## Palette
 
@@ -455,6 +456,34 @@ endpoint that already speaks it.
 
 Shared helpers live in `tournament-utils.ts`; don't re-duplicate score helpers per
 file.
+
+## Landing
+
+`/` is the signed-out front door and the PWA's `start_url`. A visitor with no
+stored token gets the landing page; everyone else is forwarded to `/tournaments`,
+which is where a plain login also lands them.
+
+**The forward reads the stored token, never `isAuthenticated`.** `initAuth()`
+reports false whenever `/auth/me` is unreachable, so auth state would drop a
+signed-in organizer onto the landing page every time they opened the installed app
+offline — the one moment they are mid-event and least able to reason about it.
+
+**The hero is the five-seat predation ring**: the shape a VTES table is, and the
+thing seating computes. The alternative, a wordmark over a headline, says nothing a
+newcomer cannot already read in the sentence below it.
+
+**It renders inside the shell**, rail and bottom nav included. The nav is itself
+the browse affordance, and a chrome-free variant would be the only route in the app
+that escapes the shell.
+
+**Two ways in, one primary.** Sign up is the crimson `primary` and points at
+`/login?mode=signup` — that parameter is what makes a "sign up" CTA open the signup
+tab instead of the login one. Browse events is `secondary`; returning members get a
+quiet text link.
+
+**The ring is the only bold thing.** No feature grid, no numbered steps, no
+motion — the surface exists to name the app and offer the two doors, and a card row
+would restate what the sentence already says.
 
 ## Member profile
 

@@ -110,6 +110,10 @@
       return;
     }
 
+    if (params.get("mode") === "signup") {
+      mode = "signup";
+    }
+
     if (params.get("recover")) {
       forgotPassword = true;
       recoverMode = true;
