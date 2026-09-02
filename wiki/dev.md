@@ -23,6 +23,26 @@ just lint      # lint and auto-fix
 just dev-reset # reset the dev database
 ```
 
+## The dev IC account
+
+`just dev-ic-account` creates one fixed account in the dev database —
+`dev-ic@example.com` / `DevIC!2026`, VEKN ID `9998001`, role IC — so members
+management can be exercised signed in. The dev dump carries the owner's own login
+and nothing else, so without it there is no second way in. It is idempotent by
+no-op: the account already being there ends the run, so roles edited in the UI
+survive a re-run, and it refuses rather than adopt a VEKN ID it did not create.
+
+**A dev login is never an app feature.** No sign-in-as button, no seeded-credentials
+banner, no backend endpoint — anything the app can reach in dev, it can reach in
+production, so the affordance is a script the repository ships and production never
+runs.
+
+The checked-in password is acceptable only because the script refuses every
+`DATABASE_URL` but the compose default, and that refusal runs **before** `init_db`,
+which would otherwise apply the schema to whatever it was pointed at. The VEKN ID
+sits at `9998001` deliberately — outside the e2e cleanup's reach
+([testing](testing.md)).
+
 ## Lint gates
 
 `just lint` auto-fixes formatting, then runs the checks nothing can fix for you;

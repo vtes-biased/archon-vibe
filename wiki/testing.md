@@ -80,6 +80,10 @@ The seed creates one organizer (IC + Ethics, VEKN ID `9999901`) and ten players
 regenerates snapshots so SSE sync is fresh. `--cleanup` removes test objects by
 VEKN ID prefix and by the `E2E ` name prefix.
 
+That cleanup deletes by the `9999%`/`9990%` prefixes with no non-empty guard, which
+is why the dev IC account sits at `9998001` ([dev](dev.md)): the two accounts share
+a database only by accident, and the e2e seed must never be the way into the dev one.
+
 Two auth helpers: one used **after** `page.goto()`, which clears the sync cursor to
 force a full-level resync, and one used **before** the first navigation via
 `addInitScript`, so the first sync already uses full-level data. Sync helpers wait

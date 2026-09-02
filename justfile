@@ -292,6 +292,10 @@ dev-reset:
     just dev-stop
     docker compose down -v
 
+# Create the fixed dev IC account (wiki/dev.md) — idempotent, dev database only
+dev-ic-account:
+    uv run python backend/scripts/dev_ic_account.py
+
 # Run E2E tests (Docker, isolated compose project — teardown can't touch dev DB)
 test-e2e:
     #!/usr/bin/env bash
