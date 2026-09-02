@@ -3,7 +3,11 @@ import { loginAsOrganizer, getE2EState, setupAuthBeforeNavigation } from './help
 import { waitForUsers, waitForSync } from './helpers/wait';
 
 test.describe('App loads correctly', () => {
-  test('redirects / to /tournaments', async ({ page }) => {
+  test('lands a signed-out visitor, forwards a stored token to /tournaments', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: /Tournaments for Vampire/ })).toBeVisible();
+
+    await setupAuthBeforeNavigation(page);
     await page.goto('/');
     await expect(page).toHaveURL(/\/tournaments/);
   });

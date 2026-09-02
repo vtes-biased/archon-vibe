@@ -71,6 +71,8 @@ test.describe('Tournament lifecycle', () => {
 
     await page.getByRole('link', { name: 'New Tournament' }).click();
     await expect(page).toHaveURL(/\/tournaments\/new/);
+    // The create form sits behind the creation wizard; #name exists only past it.
+    await page.getByRole('button', { name: /Skip the questions/ }).click();
 
     await page.locator('#name').fill('E2E Test Tournament');
     await page.locator('#start').fill('2099-01-01T10:00');
