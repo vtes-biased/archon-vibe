@@ -602,6 +602,7 @@ MEMBER_TOURNAMENT = {
     "promo_stock_source_uid": "",
     "vekn_pushed_at": None,
     "vekn_results_stale": False,
+    "vekn_event_absent_at": None,
     "twda_status": None,
     "offline_mode": False,
     "offline_device_id": "",

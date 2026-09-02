@@ -97,6 +97,10 @@
     <InlineNotice tone="warn" icon={TriangleAlert}>{m.vekn_out_of_sync_hint()}</InlineNotice>
   {/if}
 
+  {#if tournament.vekn_event_absent_at}
+    <InlineNotice tone="warn" icon={TriangleAlert}>{m.vekn_event_absent_hint()}</InlineNotice>
+  {/if}
+
   <!-- TWDA outcome: the auto-submission is otherwise invisible — tell the
        organizer what happened to the winner's deck (and why, when skipped) -->
   {#if tournament.twda_status}

@@ -71,9 +71,11 @@ import TournamentModals from "./TournamentModals.svelte";
       && (tournament?.rounds?.length ?? 0) > 0
   );
   // Once external_ids.vekn or vekn_pushed_at exist, deleting here would orphan
-  // the vekn.net record — mirrors the server gate in tournaments.py.
+  // the vekn.net record — unless the scan confirmed that record is gone.
+  // Mirrors the server gate in tournaments.py.
   const canDelete = $derived(
-    !tournament?.external_ids?.vekn && !tournament?.vekn_pushed_at
+    (!tournament?.external_ids?.vekn && !tournament?.vekn_pushed_at)
+      || !!tournament?.vekn_event_absent_at
   );
   const deleteHasResults = $derived((tournament?.rounds?.length ?? 0) > 0);
   const currentPlayerEntry = $derived(
@@ -781,6 +783,12 @@ import TournamentModals from "./TournamentModals.svelte";
               <Badge kind="status" tone="pending" title={m.vekn_out_of_sync_hint()}>
                 <CloudAlert class="w-3 h-3" aria-hidden="true" />
                 {m.vekn_out_of_sync()}
+              </Badge>
+            {/if}
+            {#if isOrganizer && tournament.vekn_event_absent_at}
+              <Badge kind="status" tone="pending" title={m.vekn_event_absent_hint()}>
+                <CloudOff class="w-3 h-3" aria-hidden="true" />
+                {m.vekn_event_absent()}
               </Badge>
             {/if}
             {#if tournament.league_uid && leagueName}

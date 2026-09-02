@@ -334,6 +334,8 @@
   "vekn_sync_pending_hint": "A sincronização com vekn.net está pendente. É realizada novamente de forma automática — nenhuma ação necessária.",
   "vekn_out_of_sync": "Dessincronizado de vekn.net",
   "vekn_out_of_sync_hint": "Os resultados mudaram depois de serem reportados para vekn.net. O relatório é enviado apenas uma vez e não será atualizado — apenas um administrador da VEKN pode corrigi-lo lá manualmente.",
+  "vekn_event_absent": "Ausente de vekn.net",
+  "vekn_event_absent_hint": "A varredura do calendário confirmou que vekn.net já não contém este evento. Lá não há mais nada que o vincule, então pode eliminá-lo aqui.",
   "twda_status_submitted": "Deck do vencedor enviado para o Tournament Winning Deck Archive (TWDA).",
   "twda_status_view_submission": "Ver o envio",
   "twda_status_skipped": "Deck do vencedor não enviado para o TWDA: {reason}.",

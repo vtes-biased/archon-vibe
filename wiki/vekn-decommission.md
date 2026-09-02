@@ -7,44 +7,12 @@ condition someone could observe firing. `/upkeep` re-checks the triggers each
 pass; a fired trigger sends its item back through `/intake` as an ordinary board
 line.
 
-Two of the three triggers are the retirement stages in
-[vekn](vekn.md#decommission), which is where what retires and in what order is
-settled. The third comes first, and is a window rather than a stage.
+Both triggers are the retirement stages in [vekn](vekn.md#decommission), which is
+where what retires and in what order is settled.
 
 While the tournament and member syncs are upstreams, anything deleted or diverged
 locally is re-created on their next run — that is what makes each of these
 unfixable today.
-
-## Trigger: the decommission is greenlit, while the API still answers
-
-This trigger is a **window**, not an instant. It opens when the decommission is
-greenlit and closes when vekn.net stops answering — the work below needs both
-conditions at once, and produces nothing afterwards.
-
-One question deferred elsewhere gates the cutover from this side too: whether
-vekn.net recomputes a pushed `rtp` or stores it verbatim, and whether a results
-re-upload replaces or appends — Q5 of the
-[no-final rating questions](tournaments.md#trigger-the-rules-director-answers-on-no-final-rating-credit).
-It decides whether our no-final stance is a display difference or a divergence
-into the system of record, and it holds whatever the rules answer turns out to be.
-
-### Reconcile our tournaments against the vekn.net record
-
-**Deferred ask** — reconcile app tournaments against the vekn.net API record and
-write the diff onto this page. One targeted `fetch_event` per tournament carrying
-`external_ids['vekn']`, never the bulk sweep. Read-only; deletes nothing. Done
-when a reviewed table exists with, per row, the vekn id, the app tournament, its
-state/rounds/players, and a verdict of confirmed-absent / still-live /
-unverifiable.
-
-It establishes the third population this page's cleanup sections need — events we
-hold that **no longer exist upstream** — which no local data can distinguish from
-events that are merely stale. The probe is the only evidence, and it is
-unreconstructable once the API is dark.
-
-Doing it *before* the greenlight would be work at risk: the greenlight may not
-come, and a table pulled early goes stale against every calendar sync that runs
-between then and the retirement it feeds.
 
 ## Trigger: stage 1 — the tournament calendar sync retires
 
@@ -198,9 +166,11 @@ module docstring does not exist — that reference is stale.
 ### IC record curation — events to delete
 
 **Deferred ask** — give ICs a cleanup capability that can delete or withdraw a
-tournament regardless of its VEKN footprint, and decide whether organizers
-regain any deletion right on VEKN-linked events. Origin gh-6, a Prince asking
-how to remove an event created by mistake. **Do not re-derive the rejected
+tournament that **still exists** on vekn.net. Origin gh-6, a Prince asking how to
+remove an event created by mistake; the half of that question about an event
+vekn.net no longer has is answered — the organizer deletes it on the scan's
+absence flag ([vekn](vekn.md#the-event-veknnet-no-longer-has)), which is why
+organizers need no further deletion right here. **Do not re-derive the rejected
 probe-at-delete approach** — it was fully built and reverted. Done when an IC
 can remove a mistaken event, every entry below is gone, and the frontend no
 longer offers Delete on an offline-locked tournament, which the API refuses
@@ -210,17 +180,18 @@ Running list of tournaments that **should not be in the record**, waiting on the
 IC cleanup capability. Distinct from its two sibling populations:
 
 - the duplicate groups above — one real event entered twice upstream;
-- the vekn.net reconciliation table (deferred above) — events we hold that **no
-  longer exist upstream**, established by a targeted `fetch_event` probe while
-  the API is still live.
+- events we hold that **no longer exist upstream** — the calendar scan confirms
+  these itself, every run, and flags them
+  ([vekn](vekn.md#the-event-veknnet-no-longer-has)); their organizer can already
+  delete them, so none of them wait here.
 
 This list is the third population: events that are simply **wrong** — created by
 mistake, mistyped, or never real — regardless of what vekn.net says.
 
 **Check before assuming any row must wait.** Deletion is refused today only when
-a tournament carries `external_ids['vekn']` or `vekn_pushed_at`
-(`backend/src/routes/tournaments.py:1115-1119`). A row with neither can be
-deleted **now** by its organizer and does not belong on this list at all. The
+a tournament carries `external_ids['vekn']` or `vekn_pushed_at` and the scan has
+not flagged it absent. A row carrying neither footprint can be deleted **now** by
+its organizer and does not belong on this list at all. The
 public projection does not currently expose `external_ids`, so this has to be
 checked against the DB, not the snapshot.
 

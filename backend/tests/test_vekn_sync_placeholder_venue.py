@@ -23,7 +23,7 @@ class _StubClient:
     def __init__(self, event: dict) -> None:
         self._event = event
 
-    async def fetch_all_events(self):
+    async def fetch_all_events(self, probed=None):
         yield self._event
 
     async def fetch_venue(self, venue_id):

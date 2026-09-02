@@ -1174,6 +1174,22 @@ async def find_same_event_tournaments(
     return found
 
 
+VEKN_ABSENCE_CANDIDATES_QUERY = """
+    SELECT "full" FROM objects
+    WHERE type = 'tournament'
+      AND deleted_at IS NULL
+      AND ("full"->'external_ids'->>'vekn' = ANY(%s::text[])
+           OR "full"->>'vekn_event_absent_at' IS NOT NULL)
+"""
+
+
+async def find_vekn_absence_candidates(absent_ids: list[str]) -> list[Tournament]:
+    """Live tournaments holding one of `absent_ids`, plus every flagged row."""
+    async with get_connection() as conn:
+        result = await conn.execute(VEKN_ABSENCE_CANDIDATES_QUERY, (absent_ids,))
+        return [decode_json(row[0], Tournament) for row in await result.fetchall()]
+
+
 # Live copies of one event where only SOME hold a vekn id. The mixed-vekn filter
 # is load-bearing — without it, legacy placeholder names flood every result.
 DUPLICATE_GROUPS_QUERY = """

@@ -358,6 +358,8 @@ export interface Tournament extends BaseObject {
   event_code?: string;
   vekn_pushed_at?: string | null;
   vekn_results_stale?: boolean; // results diverged after the write-once VEKN push
+  // Instant the calendar scan confirmed vekn.net holds no event at this id.
+  vekn_event_absent_at?: string | null;
   // Last TWDA auto-submission outcome (organizer projection only)
   twda_status?: TwdaStatus | null;
   checkin_code?: string;

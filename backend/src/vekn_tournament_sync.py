@@ -14,6 +14,7 @@ from .db import (
     decode_json,
     find_duplicate_tournament_groups,
     find_same_event_tournaments,
+    find_vekn_absence_candidates,
     get_connection,
     get_tournament_by_external_id,
     resolve_event_code,
@@ -375,8 +376,40 @@ async def _adopt_same_event(tournament: Tournament, event_id: Any) -> Tournament
     return adopted
 
 
+async def _record_vekn_absence(probed: dict[str, bool]) -> int:
+    """Stamp or clear `vekn_event_absent_at` from the scan's per-id verdict."""
+    absent = [event_id for event_id, answers in probed.items() if not answers]
+    now = datetime.now(UTC)
+    moved = 0
+
+    for candidate in await find_vekn_absence_candidates(absent):
+        answers = probed.get(candidate.external_ids.get("vekn", ""))
+        # No verdict this run — transient, or above the scan's stop. Never "gone".
+        if answers is None:
+            continue
+        flagged = candidate.vekn_event_absent_at is not None
+        if answers and not flagged:
+            continue
+        if flagged and not answers:
+            continue  # still gone: keep the instant it was first confirmed
+        stamp = None if answers else now
+
+        async with tournament_transaction(candidate.uid) as (existing, tx_conn):
+            if existing is None:  # hard-deleted between the read and the lock
+                continue
+            updated = msgspec.structs.replace(
+                existing, modified=now, vekn_event_absent_at=stamp
+            )
+            bd = await save_tournament(updated, conn=tx_conn)
+        broadcast_precomputed(bd)
+        moved += 1
+
+    return moved
+
+
 async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
-    """Returns stats: {created, adopted, updated, unchanged, errors, skipped, total}."""
+    """Returns stats: {created, adopted, updated, unchanged, errors, skipped,
+    absent, total}."""
     logger.info("Starting VEKN tournament sync")
     stats = {
         "created": 0,
@@ -385,6 +418,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
         "unchanged": 0,
         "errors": 0,
         "skipped": 0,
+        "absent": 0,
         "total": 0,
     }
 
@@ -393,7 +427,8 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
 
     venue_cache: dict[str, dict[str, str]] = {}
 
-    async for event_data in client.fetch_all_events():
+    probed: dict[str, bool] = {}
+    async for event_data in client.fetch_all_events(probed=probed):
         stats["total"] += 1
         event_id = event_data.get("event_id", "?")
 
@@ -550,6 +585,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                                 standings=tournament.standings,
                                 finals=tournament.finals,
                                 vekn_pushed_at=tournament.vekn_pushed_at,
+                                vekn_event_absent_at=existing.vekn_event_absent_at,
                                 # A fresh Tournament's default_factory code would
                                 # break an already-printed QR.
                                 checkin_code=existing.checkin_code,
@@ -592,10 +628,13 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                 f"{stats['skipped']} skipped, {stats['errors']} errors"
             )
 
+    stats["absent"] = await _record_vekn_absence(probed)
+
     logger.info(
         f"VEKN tournament sync completed: {stats['created']} created, "
         f"{stats['adopted']} adopted, {stats['updated']} updated, "
         f"{stats['unchanged']} unchanged, {stats['skipped']} skipped, "
+        f"{stats['absent']} absence flags moved, "
         f"{stats['errors']} errors, {stats['total']} total"
     )
 

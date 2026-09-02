@@ -836,6 +836,13 @@ class Tournament(TournamentConfig, kw_only=True):
     # sticky: results changed after vekn_pushed_at. The push is write-once, so
     # only a manual admin fix clears it.
     vekn_results_stale: bool = False
+    vekn_event_absent_at: Annotated[
+        datetime | None,
+        msgspec.Meta(
+            description="UTC instant the calendar scan last confirmed vekn.net "
+            "holds no event at this id. Null while the event still answers."
+        ),
+    ] = None
     twda_status: TwdaStatus | None = None  # organizer projection only
     offline_mode: bool = False
     offline_device_id: str = ""

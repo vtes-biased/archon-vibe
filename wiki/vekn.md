@@ -317,12 +317,49 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
 - Stamps `vekn_pushed_at = now` on finished imports so the batch never re-uploads
   them.
 - Rebuilds changed tournaments field by field, so local-only bookkeeping
-  (`checkin_code`, `twda_status`) must be **explicitly carried over** from the
-  existing row or it resets on every re-sync.
+  (`checkin_code`, `twda_status`, `vekn_event_absent_at`) must be **explicitly
+  carried over** from the existing row or it resets on every re-sync.
 
 Each phase — member, tournament, TWDA — is wrapped independently: an exception or
 timeout logs an error and skips that phase for the cycle without aborting the
 others.
+
+### The event vekn.net no longer has
+
+An event created by mistake and deleted upstream would otherwise stay linked here
+forever, undeletable, and be re-pushed by the hourly batch into a 404 loop.
+`vekn_event_absent_at` is the record that it is gone: the instant the scan first
+confirmed it, null while the event still answers.
+
+**The verdict is per id, and it is not the scan's yield.** `fetch_all_events`
+fills a `probed` map — id to "does an event answer" — off `fetch_event`'s
+confirmed-no-event branch, which the API gives per id and free, since the scan
+already probes every id every run. What the scan *yields* is a different question:
+it drops past events with no players, which exist upstream and are the exact
+profile of an event entered by mistake. Diffing against the yield would therefore
+flag the whole population this serves.
+
+**Absence from the map is unknown, never gone.** An id the run failed on
+transiently (`fetch_event` raises rather than returning None precisely so these
+stay distinguishable) and every id above the run's stop on `empty_run_limit` is
+simply not in it, and moves nothing.
+
+`_record_vekn_absence` is the field's only writer. It runs once after the scan,
+stamps the live tournament holding a confirmed-gone id, and clears the flag when
+that id answers again — including when the event comes back as a past entry with
+no players, which the yield never sees. A row already flagged keeps its first
+instant rather than being restamped each run.
+
+**It unlocks the delete**, so it is server-owned and no client can write it:
+`DELETE /tournaments/{uid}` refuses a VEKN footprint unless the flag is set. It is
+organizer-projection only, and a header badge on the tournament says the upstream
+record is gone. Giving ICs a blanket cleanup capability for events that *do* still
+exist upstream is separate, and deferred
+([vekn-decommission](vekn-decommission.md)).
+
+A false positive costs a duplicate, not data: the soft-deleted row keeps its vekn
+id, `get_tournament_by_external_id` skips tombstones, and the next sync re-creates
+a live copy.
 
 ### Matching an incoming event
 
@@ -649,6 +686,13 @@ waiting on it names a real condition.
 The end state is **archon as the system of record** for members, events and results,
 with vekn.net frozen as a historical archive.
 
+One question deferred elsewhere gates the cutover: whether vekn.net recomputes a
+pushed `rtp` or stores it verbatim, and whether a results re-upload replaces or
+appends — Q5 of the
+[no-final rating questions](tournaments.md#trigger-the-rules-director-answers-on-no-final-rating-credit).
+It decides whether our no-final stance is a display difference or a divergence into
+the system of record, and it must be answered while the API still responds.
+
 **Push is not a third direction to decide — it *is* API calls**, so each direction's
 push dies with the read it accompanies. There is no write-only period: the results
 push is write-once, so a transition that kept pushing would accumulate divergence
@@ -672,8 +716,10 @@ deleted locally and wipes anything corrected — so they all become ordinary loc
 work the moment it stops.
 
 `dedup_tournaments.py --probe-vekn` loses its upstream here and cannot be run
-afterwards — it is what tells a live vekn id from a dead one, and the reconciliation
-deferred on the greenlight window exists because of that.
+afterwards — it is what tells a live vekn id from a dead one. The calendar scan's
+absence flag ([above](#the-event-veknnet-no-longer-has)) records that same
+distinction every run while the API still answers, so what it has already reached
+survives the cutover.
 
 ### Stage 2 — the member roster retires, when vekn.net registration closes
 

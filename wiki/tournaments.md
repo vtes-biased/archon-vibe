@@ -123,9 +123,11 @@ paths recompute it.
 `UpdateConfig`, `ReportPromos` and Delete are available in any state.
 `SetScore`/`Override`/`Unoverride` are open to players only during `Playing`, and
 to organizers whenever rounds exist — Waiting, Playing or Finished — with standings
-recomputed after every edit. Delete is plain REST, not an engine event, gated only
-on the VEKN footprint: blocked once `external_ids.vekn` or `vekn_pushed_at` is set,
-since deleting would orphan the vekn.net record. Deleting a `Finished` tournament
+recomputed after every edit. Delete is plain REST, not an engine event, gated on
+the VEKN footprint: blocked once `external_ids.vekn` or `vekn_pushed_at` is set,
+since deleting would orphan the vekn.net record — unless the calendar scan has
+confirmed that record is gone
+([vekn](vekn.md#the-event-veknnet-no-longer-has)). Deleting a `Finished` tournament
 triggers a ratings recompute for its players.
 
 ## Player states

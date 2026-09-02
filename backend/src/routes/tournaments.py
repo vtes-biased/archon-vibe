@@ -115,6 +115,9 @@ SERVER_OWNED_TOURNAMENT_FIELDS = frozenset(
         "event_code",
         "vekn_pushed_at",
         "vekn_results_stale",
+        # Not bookkeeping: it unlocks the delete below, so a client that could
+        # write it could delete a live sanctioned event.
+        "vekn_event_absent_at",
         "twda_status",
     }
 )
@@ -1107,9 +1110,12 @@ async def delete_tournament_endpoint(
             detail="Cannot delete a tournament locked for offline use; unlock it first",
         )
 
-    # Deletable until it has a VEKN footprint (external_ids.vekn or
-    # vekn_pushed_at) — past that, deleting here orphans the vekn.net record.
-    if tournament.external_ids.get("vekn") or tournament.vekn_pushed_at is not None:
+    # A VEKN footprint (external_ids.vekn or vekn_pushed_at) means deleting here
+    # orphans the vekn.net record — unless the scan confirmed that record is
+    # already gone, which is the only way a mistaken event ever leaves.
+    if (
+        tournament.external_ids.get("vekn") or tournament.vekn_pushed_at is not None
+    ) and tournament.vekn_event_absent_at is None:
         raise HTTPException(
             status_code=400,
             detail="Cannot delete a tournament that has been pushed to VEKN",

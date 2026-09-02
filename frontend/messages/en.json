@@ -334,6 +334,8 @@
   "vekn_sync_pending_hint": "Sync with vekn.net is pending. It is retried automatically — no action needed.",
   "vekn_out_of_sync": "Out of sync with vekn.net",
   "vekn_out_of_sync_hint": "Results changed after being reported to vekn.net. The report is write-once and will not be updated — only a VEKN admin can fix it there manually.",
+  "vekn_event_absent": "Gone from vekn.net",
+  "vekn_event_absent_hint": "The calendar scan confirmed vekn.net no longer holds this event. Nothing links to it there any more, so you can delete it here.",
   "twda_status_submitted": "Winner's deck submitted to the Tournament Winning Deck Archive (TWDA).",
   "twda_status_view_submission": "View submission",
   "twda_status_skipped": "Winner's deck not sent to the TWDA: {reason}.",

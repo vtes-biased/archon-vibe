@@ -432,9 +432,17 @@ class VEKNAPIClient:
         batch_size: int = 10,
         empty_run_limit: int = 200,
         transient_limit: int = 200,
+        probed: dict[str, bool] | None = None,
     ) -> AsyncIterator[dict]:
         """Probe IDs upward until `empty_run_limit` consecutive confirmed-no-event
-        IDs; `transient_limit` consecutive transient failures aborts the scan instead."""
+        IDs; `transient_limit` consecutive transient failures aborts the scan instead.
+
+        `probed` collects the API's per-id verdict, id -> does an event answer. An
+        id the API failed on transiently, and every id above the scan's stop, is
+        absent from it: callers must read a missing key as unknown, never as no
+        event. The yield below is not that verdict — it drops past events with no
+        players, which exist upstream.
+        """
         import asyncio
         from datetime import UTC, datetime
 
@@ -450,7 +458,7 @@ class VEKNAPIClient:
             tasks = [self.fetch_event(eid) for eid in range(start, end)]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            for event_data in results:
+            for event_id, event_data in zip(range(start, end), results, strict=True):
                 if isinstance(event_data, BaseException):
                     # Must not count as empty — an outage would otherwise end
                     # the scan; abort instead if the API stays down.
@@ -464,6 +472,9 @@ class VEKNAPIClient:
                     continue
 
                 consecutive_transient = 0  # API reachable (event or confirmed-empty)
+
+                if probed is not None:
+                    probed[str(event_id)] = event_data is not None
 
                 if event_data is None:
                     consecutive_empty += 1

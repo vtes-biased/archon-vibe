@@ -162,6 +162,7 @@ _TOURNAMENT_MEMBER_EXCLUDE = {
     "checkin_code",
     "vekn_pushed_at",
     "vekn_results_stale",
+    "vekn_event_absent_at",
     "twda_status",
 }
 
