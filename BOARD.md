@@ -24,3 +24,5 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
+
+- Hold a Limited deck to the checks that apply in every format, not to Standard construction: under Limited the engine reports only unknown and banned cards, never the 60–90 library, the 12-card crypt or the consecutive-groups rule. **Done when** a 40-card three-group deck validates clean on a Limited event and errors on a Standard one, an engine test pins that beside the V5 one, the format row in `wiki/tournaments.md` says what Limited validation does, and the deck-validation paragraph in `wiki/architecture.md` no longer says the sizes apply whatever the format.
