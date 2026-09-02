@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.1.1 — 2026-09-02
 
 - Storyline tournaments.
 - New front page for signed-out visitors.
