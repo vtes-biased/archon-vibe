@@ -628,11 +628,12 @@ corollary is that nothing manages them either: they are not pruned, and **not
 pushed off-box by restic**, which covers only `/var/backups/postgres`. The
 off-box copies are the durable half.
 
-The nightly job also still holds the frozen restic repo `archon-db-backups/archondb`
-from before the drop. Because the database no longer exists, `pg-backup` never
-prunes that repo again; the *"repo has no backed-up database"* warning it now
-logs each night is **expected and permanent**, and is the marker that the archive
-is there.
+The frozen restic repo `archon-db-backups/archondb` held every daily dump taken
+up to the drop — 54 snapshots, 952 MiB, the last of them 2026-08-24 — and since
+the database was gone nothing ever pruned it. It was deleted on 2026-09-02,
+redundant against the three artefacts above. The bucket now holds `archon` and
+`globals` only, so a *"repo has no backed-up database"* warning in the nightly
+log names a **new** orphan and is worth acting on.
 
 **Single writer per field**, which is what prevents a daily flip-flop between
 syncs:
