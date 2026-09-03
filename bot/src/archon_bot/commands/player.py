@@ -2,12 +2,12 @@ import logging
 
 import hikari
 import lightbulb
+from hikari.impl import MessageActionRowBuilder
 
 from .. import config
 from ..archon_api import ArchonAPI
 from ..command_mentions import command_mention
 from ..oauth_utils import (
-    consent_button,
     generate_pkce,
     generate_state,
     make_oauth_url,
@@ -39,7 +39,9 @@ async def _ensure_auth(
     await ctx.respond(
         "**Connect your Archon account**\n"
         "Use the button below to authenticate, then run the command again.",
-        component=consent_button(url, "Connect Archon account"),
+        component=MessageActionRowBuilder().add_link_button(
+            url, label="Connect Archon account"
+        ),
         flags=hikari.MessageFlag.EPHEMERAL,
     )
     return None

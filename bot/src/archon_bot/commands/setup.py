@@ -2,13 +2,13 @@ import logging
 
 import hikari
 import lightbulb
+from hikari.impl import MessageActionRowBuilder
 
 from .. import config
 from ..archon_api import ArchonAPI
 from ..channel_manager import create_tournament_channels, teardown_tournament
 from ..command_mentions import command_mention
 from ..oauth_utils import (
-    consent_button,
     generate_pkce,
     generate_state,
     make_oauth_url,
@@ -90,7 +90,9 @@ class SetupCommand(
                 "**Authorize Archon Bot for this event**\n"
                 "Use the button below to grant the bot access to it, then run "
                 f"{command_mention('setup')} again with `{self.url}`.",
-                component=consent_button(url, "Authorize Archon Bot"),
+                component=MessageActionRowBuilder().add_link_button(
+                    url, label="Authorize Archon Bot"
+                ),
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
             return

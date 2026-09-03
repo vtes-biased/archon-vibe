@@ -12,7 +12,6 @@ os.environ.setdefault("OAUTH_CLIENT_SECRET", "test-secret")
 
 from archon_bot import config  # noqa: E402
 from archon_bot.oauth_utils import (  # noqa: E402
-    consent_button,
     generate_pkce,
     generate_state,
     make_oauth_url,
@@ -31,6 +30,3 @@ def test_consent_url_fits_a_link_button(monkeypatch) -> None:
     _, code_challenge = generate_pkce()
     url = make_oauth_url(generate_state(), code_challenge, TOURNAMENT_UID)
     assert len(url) <= DISCORD_LINK_BUTTON_URL_MAX
-    row = consent_button(url, "Authorize Archon Bot")
-    (button,) = row.components
-    assert button.url == url
