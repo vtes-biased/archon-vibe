@@ -628,6 +628,11 @@ Standing decisions:
   any-state path while the bar names the moment.
 - **The description drops out of the organizer view only** — organizers wrote it,
   players still need it.
+- **Posted announcements fold with the composer**, one section the organizer
+  opens to write or to re-read, its header count naming what the fold hides.
+  They are what anyone came to read on the *player* banner; on the console the
+  organizer wrote them, and twenty of them pushed the working surface out of the
+  first viewport.
 
 Rejected, with the reason that killed each: **per-tab status counts** and **a
 masthead reporting live round state**, both because the action bar's guidance line

@@ -24,5 +24,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
-
-Fold the organizer console's posted announcements into the announcement section with the composer, so a collapsed section is one row and the working surface keeps the first viewport — **Done when** the console shows composer and posted list under one fold, the header count counts what the fold hides, and the standing decision is recorded under the workbench in `wiki/design.md`.

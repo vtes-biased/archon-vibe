@@ -8,9 +8,7 @@
 
   let { tournament }: { tournament: Tournament } = $props();
 
-  // The composer folds; the posted announcements never do — those are what
-  // anyone came to read.
-  let composing = $state(false);
+  let expanded = $state(false);
 
   const MAX_LEN = 280;  // soft UI cap; backend enforces MAX_ANNOUNCEMENT_LEN
 
@@ -55,8 +53,8 @@
   }
 </script>
 
-<div class="mb-4 space-y-2">
-  <FoldableSection title={m.announcement_composer_title()} bind:open={composing}>
+<div class="mb-4">
+  <FoldableSection title={m.announcement_section_title()} bind:open={expanded}>
     {#snippet header()}
       {#if sorted.length > 0}
         <span class="text-xs px-2 py-0.5 rounded bg-surface-active text-ink-muted">{sorted.length}</span>
@@ -68,7 +66,6 @@
         rows="2"
         maxlength={MAX_LEN + 50}
         placeholder={m.announcement_composer_placeholder()}
-        aria-label={m.announcement_composer_title()}
         class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none resize-y"
       ></textarea>
 
@@ -80,21 +77,21 @@
         </Button>
       </div>
     </div>
-  </FoldableSection>
 
-  {#if sorted.length > 0}
-    <div class="bg-surface-card rounded-lg shadow border border-line px-3 sm:px-4 py-3 space-y-1.5">
-      {#each sorted as a (a.id)}
-        <div class="flex items-start justify-between gap-2 text-sm">
-          <div class="min-w-0">
-            <p class="text-ink whitespace-pre-wrap break-words">{a.body}</p>
-            <p class="text-xs text-ink-faint mt-0.5">{a.author_name} &middot; {formatTime(a.created_at)}</p>
+    {#if sorted.length > 0}
+      <div class="space-y-1.5">
+        {#each sorted as a (a.id)}
+          <div class="flex items-start justify-between gap-2 text-sm">
+            <div class="min-w-0">
+              <p class="text-ink whitespace-pre-wrap break-words">{a.body}</p>
+              <p class="text-xs text-ink-faint mt-0.5">{a.author_name} &middot; {formatTime(a.created_at)}</p>
+            </div>
+            <button onclick={() => remove(a.id)} disabled={deletingId === a.id} class="text-ink-muted hover:text-error transition-colors p-1 shrink-0 disabled:opacity-50" title={m.announcement_delete()} aria-label={m.announcement_delete()}>
+              <Trash2 class="w-4 h-4" />
+            </button>
           </div>
-          <button onclick={() => remove(a.id)} disabled={deletingId === a.id} class="text-ink-muted hover:text-error transition-colors p-1 shrink-0 disabled:opacity-50" title={m.announcement_delete()} aria-label={m.announcement_delete()}>
-            <Trash2 class="w-4 h-4" />
-          </button>
-        </div>
-      {/each}
-    </div>
-  {/if}
+        {/each}
+      </div>
+    {/if}
+  </FoldableSection>
 </div>
