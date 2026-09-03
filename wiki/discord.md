@@ -218,4 +218,8 @@ once a token has genuinely died.
 `display_name` (the Discord nickname) stored on the player and shown in player and
 seat displays. Bot-generated links point at `/consent?…&login_hint=discord`; an unauthenticated
 user forwards to `/login?redirect=…&login_hint=discord`, which auto-redirects to
-Discord OAuth.
+Discord OAuth. `/setup` and the player commands hand the link out as a Discord
+**link button**, never as raw text: Discord caps a button URL at 512 characters,
+and the production-shaped URL — frontend origin, bot callback, 32-character client
+id, uuid, state and PKCE challenge — measures about 395, pinned by
+`bot/tests/test_consent_link_button.py`.

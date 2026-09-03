@@ -5,7 +5,13 @@ import secrets
 from base64 import urlsafe_b64encode
 from urllib.parse import urlencode
 
+from hikari.impl import MessageActionRowBuilder
+
 from . import config
+
+
+def generate_state() -> str:
+    return secrets.token_urlsafe(32)
 
 
 def generate_pkce() -> tuple[str, str]:
@@ -19,7 +25,7 @@ def generate_pkce() -> tuple[str, str]:
 def make_oauth_url(state: str, code_challenge: str, tournament_uid: str) -> str:
     """Build Archon OAuth authorize URL with login_hint=discord. `event:run`
     is granted per event, so the tournament rides the request and the consent page
-    names it to the user."""
+    names it to the user. Shipped as a Discord link button, whose URL is capped."""
     params = {
         "response_type": "code",
         "client_id": config.OAUTH_CLIENT_ID,
@@ -32,3 +38,7 @@ def make_oauth_url(state: str, code_challenge: str, tournament_uid: str) -> str:
         "tournament": tournament_uid,
     }
     return f"{config.ARCHON_FRONTEND_URL}/consent?{urlencode(params)}"
+
+
+def consent_button(url: str, label: str) -> MessageActionRowBuilder:
+    return MessageActionRowBuilder().add_link_button(url, label=label)

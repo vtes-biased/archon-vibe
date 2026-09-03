@@ -1,5 +1,4 @@
 import logging
-import secrets
 
 import hikari
 import lightbulb
@@ -7,7 +6,12 @@ import lightbulb
 from .. import config
 from ..archon_api import ArchonAPI
 from ..command_mentions import command_mention
-from ..oauth_utils import generate_pkce, make_oauth_url
+from ..oauth_utils import (
+    consent_button,
+    generate_pkce,
+    generate_state,
+    make_oauth_url,
+)
 from ..token_store import TokenStore
 from ..tournament_resolver import resolve_tournament
 from ._common import fetch_userinfo
@@ -23,7 +27,7 @@ async def _ensure_auth(
     if tokens:
         return tokens
 
-    state = secrets.token_urlsafe(32)
+    state = generate_state()
     code_verifier, code_challenge = generate_pkce()
     await store.store_pending_oauth(
         state=state,
@@ -33,9 +37,9 @@ async def _ensure_auth(
     )
     url = make_oauth_url(state, code_challenge, tournament_uid)
     await ctx.respond(
-        f"**Connect your Archon account**\n"
-        f"Click the link below to authenticate:\n{url}\n\n"
-        f"After authentication, run the command again.",
+        "**Connect your Archon account**\n"
+        "Use the button below to authenticate, then run the command again.",
+        component=consent_button(url, "Connect Archon account"),
         flags=hikari.MessageFlag.EPHEMERAL,
     )
     return None
