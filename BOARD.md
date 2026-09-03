@@ -25,5 +25,4 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 
 Board changes ride the commit that earns them.
 
-- Let a member grant the Discord bot a second event: replace the consent table's unique index on (user, client) with one keyed on (user, client, tournament) that also holds the no-event identity grant unique, using an explicit drop so the change applies on a live database at startup. Done when a regression test approves one member for one client on two events and `wiki/hazards.md` records that a changed index in the schema file needs an explicit drop.
 - Send the bot's consent link as a Discord link button instead of a raw URL, at both the setup command and the player commands. Done when both messages carry a button and the URL length stays under Discord's 512-character button limit with the state and challenge the bot generates.

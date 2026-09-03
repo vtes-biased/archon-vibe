@@ -132,8 +132,10 @@ CREATE TABLE IF NOT EXISTS oauth_consents (
     modified TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     data JSONB NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_consents_user_client
-ON oauth_consents((data->>'user_uid'), (data->>'client_id'));
+DROP INDEX IF EXISTS idx_oauth_consents_user_client;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_consents_user_client_tournament
+ON oauth_consents((data->>'user_uid'), (data->>'client_id'), (data->>'tournament_uid'))
+NULLS NOT DISTINCT;
 DROP TRIGGER IF EXISTS oauth_consents_modified_trigger ON oauth_consents;
 CREATE TRIGGER oauth_consents_modified_trigger
 BEFORE INSERT OR UPDATE ON oauth_consents
@@ -213,9 +215,8 @@ ON objects(type, uid);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_objects_user_vekn_id
 ON objects(("full"->>'vekn_id'))
 WHERE type = 'user' AND "full"->>'vekn_id' IS NOT NULL AND "full"->>'vekn_id' != '';
--- Drop the stale expression index (token is no longer in "full").
 DROP INDEX IF EXISTS idx_objects_user_calendar_token;
-CREATE INDEX IF NOT EXISTS idx_objects_user_calendar_token
+CREATE INDEX IF NOT EXISTS idx_objects_user_calendar_token_column
 ON objects(calendar_token)
 WHERE type = 'user' AND calendar_token IS NOT NULL;
 -- Tournament VEKN external ID lookup

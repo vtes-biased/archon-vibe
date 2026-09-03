@@ -584,6 +584,15 @@ the old values with nothing left in the tree to re-apply. And the row count must
 be bounded, tens to low thousands: a pre-serve migration extends deploy downtime
 by its own runtime, so a corpus-scale rewrite stays a post-deploy script.
 
+**Changing an existing index in the schema file needs an explicit `DROP INDEX IF
+EXISTS` of the old name.** The file is applied at every startup with `CREATE …
+IF NOT EXISTS`, which is a no-op for any name a live database already holds: the
+edited definition takes effect on fresh databases only, and CI stays green while
+production keeps the old one. The consent index stayed keyed on (user, client)
+in production for as long as it took a member to run the Discord bot on a second
+event. Give the replacement a **new name** so the drop is a one-time no-op and
+the create stays idempotent rather than rebuilding the index on every start.
+
 **A backend-first deploy is safe by design**: an unknown snapshot type is counted
 toward the `eof` total and ignored. Do not "fix" that by counting only recognised
 types ([sync](sync.md#adding-a-new-object-type)).
