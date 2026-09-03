@@ -84,7 +84,7 @@ class SetupCommand(
             url = make_oauth_url(state, code_challenge, tournament_uid)
             await ctx.respond(
                 f"**Authorize Archon Bot for this event**\nClick the link below to grant the bot access to it:\n{url}\n\n"
-                f"After authorization, run {command_mention('setup')} again with the same URL.",
+                f"After authorization, run {command_mention('setup')} again with `{self.url}`.",
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
             return
