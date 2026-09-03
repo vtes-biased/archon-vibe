@@ -26,3 +26,4 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 Board changes ride the commit that earns them.
 
 - Send the bot's consent link as a Discord link button instead of a raw URL, at both the setup command and the player commands. Done when both messages carry a button and the URL length stays under Discord's 512-character button limit with the state and challenge the bot generates.
+- Post into each table's text chat when the round clock starts, add a 1-minute warning to the bot's 15-minute, 5-minute and time-up reminders, and announce a table's time extension in its chat when the organizer grants one, all honouring per-table extra time. Done when the start post lands in every pending table's chat on clock start but not on resume or reconnect catch-up, the regression test's threshold lists carry the 1-minute warning, and the round-timer paragraph in `wiki/discord.md` names the new set. Context in `board/timer-posts.md`.
