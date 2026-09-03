@@ -122,7 +122,9 @@ creates nothing; on success it names the category from the real tournament name 
 creates announcement, lobby and judges channels, gated on the `create_tournament`
 capability. Then `/teardown`, `/announce`, `/sync` (reconcile voice channels — a
 repair tool), `/register`, `/checkin`, `/report <vp>`, `/judge`, and a multi-step
-`/sanction`.
+`/sanction`. Guidance text names a command as a clickable Discord command
+mention — `</name:id>`, the id read from the commands lightbulb synced at
+startup — and falls back to the plain name when there is no synced id.
 
 **Modules** — `token_store.py` (SQLite: tokens per (Discord account, event),
 guild-tournament links with a scheduled event id, pending OAuth with a 15-minute

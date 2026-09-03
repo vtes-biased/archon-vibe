@@ -6,6 +6,7 @@ import lightbulb
 
 from .. import config
 from ..archon_api import ArchonAPI
+from ..command_mentions import command_mention
 from ..oauth_utils import generate_pkce, make_oauth_url
 from ..token_store import TokenStore
 from ..tournament_resolver import resolve_tournament
@@ -259,7 +260,7 @@ class JudgeCommand(
         link = await store.get_tournament_link(guild_id, tournament_uid)
         if not link:
             await ctx.respond(
-                "Tournament configuration not found. Ask an organizer to run `/setup` again.",
+                f"Tournament configuration not found. Ask an organizer to run {command_mention('setup')} again.",
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
             return

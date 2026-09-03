@@ -6,6 +6,7 @@ import miru
 
 from . import config
 from .archon_api import ArchonAPI
+from .command_mentions import bind as bind_command_mentions
 from .commands.judge import SanctionCommand
 from .commands.player import (
     CheckinCommand,
@@ -89,6 +90,7 @@ def build_client(
 
     for command in COMMANDS:
         client.register(command)
+    bind_command_mentions(client)
     return client
 
 

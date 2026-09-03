@@ -31,6 +31,7 @@ from .channel_manager import (
     sync_judges_channel,
     sync_table_permissions,
 )
+from .command_mentions import command_mention
 from .scheduled_events import ensure_scheduled_event, event_signature
 from .token_store import TokenStore
 
@@ -773,7 +774,7 @@ async def _warn_unlinked_players(
         judges_id,
         f"**Warning:** {len(unlinked)} seated player{'s have' if len(unlinked) != 1 else ' has'} "
         f"not linked their Discord account and cannot join voice: {', '.join(names)}. "
-        f"Ask them to run `/checkin` in the lobby.",
+        f"Ask them to run {command_mention('checkin')} in the lobby.",
     )
 
 
@@ -791,7 +792,7 @@ async def _warn_unlinked_organizers(
         judges_id,
         f"**Warning:** {len(new)} organizer{'s have' if len(new) != 1 else ' has'} "
         f"no linked Discord account and cannot see this channel: "
-        f"{', '.join(names)}. Ask them to run `/register` here once, or link "
+        f"{', '.join(names)}. Ask them to run {command_mention('register')} here once, or link "
         f"Discord on the webapp.",
     )
 
@@ -837,8 +838,8 @@ async def reconcile_channels(
             bot,
             judges_id,
             "**Channel sync aborted:** the tournament category was deleted, so I "
-            "can't place voice channels. Recreate it, or run `/teardown` then "
-            "`/setup` again.",
+            f"can't place voice channels. Recreate it, or run {command_mention('teardown')} then "
+            f"{command_mention('setup')} again.",
         )
         return ReconcileSummary(aborted=True)
 
@@ -1086,12 +1087,12 @@ async def _emit_announcements(
             bot,
             announcement_id,
             f"**Registration is open for {name}!**\n"
-            f"Use `/register` in <#{lobby_id}> to sign up.",
+            f"Use {command_mention('register')} in <#{lobby_id}> to sign up.",
         )
         await _post(
             bot,
             lobby_id,
-            f"Registration is open! Use `/register` to sign up for **{name}**.",
+            f"Registration is open! Use {command_mention('register')} to sign up for **{name}**.",
         )
         await _post(
             bot,
@@ -1113,12 +1114,12 @@ async def _emit_announcements(
             announcement_id,
             f"**Check-in is open for {name}!**\n"
             f"{registered} player{'s' if registered != 1 else ''} registered. "
-            f"Use `/checkin` in <#{lobby_id}> to check in.{decklist_note}",
+            f"Use {command_mention('checkin')} in <#{lobby_id}> to check in.{decklist_note}",
         )
         await _post(
             bot,
             lobby_id,
-            f"Check-in is now open! Use `/checkin` to check in for "
+            f"Check-in is now open! Use {command_mention('checkin')} to check in for "
             f"**{name}**.{decklist_note}",
         )
         await _post(
@@ -1139,7 +1140,7 @@ async def _emit_announcements(
             )
         )
         lines.append(
-            f"\nCheck-in for the next round is open — use `/checkin` in <#{lobby_id}>."
+            f"\nCheck-in for the next round is open — use {command_mention('checkin')} in <#{lobby_id}>."
         )
         await _post(bot, announcement_id, "\n".join(lines))
 
@@ -1211,7 +1212,7 @@ async def _emit_announcements(
             judges_id,
             f"**{name}** — Tournament finished.\n"
             f"Results and VEKN push available on the webapp.\n"
-            f"Use `/teardown` when you're ready to remove the tournament channels.\n{webapp_url}",
+            f"Use {command_mention('teardown')} when you're ready to remove the tournament channels.\n{webapp_url}",
         )
 
 
@@ -1260,7 +1261,7 @@ async def _announce_round_seating(
         judges_id,
         f"**{name}** — Round {round_count} started ({len(tables_data)} tables, "
         f"{sum(len(t) for t in tables_data)} players).\n"
-        f"Use `/sanction @player` to issue sanctions.\n{webapp_url}",
+        f"Use {command_mention('sanction')} on a player to issue sanctions.\n{webapp_url}",
     )
 
 

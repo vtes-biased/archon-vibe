@@ -7,6 +7,7 @@ import lightbulb
 from .. import config
 from ..archon_api import ArchonAPI
 from ..channel_manager import create_tournament_channels, teardown_tournament
+from ..command_mentions import command_mention
 from ..oauth_utils import generate_pkce, make_oauth_url
 from ..scheduled_events import delete_scheduled_event
 from ..sse_listener import (
@@ -83,7 +84,7 @@ class SetupCommand(
             url = make_oauth_url(state, code_challenge, tournament_uid)
             await ctx.respond(
                 f"**Authorize Archon Bot for this event**\nClick the link below to grant the bot access to it:\n{url}\n\n"
-                f"After authorization, run `/setup {self.url}` again.",
+                f"After authorization, run {command_mention('setup')} again with the same URL.",
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
             return
@@ -104,7 +105,7 @@ class SetupCommand(
         existing = await store.get_tournament_link(str(ctx.guild_id), tournament_uid)
         if existing:
             await ctx.respond(
-                "This tournament is already linked to this server. Use `/teardown` first to unlink.",
+                f"This tournament is already linked to this server. Use {command_mention('teardown')} first to unlink.",
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
             return
@@ -174,7 +175,7 @@ class SetupCommand(
             await ctx.client.app.rest.create_message(
                 lobby_id,
                 f"Welcome! This is the tournament lobby.\n"
-                f"When registration opens, use `/register` here to sign up.\n"
+                f"When registration opens, use {command_mention('register')} here to sign up.\n"
                 f"Tournament details: {webapp_url}",
             )
             await ctx.client.app.rest.create_message(
@@ -395,8 +396,8 @@ class SyncCommand(
         if summary.aborted:
             await ctx.respond(
                 "Sync aborted: the tournament category is missing. See "
-                f"<#{link['judges_channel_id']}> — recreate it, or `/teardown` "
-                "then `/setup`.",
+                f"<#{link['judges_channel_id']}> — recreate it, or {command_mention('teardown')} "
+                f"then {command_mention('setup')}.",
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
             return

@@ -1,3 +1,5 @@
+from .command_mentions import command_mention
+
 _SANCTION_LEVEL_LABELS = {
     "caution": "Caution",
     "warning": "Warning",
@@ -87,7 +89,7 @@ def format_round_seating(
         ]
         lines.append(f"**Table {ti + 1}**: {' → '.join(seat_names)}")
     lines.append(
-        "\nJoin your table's voice channel and use `/report` when the round ends."
+        f"\nJoin your table's voice channel and use {command_mention('report')} when the round ends."
     )
     return "\n".join(lines)
 
@@ -157,7 +159,7 @@ def format_timer_reminder(table_label: str, threshold_seconds: int) -> str:
     if threshold_seconds <= 0:
         return (
             f"⏰ **Time!** {table_label} — the round clock has run out. "
-            f"Finish the current turn, then report results with `/report`."
+            f"Finish the current turn, then report results with {command_mention('report')}."
         )
     minutes = threshold_seconds // 60
     unit = "minute" if minutes == 1 else "minutes"

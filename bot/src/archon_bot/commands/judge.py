@@ -5,6 +5,7 @@ import lightbulb
 import miru
 
 from ..archon_api import ArchonAPI
+from ..command_mentions import command_mention
 from ..token_store import TokenStore
 from ..tournament_resolver import resolve_tournament
 from ._common import fetch_userinfo
@@ -320,7 +321,7 @@ class SanctionCommand(
         if not tokens:
             await ctx.respond(
                 "You need to connect your Archon account to this event first. "
-                "Run `/register` in a tournament channel to get started.",
+                f"Run {command_mention('register')} in a tournament channel to get started.",
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
             return

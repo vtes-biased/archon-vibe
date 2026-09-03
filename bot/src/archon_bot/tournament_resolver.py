@@ -3,6 +3,7 @@ import logging
 import hikari
 import lightbulb
 
+from .command_mentions import command_mention
 from .token_store import TokenStore
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,7 @@ async def resolve_tournament(ctx: lightbulb.Context, store: TokenStore) -> str |
 
     if not tournaments:
         await ctx.respond(
-            "No tournament is linked to this server. Ask an organizer to run `/setup`.",
+            f"No tournament is linked to this server. Ask an organizer to run {command_mention('setup')}.",
             flags=hikari.MessageFlag.EPHEMERAL,
         )
         return None
