@@ -1054,6 +1054,24 @@ fn test_checkin_with_decklist_no_warning() {
 }
 
 #[test]
+fn test_recheckin_after_upload_clears_missing_decklist() {
+    let mut tournament = tournament_with_player("Waiting");
+    tournament["decklist_required"] = true.into();
+    tournament["players"][0]["missing_decklist"] = true.into();
+
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
+    let event = json::object! { type: "CheckIn", player_uid: "player-1" };
+    let actor = make_player("player-1");
+    let (raw, _) = run_event_with_decks(&tournament, &event, &actor, decks).unwrap();
+    let updated = json::parse(&raw).unwrap();
+    assert_eq!(updated["players"][0]["state"].as_str(), Some("Checked-in"));
+    assert_ne!(
+        updated["players"][0]["missing_decklist"].as_bool(),
+        Some(true)
+    );
+}
+
+#[test]
 fn test_set_payment_status() {
     let mut tournament = make_tournament();
     tournament["state"] = "Waiting".into();

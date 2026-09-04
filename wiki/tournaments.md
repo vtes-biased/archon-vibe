@@ -230,11 +230,14 @@ CSV import is how the roster fills, a latecomer or a row the import could not ma
 still gets in, and a seat bought at a ticket shop is cancelled at its source, not
 here.
 
-Barriers to check-in: sitting on the waitlist, a required decklist not uploaded, a
-VEKN ban, a disqualification from this event, or reaching the per-player round cap.
-`CheckInAll` skips waitlisted players rather than failing on them, and
-`SelfOrganizeRound` refuses them — self-seating past the cap would make it advisory
-again.
+Barriers to check-in: sitting on the waitlist, a VEKN ban, a disqualification from
+this event, or reaching the per-player round cap. `CheckInAll` skips waitlisted
+players rather than failing on them, and `SelfOrganizeRound` refuses them —
+self-seating past the cap would make it advisory again. A required decklist not
+yet uploaded is not a barrier: `CheckIn` stamps the player `missing_decklist`
+instead, writing the stamp both ways on every check-in so a re-check-in after the
+upload clears it. The bot's `/checkin` reply warns only players who carry the
+stamp; `/register` gives everyone the neutral reminder, no deck being judged yet.
 
 **The door stays open mid-round** — check-in is allowed while a round is
 `Playing`, and a player never registered is enrolled by it, though on an event

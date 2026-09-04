@@ -110,12 +110,13 @@ async def _handle_registration_pipeline(
                     "registration cap. An organizer will promote you if a seat "
                     "opens; you cannot check in until they do."
                 )
-            if player_entry and player_entry.get("missing_decklist"):
-                msg += (
-                    "\n\n**Warning:** This tournament requires a decklist. "
-                    "Upload yours before the round starts:\n"
-                    + config.event_url(result.data, tournament_uid)
-                )
+            if action == "checkin":
+                if player_entry and player_entry.get("missing_decklist"):
+                    msg += (
+                        "\n\n**Warning:** This tournament requires a decklist and "
+                        "none of yours is on record. Upload it before the round "
+                        "starts:\n" + config.event_url(result.data, tournament_uid)
+                    )
             elif result.data.get("decklist_required"):
                 msg += (
                     "\n\nThis tournament requires a decklist. "

@@ -791,6 +791,8 @@ fn apply_event(
             .into();
             if missing_decklist {
                 tournament[tournament::PLAYERS][idx][player::MISSING_DECKLIST] = true.into();
+            } else {
+                tournament[tournament::PLAYERS][idx].remove(player::MISSING_DECKLIST);
             }
 
             Ok(())

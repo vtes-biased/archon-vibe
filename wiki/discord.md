@@ -98,7 +98,9 @@ Discord tournaments authorizes once for each.
 The bot therefore cannot claim a VEKN ID for a player: `/vekn/claim` merges two
 accounts and answers with a **first-party** token pair, which no delegated grant
 reaches. `/register` and `/checkin` send a member without a VEKN ID to their
-Archon profile to link one, then back.
+Archon profile to link one, then back. On an event that requires a decklist,
+`/checkin` warns only a player whose check-in found none on record; `/register`
+and the check-in-open posts carry the neutral reminder.
 
 **Status: pre-production.** Deployed and running, not yet live on production
 guilds and not yet tested end to end.

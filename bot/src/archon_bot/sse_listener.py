@@ -1105,8 +1105,8 @@ async def _emit_announcements(
         decklist_note = ""
         if obj.get("decklist_required"):
             decklist_note = (
-                f"\nThis tournament requires a decklist — upload yours on the "
-                f"webapp: {webapp_url}"
+                f"\nThis tournament requires a decklist — if you haven't uploaded "
+                f"yours yet, do it on the webapp before the round starts: {webapp_url}"
             )
 
         await _post(
