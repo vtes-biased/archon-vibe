@@ -125,8 +125,6 @@ def find_player_table(
     # Finals first: a finalist is still seated in the last preliminary round.
     finals = tournament.get("finals") or {}
     if finals.get("seating"):
-        if finals.get("result"):
-            return None
         if any(s.get("player_uid") == player_uid for s in finals["seating"]):
             return (len(rounds), 0)
         return None

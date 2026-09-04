@@ -43,16 +43,15 @@ def _seat_uids(seating: Iterable[dict]) -> frozenset[str]:
 
 
 def desired_channels(obj: dict) -> list[DesiredChannel]:
-    """Reconcile's goal set. An empty return (finals finished, or not ``Playing``)
-    means every matching Discord channel gets torn down."""
+    """Reconcile's goal set. An empty return (not ``Playing``) means every
+    matching Discord channel gets torn down; a seated finals table keeps its
+    channel until then, whatever its own state."""
     if obj.get("state") != "Playing":
         return []
     organizer_uids = frozenset(obj.get("organizers_uids", []))
     finals = obj.get("finals") or {}
     finals_seating = finals.get("seating")
     if finals_seating:
-        if finals.get("result"):
-            return []
         return [DesiredChannel("Finals", _seat_uids(finals_seating) | organizer_uids)]
     rounds = obj.get("rounds", [])
     if not rounds:

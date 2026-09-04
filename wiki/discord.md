@@ -151,6 +151,8 @@ reconcile is skipped when the structure is unchanged. A per-tournament
 and `/sync` never interleave. Convergence diffs Discord's **actual** channels —
 one `fetch_guild_channels` call, matched by name — against the desired set, so a
 timed-out partial create converges on retry instead of duplicating channels.
+The Finals voice channel stands until the tournament is finished, whatever the
+finals table's own state — the engine sets no table-level result to gate on.
 
 **Event dispatch is time-bounded** (`_DISPATCH_TIMEOUT`): a handler that blocks
 would freeze stream consumption silently — no error and no reconnect, since
