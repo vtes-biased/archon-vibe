@@ -419,11 +419,14 @@ stack.
 (offline-capable). URL import (VDB / VTESDecks / Amaranth) and QR go through the
 backend `GET /fetch-deck` proxy, which uses krcg providers to fetch and resolve
 provider-native card ids — notably Amaranth's own — to VEKN ids against krcg's own
-bundled card DB, independent of our `cards.json`. URL and QR import are disabled
-offline; text import is not. Both ride `apiRequest`, so they inherit the
-refresh-and-retry every other authenticated call has, and the proxy codes its
-refusals (`deck_fetch.bad_link`, `deck_fetch.provider_unavailable`) so a dead
-session, an unreadable link and a provider outage each read differently.
+bundled card DB, independent of our `cards.json`. VDB's deck-in-URL form
+(`/decks/deck?name=…#id=count;…`) carries the deck itself and krcg decodes it
+without calling VDB. URL and QR import are disabled offline; text import is not.
+Both ride `apiRequest`, so they inherit the refresh-and-retry every other
+authenticated call has, and the proxy codes its refusals so a dead session, an
+unreadable link and a provider outage each read differently: a 4xx answer from
+the provider, an unknown card or an unreadable link is `deck_fetch.bad_link`; a
+5xx answer or a transport failure is `deck_fetch.provider_unavailable`.
 
 **Library type ordering** is `LIBRARY_TYPE_ORDER` in `engine/src/deck.rs`, exported
 as `libraryTypeOrder` and read through `getLibraryTypeOrder()`. The engine's own

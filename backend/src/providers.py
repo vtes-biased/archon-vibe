@@ -100,6 +100,11 @@ async def fetch_deck_from_url(url: str) -> dict:
             f"Could not read the deck at {parsed.netloc}: {e}", "deck_fetch.bad_link"
         ) from e
     except (aiohttp.ClientError, TimeoutError) as e:
+        if isinstance(e, aiohttp.ClientResponseError) and 400 <= e.status < 500:
+            raise DeckFetchError(
+                f"{parsed.netloc} refused the deck link: {e.status} {e.message}",
+                "deck_fetch.bad_link",
+            ) from e
         raise DeckFetchError(
             f"Could not fetch deck from {parsed.netloc}: {e}",
             "deck_fetch.provider_unavailable",

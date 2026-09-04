@@ -240,7 +240,7 @@ requires-dist = [
     { name = "email-validator", specifier = ">=2.2.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "fpdf2", specifier = ">=2.8.8" },
-    { name = "krcg", specifier = ">=5.5" },
+    { name = "krcg", specifier = ">=5.12" },
     { name = "msgspec", specifier = ">=0.19.0" },
     { name = "openpyxl", specifier = ">=3.1.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.3" },
@@ -926,7 +926,7 @@ wheels = [
 
 [[package]]
 name = "krcg"
-version = "5.11"
+version = "5.12"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -936,9 +936,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "unidecode" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/09/bc/dd7260be5e60222cb7738312b89ecb714d5af4e38f3813f97dad6ca15105/krcg-5.11.tar.gz", hash = "sha256:b3dc21f64d778a2412438d6687f0aff4844d20a0f3b52e89b9099ef80473638e", size = 1932741, upload-time = "2026-08-22T21:13:08.226Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2b/e3/029315b671ccbcb3880db9285443a5d9f6a12141328c81b94f4d10989cd0/krcg-5.12.tar.gz", hash = "sha256:88a9dd7a623a3fda61a4dfc805ee6b4bfd8d3d0f41afc2ef899f4a7b69b56555", size = 1928019, upload-time = "2026-09-04T06:13:03.767Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/65/eb/7107bbb0dc6a5b662ba98b1616bb4875bf017b9cfd6a0cc8b29baaca38ae/krcg-5.11-py3-none-any.whl", hash = "sha256:ee689886f018ef9225891ed39f56c7028f147b5d47d0140fa8461840a503a261", size = 1884285, upload-time = "2026-08-22T21:13:06.649Z" },
+    { url = "https://files.pythonhosted.org/packages/40/a2/aa1e60d8b5d2494a33b8c965189b5099fd5e2613e12a11649b35c92d084a/krcg-5.12-py3-none-any.whl", hash = "sha256:7cb763bf9566c47da9ddfbedbf69f26812ac8939441987f33439a1bdb4e3a53a", size = 1879316, upload-time = "2026-09-04T06:13:01.817Z" },
 ]
 
 [[package]]

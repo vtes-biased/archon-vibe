@@ -21,7 +21,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "openpyxl>=3.1.0",
     "pywebpush>=2.0.0",
-    "krcg>=5.5",
+    "krcg>=5.12",
     "scalar-fastapi>=1.8.2",
     "fpdf2>=2.8.8",
 ]
