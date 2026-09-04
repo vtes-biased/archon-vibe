@@ -602,8 +602,7 @@ def _live_round_count(obj: dict) -> int:
     return sum(1 for r in obj.get("rounds", []) if any(_table_pending(t) for t in r))
 
 
-# Reminders fire at these many seconds of remaining time, per table: 15-, 5- and
-# 1-minute warnings, then the time-up post. Ordered longest-first for readability.
+# Reminders fire at these many seconds of remaining time, per table.
 _TIMER_THRESHOLDS = (900, 300, 60, 0)
 
 
