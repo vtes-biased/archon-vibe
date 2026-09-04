@@ -20,14 +20,18 @@ def _table(seats: list[dict], state: str = "In Progress") -> dict:
     return {"seating": seats, "state": state, "override": None}
 
 
+def _four(*uids: str, vp: float = 0.0) -> list[dict]:
+    return [_seat(u, vp) for u in uids]
+
+
 def test_round_start_echoes_every_table_and_skips_the_zero_sentinel() -> None:
     prev = {"rounds": [], "state": "Waiting"}
     cur = {
         "rounds": [
             [
-                _table([_seat("alice"), _seat("bob")]),
-                _table([_seat("carol"), _seat("dave")]),
-                _table([_seat("erin"), _seat("frank")]),
+                _table(_four("alice", "bob", "carol", "dave")),
+                _table(_four("erin", "frank", "gina", "hank")),
+                _table(_four("ivan", "judy", "kate", "liam")),
             ]
         ],
         "state": "Playing",
@@ -37,8 +41,17 @@ def test_round_start_echoes_every_table_and_skips_the_zero_sentinel() -> None:
 
 
 def test_silent_on_score_report_and_noop_push() -> None:
-    prev = {"rounds": [[_table([_seat("alice"), _seat("bob")])]]}
-    scored = {"rounds": [[_table([_seat("alice", 3), _seat("bob", 1)], "Finished")]]}
+    prev = {"rounds": [[_table(_four("alice", "bob", "carol", "dave"))]]}
+    scored = {
+        "rounds": [
+            [
+                _table(
+                    [_seat("alice", 3), _seat("bob", 1), _seat("carol"), _seat("dave")],
+                    "Finished",
+                )
+            ]
+        ]
+    }
     assert compute_seating_echoes(prev, scored, [111]) == []
     assert compute_seating_echoes(prev, prev, [111]) == []
 
@@ -47,17 +60,17 @@ def test_mid_round_update_echoes_only_the_changed_tables() -> None:
     prev = {
         "rounds": [
             [
-                _table([_seat("alice"), _seat("bob")]),
-                _table([_seat("carol"), _seat("dave")]),
+                _table(_four("alice", "bob", "carol", "dave")),
+                _table(_four("erin", "frank", "gina", "hank")),
             ]
         ]
     }
     cur = {
         "rounds": [
             [
-                _table([_seat("alice"), _seat("bob")]),
-                _table([_seat("dave"), _seat("carol")]),
-                _table([_seat("erin"), _seat("frank")]),
+                _table(_four("alice", "bob", "carol", "dave")),
+                _table(_four("frank", "erin", "gina", "hank")),
+                _table(_four("ivan", "judy", "kate", "liam")),
             ]
         ]
     }
