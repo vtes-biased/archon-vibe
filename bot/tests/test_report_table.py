@@ -1,6 +1,5 @@
-"""A finalist is still seated in the last preliminary round, so a lookup that
-scans ``rounds`` first sends a finals ``/report`` to the closed prelim table —
-and the engine accepts that score."""
+"""A finals ``/report`` must resolve to the finals table, not the closed prelim
+table the finalist is still seated at."""
 
 from __future__ import annotations
 

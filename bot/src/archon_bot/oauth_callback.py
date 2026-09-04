@@ -63,8 +63,6 @@ async def handle_callback(request: web.Request) -> web.Response:
             await start_sse(
                 _bot, _api, _store, gt["guild_id"], tournament_uid, discord_id
             )
-        # A fresh grant changes no tournament structure, so nothing else would
-        # reconcile the holder's table CONNECT until the next round.
         task = asyncio.create_task(
             _reconcile_after_grant(gt["guild_id"], tournament_uid)
         )
