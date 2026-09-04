@@ -18,6 +18,7 @@ from .announcements import (
     format_sanction,
     format_standings,
     format_table_result,
+    format_table_seating,
     format_time_extension,
     format_timer_reminder,
     format_timer_start,
@@ -500,16 +501,15 @@ async def _post(bot, channel_id: int, content: str) -> None:
         logger.warning("Failed to post to channel %s: %s", channel_id, e)
 
 
-def _extract_round_seating(tournament: dict) -> list[set[str]] | None:
+def _seat_uids(table: dict) -> list[str]:
+    return [s.get("player_uid", "") for s in table.get("seating", [])]
+
+
+def _extract_round_seating(tournament: dict) -> list[list[str]] | None:
     rounds = tournament.get("rounds", [])
     if not rounds:
         return None
-    current_round = rounds[-1]
-    result = []
-    for table in current_round:
-        seating = table.get("seating", [])
-        result.append({s.get("player_uid", "") for s in seating})
-    return result
+    return [_seat_uids(table) for table in rounds[-1]]
 
 
 def _seat_results(table: dict) -> dict[str, tuple]:
@@ -566,6 +566,32 @@ def compute_result_announcements(
                 ),
             )
         )
+    return out
+
+
+def compute_seating_echoes(
+    prev_obj: dict | None, cur_obj: dict, table_chs: list[int]
+) -> list[tuple[int, int]]:
+    """``(channel_id, table_index)`` for every table whose chat should get its
+    seating: all of them on a round or finals start, only the changed ones on a
+    mid-round update. ``[]`` on a None ``prev_obj`` — no replay on reconnect."""
+    if prev_obj is None:
+        return []
+    cur_tag, cur_tables = _active_tables(cur_obj)
+    if not cur_tag:
+        return []
+    prev_tag, prev_tables = _active_tables(prev_obj)
+    out: list[tuple[int, int]] = []
+    for i, table in enumerate(cur_tables):
+        if i >= len(table_chs) or not table_chs[i]:
+            continue
+        if (
+            cur_tag == prev_tag
+            and i < len(prev_tables)
+            and _seat_uids(table) == _seat_uids(prev_tables[i])
+        ):
+            continue
+        out.append((table_chs[i], i))
     return out
 
 
@@ -1247,6 +1273,26 @@ async def _emit_announcements(
         ):
             await _announce_seating_update(
                 bot, store, guild_id, tournament_uid, obj, link
+            )
+
+    echoes = compute_seating_echoes(prev_obj, obj, _table_channels.get(key, []))
+    if echoes:
+        tag, tables = _active_tables(obj)
+        seated = {uid for _ch, i in echoes for uid in _seat_uids(tables[i])}
+        discord_id_map = await _build_discord_id_map(store, seated)
+        for ch_id, i in echoes:
+            await _post(
+                bot,
+                ch_id,
+                format_table_seating(
+                    i,
+                    tables[i],
+                    players,
+                    is_finals=tag == "finals",
+                    seed_order=(obj.get("finals") or {}).get("seed_order", []),
+                    discord_id_map=discord_id_map,
+                    user_names=_user_names[key],
+                ),
             )
 
     # A pure score report makes no structural change, so _table_channels still

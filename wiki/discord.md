@@ -172,8 +172,11 @@ sync retrofits pre-privacy channels found without the deny override.
 
 **Announcements** are a separate edge-triggered layer posting seating, standings and
 scores to #announcement after the structural reconcile, suppressed during silent
-catch-up. It also mirrors organizer in-app announcements, diffing the list by `id`
-and posting new entries only.
+catch-up. Seating is also echoed into each table's own voice text chat, with
+player mentions: every table on a round or finals start, only the tables whose
+seating order changed on a mid-round update, and nothing on reconnect. It also
+mirrors organizer in-app announcements, diffing the list by `id` and posting new
+entries only.
 
 **Round-timer posts** — every table's voice text chat gets the clock's story:
 a start post when the organizer starts the round clock (a first start, never a

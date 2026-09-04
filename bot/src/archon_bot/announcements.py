@@ -119,6 +119,36 @@ def format_finals(
     return "\n".join(lines)
 
 
+def format_table_seating(
+    table_index: int,
+    table: dict,
+    players: list,
+    *,
+    is_finals: bool = False,
+    seed_order: list | None = None,
+    discord_id_map: dict | None = None,
+    user_names: dict | None = None,
+) -> str:
+    label = "Finals" if is_finals else f"Table {table_index + 1}"
+    lines = [f"**{label} — Seating** (prey → predator)"]
+    for i, s in enumerate(table.get("seating", [])):
+        uid = s.get("player_uid", "")
+        display = player_display(
+            uid,
+            players,
+            discord_id_map=discord_id_map,
+            user_names=user_names,
+            mention=True,
+        )
+        seed = (
+            f" (seed #{seed_order.index(uid) + 1})"
+            if seed_order and uid in seed_order
+            else ""
+        )
+        lines.append(f"  {i + 1}. {display}{seed}")
+    return "\n".join(lines)
+
+
 def _fmt_vp(vp) -> str:
     """VPs are whole in normal play but the model allows halves (split finals);
     render '3' not '3.0', and '2.5' as-is."""
