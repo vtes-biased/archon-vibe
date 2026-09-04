@@ -155,15 +155,41 @@ def format_table_result(
     return "\n".join(lines)
 
 
+def _fmt_duration(seconds: int) -> str:
+    minutes, rest = divmod(int(seconds), 60)
+    if rest:
+        return f"{minutes}:{rest:02d}"
+    return f"{minutes} minute" if minutes == 1 else f"{minutes} minutes"
+
+
+def format_timer_start(table_label: str, total_seconds: int) -> str:
+    return (
+        f"▶️ **The round clock has started** at {table_label} — "
+        f"{_fmt_duration(total_seconds)} on the clock."
+    )
+
+
+def format_time_extension(
+    table_label: str, granted_seconds: int, total_extra_seconds: int
+) -> str:
+    total = (
+        ""
+        if total_extra_seconds == granted_seconds
+        else f" ({_fmt_duration(total_extra_seconds)} in total)"
+    )
+    return (
+        f"⏱️ **Time extension** at {table_label}: a judge has granted "
+        f"{_fmt_duration(granted_seconds)} of extra time{total}."
+    )
+
+
 def format_timer_reminder(table_label: str, threshold_seconds: int) -> str:
     if threshold_seconds <= 0:
         return (
             f"⏰ **Time!** {table_label} — the round clock has run out. "
             f"Finish the current turn, then report results with {command_mention('report')}."
         )
-    minutes = threshold_seconds // 60
-    unit = "minute" if minutes == 1 else "minutes"
-    return f"⏳ **{minutes} {unit} remaining** at {table_label}."
+    return f"⏳ **{_fmt_duration(threshold_seconds)} remaining** at {table_label}."
 
 
 def format_announcement(text: str) -> str:

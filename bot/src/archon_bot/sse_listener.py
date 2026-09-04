@@ -18,7 +18,9 @@ from .announcements import (
     format_sanction,
     format_standings,
     format_table_result,
+    format_time_extension,
     format_timer_reminder,
+    format_timer_start,
     player_display,
 )
 from .channel_manager import (
@@ -600,9 +602,9 @@ def _live_round_count(obj: dict) -> int:
     return sum(1 for r in obj.get("rounds", []) if any(_table_pending(t) for t in r))
 
 
-# Reminders fire at these many seconds of remaining time, per table: 15-minute and
-# 5-minute warnings, then the time-up post. Ordered longest-first for readability.
-_TIMER_THRESHOLDS = (900, 300, 0)
+# Reminders fire at these many seconds of remaining time, per table: 15-, 5- and
+# 1-minute warnings, then the time-up post. Ordered longest-first for readability.
+_TIMER_THRESHOLDS = (900, 300, 60, 0)
 
 
 @dataclass(frozen=True)
@@ -611,6 +613,14 @@ class TimerReminder:
     token: tuple
     delay: float  # wall-clock seconds from `now`; ≤0 means the threshold has passed
     message: str
+
+
+@dataclass(frozen=True)
+class ClockTable:
+    index: int
+    channel_id: int
+    label: str
+    total: int  # the round or finals time plus this table's extra time, seconds
 
 
 def _parse_started_at_epoch(started_at: str | None) -> float | None:
@@ -624,40 +634,29 @@ def _parse_started_at_epoch(started_at: str | None) -> float | None:
     return dt.timestamp() if dt.tzinfo else dt.replace(tzinfo=UTC).timestamp()
 
 
-def compute_timer_reminders(
-    obj: dict, table_chs: list[int], now: float
-) -> list[TimerReminder]:
-    """Mirrors the frontend countdown formula exactly (TimerDisplay.svelte):
-    ``remaining = total - (elapsed_before_pause + (now - started_at)) + extra``.
-    The two must change together or the bot's reminders drift from the display."""
+def clock_tables(obj: dict, table_chs: list[int]) -> tuple[str, list[ClockTable]]:
+    """The pending tables the shared round clock governs, with their chat channel
+    and full allotment; empty whenever the frontend hides the timer."""
     if obj.get("state", "") != "Playing":
-        return []
-    timer = obj.get("timer") or {}
-    if timer.get("paused"):
-        return []
-    started_epoch = _parse_started_at_epoch(timer.get("started_at"))
-    if started_epoch is None:
-        return []
-
+        return "", []
     tag, tables = _active_tables(obj)
     if not tag:
-        return []
+        return "", []
     is_finals = tag == "finals"
     # One shared clock is meaningless once >1 prelim round is live; mirrors the
     # frontend, which hides the timer in the same case.
     if not is_finals and _live_round_count(obj) > 1:
-        return []
+        return "", []
     total = (
         (obj.get("finals_time") or obj.get("round_time") or 0)
         if is_finals
         else (obj.get("round_time") or 0)
     )
     if total <= 0:
-        return []
+        return "", []
 
-    elapsed_before = float(timer.get("elapsed_before_pause") or 0.0)
     extra_map = obj.get("table_extra_time") or {}
-    out: list[TimerReminder] = []
+    out: list[ClockTable] = []
     for i, table in enumerate(tables):
         if i >= len(table_chs) or not table_chs[i]:  # skip 0 sentinel / missing
             continue
@@ -665,17 +664,81 @@ def compute_timer_reminders(
             # A finished finals (seating still populated) would otherwise keep a
             # stale "Time!" scheduled until the tournament is formally finalized.
             continue
-        extra = extra_map.get(str(i), 0)
-        deadline = started_epoch + total + extra - elapsed_before
-        label = "Finals" if is_finals else f"Table {i + 1}"
+        out.append(
+            ClockTable(
+                index=i,
+                channel_id=table_chs[i],
+                label="Finals" if is_finals else f"Table {i + 1}",
+                total=total + extra_map.get(str(i), 0),
+            )
+        )
+    return tag, out
+
+
+def _clock_running(obj: dict) -> bool:
+    timer = obj.get("timer") or {}
+    return bool(timer.get("started_at")) and not timer.get("paused")
+
+
+def compute_timer_reminders(
+    obj: dict, table_chs: list[int], now: float
+) -> list[TimerReminder]:
+    """Mirrors the frontend countdown formula exactly (TimerDisplay.svelte):
+    ``remaining = total - (elapsed_before_pause + (now - started_at)) + extra``.
+    The two must change together or the bot's reminders drift from the display."""
+    timer = obj.get("timer") or {}
+    if timer.get("paused"):
+        return []
+    started_epoch = _parse_started_at_epoch(timer.get("started_at"))
+    if started_epoch is None:
+        return []
+    elapsed_before = float(timer.get("elapsed_before_pause") or 0.0)
+    tag, tables = clock_tables(obj, table_chs)
+    out: list[TimerReminder] = []
+    for ct in tables:
+        deadline = started_epoch + ct.total - elapsed_before
         for thr in _TIMER_THRESHOLDS:
             out.append(
                 TimerReminder(
-                    channel_id=table_chs[i],
-                    token=(tag, i, thr),
+                    channel_id=ct.channel_id,
+                    token=(tag, ct.index, thr),
                     delay=(deadline - thr) - now,
-                    message=format_timer_reminder(label, thr),
+                    message=format_timer_reminder(ct.label, thr),
                 )
+            )
+    return out
+
+
+def compute_timer_start_posts(
+    prev_obj: dict | None, cur_obj: dict, table_chs: list[int]
+) -> list[tuple[int, str]]:
+    """A first start carries ``elapsed_before_pause`` 0; a resume carries the
+    elapsed time the pause banked, so it posts nothing."""
+    if prev_obj is None or _clock_running(prev_obj) or not _clock_running(cur_obj):
+        return []
+    if float((cur_obj.get("timer") or {}).get("elapsed_before_pause") or 0.0) > 0:
+        return []
+    _tag, tables = clock_tables(cur_obj, table_chs)
+    return [(ct.channel_id, format_timer_start(ct.label, ct.total)) for ct in tables]
+
+
+def compute_time_extension_posts(
+    prev_obj: dict | None, cur_obj: dict, table_chs: list[int]
+) -> list[tuple[int, str]]:
+    """Every round transition resets ``table_extra_time`` to ``{}``, so live
+    diffs only ever grow and a shrink is a round boundary with nothing to say."""
+    if prev_obj is None:
+        return []
+    prev_extra = prev_obj.get("table_extra_time") or {}
+    cur_extra = cur_obj.get("table_extra_time") or {}
+    _tag, tables = clock_tables(cur_obj, table_chs)
+    out: list[tuple[int, str]] = []
+    for ct in tables:
+        total_extra = cur_extra.get(str(ct.index), 0)
+        granted = total_extra - prev_extra.get(str(ct.index), 0)
+        if granted > 0:
+            out.append(
+                (ct.channel_id, format_time_extension(ct.label, granted, total_extra))
             )
     return out
 
@@ -943,11 +1006,17 @@ async def sync_now(
     tournament_uid: str,
 ) -> ReconcileSummary | None:
     """Returns ``None`` if no tournament state is cached yet (still connecting)."""
+    key = _task_key(guild_id, tournament_uid)
     async with structural_lock(guild_id, tournament_uid):
-        obj = _last_tournament.get(_task_key(guild_id, tournament_uid))
+        obj = _last_tournament.get(key)
         if obj is None:
             return None
-        return await reconcile_channels(bot, store, guild_id, tournament_uid, obj)
+        summary = await reconcile_channels(bot, store, guild_id, tournament_uid, obj)
+    try:
+        await _reschedule_timers(bot, guild_id, tournament_uid, obj)
+    except Exception as e:
+        logger.error("Timer reschedule failed for %s: %s", key, e)
+    return summary
 
 
 async def _handle_update(
@@ -989,6 +1058,10 @@ async def _handle_update(
                     logger.error(
                         "Organizer re-grant reconcile failed for %s: %s", key, e
                     )
+            try:
+                await _reschedule_timers(bot, guild_id, tournament_uid, obj)
+            except Exception as e:
+                logger.error("Timer reschedule failed for %s: %s", key, e)
         return
 
     if obj_type != "tournament":
@@ -1019,7 +1092,8 @@ async def _handle_update(
         len(obj.get("players", [])),
     )
 
-    if structure_signature(prev_obj or {}) != structure_signature(obj):
+    structure_changed = structure_signature(prev_obj or {}) != structure_signature(obj)
+    if structure_changed:
         async with structural_lock(guild_id, tournament_uid):
             try:
                 await reconcile_channels(bot, store, guild_id, tournament_uid, obj)
@@ -1045,7 +1119,7 @@ async def _handle_update(
 
     # No structural lock: only touches in-process tasks, never Discord channels.
     # Runs after any structural reconcile above so _table_channels is current.
-    if _timer_signature(prev_obj or {}) != _timer_signature(obj):
+    if structure_changed or _timer_signature(prev_obj or {}) != _timer_signature(obj):
         try:
             await _reschedule_timers(bot, guild_id, tournament_uid, obj)
         except Exception as e:
@@ -1183,6 +1257,15 @@ async def _emit_announcements(
             prev_obj, obj, _table_channels.get(key, []), players, _user_names[key]
         ):
             await _post(bot, ch_id, msg)
+
+    for ch_id, msg in compute_timer_start_posts(
+        prev_obj, obj, _table_channels.get(key, [])
+    ):
+        await _post(bot, ch_id, msg)
+    for ch_id, msg in compute_time_extension_posts(
+        prev_obj, obj, _table_channels.get(key, [])
+    ):
+        await _post(bot, ch_id, msg)
 
     # Not state-gated — an organizer can broadcast at any phase.
     for _aid, msg in compute_announcement_posts(prev_obj, obj):

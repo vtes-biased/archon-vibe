@@ -175,16 +175,26 @@ scores to #announcement after the structural reconcile, suppressed during silent
 catch-up. It also mirrors organizer in-app announcements, diffing the list by `id`
 and posting new entries only.
 
-**Round-timer reminders** — a pure function mirrors the frontend countdown
-(`TimerDisplay.svelte`'s exact formula: total − (elapsed before pause + since
-start) + extra time; the two must stay in lockstep) to
-schedule 15-minute and 5-minute warnings plus a time-up task per table, posting into
-each table's voice text chat. One authority cancels and rebuilds the whole schedule
-on every timer-signature change — start, pause, resume, per-table extra time, round
-change, a table finishing — and after a reconnect's catch-up. There is no persisted
-cron: the schedule is recomputed from the snapshot. Passed thresholds are suppressed
-without posting and a per-key fired set prevents double-fire, so a restart never
-re-posts. Only pending tables get reminders.
+**Round-timer posts** — every table's voice text chat gets the clock's story:
+a start post when the organizer starts the round clock (a first start, never a
+resume — the engine banks elapsed time in `elapsed_before_pause` on pause, so a
+resume carries a non-zero value), 15-, 5- and 1-minute warnings, a time-up post,
+and an extension post naming the granted and total extra time when a judge adds
+time to that table ([rules §2.8](domain/tournament-rules.md#roles) requires the
+extension to be clearly communicated). The start and extension posts are
+edge-triggered diffs against the previous snapshot in the announcement layer, so
+catch-up and reconnect never replay them. The warnings and time-up are a schedule:
+a pure function mirrors the frontend countdown (`TimerDisplay.svelte`'s exact
+formula: total − (elapsed before pause + since start) + extra time; the two must
+stay in lockstep). One authority cancels and rebuilds the whole schedule on every
+timer-signature change — start, pause, resume, per-table extra time, round change,
+a table finishing — after every structural reconcile (including `/sync`), since a
+channel created or repaired later than the clock start would otherwise keep a
+schedule computed against its zero sentinel, and after a reconnect's catch-up.
+There is no persisted cron: the schedule is recomputed from the snapshot. Passed
+thresholds are suppressed without posting and a per-key fired set prevents
+double-fire, so a restart never re-posts. Only pending tables get posts, and none
+when the frontend hides the timer (untimed round, parallel rounds).
 
 **Catch-up on connect** — the bot sends no `since` cursor, so the backend replays
 full current state; events seed state silently until `sync_complete` flips the
