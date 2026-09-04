@@ -35,16 +35,14 @@ logger = logging.getLogger(__name__)
 async def _auto_defer(
     _pipeline: lightbulb.ExecutionPipeline, ctx: lightbulb.Context
 ) -> None:
-    """Blanket ephemeral defer is safe only because no command opens a modal as
-    its first response — modals come from miru button callbacks instead."""
+    """Safe only because no command opens a modal as its first response —
+    modals come from miru component callbacks instead."""
     await ctx.defer(ephemeral=True)
 
 
 async def _on_unhandled_command_error(
     exc: lightbulb.exceptions.ExecutionPipelineFailedException,
 ) -> bool:
-    """Last-resort handler: log the traceback and replace the deferred
-    "thinking…" with a visible error instead of a silent hang."""
     logger.error("Unhandled command error", exc_info=exc)
     try:
         await exc.context.respond(
@@ -56,8 +54,6 @@ async def _on_unhandled_command_error(
     return True
 
 
-# A tuple so test_startup.py can register the same set and assert each
-# command's injected dependencies resolve — the #154 wiring regression.
 COMMANDS = (
     SetupCommand,
     TeardownCommand,
@@ -77,8 +73,6 @@ def build_client(
     api: ArchonAPI,
     miru_client: miru.Client,
 ) -> lightbulb.Client:
-    """Extracted from ``main`` so a startup smoke test can exercise this wiring
-    without a live Discord connection."""
     client = lightbulb.client_from_app(bot, hooks=[_auto_defer])
     client.error_handler(_on_unhandled_command_error, priority=-10)
     bot.subscribe(hikari.StartingEvent, client.start)
@@ -104,16 +98,12 @@ def main() -> None:
         ver = "0.0.0+unknown"
     logger.info(f"Archon Discord bot starting (version {ver})")
 
-    bot = hikari.GatewayBot(
-        config.DISCORD_BOT_TOKEN,
-        intents=hikari.Intents.GUILDS | hikari.Intents.GUILD_VOICE_STATES,
-    )
+    bot = hikari.GatewayBot(config.DISCORD_BOT_TOKEN, intents=hikari.Intents.GUILDS)
     miru_client = miru.Client(bot)
     store = TokenStore()
     api = ArchonAPI(store)
     build_client(bot, store, api, miru_client)
 
-    # hikari's GatewayBot has no data store in v2.5; share via this closure
     callback_runner = None
 
     @bot.listen(hikari.StartedEvent)

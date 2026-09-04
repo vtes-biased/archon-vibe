@@ -168,7 +168,7 @@ class SetupCommand(
             discord_id,
         )
 
-        webapp_url = f"{config.ARCHON_FRONTEND_URL}/tournaments/{tournament_uid}"
+        webapp_url = config.event_url(tournament, tournament_uid)
         ann_id = int(channels["announcement_channel_id"])
         lobby_id = int(channels["lobby_channel_id"])
         judges_id = int(channels["judges_channel_id"])
@@ -248,12 +248,10 @@ class TeardownCommand(
             "Removing tournament channels...", flags=hikari.MessageFlag.EPHEMERAL
         )
 
-        # Hold the structural lock for the whole delete and unlink FIRST, so a
-        # reconcile queued behind us re-reads a gone link and no-ops (teardown wins).
+        # Unlink under the structural lock, so a reconcile queued behind this
+        # re-reads a gone link and no-ops: teardown wins.
         failed: list[int] = []
         async with structural_lock(guild_id, tournament_uid):
-            # Snapshot tracked table/finals channels BEFORE stop_sse clears the map;
-            # teardown then also reaches channels that drifted out of the category.
             extra_ids = [
                 int(link[k])
                 for k in (
@@ -265,7 +263,6 @@ class TeardownCommand(
             ]
             extra_ids += tracked_table_channels(guild_id, tournament_uid)
 
-            # Remove the Discord scheduled event before the link row is dropped.
             try:
                 await delete_scheduled_event(
                     ctx.client.app, store, guild_id, tournament_uid
@@ -380,7 +377,6 @@ class SyncCommand(
             )
             return
 
-        # Same organizer gate as /announce and /teardown.
         is_organizer = link["organizer_discord_id"] == discord_id
         if not is_organizer:
             info = await api.get_userinfo(discord_id, tournament_uid)
@@ -391,8 +387,6 @@ class SyncCommand(
                 )
                 return
 
-        # Already deferred ephemerally by the PRE_INVOKE hook, so one respond after
-        # the reconcile's REST work delivers the result (no interim message needed).
         summary = await sync_now(ctx.client.app, store, guild_id, tournament_uid)
         if summary is None:
             await ctx.respond(

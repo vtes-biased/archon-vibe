@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import aiohttp
 import hikari
+from PIL import Image
 
 from . import config
 
@@ -35,10 +36,10 @@ class EventSpec:
     banner_path: str | None
 
 
-def _parse_start(obj: dict) -> datetime | None:
-    """A naive wall-clock ``start`` is localized with the tournament's IANA
+def _parse_instant(obj: dict, key: str) -> datetime | None:
+    """A naive wall-clock value is localized with the tournament's IANA
     ``timezone`` before normalizing to UTC; an absolute instant passes through."""
-    raw = obj.get("start")
+    raw = obj.get(key)
     if not raw:
         return None
     try:
@@ -53,21 +54,14 @@ def _parse_start(obj: dict) -> datetime | None:
     return dt.astimezone(UTC)
 
 
+def _parse_start(obj: dict) -> datetime | None:
+    return _parse_instant(obj, "start")
+
+
 def _parse_end(obj: dict, start: datetime) -> datetime:
-    raw = obj.get("finish")
-    if raw:
-        try:
-            end = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
-            if end.tzinfo is None:
-                try:
-                    end = end.replace(tzinfo=ZoneInfo(obj.get("timezone") or "UTC"))
-                except (ZoneInfoNotFoundError, ValueError):
-                    end = end.replace(tzinfo=UTC)
-            end = end.astimezone(UTC)
-            if end > start:
-                return end
-        except ValueError:
-            pass
+    end = _parse_instant(obj, "finish")
+    if end is not None and end > start:
+        return end
     return start + DEFAULT_DURATION
 
 
@@ -118,9 +112,6 @@ def event_signature(obj: dict) -> tuple:
 
 
 def _to_png(data: bytes) -> bytes:
-    """Transcode arbitrary image bytes (webp/png/jpeg) to PNG — sync/CPU bound."""
-    from PIL import Image  # local import so a missing wheel can't break bot startup
-
     with Image.open(io.BytesIO(data)) as im:
         buf = io.BytesIO()
         im.convert("RGB").save(buf, format="PNG")
@@ -175,8 +166,6 @@ async def ensure_scheduled_event(
         return
 
     now = datetime.now(UTC)
-    # Re-fetch/transcode the banner only on an actual cover change — a
-    # name/description-only edit keeps the event's existing Discord cover.
     cover_changed = (
         event_id is None
         or prev_obj is None
@@ -202,13 +191,11 @@ async def ensure_scheduled_event(
             logger.info("Edited scheduled event %s for %s", event_id, tournament_uid)
             return
         except hikari.NotFoundError:
-            # Deleted on Discord — fall through and recreate.
             logger.info("Scheduled event %s gone; recreating", event_id)
         except Exception as e:
             logger.warning("Edit scheduled event failed for %s: %s", tournament_uid, e)
             return
 
-    # Create — Discord requires a future start.
     if spec.start <= now:
         logger.info(
             "Start not in the future; skipping event create for %s", tournament_uid
@@ -235,8 +222,6 @@ async def ensure_scheduled_event(
 
 
 async def _warn_missing_events_permission(bot, link: dict, key: str) -> None:
-    """Deduped per (guild, tournament) per process; cleared on the next
-    successful create."""
     if key in _perm_warned:
         return
     _perm_warned.add(key)

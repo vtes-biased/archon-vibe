@@ -123,7 +123,8 @@ creating anything, so a bad or inaccessible uid, or a `Finished` tournament,
 creates nothing; on success it names the category from the real tournament name and
 creates announcement, lobby and judges channels, gated on the `create_tournament`
 capability. Then `/teardown`, `/announce`, `/sync` (reconcile voice channels — a
-repair tool), `/register`, `/checkin`, `/report <vp>`, `/judge`, and a multi-step
+repair tool), `/register`, `/checkin`, `/report <vp>` (the caller's live table,
+the finals table first once one is seated), `/judge`, and a multi-step
 `/sanction`. Guidance text names a command as a clickable Discord command
 mention — `</name:id>`, the id read from the commands lightbulb synced at
 startup — and falls back to the plain name when there is no synced id.
@@ -227,7 +228,9 @@ grant; 5xx, network errors and timeouts are treated as transient and feed the
 listener's reconnect backoff instead, so a backend blip cannot kill a valid
 token. A finished event is itself a 400, which is how a grant retires. A
 successful callback respawns that event's dead listener — self-service recovery
-once a token has genuinely died.
+once a token has genuinely died — and reconciles every guild linked to the
+event: a fresh grant changes no tournament structure, so nothing else would give
+the holder their table's CONNECT before the next round.
 
 **Display names** — Register, AddPlayer and CheckIn accept an optional
 `display_name` (the Discord nickname) stored on the player and shown in player and

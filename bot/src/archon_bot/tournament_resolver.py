@@ -36,10 +36,7 @@ async def resolve_tournament(ctx: lightbulb.Context, store: TokenStore) -> str |
 
     lines = ["Run this command in a tournament channel. Active tournaments:"]
     for t in tournaments:
-        link = await store.get_tournament_link(guild_id, t["tournament_uid"])
-        if link:
-            lobby_id = link["lobby_channel_id"]
-            lines.append(f"  <#{lobby_id}>")
+        lines.append(f"  <#{t['lobby_channel_id']}>")
 
     await ctx.respond("\n".join(lines), flags=hikari.MessageFlag.EPHEMERAL)
     return None

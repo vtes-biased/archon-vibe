@@ -27,8 +27,6 @@ class TokenStore:
             await self._db.execute("DROP TABLE tokens")
             await self._db.execute("DROP TABLE IF EXISTS pending_oauth")
 
-        # A grant is per (user, event): the backend issues no token that reaches
-        # more than one tournament, so neither does the store.
         await self._db.execute("""
             CREATE TABLE IF NOT EXISTS tokens (
                 discord_id TEXT NOT NULL,
@@ -54,8 +52,6 @@ class TokenStore:
                 PRIMARY KEY (guild_id, tournament_uid)
             )
         """)
-        # Migration: the Discord scheduled-event id for this tournament (added later).
-        # ALTER on an existing table; ignore the duplicate-column error on re-run.
         try:
             await self._db.execute(
                 "ALTER TABLE guild_tournaments ADD COLUMN scheduled_event_id TEXT"
@@ -225,17 +221,12 @@ class TokenStore:
         assert self._db
         rows = []
         async with self._db.execute(
-            "SELECT tournament_uid, organizer_discord_id, category_id FROM guild_tournaments WHERE guild_id = ?",
+            "SELECT tournament_uid, lobby_channel_id FROM guild_tournaments "
+            "WHERE guild_id = ?",
             (guild_id,),
         ) as cur:
             async for row in cur:
-                rows.append(
-                    {
-                        "tournament_uid": row[0],
-                        "organizer_discord_id": row[1],
-                        "category_id": row[2],
-                    }
-                )
+                rows.append({"tournament_uid": row[0], "lobby_channel_id": row[1]})
         return rows
 
     async def get_tournament_by_category(
@@ -243,22 +234,12 @@ class TokenStore:
     ) -> dict | None:
         assert self._db
         async with self._db.execute(
-            """SELECT tournament_uid, organizer_discord_id, category_id,
-                      announcement_channel_id, lobby_channel_id, judges_channel_id
-               FROM guild_tournaments WHERE guild_id = ? AND category_id = ?""",
+            "SELECT tournament_uid FROM guild_tournaments "
+            "WHERE guild_id = ? AND category_id = ?",
             (guild_id, category_id),
         ) as cur:
             row = await cur.fetchone()
-            if not row:
-                return None
-            return {
-                "tournament_uid": row[0],
-                "organizer_discord_id": row[1],
-                "category_id": row[2],
-                "announcement_channel_id": row[3],
-                "lobby_channel_id": row[4],
-                "judges_channel_id": row[5],
-            }
+            return {"tournament_uid": row[0]} if row else None
 
     async def get_all_guild_tournaments(self) -> list[dict]:
         assert self._db

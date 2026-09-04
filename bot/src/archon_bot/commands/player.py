@@ -12,6 +12,7 @@ from ..oauth_utils import (
     generate_state,
     make_oauth_url,
 )
+from ..sse_listener import find_player_table
 from ..token_store import TokenStore
 from ..tournament_resolver import resolve_tournament
 from ._common import fetch_userinfo
@@ -47,8 +48,7 @@ async def _ensure_auth(
     return None
 
 
-def _get_display_name(ctx) -> str | None:
-    """Get Discord guild nickname for use as display_name (snapshot)."""
+def _get_display_name(ctx: lightbulb.Context) -> str:
     member = getattr(ctx, "member", None)
     if member:
         return (
@@ -66,7 +66,6 @@ async def _handle_registration_pipeline(
     tournament_uid: str,
     action: str,
 ) -> None:
-    """Shared pipeline for /register and /checkin."""
     discord_id = str(ctx.user.id)
 
     tokens = await _ensure_auth(ctx, store, tournament_uid)
@@ -82,17 +81,22 @@ async def _handle_registration_pipeline(
 
     if vekn_id:
         display_name = _get_display_name(ctx)
-        event_name = "CheckIn" if action == "checkin" else "Register"
-
-        result = await api.tournament_action(
-            discord_id,
-            tournament_uid,
-            event_name,
-            player_uid=archon_uid if event_name == "CheckIn" else None,
-            user_uid=archon_uid if event_name == "Register" else None,
-            vekn_id=vekn_id,
-            display_name=display_name,
-        )
+        if action == "checkin":
+            result = await api.tournament_action(
+                discord_id,
+                tournament_uid,
+                "CheckIn",
+                player_uid=archon_uid,
+                display_name=display_name,
+            )
+        else:
+            result = await api.tournament_action(
+                discord_id,
+                tournament_uid,
+                "Register",
+                user_uid=archon_uid,
+                display_name=display_name,
+            )
         if result.ok:
             msg = f"You're {'checked in' if action == 'checkin' else 'registered'}!"
 
@@ -134,9 +138,6 @@ async def _handle_registration_pipeline(
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
     else:
-        # Sponsorship is no longer a bot flow — new players are created at the
-        # door by an official, who curates the member list. Claiming an existing
-        # VEKN ID merges two accounts, which a per-event grant cannot reach.
         await ctx.respond(
             "**You need a VEKN ID to play.**\n"
             f"If you already have one, link it on your Archon profile — "
@@ -218,11 +219,7 @@ class ReportCommand(
             return
 
         archon_uid = info.data["sub"]
-        guild_id = str(ctx.guild_id)
-
-        from ..sse_listener import find_player_table
-
-        location = find_player_table(guild_id, tournament_uid, archon_uid)
+        location = find_player_table(str(ctx.guild_id), tournament_uid, archon_uid)
         if not location:
             await ctx.respond(
                 "Could not find your table. Are you seated in the current round?",
@@ -276,7 +273,7 @@ class JudgeCommand(
             return
 
         judges_id = int(link["judges_channel_id"])
-        display_name = _get_display_name(ctx) or ctx.user.username
+        display_name = _get_display_name(ctx)
 
         table_info = "unknown location"
         try:

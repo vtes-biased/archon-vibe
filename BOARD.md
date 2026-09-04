@@ -24,5 +24,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
-
-- Review the whole tournament bot package cold, after the bot lines above it have landed, for organization, efficiency, lingering traps and defects, and land what it finds as one change. Done when every finding is fixed in the change, refused with its reason in the commit message, or sent through ingress as separable work, the comment pass has run over every bot module, `just lint` and the bot's pytest are green, and the "Rounds and the bot" section of `wiki/hazards.md` plus the tournament bot and SSE listener sections of `wiki/discord.md` describe the code as it stands.

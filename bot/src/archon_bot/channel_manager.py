@@ -161,24 +161,14 @@ def member_override_ids(channel: object) -> set[int]:
 
 async def sync_table_permissions(
     bot: hikari.GatewayBot,
-    guild_id: int,
     channel_id: int,
-    player_uids: set[str],
-    organizer_uids: set[str],
+    member_uids: frozenset[str] | set[str],
     discord_id_map: dict[str, int],
-    current_member_ids: set[int] | None = None,
+    current_member_ids: set[int],
 ) -> None:
-    allowed_uids = player_uids | organizer_uids
-    desired_discord_ids: set[int] = set()
-    for uid in allowed_uids:
-        did = discord_id_map.get(uid)
-        if did:
-            desired_discord_ids.add(did)
-
-    if current_member_ids is None:
-        channel = await bot.rest.fetch_channel(channel_id)
-        current_member_ids = member_override_ids(channel)
-
+    desired_discord_ids = {
+        discord_id_map[uid] for uid in member_uids if discord_id_map.get(uid)
+    }
     await sync_member_overrides(
         bot, channel_id, desired_discord_ids, current_member_ids, PLAYER_ALLOW
     )
@@ -296,9 +286,7 @@ async def create_round_voice_channel(
         ),
     ]
     me = bot.get_me()
-    if (
-        me is not None
-    ):  # win back CONNECT for the bot over the @everyone deny (BOT_ALLOW)
+    if me is not None:
         overwrites.append(
             hikari.PermissionOverwrite(
                 id=me.id,
@@ -313,16 +301,9 @@ async def create_round_voice_channel(
         permission_overwrites=overwrites,
     )
     logger.info("✓ created '%s' id=%s", name, ch.id)
-    # Freshly created → only the @everyone + bot overrides exist; the bot's own
-    # override is preserved by sync_table_permissions, so no fetch needed.
+    # Freshly created: only the @everyone and bot overrides exist, so no fetch.
     await sync_table_permissions(
-        bot,
-        guild_id,
-        ch.id,
-        set(member_uids),
-        set(),
-        discord_id_map,
-        current_member_ids=set(),
+        bot, ch.id, member_uids, discord_id_map, current_member_ids=set()
     )
     return ch.id
 
@@ -377,11 +358,9 @@ async def teardown_tournament(
             if getattr(ch, "parent_id", None) == category_id
         ]
     except Exception as e:
-        # Listing failed — still delete the explicitly-known ids below.
         logger.warning("Teardown: failed to list channels in guild=%s: %s", guild_id, e)
 
     failed: list[int] = []
-    # Children + known orphans first; the category itself only after they're gone.
     targets = dict.fromkeys(
         cid
         for cid in (*under_category, *map(int, extra_channel_ids))
@@ -396,7 +375,6 @@ async def teardown_tournament(
             logger.warning("Teardown: failed to delete channel %s: %s", cid, e)
             failed.append(cid)
 
-    # Keep the category as an anchor on partial failure — never orphan survivors.
     if failed:
         logger.warning(
             "Teardown left %d channel(s) undeleted; keeping category %s as their "

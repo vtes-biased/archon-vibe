@@ -126,10 +126,10 @@ class SingleFlightRefreshTest(unittest.IsolatedAsyncioTestCase):
 
         # Both callers captured the same (now-expiring) access token.
         results = await asyncio.gather(
-            api._refresh_tokens(
+            api.refresh_tokens(
                 DISCORD_ID, TOURNAMENT_UID, stale_access_token="access-0"
             ),
-            api._refresh_tokens(
+            api.refresh_tokens(
                 DISCORD_ID, TOURNAMENT_UID, stale_access_token="access-0"
             ),
         )
@@ -159,7 +159,7 @@ class SingleFlightRefreshTest(unittest.IsolatedAsyncioTestCase):
 
         results = await asyncio.gather(
             *(
-                api._refresh_tokens(
+                api.refresh_tokens(
                     DISCORD_ID, TOURNAMENT_UID, stale_access_token="access-0"
                 )
                 for _ in range(8)
@@ -204,10 +204,10 @@ class SingleFlightRefreshTest(unittest.IsolatedAsyncioTestCase):
         api = _make_api(backend, store)
 
         results = await asyncio.gather(
-            api._refresh_tokens(
+            api.refresh_tokens(
                 DISCORD_ID, TOURNAMENT_UID, stale_access_token="access-0"
             ),
-            api._refresh_tokens(
+            api.refresh_tokens(
                 DISCORD_ID, TOURNAMENT_UID, stale_access_token="access-0"
             ),
         )
@@ -231,7 +231,7 @@ class SingleFlightRefreshTest(unittest.IsolatedAsyncioTestCase):
         backend = FakeBackend("refresh-0", fail_all=True, fail_status=503)
         api = _make_api(backend, store)
 
-        result = await api._refresh_tokens(
+        result = await api.refresh_tokens(
             DISCORD_ID, TOURNAMENT_UID, stale_access_token="access-0"
         )
 
@@ -260,7 +260,7 @@ class SingleFlightRefreshTest(unittest.IsolatedAsyncioTestCase):
         # a single fake backend only tracks one chain, so assert via the lock map.
         api = _make_api(backend, store)
 
-        await api._refresh_tokens(
+        await api.refresh_tokens(
             DISCORD_ID, TOURNAMENT_UID, stale_access_token="access-0"
         )
         self.assertIn((DISCORD_ID, TOURNAMENT_UID), api._refresh_locks)

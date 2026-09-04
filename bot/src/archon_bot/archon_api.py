@@ -52,7 +52,6 @@ class ArchonAPI:
             await self._session.close()
 
     def _refresh_lock_for(self, discord_id: str, tournament_uid: str) -> asyncio.Lock:
-        """Get-or-create the per-grant refresh lock (atomic under asyncio)."""
         key = (discord_id, tournament_uid)
         lock = self._refresh_locks.get(key)
         if lock is None:
@@ -67,32 +66,17 @@ class ArchonAPI:
         *,
         stale_access_token: str | None = None,
     ) -> dict | None:
-        return await self._refresh_tokens(
-            discord_id, tournament_uid, stale_access_token=stale_access_token
-        )
-
-    async def _refresh_tokens(
-        self,
-        discord_id: str,
-        tournament_uid: str,
-        *,
-        stale_access_token: str | None = None,
-    ) -> dict | None:
         """Single-flight per grant; if the stored access token no longer matches
         ``stale_access_token``, another caller already refreshed. (#11)"""
         async with self._refresh_lock_for(discord_id, tournament_uid):
             tokens = await self._store.get_tokens(discord_id, tournament_uid)
             if not tokens:
                 return None
-
-            # A concurrent refresher beat us to it: the stored access token is no
-            # longer the one we tried to use, so a fresh pair already exists.
             if (
                 stale_access_token is not None
                 and tokens["access_token"] != stale_access_token
             ):
                 return tokens
-
             return await self._do_refresh(discord_id, tournament_uid, tokens)
 
     async def _do_refresh(
@@ -111,8 +95,6 @@ class ArchonAPI:
                 },
             ) as resp:
                 if resp.status in (400, 401):
-                    # Invalid-grant is signaled via 400 only (401 = bad client
-                    # creds); only then is the stored pair genuinely dead.
                     logger.warning(
                         "Refresh token rejected (%s) for discord_id=%s tournament=%s",
                         resp.status,
@@ -122,8 +104,6 @@ class ArchonAPI:
                     await self._store.remove_tokens(discord_id, tournament_uid)
                     return None
                 if resp.status != 200:
-                    # 5xx / proxy blip (e.g. the backend's daily restart): the
-                    # stored pair is still valid — keep it, let callers retry.
                     logger.warning(
                         "Transient token refresh failure (%s) for discord_id=%s; "
                         "keeping tokens",
@@ -153,15 +133,6 @@ class ArchonAPI:
             "refresh_token": data["refresh_token"],
         }
 
-    async def _get_stored_token(
-        self, discord_id: str, tournament_uid: str
-    ) -> str | None:
-        """Get stored access token (may be expired; caller handles 401 refresh)."""
-        tokens = await self._store.get_tokens(discord_id, tournament_uid)
-        if not tokens:
-            return None
-        return tokens["access_token"]
-
     @staticmethod
     def _extract_error(status: int, text: str) -> str:
         try:
@@ -170,7 +141,6 @@ class ArchonAPI:
             if isinstance(detail, str) and detail:
                 return detail
             if isinstance(detail, list) and detail:
-                # FastAPI validation errors
                 return "; ".join(d.get("msg", str(d)) for d in detail)
         except (json.JSONDecodeError, AttributeError):
             pass
@@ -190,11 +160,12 @@ class ArchonAPI:
         tournament_uid: str,
         json_body: dict | None = None,
     ) -> ApiResult:
-        token = await self._get_stored_token(discord_id, tournament_uid)
-        if not token:
+        tokens = await self._store.get_tokens(discord_id, tournament_uid)
+        if not tokens:
             return ApiResult.fail(
                 "Your Archon session has expired. Run the command again to re-authenticate."
             )
+        token = tokens["access_token"]
 
         assert self._session
         headers = {"Authorization": f"Bearer {token}"}
@@ -202,9 +173,7 @@ class ArchonAPI:
             method, path, json=json_body, headers=headers
         ) as resp:
             if resp.status == 401:
-                # Try refresh, passing the token that 401'd so a concurrent
-                # refresh is detected instead of double-spending the grant.
-                refreshed = await self._refresh_tokens(
+                refreshed = await self.refresh_tokens(
                     discord_id, tournament_uid, stale_access_token=token
                 )
                 if not refreshed:
@@ -278,6 +247,7 @@ class ArchonAPI:
         )
 
     async def exchange_code(self, code: str, code_verifier: str) -> dict | None:
+        """The token pair plus the ``archon_uid`` it belongs to, or None."""
         assert self._session
         async with self._session.post(
             "/oauth/token",
@@ -294,4 +264,17 @@ class ArchonAPI:
                 text = await resp.text()
                 logger.error("Code exchange failed: %s %s", resp.status, text)
                 return None
-            return await resp.json()
+            token_data = await resp.json()
+        async with self._session.get(
+            "/oauth/userinfo",
+            headers={"Authorization": f"Bearer {token_data['access_token']}"},
+        ) as resp:
+            if resp.status != 200:
+                logger.error("Userinfo after code exchange failed: %s", resp.status)
+                return None
+            userinfo = await resp.json()
+        return {
+            "archon_uid": userinfo["sub"],
+            "access_token": token_data["access_token"],
+            "refresh_token": token_data["refresh_token"],
+        }

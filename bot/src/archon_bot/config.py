@@ -16,8 +16,6 @@ CALLBACK_PORT = int(os.environ.get("CALLBACK_PORT", "9000"))
 
 TOKEN_DB_PATH = os.environ.get("TOKEN_DB_PATH", "bot_tokens.db")
 
-# The bot never knows who holds this: /oauth/userinfo answers that, so /sanction
-# carries no local check and just surfaces the API's refusal.
 SETUP_CAPABILITY = "create_tournament"
 
 

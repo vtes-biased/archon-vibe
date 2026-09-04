@@ -5,6 +5,7 @@ import json
 import logging
 import time
 from collections import defaultdict
+from contextlib import aclosing
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -118,26 +119,23 @@ def find_player_table(
     if not tournament:
         return None
 
-    state = tournament.get("state", "")
-    if state != "Playing":
+    if tournament.get("state", "") != "Playing":
         return None
-
     rounds = tournament.get("rounds", [])
+    # Finals first: a finalist is still seated in the last preliminary round.
+    finals = tournament.get("finals") or {}
+    if finals.get("seating"):
+        if finals.get("result"):
+            return None
+        if any(s.get("player_uid") == player_uid for s in finals["seating"]):
+            return (len(rounds), 0)
+        return None
     if not rounds:
         return None
-
     round_idx = len(rounds) - 1
     for ti, table in enumerate(rounds[round_idx]):
-        seating = table.get("seating", [])
-        if any(s.get("player_uid") == player_uid for s in seating):
+        if any(s.get("player_uid") == player_uid for s in table.get("seating", [])):
             return (round_idx, ti)
-
-    finals = tournament.get("finals")
-    if finals and not finals.get("result"):
-        seating = finals.get("seating", [])
-        if any(s.get("player_uid") == player_uid for s in seating):
-            return (len(rounds), 0)
-
     return None
 
 
@@ -225,33 +223,34 @@ async def probe_tournament(
                         continue
                     if resp.status != 200:
                         return None
-                    return await _read_probe_frames(resp, tournament_uid)
+                    async with aclosing(_sse_frames(resp)) as frames:
+                        async for data in frames:
+                            if data.get("type") == "sync_complete":
+                                return None
+                            for ev in _normalize_events(data):
+                                if ev.get("type") == "tournament":
+                                    return ev.get("data") or {}
+                    return None
     except (aiohttp.ClientError, TimeoutError):
         return None
     return None
 
 
-async def _read_probe_frames(resp, tournament_uid: str) -> dict | None:
+async def _sse_frames(resp):
+    """Yields each frame's JSON payload. No ``event:`` field is sent; consumers
+    dispatch on the payload ``type``."""
     data_lines: list[str] = []
     async for line_bytes in resp.content:
         line = line_bytes.decode("utf-8").rstrip("\n\r")
         if line.startswith("data:"):
             data_lines.append(line[5:].strip())
-            continue
-        if line != "" or not data_lines:
-            continue  # `:`-comment lines, or a blank between frames
-        try:
-            data = json.loads("\n".join(data_lines))
-        except json.JSONDecodeError:
-            data = {}
-        data_lines = []
-        if data.get("type") == "sync_complete":
-            return None  # catch-up ended without the tournament frame
-        for ev in _normalize_events(data):
-            obj = ev.get("data") or {}
-            if ev.get("type") == "tournament" and obj.get("uid") == tournament_uid:
-                return obj
-    return None
+        elif line == "" and data_lines:
+            data_str = "\n".join(data_lines)
+            data_lines = []
+            try:
+                yield json.loads(data_str)
+            except json.JSONDecodeError:
+                logger.warning("Unparseable SSE data: %s", data_str[:200])
 
 
 async def _sse_loop(
@@ -326,32 +325,12 @@ async def _sse_loop(
                             tournament_uid,
                         )
 
-                        # No `event:` field; dispatch on the payload `type` instead.
                         synced = False
-                        data_lines: list[str] = []
-
-                        async for line_bytes in resp.content:
-                            line = line_bytes.decode("utf-8").rstrip("\n\r")
-
-                            if line.startswith("data:"):
-                                data_lines.append(line[5:].strip())
-                            elif line == "":
-                                if not data_lines:
-                                    continue
-                                data_str = "\n".join(data_lines)
-                                data_lines = []
-                                try:
-                                    data = json.loads(data_str)
-                                except json.JSONDecodeError:
-                                    logger.warning(
-                                        "Unparseable SSE data: %s", data_str[:200]
-                                    )
-                                    continue
-
+                        async with aclosing(_sse_frames(resp)) as frames:
+                            async for data in frames:
                                 if data.get("type") == "resync":
                                     logger.info(
-                                        "Resync requested, reconnecting SSE for %s",
-                                        key,
+                                        "Resync requested, reconnecting SSE for %s", key
                                     )
                                     break
 
@@ -369,8 +348,6 @@ async def _sse_loop(
                                         timeout=_DISPATCH_TIMEOUT,
                                     )
                                 except TimeoutError:
-                                    # Connection is fine, only the handler stalled;
-                                    # keep reading — reconcile repairs the miss.
                                     logger.error(
                                         "Timed out (%ds) handling SSE %s for %s; "
                                         "skipping to keep the stream flowing",
@@ -389,10 +366,7 @@ async def _sse_loop(
                                     try:
                                         await asyncio.wait_for(
                                             _reconcile(
-                                                bot,
-                                                store,
-                                                guild_id,
-                                                tournament_uid,
+                                                bot, store, guild_id, tournament_uid
                                             ),
                                             timeout=_DISPATCH_TIMEOUT,
                                         )
@@ -405,7 +379,6 @@ async def _sse_loop(
                                 # of hammering /stream once per second.
                                 if synced:
                                     retry_delay = 1
-                            # `:`-comment lines (": connected") ignored
 
             except asyncio.CancelledError:
                 logger.info("SSE listener cancelled for %s; stopping", key)
@@ -441,8 +414,6 @@ async def _dispatch_event(
     data: dict,
     synced: bool,
 ) -> bool:
-    """Until ``sync_complete`` arrives, only seed state — no announcements —
-    so a catch-up replay doesn't spam every past transition into the channels."""
     msg_type = data.get("type", "")
     key = _task_key(guild_id, tournament_uid)
 
@@ -461,7 +432,7 @@ async def _dispatch_event(
 
     if not synced:
         logger.info("SSE catch-up: seeding %d object(s) for %s", len(events), key)
-        _handle_snapshot(key, tournament_uid, events)
+        _handle_snapshot(key, events)
         return synced
 
     for ev in events:
@@ -470,16 +441,13 @@ async def _dispatch_event(
     return synced
 
 
-def _handle_snapshot(key: str, tournament_uid: str, data: dict | list) -> None:
-    """Recording it silently means the next live event diffs against where we
-    actually are, and a reconnect's reconcile reads it to repair channels."""
-    items = data if isinstance(data, list) else [data]
-    for item in items:
-        obj = item.get("data", item)
-        if item.get("type") == "user":
+def _handle_snapshot(key: str, events: list[dict]) -> None:
+    for ev in events:
+        obj = ev.get("data") or {}
+        if ev.get("type") == "user":
             _cache_user_identity(key, obj)
             continue
-        if item.get("type") != "tournament" or obj.get("uid") != tournament_uid:
+        if ev.get("type") != "tournament":
             continue
         _last_tournament[key] = obj
         logger.info(
@@ -490,15 +458,17 @@ def _handle_snapshot(key: str, tournament_uid: str, data: dict | list) -> None:
         )
 
 
-async def _post(bot, channel_id: int, content: str) -> None:
+async def _post(bot, channel_id: int, content: str) -> bool:
     """Logs before AND after the Discord call: a "→" with no matching "✓" pins a
     hung/slow REST call to the exact channel — the bot has no CI, we debug from logs."""
     logger.info("→ create_message channel=%s (%d chars)", channel_id, len(content))
     try:
         await bot.rest.create_message(channel_id, content)
-        logger.info("✓ create_message channel=%s", channel_id)
     except Exception as e:
         logger.warning("Failed to post to channel %s: %s", channel_id, e)
+        return False
+    logger.info("✓ create_message channel=%s", channel_id)
+    return True
 
 
 def _seat_uids(table: dict) -> list[str]:
@@ -649,7 +619,6 @@ class ClockTable:
 
 
 def _parse_started_at_epoch(started_at: str | None) -> float | None:
-    """A bare ``Z`` and naive strings are handled defensively (naive ⇒ assume UTC)."""
     if not started_at:
         return None
     try:
@@ -811,30 +780,32 @@ async def _reschedule_timers(
     bot, guild_id: str, tournament_uid: str, obj: dict
 ) -> None:
     """The single authority for the schedule: a passed threshold is marked fired
-    WITHOUT posting, suppressing stale reminders on reconnect/restart."""
+    WITHOUT posting, suppressing stale reminders on reconnect/restart. Never
+    raises — a schedule miss is repaired by the next signature change."""
     key = _task_key(guild_id, tournament_uid)
-    _cancel_timer_tasks(key)
-
-    tag, _ = _active_tables(obj)
-    if _timer_round_tag.get(key) != tag:
-        _timer_round_tag[key] = tag
-        _timer_fired[key] = set()
-
-    fired = _timer_fired[key]
-    for reminder in compute_timer_reminders(
-        obj, _table_channels.get(key, []), time.time()
-    ):
-        if reminder.token in fired:
-            continue
-        if reminder.delay <= 0:
-            fired.add(reminder.token)  # already passed → suppress, don't post late
-            continue
-        _timer_tasks[key].append(
-            asyncio.create_task(_fire_timer_reminder(bot, key, reminder))
+    try:
+        _cancel_timer_tasks(key)
+        tag, _ = _active_tables(obj)
+        if _timer_round_tag.get(key) != tag:
+            _timer_round_tag[key] = tag
+            _timer_fired[key] = set()
+        fired = _timer_fired[key]
+        for reminder in compute_timer_reminders(
+            obj, _table_channels.get(key, []), time.time()
+        ):
+            if reminder.token in fired:
+                continue
+            if reminder.delay <= 0:
+                fired.add(reminder.token)
+                continue
+            _timer_tasks[key].append(
+                asyncio.create_task(_fire_timer_reminder(bot, key, reminder))
+            )
+        logger.info(
+            "Timer reschedule %s: %d pending (tag=%s)", key, len(_timer_tasks[key]), tag
         )
-    logger.info(
-        "Timer reschedule %s: %d pending (tag=%s)", key, len(_timer_tasks[key]), tag
-    )
+    except Exception as e:
+        logger.error("Timer reschedule failed for %s: %s", key, e)
 
 
 async def _build_discord_id_map(
@@ -966,10 +937,8 @@ async def reconcile_channels(
             try:
                 await sync_table_permissions(
                     bot,
-                    int(guild_id),
                     int(ch.id),
-                    set(dc.member_uids),
-                    set(),
+                    dc.member_uids,
                     discord_id_map,
                     current_member_ids=member_override_ids(ch),
                 )
@@ -988,7 +957,6 @@ async def reconcile_channels(
     else:
         organizer_uids = set(obj.get("organizers_uids", []))
         judge_map = await _build_discord_id_map(store, organizer_uids)
-        # Fallback for organizers who never ran /register.
         for uid in organizer_uids - set(judge_map):
             did = (_user_names[key].get(uid) or {}).get("discord_id")
             if did:
@@ -1037,10 +1005,7 @@ async def sync_now(
         if obj is None:
             return None
         summary = await reconcile_channels(bot, store, guild_id, tournament_uid, obj)
-    try:
-        await _reschedule_timers(bot, guild_id, tournament_uid, obj)
-    except Exception as e:
-        logger.error("Timer reschedule failed for %s: %s", key, e)
+    await _reschedule_timers(bot, guild_id, tournament_uid, obj)
     return summary
 
 
@@ -1076,17 +1041,10 @@ async def _handle_update(
             and uid in (obj.get("organizers_uids") or [])
         ):
             _warned_unlinked_organizers[key].discard(uid)
-            async with structural_lock(guild_id, tournament_uid):
-                try:
-                    await reconcile_channels(bot, store, guild_id, tournament_uid, obj)
-                except Exception as e:
-                    logger.error(
-                        "Organizer re-grant reconcile failed for %s: %s", key, e
-                    )
             try:
-                await _reschedule_timers(bot, guild_id, tournament_uid, obj)
+                await sync_now(bot, store, guild_id, tournament_uid)
             except Exception as e:
-                logger.error("Timer reschedule failed for %s: %s", key, e)
+                logger.error("Organizer re-grant reconcile failed for %s: %s", key, e)
         return
 
     if obj_type != "tournament":
@@ -1094,10 +1052,7 @@ async def _handle_update(
             logger.debug("Ignoring SSE update of unknown type: %s", obj_type)
         return
 
-    obj = data.get("data", data)
-    if obj.get("uid") != tournament_uid:
-        return
-
+    obj = data.get("data") or {}
     key = _task_key(guild_id, tournament_uid)
     link = await store.get_tournament_link(guild_id, tournament_uid)
     if not link:
@@ -1145,10 +1100,7 @@ async def _handle_update(
     # No structural lock: only touches in-process tasks, never Discord channels.
     # Runs after any structural reconcile above so _table_channels is current.
     if structure_changed or _timer_signature(prev_obj or {}) != _timer_signature(obj):
-        try:
-            await _reschedule_timers(bot, guild_id, tournament_uid, obj)
-        except Exception as e:
-            logger.error("Timer reschedule failed for %s: %s", key, e)
+        await _reschedule_timers(bot, guild_id, tournament_uid, obj)
 
     # Snapshot LAST: the diffs above need the previous object; a crash retries next event.
     _last_tournament[key] = obj
@@ -1504,11 +1456,7 @@ async def _reconcile(
             await ensure_scheduled_event(bot, store, guild_id, tournament_uid, obj)
         except Exception as e:
             logger.error("Scheduled-event ensure failed for %s: %s", key, e)
-
-    try:
-        await _reschedule_timers(bot, guild_id, tournament_uid, obj)
-    except Exception as e:
-        logger.error("Timer reschedule failed for %s: %s", key, e)
+    await _reschedule_timers(bot, guild_id, tournament_uid, obj)
 
 
 def sanction_table_channel(
@@ -1536,11 +1484,7 @@ async def _handle_sanction_update(
     tournament_uid: str,
     data: dict,
 ) -> None:
-    obj = data.get("data", data)
-
-    if obj.get("tournament_uid") != tournament_uid:
-        return
-
+    obj = data.get("data") or {}
     if obj.get("lifted_at") or obj.get("deleted_at"):
         return
 
@@ -1565,20 +1509,11 @@ async def _handle_sanction_update(
         level, category, subcategory, description, round_number, player_mention
     )
 
-    logger.info(
-        "SSE recv sanction (level=%s round=%s) for %s",
-        level,
-        round_number,
-        _task_key(guild_id, tournament_uid),
-    )
-
-    try:
-        logger.info("→ create_message sanction→judges channel=%s", judges_id)
-        await bot.rest.create_message(judges_id, judges_msg)
-    except Exception as e:
-        logger.warning("Failed to post sanction to judges: %s", e)
-
     key = _task_key(guild_id, tournament_uid)
+    logger.info(
+        "SSE recv sanction (level=%s round=%s) for %s", level, round_number, key
+    )
+    await _post(bot, judges_id, judges_msg)
 
     posted_to_table = False
     if round_number is not None:
@@ -1589,19 +1524,9 @@ async def _handle_sanction_update(
             _table_channels.get(key, []),
         )
         if target:
-            try:
-                logger.info("→ create_message sanction→table channel=%s", target)
-                await bot.rest.create_message(target, player_msg)
-                posted_to_table = True
-            except Exception as e:
-                logger.warning("Failed to post sanction to table %s: %s", target, e)
-
+            posted_to_table = await _post(bot, target, player_msg)
     if not posted_to_table:
-        try:
-            logger.info("→ create_message sanction→lobby channel=%s", lobby_id)
-            await bot.rest.create_message(lobby_id, player_msg)
-        except Exception as e:
-            logger.warning("Failed to post sanction to lobby: %s", e)
+        await _post(bot, lobby_id, player_msg)
 
 
 async def _handle_judge_call(
@@ -1611,25 +1536,14 @@ async def _handle_judge_call(
     tournament_uid: str,
     data: dict,
 ) -> None:
-    """One organizer token streams judge calls for all their tournaments, so
-    filter to this listener's tournament."""
-    if data.get("tournament_uid") != tournament_uid:
-        return
-
     link = await store.get_tournament_link(guild_id, tournament_uid)
     if not link:
         return
-
-    judges_id = int(link["judges_channel_id"])
     table = data.get("table", 0)
     table_label = data.get("table_label") or f"Table {table + 1}"
     player_name = data.get("player_name", "Unknown")
-
-    try:
-        logger.info("→ create_message judge_call→judges channel=%s", judges_id)
-        await bot.rest.create_message(
-            judges_id,
-            f"**Judge call!** {table_label} — {player_name} needs a judge",
-        )
-    except Exception as e:
-        logger.warning("Failed to post judge call: %s", e)
+    await _post(
+        bot,
+        int(link["judges_channel_id"]),
+        f"**Judge call!** {table_label} — {player_name} needs a judge",
+    )

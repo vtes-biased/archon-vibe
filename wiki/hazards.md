@@ -436,6 +436,12 @@ frames**, so reconcile logic using the name cache for a just-added organizer or
 player is one message stale. Catch-up is safe
 ([sync](sync.md#the-sse-endpoint)).
 
+**A finalist is still seated in the last preliminary round**, so a per-player
+lookup on the bot checks the finals table before `rounds[-1]`. The engine
+addresses the finals as round index `len(rounds)`, table 0, and accepts a
+non-organizer score on a closed prelim table, so a lookup that scans `rounds`
+first sends a finals `/report` to the prelim table and silently rewrites it.
+
 ## Ratings and migration
 
 **The ratings no-change guard converges only if its denormalized inputs are
