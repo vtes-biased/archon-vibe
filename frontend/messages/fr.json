@@ -417,6 +417,8 @@
   "profile_email_sending": "Envoi en cours...",
   "profile_email_send_link": "Envoyer le lien",
   "profile_email_send_failed": "Échec de l'envoi de l'email de vérification",
+  "profile_password_change": "Changer le mot de passe",
+  "profile_password_changed": "Mot de passe modifié",
   "profile_email_check_inbox": "Vérifiez votre boîte de réception",
   "profile_email_sent_to": "Nous avons envoyé un lien à {email}",
   "profile_email_verify_hint": "Cliquez dessus pour vérifier votre email et définir votre mot de passe.",

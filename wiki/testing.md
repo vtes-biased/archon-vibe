@@ -114,9 +114,10 @@ click-based unseat/seat flow; drag-and-drop is not reliably scriptable.
 **Never `git checkout` during mutation testing** — it has wiped uncommitted feature
 code mid-run. Back the file up first.
 
-**The backend `test_db` fixture wipes only `type = 'user'` rows**
-(`backend/tests/conftest.py`) — a test that creates tournaments or decks cleans up
-after itself, as the existing suites do with `_cleanup()` context managers.
+**The backend `test_db` fixture wipes only `type = 'user'` rows and
+`auth_methods`** (`backend/tests/conftest.py`) — a test that creates tournaments
+or decks cleans up after itself, as the existing suites do with `_cleanup()`
+context managers.
 
 **`test_access_levels.py` is the only place in the backend suite that asserts
 projection field membership.** Everything else mentioning `"public"` asserts row

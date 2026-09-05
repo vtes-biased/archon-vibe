@@ -21,6 +21,7 @@
     passkeyMessage: string;
     error: string | null;
     onLinkEmail: (email: string) => Promise<boolean>;
+    onChangePassword: (password: string) => Promise<string | null>;
     onLinkDiscord: () => void;
     onLinkGithub: () => void;
     onUnlinkGithub: () => void;
@@ -31,7 +32,7 @@
     hasDiscord, discordUsername,
     hasGithub, githubUsername, hasPasskey,
     discordMessage, discordError, githubMessage, githubError, passkeyMessage, error,
-    onLinkEmail, onLinkDiscord, onLinkGithub, onUnlinkGithub, onRegisterPasskey,
+    onLinkEmail, onChangePassword, onLinkDiscord, onLinkGithub, onUnlinkGithub, onRegisterPasskey,
   }: Props = $props();
 
   let registeringPasskey = $state(false);
@@ -41,11 +42,32 @@
   let emailLinkAddress = $state("");
   let sendingEmailLink = $state(false);
   let emailError = $state("");
+  let showPasswordChange = $state(false);
+  let newPassword = $state("");
+  let changingPassword = $state(false);
+  let passwordChanged = $state(false);
+  let passwordError = $state("");
 
   async function handleRegisterPasskey() {
     registeringPasskey = true;
     await onRegisterPasskey();
     registeringPasskey = false;
+  }
+
+  async function handleChangePassword() {
+    passwordError = "";
+    if (newPassword.length < 8) {
+      passwordError = m.auth_verify_error_password_length();
+      return;
+    }
+    changingPassword = true;
+    passwordError = (await onChangePassword(newPassword)) ?? "";
+    changingPassword = false;
+    if (!passwordError) {
+      newPassword = "";
+      showPasswordChange = false;
+      passwordChanged = true;
+    }
   }
 
   async function handleSendEmailLink() {
@@ -80,13 +102,40 @@
       </div>
     </div>
     {#if hasEmail}
-      <span class="px-3 py-1 text-sm rounded badge-success">{m.profile_passkey_active()}</span>
+      <div class="flex items-center gap-2">
+        <span class="px-3 py-1 text-sm rounded badge-success">{m.profile_passkey_active()}</span>
+        {#if !showPasswordChange}
+          <Button variant="secondary" size="lg" onclick={() => { showPasswordChange = true; passwordChanged = false; }}>
+            {m.profile_password_change()}
+          </Button>
+        {/if}
+      </div>
     {:else if !showEmailSetup}
       <Button variant="secondary" size="lg" onclick={() => (showEmailSetup = true)}>
         {m.profile_email_setup()}
       </Button>
     {/if}
   </div>
+  {#if hasEmail && showPasswordChange}
+    <form onsubmit={(e) => { e.preventDefault(); handleChangePassword(); }}
+      class="ml-8 flex gap-2">
+      <input type="password" bind:value={newPassword} autocomplete="new-password" minlength="8" required
+        placeholder={m.auth_verify_password_placeholder()}
+        class="flex-1 px-3 py-2 bg-surface-muted border border-line-strong rounded text-ink-strong placeholder-ink-faint focus:outline-none focus:border-accent-strong-hover text-sm" />
+      <Button type="submit" variant="primary" size="lg" class="whitespace-nowrap" loading={changingPassword} disabled={!newPassword}>
+        {m.common_save()}
+      </Button>
+      <Button variant="secondary" size="lg" onclick={() => { showPasswordChange = false; newPassword = ""; passwordError = ""; }}>
+        {m.common_cancel()}
+      </Button>
+    </form>
+  {/if}
+  {#if passwordError}
+    <p class="ml-8 text-sm text-link">{passwordError}</p>
+  {/if}
+  {#if passwordChanged}
+    <p class="ml-8 text-sm text-info">{m.profile_password_changed()}</p>
+  {/if}
   {#if showEmailSetup && !hasEmail}
     {#if emailLinkSent}
       <div class="ml-8 p-3 rounded-lg bg-surface-muted border border-line-strong space-y-1">

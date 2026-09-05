@@ -486,6 +486,18 @@ instead of growing its own guard.
 
 ## Deploy
 
+**The boot auto-reload fires on every device the first time it opens after a
+deploy, so a page must not discard anything it still needs.** `maybeAutoApply`
+applies a waiting service worker without a banner click, inside a 120s window
+from boot, and reloads. Its `sw_auto_applied` guard lives in `sessionStorage`,
+which a freshly-opened tab starts empty — the state every device is in right
+after a deploy — so the first reload is never suppressed. A page that scrubs its
+own URL before its work completes therefore strands itself on that reload:
+`/verify-email` did exactly this, clearing the magic token the instant verify
+returned and coming back to "Link invalid" with no password form. Anything a
+page needs across an unannounced reload must survive in the URL or in storage
+until it is actually spent.
+
 **Running out of file descriptors truncates responses mid-body — it does not
 refuse connects.** Measured in the local EC rehearsal at macOS's 256-fd
 default: 26 of 200 snapshot downloads cut mid-body (`TransferEncodingError` on

@@ -612,6 +612,27 @@ export async function setPassword(token: string, password: string): Promise<bool
   }
 }
 
+/** Returns the failure message, or null on success. Writes no shared auth state:
+ * the profile page unmounts its whole panel on `isLoading`, taking the form with it. */
+export async function changePassword(password: string): Promise<string | null> {
+  try {
+    const response = await authorizedFetch(`${API_BASE}/auth/me/password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return data.detail || m.auth_error_set_password();
+    }
+
+    return null;
+  } catch (e) {
+    return toUserMessage(e, m.auth_error_set_password());
+  }
+}
+
 export async function generateCalendarToken(): Promise<{ calendar_token: string; calendar_url: string } | null> {
   if (!getAccessToken()) return null;
 

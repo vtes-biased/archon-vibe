@@ -1,4 +1,4 @@
-"""Profile endpoints: /me GET, /me PATCH, calendar token."""
+"""Profile endpoints: /me GET, /me PATCH, password change, calendar token."""
 
 import os
 import secrets
@@ -6,8 +6,9 @@ import time
 from datetime import UTC, datetime
 
 import msgspec
+from argon2 import PasswordHasher
 from fastapi import APIRouter, HTTPException, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ... import permissions
 from ...broadcast import broadcast_precomputed
@@ -21,14 +22,16 @@ from ...db import (
     get_auth_methods_for_user,
     get_calendar_token,
     save_user,
+    update_auth_method,
 )
 from ...geonames import stored_country
 from ...link_preview import LinkPreviewError, fetch_link_title
 from ...middleware.auth import CurrentUser
-from ...models import CommunityLink
+from ...models import AuthMethodType, CommunityLink
 
 router = APIRouter()
 encoder = msgspec.json.Encoder()
+ph = PasswordHasher()
 
 
 class CommunityLinkInput(BaseModel):
@@ -50,6 +53,10 @@ class ProfileUpdateRequest(BaseModel):
     contact_phone: str | None = None
     phone_is_whatsapp: bool | None = None
     community_links: list[CommunityLinkInput] | None = None
+
+
+class PasswordChangeRequest(BaseModel):
+    password: str = Field(min_length=8)
 
 
 @router.get("/me")
@@ -198,6 +205,33 @@ async def update_current_user(
         content=encoder.encode(response_data),
         media_type="application/json",
     )
+
+
+@router.post("/me/password", status_code=204)
+async def change_password(
+    request: PasswordChangeRequest,
+    current_user: CurrentUser,
+) -> Response:
+    auth_methods = await get_auth_methods_for_user(current_user.uid)
+    # An account merge carries every absorbed login over, so a member can hold
+    # more than one email credential — all of them are theirs to sign in with.
+    email_auths = [m for m in auth_methods if m.method_type == AuthMethodType.EMAIL]
+    if not email_auths:
+        raise HTTPException(
+            status_code=404,
+            detail="No email login to change. Set one up from your profile first.",
+        )
+
+    now = datetime.now(UTC)
+    password_hash = ph.hash(request.password)
+    for email_auth in email_auths:
+        await update_auth_method(
+            msgspec.structs.replace(
+                email_auth, modified=now, credential_hash=password_hash
+            )
+        )
+
+    return Response(status_code=204)
 
 
 # In-process (per-worker) quota on the one route that fetches an address a

@@ -6,6 +6,7 @@
     authorizedFetch, getAuthState, getAccessToken, logout,
     initAuth, storeTokensFromCallback,
     requestMagicLink,
+    changePassword,
   } from "$lib/stores/auth.svelte";
   import { canManageOauthClients, canRunAdminSync } from "$lib/engine";
   import { HOF_MIN_WINS } from "$lib/tournament-utils";
@@ -315,6 +316,7 @@
               {passkeyMessage}
               error={auth.error}
               onLinkEmail={handleLinkEmail}
+              onChangePassword={changePassword}
               onLinkDiscord={handleLinkDiscord}
               onLinkGithub={handleLinkGithub}
               onUnlinkGithub={handleUnlinkGithub}

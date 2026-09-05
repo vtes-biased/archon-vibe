@@ -81,11 +81,13 @@ async def test_db() -> AsyncIterator[None]:
 
     async with db.get_connection() as conn:
         await conn.execute("DELETE FROM objects WHERE type = 'user'")
+        await conn.execute("DELETE FROM auth_methods")
 
     yield
 
     async with db.get_connection() as conn:
         await conn.execute("DELETE FROM objects WHERE type = 'user'")
+        await conn.execute("DELETE FROM auth_methods")
 
     await db.close_db()
 

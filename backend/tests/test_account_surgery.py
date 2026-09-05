@@ -49,7 +49,6 @@ async def _cleanup_surgery():
     finally:
         async with db.get_connection() as conn:
             await conn.execute("DELETE FROM objects WHERE type IN ('sanction', 'deck')")
-            await conn.execute("DELETE FROM auth_methods")
             await conn.execute("DELETE FROM nda_records")
 
 

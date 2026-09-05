@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto, replaceState } from "$app/navigation";
+  import { goto } from "$app/navigation";
   import { onMount } from "svelte";
   import { getAuthState, verifyMagicLink, setPassword, type VerifyMagicLinkResult } from "$lib/stores/auth.svelte";
   import { Loader2, X } from '@lucide/svelte';
@@ -32,8 +32,6 @@
 
     if (result) {
       verifyResult = result;
-      // Clear URL params for security
-      replaceState("/verify-email", {});
     } else {
       error = auth.error || m.auth_verify_error_failed();
     }

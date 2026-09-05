@@ -417,6 +417,8 @@
   "profile_email_sending": "Enviando...",
   "profile_email_send_link": "Enviar enlace",
   "profile_email_send_failed": "Error al enviar el email de verificación",
+  "profile_password_change": "Cambiar contraseña",
+  "profile_password_changed": "Contraseña cambiada",
   "profile_email_check_inbox": "Comprueba tu bandeja de entrada",
   "profile_email_sent_to": "Hemos enviado un enlace a {email}",
   "profile_email_verify_hint": "Haz clic en él para verificar tu email y establecer tu contraseña.",

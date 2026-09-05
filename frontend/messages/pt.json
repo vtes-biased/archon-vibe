@@ -417,6 +417,8 @@
   "profile_email_sending": "Enviando...",
   "profile_email_send_link": "Enviar link",
   "profile_email_send_failed": "Falha ao enviar email de verificação",
+  "profile_password_change": "Alterar senha",
+  "profile_password_changed": "Senha alterada",
   "profile_email_check_inbox": "Verifique sua caixa de entrada",
   "profile_email_sent_to": "Enviamos um link para {email}",
   "profile_email_verify_hint": "Clique nele para verificar seu email e definir sua senha.",

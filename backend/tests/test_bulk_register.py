@@ -109,4 +109,3 @@ async def test_bulk_register_matches_and_reports(test_client):
     finally:
         async with db.get_connection() as conn:
             await conn.execute("DELETE FROM objects WHERE uid = %s", (tournament.uid,))
-            await conn.execute("DELETE FROM auth_methods")

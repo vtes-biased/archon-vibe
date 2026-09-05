@@ -104,7 +104,7 @@ session is invalidated on purpose.
 
 | Method | Notes | Key files |
 |---|---|---|
-| Email + password | register or login | `routes/auth.py` |
+| Email + password | register, login, and change from the profile — `POST /auth/me/password` rewrites the credential on the session alone | `routes/auth/email_password.py`, `routes/auth/profile.py` |
 | Magic link | signup, password reset, invite; the link stays valid until the password is actually set, not merely verified | `email_service.py` |
 | WebAuthn / passkeys | FIDO2; four endpoints — `register/{options,verify}` to add to an existing authenticated account, and `create/{options,verify}` unauthenticated to create a new user | `passkeys.svelte.ts` |
 | Discord OAuth | `GET /auth/discord/authorize` (`?link=true` attaches the Discord ID to the authenticated user) → callback; login matches by Discord ID or creates a user | `routes/auth/discord.py` |
@@ -125,6 +125,21 @@ so a "sign up" link without it lands the reader on the wrong one.
 reset, 7 days for an invite — its recipient did not ask for the email and has no
 reason to be watching their inbox. Clicking any of them mints a separate
 10-minute window to submit the password.
+
+**The landing page keeps the token in its URL until the password is set**, the
+client half of the rule the server already keeps: verifying does not consume the
+`magic:` token, so a page that reloads before the form is submitted re-verifies
+and mints a fresh window. Scrubbing it on verify instead strands that reload on
+"Link invalid" — and a reload there is not hypothetical
+([hazards](hazards.md#deploy)).
+
+**A password change needs the session, not the current password.** The link is
+how an address is *verified*, so a member with no email credential still sets
+their first password by link; changing an existing one is a session-only
+act. Demanding the old password would guard one door while
+`passkey_register_options` beside it mints a permanent credential on the same
+bare session, and refresh tokens are stateless, so neither route evicts another
+session.
 
 An expired or already-used link routes to `/login?recover=1`, the reset form under
 wording that fits someone who has never had a password. That is the invited
