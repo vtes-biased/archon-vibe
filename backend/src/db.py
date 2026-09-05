@@ -54,6 +54,8 @@ class BroadcastData:
     # DB-clock modified_at, emitted as the SSE envelope `ts` for cursor advance —
     # not the payload's app-clock `modified`, a different format and value space.
     modified_at: str | None = None
+    # Levels non-NULL before this write and NULL after — the object left them.
+    retracted_levels: tuple[str, ...] = ()
 
 
 DB_URL = os.getenv(
@@ -337,6 +339,11 @@ async def save_object(
     cal_token = full_data.get("calendar_token") if obj_type == ObjectType.USER else None
 
     query = """
+        WITH prev AS (
+            SELECT "public" IS NOT NULL AS had_public,
+                   "member" IS NOT NULL AS had_member
+            FROM objects WHERE uid = %s
+        )
         INSERT INTO objects (uid, type, deleted_at, "public", "member", "api", "full", calendar_token)
         VALUES (%s, %s, %s::timestamp, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb, %s)
         ON CONFLICT (uid) DO UPDATE SET
@@ -347,9 +354,12 @@ async def save_object(
             "api" = EXCLUDED."api",
             "full" = EXCLUDED."full",
             calendar_token = COALESCE(EXCLUDED.calendar_token, objects.calendar_token)
-        RETURNING modified_at
+        RETURNING modified_at,
+                  (SELECT had_public FROM prev),
+                  (SELECT had_member FROM prev)
     """
     params = (
+        uid,
         uid,
         obj_type,
         deleted_at,
@@ -368,6 +378,14 @@ async def save_object(
     # BEFORE trigger sets modified_at = CURRENT_TIMESTAMP, so RETURNING reflects
     # the authoritative DB-clock value used by the `since`/sync_complete cursor.
     modified_at = row[0].isoformat() if row and row[0] else None
+    retracted = tuple(
+        lvl
+        for lvl, was_visible, now_json in (
+            ("public", row and row[1], pub_json),
+            ("member", row and row[2], mem_json),
+        )
+        if was_visible and now_json is None
+    )
 
     return BroadcastData(
         obj_type=obj_type,
@@ -380,6 +398,7 @@ async def save_object(
         obj_user_uid=full_data.get("user_uid"),
         tournament_uid=full_data.get("tournament_uid"),
         modified_at=modified_at,
+        retracted_levels=retracted,
     )
 
 
@@ -497,8 +516,10 @@ async def stream_objects_new(
         async with _pool.connection() as c:
             return await (await c.execute(sql, (*params, batch_size))).fetchall()
 
+    retract_null = level == "member" and obj_type == ObjectType.DECK
+
     while True:
-        conditions = [f"{col} IS NOT NULL"]
+        conditions = ["TRUE"] if retract_null else [f"{col} IS NOT NULL"]
         params: list = []
         if obj_type:
             conditions.append("type = %s")
@@ -519,7 +540,14 @@ async def stream_objects_new(
 
         if not rows:
             break
-        yield [r[0] for r in rows], rows[-1][1].isoformat()
+        batch = [
+            r[0]
+            or _encoder.encode({"uid": r[2], "deleted_at": r[1].isoformat()}).decode(
+                "utf-8"
+            )
+            for r in rows
+        ]
+        yield batch, rows[-1][1].isoformat()
         if len(rows) < batch_size:
             break
         last_modified = rows[-1][1].isoformat()

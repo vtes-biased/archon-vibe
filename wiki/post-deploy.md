@@ -57,3 +57,33 @@ ORDER BY 1;
 Nothing to rewrite either way: an imported record stays as it was filed, and the
 rows are inert once the bleed is closed. Report the counts to the owner and delete
 this section.
+
+## Retract the decks production already unpublished
+
+Gated by the commit that ships this section — the fix and this item land together,
+so the first release carrying this text carries its gate (`git log -1 --format=%H
+-S'Retract the decks production already unpublished' -- wiki/post-deploy.md`).
+Before it, the catch-up still skips a NULL member row and the sweep below would
+achieve nothing.
+
+Rows whose member projection went NULL before that commit were never announced:
+their holders' IndexedDB still carries the deck at `public: true`, and no later
+frame mentions them, since catch-up only asks for `modified_at > since`. The fix
+retracts on write and on catch-up; neither reaches a row that stopped being
+visible in the past.
+
+Bump the cursor on exactly those rows so the member catch-up tombstones them.
+Raw SQL is right here rather than `reproject_public.py`: no projection is
+changing, only `modified_at`, which the BEFORE-UPDATE trigger stamps on any write
+([sync](sync.md#access-levels)). Run it once, off-peak.
+
+```sql
+UPDATE objects SET type = type
+WHERE type = 'deck' AND "member" IS NULL AND deleted_at IS NULL;
+```
+
+Every connected member then gets one tombstone per private deck on its next
+catch-up — inert for a deck it never held, an eviction for one it did. Confirm on
+a member client that a previously-unpublished decklist has left its profile deck
+list, report the row count to the owner, and delete this section. No issue
+reported this, so there is nobody to tell.

@@ -177,6 +177,13 @@ def broadcast_precomputed(
         "member": _make_msg(bd.mem_json) if bd.mem_json else None,
         "full": _make_msg(bd.full_json) if bd.full_json else None,
     }
+    if bd.retracted_levels:
+        deleted_at = bd.modified_at or datetime.now(UTC).isoformat()
+        tombstone = _make_msg(
+            encoder.encode({"uid": bd.uid, "deleted_at": deleted_at}).decode("utf-8")
+        )
+        for retracted in bd.retracted_levels:
+            msg_by_level[retracted] = tombstone
 
     disconnected: set[SSEConnection] = set()
     for sse_conn in _sse_connections:

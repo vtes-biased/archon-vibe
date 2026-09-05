@@ -24,5 +24,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
-
-A decklist the event unpublishes stays visible to a member — the broadcast sends no frame when a row's member projection drops to null, so a `decklists_mode` narrowed on a still-Finished event leaves a stale `public: true` in every connected member's IndexedDB and the profile deck list shows a decklist that is no longer public. Done when narrowing `decklists_mode` on a Finished event removes the now-private decks from a connected member's IndexedDB, a member reconnecting after the narrowing has them removed by catch-up, and `wiki/sync.md` records that a member projection dropping to null retracts the row.

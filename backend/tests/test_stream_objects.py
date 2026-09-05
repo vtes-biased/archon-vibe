@@ -6,12 +6,14 @@ means clients can't bootstrap at all.
 
 import gzip
 import json
+from datetime import UTC, datetime
+from uuid import uuid7
 
 import msgspec
 import pytest
 from src import db, snapshots
-from src.db import stream_objects_new
-from src.models import ObjectType
+from src.db import save_object_from_model, stream_objects_new
+from src.models import DeckObject, ObjectType
 
 
 @pytest.mark.asyncio
@@ -131,3 +133,40 @@ async def test_snapshot_rebuilt_only_when_the_corpus_moves(
         await conn.execute("DELETE FROM objects WHERE uid = %s", (populated_db[1].uid,))
     await snapshots.generate_snapshots()
     assert inodes() != rebuilt
+
+
+@pytest.mark.asyncio
+async def test_member_stream_retracts_a_deck_that_stops_being_public(test_db):
+    """Narrowing an event's decklists_mode flips a published deck back to private
+    and its member projection to NULL. A skipped row would leave every member
+    holding the deck the event just unpublished."""
+    deck = DeckObject(
+        uid=str(uuid7()),
+        modified=datetime.now(UTC),
+        tournament_uid=str(uuid7()),
+        user_uid=str(uuid7()),
+        name="published",
+        public=True,
+    )
+    try:
+        published = await save_object_from_model(ObjectType.DECK, deck)
+        assert published.retracted_levels == ()
+        assert published.mem_json is not None
+
+        deck.public = False
+        retracted = await save_object_from_model(ObjectType.DECK, deck)
+        assert retracted.retracted_levels == ("member",)
+        assert retracted.mem_json is None
+
+        frames = [
+            msgspec.json.decode(js.encode())
+            async for batch, _ in stream_objects_new(
+                obj_type=ObjectType.DECK, level="member", since=published.modified_at
+            )
+            for js in batch
+        ]
+        assert [f["uid"] for f in frames] == [deck.uid]
+        assert frames[0]["deleted_at"]  # a tombstone, not the deck it just hid
+    finally:
+        async with db.get_connection() as conn:
+            await conn.execute("DELETE FROM objects WHERE uid = %s", (deck.uid,))

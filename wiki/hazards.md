@@ -354,6 +354,12 @@ skips both silently ([access](access.md#capabilities)).
 non-country, non-own-object full grant must also be added to the overlay frames, or
 a resync re-delivers the lower projection ([sync](sync.md#access-entitlement)).
 
+**A deck frame that reaches `broadcast_precomputed` without its `org_uids` stamp
+now deletes the organizer's copy**, where it used to merely withhold an update: a
+deck losing its `public` flag retracts at member level, and the organizer's
+connection resolves to member without that stamp. Every path that writes a deck
+stamps it after the save ([sync](sync.md#broadcast-and-backpressure)).
+
 **Adding a precomputed access column** is warranted only when projection *content*
 must vary by **consumer class**. A new viewer level inside the app does not
 qualify — collapse onto an existing column and shrink the lower one. `api` did:

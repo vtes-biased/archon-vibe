@@ -33,6 +33,21 @@ through the separate API process ([public-api](public-api.md)).
 
 "None" means the column is NULL and the object is invisible at that level.
 
+**A column that goes from non-NULL to NULL is a retraction, not an absence.** The
+object still exists — a deck the event unpublishes carries no `deleted_at` — so a
+level that simply stops receiving it leaves every holder of the old row on a copy
+that is no longer visible to them. `save_object` snapshots the pre-write columns
+in the upsert's own CTE (`RETURNING` alone sees only the new row, and a separate
+read races a concurrent write) and reports the levels that lost their projection;
+`broadcast_precomputed` sends a **tombstone** at exactly those levels. The
+`member` catch-up closes the same gap for a client that was away, streaming a
+tombstone for every NULL **deck** row instead of skipping it. Naming the type in
+the guard rather than resting on "no other member projection is partial" keeps
+that fact structural: a future partial projection would otherwise start retracting
+corpus-wide in silence. Every other level keeps the skip — a member with no
+community links has no public row and never had one, so a rating recompute would
+tombstone thousands of rows an anonymous client never held.
+
 Playtest NDA records appear at **no** level: they carry PII and live in the
 `nda_records` side table, not on `User`, so nothing about them is projected or
 streamed — every read is a gated REST fetch
@@ -309,7 +324,9 @@ auto-populated for decks, which carry no `organizers_uids` of their own, so ever
 path that writes a deck stamps it manually after the save: the deck-ops processor,
 the go-online replay, the TWDA import, and the account merge that reassigns a
 deck. An unstamped deck frame projects at member level, where a non-public deck is
-`None`, so the tournament's organizer sees nothing until their next reconnect.
+`None` — so the tournament's organizer misses the update until their next
+reconnect, and when that `None` is a **retraction** the frame *deletes* the deck
+from their IndexedDB rather than merely withholding it.
 
 Each connection has a bounded `CoalescingQueue` (maxsize 30) keeping only the
 **latest frame per `(type, uid)`**, so successive whole-object snapshots of one
@@ -514,9 +531,9 @@ transition is delivered as a single update:
 - **demote, lower projection non-null** → push the lower projection, and the
   overwrite drops the full-only fields;
 - **demote, lower projection null** — a private deck at member level — → push a
-  **tombstone** so the client evicts just that object. This is the leak fix: the
-  member projection of a private deck is null, so the since-catch-up could neither
-  re-send nor evict it.
+  **tombstone** so the client evicts just that object. An entitlement change
+  writes no row, so nothing moves `modified_at` and the since-catch-up has no
+  frame to carry either the demotion or the eviction.
 
 Every targeted frame carries the recomputed access version. Organizer add/remove
 uses this: the new organizer gets the tournament and its private decks at full, and
