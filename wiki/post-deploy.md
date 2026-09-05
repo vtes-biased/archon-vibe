@@ -60,11 +60,8 @@ this section.
 
 ## Retract the decks production already unpublished
 
-Gated by the commit that ships this section — the fix and this item land together,
-so the first release carrying this text carries its gate (`git log -1 --format=%H
--S'Retract the decks production already unpublished' -- wiki/post-deploy.md`).
-Before it, the catch-up still skips a NULL member row and the sweep below would
-achieve nothing.
+Gated by `8780030f`. Before it the catch-up skips a NULL member row, so the sweep
+below would bump a cursor no client acts on.
 
 Rows whose member projection went NULL before that commit were never announced:
 their holders' IndexedDB still carries the deck at `public: true`, and no later
