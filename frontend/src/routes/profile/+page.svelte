@@ -296,7 +296,7 @@
               {/if}
             </div>
             <PlayerRatings {user} showHeading={false} />
-            <PlayerRecord {user} self />
+            <PlayerRecord {user} />
           </div>
         {:else}
           <div class="divide-y divide-line">

@@ -515,8 +515,9 @@ and roles are the page's subject, not tab content. Below it:
   sponsor note and whatever VEKN, NDA and sanction controls the viewer's access
   grants.
 - **Play record** — ratings, then the wins and the decklists. The
-  undocumented-decklist nudge sits between them on `/profile` only: it is
-  actionable by the player alone and reads as a reproach on anyone else's page.
+  undocumented-decklist nudge sits between them on the viewer's own record,
+  by whichever route they reached it: it is actionable by the player alone and
+  reads as a reproach on anyone else's page.
 - **Account** — linked accounts, authorized apps, the member's own playtest NDA
   records with a re-download of each sealed file, settings, developer,
   administration, data. The NDA block renders only when a record exists.

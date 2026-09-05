@@ -666,6 +666,26 @@ to replace it, without opening it. The roster's decks-in tally and its
 missing/problems filters count submitted decks either way — the chase asks who
 still owes a decklist, which is a question about check-in, not about contents.
 
+**A profile lists a decklist only once its event published it.** The player
+record on `/profile` and `/users/[uid]` gates on the tournament being held
+locally, not soft-deleted and `Finished`, plus `public` for anyone but the deck's
+owner, who is entitled to all of their own. The `public` leg is what answers for
+an organizer, since they hold every deck of their event at `full` whatever its
+state.
+
+**An unpublish never reaches a member's IndexedDB.** The engine retracts
+server-side — `ReopenTournament` sets every deck back to private, and a
+`decklists_mode` narrowed while Finished recomputes each one — but a deck whose
+member projection drops to null broadcasts no frame at all, and the client hard-
+deletes only on a tombstone, so a stale `public: true` survives locally. The
+`Finished` leg covers a reopen that re-finishes under the same mode; a narrowing
+— applied to a Finished event directly, or across a reopen, since neither finish
+path ever pushes `false` — has no client-side leg and shows until a full resync.
+
+The wins-without-a-decklist nudge counts decks **before** that visibility filter:
+it asks whether a deck exists, not whether it is public, so a reopened event the
+player holds a deck for is not offered back to them as undocumented.
+
 **Raffle** — `RaffleDraw` (pools AllPlayers, NonFinalists, GameWinners, NoGameWin,
 NoVictoryPoint; optional `prize_promo_uid`, display-only and never written to
 `promos_distributed`), `RaffleUndo`, `RaffleClear`.

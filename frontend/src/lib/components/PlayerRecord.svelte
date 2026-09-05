@@ -2,24 +2,25 @@
   import type { User, Tournament, DeckObject } from "$lib/types";
   import type { TournamentListItem } from "$lib/db";
   import { getTournamentListItems, getDecksByUser, getTournament } from "$lib/db";
+  import { getAuthState } from "$lib/stores/auth.svelte";
   import { getCountryFlag } from "$lib/geonames";
   import FoldableSection from "$lib/components/FoldableSection.svelte";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
   import { Trophy, TriangleAlert } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  let { user, self = false }: { user: User | undefined; self?: boolean } = $props();
+  let { user }: { user: User | undefined } = $props();
 
   let wins = $state<Tournament[]>([]);
-  let decks = $state<{ deck: DeckObject; tournament: Tournament | undefined }[]>([]);
+  let decks = $state<{ deck: DeckObject; tournament: Tournament }[]>([]);
   let undocumented = $state<TournamentListItem[]>([]);
   let expandedDeck = $state<string | null>(null);
 
-  function day(t: { start: string | null } | undefined): string {
-    return t?.start?.slice(0, 10) ?? "";
+  function day(t: { start: string | null }): string {
+    return t.start?.slice(0, 10) ?? "";
   }
 
-  async function load(uid: string, winUids: string[], withMissing: boolean) {
+  async function load(uid: string, winUids: string[], owner: boolean) {
     const won = await Promise.all(winUids.map(u => getTournament(u)));
     wins = won
       .filter((t): t is Tournament => !!t)
@@ -28,11 +29,13 @@
     const mine = await getDecksByUser(uid);
     decks = (await Promise.all(
       mine.map(async d => ({ deck: d, tournament: await getTournament(d.tournament_uid) })),
-    )).sort((a, b) => day(b.tournament).localeCompare(day(a.tournament)));
+    ))
+      .filter((r): r is { deck: DeckObject; tournament: Tournament } =>
+        !!r.tournament && !r.tournament.deleted_at && r.tournament.state === "Finished"
+        && (owner || r.deck.public))
+      .sort((a, b) => day(b.tournament).localeCompare(day(a.tournament)));
 
-    // Not the Hall of Fame rule inverted — that is server-side and stays there.
-    // This asks only "you won it and no deck of yours is on it".
-    if (!withMissing) {
+    if (!owner) {
       undocumented = [];
       return;
     }
@@ -51,7 +54,7 @@
       undocumented = [];
       return;
     }
-    load(uid, winUids, self);
+    load(uid, winUids, getAuthState().user?.uid === uid);
   });
 </script>
 
@@ -99,7 +102,7 @@
     </h2>
     <div class="space-y-2">
       {#each decks as { deck, tournament } (deck.uid)}
-        {@const label = deck.name || tournament?.name || day(tournament)}
+        {@const label = deck.name || tournament.name || day(tournament)}
         <FoldableSection
           open={expandedDeck === deck.uid}
           ontoggle={() => expandedDeck = expandedDeck === deck.uid ? null : deck.uid}
@@ -108,11 +111,9 @@
           {#snippet header()}
             <span class="text-xs text-ink-faint ml-auto whitespace-nowrap">{day(tournament)}</span>
           {/snippet}
-          {#if tournament}
-            <a href="/tournaments/{tournament.uid}" class="text-sm text-link hover:text-link-soft">
-              {tournament.name}
-            </a>
-          {/if}
+          <a href="/tournaments/{tournament.uid}" class="text-sm text-link hover:text-link-soft">
+            {tournament.name}
+          </a>
           <!-- No `format`: validation is read-only noise here, and a 2005 archive
                deck fails today's legality rules for reasons its player cannot act on. -->
           <DeckDisplay {deck} />

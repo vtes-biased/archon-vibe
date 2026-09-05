@@ -86,7 +86,9 @@ a trailing 18 months, rating points in finished standings, a rankings page with
 country and date filters, and a Hall of Fame for five wins that would have made
 the TWDA with the winning deck on record
 ([the rule](tournaments.md#configuration)), stated on the page. A member profile
-carries the wins behind the count and their decklists on record; your own also
+carries the wins behind the count and their decklists on record — a decklist
+reaches a profile only once its tournament is Finished, and to anyone but its
+owner only once that event published it; your own also
 lists the events you won with no decklist attached. The formula and the
 standing warning about vekn.net's stored value are [domain](domain/vekn.md#ratings).
 
