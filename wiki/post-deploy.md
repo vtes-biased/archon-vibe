@@ -88,7 +88,7 @@ reported this, so there is nobody to tell.
 ## Tombstone the decks of players who left their event
 
 Gated by the commit that made `Unregister` and `RemovePlayer` delete the player's
-decks (`GATING_SHA`). Before it a departure left the decks behind, and under the
+decks (`7f124e63`). Before it a departure left the decks behind, and under the
 All mode an orphan still publishes at finish; running earlier lets the count refill
 until the deploy.
 
