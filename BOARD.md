@@ -24,3 +24,5 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
+
+Record one promo movement across several promos at once — the movement form takes a quantity per active promo instead of a single-promo picker, and one submission writes one ledger row per promo, for all three kinds. Done when an NC sends five different promos to a Prince in a single submission, an invalid line rejects the whole submission before any row is written, stock recomputes once for the set, and the Inventory ledger paragraph in `wiki/architecture.md` records the new request shape.
