@@ -1,9 +1,7 @@
 <script lang="ts">
-  // Record a promo inventory movement (officials): intake = print batch received from BCP, assignment
-  // = stock moved holder→holder, distribution = a non-tournament exit. Negative qty is a compensating correction.
   import type { Promo, PromoLedgerKind } from "$lib/types";
   import type { UserListItem } from "$lib/db";
-  import { createPromoLedgerEntry } from "$lib/api";
+  import { createPromoLedgerEntries } from "$lib/api";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { getCountryFlag } from "$lib/geonames";
   import { showToast } from "$lib/stores/toast.svelte";
@@ -27,8 +25,8 @@
   const auth = $derived(getAuthState());
 
   let kind = $state<PromoLedgerKind>("assignment");
-  let promoUid = $state("");
-  let qty = $state<number | null>(1);
+  const sortedPromos = $derived([...promos].sort((a, b) => a.name.localeCompare(b.name)));
+  let qtys = $state<Record<string, number | null>>({});
   let note = $state("");
   let toUser = $state<UserListItem | null>(null);
   // IC only: null = self (the server default).
@@ -41,11 +39,14 @@
   );
 
   let saving = $state(false);
+  const lines = $derived(
+    sortedPromos
+      .map((p) => ({ promo_uid: p.uid, qty: qtys[p.uid] ?? 0 }))
+      .filter((l) => l.qty !== 0)
+  );
   const canSubmit = $derived(
-    !!promoUid &&
-      qty !== null &&
-      Number.isInteger(qty) &&
-      qty !== 0 &&
+    lines.length > 0 &&
+      lines.every((l) => Number.isInteger(l.qty)) &&
       !!happenedAt &&
       (kind !== "assignment" || !!toUser) &&
       !saving
@@ -68,10 +69,9 @@
     if (!canSubmit) return;
     saving = true;
     try {
-      await createPromoLedgerEntry({
+      await createPromoLedgerEntries({
         kind,
-        promo_uid: promoUid,
-        qty: qty!,
+        lines,
         to_uid: kind === "assignment" ? toUser!.uid : undefined,
         from_uid: canManagePromo && fromUser ? fromUser.uid : undefined,
         note: note.trim() || undefined,
@@ -155,13 +155,25 @@
       </div>
 
       <div>
-        <label for="movement-promo" class="block text-sm text-ink-muted mb-1">{m.promo_movement_promo_label()} *</label>
-        <select id="movement-promo" bind:value={promoUid} required class={inputClass}>
-          <option value="" disabled>{m.promos_select()}</option>
-          {#each promos as promo (promo.uid)}
-            <option value={promo.uid}>{promo.name}</option>
+        <span class="block text-sm text-ink-muted mb-1">{m.promo_movement_quantities_label()} *</span>
+        <div class="border border-line-strong rounded-lg divide-y divide-line max-h-64 overflow-y-auto">
+          {#each sortedPromos as promo (promo.uid)}
+            <div class="flex items-center gap-3 px-3 py-2">
+              <label for="movement-qty-{promo.uid}" class="flex-1 min-w-0 truncate text-sm text-ink">{promo.name}</label>
+              <input
+                id="movement-qty-{promo.uid}"
+                type="number"
+                step="1"
+                bind:value={qtys[promo.uid]}
+                class="w-24 shrink-0 px-2 py-1.5 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
+              />
+            </div>
           {/each}
-        </select>
+        </div>
+        <p class="mt-1 text-xs text-ink-faint">{m.promo_movement_qty_hint()}</p>
+        {#if lines.length > 0}
+          <p class="mt-1 text-xs text-ink-muted">{m.promo_movement_lines_summary({ count: String(lines.length) })}</p>
+        {/if}
       </div>
 
       {#if kind === "assignment"}
@@ -201,12 +213,6 @@
           {/if}
         </div>
       {/if}
-
-      <div>
-        <label for="movement-qty" class="block text-sm text-ink-muted mb-1">{m.promo_movement_qty_label()} *</label>
-        <input id="movement-qty" type="number" bind:value={qty} step="1" required class={inputClass} />
-        <p class="mt-1 text-xs text-ink-faint">{m.promo_movement_qty_hint()}</p>
-      </div>
 
       <div>
         <label for="movement-date" class="block text-sm text-ink-muted mb-1">{m.promo_movement_date_label()}</label>

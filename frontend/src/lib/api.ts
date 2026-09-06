@@ -709,16 +709,15 @@ export async function deletePromoImage(uid: string): Promise<void> {
 
 export interface LedgerEntryPayload {
   kind: PromoLedgerKind;
-  promo_uid: string;
-  qty: number; // negative = compensating correction
+  lines: { promo_uid: string; qty: number }[];
   to_uid?: string; // assignments only
   from_uid?: string; // IC only; defaults to the actor
   note?: string;
   happened_at?: string;
 }
 
-export async function createPromoLedgerEntry(payload: LedgerEntryPayload): Promise<PromoLedgerEntry> {
-  return apiRequest<PromoLedgerEntry>('/api/promos/ledger', {
+export async function createPromoLedgerEntries(payload: LedgerEntryPayload): Promise<PromoLedgerEntry[]> {
+  return apiRequest<PromoLedgerEntry[]>('/api/promos/ledger', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

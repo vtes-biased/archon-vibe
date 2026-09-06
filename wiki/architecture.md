@@ -493,9 +493,13 @@ exit, no `to_uid`). Corrections are compensating negative-`qty` rows, never edit
 A holder with no recorded intake is the old fallback: stock can still go negative
 from assignments and distributions alone, and the UI hides the negative source.
 
-`POST/GET /api/promos/ledger` — POST is self-sourced except for IC, who may record
-for another holder; `intake` is additionally officials-only, with NC able to
-intake into their own pool and IC into any holder's, and plain members not at all.
+`POST/GET /api/promos/ledger` — one POST records one movement across several
+promos: a single kind, holder pair, note and date over `lines`
+(`{promo_uid, qty}[]`, each promo at most once), written as one multi-row INSERT
+so a rejected line leaves no row behind, and recomputed once for the whole set.
+POST is self-sourced except for IC, who may record for another holder; `intake`
+is additionally officials-only, with NC able to intake into their own pool and IC
+into any holder's, and plain members not at all.
 `assignment` rejects `from_uid == to_uid` with a 400: it credits and debits the
 same holder, a no-op in the recompute — use `intake`. GET returns the whole
 role-scoped ledger with no pagination (IC and NC see every row, everyone else only

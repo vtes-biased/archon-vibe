@@ -109,7 +109,7 @@
   {/if}
 
   <div class="flex flex-wrap gap-2 mb-4">
-    <Button variant="secondary" disabled={!online} onclick={() => (showMovement = true)}>
+    <Button variant="secondary" disabled={!online || activePromos.length === 0} onclick={() => (showMovement = true)}>
       {m.promo_record_movement()}
     </Button>
     <Button variant="ghost" disabled={!online} loading={exporting} onclick={exportCsv}>

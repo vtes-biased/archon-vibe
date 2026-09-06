@@ -63,7 +63,7 @@ async def test_recompute_nets_ledger_and_attributions_and_cleans_stale_holders(t
             _entry(PromoLedgerKind.DISTRIBUTION, p, 3, org_b.uid, None),
             _entry(PromoLedgerKind.DISTRIBUTION, p, -1, org_b.uid, None),
         ):
-            await db.insert_promo_ledger_entry(e)
+            await db.insert_promo_ledger_entries([e])
 
         # A tournament reports 2 distributed, sourced from C's stock.
         t = Tournament(

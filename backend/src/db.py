@@ -1764,12 +1764,15 @@ def _ledger_row_to_entry(row: tuple) -> PromoLedgerEntry:
     )
 
 
-async def insert_promo_ledger_entry(entry: PromoLedgerEntry) -> None:
-    """Append one ledger row (corrections are new compensating rows)."""
-    async with get_connection() as conn:
-        await conn.execute(
-            f"""INSERT INTO promo_ledger ({_LEDGER_COLS})
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+async def insert_promo_ledger_entries(entries: list[PromoLedgerEntry]) -> None:
+    """One multi-VALUES statement: the pool is autocommit, so a single
+    statement is what makes a submission's rows land all-or-nothing."""
+    if not entries:
+        return
+    values = ", ".join(["(" + ", ".join(["%s"] * 10) + ")"] * len(entries))
+    params: list[object] = []
+    for entry in entries:
+        params.extend(
             (
                 entry.uid,
                 entry.kind,
@@ -1781,7 +1784,11 @@ async def insert_promo_ledger_entry(entry: PromoLedgerEntry) -> None:
                 entry.happened_at,
                 entry.created_by,
                 entry.created_at,
-            ),
+            )
+        )
+    async with get_connection() as conn:
+        await conn.execute(
+            f"INSERT INTO promo_ledger ({_LEDGER_COLS}) VALUES {values}", params
         )
 
 

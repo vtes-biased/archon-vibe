@@ -13,12 +13,13 @@ from ..broadcast import broadcast_precomputed
 from ..db import (
     count_promo_references,
     delete_promo_image,
+    get_all_promos,
     get_league_by_uid,
     get_promo_by_uid,
     get_promo_image,
     get_promo_ledger_entries,
     get_user_by_uid,
-    insert_promo_ledger_entry,
+    insert_promo_ledger_entries,
     save_promo,
     upsert_promo_image,
 )
@@ -162,10 +163,14 @@ async def delete_promo(
 # Stock is recomputed server-side and streamed via Promo/User, never derived client-side.
 
 
+class LedgerLine(BaseModel):
+    promo_uid: str
+    qty: int
+
+
 class LedgerEntryCreate(BaseModel):
     kind: PromoLedgerKind
-    promo_uid: str
-    qty: int  # negative = compensating correction
+    lines: list[LedgerLine]
     to_uid: str | None = None
     from_uid: str | None = None  # IC only; defaults to the actor
     note: str = ""
@@ -173,14 +178,15 @@ class LedgerEntryCreate(BaseModel):
 
 
 @router.post("/ledger")
-async def create_ledger_entry(
+async def create_ledger_entries(
     body: LedgerEntryCreate,
     user: OptionalUser = None,
 ) -> Response:
-    """Record an inventory movement. Self-sourced (own stock) for anyone;
-    IC may record for another holder (unrecorded supply needs no prior stock).
-    Intake (batch received from BCP, from_uid = the receiving holder) is
-    officials-only: NC for their own pool, IC for anyone."""
+    """Record one inventory movement across several promos — one row per line,
+    written all-or-nothing. Self-sourced (own stock) for anyone; IC may record
+    for another holder (unrecorded supply needs no prior stock). Intake (batch
+    received from BCP, from_uid = the receiving holder) is officials-only: NC
+    for their own pool, IC for anyone."""
     if not user:
         raise HTTPException(401, "Authentication required")
     # Membership floor: every real holder has a VEKN ID — keeps drive-by accounts
@@ -196,9 +202,15 @@ async def create_ledger_entry(
         user
     ):
         raise HTTPException(403, "Only IC or NC can record an intake")
-    if body.qty == 0:
+    if not body.lines:
+        raise HTTPException(400, "At least one line is required")
+    if any(line.qty == 0 for line in body.lines):
         raise HTTPException(400, "qty must be non-zero")
-    if not await get_promo_by_uid(body.promo_uid):
+    promo_uids = [line.promo_uid for line in body.lines]
+    if len(set(promo_uids)) != len(promo_uids):
+        raise HTTPException(400, "A promo may appear only once per submission")
+    known = {promo.uid for promo in await get_all_promos()}
+    if not set(promo_uids) <= known:
         raise HTTPException(404, "Promo not found")
     if body.kind == PromoLedgerKind.ASSIGNMENT:
         if not body.to_uid:
@@ -214,22 +226,25 @@ async def create_ledger_entry(
         raise HTTPException(400, "Only assignments have to_uid")
 
     now = datetime.now(UTC)
-    entry = PromoLedgerEntry(
-        uid=str(uuid7()),
-        kind=body.kind,
-        promo_uid=body.promo_uid,
-        qty=body.qty,
-        from_uid=from_uid,
-        to_uid=body.to_uid,
-        note=body.note,
-        happened_at=body.happened_at or now,
-        created_by=user.uid,
-        created_at=now,
-    )
-    await insert_promo_ledger_entry(entry)
-    schedule_recompute([body.promo_uid])
+    entries = [
+        PromoLedgerEntry(
+            uid=str(uuid7()),
+            kind=body.kind,
+            promo_uid=line.promo_uid,
+            qty=line.qty,
+            from_uid=from_uid,
+            to_uid=body.to_uid,
+            note=body.note,
+            happened_at=body.happened_at or now,
+            created_by=user.uid,
+            created_at=now,
+        )
+        for line in body.lines
+    ]
+    await insert_promo_ledger_entries(entries)
+    schedule_recompute(promo_uids)
     return Response(
-        content=encoder.encode(msgspec.to_builtins(entry)),
+        content=encoder.encode(msgspec.to_builtins(entries)),
         media_type="application/json",
         status_code=201,
     )
