@@ -250,13 +250,16 @@ export async function processTournamentEvent(
  * PyEngine.update_standings — same shared Rust, fed from IDB sanctions instead of Postgres. */
 export async function updateStandings(
   tournament: Tournament,
-  sanctions: Sanction[]
-): Promise<Tournament> {
+  sanctions: Sanction[],
+  decks: DeckObject[] = []
+): Promise<EngineResult> {
   const engine = await initEngine();
   const tournamentJson = JSON.stringify(tournament);
   const sanctionsJson = buildSanctionsPayload(sanctions, tournament.uid);
-  const resultJson = callEngine(() => engine.updateStandings(tournamentJson, sanctionsJson));
-  return JSON.parse(resultJson) as Tournament;
+  const decksJson = buildDecksPayload(decks);
+  const resultJson = callEngine(() => engine.updateStandings(tournamentJson, sanctionsJson, decksJson));
+  const result = JSON.parse(resultJson);
+  return { tournament: result.tournament, deckOps: result.deck_ops || [] };
 }
 
 export interface PermissionResult {

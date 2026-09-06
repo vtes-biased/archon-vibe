@@ -324,11 +324,21 @@ pub fn process_tournament_event(
 pub fn update_standings_json(
     tournament_json: &str,
     sanctions_json: &str,
+    decks_json: &str,
 ) -> Result<String, EngineError> {
     let mut tournament = json::parse(tournament_json)?;
     let sanctions = json::parse(sanctions_json)?;
+    let decks = json::parse(decks_json)?;
     update_standings(&mut tournament, &sanctions);
-    Ok(tournament.dump())
+    let mut deck_ops = JsonValue::new_array();
+    if tournament[tournament::STATE].as_str() == Some("Finished") {
+        recompute_deck_publication(&tournament, &decks, &mut deck_ops);
+    }
+    let result = json::object! {
+        arg::TOURNAMENT => tournament,
+        arg::DECK_OPS => deck_ops,
+    };
+    Ok(result.dump())
 }
 
 /// Mirrors SetScore's SA cascade exactly, so live UI previews never drift from
@@ -2432,13 +2442,17 @@ fn apply_event(
 
             update_standings(tournament, sanctions);
 
-            // `ranking_eligibility` reads a bare winner as a played final: crowning
-            // past the rating floor would rank the event.
+            // `ranking_eligibility` reads a bare winner as a played final: a crown
+            // left standing past the rating floor would rank the event.
             if tournament[tournament::FINALS].is_null()
                 && !tournament[tournament::ROUNDS].is_empty()
-                && crate::ratings::players_with_rounds(tournament)
-                    < crate::ratings::RATING_MIN_PLAYERS
+                && tournament[tournament::EXTERNAL_IDS][arg::ARCHON]
+                    .as_str()
+                    .unwrap_or("")
+                    .is_empty()
             {
+                let under_floor = crate::ratings::players_with_rounds(tournament)
+                    < crate::ratings::RATING_MIN_PLAYERS;
                 let first = tournament[tournament::STANDINGS]
                     .members()
                     .find(|s| {
@@ -2446,6 +2460,7 @@ fn apply_event(
                             && !s[standing::NON_COMPETING].as_bool().unwrap_or(false)
                     })
                     .and_then(|s| s[standing::USER_UID].as_str())
+                    .filter(|_| under_floor)
                     .unwrap_or("")
                     .to_string();
                 tournament[tournament::WINNER] = first.as_str().into();

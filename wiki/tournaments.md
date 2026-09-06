@@ -148,8 +148,7 @@ and re-runs `FinishFinals` when done; `CancelFinals` is the one path that discar
 a final, reachable from there, and it takes the winner with it — a winner standing
 over a null `finals` is the archival shape `compute_final_standings` ranks first.
 An event finished without one returns to `Waiting`, having no final to come back
-to, and keeps its winner — an archival import's, or the one the no-final finish
-crowned, re-derived by the next finish. Players released from
+to, and keeps its winner until the next finish re-derives it. Players released from
 `Finished` return to `Playing` if they were finalists, else to `Completed` when
 they are at the per-player `max_rounds` cap and `Checked-in` otherwise. Decklists
 unpublish, since publication is derived from the finished state by the post-finish
@@ -496,9 +495,12 @@ uid because the client applies the event through WASM before the server replays 
 
 `FinishTournament` without a final sets `Finished` and preliminary standings, and
 crowns the standings' first place — §3.1.6 ranks such an event by §3.1 — **only
-when fewer than 8 played**: `ranking_eligibility` reads a bare `winner` as a played
-final, so crowning a larger event would rank it and pre-empt the second question
-deferred below. It sets no finalist flags, so a native no-final event awards no
+when fewer than 8 played**, and clears the winner otherwise: `ranking_eligibility`
+reads a bare `winner` as a played final, so a crown standing on a larger event —
+including one reopened and grown past the floor — would rank it and pre-empt the
+second question deferred below. A legacy archon import (`external_ids.archon`)
+keeps upstream's winner through a re-finish, as the stance below keeps an import's
+answer. It sets no finalist flags, so a native no-final event awards no
 winner/finalist rating bonus and no winner GW. That is rules-literal — A.2 credits
 a game won "including a final round victory" and A.2.1 defines a finalist as one
 who advanced to a final — but vekn.net's own implementation credits a no-final top
@@ -692,9 +694,10 @@ deleted, whose ops already carry the answer. There is no other writer: finishing
 reopening, narrowing the mode, a finals rescore that moves the winner and an
 archival correction all publish and retract through it. The pass reads the flag
 off the decks payload the engine is handed, so the two payload builders carry it
-([hazards](hazards.md#two-implementations-of-one-gate)). The sanction routes call
-`update_standings` outside it and emit no deck ops: a sanction re-scores but never
-moves the winner, so nothing there can change publication. A retracted deck
+([hazards](hazards.md#two-implementations-of-one-gate)). The sanction routes reach
+it through `update_standings`, which takes the decks and returns deck ops for the
+same reason: a standings adjustment or a DQ on the final re-scores it and can move
+the winner, and the server-side follow-up below runs there too. A retracted deck
 tombstones at the levels that lost it ([sync](sync.md#access-levels)).
 
 Server-side the same trigger — any action on a `Finished` event — resubmits the

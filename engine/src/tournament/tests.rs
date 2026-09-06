@@ -2222,13 +2222,45 @@ fn test_no_final_finish_crowns_first_place_under_the_floor() {
 }
 
 #[test]
-fn test_no_final_finish_leaves_a_rated_size_uncrowned() {
+fn test_no_final_finish_uncrowns_a_rated_size() {
     // A bare winner reads as a played final to `ranking_eligibility`; whether such
-    // an event ranks is with the Rules Director.
+    // an event ranks is with the Rules Director. The crown an earlier, smaller
+    // finish set goes too, so a reopened event that grew cannot keep it.
+    let mut tournament = no_final_event(8);
+    tournament["winner"] = "p1".into();
     let event = json::object! { type: "FinishTournament" };
-    let updated =
-        json::parse(&run_event(&no_final_event(8), &event, &make_organizer()).unwrap()).unwrap();
+    let updated = json::parse(&run_event(&tournament, &event, &make_organizer()).unwrap()).unwrap();
     assert!(updated["winner"].as_str().unwrap_or("").is_empty());
+}
+
+#[test]
+fn test_sanction_recompute_moves_publication_with_the_winner() {
+    // The sanction door re-scores the final; an SA that drops p1 below p2 moves
+    // the winner and the pass must follow there too.
+    let mut tournament = finished_with_finals();
+    tournament["finals"]["seating"][0]["result"]["vp"] = 2.0.into();
+    tournament["finals"]["seating"][1]["result"]["vp"] = 2.0.into();
+    let sanctions = json::array![
+        { user_uid: "p1", level: "standings_adjustment", round_number: 3, lifted_at: json::Null, deleted_at: json::Null },
+    ];
+    let decks = json::array![
+        { uid: "d1", user_uid: "p1", tournament_uid: "test-tournament", round: 3, public: true },
+        { uid: "d2", user_uid: "p2", tournament_uid: "test-tournament", round: 3, public: false },
+    ];
+    let raw = update_standings_json(&tournament.dump(), &sanctions.dump(), &decks.dump()).unwrap();
+    let result = json::parse(&raw).unwrap();
+    assert_eq!(result["tournament"]["winner"].as_str(), Some("p2"));
+    let mut flags: Vec<(&str, bool)> = result["deck_ops"]
+        .members()
+        .map(|op| {
+            (
+                op["deck_uid"].as_str().unwrap(),
+                op["public"].as_bool().unwrap(),
+            )
+        })
+        .collect();
+    flags.sort();
+    assert_eq!(flags, vec![("d1", false), ("d2", true)]);
 }
 
 #[test]

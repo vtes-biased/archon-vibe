@@ -8,7 +8,9 @@ import {
   type CreateSanctionData,
 } from './api';
 import {
+  addOfflineDeckUid,
   addOfflineSanctionUid,
+  getDecksByTournament,
   getSanction,
   getSanctionsForTournament,
   getTournament,
@@ -16,6 +18,7 @@ import {
   saveTournament,
 } from './db';
 import { updateStandings } from './engine';
+import { applyDeckOps } from './tournament-actions';
 import { getAuthState } from './stores/auth.svelte';
 import { isOffline } from './stores/offline.svelte';
 import { syncManager } from './sync';
@@ -96,8 +99,12 @@ async function applyOfflineSanctionEffects(tournamentUid: string): Promise<void>
     }
   }
 
-  const updated = await updateStandings(tournament, sanctions);
+  const decks = await getDecksByTournament(tournamentUid);
+  const { tournament: updated, deckOps } = await updateStandings(tournament, sanctions, decks);
   await saveTournament(updated);
+  for (const deckUid of await applyDeckOps(deckOps, tournamentUid, decks)) {
+    await addOfflineDeckUid(tournamentUid, deckUid);
+  }
 
   // No SSE offline: poke the same refresh hooks server events would.
   syncManager.notifyLocalMutation('sanction');

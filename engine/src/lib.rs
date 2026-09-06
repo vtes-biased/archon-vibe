@@ -673,10 +673,12 @@ mod wasm {
             &self,
             tournament_json: &str,
             sanctions_json: &str,
+            decks_json: &str,
         ) -> Result<String, String> {
             js_str(super::tournament::update_standings_json(
                 tournament_json,
                 sanctions_json,
+                decks_json,
             ))
         }
     }
@@ -883,10 +885,12 @@ mod python {
             &self,
             tournament_json: &str,
             sanctions_json: &str,
+            decks_json: &str,
         ) -> PyResult<String> {
             py_str(super::tournament::update_standings_json(
                 tournament_json,
                 sanctions_json,
+                decks_json,
             ))
         }
 

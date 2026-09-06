@@ -289,7 +289,6 @@ pub(super) fn compute_deck_public(tournament: &JsonValue, player_uid: &str) -> b
     }
 }
 
-/// The post-finish pass: every deck's `public` follows the tournament, both ways.
 pub(super) fn recompute_deck_publication(
     tournament: &JsonValue,
     decks: &JsonValue,
@@ -336,8 +335,8 @@ pub(super) fn recompute_deck_publication(
     }
 }
 
-/// A departure takes the player's decks along. Both callers run before any round
-/// exists, so every deck of theirs is still pending.
+/// Both callers run before any round exists, so every deck of theirs is pending
+/// and a null `deck_index` matches them all.
 pub(super) fn delete_player_decks(
     tournament: &JsonValue,
     decks: &JsonValue,

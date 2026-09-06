@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from datetime import UTC, date, datetime, timedelta
@@ -164,6 +165,8 @@ async def _apply_sanction_to_tournament(
         if tournament is None:
             return
         changed = False
+        winner_before = tournament.winner
+        deck_ops: list = []
         if dq_user_uid is not None and dq_state is not None:
             for player in tournament.players:
                 if player.user_uid == dq_user_uid:
@@ -193,10 +196,16 @@ async def _apply_sanction_to_tournament(
                 }
                 for s in sanctions
             ]
+            from .tournaments import _build_decks_json
+
             tournament_json = encoder.encode(tournament).decode("utf-8")
             sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
-            result_json = _engine.update_standings(tournament_json, sanctions_json)
-            tournament = msgspec.convert(json.loads(result_json), Tournament)
+            decks_json = await _build_decks_json(tournament_uid, conn=tx_conn)
+            result = json.loads(
+                _engine.update_standings(tournament_json, sanctions_json, decks_json)
+            )
+            tournament = msgspec.convert(result["tournament"], Tournament)
+            deck_ops = result["deck_ops"]
             if dq_user_uid is not None and dq_state is not None:
                 for player in tournament.players:
                     if player.user_uid == dq_user_uid:
@@ -215,6 +224,31 @@ async def _apply_sanction_to_tournament(
         tournament.modified = datetime.now(UTC)
         bd = await save_tournament(tournament, conn=tx_conn)
     broadcast_precomputed(bd)
+
+    # Unlocked, like the action route's tail: the post-finish pass follows a
+    # winner the re-score moved.
+    from .tournaments import _process_deck_ops, maybe_submit_twda
+
+    for deck_bd in await _process_deck_ops(
+        deck_ops, tournament_uid, org_uids=tournament.organizers_uids
+    ):
+        broadcast_precomputed(deck_bd)
+    if (
+        tournament.state == TournamentState.FINISHED
+        and winner_before != tournament.winner
+    ):
+        asyncio.create_task(maybe_submit_twda(tournament))
+        try:
+            from ..ratings import recompute_wins
+
+            for _user, user_bd in await recompute_wins(
+                {winner_before, tournament.winner} - {""}
+            ):
+                broadcast_precomputed(user_bd)
+        except Exception as e:
+            logger.error(
+                f"Error recomputing wins for {tournament_uid}: {e}", exc_info=True
+            )
 
 
 class CreateSanctionRequest(BaseModel):

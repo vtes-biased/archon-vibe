@@ -281,7 +281,7 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
 
 /** In online mode, SSE delivers authoritative state and overwrites. Returns affected deck UIDs for
  * offline tracking. */
-async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, existingDecks: DeckObject[]): Promise<string[]> {
+export async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, existingDecks: DeckObject[]): Promise<string[]> {
   const affectedUids: string[] = [];
   for (const op of deckOps) {
     if (op.op === 'upsert' && op.deck && op.player_uid) {
