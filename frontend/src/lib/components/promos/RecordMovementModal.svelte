@@ -7,7 +7,7 @@
   import { showToast } from "$lib/stores/toast.svelte";
   import Button from "$lib/components/Button.svelte";
   import UserPicker from "$lib/components/UserPicker.svelte";
-  import { X } from "@lucide/svelte";
+  import { Plus, X } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
@@ -26,7 +26,9 @@
 
   let kind = $state<PromoLedgerKind>("assignment");
   const sortedPromos = $derived([...promos].sort((a, b) => a.name.localeCompare(b.name)));
-  let qtys = $state<Record<string, number | null>>({});
+  let rows = $state<{ promo_uid: string; qty: number | null; touched: boolean }[]>([
+    { promo_uid: "", qty: 1, touched: false },
+  ]);
   let note = $state("");
   let toUser = $state<UserListItem | null>(null);
   // IC only: null = self (the server default).
@@ -39,14 +41,23 @@
   );
 
   let saving = $state(false);
-  const lines = $derived(
-    sortedPromos
-      .map((p) => ({ promo_uid: p.uid, qty: qtys[p.uid] ?? 0 }))
-      .filter((l) => l.qty !== 0)
-  );
+
+  function optionsFor(index: number): Promo[] {
+    const chosen = new Set(rows.filter((_, i) => i !== index).map((r) => r.promo_uid));
+    return sortedPromos.filter((p) => !chosen.has(p.uid));
+  }
+
+  function validQty(qty: number | null): boolean {
+    return qty !== null && Number.isInteger(qty) && qty !== 0;
+  }
+
+  const rowInvalid = (r: { promo_uid: string; qty: number | null }) =>
+    !r.promo_uid || !validQty(r.qty);
+  const hasInvalidRow = $derived(rows.some(rowInvalid));
+  const flagRows = $derived(rows.some((r) => r.touched && rowInvalid(r)));
   const canSubmit = $derived(
-    lines.length > 0 &&
-      lines.every((l) => Number.isInteger(l.qty)) &&
+    rows.length > 0 &&
+      !hasInvalidRow &&
       !!happenedAt &&
       (kind !== "assignment" || !!toUser) &&
       !saving
@@ -71,7 +82,7 @@
     try {
       await createPromoLedgerEntries({
         kind,
-        lines,
+        lines: rows.map((r) => ({ promo_uid: r.promo_uid, qty: r.qty! })),
         to_uid: kind === "assignment" ? toUser!.uid : undefined,
         from_uid: canManagePromo && fromUser ? fromUser.uid : undefined,
         note: note.trim() || undefined,
@@ -90,6 +101,14 @@
 
   function requestClose() {
     if (!saving) onclose();
+  }
+
+  function addRow() {
+    rows = [...rows, { promo_uid: "", qty: 1, touched: true }];
+  }
+
+  function removeRow(index: number) {
+    rows = rows.filter((_, i) => i !== index);
   }
 
   function focusOnMount(node: HTMLElement) {
@@ -135,7 +154,7 @@
     tabindex="-1"
     use:focusOnMount
     onkeydown={(e) => { e.stopPropagation(); if (e.key === 'Escape') requestClose(); }}
-    class="bg-surface-card w-full h-full overflow-y-auto pt-safe-t pb-safe-b sm:pt-0 sm:pb-safe-b sm:h-auto sm:max-h-[90dvh] sm:max-w-md sm:rounded-lg sm:border sm:border-line sm:shadow-xl"
+    class="bg-surface-card w-full h-full overflow-y-auto pt-safe-t pb-safe-b sm:pt-0 sm:pb-safe-b sm:h-auto sm:max-h-[85dvh] sm:max-w-md sm:rounded-lg sm:border sm:border-line sm:shadow-xl"
   >
     <div class="p-6 border-b border-line">
       <h2 id="promo-movement-title" class="text-xl font-medium text-ink-strong">{m.promo_movement_title()}</h2>
@@ -156,24 +175,53 @@
 
       <div>
         <span class="block text-sm text-ink-muted mb-1">{m.promo_movement_quantities_label()} *</span>
-        <div class="border border-line-strong rounded-lg divide-y divide-line max-h-64 overflow-y-auto">
-          {#each sortedPromos as promo (promo.uid)}
-            <div class="flex items-center gap-3 px-3 py-2">
-              <label for="movement-qty-{promo.uid}" class="flex-1 min-w-0 truncate text-sm text-ink">{promo.name}</label>
+        <div class="space-y-2">
+          {#each rows as row, i}
+            <div class="flex items-center gap-2">
+              <select
+                bind:value={row.promo_uid}
+                onchange={() => (row.touched = true)}
+                aria-label={m.promos_select()}
+                class="flex-1 min-w-0 px-3 min-h-[44px] text-sm border rounded-lg bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent {!row.touched || row.promo_uid ? 'border-line-strong' : 'border-warn'}"
+              >
+                <option value="" disabled>{m.promos_select()}</option>
+                {#each optionsFor(i) as promo (promo.uid)}
+                  <option value={promo.uid}>{promo.name}</option>
+                {/each}
+              </select>
               <input
-                id="movement-qty-{promo.uid}"
                 type="number"
                 step="1"
-                bind:value={qtys[promo.uid]}
-                class="w-24 shrink-0 px-2 py-1.5 text-sm border border-line-strong rounded-lg bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
+                bind:value={row.qty}
+                onchange={() => (row.touched = true)}
+                aria-label={m.promo_movement_qty_label()}
+                class="w-16 shrink-0 px-2 text-center min-h-[44px] text-sm border rounded-lg bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent {!row.touched || validQty(row.qty) ? 'border-line-strong' : 'border-warn'}"
               />
+              <button
+                type="button"
+                onclick={() => removeRow(i)}
+                disabled={rows.length === 1}
+                class="min-w-[44px] min-h-[44px] shrink-0 inline-flex items-center justify-center text-ink-faint hover:text-link transition-colors disabled:opacity-40"
+                aria-label={m.promos_remove()}
+              >
+                <X class="w-4 h-4" aria-hidden="true" />
+              </button>
             </div>
           {/each}
         </div>
-        <p class="mt-1 text-xs text-ink-faint">{m.promo_movement_qty_hint()}</p>
-        {#if lines.length > 0}
-          <p class="mt-1 text-xs text-ink-muted">{m.promo_movement_lines_summary({ count: String(lines.length) })}</p>
+        {#if flagRows}
+          <p class="mt-1 text-xs text-warn">{m.promo_movement_row_hint()}</p>
         {/if}
+        <p class="mt-1 text-xs text-ink-faint">{m.promo_movement_qty_hint()}</p>
+        <button
+          type="button"
+          onclick={addRow}
+          disabled={rows.length >= sortedPromos.length}
+          class="mt-1 inline-flex items-center gap-1 min-h-[44px] text-sm text-ink-muted hover:text-ink-strong transition-colors disabled:opacity-40"
+        >
+          <Plus class="w-4 h-4" aria-hidden="true" />
+          {m.promos_add()}
+        </button>
       </div>
 
       {#if kind === "assignment"}

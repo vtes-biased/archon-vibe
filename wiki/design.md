@@ -292,7 +292,17 @@ Design for touch first, then enhance for desktop.
   exchange (*gagliardetto*, *banderín*) rather than a season; and `User` beside community's `Users` is one shape at that size,
   so profile takes the circled bust. `/tournaments`, `/leagues` and `/profile`
   repeat their nav icon in their own empty state.
-- **Forms**: large inputs, no complex multi-column layouts on mobile.
+- **Forms**: large inputs, no complex multi-column layouts on mobile. A form
+  reveals invalid state only once the user has touched it — a pristine form that
+  opens already flagging its own empty required fields reads as an error the
+  user caused.
+- **A repeated row beats a row per candidate.** Where a form takes a quantity
+  against several catalogue items, add rows on demand — a picker plus a
+  quantity plus a remove control, options excluding what other rows took — and
+  never render one input per catalogue entry. The per-entry form grows with a
+  catalogue that only grows, and its inner scroller nests inside the modal's
+  own. The promo movement and tournament distribution editors are the two
+  instances.
 - **Containers**: full width on mobile, max-width on larger screens.
 - **Tables must reflow to cards** on mobile — the player table is the canonical
   case — or signal a horizontal-scroll affordance.

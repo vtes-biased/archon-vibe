@@ -26,11 +26,14 @@
   let winner = $state(tournament.winner ?? "");
   // svelte-ignore state_referenced_locally
   let count = $state<number | null>(tournament.reported_player_count || null);
+  let countTouched = $state(false);
   let names = $state<Record<string, string>>({});
   let saving = $state(false);
 
   const label = (uid: string) => names[uid] ?? seatDisplay(uid, playerInfo);
-  const invalid = $derived(!winner || !count || count < roster.length);
+  const countOk = $derived(!!count && count >= roster.length);
+  const invalid = $derived(!winner || !countOk);
+  const flagCount = $derived((countTouched || count !== null) && !countOk);
 
   function add(user: UserListItem) {
     names = { ...names, [user.uid]: user.vekn_id ? `${user.name} (${user.vekn_id})` : user.name };
@@ -69,9 +72,10 @@
     id="archival-count"
     type="number"
     bind:value={count}
+    onchange={() => (countTouched = true)}
     min={roster.length || 1}
     max={9999}
-    class="w-24 px-2 py-1 min-h-[44px] mb-3 text-sm bg-surface-muted border rounded text-ink-strong text-center focus:border-accent-strong-hover focus:outline-none {count && count >= roster.length ? 'border-line-strong' : 'border-warn'}"
+    class="w-24 px-2 py-1 min-h-[44px] mb-3 text-sm bg-surface-muted border rounded text-ink-strong text-center focus:border-accent-strong-hover focus:outline-none {flagCount ? 'border-warn' : 'border-line-strong'}"
   />
 
   <p class="text-xs text-ink-faint mb-1">{m.archival_roster()}</p>
