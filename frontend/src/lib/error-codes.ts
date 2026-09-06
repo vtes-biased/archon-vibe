@@ -107,6 +107,7 @@ const ENGINE_MESSAGES: Record<string, (p: Record<string, string>) => string> = {
   'tournament.format_forbids_rank': () => m.err_tournament_format_forbids_rank(),
   'tournament.format_forbids_decks': () => m.err_tournament_format_forbids_decks(),
   'tournament.rank_forbids_multideck': () => m.err_tournament_rank_forbids_multideck(),
+  'tournament.multideck_locked_rounds': () => m.err_tournament_multideck_locked_rounds(),
   'tournament.vekn_frozen_field': (p) => m.err_tournament_vekn_frozen_field({ field: p.field ?? '' }),
   'tournament.self_organize_disabled': () => m.err_tournament_self_organize_disabled(),
   'tournament.self_organize_not_open_rounds': () => m.err_tournament_self_organize_not_open_rounds(),

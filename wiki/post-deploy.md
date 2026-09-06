@@ -92,7 +92,9 @@ decks (`7f124e63`). Before it a departure left the decks behind, and under the
 All mode an orphan still publishes at finish; running earlier lets the count refill
 until the deploy.
 
-Count them:
+A winner's deck is never such an orphan — `RemovePlayer` needs zero rounds, so
+no native winner was ever removed — and an archive reconstruction's roster is its
+winner alone, so both are excluded rather than trusted. Count them:
 
 ```sql
 SELECT count(*) FROM objects d
@@ -100,7 +102,9 @@ JOIN objects t ON t.type = 'tournament' AND t.uid = d."full"->>'tournament_uid'
 WHERE d.type = 'deck' AND d.deleted_at IS NULL
   AND NOT EXISTS (
       SELECT 1 FROM jsonb_array_elements(t."full"->'players') p
-      WHERE p->>'user_uid' = d."full"->>'user_uid');
+      WHERE p->>'user_uid' = d."full"->>'user_uid')
+  AND d."full"->>'user_uid' IS DISTINCT FROM t."full"->>'winner'
+  AND t."full"->'external_ids'->>'twda' IS NULL;
 ```
 
 Then tombstone them through the model, so the projections drop and every holder's
@@ -121,6 +125,8 @@ WHERE d.type = 'deck' AND d.deleted_at IS NULL
   AND NOT EXISTS (
       SELECT 1 FROM jsonb_array_elements(t."full"->'players') p
       WHERE p->>'user_uid' = d."full"->>'user_uid')
+  AND d."full"->>'user_uid' IS DISTINCT FROM t."full"->>'winner'
+  AND t."full"->'external_ids'->>'twda' IS NULL
 """
 
 
@@ -145,7 +151,7 @@ and run it with the service environment:
 
 ```sh
 sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
-  cd /opt/archon/backend && .venv/bin/python /tmp/tombstone_orphan_decks.py'
+  cd /opt/archon/backend && PYTHONPATH=/opt/archon/backend .venv/bin/python /tmp/tombstone_orphan_decks.py'
 ```
 
 The count query then answers 0. Report the number to the owner and delete this
