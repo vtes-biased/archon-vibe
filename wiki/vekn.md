@@ -418,12 +418,17 @@ lands there, the archive granting only permission to open the pull request
 `archon/{event_code}` and file `decks/{event_code}.txt`, create-or-update, with the
 short event link in the PR body and in the deck header krcg parses back as the
 entry's `event_link` — which is what makes an entry we submitted resolvable against
-its own tournament on the next archive read. Five triggers
-fire it: the finish action; a winner-deck upsert on an already-finished tournament,
-by an organizer or by the winner adding their *first* deck, so late uploads and
-post-event edits reach the archive; the manual organizer publish; the batch after a
-successful results push, covering events finished offline or whose VEKN event id
-only just arrived; and go-online for a tournament finished offline.
+its own tournament on the next archive read. The commit and the pull-request title
+read `Add TWD` for a new file and `Update TWD` when the branch already held one. It
+fires on the finish action; on any later action on the Finished event that moves
+the winner or a winner's deck — the post-finish pass
+([tournaments](tournaments.md#engine-event-catalog)), so late uploads, owner
+corrections and a rescored final all reach the archive, the open pull request
+taking the new file and a merged one getting a fresh request; on the manual
+organizer publish; on the batch after a successful results push, covering events
+finished offline or whose VEKN event id only just arrived; and on go-online for a
+tournament finished offline. In a multideck event the archived deck is the one
+stamped at the finals index; none on record is `no_deck`.
 
 Every attempt records its outcome on `Tournament.twda_status`: `submitted` with the
 PR URL, `skipped` with a reason code — no winner, Limited format (draft and sealed

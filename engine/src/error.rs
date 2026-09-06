@@ -83,6 +83,7 @@ pub enum EngineError {
     MaxRoundsBelowCompleted { max: usize, completed: usize },
     RankForbidsProxies,
     RankForbidsMultideck,
+    MultideckLockedRounds,
     FormatForbidsRank,
     FormatForbidsDecks,
     VeknFrozenField { field: String },
@@ -189,6 +190,7 @@ impl EngineError {
             MaxRoundsBelowCompleted { .. } => "tournament.max_rounds_below_completed",
             RankForbidsProxies => "tournament.rank_forbids_proxies",
             RankForbidsMultideck => "tournament.rank_forbids_multideck",
+            MultideckLockedRounds => "tournament.multideck_locked_rounds",
             FormatForbidsRank => "tournament.format_forbids_rank",
             FormatForbidsDecks => "tournament.format_forbids_decks",
             VeknFrozenField { .. } => "tournament.vekn_frozen_field",
@@ -392,6 +394,9 @@ impl fmt::Display for EngineError {
                 f,
                 "Multideck is not allowed in National or Continental championships"
             ),
+            MultideckLockedRounds => {
+                write!(f, "Multideck cannot change once a round has been played")
+            }
             FormatForbidsRank => write!(
                 f,
                 "Only Standard and Limited events can be National or Continental \

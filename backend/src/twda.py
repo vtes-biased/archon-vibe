@@ -162,13 +162,13 @@ async def submit_twda_pr(
                 return "", f"commit:{file_status}"
 
             content_b64 = base64.b64encode(deck_text.encode()).decode()
+            verb = "Update" if file_status == 200 else "Add"
             file_data: dict = {
-                "message": f"Add TWD: {tournament_name}",
+                "message": f"{verb} TWD: {tournament_name}",
                 "content": content_b64,
                 "branch": branch,
             }
             if file_status == 200:
-                # File exists on branch — include its sha to update
                 file_data["sha"] = json.loads(file_text)["sha"]
 
             put_status, put_text = await _req(
@@ -201,7 +201,7 @@ async def submit_twda_pr(
                 f"/repos/{TWDA_TARGET_REPO}/pulls",
                 archive_token,
                 json={
-                    "title": f"Add TWD: {tournament_name}",
+                    "title": f"{verb} TWD: {tournament_name}",
                     "body": (
                         "Automatically submitted by Archon tournament manager.\n\n"
                         f"{frontend_url()}/t/{event_key}"

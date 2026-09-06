@@ -84,3 +84,69 @@ catch-up — inert for a deck it never held, an eviction for one it did. Confirm
 a member client that a previously-unpublished decklist has left its profile deck
 list, report the row count to the owner, and delete this section. No issue
 reported this, so there is nobody to tell.
+
+## Tombstone the decks of players who left their event
+
+Gated by the commit that made `Unregister` and `RemovePlayer` delete the player's
+decks (`GATING_SHA`). Before it a departure left the decks behind, and under the
+All mode an orphan still publishes at finish; running earlier lets the count refill
+until the deploy.
+
+Count them:
+
+```sql
+SELECT count(*) FROM objects d
+JOIN objects t ON t.type = 'tournament' AND t.uid = d."full"->>'tournament_uid'
+WHERE d.type = 'deck' AND d.deleted_at IS NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM jsonb_array_elements(t."full"->'players') p
+      WHERE p->>'user_uid' = d."full"->>'user_uid');
+```
+
+Then tombstone them through the model, so the projections drop and every holder's
+next catch-up evicts its copy ([sync](sync.md#access-levels)). Save this as
+`/tmp/tombstone_orphan_decks.py` on the box:
+
+```python
+import asyncio
+from datetime import UTC, datetime
+import msgspec
+from src import db
+from src.models import DeckObject, ObjectType
+
+QUERY = """
+SELECT d."full" FROM objects d
+JOIN objects t ON t.type = 'tournament' AND t.uid = d."full"->>'tournament_uid'
+WHERE d.type = 'deck' AND d.deleted_at IS NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM jsonb_array_elements(t."full"->'players') p
+      WHERE p->>'user_uid' = d."full"->>'user_uid')
+"""
+
+
+async def main():
+    await db.init_db()
+    async with db.get_connection() as conn:
+        rows = await (await conn.execute(QUERY)).fetchall()
+    now = datetime.now(UTC)
+    for (row,) in rows:
+        deck = db.decode_json(row, DeckObject)
+        await db.save_object_from_model(
+            ObjectType.DECK, msgspec.structs.replace(deck, deleted_at=now, modified=now)
+        )
+    print(f"tombstoned {len(rows)}")
+    await db.close_db()
+
+
+asyncio.run(main())
+```
+
+and run it with the service environment:
+
+```sh
+sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
+  cd /opt/archon/backend && .venv/bin/python /tmp/tombstone_orphan_decks.py'
+```
+
+The count query then answers 0. Report the number to the owner and delete this
+section. No issue reported this, so there is nobody to tell.

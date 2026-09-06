@@ -216,6 +216,7 @@ function buildDecksPayload(decks: DeckObject[]): string {
       user_uid: d.user_uid,
       round: d.round,
       uid: d.uid,
+      public: d.public,
     }))
   );
 }

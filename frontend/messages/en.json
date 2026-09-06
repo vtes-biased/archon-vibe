@@ -1783,6 +1783,7 @@
   "tfield_rank_storyline_hint": "Storyline events cannot be championships — the VEKN calendar has no Storyline championship type.",
   "err_tournament_rank_forbids_proxies": "Proxies are not allowed in National or Continental championships",
   "err_tournament_rank_forbids_multideck": "Multideck is not allowed in National or Continental championships",
+  "err_tournament_multideck_locked_rounds": "Multideck cannot change once a round has been played",
   "err_tournament_format_forbids_rank": "Only Standard and Limited events can be National or Continental championships",
   "err_tournament_format_forbids_decks": "Storyline events take no decklist",
   "err_tournament_vekn_frozen_field": "Cannot change {field} after the event is published to VEKN",

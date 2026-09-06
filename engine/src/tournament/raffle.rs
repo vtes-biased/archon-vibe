@@ -1,4 +1,4 @@
-//! Raffle pool computation and deck public flag logic.
+//! Raffle pool computation.
 
 use super::standings::compute_preliminary_standings;
 use crate::error::EngineError;
@@ -96,25 +96,4 @@ pub fn get_raffle_pool(
     }
 
     Ok(eligible)
-}
-
-pub(super) fn compute_deck_public(tournament: &JsonValue, player_uid: &str) -> bool {
-    let state = tournament[tournament::STATE].as_str().unwrap_or("");
-    if state != "Finished" {
-        return false;
-    }
-    let mode = tournament[tournament::DECKLISTS_MODE]
-        .as_str()
-        .unwrap_or("Winner");
-    match mode {
-        "All" => true,
-        "Finalists" => {
-            tournament[tournament::WINNER].as_str() == Some(player_uid)
-                || tournament[tournament::PLAYERS].members().any(|p| {
-                    p[player::USER_UID].as_str() == Some(player_uid)
-                        && p[player::FINALIST].as_bool().unwrap_or(false)
-                })
-        }
-        _ => tournament[tournament::WINNER].as_str() == Some(player_uid),
-    }
 }

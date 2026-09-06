@@ -303,10 +303,13 @@ from .access_levels import (  # noqa: E402
 async def get_decks_for_tournament(
     tournament_uid: str, conn: psycopg.AsyncConnection | None = None
 ) -> list[DeckObject]:
-    """Get all DeckObjects for a tournament (uses idx_objects_deck_tournament)."""
+    """The tournament's live decks (uses idx_objects_deck_tournament)."""
     async with _acquire(conn) as conn:
         result = await conn.execute(
-            """SELECT "full"::text FROM objects WHERE type = 'deck' AND "full"->>'tournament_uid' = %s""",
+            """SELECT "full"::text FROM objects
+            WHERE type = 'deck'
+              AND "full"->>'tournament_uid' = %s
+              AND "full"->>'deleted_at' IS NULL""",
             (tournament_uid,),
         )
         rows = await result.fetchall()
@@ -1050,8 +1053,6 @@ async def soft_delete_tournament(
             (ObjectType.SANCTION, sanctions),
         ):
             for obj in objs:
-                if obj.deleted_at is not None:
-                    continue  # get_decks_for_tournament doesn't filter tombstones
                 tombstoned = msgspec.structs.replace(obj, deleted_at=now, modified=now)
                 bds.append(
                     await save_object_from_model(obj_type, tombstoned, conn=tx_conn)

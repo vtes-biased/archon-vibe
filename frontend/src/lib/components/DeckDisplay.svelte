@@ -138,6 +138,7 @@
         author: authorValue,
         comments: deck.comments,
         cards: editedCards,
+        round: deck.round,
       };
       if (attrValue !== undefined) deckData.attribution = attrValue;
 

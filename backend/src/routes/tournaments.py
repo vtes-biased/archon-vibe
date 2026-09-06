@@ -79,8 +79,7 @@ logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 
 # Wire types are raw: list every deck-upsert alias the engine accepts or the one
-# omitted skips the recompute. Rating-irrelevant only — the deck actions below do
-# move the Hall of Fame, and the caller recomputes wins for them separately.
+# omitted skips the recompute.
 _RATING_IRRELEVANT_ACTIONS = frozenset(
     {
         "UpsertDeck",
@@ -134,7 +133,10 @@ def _promo_recompute_diff(old: Tournament | None, new: Tournament | None) -> Non
 async def _build_decks_json(tournament_uid: str, conn=None) -> str:
     decks = await get_decks_for_tournament(tournament_uid, conn=conn)
     return msgspec.json.encode(
-        [{"user_uid": d.user_uid, "round": d.round, "uid": d.uid} for d in decks]
+        [
+            {"user_uid": d.user_uid, "round": d.round, "uid": d.uid, "public": d.public}
+            for d in decks
+        ]
     ).decode()
 
 
@@ -358,7 +360,15 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
         return None
 
     decks = await get_decks_for_tournament(tournament.uid)
-    winner_deck = next((d for d in decks if d.user_uid == tournament.winner), None)
+    finals_round = len(tournament.rounds) if tournament.multideck else None
+    winner_deck = next(
+        (
+            d
+            for d in decks
+            if d.user_uid == tournament.winner and d.round == finals_round
+        ),
+        None,
+    )
     if not winner_deck:
         return None
 
@@ -905,11 +915,7 @@ async def get_round_decks(
             status_code=403, detail="Only the event's officials can read its decks"
         )
 
-    stamped = {
-        (d.user_uid, d.round): d
-        for d in await get_decks_for_tournament(uid)
-        if not d.deleted_at
-    }
+    stamped = {(d.user_uid, d.round): d for d in await get_decks_for_tournament(uid)}
 
     slots: list[tuple[int, list[Table]]] = list(enumerate(tournament.rounds))
     if tournament.finals:
@@ -1700,30 +1706,25 @@ async def tournament_action(
         except Exception as e:
             logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
 
-    # `set_public` carries no player_uid and needs none: the Hall of Fame asks
-    # whether the deck exists, never whether it is publicly visible.
-    winner_deck_ops = [op for op in deck_ops if op.get("player_uid") == updated.winner]
-
     # VEKN push backgrounds (vekn.net can take 30-120s or be down; batch_push
     # retries) — TWDA submission runs inline since it's local/fast.
     if is_finished and not was_finished:
         await maybe_submit_twda(updated)
         asyncio.create_task(_maybe_push_vekn(updated))
-    elif is_finished and updated.winner and winner_deck_ops:
-        if any(op.get("op") == "upsert" for op in winner_deck_ops):
-            # Re-submit on a post-finish winner-deck edit (organizers only — players
-            # are deck-locked); the TWDA PR is idempotent, keyed on the vekn event id.
+    elif is_finished:
+        # `set_public` ops carry no player_uid: the archive and the Hall of Fame
+        # ask whether the deck exists, never whether it is visible.
+        winners = {tournament.winner, updated.winner} - {""}
+        winner_deck_moved = any(op.get("player_uid") in winners for op in deck_ops)
+        if tournament.winner != updated.winner or winner_deck_moved:
             asyncio.create_task(maybe_submit_twda(updated))
-        # The same edit moves the Hall of Fame in both directions — the win counts
-        # only while the deck is on record — and every deck action is on
-        # `_RATING_IRRELEVANT_ACTIONS`, so the recompute above skipped it.
-        try:
-            from ..ratings import recompute_wins
+            try:
+                from ..ratings import recompute_wins
 
-            for _user, bd in await recompute_wins({updated.winner}):
-                broadcast_precomputed(bd)
-        except Exception as e:
-            logger.error(f"Error recomputing wins for {uid}: {e}", exc_info=True)
+                for _user, bd in await recompute_wins(winners):
+                    broadcast_precomputed(bd)
+            except Exception as e:
+                logger.error(f"Error recomputing wins for {uid}: {e}", exc_info=True)
 
     return Response(
         content=encoder.encode(updated),

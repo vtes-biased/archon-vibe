@@ -14,7 +14,7 @@ server (PyO3) behave identically.
 | Format | Standard, V5, Limited, Storyline | V5 has its own decklist validation; Limited checks only unknown cards, the banned list and the 90-card library maximum (§7.2.1 ties the minimums to the booster count and drops the group rule), so draft events run as Limited; Storyline takes no decklist at all — below |
 | Rank | Standard, National, Continental | National and Continental earn the rating coefficient bonus and are engine-blocked from proxies and multideck, at create and at config edit |
 | Proxies | yes/no | Standard rank only |
-| Multideck | yes/no | Standard rank only |
+| Multideck | yes/no | Standard rank only; frozen once a round exists, since the flag re-keys every deck read |
 | Decklist required | yes/no | organizer choice |
 | Online | yes/no | the venue URL is the meeting place |
 | `registration_url` | URL, empty = none | the external page taking the sign-ups; setting it closes Archon's own sign-up — the engine refuses `Register` and self-`Unregister`, below — and surfaces the paid-registrations CSV import in the action bar |
@@ -23,7 +23,7 @@ server (PyO3) behave identically.
 | `open_rounds` | bool | the non-VEKN house format, below |
 | `self_organized_rounds` | bool | players seat their own pods |
 | `standings_mode` | Private / Cutoff / Top 10 / Public | display default during play |
-| `decklists_mode` | Winner / Finalists / All | applied by `FinishFinals`, `FinishTournament` and a later edit of the field |
+| `decklists_mode` | Winner / Finalists / All | applied by the post-finish pass, [below](#engine-event-catalog) |
 | `round_time`, `finals_time` | seconds; `round_time` 0 = untimed, `finals_time` 0 = use `round_time` | the shared timer |
 | `table_rooms` | named rooms over table ranges | labels in seating, print and player views |
 
@@ -139,7 +139,7 @@ Planned ──open──> Registration ──close──> Waiting ⇄ Playing �
 | `Registration` | players register/unregister | Register, AddPlayer, CloseRegistration, CancelRegistration |
 | `Waiting` | between rounds, check-in active | CheckIn, CheckInAll, StartRound, StartFinals, FinishTournament, ReopenRegistration |
 | `Playing` | round in progress | SetScore, Override, FinishRound, CancelRound, seating edits |
-| `Finished` | complete | ReopenTournament, organizer SetScore/Override, deck uploads |
+| `Finished` | complete | ReopenTournament, organizer SetScore/Override, owner deck corrections |
 
 **`ReopenTournament` destroys nothing.** An event finished on a played final
 returns to `Playing` with that final, its winner, the finalist flags and the deck
@@ -148,11 +148,12 @@ and re-runs `FinishFinals` when done; `CancelFinals` is the one path that discar
 a final, reachable from there, and it takes the winner with it — a winner standing
 over a null `finals` is the archival shape `compute_final_standings` ranks first.
 An event finished without one returns to `Waiting`, having no final to come back
-to, and keeps the winner an archival import may have set. Players released from
+to, and keeps its winner — an archival import's, or the one the no-final finish
+crowned, re-derived by the next finish. Players released from
 `Finished` return to `Playing` if they were finalists, else to `Completed` when
 they are at the per-player `max_rounds` cap and `Checked-in` otherwise. Decklists
-unpublish, since publication is derived from the finished state and both finish
-paths recompute it.
+unpublish, since publication is derived from the finished state by the post-finish
+pass.
 
 `UpdateConfig`, `ReportPromos` and Delete are available in any state.
 `SetScore`/`Override`/`Unoverride` are open to players only during `Playing`, and
@@ -236,8 +237,11 @@ players rather than failing on them, and `SelfOrganizeRound` refuses them —
 self-seating past the cap would make it advisory again. A required decklist not
 yet uploaded is not a barrier: `CheckIn` stamps the player `missing_decklist`
 instead, writing the stamp both ways on every check-in so a re-check-in after the
-upload clears it. The bot's `/checkin` reply warns only players who carry the
-stamp; `/register` gives everyone the neutral reminder, no deck being judged yet.
+upload clears it. The stamp follows the decks: `UpsertDeck` clears it and
+`DeleteDeck` restores it when decklists are required, the player is checked in or
+playing, and no live deck of theirs is left. The bot's `/checkin` reply warns only
+players who carry the stamp; `/register` gives everyone the neutral reminder, no
+deck being judged yet.
 
 **The door stays open mid-round** — check-in is allowed while a round is
 `Playing`, and a player never registered is enrolled by it, though on an event
@@ -490,8 +494,11 @@ A group only partly tossed by hand is re-tossed whole; a group already holding
 distinct non-zero tosses is left alone. The shuffle is seeded from the tournament
 uid because the client applies the event through WASM before the server replays it.
 
-`FinishTournament` without a final sets `Finished` and preliminary standings but
-sets no winner or finalist flags, so a native no-final event awards no
+`FinishTournament` without a final sets `Finished` and preliminary standings, and
+crowns the standings' first place — §3.1.6 ranks such an event by §3.1 — **only
+when fewer than 8 played**: `ranking_eligibility` reads a bare `winner` as a played
+final, so crowning a larger event would rank it and pre-empt the second question
+deferred below. It sets no finalist flags, so a native no-final event awards no
 winner/finalist rating bonus and no winner GW. That is rules-literal — A.2 credits
 a game won "including a final round victory" and A.2.1 defines a finalist as one
 who advanced to a final — but vekn.net's own implementation credits a no-final top
@@ -579,7 +586,8 @@ status.
 
 **Players** — `Register` / `Unregister` (self), `AddPlayer` / `RemovePlayer`
 (organizer; RemovePlayer is for a player who has not played — use `DropOut`
-otherwise), `DropOut` (preserves scores), `CheckIn`, `CheckOut` (one checked-in
+otherwise; both departures delete the player's decks, which were never played,
+where `DropOut` keeps them), `DropOut` (preserves scores), `CheckIn`, `CheckOut` (one checked-in
 player back to `Registered`), `CheckInAll`, `ResetCheckIn`, `SetPaymentStatus`,
 `MarkAllPaid`, `SetNonCompeting`, `SetWaitlisted`.
 
@@ -653,10 +661,13 @@ seating rather than at upload is what makes the index the tournament's: a deck i
 uploaded before the round it will be played in exists, so nothing earlier could
 name one.
 
-**Stamped is locked.** A stamped deck was played, so a player may neither replace
-nor delete it in any state — the engine drops any round a player names on an
-upload, leaving them one editable deck at a time. Only an organizer names a round,
-which is how a played round's deck is corrected.
+**Stamped is locked during play.** A stamped deck was played, so until the event
+finishes a player may neither replace nor delete it — the engine drops any round
+a player names on an upload, leaving them one editable deck at a time, and only
+an organizer names a round. **Once Finished the owner corrects.** A player may
+add, replace or edit any of their own decks, naming the round it was played in;
+deletion stays with the organizer, since a correction is never an erasure.
+`DeleteDeck` carries the same Storyline refusal as the upload.
 
 **An organizer sees a deck once it has been played**, never before: organizer
 eligibility is not enforced and they may be sitting at a table. On the roster a
@@ -673,14 +684,22 @@ owner, who is entitled to all of their own. The `public` leg is what answers for
 an organizer, since they hold every deck of their event at `full` whatever its
 state.
 
-**An unpublish never reaches a member's IndexedDB.** The engine retracts
-server-side — `ReopenTournament` sets every deck back to private, and a
-`decklists_mode` narrowed while Finished recomputes each one — but a deck whose
-member projection drops to null broadcasts no frame at all, and the client hard-
-deletes only on a tombstone, so a stale `public: true` survives locally. The
-`Finished` leg covers a reopen that re-finishes under the same mode; a narrowing
-— applied to a Finished event directly, or across a reopen, since neither finish
-path ever pushes `false` — has no client-side leg and shows until a full resync.
+**One post-finish pass owns publication.** After every event that starts or ends
+on a `Finished` tournament, the engine recomputes each deck's `public` from the
+mode, the winner and the finalist flags and emits `set_public` in both directions
+for every deck whose flag moved — skipping the decks the same event upserted or
+deleted, whose ops already carry the answer. There is no other writer: finishing,
+reopening, narrowing the mode, a finals rescore that moves the winner and an
+archival correction all publish and retract through it. The pass reads the flag
+off the decks payload the engine is handed, so the two payload builders carry it
+([hazards](hazards.md#two-implementations-of-one-gate)). The sanction routes call
+`update_standings` outside it and emit no deck ops: a sanction re-scores but never
+moves the winner, so nothing there can change publication. A retracted deck
+tombstones at the levels that lost it ([sync](sync.md#access-levels)).
+
+Server-side the same trigger — any action on a `Finished` event — resubmits the
+TWDA and recomputes the winners' wins whenever the winner or a winner's deck
+moved ([vekn](vekn.md#outbound)).
 
 The wins-without-a-decklist nudge counts decks **before** that visibility filter:
 it asks whether a deck exists, not whether it is public, so a reopened event the
@@ -730,7 +749,7 @@ and the VEKN record outranks the archive from that moment on.
 | Register / Unregister | any authenticated member, during Registration |
 | Self-organize a round | registered players, open rounds with `self_organized_rounds`, Waiting/Playing, no finals |
 | Set score | players at the table during Playing; organizers whenever rounds exist |
-| Deck upload | players for their own deck, organizers for any |
+| Deck upload | players for their own deck — any of their own, naming its round, once Finished — organizers for any |
 | Correct an archival record | IC |
 | Everything else | organizers |
 

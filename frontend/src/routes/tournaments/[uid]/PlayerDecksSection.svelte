@@ -59,6 +59,7 @@
   // Accordion key: a stamped deck's round, or PENDING for the not-yet-played one.
   const PENDING = -1;
   let uploadingFor = $state<string | null>(null);
+  let uploadingRound = $state<number | undefined>(undefined);
   let expandedRoundIdx = $state<number | null>(null);
   let confirmDeletePending = $state(false);
   let expandedDecks = $state<Set<string>>(new Set());
@@ -82,6 +83,7 @@
 
   function onUploaded() {
     uploadingFor = null;
+    uploadingRound = undefined;
     if (!decksByUserProp) {
       getDecksByTournamentGrouped(tournament.uid).then(grouped => {
         localDecks = grouped;
@@ -90,17 +92,10 @@
   }
 
   const isStoryline = $derived(tournament.format === 'Storyline');
-  const canModifyPending = $derived(tournament.state !== 'Finished' && !isStoryline);
-
-  // Post-tournament recovery aside, a single-deck event's registered deck is
-  // frozen once play starts — the engine's own rule.
-  const singleDeckEditable = $derived(
-    isStoryline
-      ? false
-      : tournament.state === 'Playing'
-        ? false
-        : tournament.state !== 'Finished' || myDecks.length === 0,
-  );
+  const isFinished = $derived(tournament.state === 'Finished');
+  const canModifyPending = $derived(!isStoryline);
+  const canDelete = $derived(!isStoryline && !isFinished);
+  const singleDeckEditable = $derived(!isStoryline && tournament.state !== 'Playing');
 
   function roundLabel(round: number | null): string {
     if (round === null) return m.decks_next_round();
@@ -195,11 +190,24 @@
             title={roundLabel(deck.round)}
           >
             {#snippet header()}
-              <Lock class="w-3 h-3 text-ink-faint" />
+              {#if !isFinished}<Lock class="w-3 h-3 text-ink-faint" />{/if}
               <CircleCheck class="w-3.5 h-3.5 text-info" />
             {/snippet}
-            <DeckDisplay {deck} tournamentUid={tournament.uid} format={tournament.format} />
-            <p class="text-sm text-ink-faint">{m.decks_locked()}</p>
+            {#if isFinished && uploadingFor === myUid && uploadingRound === deck.round}
+              <DeckUpload tournamentUid={tournament.uid} round={deck.round ?? undefined} multideck onuploaded={onUploaded} />
+            {:else}
+              <DeckDisplay
+                {deck}
+                editable={isFinished}
+                tournamentUid={tournament.uid}
+                multideck
+                format={tournament.format}
+                onreplace={isFinished ? () => { uploadingFor = myUid; uploadingRound = deck.round ?? undefined; } : undefined}
+              />
+              {#if !isFinished}
+                <p class="text-sm text-ink-faint">{m.decks_locked()}</p>
+              {/if}
+            {/if}
           </FoldableSection>
         {/each}
         {#if showPendingSlot}
@@ -216,7 +224,7 @@
                 <span class="text-ink-faint truncate">{m.decks_no_deck()}</span>
               {/if}
             {/snippet}
-            {#if uploadingFor === myUid}
+            {#if uploadingFor === myUid && uploadingRound === undefined}
               <DeckUpload tournamentUid={tournament.uid} multideck onuploaded={onUploaded} />
             {:else if myPending}
               <DeckDisplay
@@ -225,8 +233,8 @@
                 tournamentUid={tournament.uid}
                 multideck
                 format={tournament.format}
-                onreplace={canModifyPending ? () => { uploadingFor = myUid; } : undefined}
-                ondelete={canModifyPending ? () => { confirmDeletePending = true; } : undefined}
+                onreplace={canModifyPending ? () => { uploadingFor = myUid; uploadingRound = undefined; } : undefined}
+                ondelete={canDelete ? () => { confirmDeletePending = true; } : undefined}
               />
               {#if confirmDeletePending}
                 <div class="mt-2 bg-accent-soft/20 border border-accent-soft-border/50 rounded-lg p-3 space-y-2">
@@ -257,7 +265,7 @@
               <Button
                 variant="secondary"
                 size="lg"
-                onclick={() => { uploadingFor = myUid; }}
+                onclick={() => { uploadingFor = myUid; uploadingRound = undefined; }}
               >{m.decks_upload()}</Button>
             {:else}
               <p class="text-sm text-ink-faint">{m.decks_no_deck()}</p>
@@ -280,7 +288,7 @@
               {#if uploadingFor === myUid && singleDeckEditable}
                 <DeckUpload tournamentUid={tournament.uid} onuploaded={onUploaded} />
               {:else}
-                <DeckDisplay deck={myDecks[0]} editable={singleDeckEditable} tournamentUid={tournament.uid} format={tournament.format} onreplace={singleDeckEditable ? () => uploadingFor = myUid : undefined} ondelete={singleDeckEditable ? () => { confirmDeletePending = true; } : undefined} />
+                <DeckDisplay deck={myDecks[0]} editable={singleDeckEditable} tournamentUid={tournament.uid} format={tournament.format} onreplace={singleDeckEditable ? () => uploadingFor = myUid : undefined} ondelete={singleDeckEditable && canDelete ? () => { confirmDeletePending = true; } : undefined} />
                 {#if confirmDeletePending}
                   <div class="mt-2 bg-accent-soft/20 border border-accent-soft-border/50 rounded-lg p-3 space-y-2">
                     <p class="text-sm text-link-soft font-medium">{m.decks_delete_confirm_title()}</p>

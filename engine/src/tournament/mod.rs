@@ -26,12 +26,12 @@ pub use types::{ActorContext, PlayerState, SeatScore, TournamentEvent, Tournamen
 
 use crate::error::EngineError;
 use helpers::{
-    all_rounds_finished, collect_previous_rounds, count_played_rounds, count_player_rounds_played,
-    demote_unseated_players, find_player_index, past_registration_cap, player_exists,
-    players_in_other_active_rounds, release_stamped_decks, require_can_edit_results,
-    require_organizer, require_state, require_state_or_finished, stamp_round_decks, validate_enum,
+    all_rounds_finished, collect_previous_rounds, compute_deck_public, count_played_rounds,
+    count_player_rounds_played, delete_player_decks, demote_unseated_players, find_player_index,
+    past_registration_cap, player_exists, players_in_other_active_rounds,
+    recompute_deck_publication, release_stamped_decks, require_can_edit_results, require_organizer,
+    require_state, require_state_or_finished, stamp_round_decks, validate_enum,
 };
-use raffle::compute_deck_public;
 use sanctions::{has_active_suspension, has_dq_sanction, table_sa_adjustments};
 use standings::{
     compute_preliminary_standings, finals_candidates, top5_has_ties, toss_groups, tosses_are_total,
@@ -299,6 +299,7 @@ pub fn process_tournament_event(
     let actor = ActorContext::from_json(&actor_value)?;
 
     let mut deck_ops = JsonValue::new_array();
+    let was_finished = tournament[tournament::STATE].as_str() == Some("Finished");
     apply_event(
         &mut tournament,
         &event,
@@ -307,6 +308,9 @@ pub fn process_tournament_event(
         &decks,
         &mut deck_ops,
     )?;
+    if was_finished || tournament[tournament::STATE].as_str() == Some("Finished") {
+        recompute_deck_publication(&tournament, &decks, &mut deck_ops);
+    }
 
     let result = json::object! {
         arg::TOURNAMENT => tournament,
@@ -460,17 +464,6 @@ fn apply_event(
                 .into();
             }
             update_standings(tournament, sanctions);
-            for d in decks.members() {
-                let deck_uid = d[deck_object::UID].as_str().unwrap_or("");
-                if !deck_uid.is_empty() {
-                    let op = json::object! {
-                        arg::OP => "set_public",
-                        arg::DECK_UID => deck_uid,
-                        arg::PUBLIC => false,
-                    };
-                    let _ = deck_ops.push(op);
-                }
-            }
             Ok(())
         }
 
@@ -544,6 +537,7 @@ fn apply_event(
             let players = &mut tournament[tournament::PLAYERS];
             let idx = find_player_index(players, user_uid).ok_or(EngineError::PlayerNotFound)?;
             players.array_remove(idx);
+            delete_player_decks(tournament, decks, deck_ops, user_uid);
             Ok(())
         }
 
@@ -631,6 +625,7 @@ fn apply_event(
             let players = &mut tournament[tournament::PLAYERS];
             let idx = find_player_index(players, user_uid).ok_or(EngineError::PlayerNotFound)?;
             players.array_remove(idx);
+            delete_player_decks(tournament, decks, deck_ops, user_uid);
             Ok(())
         }
 
@@ -2361,23 +2356,6 @@ fn apply_event(
             }
 
             update_standings(tournament, sanctions);
-
-            for d in decks.members() {
-                let user_uid = d[deck_object::USER_UID].as_str().unwrap_or("");
-                if user_uid.is_empty() {
-                    continue;
-                }
-                let is_public = compute_deck_public(tournament, user_uid);
-                if is_public {
-                    let op = json::object! {
-                        arg::OP => "set_public",
-                        arg::DECK_UID => d[deck_object::UID].as_str().unwrap_or(""),
-                        arg::PUBLIC => true,
-                    };
-                    let _ = deck_ops.push(op);
-                }
-            }
-
             Ok(())
         }
 
@@ -2454,20 +2432,23 @@ fn apply_event(
 
             update_standings(tournament, sanctions);
 
-            for d in decks.members() {
-                let user_uid = d[deck_object::USER_UID].as_str().unwrap_or("");
-                if user_uid.is_empty() {
-                    continue;
-                }
-                let is_public = compute_deck_public(tournament, user_uid);
-                if is_public {
-                    let op = json::object! {
-                        arg::OP => "set_public",
-                        arg::DECK_UID => d[deck_object::UID].as_str().unwrap_or(""),
-                        arg::PUBLIC => true,
-                    };
-                    let _ = deck_ops.push(op);
-                }
+            // `ranking_eligibility` reads a bare winner as a played final: crowning
+            // past the rating floor would rank the event.
+            if tournament[tournament::FINALS].is_null()
+                && !tournament[tournament::ROUNDS].is_empty()
+                && crate::ratings::players_with_rounds(tournament)
+                    < crate::ratings::RATING_MIN_PLAYERS
+            {
+                let first = tournament[tournament::STANDINGS]
+                    .members()
+                    .find(|s| {
+                        !s[standing::DISQUALIFIED].as_bool().unwrap_or(false)
+                            && !s[standing::NON_COMPETING].as_bool().unwrap_or(false)
+                    })
+                    .and_then(|s| s[standing::USER_UID].as_str())
+                    .unwrap_or("")
+                    .to_string();
+                tournament[tournament::WINNER] = first.as_str().into();
             }
             Ok(())
         }
@@ -2483,33 +2464,21 @@ fn apply_event(
             if !actor.is_organizer && actor.uid != *player_uid {
                 return Err(EngineError::DeckUploadForbidden);
             }
-            let is_registered = tournament[tournament::PLAYERS]
+            let idx = find_player_index(&tournament[tournament::PLAYERS], player_uid)
+                .ok_or(EngineError::NotRegistered)?;
+            let has_deck = decks
                 .members()
-                .any(|p| p[player::USER_UID].as_str() == Some(player_uid.as_str()));
-            if !is_registered {
-                return Err(EngineError::NotRegistered);
-            }
-            let existing_count = decks
-                .members()
-                .filter(|d| d[deck_object::USER_UID].as_str() == Some(player_uid.as_str()))
-                .count();
-            if !actor.is_organizer {
-                match state {
-                    TournamentState::Playing if !*multideck && existing_count > 0 => {
-                        return Err(EngineError::DeckLockedPlaying);
-                    }
-                    TournamentState::Finished if existing_count > 0 => {
-                        return Err(EngineError::DeckLockedFinished);
-                    }
-                    _ => {}
-                }
+                .any(|d| d[deck_object::USER_UID].as_str() == Some(player_uid.as_str()));
+            if !actor.is_organizer && state == TournamentState::Playing && !*multideck && has_deck {
+                return Err(EngineError::DeckLockedPlaying);
             }
             let is_public = compute_deck_public(tournament, player_uid);
             let mut deck_data = deck.clone();
             deck_data[deck_object::PUBLIC] = is_public.into();
-            if !actor.is_organizer {
+            if !actor.is_organizer && state != TournamentState::Finished {
                 deck_data[deck_object::ROUND] = JsonValue::Null;
             }
+            tournament[tournament::PLAYERS][idx].remove(player::MISSING_DECKLIST);
             let op = json::object! {
                 arg::OP => "upsert",
                 arg::PLAYER_UID => player_uid.as_str(),
@@ -2525,6 +2494,9 @@ fn apply_event(
             deck_index,
             multideck,
         } => {
+            if tournament[tournament::FORMAT].as_str() == Some("Storyline") {
+                return Err(EngineError::FormatForbidsDecks);
+            }
             if !actor.is_organizer && actor.uid != *player_uid {
                 return Err(EngineError::DeckDeleteForbidden);
             }
@@ -2549,6 +2521,26 @@ fn apply_event(
                 arg::MULTIDECK => *multideck,
             };
             let _ = deck_ops.push(op);
+            let deck_survives = decks.members().any(|d| {
+                d[deck_object::USER_UID].as_str() == Some(player_uid.as_str())
+                    && *multideck
+                    && d[deck_object::ROUND].as_usize() != *deck_index
+            });
+            if !deck_survives
+                && tournament[tournament::DECKLIST_REQUIRED]
+                    .as_bool()
+                    .unwrap_or(false)
+            {
+                if let Some(idx) = find_player_index(&tournament[tournament::PLAYERS], player_uid) {
+                    let player = &mut tournament[tournament::PLAYERS][idx];
+                    if matches!(
+                        player[player::STATE].as_str(),
+                        Some("Checked-in") | Some("Playing")
+                    ) {
+                        player[player::MISSING_DECKLIST] = true.into();
+                    }
+                }
+            }
             Ok(())
         }
 
@@ -2737,8 +2729,16 @@ fn apply_event(
                 }
             }
 
-            let decklists_mode_changing = config.has_key(tournament_config::DECKLISTS_MODE)
-                && state == TournamentState::Finished;
+            if config.has_key(tournament_config::MULTIDECK)
+                && config[tournament_config::MULTIDECK]
+                    .as_bool()
+                    .unwrap_or(false)
+                    != tournament[tournament::MULTIDECK].as_bool().unwrap_or(false)
+                && (!tournament[tournament::ROUNDS].is_empty()
+                    || !tournament[tournament::FINALS].is_null())
+            {
+                return Err(EngineError::MultideckLockedRounds);
+            }
 
             // Apply config fields (key present = apply, even if null)
             for field in CONFIG_FIELDS {
@@ -2751,23 +2751,6 @@ fn apply_event(
                 tournament[tournament::DECKLIST_REQUIRED] = false.into();
                 for p in tournament[tournament::PLAYERS].members_mut() {
                     p.remove(player::MISSING_DECKLIST);
-                }
-            }
-
-            if decklists_mode_changing {
-                for d in decks.members() {
-                    let user_uid = d[deck_object::USER_UID].as_str().unwrap_or("");
-                    let deck_uid = d[deck_object::UID].as_str().unwrap_or("");
-                    if user_uid.is_empty() || deck_uid.is_empty() {
-                        continue;
-                    }
-                    let is_public = compute_deck_public(tournament, user_uid);
-                    let op = json::object! {
-                        arg::OP => "set_public",
-                        arg::DECK_UID => deck_uid,
-                        arg::PUBLIC => is_public,
-                    };
-                    let _ = deck_ops.push(op);
                 }
             }
 

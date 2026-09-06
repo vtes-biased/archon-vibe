@@ -171,8 +171,9 @@ Mechanics: [tournaments](tournaments.md#player-states).
 **Decklist vs check-in** — when decklists are required, a player without one is
 warned at check-in and the organizer may override and check them in anyway.
 
-**Post-tournament deck upload** is allowed, for winner's-deck recovery and TWDA
-submission. Post-finish, players may add but not replace.
+**Post-tournament deck corrections** are the owner's: once an event is finished a
+player may add, replace or correct any of their own decks, and the record —
+publication, the Hall of Fame, the archive — follows the correction.
 
 **Online tournament player display** (frontend only): nickname is the primary
 label, with the real name abbreviated to first word plus initials alongside the

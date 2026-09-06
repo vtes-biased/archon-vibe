@@ -36,6 +36,8 @@ pub fn compute_rating_points(
 /// Ranking-eligibility gate (VEKN 3.1/3.1.6), returning "eligible" or the first
 /// blocking reason. The single source: ratings.py and the frontend badge read
 /// it, and must never re-derive it.
+pub const RATING_MIN_PLAYERS: usize = 8;
+
 pub fn ranking_eligibility(t: &json::JsonValue) -> &'static str {
     if t[tournament::FORMAT].as_str() == Some("Storyline") {
         return "storyline";
@@ -54,7 +56,7 @@ pub fn ranking_eligibility(t: &json::JsonValue) -> &'static str {
     if played == 0 {
         return "no_results";
     }
-    if played < 8 {
+    if played < RATING_MIN_PLAYERS {
         return "few_players";
     }
     // A reconstructed VEKN import carries a winner but no finals object.

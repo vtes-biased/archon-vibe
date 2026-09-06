@@ -267,3 +267,93 @@ pub(super) fn players_in_other_active_rounds(
         .filter_map(|seat| seat[seat::PLAYER_UID].as_str().map(|s| s.to_string()))
         .collect()
 }
+
+pub(super) fn compute_deck_public(tournament: &JsonValue, player_uid: &str) -> bool {
+    let state = tournament[tournament::STATE].as_str().unwrap_or("");
+    if state != "Finished" {
+        return false;
+    }
+    let mode = tournament[tournament::DECKLISTS_MODE]
+        .as_str()
+        .unwrap_or("Winner");
+    match mode {
+        "All" => true,
+        "Finalists" => {
+            tournament[tournament::WINNER].as_str() == Some(player_uid)
+                || tournament[tournament::PLAYERS].members().any(|p| {
+                    p[player::USER_UID].as_str() == Some(player_uid)
+                        && p[player::FINALIST].as_bool().unwrap_or(false)
+                })
+        }
+        _ => tournament[tournament::WINNER].as_str() == Some(player_uid),
+    }
+}
+
+/// The post-finish pass: every deck's `public` follows the tournament, both ways.
+pub(super) fn recompute_deck_publication(
+    tournament: &JsonValue,
+    decks: &JsonValue,
+    deck_ops: &mut JsonValue,
+) {
+    // A deck this event's own ops upserted or deleted already carries its answer;
+    // a set_public behind a delete would resurrect the row on the client.
+    let touched = |deck: &JsonValue| -> bool {
+        deck_ops.members().any(|op| {
+            op[arg::PLAYER_UID].as_str() == deck[deck_object::USER_UID].as_str()
+                && match op[arg::OP].as_str() {
+                    Some("upsert") => {
+                        op[arg::DECK][deck_object::ROUND].as_usize()
+                            == deck[deck_object::ROUND].as_usize()
+                    }
+                    Some("delete") => {
+                        !op[arg::MULTIDECK].as_bool().unwrap_or(false)
+                            || op[arg::DECK_INDEX].as_usize() == deck[deck_object::ROUND].as_usize()
+                    }
+                    _ => false,
+                }
+        })
+    };
+    let changes: Vec<(String, bool)> = decks
+        .members()
+        .filter(|d| !touched(d))
+        .filter_map(|d| {
+            let user_uid = d[deck_object::USER_UID].as_str().unwrap_or("");
+            let deck_uid = d[deck_object::UID].as_str().unwrap_or("");
+            if user_uid.is_empty() || deck_uid.is_empty() {
+                return None;
+            }
+            let is_public = compute_deck_public(tournament, user_uid);
+            (d[deck_object::PUBLIC].as_bool().unwrap_or(false) != is_public)
+                .then(|| (deck_uid.to_string(), is_public))
+        })
+        .collect();
+    for (deck_uid, public) in changes {
+        let _ = deck_ops.push(json::object! {
+            arg::OP => "set_public",
+            arg::DECK_UID => deck_uid,
+            arg::PUBLIC => public,
+        });
+    }
+}
+
+/// A departure takes the player's decks along. Both callers run before any round
+/// exists, so every deck of theirs is still pending.
+pub(super) fn delete_player_decks(
+    tournament: &JsonValue,
+    decks: &JsonValue,
+    deck_ops: &mut JsonValue,
+    user_uid: &str,
+) {
+    if !decks
+        .members()
+        .any(|d| d[deck_object::USER_UID].as_str() == Some(user_uid))
+    {
+        return;
+    }
+    let _ = deck_ops.push(json::object! {
+        arg::OP => "delete",
+        arg::PLAYER_UID => user_uid,
+        arg::DECK_INDEX => JsonValue::Null,
+        arg::MULTIDECK => tournament[tournament::MULTIDECK].as_bool().unwrap_or(false),
+    });
+}

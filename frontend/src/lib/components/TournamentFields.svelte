@@ -323,7 +323,7 @@
       <input
         type="checkbox"
         checked={values.multideck}
-        disabled={disabled || !!values.rank}
+        disabled={disabled || !!values.rank || disabledFields.has("multideck")}
         onchange={(e) => handleInput("multideck", (e.target as HTMLInputElement).checked)}
         class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
       />

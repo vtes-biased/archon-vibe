@@ -136,6 +136,7 @@
   const disabledFields = $derived.by(() => {
     const s = new Set<string>();
     if (started || pushedToVekn) { s.add("open_rounds"); s.add("max_rounds"); }
+    if ((tournament.rounds?.length ?? 0) > 0 || tournament.finals) s.add("multideck");
     // VEKN identity freeze: post-push edits to these silently diverge from
     // vekn.net (engine rejects them too); proxies joins them because the sync
     // reads it back, so a local change would revert rather than diverge.

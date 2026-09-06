@@ -990,19 +990,72 @@ fn test_player_can_upload_missing_deck_after_finish() {
 }
 
 #[test]
-fn test_player_cannot_replace_deck_after_finish() {
-    let tournament = tournament_with_player("Finished");
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
+fn test_owner_corrects_a_played_deck_after_finish() {
+    // Once Finished the owner may replace any of their decks and name its round.
+    let mut tournament = tournament_with_player("Finished");
+    tournament["multideck"] = true.into();
+    let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0"}]"#;
     let event = json::object! {
         type: "UpsertDeck",
         player_uid: "player-1",
-        deck: { name: "New", author: "", comments: "", cards: {} },
-        multideck: false,
+        deck: { name: "Corrected", author: "", comments: "", cards: {}, round: 0 },
+        multideck: true,
     };
     let actor = make_player("player-1");
-    let result = run_event_with_decks(&tournament, &event, &actor, decks);
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("finished"));
+    let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, decks).unwrap();
+    assert_eq!(deck_ops.len(), 1);
+    assert_eq!(deck_ops[0]["op"].as_str(), Some("upsert"));
+    assert_eq!(deck_ops[0]["deck"]["round"].as_usize(), Some(0));
+}
+
+#[test]
+fn test_upsert_deck_clears_missing_decklist() {
+    let mut tournament = tournament_with_player("Waiting");
+    tournament["decklist_required"] = true.into();
+    tournament["players"][0]["missing_decklist"] = true.into();
+    let event = json::object! {
+        type: "UpsertDeck",
+        player_uid: "player-1",
+        deck: { name: "Late", author: "", comments: "", cards: {} },
+        multideck: false,
+    };
+    let (updated_json, _) =
+        run_event_with_decks(&tournament, &event, &make_player("player-1"), "[]").unwrap();
+    let updated = json::parse(&updated_json).unwrap();
+    assert!(updated["players"][0]["missing_decklist"].is_null());
+}
+
+#[test]
+fn test_delete_deck_restores_missing_decklist() {
+    let mut tournament = tournament_with_player("Waiting");
+    tournament["decklist_required"] = true.into();
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
+    let event = json::object! {
+        type: "DeleteDeck",
+        player_uid: "player-1",
+        deck_index: json::Null,
+        multideck: false,
+    };
+    let (updated_json, _) =
+        run_event_with_decks(&tournament, &event, &make_player("player-1"), decks).unwrap();
+    let updated = json::parse(&updated_json).unwrap();
+    assert_eq!(
+        updated["players"][0]["missing_decklist"].as_bool(),
+        Some(true)
+    );
+}
+
+#[test]
+fn test_unregister_releases_the_decks() {
+    let mut tournament = tournament_with_player("Registration");
+    tournament["players"][0]["state"] = "Registered".into();
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
+    let event = json::object! { type: "Unregister", user_uid: "player-1" };
+    let (_, deck_ops) =
+        run_event_with_decks(&tournament, &event, &make_player("player-1"), decks).unwrap();
+    assert_eq!(deck_ops.len(), 1);
+    assert_eq!(deck_ops[0]["op"].as_str(), Some("delete"));
+    assert_eq!(deck_ops[0]["player_uid"].as_str(), Some("player-1"));
 }
 
 #[test]
@@ -2088,6 +2141,94 @@ fn test_cancel_finals_uncrowns_the_reopened_event() {
     assert!(updated["finals"].is_null());
     assert_eq!(updated["winner"].as_str(), Some(""));
     assert!(!updated["players"][0]["finalist"].as_bool().unwrap_or(true));
+}
+
+#[test]
+fn test_finals_rescore_moves_publication_with_the_winner() {
+    // The post-finish pass: a corrected final crowns p2, so p2's deck publishes
+    // and p1's retracts, with no finish action in between.
+    let tournament = finished_with_finals();
+    let decks = json::array![
+        { uid: "d1", user_uid: "p1", tournament_uid: "test-tournament", round: 3, public: true },
+        { uid: "d2", user_uid: "p2", tournament_uid: "test-tournament", round: 3, public: false },
+    ];
+    let event = json::object! {
+        type: "SetScore",
+        round: 3,
+        table: 0,
+        scores: [
+            { player_uid: "p1", vp: 0.0 },
+            { player_uid: "p2", vp: 3.0 },
+            { player_uid: "p3", vp: 1.0 },
+            { player_uid: "p4", vp: 1.0 },
+            { player_uid: "p5", vp: 0.0 },
+        ],
+    };
+    let (updated_json, deck_ops) =
+        run_event_with_decks(&tournament, &event, &make_organizer(), &decks.dump()).unwrap();
+    let updated = json::parse(&updated_json).unwrap();
+    assert_eq!(updated["winner"].as_str(), Some("p2"));
+    let mut flags: Vec<(&str, bool)> = deck_ops
+        .members()
+        .filter(|op| op["op"].as_str() == Some("set_public"))
+        .map(|op| {
+            (
+                op["deck_uid"].as_str().unwrap(),
+                op["public"].as_bool().unwrap(),
+            )
+        })
+        .collect();
+    flags.sort();
+    assert_eq!(flags, vec![("d1", false), ("d2", true)]);
+}
+
+/// One scored round, no final, `n` players, in Waiting.
+fn no_final_event(n: usize) -> JsonValue {
+    let mut t = make_tournament();
+    t["state"] = "Waiting".into();
+    let mut players = JsonValue::new_array();
+    let mut seating = JsonValue::new_array();
+    for i in 0..n {
+        let uid = format!("p{i}");
+        let _ = players.push(json::object! {
+            user_uid: uid.as_str(), state: "Checked-in", payment_status: "Pending", toss: 0,
+        });
+        let vp = match i {
+            1 => 2.0,
+            0 => 1.0,
+            _ => 0.0,
+        };
+        let _ = seating.push(json::object! {
+            player_uid: uid.as_str(), result: { gw: 0, vp: vp, tp: 0 }, judge_uid: "",
+        });
+    }
+    t["players"] = players;
+    let mut table = json::object! { state: "Finished", override: json::Null };
+    table["seating"] = seating;
+    let mut round = JsonValue::new_array();
+    let _ = round.push(table);
+    let mut rounds = JsonValue::new_array();
+    let _ = rounds.push(round);
+    t["rounds"] = rounds;
+    t
+}
+
+#[test]
+fn test_no_final_finish_crowns_first_place_under_the_floor() {
+    let event = json::object! { type: "FinishTournament" };
+    let updated =
+        json::parse(&run_event(&no_final_event(5), &event, &make_organizer()).unwrap()).unwrap();
+    assert_eq!(updated["winner"].as_str(), Some("p1"));
+}
+
+#[test]
+fn test_no_final_finish_leaves_a_rated_size_uncrowned() {
+    // A bare winner reads as a played final to `ranking_eligibility`; whether such
+    // an event ranks is with the Rules Director.
+    let event = json::object! { type: "FinishTournament" };
+    let updated =
+        json::parse(&run_event(&no_final_event(8), &event, &make_organizer()).unwrap()).unwrap();
+    assert!(updated["winner"].as_str().unwrap_or("").is_empty());
 }
 
 #[test]
@@ -3472,6 +3613,26 @@ fn multideck_tournament(state: &str, rounds_played: usize) -> JsonValue {
     }
     t["rounds"] = rounds;
     t
+}
+
+#[test]
+fn test_multideck_locked_once_a_round_exists() {
+    let event = json::object! { type: "UpdateConfig", config: { multideck: false } };
+    assert_eq!(
+        run_event(
+            &multideck_tournament("Waiting", 1),
+            &event,
+            &make_organizer()
+        )
+        .unwrap_err(),
+        EngineError::MultideckLockedRounds
+    );
+    assert!(run_event(
+        &multideck_tournament("Waiting", 0),
+        &event,
+        &make_organizer()
+    )
+    .is_ok());
 }
 
 #[test]

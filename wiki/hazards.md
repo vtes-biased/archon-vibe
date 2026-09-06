@@ -153,6 +153,12 @@ count instead is what a soft-cancel corrupts: the count skips `Cancelled`, so
 every later value shifts by one and a deck answers for a round it was not played
 in.
 
+**The engine's decks payload is built twice** — `_build_decks_json` on the backend
+and `buildDecksPayload` on the frontend — and the post-finish publication pass
+reads `public` off it to emit only the flags that moved. A field one builder drops
+is silently `false` to the engine: the pass then re-publishes every public deck on
+every action from that side and never retracts one.
+
 **`preview_scores_json` deliberately duplicates the `SetScore` GW/TP cascade** —
 the preview runs on not-yet-persisted scores, so the two paths cannot share state.
 A cascade change must land on both sides; the single equality test
@@ -313,11 +319,10 @@ on the unrelated coincidence of having played a rated event, so a historic winne
 was invisible. `recompute_wins` enumerates from the tournaments; its optional
 user set narrows the rewrite, never the rule. Any new path that finishes,
 un-finishes or deletes a tournament has to call it alongside the rating recompute,
-or a fresh win waits for the nightly pass — **and so does any path that writes a
-deck**, which is the trap, because every deck action sits on
-`_RATING_IRRELEVANT_ACTIONS` and skips that block entirely. Rating-irrelevant is
-not Hall-of-Fame-irrelevant: uploading the winner's deck admits them and deleting
-it evicts them.
+or a fresh win waits for the nightly pass. On a Finished event the action route's
+post-finish branch re-derives the winners' wins whenever the winner or a winner's
+deck moved, reading the winner and the deck ops rather than
+`_RATING_IRRELEVANT_ACTIONS`, which answers for ratings only.
 
 `len(rounds) == 0` is not "no results", and never measures field size. Every
 pre-2014 import is rounds-less while carrying a full scored result sheet, so the
