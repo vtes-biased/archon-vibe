@@ -991,7 +991,6 @@ fn test_player_can_upload_missing_deck_after_finish() {
 
 #[test]
 fn test_owner_corrects_a_played_deck_after_finish() {
-    // Once Finished the owner may replace any of their decks and name its round.
     let mut tournament = tournament_with_player("Finished");
     tournament["multideck"] = true.into();
     let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0"}]"#;
@@ -2223,9 +2222,8 @@ fn test_no_final_finish_crowns_first_place_under_the_floor() {
 
 #[test]
 fn test_no_final_finish_uncrowns_a_rated_size() {
-    // A bare winner reads as a played final to `ranking_eligibility`; whether such
-    // an event ranks is with the Rules Director. The crown an earlier, smaller
-    // finish set goes too, so a reopened event that grew cannot keep it.
+    // The crown an earlier, smaller finish set goes too, so a reopened event that
+    // grew cannot keep it.
     let mut tournament = no_final_event(8);
     tournament["winner"] = "p1".into();
     let event = json::object! { type: "FinishTournament" };
