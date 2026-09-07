@@ -225,7 +225,6 @@ async def _apply_sanction_to_tournament(
         bd = await save_tournament(tournament, conn=tx_conn)
     broadcast_precomputed(bd)
 
-    # Unlocked, like the action route's tail.
     from .tournaments import _process_deck_ops, maybe_submit_twda
 
     for deck_bd in await _process_deck_ops(

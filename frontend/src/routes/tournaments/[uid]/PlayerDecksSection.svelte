@@ -56,6 +56,22 @@
     !!myPending || maxRounds === 0 || myRoundsPlayed < maxRounds,
   );
 
+  // Once Finished every round the event had is a slot, so a missing deck is added
+  // against the round it was played in.
+  type RoundSlot = { round: number | null; deck: DeckObject | null };
+  const mySlots = $derived.by((): RoundSlot[] => {
+    if (tournament.state !== 'Finished') {
+      const slots: RoundSlot[] = myStamped.map(d => ({ round: d.round, deck: d }));
+      if (showPendingSlot) slots.push({ round: null, deck: myPending });
+      return slots;
+    }
+    const byRound = new Map(myDecks.map(d => [d.round, d]));
+    const slots: RoundSlot[] = Array.from({ length: roundCount }, (_, r) => ({ round: r, deck: byRound.get(r) ?? null }));
+    if (tournament.finals) slots.push({ round: roundCount, deck: byRound.get(roundCount) ?? null });
+    if (myPending) slots.push({ round: null, deck: myPending });
+    return slots;
+  });
+
   // Accordion key: a stamped deck's round, or PENDING for the not-yet-played one.
   const PENDING = -1;
   let uploadingFor = $state<string | null>(null);
@@ -105,7 +121,7 @@
 
   let deleteError = $state<string | null>(null);
 
-  async function deleteDeck(playerUid: string, round: number | null) {
+  async function deleteDeck(playerUid: string, round: number | null): Promise<boolean> {
     deleteError = null;
     try {
       await tournamentAction(tournament.uid, 'DeleteDeck', {
@@ -113,8 +129,10 @@
         deck_index: round,
         multideck: isMultideck,
       });
+      return true;
     } catch (e) {
       deleteError = toUserMessage(e, m.tournament_error_action());
+      return false;
     }
   }
 
@@ -156,7 +174,7 @@
       <Button
         variant="danger"
         size="lg"
-        onclick={() => { deleteDeck(myUid, round); confirmDeleteRound = undefined; }}
+        onclick={async () => { if (await deleteDeck(myUid, round)) confirmDeleteRound = undefined; }}
       ><Trash2 class="w-4 h-4" aria-hidden="true" />{m.decks_delete_confirm_yes()}</Button>
       <Button
         variant="secondary"
@@ -205,81 +223,52 @@
     {#if isMultideck}
       <div class="bg-surface-muted/50 rounded-lg p-3 sm:p-4 space-y-2">
         <h3 class="text-sm font-semibold text-ink-strong">{m.decks_my_decks()}</h3>
-        {#each myStamped as deck (deck.uid)}
-          {@const isExpanded = expandedRoundIdx === deck.round}
+        {#each mySlots as slot (slot.round ?? PENDING)}
+          {@const key = slot.round ?? PENDING}
+          {@const isExpanded = expandedRoundIdx === key}
+          {@const editable = slot.round === null ? canModifyPending : isFinished}
           <FoldableSection
             open={isExpanded}
-            ontoggle={() => expandedRoundIdx = isExpanded ? null : deck.round}
-            title={roundLabel(deck.round)}
+            ontoggle={() => expandedRoundIdx = isExpanded ? null : key}
+            title={roundLabel(slot.round)}
           >
             {#snippet header()}
-              {#if !isFinished}<Lock class="w-3 h-3 text-ink-faint" />{/if}
-              <CircleCheck class="w-3.5 h-3.5 text-info" />
-            {/snippet}
-            {#if isFinished && uploadingFor === myUid && uploadingRound === deck.round}
-              <DeckUpload tournamentUid={tournament.uid} round={deck.round ?? undefined} multideck onuploaded={onUploaded} />
-            {:else}
-              <DeckDisplay
-                {deck}
-                editable={isFinished}
-                tournamentUid={tournament.uid}
-                multideck
-                format={tournament.format}
-                onreplace={isFinished ? () => { uploadingFor = myUid; uploadingRound = deck.round ?? undefined; } : undefined}
-                ondelete={isFinished ? () => { confirmDeleteRound = deck.round; } : undefined}
-              />
-              {#if confirmDeleteRound === deck.round}
-                {@render deleteConfirm(deck.round)}
-              {/if}
-              {#if !isFinished}
-                <p class="text-sm text-ink-faint">{m.decks_locked()}</p>
-              {/if}
-            {/if}
-          </FoldableSection>
-        {/each}
-        {#if showPendingSlot}
-          {@const isExpanded = expandedRoundIdx === PENDING}
-          <FoldableSection
-            open={isExpanded}
-            ontoggle={() => expandedRoundIdx = isExpanded ? null : PENDING}
-            title={m.decks_next_round()}
-          >
-            {#snippet header()}
-              {#if myPending}
+              {#if slot.deck}
+                {#if slot.round !== null && !isFinished}<Lock class="w-3 h-3 text-ink-faint" />{/if}
                 <CircleCheck class="w-3.5 h-3.5 text-info" />
               {:else}
                 <span class="text-ink-faint truncate">{m.decks_no_deck()}</span>
               {/if}
             {/snippet}
-            {#if uploadingFor === myUid && uploadingRound === undefined}
-              <DeckUpload tournamentUid={tournament.uid} multideck onuploaded={onUploaded} />
-            {:else if myPending}
+            {#if uploadingFor === myUid && uploadingRound === (slot.round ?? undefined)}
+              <DeckUpload tournamentUid={tournament.uid} round={slot.round ?? undefined} multideck onuploaded={onUploaded} />
+            {:else if slot.deck}
               <DeckDisplay
-                deck={myPending}
-                editable={canModifyPending}
+                deck={slot.deck}
+                {editable}
                 tournamentUid={tournament.uid}
                 multideck
                 format={tournament.format}
-                onreplace={canModifyPending ? () => { uploadingFor = myUid; uploadingRound = undefined; } : undefined}
-                ondelete={canModifyPending ? () => { confirmDeleteRound = null; } : undefined}
+                onreplace={editable ? () => { uploadingFor = myUid; uploadingRound = slot.round ?? undefined; } : undefined}
+                ondelete={editable ? () => { confirmDeleteRound = slot.round; } : undefined}
               />
-              {#if confirmDeleteRound === null}
-                {@render deleteConfirm(null)}
+              {#if confirmDeleteRound === slot.round}
+                {@render deleteConfirm(slot.round)}
               {/if}
-              {#if !canModifyPending}
+              {#if !editable}
                 <p class="text-sm text-ink-faint">{m.decks_locked()}</p>
               {/if}
-            {:else if canModifyPending}
+            {:else if editable}
               <Button
                 variant="secondary"
                 size="lg"
-                onclick={() => { uploadingFor = myUid; uploadingRound = undefined; }}
+                onclick={() => { uploadingFor = myUid; uploadingRound = slot.round ?? undefined; }}
               >{m.decks_upload()}</Button>
             {:else}
               <p class="text-sm text-ink-faint">{m.decks_no_deck()}</p>
             {/if}
           </FoldableSection>
-        {/if}
+        {/each}
       </div>
     {:else}
       <div>
