@@ -1767,7 +1767,6 @@
   "err_tournament_no_finals_in_progress": "No hay ninguna final en progreso",
   "err_tournament_finals_table_unfinished": "La mesa de finales debe estar finalizada primero",
   "err_tournament_toss_min_rounds": "Se necesitan al menos 2 rondas antes de establecer el sorteo",
-  "err_tournament_deck_locked_finished": "No se puede modificar el mazo después de que el torneo haya finalizado",
   "err_tournament_deck_locked_playing": "No se puede modificar el mazo mientras el torneo está en progreso",
   "err_tournament_deck_locked_round": "No se puede modificar un mazo para una ronda que ya ha comenzado",
   "err_tournament_raffle_count_min": "El número de sorteos debe ser al menos 1",

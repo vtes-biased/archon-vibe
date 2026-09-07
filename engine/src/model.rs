@@ -118,7 +118,6 @@ pub mod arg {
     pub const UNRECOGNIZED_LINES: &str = "unrecognized_lines";
     pub const USER_UID: &str = "user_uid";
     pub const V5: &str = "v5";
-    pub const ARCHON: &str = "archon";
     pub const VEKN: &str = "vekn";
     pub const VEKN_ID: &str = "vekn_id";
     pub const VP: &str = "vp";

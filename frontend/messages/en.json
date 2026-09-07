@@ -1767,7 +1767,6 @@
   "err_tournament_no_finals_in_progress": "No finals in progress",
   "err_tournament_finals_table_unfinished": "Finals table must be Finished first",
   "err_tournament_toss_min_rounds": "Need at least 2 rounds before setting toss",
-  "err_tournament_deck_locked_finished": "Cannot modify deck after tournament is finished",
   "err_tournament_deck_locked_playing": "Cannot modify deck while tournament is in progress",
   "err_tournament_deck_locked_round": "Cannot modify a deck for a round that has already started",
   "err_tournament_raffle_count_min": "Raffle count must be at least 1",

@@ -71,7 +71,6 @@ pub enum EngineError {
     NoFinalsInProgress,
     FinalsTableUnfinished,
     TossMinRounds,
-    DeckLockedFinished,
     DeckLockedPlaying,
     DeckLockedRound,
     RaffleCountMin,
@@ -178,7 +177,6 @@ impl EngineError {
             NoFinalsInProgress => "tournament.no_finals_in_progress",
             FinalsTableUnfinished => "tournament.finals_table_unfinished",
             TossMinRounds => "tournament.toss_min_rounds",
-            DeckLockedFinished => "tournament.deck_locked_finished",
             DeckLockedPlaying => "tournament.deck_locked_playing",
             DeckLockedRound => "tournament.deck_locked_round",
             RaffleCountMin => "tournament.raffle_count_min",
@@ -362,7 +360,6 @@ impl fmt::Display for EngineError {
             NoFinalsInProgress => write!(f, "No finals in progress"),
             FinalsTableUnfinished => write!(f, "Finals table must be Finished first"),
             TossMinRounds => write!(f, "Need at least 2 rounds before setting toss"),
-            DeckLockedFinished => write!(f, "Cannot modify deck after tournament is finished"),
             DeckLockedPlaying => {
                 write!(f, "Cannot modify deck while tournament is in progress")
             }

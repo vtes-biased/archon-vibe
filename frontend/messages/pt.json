@@ -1767,7 +1767,6 @@
   "err_tournament_no_finals_in_progress": "Nenhuma final em andamento",
   "err_tournament_finals_table_unfinished": "A mesa final deve ser Finalizada primeiro",
   "err_tournament_toss_min_rounds": "São necessárias pelo menos 2 rodadas antes de definir o toss",
-  "err_tournament_deck_locked_finished": "Não é possível modificar o deck após o término do torneio",
   "err_tournament_deck_locked_playing": "Não é possível modificar o deck enquanto o torneio está em andamento",
   "err_tournament_deck_locked_round": "Não é possível modificar um deck para uma rodada que já começou",
   "err_tournament_raffle_count_min": "O número de sorteios deve ser pelo menos 1",

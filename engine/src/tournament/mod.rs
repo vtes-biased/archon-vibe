@@ -2442,29 +2442,6 @@ fn apply_event(
 
             update_standings(tournament, sanctions);
 
-            // `ranking_eligibility` reads a bare winner as a played final: a crown
-            // left standing past the rating floor would rank the event.
-            if tournament[tournament::FINALS].is_null()
-                && !tournament[tournament::ROUNDS].is_empty()
-                && tournament[tournament::EXTERNAL_IDS][arg::ARCHON]
-                    .as_str()
-                    .unwrap_or("")
-                    .is_empty()
-            {
-                let under_floor = crate::ratings::players_with_rounds(tournament)
-                    < crate::ratings::RATING_MIN_PLAYERS;
-                let first = tournament[tournament::STANDINGS]
-                    .members()
-                    .find(|s| {
-                        !s[standing::DISQUALIFIED].as_bool().unwrap_or(false)
-                            && !s[standing::NON_COMPETING].as_bool().unwrap_or(false)
-                    })
-                    .and_then(|s| s[standing::USER_UID].as_str())
-                    .filter(|_| under_floor)
-                    .unwrap_or("")
-                    .to_string();
-                tournament[tournament::WINNER] = first.as_str().into();
-            }
             Ok(())
         }
 
@@ -2515,18 +2492,12 @@ fn apply_event(
             if !actor.is_organizer && actor.uid != *player_uid {
                 return Err(EngineError::DeckDeleteForbidden);
             }
-            if !actor.is_organizer {
+            if !actor.is_organizer && state != TournamentState::Finished {
                 if *multideck && deck_index.is_some() {
                     return Err(EngineError::DeckLockedRound);
                 }
-                match state {
-                    TournamentState::Playing if !*multideck => {
-                        return Err(EngineError::DeckLockedPlaying);
-                    }
-                    TournamentState::Finished => {
-                        return Err(EngineError::DeckLockedFinished);
-                    }
-                    _ => {} // Planned, Registration, Waiting: always allowed
+                if state == TournamentState::Playing && !*multideck {
+                    return Err(EngineError::DeckLockedPlaying);
                 }
             }
             let op = json::object! {

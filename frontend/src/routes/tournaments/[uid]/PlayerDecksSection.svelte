@@ -61,7 +61,8 @@
   let uploadingFor = $state<string | null>(null);
   let uploadingRound = $state<number | undefined>(undefined);
   let expandedRoundIdx = $state<number | null>(null);
-  let confirmDeletePending = $state(false);
+  // The deck being confirmed for deletion: its round stamp, null for the pending or single deck.
+  let confirmDeleteRound = $state<number | null | undefined>(undefined);
   let expandedDecks = $state<Set<string>>(new Set());
   let cardsDb = $state<Map<number, VtesCard>>(new Map());
   $effect(() => { getCards().then(c => cardsDb = c); });
@@ -94,7 +95,6 @@
   const isStoryline = $derived(tournament.format === 'Storyline');
   const isFinished = $derived(tournament.state === 'Finished');
   const canModifyPending = $derived(!isStoryline);
-  const canDelete = $derived(!isStoryline && !isFinished);
   const singleDeckEditable = $derived(!isStoryline && tournament.state !== 'Playing');
 
   function roundLabel(round: number | null): string {
@@ -105,12 +105,12 @@
 
   let deleteError = $state<string | null>(null);
 
-  async function deleteDeck(playerUid: string) {
+  async function deleteDeck(playerUid: string, round: number | null) {
     deleteError = null;
     try {
       await tournamentAction(tournament.uid, 'DeleteDeck', {
         player_uid: playerUid,
-        deck_index: null,
+        deck_index: round,
         multideck: isMultideck,
       });
     } catch (e) {
@@ -147,6 +147,29 @@
   const deckEntries = $derived(Object.entries(visibleDecks).filter(([uid]) => uid !== myUid));
   const totalVisibleDecks = $derived(deckEntries.reduce((n, [, d]) => n + d.filter(Boolean).length, 0));
 </script>
+
+{#snippet deleteConfirm(round: number | null)}
+  <div class="mt-2 bg-accent-soft/20 border border-accent-soft-border/50 rounded-lg p-3 space-y-2">
+    <p class="text-sm text-link-soft font-medium">{m.decks_delete_confirm_title()}</p>
+    <p class="text-xs text-ink-muted">{m.decks_delete_confirm_msg()}</p>
+    <div class="flex gap-2">
+      <Button
+        variant="danger"
+        size="lg"
+        onclick={() => { deleteDeck(myUid, round); confirmDeleteRound = undefined; }}
+      ><Trash2 class="w-4 h-4" aria-hidden="true" />{m.decks_delete_confirm_yes()}</Button>
+      <Button
+        variant="secondary"
+        onclick={() => confirmDeleteRound = undefined}
+      >{m.common_cancel()}</Button>
+    </div>
+  </div>
+  {#if deleteError}
+    <div class="mt-2 bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3">
+      <p class="text-link-soft text-sm">{deleteError}</p>
+    </div>
+  {/if}
+{/snippet}
 
 <div class="space-y-6">
   {#if tournament.decklist_required && tournament.state === 'Registration'}
@@ -203,7 +226,11 @@
                 multideck
                 format={tournament.format}
                 onreplace={isFinished ? () => { uploadingFor = myUid; uploadingRound = deck.round ?? undefined; } : undefined}
+                ondelete={isFinished ? () => { confirmDeleteRound = deck.round; } : undefined}
               />
+              {#if confirmDeleteRound === deck.round}
+                {@render deleteConfirm(deck.round)}
+              {/if}
               {#if !isFinished}
                 <p class="text-sm text-ink-faint">{m.decks_locked()}</p>
               {/if}
@@ -234,29 +261,10 @@
                 multideck
                 format={tournament.format}
                 onreplace={canModifyPending ? () => { uploadingFor = myUid; uploadingRound = undefined; } : undefined}
-                ondelete={canDelete ? () => { confirmDeletePending = true; } : undefined}
+                ondelete={canModifyPending ? () => { confirmDeleteRound = null; } : undefined}
               />
-              {#if confirmDeletePending}
-                <div class="mt-2 bg-accent-soft/20 border border-accent-soft-border/50 rounded-lg p-3 space-y-2">
-                  <p class="text-sm text-link-soft font-medium">{m.decks_delete_confirm_title()}</p>
-                  <p class="text-xs text-ink-muted">{m.decks_delete_confirm_msg()}</p>
-                  <div class="flex gap-2">
-                    <Button
-                      variant="danger"
-                      size="lg"
-                      onclick={() => { deleteDeck(myUid); confirmDeletePending = false; }}
-                    ><Trash2 class="w-4 h-4" aria-hidden="true" />{m.decks_delete_confirm_yes()}</Button>
-                    <Button
-                      variant="secondary"
-                      onclick={() => confirmDeletePending = false}
-                    >{m.common_cancel()}</Button>
-                  </div>
-                </div>
-              {/if}
-              {#if deleteError}
-                <div class="mt-2 bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3">
-                  <p class="text-link-soft text-sm">{deleteError}</p>
-                </div>
+              {#if confirmDeleteRound === null}
+                {@render deleteConfirm(null)}
               {/if}
               {#if !canModifyPending}
                 <p class="text-sm text-ink-faint">{m.decks_locked()}</p>
@@ -288,28 +296,9 @@
               {#if uploadingFor === myUid && singleDeckEditable}
                 <DeckUpload tournamentUid={tournament.uid} onuploaded={onUploaded} />
               {:else}
-                <DeckDisplay deck={myDecks[0]} editable={singleDeckEditable} tournamentUid={tournament.uid} format={tournament.format} onreplace={singleDeckEditable ? () => uploadingFor = myUid : undefined} ondelete={singleDeckEditable && canDelete ? () => { confirmDeletePending = true; } : undefined} />
-                {#if confirmDeletePending}
-                  <div class="mt-2 bg-accent-soft/20 border border-accent-soft-border/50 rounded-lg p-3 space-y-2">
-                    <p class="text-sm text-link-soft font-medium">{m.decks_delete_confirm_title()}</p>
-                    <p class="text-xs text-ink-muted">{m.decks_delete_confirm_msg()}</p>
-                    <div class="flex gap-2">
-                      <Button
-                        variant="danger"
-                        size="lg"
-                        onclick={() => { deleteDeck(myUid); confirmDeletePending = false; }}
-                      ><Trash2 class="w-4 h-4" aria-hidden="true" />{m.decks_delete_confirm_yes()}</Button>
-                      <Button
-                        variant="secondary"
-                        onclick={() => confirmDeletePending = false}
-                      >{m.common_cancel()}</Button>
-                    </div>
-                  </div>
-                {/if}
-                {#if deleteError}
-                  <div class="mt-2 bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3">
-                    <p class="text-link-soft text-sm">{deleteError}</p>
-                  </div>
+                <DeckDisplay deck={myDecks[0]} editable={singleDeckEditable} tournamentUid={tournament.uid} format={tournament.format} onreplace={singleDeckEditable ? () => uploadingFor = myUid : undefined} ondelete={singleDeckEditable ? () => { confirmDeleteRound = null; } : undefined} />
+                {#if confirmDeleteRound === null}
+                  {@render deleteConfirm(null)}
                 {/if}
               {/if}
             </div>

@@ -93,7 +93,6 @@ const ENGINE_MESSAGES: Record<string, (p: Record<string, string>) => string> = {
   'tournament.no_finals_in_progress': () => m.err_tournament_no_finals_in_progress(),
   'tournament.finals_table_unfinished': () => m.err_tournament_finals_table_unfinished(),
   'tournament.toss_min_rounds': () => m.err_tournament_toss_min_rounds(),
-  'tournament.deck_locked_finished': () => m.err_tournament_deck_locked_finished(),
   'tournament.deck_locked_playing': () => m.err_tournament_deck_locked_playing(),
   'tournament.deck_locked_round': () => m.err_tournament_deck_locked_round(),
   'tournament.raffle_count_min': () => m.err_tournament_raffle_count_min(),

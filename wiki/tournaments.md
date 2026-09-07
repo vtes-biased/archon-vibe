@@ -148,7 +148,7 @@ and re-runs `FinishFinals` when done; `CancelFinals` is the one path that discar
 a final, reachable from there, and it takes the winner with it — a winner standing
 over a null `finals` is the archival shape `compute_final_standings` ranks first.
 An event finished without one returns to `Waiting`, having no final to come back
-to, and keeps its winner until the next finish re-derives it. Players released from
+to, and keeps the winner an archival import may have set. Players released from
 `Finished` return to `Playing` if they were finalists, else to `Completed` when
 they are at the per-player `max_rounds` cap and `Checked-in` otherwise. Decklists
 unpublish, since publication is derived from the finished state by the post-finish
@@ -493,15 +493,11 @@ A group only partly tossed by hand is re-tossed whole; a group already holding
 distinct non-zero tosses is left alone. The shuffle is seeded from the tournament
 uid because the client applies the event through WASM before the server replays it.
 
-`FinishTournament` without a final sets `Finished` and preliminary standings, and
-crowns the standings' first place — §3.1.6 ranks such an event by §3.1 — **only
-when fewer than 8 played**, and clears the winner otherwise: `ranking_eligibility`
-reads a bare `winner` as a played final, so a crown standing on a larger event —
-including one reopened and grown past the floor — would rank it and pre-empt the
-second question deferred below. A legacy archon import (`external_ids.archon`)
-keeps upstream's winner through a re-finish, as the stance below keeps an import's
-answer. It sets no finalist flags, so a native no-final event awards no
-winner/finalist rating bonus and no winner GW. That is rules-literal — A.2 credits
+`FinishTournament` without a final sets `Finished` and preliminary standings but
+sets no winner or finalist flags — first place is read off the standings, and a
+crown would read as a played final to `ranking_eligibility` — so a native no-final
+event awards no winner/finalist rating bonus and no winner GW. That is
+rules-literal — A.2 credits
 a game won "including a final round victory" and A.2.1 defines a finalist as one
 who advanced to a final — but vekn.net's own implementation credits a no-final top
 five exactly like a final, and our VEKN imports mirror that. Owner-approved interim
@@ -667,8 +663,8 @@ name one.
 finishes a player may neither replace nor delete it — the engine drops any round
 a player names on an upload, leaving them one editable deck at a time, and only
 an organizer names a round. **Once Finished the owner corrects.** A player may
-add, replace or edit any of their own decks, naming the round it was played in;
-deletion stays with the organizer, since a correction is never an erasure.
+add, replace, edit or delete any of their own decks, naming the round it was
+played in.
 `DeleteDeck` carries the same Storyline refusal as the upload.
 
 **An organizer sees a deck once it has been played**, never before: organizer

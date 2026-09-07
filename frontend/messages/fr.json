@@ -1767,7 +1767,6 @@
   "err_tournament_no_finals_in_progress": "Aucune finale en cours",
   "err_tournament_finals_table_unfinished": "La table de finale doit d'abord être terminée",
   "err_tournament_toss_min_rounds": "Au moins 2 rondes sont nécessaires avant de définir le toss",
-  "err_tournament_deck_locked_finished": "Impossible de modifier le deck après la fin du tournoi",
   "err_tournament_deck_locked_playing": "Impossible de modifier le deck pendant le tournoi",
   "err_tournament_deck_locked_round": "Impossible de modifier un deck pour une ronde déjà commencée",
   "err_tournament_raffle_count_min": "Le nombre de tirages doit être au moins 1",

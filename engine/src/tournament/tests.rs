@@ -2181,86 +2181,6 @@ fn test_finals_rescore_moves_publication_with_the_winner() {
     assert_eq!(flags, vec![("d1", false), ("d2", true)]);
 }
 
-/// One scored round, no final, `n` players, in Waiting.
-fn no_final_event(n: usize) -> JsonValue {
-    let mut t = make_tournament();
-    t["state"] = "Waiting".into();
-    let mut players = JsonValue::new_array();
-    let mut seating = JsonValue::new_array();
-    for i in 0..n {
-        let uid = format!("p{i}");
-        let _ = players.push(json::object! {
-            user_uid: uid.as_str(), state: "Checked-in", payment_status: "Pending", toss: 0,
-        });
-        let vp = match i {
-            1 => 2.0,
-            0 => 1.0,
-            _ => 0.0,
-        };
-        let _ = seating.push(json::object! {
-            player_uid: uid.as_str(), result: { gw: 0, vp: vp, tp: 0 }, judge_uid: "",
-        });
-    }
-    t["players"] = players;
-    let mut table = json::object! { state: "Finished", override: json::Null };
-    table["seating"] = seating;
-    let mut round = JsonValue::new_array();
-    let _ = round.push(table);
-    let mut rounds = JsonValue::new_array();
-    let _ = rounds.push(round);
-    t["rounds"] = rounds;
-    t
-}
-
-#[test]
-fn test_no_final_finish_crowns_first_place_under_the_floor() {
-    let event = json::object! { type: "FinishTournament" };
-    let updated =
-        json::parse(&run_event(&no_final_event(5), &event, &make_organizer()).unwrap()).unwrap();
-    assert_eq!(updated["winner"].as_str(), Some("p1"));
-}
-
-#[test]
-fn test_no_final_finish_uncrowns_a_rated_size() {
-    // The crown an earlier, smaller finish set goes too, so a reopened event that
-    // grew cannot keep it.
-    let mut tournament = no_final_event(8);
-    tournament["winner"] = "p1".into();
-    let event = json::object! { type: "FinishTournament" };
-    let updated = json::parse(&run_event(&tournament, &event, &make_organizer()).unwrap()).unwrap();
-    assert!(updated["winner"].as_str().unwrap_or("").is_empty());
-}
-
-#[test]
-fn test_sanction_recompute_moves_publication_with_the_winner() {
-    // The sanction door re-scores the final; an SA that drops p1 below p2 moves
-    // the winner and the pass must follow there too.
-    let mut tournament = finished_with_finals();
-    tournament["finals"]["seating"][0]["result"]["vp"] = 2.0.into();
-    tournament["finals"]["seating"][1]["result"]["vp"] = 2.0.into();
-    let sanctions = json::array![
-        { user_uid: "p1", level: "standings_adjustment", round_number: 3, lifted_at: json::Null, deleted_at: json::Null },
-    ];
-    let decks = json::array![
-        { uid: "d1", user_uid: "p1", tournament_uid: "test-tournament", round: 3, public: true },
-        { uid: "d2", user_uid: "p2", tournament_uid: "test-tournament", round: 3, public: false },
-    ];
-    let raw = update_standings_json(&tournament.dump(), &sanctions.dump(), &decks.dump()).unwrap();
-    let result = json::parse(&raw).unwrap();
-    assert_eq!(result["tournament"]["winner"].as_str(), Some("p2"));
-    let mut flags: Vec<(&str, bool)> = result["deck_ops"]
-        .members()
-        .map(|op| {
-            (
-                op["deck_uid"].as_str().unwrap(),
-                op["public"].as_bool().unwrap(),
-            )
-        })
-        .collect();
-    flags.sort();
-    assert_eq!(flags, vec![("d1", false), ("d2", true)]);
-}
-
 #[test]
 fn test_finish_finals_publishes_the_winner_deck() {
     // Publication is derived from the Finished state, so it must come back when the
@@ -3593,19 +3513,21 @@ fn test_delete_deck_playing_blocked() {
 }
 
 #[test]
-fn test_delete_deck_finished_blocked() {
-    let tournament = tournament_with_player("Finished");
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
+fn test_owner_deletes_a_played_deck_after_finish() {
+    let mut tournament = tournament_with_player("Finished");
+    tournament["multideck"] = true.into();
+    let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0"}]"#;
     let event = json::object! {
         type: "DeleteDeck",
         player_uid: "player-1",
-        deck_index: json::Null,
-        multideck: false,
+        deck_index: 0,
+        multideck: true,
     };
     let actor = make_player("player-1");
-    let result = run_event_with_decks(&tournament, &event, &actor, decks);
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("finished"));
+    let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, decks).unwrap();
+    assert_eq!(deck_ops.len(), 1);
+    assert_eq!(deck_ops[0]["op"].as_str(), Some("delete"));
+    assert_eq!(deck_ops[0]["deck_index"].as_usize(), Some(0));
 }
 
 #[test]
