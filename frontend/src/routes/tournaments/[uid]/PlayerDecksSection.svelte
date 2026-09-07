@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Tournament, DeckObject, VtesCard } from "$lib/types";
+  import type { Tournament, DeckObject, Table, VtesCard } from "$lib/types";
   import type { PlayerInfoMap } from "$lib/tournament-utils";
   import { roundsPlayed, seatDisplay } from "$lib/tournament-utils";
   import { getDecksByTournamentGrouped } from "$lib/db";
@@ -56,8 +56,6 @@
     !!myPending || maxRounds === 0 || myRoundsPlayed < maxRounds,
   );
 
-  // Once Finished every round the event had is a slot, so a missing deck is added
-  // against the round it was played in.
   type RoundSlot = { round: number | null; deck: DeckObject | null };
   const mySlots = $derived.by((): RoundSlot[] => {
     if (tournament.state !== 'Finished') {
@@ -65,9 +63,17 @@
       if (showPendingSlot) slots.push({ round: null, deck: myPending });
       return slots;
     }
+    // Slots by round index, never by count: a cancelled table shifts the count.
     const byRound = new Map(myDecks.map(d => [d.round, d]));
-    const slots: RoundSlot[] = Array.from({ length: roundCount }, (_, r) => ({ round: r, deck: byRound.get(r) ?? null }));
-    if (tournament.finals) slots.push({ round: roundCount, deck: byRound.get(roundCount) ?? null });
+    const seated = (tables: Table[]) =>
+      tables.some(t => t.state !== 'Cancelled' && t.seating.some(seat => seat.player_uid === myUid));
+    const slots: RoundSlot[] = [];
+    (tournament.rounds ?? []).forEach((tables, r) => {
+      if (seated(tables)) slots.push({ round: r, deck: byRound.get(r) ?? null });
+    });
+    if (tournament.finals && seated([tournament.finals])) {
+      slots.push({ round: roundCount, deck: byRound.get(roundCount) ?? null });
+    }
     if (myPending) slots.push({ round: null, deck: myPending });
     return slots;
   });
@@ -178,7 +184,7 @@
       ><Trash2 class="w-4 h-4" aria-hidden="true" />{m.decks_delete_confirm_yes()}</Button>
       <Button
         variant="secondary"
-        onclick={() => confirmDeleteRound = undefined}
+        onclick={() => { confirmDeleteRound = undefined; deleteError = null; }}
       >{m.common_cancel()}</Button>
     </div>
   </div>
