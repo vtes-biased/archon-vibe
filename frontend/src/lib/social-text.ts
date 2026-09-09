@@ -1,4 +1,4 @@
-import type { Tournament, Deck, DeckObject, VtesCard } from "$lib/types";
+import type { Tournament, DeckObject, VtesCard } from "$lib/types";
 import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
 import { eventUrl, seatDisplay } from "$lib/tournament-utils";
 import { formatScore } from "$lib/utils";
@@ -6,15 +6,16 @@ import { getCountry } from "$lib/geonames";
 import { getCards } from "$lib/cards";
 import { getLibraryTypeOrder } from "$lib/engine";
 import { getDecksByTournamentGrouped } from "$lib/db";
+import { creditName } from "$lib/deck-credit";
 import { getLocale } from "$lib/paraglide/runtime.js";
 import * as m from "$lib/paraglide/messages.js";
 
 interface CardEntry { name: string; count: number; type: string; capacity: number }
 
-function formatDeckText(deck: Deck, cardsMap: Map<number, VtesCard>): string[] {
+function formatDeckText(deck: DeckObject, cardsMap: Map<number, VtesCard>, credit: string): string[] {
   const lines: string[] = [];
   if (deck.name) lines.push(deck.name);
-  if (deck.author) lines.push(`by ${deck.author}`);
+  if (credit) lines.push(`by ${credit}`);
   if (lines.length) lines.push("");
 
   const crypt: CardEntry[] = [];
@@ -122,7 +123,7 @@ export async function generateResultsText(
         // The decklist itself stays in TWDA English convention (card names,
         // Crypt/Library headers) — only the prose heading is localized.
         lines.push(`\u{1F0CF} ${m.share_text_deck_heading({ name: winnerName })}`);
-        lines.push(...formatDeckText(deck, cardsMap));
+        lines.push(...formatDeckText(deck, cardsMap, await creditName(deck.attribution)));
       }
     }
   }

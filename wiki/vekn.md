@@ -447,9 +447,14 @@ all except `config`. A 4xx is a refusal and an unreadable App key a
 misconfiguration: both repeat identically, so neither offers the retry.
 
 **Designer credit**: the winner's name is always in the header; a separate optional
-`Created by: <name>` line is emitted only when the deck is attributed to someone
-else. Names only, never VEKN IDs. The winner's name appearing regardless of
-attribution is intentional — the TWDA is the public win registry.
+`Created by: <name>` line is emitted only when the deck is credited to someone
+else — a `Member` credit resolved to that member's current name, or the name a
+`Named` or `Archive` credit carries. Names only, never VEKN IDs. A credit that
+names nobody, an `Anonymous` or `Owner` one and a `Member` id no member holds
+alike, emits no line and no fallback: the typed credit keeps no loose string for
+one to fall back to. The winner's name appearing regardless is intentional — the
+TWDA is the public win registry, which is also why anonymity never withholds the
+winner's own `user_uid` ([tournaments](tournaments.md#decks)).
 
 ### Inbound
 
@@ -471,8 +476,8 @@ a record we hold.
 
 `twda_import.py` reads `static.krcg.org/data/twda.json` and does two things:
 reconstructs the historic events the archive is the only record of, and gives every
-resolved winner their decklist (`attribution="twda"`, `public=True`, only where the
-winner has none for that tournament). Then it recomputes those winners' Hall of
+resolved winner their decklist (an `Archive` credit carrying the archived author's
+name, `public=True`, only where the winner has none for that tournament). Then it recomputes those winners' Hall of
 Fame lists, which is why that step follows the deck pass rather than preceding it:
 a reconstruction only counts once its deck is on record
 ([the rule](tournaments.md#configuration)). The backfill depends on the ordering

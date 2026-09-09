@@ -100,6 +100,7 @@ _ACTION_ANY_VALUE = {
     "player_uids",
     "config",
     "deck",
+    "attribution",
     "multideck",
     "exclude_drawn",
     "count",

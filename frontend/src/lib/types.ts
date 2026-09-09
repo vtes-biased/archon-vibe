@@ -296,13 +296,12 @@ export interface FinalsTable extends Table {
   seed_order: string[];
 }
 
-export interface Deck {
-  round: number | null;
+export type AttributionKind = "Anonymous" | "Owner" | "Member" | "Named" | "Archive";
+
+export interface DeckAttribution {
+  kind: AttributionKind;
+  vekn_id: string;
   name: string;
-  author: string;
-  comments: string;
-  cards: Record<string, number>;
-  attribution?: string | null; // null = anonymous, vekn_id = attributed to member
 }
 
 export interface Room {
@@ -398,14 +397,16 @@ export interface OfflinePlayer {
 // Standalone deck object (synced separately from tournament)
 export interface DeckObject extends BaseObject {
   tournament_uid: string;
-  user_uid: string;
+  // Absent below full level on an anonymous deck: the boundary withholds it, so
+  // anything keyed by owner must fall back to the deck's own uid.
+  user_uid?: string;
   round: number | null;
   name: string;
-  author: string;
   comments: string;
   cards: Record<string, number>;
-  attribution?: string | null;
+  attribution: DeckAttribution;
   public: boolean;
+  winner: boolean;
 }
 
 export type RatingCategory = "constructed_online" | "constructed_offline" | "limited_online" | "limited_offline";

@@ -31,6 +31,8 @@ from .db import (
 )
 from .geonames import normalize_country
 from .models import (
+    AttributionKind,
+    DeckAttribution,
     DeckObject,
     ObjectType,
     Player,
@@ -434,11 +436,13 @@ async def _import_decks(
             tournament_uid=tournament_uid,
             user_uid=winner_uid,
             name=entry.get("name", ""),
-            author=entry.get("player", ""),
             comments=entry.get("comments", ""),
             cards=cards,
-            attribution="twda",
+            attribution=DeckAttribution(
+                kind=AttributionKind.ARCHIVE, name=entry.get("player", "")
+            ),
             public=True,
+            winner=True,
         )
         bd = await save_object_from_model(ObjectType.DECK, deck)
         bd.org_uids = row[1]

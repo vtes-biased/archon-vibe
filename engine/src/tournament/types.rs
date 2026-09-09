@@ -209,6 +209,11 @@ pub enum TournamentEvent {
         deck_index: Option<usize>,
         multideck: bool,
     },
+    SetDeckAttribution {
+        player_uid: String,
+        round: Option<usize>,
+        attribution: JsonValue,
+    },
 
     RaffleDraw {
         label: String,

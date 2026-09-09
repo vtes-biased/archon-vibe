@@ -1,4 +1,4 @@
-import type { CommunityLinkType, DeckObject, LinkMedia, LinkPlacement, RafflePool, Sanction, SanctionCategory, SanctionLevel, SanctionSubcategory, Tournament, User } from './types';
+import type { CommunityLinkType, DeckAttribution, DeckObject, LinkMedia, LinkPlacement, RafflePool, Sanction, SanctionCategory, SanctionLevel, SanctionSubcategory, Tournament, User } from './types';
 import { getAllLeagues } from './db';
 import { callEngine, getEngine, initEngine } from './engine-instance';
 
@@ -113,6 +113,7 @@ export type TournamentEventType =
   | 'RemoveTable'
   | 'UpsertDeck'
   | 'DeleteDeck'
+  | 'SetDeckAttribution'
   | 'SetScore'
   | 'Override'
   | 'Unoverride'
@@ -152,7 +153,8 @@ export interface TournamentEvent {
   seating?: string[][];
   player_uids?: string[]; // SelfOrganizeRound: the chosen pod
   vekn_id?: string;
-  deck?: { name: string; author: string; comments: string; cards: Record<string, number>; round?: number; attribution?: string | null };
+  deck?: { name: string; comments: string; cards: Record<string, number>; round?: number; attribution?: DeckAttribution };
+  attribution?: DeckAttribution; // SetDeckAttribution
   deck_index?: number | null;
   multideck?: boolean;
   config?: Record<string, unknown>;
@@ -195,14 +197,16 @@ export function buildSanctionsPayload(sanctions: Sanction[], tournamentUid: stri
 }
 
 export interface DeckOp {
-  op: 'upsert' | 'delete' | 'set_round' | 'set_public';
+  op: 'upsert' | 'delete' | 'set_round' | 'set_publication' | 'set_attribution';
   player_uid?: string;
-  deck?: { name: string; author: string; comments: string; cards: Record<string, number>; round?: number | null; public?: boolean; attribution?: string | null };
+  deck?: { name: string; comments: string; cards: Record<string, number>; round?: number | null; public?: boolean; winner?: boolean; attribution?: DeckAttribution };
   deck_uid?: string;
   deck_index?: number | null; // delete: the deck's round stamp, null being the pending deck
   round?: number | null; // set_round: the round the deck was played in
   multideck?: boolean;
   public?: boolean;
+  winner?: boolean;
+  attribution?: DeckAttribution;
 }
 
 export interface EngineResult {
@@ -217,6 +221,7 @@ function buildDecksPayload(decks: DeckObject[]): string {
       round: d.round,
       uid: d.uid,
       public: d.public,
+      winner: d.winner,
     }))
   );
 }

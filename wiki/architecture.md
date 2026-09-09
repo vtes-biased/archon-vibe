@@ -409,11 +409,19 @@ spelling still resolves. The frontend renders `printed_name` with separate badge
 — a circled group number (group `"any"` gets none) and an advanced glyph — rather
 than a suffixed name string.
 
-**DeckObject** fields: `tournament_uid`, `user_uid`, `round`, `name`, `author`,
-`comments`, `cards` (card_id → count), `attribution`, `public`. The engine sets
-`public` from `decklists_mode` plus tournament state (Winner / Finalists / All).
-Deduplication keys on `(tournament_uid, user_uid, round)` on both sides of the
-stack.
+**DeckObject** fields: `tournament_uid`, `user_uid`, `round`, `name`, `comments`,
+`cards` (card_id → count), `attribution`, `public`, `winner`. The engine sets the
+last two: `public` from `decklists_mode` plus tournament state (Winner /
+Finalists / All), and `winner` from whether the owner won — a fact the deck row
+cannot otherwise reach, and which the projections need to spare the winner from
+anonymity ([tournaments](tournaments.md#decks)).
+
+**`attribution` is a typed credit**, one `kind` of `Anonymous`, `Owner`,
+`Member` (carrying a `vekn_id`), `Named` or `Archive` (each carrying a `name`).
+A member's display name is resolved at render rather than stored, so a rename
+follows the credit. Deduplication keys on `(tournament_uid, user_uid, round)` on
+both sides of the stack — except where the owner is withheld, and a deck with no
+`user_uid` keys on its own uid.
 
 **Import** — raw-text paste parses locally through the WASM engine
 (offline-capable). URL import (VDB / VTESDecks / Amaranth) and QR go through the

@@ -155,9 +155,10 @@ in.
 
 **The engine's decks payload is built twice** — `_build_decks_json` on the backend
 and `buildDecksPayload` on the frontend — and the post-finish publication pass
-reads `public` off it to emit only the flags that moved. A field one builder drops
-is silently `false` to the engine: the pass then re-publishes every public deck on
-every action from that side and never retracts one.
+reads `public` and `winner` off it to emit only the flags that moved. A field one
+builder drops is silently `false` to the engine: the pass then re-publishes every
+public deck on every action from that side and never retracts one — and, for
+`winner`, re-stamps the crown it should have left alone.
 
 **`preview_scores_json` deliberately duplicates the `SetScore` GW/TP cascade** —
 the preview runs on not-yet-persisted scores, so the two paths cannot share state.

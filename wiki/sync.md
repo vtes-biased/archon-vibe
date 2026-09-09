@@ -27,7 +27,7 @@ through the separate API process ([public-api](public-api.md)).
 | user | NC/Prince with contact + community links; IC without contact; any other user with non-empty community links as a minimal no-name row (country, roles, links) | all users — no contact except an NC's or Prince's published one, no `deceased_by_uid`, no `github_login`/`github_id`; `deceased_at` included; anyone with non-empty community links gets those included | everything except `calendar_token` | only users holding a `vekn_id`: uid, the id, country, roles, the four `CategoryRating` fields, `wins`, community links with their moderation value — no name, nickname, contact, city or avatar |
 | tournament | the event-page fields — config, venue/address/map, description, rules flags, `banner_path`: everything an unauthenticated visitor needs to decide whether to attend | all except `checkin_code`, `vekn_pushed_at`, `vekn_results_stale`, `vekn_event_absent_at`, `twda_status` | everything | the member projection minus `announcements`, `raffles`, `promos_distributed`, `promo_stock_source_uid`, `offline_device_id`, and minus each player's `display_name`, `missing_decklist`, `payment_status` and `waitlisted` |
 | sanction | none | full data | full data | none, permanently |
-| deck | none | full data when `public = true`, else none | full data | the member rule minus `author` and minus `public`, which the rule already pins to `true` and so carries no information at this level. `attribution` carries the designer credit: a VEKN id, the sentinel `"twda"` (credit lives in the archive, not in our `author`), or null for anonymous |
+| deck | none | full data when `public = true`, else none — **minus `user_uid`** where the credit is `Anonymous` and the deck is not the winner's | full data | the member rule minus `public`, which the rule already pins to `true` and so carries no information at this level, and with the credit's free-text `name` dropped: this level carries member credits only |
 | league | full data **except `organizers_uids`** | full data | full data | full data, organizers included — the same call as a tournament's |
 | promo | catalog only, no `holdings` | same as public | everything including `holdings` | none |
 
@@ -125,7 +125,10 @@ Two real server-side boundaries exist inside the member level:
 
 - **Decks** are a separate object type with their own per-deck member projection.
   A deck ships only when the engine sets its `public` flag. That row *is* access
-  control.
+  control — and it is the one place a member row is *partial*: an anonymous
+  deck's `user_uid` is withheld from it, the winner's excepted. The owner is
+  spared by the personal overlay, which serves their own decks at `full` and is
+  drained **after** the member corpus, so their own row wins.
 - The five excluded tournament fields above.
 
 Everything else is a **frontend display default**, not an access boundary:
@@ -137,7 +140,7 @@ results are rendered client-side from data the client already holds.
 | Config | — always shipped | shown |
 | Players | no — full per-player data shipped | per-player results hidden mid-event |
 | Standings | no | per `standings_mode` |
-| Decks | **yes** — per-deck `public` flag | — |
+| Decks | **yes** — per-deck `public` flag, and `user_uid` on an anonymous one | — |
 | Finals | no — shipped | hidden until finished |
 | My tables | no — all tables shipped | only the viewer's own |
 | Rounds | no — shipped | hidden |
@@ -241,7 +244,9 @@ StreamReader rejects lines over 512 KB. An object larger than the budget is emit
 alone, never split across lines.
 
 After catch-up, a **personal overlay** sends `full`-level data for the viewer's own
-objects and their role-based full-access objects. The stream then enters the live
+objects and their role-based full-access objects. Its position is load-bearing:
+the member projection of a deck is partial, so the overlay's own copy must land
+*after* the corpus that carries the pruned one. The stream then enters the live
 phase, relaying single-object events:
 
 ```

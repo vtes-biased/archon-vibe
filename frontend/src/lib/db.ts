@@ -20,6 +20,7 @@ interface ArchonDB extends DBSchema {
     value: User;
     indexes: {
       'by-name': string;
+      'by-vekn': string;
     };
   };
   sanctions: {
@@ -74,7 +75,7 @@ interface ArchonDB extends DBSchema {
 
 let dbPromise: Promise<IDBPDatabase<ArchonDB>> | null = null;
 
-const DB_VERSION = 17;
+const DB_VERSION = 18;
 
 type UpgradeTx = IDBPTransaction<ArchonDB, ArrayLike<StoreNames<ArchonDB>>, 'versionchange'>;
 
@@ -206,6 +207,7 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
 
       const userStore = db.createObjectStore('users', { keyPath: 'uid' });
       userStore.createIndex('by-name', 'name');
+      userStore.createIndex('by-vekn', 'vekn_id');
 
       const sanctionStore = db.createObjectStore('sanctions', { keyPath: 'uid' });
       sanctionStore.createIndex('by-user', 'user_uid');
@@ -245,6 +247,11 @@ export function getDB(): Promise<IDBPDatabase<ArchonDB>> {
 export async function getUser(uid: string): Promise<User | undefined> {
   const db = await getDB();
   return db.get('users', uid);
+}
+
+export async function getUserByVekn(veknId: string): Promise<User | undefined> {
+  const db = await getDB();
+  return db.getFromIndex('users', 'by-vekn', veknId);
 }
 
 export async function getUserListItem(uid: string): Promise<UserListItem | undefined> {
@@ -960,7 +967,7 @@ export async function getDecksByTournamentGrouped(tournamentUid: string): Promis
   const decks = await getDecksByTournament(tournamentUid);
   const grouped: Record<string, DeckObject[]> = {};
   for (const d of decks) {
-    (grouped[d.user_uid] ??= []).push(d);
+    (grouped[d.user_uid ?? d.uid] ??= []).push(d);
   }
   // Sort each player's decks by round so array index matches slot index
   for (const arr of Object.values(grouped)) {
@@ -974,7 +981,10 @@ export async function saveDeck(deck: DeckObject): Promise<void> {
   const tx = db.transaction('decks', 'readwrite');
   // Removes any other deck with the same (tournament_uid, user_uid, round) but a different uid — this
   // cleans up optimistic decks once authoritative SSE arrives. Spares offline tombstones (deleted_at): they must survive until go-online pushes them.
-  const existing = await tx.store.index('by-tournament').getAll(deck.tournament_uid);
+  // An anonymous deck arrives with no user_uid, so it has no such twin to clear.
+  const existing = deck.user_uid
+    ? await tx.store.index('by-tournament').getAll(deck.tournament_uid)
+    : [];
   for (const d of existing) {
     if (d.uid !== deck.uid && d.user_uid === deck.user_uid && d.round === deck.round && !d.deleted_at) {
       tx.store.delete(d.uid);

@@ -287,7 +287,8 @@ async def test_nested_uids_and_deck_attribution_remapped(test_client, test_db):
                 "modified": datetime.now(UTC).isoformat(),
                 "tournament_uid": base_uid,
                 "user_uid": temp_uid,
-                "attribution": temp_vekn,  # attributed to the temp vekn
+                # credited to another offline player, by their temp vekn
+                "attribution": {"kind": "Member", "vekn_id": temp_vekn},
                 "name": "Alice's Deck",
             }
         ],
@@ -313,8 +314,8 @@ async def test_nested_uids_and_deck_attribution_remapped(test_client, test_db):
     decks = await db.get_decks_for_tournament(base_uid)
     assert len(decks) == 1
     assert decks[0].user_uid == real_uid
-    assert decks[0].attribution == created.vekn_id
-    assert not decks[0].attribution.startswith("TEMP-")
+    assert decks[0].attribution.vekn_id == created.vekn_id
+    assert not decks[0].attribution.vekn_id.startswith("TEMP-")
 
 
 @pytest.mark.asyncio

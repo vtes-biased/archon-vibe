@@ -1,6 +1,8 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
-  import type { Deck, VtesCard } from "$lib/types";
+  import type { DeckAttribution, DeckObject, VtesCard } from "$lib/types";
+  import { creditName } from "$lib/deck-credit";
+  import { getAuthState } from "$lib/stores/auth.svelte";
   import { getCards } from "$lib/cards";
   import { normalizeSearch } from "$lib/utils";
   import { disciplineIcon, typeIcon } from "$lib/vtes-icons";
@@ -19,19 +21,17 @@
     tournamentUid = '',
     playerUid = '',
     playerName = undefined,
-    playerVekn = undefined,
     multideck = false,
     format = '',
     onsaved,
     onreplace,
     ondelete,
   }: {
-    deck: Deck;
+    deck: DeckObject;
     editable?: boolean;
     tournamentUid?: string;
     playerUid?: string;
     playerName?: string;
-    playerVekn?: string;
     multideck?: boolean;
     format?: string;
     onsaved?: () => void;
@@ -43,11 +43,17 @@
   let cardImageUrl = $state<string | null>(null);
   let editedCards = $state<Record<string, number>>({});
   let editedName = $state('');
-  let attrMode = $state<'self' | 'anonymous' | 'other'>('self');
-  let attributionSearch = $state('');
-  let attributionVekn = $state('');
-  let attributionName = $state('');
   let editing = $state(false);
+  let editingCredit = $state(false);
+  let editedAttribution = $state<DeckAttribution>({ kind: 'Anonymous', vekn_id: '', name: '' });
+  let credit = $state('');
+  let creditError = $state<string | null>(null);
+  const myUid = $derived(getAuthState().user?.uid);
+  const ownsDeck = $derived(!!tournamentUid && !!myUid && (playerUid || myUid) === myUid);
+
+  $effect(() => {
+    creditName(deck.attribution).then(n => credit = n);
+  });
   let saving = $state(false);
   let saveError = $state<string | null>(null);
   let validationErrors = $state<ValidationError[] | null>([]);
@@ -70,18 +76,30 @@
   function startEditing() {
     editedCards = { ...deck.cards };
     editedName = deck.name;
-    if (deck.attribution === null) {
-      attrMode = 'anonymous';
-    } else if (deck.attribution) {
-      attrMode = 'other';
-      attributionVekn = deck.attribution;
-      attributionName = deck.author || '';
-      attributionSearch = deck.author || '';
-    } else {
-      attrMode = 'self';
-    }
     editing = true;
     saveError = null;
+  }
+
+  function startEditingCredit() {
+    editedAttribution = deck.attribution;
+    editingCredit = true;
+    creditError = null;
+  }
+
+  async function saveCredit() {
+    creditError = null;
+    try {
+      const { tournamentAction } = await import('$lib/tournament-actions');
+      await tournamentAction(tournamentUid, 'SetDeckAttribution', {
+        player_uid: playerUid || myUid,
+        round: deck.round,
+        attribution: editedAttribution,
+      });
+      editingCredit = false;
+      onsaved?.();
+    } catch (e: any) {
+      creditError = toUserMessage(e, m.deck_error_save());
+    }
   }
 
   function cancelEditing() {
@@ -112,35 +130,14 @@
     saveError = null;
     try {
       const { tournamentAction } = await import('$lib/tournament-actions');
-      const auth = (await import('$lib/stores/auth.svelte')).getAuthState();
-      const targetUid = playerUid || auth.user?.uid;
-
-      let attrValue: string | null | undefined = undefined;
-      let authorValue = deck.author;
-      if (attrMode === 'anonymous') {
-        attrValue = null;
-        authorValue = ''; // anonymous: never persist a designer name
-      } else if (attrMode === 'self') {
-        const selfVekn = playerVekn || auth.user?.vekn_id;
-        const selfName = playerName || auth.user?.name;
-        attrValue = selfVekn || selfName || null;
-        if (selfName) authorValue = selfName;
-      } else if (attrMode === 'other') {
-        const val = attributionVekn.trim() || attributionSearch.trim();
-        if (val) {
-          attrValue = val;
-          authorValue = attributionName || attributionSearch.trim();
-        }
-      }
+      const targetUid = playerUid || myUid;
 
       const deckData: Record<string, unknown> = {
         name: editedName,
-        author: authorValue,
         comments: deck.comments,
         cards: editedCards,
         round: deck.round,
       };
-      if (attrValue !== undefined) deckData.attribution = attrValue;
 
       await tournamentAction(tournamentUid, 'UpsertDeck', {
         player_uid: targetUid,
@@ -229,15 +226,6 @@
     class="w-full px-3 py-2 mb-2 bg-surface-muted border border-line-strong rounded-lg text-ink-bright placeholder-ink-faint text-sm"
   />
 
-  <AttributionPicker
-    bind:mode={attrMode}
-    bind:search={attributionSearch}
-    bind:vekn={attributionVekn}
-    bind:name={attributionName}
-    {playerUid}
-    {playerName}
-  />
-
   <div class="mb-3">
     <CardSearch onselect={addCard} />
     <p class="text-xs text-ink-faint mt-1">{m.deck_edit_search_hint()}</p>
@@ -246,8 +234,22 @@
   {#if deck.name}
     <h4 class="text-sm font-semibold text-ink-strong mb-1">{deck.name}</h4>
   {/if}
-  {#if deck.author && deck.attribution !== null}
-    <p class="text-xs text-ink-muted mb-2">{m.deck_by_author({ author: deck.author })}</p>
+  {#if editingCredit}
+    <AttributionPicker bind:attribution={editedAttribution} {playerUid} {playerName} />
+    <div class="flex gap-2 mb-2">
+      <Button variant="primary" size="lg" onclick={saveCredit}>{m.common_save()}</Button>
+      <Button variant="secondary" size="lg" onclick={() => editingCredit = false}>{m.common_cancel()}</Button>
+    </div>
+    {#if creditError}
+      <p class="text-sm text-link mb-2">{creditError}</p>
+    {/if}
+  {:else}
+    <p class="text-xs text-ink-muted mb-2">
+      {credit ? m.deck_by_author({ author: credit }) : m.deck_credit_none()}
+      {#if ownsDeck}
+        <button class="text-link underline ml-1" onclick={startEditingCredit}>{m.deck_credit_edit()}</button>
+      {/if}
+    </p>
   {/if}
 
   {#if editable || onreplace || ondelete}

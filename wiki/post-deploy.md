@@ -58,33 +58,6 @@ Nothing to rewrite either way: an imported record stays as it was filed, and the
 rows are inert once the bleed is closed. Report the counts to the owner and delete
 this section.
 
-## Retract the decks production already unpublished
-
-Gated by `8780030f`. Before it the catch-up skips a NULL member row, so the sweep
-below would bump a cursor no client acts on.
-
-Rows whose member projection went NULL before that commit were never announced:
-their holders' IndexedDB still carries the deck at `public: true`, and no later
-frame mentions them, since catch-up only asks for `modified_at > since`. The fix
-retracts on write and on catch-up; neither reaches a row that stopped being
-visible in the past.
-
-Bump the cursor on exactly those rows so the member catch-up tombstones them.
-Raw SQL is right here rather than `reproject_public.py`: no projection is
-changing, only `modified_at`, which the BEFORE-UPDATE trigger stamps on any write
-([sync](sync.md#access-levels)). Run it once, off-peak.
-
-```sql
-UPDATE objects SET type = type
-WHERE type = 'deck' AND "member" IS NULL AND deleted_at IS NULL;
-```
-
-Every connected member then gets one tombstone per private deck on its next
-catch-up — inert for a deck it never held, an eviction for one it did. Confirm on
-a member client that a previously-unpublished decklist has left its profile deck
-list, report the row count to the owner, and delete this section. No issue
-reported this, so there is nobody to tell.
-
 ## Tombstone the decks of players who left their event
 
 Gated by the commit that made `Unregister` and `RemovePlayer` delete the player's
@@ -156,3 +129,43 @@ sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
 
 The count query then answers 0. Report the number to the owner and delete this
 section. No issue reported this, so there is nobody to tell.
+
+## Prove the deck credit typing applied
+
+**Migration** `deck-typed-credit`
+
+Gated by the commit that typed the deck credit. Every deck row held `author` plus
+a loose `attribution` string; the entry rewrites both into the typed field and
+stamps `winner`, mapping null to `Anonymous`, `"twda"` to `Archive`, the owner's
+own VEKN id to `Owner`, another member's to `Member`, and anything else to
+`Named`.
+
+Nothing to run: the entry rewrote the rows before the process served. No row may
+still hold the old shape —
+
+```sql
+SELECT count(*) FROM objects
+WHERE type = 'deck'
+  AND (jsonb_typeof("full"->'attribution') IS DISTINCT FROM 'object'
+       OR "full" ? 'author');
+```
+
+— and no published deck may still carry an owner it is no longer entitled to:
+
+```sql
+SELECT count(*) FROM objects
+WHERE type = 'deck' AND "member" IS NOT NULL
+  AND "member"->'attribution'->>'kind' = 'Anonymous'
+  AND NOT ("full"->>'winner')::boolean
+  AND "member" ? 'user_uid';
+```
+
+Both answer 0. The re-save also recomputed every deck's four projections, which
+is what carries the new boundary to the members already holding a row — and it
+subsumes the retraction sweep that used to sit on this page, since a row whose
+member projection went NULL in the past has now had its `modified_at` bumped and
+tombstones on the next catch-up.
+
+Confirm on a member client that another member's anonymous decklist shows no
+owner and has left their profile, report both counts to the owner, and delete
+this section. No issue reported this, so there is nobody to tell.

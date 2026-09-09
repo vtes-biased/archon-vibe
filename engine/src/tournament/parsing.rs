@@ -270,6 +270,21 @@ impl TournamentEvent {
                     multideck,
                 })
             }
+            "SetDeckAttribution" => {
+                let player_uid = value[arg::PLAYER_UID]
+                    .as_str()
+                    .ok_or("player_uid required")?
+                    .to_string();
+                let attribution = value[arg::ATTRIBUTION].clone();
+                if attribution.is_null() {
+                    return Err(EngineError::internal("attribution required"));
+                }
+                Ok(Self::SetDeckAttribution {
+                    player_uid,
+                    round: value[arg::ROUND].as_usize(),
+                    attribution,
+                })
+            }
             "RaffleDraw" => {
                 let label = value[arg::LABEL]
                     .as_str()

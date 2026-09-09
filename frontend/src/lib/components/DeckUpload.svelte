@@ -1,11 +1,11 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
   import { onDestroy } from 'svelte';
-  import type { UserListItem } from '$lib/db';
-  import { getFilteredUsers, getTournament, warmUserIndex } from '$lib/db';
-  import { getCountryFlag } from '$lib/geonames';
+  import { getTournament } from '$lib/db';
   import { validateDeck, type ValidationError } from '$lib/engine';
+  import type { DeckAttribution } from '$lib/types';
   import { CircleX, TriangleAlert } from '@lucide/svelte';
+  import AttributionPicker from '$lib/components/AttributionPicker.svelte';
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
@@ -13,7 +13,6 @@
     tournamentUid,
     playerUid = undefined,
     playerName = undefined,
-    playerVekn = undefined,
     round = undefined,
     multideck = false,
     onuploaded,
@@ -21,7 +20,6 @@
     tournamentUid: string;
     playerUid?: string;
     playerName?: string;
-    playerVekn?: string;
     round?: number;
     multideck?: boolean;
     onuploaded?: () => void;
@@ -31,14 +29,7 @@
   let deckText = $state('');
   let deckUrl = $state('');
   let deckName = $state('');
-  let attribution = $state<'self' | 'anonymous' | 'other'>('self');
-  let attributionVekn = $state('');
-  let attributionSearch = $state('');
-  let attributionName = $state(''); // resolved display name from autocomplete
-  let attrResults = $state<UserListItem[]>([]);
-  let attrTotal = $state(0);
-  let attrSelectedIndex = $state(-1);
-  const ATTR_SEARCH_LIMIT = 10;
+  let attribution = $state<DeckAttribution>({ kind: 'Owner', vekn_id: '', name: '' });
   let loading = $state(false);
   let error = $state<string | null>(null);
   let warnings = $state<string[]>([]);
@@ -64,45 +55,6 @@
     if (!online && mode !== 'text') mode = 'text';
   });
 
-  // Attribution autocomplete. attrSearchSeq guards against an earlier, slower
-  // query landing last — see UserPicker.
-  let attrSearchSeq = 0;
-
-  async function searchAttribution() {
-    attrSelectedIndex = -1;
-    const seq = ++attrSearchSeq;
-    if (attributionSearch.trim().length < 2) {
-      attrResults = [];
-      attrTotal = 0;
-      return;
-    }
-    const results = await getFilteredUsers(undefined, undefined, attributionSearch.trim());
-    if (seq !== attrSearchSeq) return;
-    attrTotal = results.length;
-    attrResults = results.slice(0, ATTR_SEARCH_LIMIT);
-  }
-
-  function selectAttrUser(user: UserListItem) {
-    attributionVekn = user.vekn_id || user.name;
-    attributionName = user.name;
-    attributionSearch = user.name + (user.vekn_id ? ` (${user.vekn_id})` : '');
-    attrResults = [];
-  }
-
-  function handleAttrKeydown(e: KeyboardEvent) {
-    if (!attrResults.length) return;
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      attrSelectedIndex = Math.min(attrSelectedIndex + 1, attrResults.length - 1);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      attrSelectedIndex = Math.max(attrSelectedIndex - 1, 0);
-    } else if (e.key === 'Enter' && attrSelectedIndex >= 0) {
-      e.preventDefault();
-      const user = attrResults[attrSelectedIndex];
-      if (user) selectAttrUser(user);
-    }
-  }
 
   let videoEl = $state<HTMLVideoElement | null>(null);
   let scanner: any = null;
@@ -187,30 +139,13 @@
 
       if (deckName) deck.name = deckName;
 
-      let attrValue: string | null | undefined = undefined;
-      let authorValue = deck.author;
-      if (attribution === 'anonymous') {
-        attrValue = null;
-        authorValue = ''; // anonymous: never persist a designer name
-      } else if (attribution === 'self' && playerUid) {
-        attrValue = playerVekn || playerName || null;
-        if (playerName) authorValue = playerName;
-      } else if (attribution === 'other') {
-        const val = attributionVekn.trim() || attributionSearch.trim();
-        if (val) {
-          attrValue = val;
-          authorValue = attributionName || attributionSearch.trim();
-        }
-      }
-
       const deckData: Record<string, unknown> = {
         name: deck.name,
-        author: authorValue,
         comments: deck.comments,
         cards: deck.cards,
+        attribution,
       };
       if (round !== undefined) deckData.round = round;
-      if (attrValue !== undefined) deckData.attribution = attrValue;
 
       const targetUid = playerUid || (await import('$lib/stores/auth.svelte')).getAuthState().user?.uid;
       await tournamentAction(tournamentUid, 'UpsertDeck', {
@@ -300,54 +235,7 @@
       <p class="text-xs text-ink-faint">{m.deck_upload_supported_sites()}</p>
     {/if}
 
-    <div class="flex items-center gap-3 text-sm flex-wrap">
-      <span class="text-ink-muted">{m.deck_upload_attribution()}:</span>
-      <label class="flex items-center gap-1 text-ink-bright">
-        <input type="radio" bind:group={attribution} value="self" class="accent-accent" />
-        {playerUid ? m.deck_upload_attr_player({ name: playerName || '?' }) : m.deck_upload_attr_self()}
-      </label>
-      <label class="flex items-center gap-1 text-ink-bright">
-        <input type="radio" bind:group={attribution} value="anonymous" class="accent-accent" />
-        {m.deck_upload_attr_anonymous()}
-      </label>
-      <label class="flex items-center gap-1 text-ink-bright">
-        <input type="radio" bind:group={attribution} value="other" class="accent-accent" />
-        {m.deck_upload_attr_other()}
-      </label>
-    </div>
-    {#if attribution === 'other'}
-      <div class="relative">
-        <input
-          type="text"
-          bind:value={attributionSearch}
-          onfocus={() => warmUserIndex()}
-          oninput={() => { attributionVekn = attributionSearch; attributionName = ''; searchAttribution(); }}
-          onkeydown={handleAttrKeydown}
-          placeholder={m.deck_upload_attr_other_placeholder()}
-          class="w-full px-3 py-2 bg-surface-muted border border-line-strong rounded-lg text-ink-bright placeholder-ink-faint text-sm"
-        />
-        {#if attrResults.length > 0}
-          <div class="absolute z-10 mt-1 w-full bg-surface-card border border-line-strong rounded-lg divide-y divide-line max-h-48 overflow-y-auto shadow-lg">
-            {#each attrResults as user, i}
-              <button
-                onclick={() => selectAttrUser(user)}
-                class="w-full px-3 py-2 text-left text-sm text-ink-bright transition-colors {i === attrSelectedIndex ? 'bg-surface-active' : 'hover:bg-surface-hover'}"
-              >
-                {#if user.country}<span class="mr-1">{getCountryFlag(user.country)}</span>{/if}{user.name}
-                {#if user.vekn_id}
-                  <span class="text-ink-faint ml-2">({user.vekn_id})</span>
-                {/if}
-              </button>
-            {/each}
-            {#if attrTotal > ATTR_SEARCH_LIMIT}
-              <div class="px-3 py-2 text-xs text-ink-faint text-center">
-                {m.add_player_more_results({ count: (attrTotal - ATTR_SEARCH_LIMIT).toString() })}
-              </div>
-            {/if}
-          </div>
-        {/if}
-      </div>
-    {/if}
+    <AttributionPicker bind:attribution {playerUid} {playerName} />
   {/if}
 
   {#if error}

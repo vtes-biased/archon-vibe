@@ -1,6 +1,6 @@
 import base64
 
-from .models import ObjectType, Role
+from .models import AttributionKind, ObjectType, Role
 
 # Reversible, not security — a harvester speed-bump only. Mirror the prefix +
 # scheme in the frontend's deobfuscateContact (lib/contact.ts).
@@ -214,19 +214,30 @@ def compute_tournament_full(d: dict) -> dict:
     return dict(d)
 
 
-DECK_API_EXCLUDE = API_SYNC_FIELDS | {"author", "public"}
+DECK_API_EXCLUDE = API_SYNC_FIELDS | {"public"}
+
+
+def _credited_deck(d: dict) -> dict:
+    """The row with its owner withheld where the credit is anonymous. The winner
+    is named whatever they chose — the TWDA is a public win registry and the
+    archive's stance is already that."""
+    if d["attribution"]["kind"] != AttributionKind.ANONYMOUS or d.get("winner"):
+        return dict(d)
+    return {k: v for k, v in d.items() if k != "user_uid"}
 
 
 def compute_deck_member(d: dict) -> dict | None:
     if d.get("public"):
-        return dict(d)
+        return _credited_deck(d)
     return None
 
 
 def compute_deck_api(d: dict) -> dict | None:
-    if d.get("public"):
-        return {k: v for k, v in d.items() if k not in DECK_API_EXCLUDE}
-    return None
+    if not d.get("public"):
+        return None
+    proj = {k: v for k, v in _credited_deck(d).items() if k not in DECK_API_EXCLUDE}
+    proj["attribution"] = {k: v for k, v in proj["attribution"].items() if k != "name"}
+    return proj
 
 
 def compute_deck_full(d: dict) -> dict:

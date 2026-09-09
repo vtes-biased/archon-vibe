@@ -147,22 +147,14 @@
   );
   const isWinner = $derived(myUid === winnerUid);
 
-  // IDB already has role-appropriate data (organizers see all, members see
-  // public+own); only decklists_mode needs a client filter, for the
-  // post-tournament visible-decks section.
+  // An organizer holds every deck at full level, so this public section asks the
+  // engine's own answer — `public` — rather than re-deriving decklists_mode.
   const visibleDecks = $derived.by(() => {
-    if (Object.keys(decksByUser).length === 0) return {};
     if (tournament.state !== 'Finished') return {};
-    const mode = tournament.decklists_mode;
-    if (!mode || mode === 'All') return decksByUser;
     const result: Record<string, DeckObject[]> = {};
-    if (myUid && decksByUser[myUid]) result[myUid] = decksByUser[myUid];
     for (const [uid, decks] of Object.entries(decksByUser)) {
-      if (uid === myUid) continue;
-      if (mode === 'Winner' && uid === tournament.winner) result[uid] = decks;
-      else if (mode === 'Finalists') {
-        if (tournament.players?.find(p => p.user_uid === uid)?.finalist) result[uid] = decks;
-      }
+      const shown = decks.filter(d => d.public || uid === myUid);
+      if (shown.length) result[uid] = shown;
     }
     return result;
   });
@@ -350,7 +342,9 @@
               {@const key = `${uid}-${i}`}
               {@const expanded = expandedDecks.has(key)}
               {@const counts = deckCounts(deck)}
-              {@const showIdentity = tournament.decklists_mode !== 'All' || uid === winnerUid}
+              {@const showIdentity = !!deck.user_uid
+                && (uid === winnerUid
+                  || (tournament.decklists_mode !== 'All' && deck.attribution.kind !== 'Anonymous'))}
               {@const isWinnerDeck = uid === winnerUid}
               <div class="bg-surface-muted/50 rounded-lg">
                 <button

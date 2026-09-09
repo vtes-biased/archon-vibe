@@ -1,7 +1,6 @@
-"""TWDA submission designer credit: the published entry must credit the deck's
-`attribution` field, never blindly echo `author` — an anonymous deck
-(attribution=None) must never leak a stored author name into an archive that
-keeps it forever.
+"""TWDA submission designer credit: the published entry credits the deck's typed
+`attribution` and nothing else — a credit that names nobody must never leak a
+name into an archive that keeps it forever.
 
 Real DB, real engine, real (pinned) card data: every assertion below reads the
 TWDA text that would be published, not an intermediate the code hands a stub.
@@ -15,6 +14,8 @@ import pytest
 from src import db
 from src.db import TWDA_MIN_PLAYERS
 from src.models import (
+    AttributionKind,
+    DeckAttribution,
     DeckObject,
     ObjectType,
     Player,
@@ -44,11 +45,14 @@ def _user(uid: str, name: str, vekn_id: str = "") -> User:
     )
 
 
+def _credit(kind: AttributionKind, **fields: str) -> DeckAttribution:
+    return DeckAttribution(kind=kind, **fields)
+
+
 @asynccontextmanager
 async def _published(
     *,
-    author: str,
-    attribution: str | None,
+    attribution: DeckAttribution,
     designer: User | None = None,
     winner_name: str = "Winner Wendy",
     winner_vekn: str = "1000001",
@@ -95,7 +99,6 @@ async def _published(
         tournament_uid=tournament.uid,
         user_uid=winner.uid,
         name="My Deck",
-        author=author,
         attribution=attribution,
         cards={"200001": 12, "100001": 10},
     )
@@ -111,59 +114,58 @@ async def _published(
 
 @pytest.mark.asyncio
 async def test_place_line_spells_the_country_out(test_db):
-    async with _published(author="Winner Wendy", attribution=None) as (_t, twda):
+    async with _published(attribution=_credit(AttributionKind.OWNER)) as (_t, twda):
         assert twda.splitlines()[1] == "France"
 
 
 @pytest.mark.asyncio
-async def test_anonymous_does_not_leak_author(test_db):
-    """attribution=None means anonymous; a stale author must be suppressed."""
-    async with _published(author="Sneaky Real Name", attribution=None) as (_t, twda):
-        assert "Sneaky Real Name" not in twda
+async def test_anonymous_credits_nobody(test_db):
+    async with _published(attribution=_credit(AttributionKind.ANONYMOUS)) as (_t, twda):
         assert CREDIT not in twda
 
 
 @pytest.mark.asyncio
-async def test_self_attribution_by_vekn_omits_credit(test_db):
+async def test_own_deck_omits_the_credit(test_db):
     """Crediting the winner as their own designer is noise in the archive."""
-    async with _published(author="Winner Wendy", attribution="1000001") as (_t, twda):
+    async with _published(attribution=_credit(AttributionKind.OWNER)) as (_t, twda):
         assert CREDIT not in twda
 
 
 @pytest.mark.asyncio
-async def test_self_attribution_by_name_omits_credit(test_db):
-    async with _published(author="Winner Wendy", attribution="Winner Wendy") as (
-        _t,
-        twda,
-    ):
-        assert CREDIT not in twda
-
-
-@pytest.mark.asyncio
-async def test_other_designer_resolved_from_vekn(test_db):
-    """A vekn id in attribution credits that member's current name, not the
-    name the submitter typed."""
+async def test_member_credit_resolves_the_current_name(test_db):
+    """A member credit names that member now, not whatever was typed once."""
     designer = _user(str(uuid7()), "Designer Dave", "1000002")
     async with _published(
-        author="Stale Typed Name", attribution="1000002", designer=designer
+        attribution=_credit(AttributionKind.MEMBER, vekn_id="1000002"),
+        designer=designer,
     ) as (_t, twda):
         assert f"{CREDIT}Designer Dave" in twda
 
 
 @pytest.mark.asyncio
-async def test_other_designer_unresolved_falls_back_to_author(test_db):
-    """An unknown vekn id still credits somebody — the typed author."""
-    async with _published(author="Offline Designer", attribution="9999999") as (
-        _t,
-        twda,
-    ):
+async def test_member_credit_naming_nobody_credits_nobody(test_db):
+    """An id no member holds names nobody — the typed credit keeps no free text
+    to fall back on, which is the whole point of it."""
+    async with _published(
+        attribution=_credit(AttributionKind.MEMBER, vekn_id="9999999")
+    ) as (_t, twda):
+        assert CREDIT not in twda
+
+
+@pytest.mark.asyncio
+async def test_named_non_member_is_credited_verbatim(test_db):
+    async with _published(
+        attribution=_credit(AttributionKind.NAMED, name="Offline Designer")
+    ) as (_t, twda):
         assert f"{CREDIT}Offline Designer" in twda
 
 
 @pytest.mark.asyncio
-async def test_twda_sentinel_passes_author_through(test_db):
+async def test_archive_credit_passes_its_name_through(test_db):
     """A reconstructed TWDA entry carries its archived author verbatim."""
-    async with _published(author="Archived Author", attribution="twda") as (_t, twda):
+    async with _published(
+        attribution=_credit(AttributionKind.ARCHIVE, name="Archived Author")
+    ) as (_t, twda):
         assert f"{CREDIT}Archived Author" in twda
 
 
@@ -171,7 +173,7 @@ async def test_twda_sentinel_passes_author_through(test_db):
 async def test_below_participation_floor_skips_twda(test_db):
     """Under the floor the event never reaches the archive, and says why."""
     async with _published(
-        author="Someone", attribution=None, seated=TWDA_MIN_PLAYERS - 1
+        attribution=_credit(AttributionKind.ANONYMOUS), seated=TWDA_MIN_PLAYERS - 1
     ) as (tournament, _twda):
         await maybe_submit_twda(tournament)
         stored = await db.get_tournament_by_uid(tournament.uid)

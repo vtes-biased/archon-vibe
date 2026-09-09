@@ -578,7 +578,7 @@
     {@const playerDecks = getPlayerDecks(puid)}
     {@const errors = validationCache[puid] ?? []}
     {#if canEditDecks && uploadingFor === puid}
-      <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={uploadingRound} multideck={isMultideck} onuploaded={onUploaded} />
+      <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} round={uploadingRound} multideck={isMultideck} onuploaded={onUploaded} />
     {:else if isMultideck || playerDecks.length > 0}
       {#if isMultideck}
         {#each getMultideckSlots(puid) as slot}
@@ -610,7 +610,7 @@
             {:else if slot.deck}
               <DeckDisplay deck={slot.deck} onreplace={canEditDecks ? () => { uploadingFor = puid; uploadingRound = slot.round ?? undefined; } : undefined} />
             {:else if canEditDecks}
-              <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} round={slot.round ?? undefined} multideck onuploaded={onUploaded} />
+              <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} round={slot.round ?? undefined} multideck onuploaded={onUploaded} />
             {:else}
               <p class="text-sm text-ink-muted">{m.players_no_deck()}</p>
             {/if}
@@ -647,7 +647,7 @@
       <p class="text-sm text-ink-muted">{m.players_no_deck()}</p>
     {/if}
     {#if canEditDecks && !archivalUids.has(puid) && playerDecks.length === 0 && !isMultideck && uploadingFor !== puid}
-      <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} playerVekn={playerInfo[puid]?.vekn ?? undefined} onuploaded={onUploaded} />
+      <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} onuploaded={onUploaded} />
     {/if}
   {/snippet}
 

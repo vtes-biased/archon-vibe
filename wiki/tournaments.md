@@ -644,8 +644,8 @@ a table Finished, comment required), `Unoverride`.
 
 **Finals** — `SetToss`, `RandomToss`, `StartFinals`, `FinishFinals`.
 
-**Decks** — `UpsertDeck`, `DeleteDeck`. All deck mutations are engine `deck_ops`
-side effects; there are no REST deck endpoints.
+**Decks** — `UpsertDeck`, `DeleteDeck`, `SetDeckAttribution`. All deck mutations
+are engine `deck_ops` side effects; there are no REST deck endpoints.
 
 A multideck deck is **stamped with the round it was played in**. `DeckObject.round`
 is the tournament's own index — `len(rounds)` the finals, as
@@ -680,12 +680,27 @@ record on `/profile` and `/users/[uid]` gates on the tournament being held
 locally, not soft-deleted and `Finished`, plus `public` for anyone but the deck's
 owner, who is entitled to all of their own. The `public` leg is what answers for
 an organizer, since they hold every deck of their event at `full` whatever its
-state.
+state. **A profile also lists to anyone else only the decks that name their
+owner** — an anonymous deck is on nobody's record but its owner's, and the
+organizer holding it at `full` is held to the same rule.
+
+**Anonymous is a boundary, not a display convention.** The credit is its own
+typed field with its own event: `SetDeckAttribution` moves it in any state, on
+the deck's owner's word alone, and touches no content — which is what lets it run
+on a deck the round it was played in has locked. `UpsertDeck` carries a credit
+only for a first upload; the engine strips it off a replacement, so re-uploading
+a deck never re-credits it and an organizer, who may upload for anyone, cannot
+re-credit anyone. An `Anonymous` deck reaches other members and the public API
+**with no owner at all** ([sync](sync.md#access-levels)), so the client keys it on
+the deck's own uid. The winner is the exception and stays named whatever they
+chose: the archive is a public win registry and the TWDA's stance is already
+that. In Finalists mode the deck list therefore names the winner and every
+finalist but an anonymous one.
 
 **One post-finish pass owns publication.** After every event that starts or ends
 on a `Finished` tournament, the engine recomputes each deck's `public` from the
-mode, the winner and the finalist flags and emits `set_public` in both directions
-for every deck whose flag moved — skipping the decks the same event upserted or
+mode, the winner and the finalist flags — and its `winner` flag with it — then
+emits `set_publication` in both directions for every deck whose flags moved — skipping the decks the same event upserted or
 deleted, whose ops already carry the answer. There is no other writer: finishing,
 reopening, narrowing the mode, a finals rescore that moves the winner and an
 archival correction all publish and retract through it. The pass reads the flag
@@ -749,6 +764,7 @@ and the VEKN record outranks the archive from that moment on.
 | Self-organize a round | registered players, open rounds with `self_organized_rounds`, Waiting/Playing, no finals |
 | Set score | players at the table during Playing; organizers whenever rounds exist |
 | Deck upload | players for their own deck — any of their own, naming its round, once Finished — organizers for any |
+| Set a deck's credit | the deck's owner alone, in any state |
 | Correct an archival record | IC |
 | Everything else | organizers |
 

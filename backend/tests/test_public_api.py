@@ -18,6 +18,7 @@ from src.db_oauth import (
     update_oauth_client,
 )
 from src.models import (
+    DeckAttribution,
     DeckObject,
     League,
     OAuthClient,
@@ -65,7 +66,12 @@ _SAMPLES = {
     ),
     ObjectType.USER: ("User", _every_field(User, vekn_id="1000001")),
     ObjectType.LEAGUE: ("League", _every_field(League)),
-    ObjectType.DECK: ("DeckObject", _every_field(DeckObject, public=True)),
+    ObjectType.DECK: (
+        "DeckObject",
+        _every_field(
+            DeckObject, public=True, attribution=_every_field(DeckAttribution)
+        ),
+    ),
 }
 
 

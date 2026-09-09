@@ -191,9 +191,16 @@ tournament's own `decklists_mode` allows: `Winner`, `Finalists` or `All`.
 **Reopening a finished event withdraws its decks** until it finishes again. A
 deck's disappearance is far more often a correction in progress than a deletion.
 
-**Decks carry no author name.** Attribution runs through `user_uid` — hand it to
-`/v1/users/{uid}` for the VEKN ID. The same uid appears in the tournament's
-`players`, `standings` and `winner`.
+**A deck's owner is its `user_uid`** — hand it to `/v1/users/{uid}` for the VEKN
+ID. The same uid appears in the tournament's `players`, `standings` and `winner`.
+
+**`attribution` credits the designer, and carries members only.** Its `kind` is
+`Owner`, `Member` (with a `vekn_id`), `Named`, `Archive` or `Anonymous`; the two
+that name a non-member publish no name, because this API never carries free text
+a member did not consent to. **`Anonymous` withholds the owner as well** — such a
+deck arrives with no `user_uid` at all and can only be keyed on its own `uid`. The
+winner's deck is the exception and stays owned, the archive's own stance on a
+public win registry.
 """.strip()
     .replace("{site}", SITE_URL)
     .replace("{api}", API_URL)
@@ -243,6 +250,7 @@ _ACTION_STATES: dict[str, tuple[tuple[str, ...], str]] = {
     "FinishTournament": (("Waiting", "Playing", "Finished"), "Finished"),
     "UpsertDeck": (_ANY_STATE, ""),
     "DeleteDeck": (_ANY_STATE, ""),
+    "SetDeckAttribution": (_ANY_STATE, ""),
     "RaffleDraw": (("Waiting", "Playing", "Finished"), ""),
     "RaffleUndo": (_ANY_STATE, ""),
     "RaffleClear": (_ANY_STATE, ""),
@@ -260,6 +268,7 @@ _PLAYER_ACTIONS = frozenset(
         "SetScore",
         "UpsertDeck",
         "DeleteDeck",
+        "SetDeckAttribution",
     }
 )
 
@@ -627,6 +636,11 @@ _ACTION_FIELDS: dict[str, dict] = {
         "type": "object",
         "description": "The decklist, as `/v1/decks` publishes one.",
     },
+    "attribution": {
+        "type": "object",
+        "description": "The typed credit, as `/v1/decks` publishes one. `Anonymous`"
+        " withholds the owner too.",
+    },
     "multideck": {
         **_BOOL,
         "description": "Address the round's deck rather than the event's single one.",
@@ -773,6 +787,12 @@ _ACTIONS: dict[str, tuple[str, tuple[str, ...], tuple[str, ...]]] = {
         " the engine takes an index this endpoint has no field for.",
         ("player_uid",),
         ("multideck",),
+    ),
+    "SetDeckAttribution": (
+        "Re-credit one of your own decklists. It touches no cards, so it works on"
+        " a deck the round it was played in has locked.",
+        ("player_uid", "attribution"),
+        ("round",),
     ),
     "RaffleDraw": (
         "Draw prize winners from a pool.",

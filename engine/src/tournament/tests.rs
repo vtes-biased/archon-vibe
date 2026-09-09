@@ -1008,6 +1008,58 @@ fn test_owner_corrects_a_played_deck_after_finish() {
 }
 
 #[test]
+fn test_replacing_a_deck_carries_no_credit() {
+    // SetDeckAttribution is the only way a credit moves once the deck exists —
+    // otherwise an organizer re-uploading would re-credit someone else's deck.
+    let tournament = tournament_with_player("Waiting");
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
+    let event = json::object! {
+        type: "UpsertDeck",
+        player_uid: "player-1",
+        deck: {
+            name: "Replacement",
+            comments: "",
+            cards: {},
+            attribution: { kind: "Member", vekn_id: "1000002", name: "" },
+        },
+        multideck: false,
+    };
+    let actor = make_organizer();
+    let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, decks).unwrap();
+    assert!(deck_ops[0]["deck"]["attribution"].is_null());
+
+    // A first upload still carries it: nothing is being overwritten.
+    let (_, first) = run_event_with_decks(&tournament, &event, &actor, "[]").unwrap();
+    assert_eq!(
+        first[0]["deck"]["attribution"]["vekn_id"].as_str(),
+        Some("1000002")
+    );
+}
+
+#[test]
+fn test_only_the_owner_sets_a_deck_credit() {
+    let tournament = tournament_with_player("Playing");
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
+    let event = json::object! {
+        type: "SetDeckAttribution",
+        player_uid: "player-1",
+        attribution: { kind: "Anonymous", vekn_id: "", name: "" },
+    };
+    let refused = run_event_with_decks(&tournament, &event, &make_organizer(), decks);
+    assert!(refused.is_err());
+
+    // The owner may, mid-play, on a deck the round has locked: no content moves.
+    let (_, deck_ops) =
+        run_event_with_decks(&tournament, &event, &make_player("player-1"), decks).unwrap();
+    assert_eq!(deck_ops[0]["op"].as_str(), Some("set_attribution"));
+    assert_eq!(deck_ops[0]["deck_uid"].as_str(), Some("d1"));
+    assert_eq!(
+        deck_ops[0]["attribution"]["kind"].as_str(),
+        Some("Anonymous")
+    );
+}
+
+#[test]
 fn test_upsert_deck_clears_missing_decklist() {
     let mut tournament = tournament_with_player("Waiting");
     tournament["decklist_required"] = true.into();
@@ -2114,7 +2166,7 @@ fn test_reopen_tournament_keeps_the_final() {
         .any(|op| op["op"].as_str() == Some("set_round")));
     let publics: Vec<bool> = deck_ops
         .members()
-        .filter(|op| op["op"].as_str() == Some("set_public"))
+        .filter(|op| op["op"].as_str() == Some("set_publication"))
         .map(|op| op["public"].as_bool().unwrap_or(true))
         .collect();
     assert_eq!(publics, vec![false]);
@@ -2169,7 +2221,7 @@ fn test_finals_rescore_moves_publication_with_the_winner() {
     assert_eq!(updated["winner"].as_str(), Some("p2"));
     let mut flags: Vec<(&str, bool)> = deck_ops
         .members()
-        .filter(|op| op["op"].as_str() == Some("set_public"))
+        .filter(|op| op["op"].as_str() == Some("set_publication"))
         .map(|op| {
             (
                 op["deck_uid"].as_str().unwrap(),
@@ -2200,7 +2252,7 @@ fn test_finish_finals_publishes_the_winner_deck() {
     assert_eq!(updated["winner"].as_str(), Some("p1"));
     let published: Vec<&str> = deck_ops
         .members()
-        .filter(|op| op["op"].as_str() == Some("set_public"))
+        .filter(|op| op["op"].as_str() == Some("set_publication"))
         .filter(|op| op["public"].as_bool().unwrap_or(false))
         .filter_map(|op| op["deck_uid"].as_str())
         .collect();

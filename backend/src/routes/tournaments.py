@@ -55,6 +55,8 @@ from ..geonames import get_country, normalize_country, stored_country
 from ..middleware.auth import OptionalUser
 from ..models import (
     Announcement,
+    AttributionKind,
+    DeckAttribution,
     DeckObject,
     ObjectType,
     PlayerState,
@@ -86,6 +88,7 @@ _RATING_IRRELEVANT_ACTIONS = frozenset(
         "UploadDeck",
         "UpdateDeck",
         "DeleteDeck",
+        "SetDeckAttribution",
         "SetPaymentStatus",
         "MarkAllPaid",
         "SetWaitlisted",
@@ -134,7 +137,13 @@ async def _build_decks_json(tournament_uid: str, conn=None) -> str:
     decks = await get_decks_for_tournament(tournament_uid, conn=conn)
     return msgspec.json.encode(
         [
-            {"user_uid": d.user_uid, "round": d.round, "uid": d.uid, "public": d.public}
+            {
+                "user_uid": d.user_uid,
+                "round": d.round,
+                "uid": d.uid,
+                "public": d.public,
+                "winner": d.winner,
+            }
             for d in decks
         ]
     ).decode()
@@ -211,11 +220,16 @@ async def _process_deck_ops(
                 )
             deck_obj.round = round_val
             deck_obj.name = deck_data.get("name", "")
-            deck_obj.author = deck_data.get("author", "")
             deck_obj.comments = deck_data.get("comments", "")
             deck_obj.cards = deck_data.get("cards", {})
-            deck_obj.attribution = deck_data.get("attribution")
+            # The engine strips the credit off a replacement, so an absent one
+            # leaves a stored credit standing rather than clearing it.
+            if "attribution" in deck_data:
+                deck_obj.attribution = msgspec.convert(
+                    deck_data["attribution"], DeckAttribution
+                )
             deck_obj.public = deck_data.get("public", False)
+            deck_obj.winner = deck_data.get("winner", False)
             bd = await save_object_from_model(ObjectType.DECK, deck_obj)
             bd.org_uids = _org_uids
             affected.append(bd)
@@ -244,12 +258,22 @@ async def _process_deck_ops(
                 bd.org_uids = _org_uids
                 affected.append(bd)
 
-        elif op_type == "set_public":
+        elif op_type == "set_publication":
             deck_uid = op.get("deck_uid")
-            public_val = op.get("public", False)
             target = next((d for d in existing_decks if d.uid == deck_uid), None)
             if target:
-                target.public = public_val
+                target.public = op.get("public", False)
+                target.winner = op.get("winner", False)
+                target.modified = datetime.now(UTC)
+                bd = await save_object_from_model(ObjectType.DECK, target)
+                bd.org_uids = _org_uids
+                affected.append(bd)
+
+        elif op_type == "set_attribution":
+            deck_uid = op.get("deck_uid")
+            target = next((d for d in existing_decks if d.uid == deck_uid), None)
+            if target:
+                target.attribution = msgspec.convert(op["attribution"], DeckAttribution)
                 target.modified = datetime.now(UTC)
                 bd = await save_object_from_model(ObjectType.DECK, target)
                 bd.org_uids = _org_uids
@@ -375,15 +399,14 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
     player_user = await get_user_by_uid(tournament.winner)
     player_name = player_user.name if player_user else "Unknown"
 
-    attribution = winner_deck.attribution
-    self_ids = {i for i in (getattr(player_user, "vekn_id", ""), player_name) if i}
-    if attribution == "twda":
-        designer_credit = winner_deck.author
-    elif not attribution or attribution in self_ids:
-        designer_credit = ""
+    credit = winner_deck.attribution
+    if credit.kind == AttributionKind.MEMBER:
+        designer = await get_user_by_vekn_id(credit.vekn_id)
+        designer_credit = designer.name if designer else ""
+    elif credit.kind in (AttributionKind.NAMED, AttributionKind.ARCHIVE):
+        designer_credit = credit.name
     else:
-        designer = await get_user_by_vekn_id(attribution)
-        designer_credit = (designer.name if designer else "") or winner_deck.author
+        designer_credit = ""
 
     deck_json = json.dumps(
         {
@@ -1445,6 +1468,7 @@ class TournamentActionRequest(BaseModel):
     player_uids: list[str] | None = None  # For SelfOrganizeRound: the chosen pod
     config: dict | None = None  # For UpdateConfig: partial config fields
     deck: dict | None = None
+    attribution: dict | None = None  # For SetDeckAttribution
     multideck: bool | None = None
     label: str | None = None
     pool: str | None = None
@@ -1712,8 +1736,9 @@ async def tournament_action(
         await maybe_submit_twda(updated)
         asyncio.create_task(_maybe_push_vekn(updated))
     elif is_finished:
-        # `set_public` ops carry no player_uid: the archive and the Hall of Fame
-        # ask whether the deck exists, never whether it is visible.
+        # `set_publication` ops carry no player_uid: the archive and the Hall of
+        # Fame ask whether the deck exists, never whether it is visible. A credit
+        # change does carry one — it rewrites the submission's Created-by line.
         winners = {tournament.winner, updated.winner} - {""}
         winner_deck_moved = any(op.get("player_uid") in winners for op in deck_ops)
         if tournament.winner != updated.winner or winner_deck_moved:
@@ -2251,7 +2276,7 @@ async def go_online(
     uid_map: dict[str, str] = {}  # temp player UID → resolved user UID
     vekn_remap: dict[
         str, str
-    ] = {}  # offline TEMP- vekn → resolved real vekn (deck attribution)
+    ] = {}  # offline TEMP- vekn → resolved real vekn (a member deck credit)
     accounts_created = 0
     for player_data in request.offline_players:
         temp_uid, real_user, created = await _resolve_or_create_offline_player(
@@ -2384,14 +2409,22 @@ async def go_online(
                     ObjectType.SANCTION, sanction, conn=tx_conn
                 )
             )
-        # Attribution is a vekn: a temp player's own-deck attribution is their
-        # offline TEMP- vekn; repoint to the resolved real vekn, or drop if unresolved.
+        # A member credit earned offline names a TEMP- vekn; repoint it to the
+        # resolved one, and withhold the credit where nothing resolves it.
         for deck_data in request.offline_decks:
             deck_obj = msgspec.convert(deck_data, DeckObject)
             deck_obj.tournament_uid = uid
             deck_obj.user_uid = uid_map.get(deck_obj.user_uid, deck_obj.user_uid)
-            if deck_obj.attribution and deck_obj.attribution.startswith("TEMP-"):
-                deck_obj.attribution = vekn_remap.get(deck_obj.attribution)
+            credit = deck_obj.attribution
+            if credit.kind == AttributionKind.MEMBER and credit.vekn_id.startswith(
+                "TEMP-"
+            ):
+                real_vekn = vekn_remap.get(credit.vekn_id)
+                deck_obj.attribution = (
+                    msgspec.structs.replace(credit, vekn_id=real_vekn)
+                    if real_vekn
+                    else DeckAttribution(kind=AttributionKind.ANONYMOUS)
+                )
             bd = await save_object_from_model(ObjectType.DECK, deck_obj, conn=tx_conn)
             bd.org_uids = updated.organizers_uids
             pending_bds.append(bd)

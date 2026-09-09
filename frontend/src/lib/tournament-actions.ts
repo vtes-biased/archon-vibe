@@ -1,7 +1,7 @@
 /** Pure HTTP transport lives in api.ts, which this module builds on one-way. */
 
 import * as m from '$lib/paraglide/messages.js';
-import type { Tournament, DeckObject } from '$lib/types';
+import type { Tournament, DeckAttribution, DeckObject } from '$lib/types';
 import {
   getUser,
   getTournament,
@@ -279,6 +279,8 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
   }, { suppressErrorToast: true });
 }
 
+const ANONYMOUS: DeckAttribution = { kind: 'Anonymous', vekn_id: '', name: '' };
+
 /** In online mode, SSE delivers authoritative state and overwrites. Returns affected deck UIDs for
  * offline tracking. */
 export async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, existingDecks: DeckObject[]): Promise<string[]> {
@@ -295,12 +297,13 @@ export async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, exi
         user_uid: op.player_uid,
         round: op.deck.round ?? null,
         name: op.deck.name || '',
-        author: op.deck.author || '',
         comments: op.deck.comments || '',
         cards: op.deck.cards || {},
-        // Mirror the backend: an absent attribution clears it (None), never keeps the old value
-        attribution: op.deck.attribution ?? null,
+        // Mirror the backend: the engine strips the credit off a replacement, so
+        // an absent one leaves the stored credit standing rather than clearing it.
+        attribution: op.deck.attribution ?? existing?.attribution ?? ANONYMOUS,
         public: op.deck.public || false,
+        winner: op.deck.winner || false,
       };
       await saveDeck(deckObj);
       affectedUids.push(deckObj.uid);
@@ -329,10 +332,19 @@ export async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, exi
         await saveDeck(target);
         affectedUids.push(target.uid);
       }
-    } else if (op.op === 'set_public' && op.deck_uid) {
+    } else if (op.op === 'set_publication' && op.deck_uid) {
       const target = existingDecks.find(d => d.uid === op.deck_uid);
       if (target) {
         target.public = op.public ?? false;
+        target.winner = op.winner ?? false;
+        target.modified = new Date().toISOString();
+        await saveDeck(target);
+        affectedUids.push(target.uid);
+      }
+    } else if (op.op === 'set_attribution' && op.deck_uid && op.attribution) {
+      const target = existingDecks.find(d => d.uid === op.deck_uid);
+      if (target) {
+        target.attribution = op.attribution;
         target.modified = new Date().toISOString();
         await saveDeck(target);
         affectedUids.push(target.uid);

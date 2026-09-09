@@ -435,10 +435,10 @@ def _make_deck(**overrides) -> dict:
         "user_uid": "u-001",
         "round": None,
         "name": "Ventrue Lawfirm",
-        "author": "Alice",
         "comments": "A classic deck",
         "cards": {"100001": 4, "100002": 2},
-        "attribution": "1000001",
+        "attribution": {"kind": "Member", "vekn_id": "1000001", "name": ""},
+        "winner": False,
     }
     base.update(overrides)
     return base
@@ -578,11 +578,35 @@ class TestTournamentApi:
 
 
 class TestDeckLeagueSanctionPromoApi:
-    def test_public_deck_loses_its_author(self):
+    def test_public_deck_keeps_a_member_credit(self):
         result = compute_api(ObjectType.DECK, _make_deck(public=True))
         assert result["cards"] == {"100001": 4, "100002": 2}
-        assert result["attribution"] == "1000001"
-        assert "author" not in result
+        assert result["attribution"] == {"kind": "Member", "vekn_id": "1000001"}
+
+    def test_public_deck_never_publishes_a_free_text_name(self):
+        d = _make_deck(
+            public=True, attribution={"kind": "Named", "vekn_id": "", "name": "Alice"}
+        )
+        assert compute_api(ObjectType.DECK, d)["attribution"] == {
+            "kind": "Named",
+            "vekn_id": "",
+        }
+
+    def test_anonymous_deck_withholds_its_owner(self):
+        d = _make_deck(
+            public=True, attribution={"kind": "Anonymous", "vekn_id": "", "name": ""}
+        )
+        assert "user_uid" not in compute_member(ObjectType.DECK, d)
+        assert "user_uid" not in compute_api(ObjectType.DECK, d)
+
+    def test_anonymous_winner_stays_owned(self):
+        d = _make_deck(
+            public=True,
+            winner=True,
+            attribution={"kind": "Anonymous", "vekn_id": "", "name": ""},
+        )
+        assert compute_member(ObjectType.DECK, d)["user_uid"] == "u-001"
+        assert compute_api(ObjectType.DECK, d)["user_uid"] == "u-001"
 
     def test_private_deck_hidden(self):
         assert compute_api(ObjectType.DECK, _make_deck(public=False)) is None

@@ -66,7 +66,8 @@ seat their own 4–5 pod. Never pushed to VEKN, never rated.
 
 **Decks** — the card database in IndexedDB; upload by paste (local, offline),
 deckbuilder URL (VDB / VTESDecks / Amaranth, backend-proxied, online only) or QR;
-Rust parse and validation; attribution; decklist-required enforcement with
+Rust parse and validation; a typed designer credit the owner alone moves, whose
+anonymous setting withholds the owner too; decklist-required enforcement with
 override; multideck decks stamped with the round they were played in and locked by
 that stamp; post-tournament upload; visibility by `decklists_mode`; automatic TWDA
 pull request on finish.
@@ -88,7 +89,7 @@ the TWDA with the winning deck on record
 ([the rule](tournaments.md#configuration)), stated on the page. A member profile
 carries the wins behind the count and their decklists on record — a decklist
 reaches a profile only once its tournament is Finished, and to anyone but its
-owner only once that event published it; your own also
+owner only once that event published it *and* it names its owner; your own also
 lists the events you won with no decklist attached. The formula and the
 standing warning about vekn.net's stored value are [domain](domain/vekn.md#ratings).
 

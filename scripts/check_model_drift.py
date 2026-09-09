@@ -46,7 +46,6 @@ TS_ONLY = {
     "City": "geography, sourced from the engine rather than stored",
     "Continent": "geography, sourced from the engine rather than stored",
     "Country": "geography, sourced from the engine rather than stored",
-    "Deck": "the engine's deck payload, not the stored DeckObject",
     "LinkMedia": "display-side classification of a community link",
     "LinkPlacement": "display-side classification of a community link",
     "OfflinePlayer": "an offline bundle's player, never stored server-side",

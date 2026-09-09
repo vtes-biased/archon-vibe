@@ -60,8 +60,10 @@ from psycopg.rows import dict_row
 from backend.src import db
 from backend.src.geonames import normalize_country
 from backend.src.models import (
+    AttributionKind,
     AuthMethod,
     AuthMethodType,
+    DeckAttribution,
     DeckListsMode,
     DeckObject,
     FinalsTable,
@@ -858,14 +860,19 @@ def _build_seats(
         if multideck and s.get("deck"):
             decks.append(
                 _deck_obj(
-                    tuid, puid, round_idx, s["deck"], _deck_public(puid, deck_ctx)
+                    tuid,
+                    puid,
+                    round_idx,
+                    s["deck"],
+                    _deck_public(puid, deck_ctx),
+                    puid == deck_ctx.winner_uid,
                 )
             )
     return seats
 
 
 def _deck_obj(
-    tuid: str, puid: str, round_idx: int | None, krcg: dict, public: bool
+    tuid: str, puid: str, round_idx: int | None, krcg: dict, public: bool, winner: bool
 ) -> DeckObject:
     return DeckObject(
         uid=deck_uid(tuid, puid, round_idx),
@@ -874,13 +881,13 @@ def _deck_obj(
         user_uid=puid,
         round=round_idx,
         name=krcg.get("name") or "",
-        author=krcg.get("author") or "",
         comments=krcg.get("comments") or "",
         cards=flatten_deck(krcg),
         # old archon never recorded designer-credit consent, so default to
         # anonymous rather than fabricating self-attribution (privacy-safe).
-        attribution=None,
+        attribution=DeckAttribution(kind=AttributionKind.ANONYMOUS),
         public=public,
+        winner=winner,
     )
 
 
@@ -1013,6 +1020,7 @@ def build_tournament(
                     None,
                     p["deck"],
                     _deck_public(str(puid), deck_ctx),
+                    str(puid) == deck_ctx.winner_uid,
                 )
             )
 

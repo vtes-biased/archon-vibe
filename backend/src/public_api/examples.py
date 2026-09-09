@@ -423,7 +423,7 @@ DECK = {
     "round": None,
     "comments": "",
     "user_uid": "019f6a5e-c78e-733e-bf17-d246b2b4c7ef",
-    "attribution": "twda",
+    "attribution": {"kind": "Archive", "vekn_id": ""},
     "tournament_uid": "019f6a5f-b16b-7673-9218-a9b9b92ca380",
 }
 
@@ -638,11 +638,15 @@ ROUND_DECKS = {
                     "user_uid": "019f6a5e-dc94-77b5-814d-20920477f87d",
                     "round": 0,
                     "name": "Nephandus Toolbox",
-                    "author": "Giulia Bianchi",
                     "comments": "",
                     "cards": {"100001": 4, "100638": 2, "101453": 10, "102079": 12},
-                    "attribution": None,
+                    "attribution": {
+                        "kind": "Named",
+                        "vekn_id": "",
+                        "name": "Giulia Bianchi",
+                    },
                     "public": False,
+                    "winner": False,
                 }
             ],
         }

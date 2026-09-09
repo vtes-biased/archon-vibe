@@ -676,6 +676,35 @@ class FinalsTable(Table, kw_only=True):
     ]
 
 
+class AttributionKind(StrEnum):
+    ANONYMOUS = "Anonymous"
+    OWNER = "Owner"
+    MEMBER = "Member"
+    NAMED = "Named"
+    ARCHIVE = "Archive"
+
+
+class DeckAttribution(msgspec.Struct, kw_only=True, frozen=True):
+    kind: Annotated[
+        AttributionKind,
+        msgspec.Meta(
+            description="Who the decklist is credited to. `Anonymous` also "
+            "withholds the owner: the deck reaches other members and this API "
+            "with no `user_uid`, the winner's excepted."
+        ),
+    ] = AttributionKind.ANONYMOUS
+    vekn_id: Annotated[
+        str, msgspec.Meta(description="The credited member, on `Member` alone.")
+    ] = ""
+    name: Annotated[
+        str,
+        msgspec.Meta(
+            description="The credited designer's name, on `Named` and `Archive`. "
+            "Never published: this API carries member credits only."
+        ),
+    ] = ""
+
+
 class DeckObject(BaseObject, kw_only=True):
     tournament_uid: Annotated[
         str, msgspec.Meta(description="Uid of the tournament the deck was played in.")
@@ -691,7 +720,6 @@ class DeckObject(BaseObject, kw_only=True):
         ),
     ] = None
     name: str = ""
-    author: str = ""
     comments: str = ""
     cards: Annotated[
         dict[str, int],
@@ -700,14 +728,9 @@ class DeckObject(BaseObject, kw_only=True):
             "https://v4.api.krcg.org."
         ),
     ] = msgspec.field(default_factory=dict)
-    attribution: Annotated[
-        str | None,
-        msgspec.Meta(
-            description="Designer credit: a VEKN id, the sentinel `twda` when the "
-            "credit lives in the archive rather than with us, or null for anonymous."
-        ),
-    ] = None
+    attribution: DeckAttribution = msgspec.field(default_factory=DeckAttribution)
     public: bool = False  # engine-set from decklists_mode, not client-writable
+    winner: bool = False  # engine-set: this event's winner, whom anonymity spares
 
 
 class Standing(msgspec.Struct, kw_only=True, frozen=True):

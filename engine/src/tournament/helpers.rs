@@ -289,13 +289,17 @@ pub(super) fn compute_deck_public(tournament: &JsonValue, player_uid: &str) -> b
     }
 }
 
+pub(super) fn compute_deck_winner(tournament: &JsonValue, player_uid: &str) -> bool {
+    tournament[tournament::WINNER].as_str() == Some(player_uid)
+}
+
 pub(super) fn recompute_deck_publication(
     tournament: &JsonValue,
     decks: &JsonValue,
     deck_ops: &mut JsonValue,
 ) {
     // A deck this event's own ops upserted or deleted already carries its answer;
-    // a set_public behind a delete would resurrect the row on the client.
+    // a set_publication behind a delete would resurrect the row on the client.
     let touched = |deck: &JsonValue| -> bool {
         deck_ops.members().any(|op| {
             op[arg::PLAYER_UID].as_str() == deck[deck_object::USER_UID].as_str()
@@ -312,7 +316,7 @@ pub(super) fn recompute_deck_publication(
                 }
         })
     };
-    let changes: Vec<(String, bool)> = decks
+    let changes: Vec<(String, bool, bool)> = decks
         .members()
         .filter(|d| !touched(d))
         .filter_map(|d| {
@@ -322,15 +326,18 @@ pub(super) fn recompute_deck_publication(
                 return None;
             }
             let is_public = compute_deck_public(tournament, user_uid);
-            (d[deck_object::PUBLIC].as_bool().unwrap_or(false) != is_public)
-                .then(|| (deck_uid.to_string(), is_public))
+            let is_winner = compute_deck_winner(tournament, user_uid);
+            (d[deck_object::PUBLIC].as_bool().unwrap_or(false) != is_public
+                || d[deck_object::WINNER].as_bool().unwrap_or(false) != is_winner)
+                .then(|| (deck_uid.to_string(), is_public, is_winner))
         })
         .collect();
-    for (deck_uid, public) in changes {
+    for (deck_uid, public, winner) in changes {
         let _ = deck_ops.push(json::object! {
-            arg::OP => "set_public",
+            arg::OP => "set_publication",
             arg::DECK_UID => deck_uid,
             arg::PUBLIC => public,
+            arg::WINNER => winner,
         });
     }
 }

@@ -3,20 +3,15 @@
   import type { UserListItem } from "$lib/db";
   import { getFilteredUsers, warmUserIndex } from "$lib/db";
   import { getCountryFlag } from "$lib/geonames";
+  import type { DeckAttribution } from "$lib/types";
   import * as m from '$lib/paraglide/messages.js';
 
   let {
-    mode = $bindable(),
-    search = $bindable(),
-    vekn = $bindable(),
-    name = $bindable(),
+    attribution = $bindable(),
     playerUid = '',
     playerName = '',
   }: {
-    mode: 'self' | 'anonymous' | 'other';
-    search: string;
-    vekn: string;
-    name: string;
+    attribution: DeckAttribution;
     playerUid?: string;
     playerName?: string;
   } = $props();
@@ -24,14 +19,25 @@
   let results = $state<UserListItem[]>([]);
   let total = $state(0);
   let selectedIndex = $state(-1);
+  let search = $state(attribution.kind === 'Member' ? attribution.vekn_id : attribution.name);
   const SEARCH_LIMIT = 10;
   // See UserPicker: guards against an earlier, slower query landing last.
   let searchSeq = 0;
 
   onMount(() => { warmUserIndex(); });
 
+  // The Archive credit is the TWDA's own and no picker offers it; a deck that
+  // holds one keeps it until the owner chooses something else.
+  const kinds = ['Owner', 'Anonymous', 'Member', 'Named'] as const;
+
+  function pick(kind: (typeof kinds)[number]) {
+    attribution = { kind, vekn_id: '', name: kind === 'Named' ? search.trim() : '' };
+    if (kind !== 'Member') results = [];
+  }
+
   async function searchUsers() {
     selectedIndex = -1;
+    attribution = { kind: 'Member', vekn_id: '', name: '' };
     const seq = ++searchSeq;
     if (search.trim().length < 2) {
       results = [];
@@ -45,8 +51,10 @@
   }
 
   function selectUser(user: UserListItem) {
-    vekn = user.vekn_id || user.name;
-    name = user.name;
+    // A member with no VEKN id cannot be credited as one: they are a name.
+    attribution = user.vekn_id
+      ? { kind: 'Member', vekn_id: user.vekn_id, name: '' }
+      : { kind: 'Named', vekn_id: '', name: user.name };
     search = user.name + (user.vekn_id ? ` (${user.vekn_id})` : '');
     results = [];
   }
@@ -60,36 +68,51 @@
       e.preventDefault();
       selectedIndex = Math.max(selectedIndex - 1, 0);
     } else if (e.key === 'Enter' && selectedIndex >= 0) {
-      e.preventDefault();
       const user = results[selectedIndex];
-      if (user) selectUser(user);
+      if (user) {
+        e.preventDefault();
+        selectUser(user);
+      }
     }
   }
+
+  const label = {
+    Owner: () => playerUid ? m.deck_upload_attr_player({ name: playerName || '?' }) : m.deck_upload_attr_self(),
+    Anonymous: () => m.deck_upload_attr_anonymous(),
+    Member: () => m.deck_upload_attr_member(),
+    Named: () => m.deck_upload_attr_named(),
+  };
+  const searching = $derived(attribution.kind === 'Member' || attribution.kind === 'Named');
 </script>
 
 <div class="flex items-center gap-3 text-sm flex-wrap mb-2">
   <span class="text-ink-muted">{m.deck_upload_attribution()}:</span>
-  <label class="flex items-center gap-1 text-ink-bright">
-    <input type="radio" bind:group={mode} value="self" class="accent-accent" />
-    {playerUid ? m.deck_upload_attr_player({ name: playerName || '?' }) : m.deck_upload_attr_self()}
-  </label>
-  <label class="flex items-center gap-1 text-ink-bright">
-    <input type="radio" bind:group={mode} value="anonymous" class="accent-accent" />
-    {m.deck_upload_attr_anonymous()}
-  </label>
-  <label class="flex items-center gap-1 text-ink-bright">
-    <input type="radio" bind:group={mode} value="other" class="accent-accent" />
-    {m.deck_upload_attr_other()}
-  </label>
+  {#each kinds as kind}
+    <label class="flex items-center gap-1 text-ink-bright">
+      <input
+        type="radio"
+        name="attribution-kind"
+        checked={attribution.kind === kind}
+        onchange={() => pick(kind)}
+        class="accent-accent"
+      />
+      {label[kind]()}
+    </label>
+  {/each}
 </div>
-{#if mode === 'other'}
+{#if searching}
   <div class="relative mb-2">
     <input
       type="text"
       bind:value={search}
-      oninput={() => { vekn = search; name = ''; searchUsers(); }}
+      oninput={() => {
+        if (attribution.kind === 'Named') attribution = { kind: 'Named', vekn_id: '', name: search.trim() };
+        else searchUsers();
+      }}
       onkeydown={handleKeydown}
-      placeholder={m.deck_upload_attr_other_placeholder()}
+      placeholder={attribution.kind === 'Member'
+        ? m.deck_upload_attr_member_placeholder()
+        : m.deck_upload_attr_named_placeholder()}
       autocomplete="off"
       autocorrect="off"
       autocapitalize="off"

@@ -26,9 +26,9 @@ pub use types::{ActorContext, PlayerState, SeatScore, TournamentEvent, Tournamen
 
 use crate::error::EngineError;
 use helpers::{
-    all_rounds_finished, collect_previous_rounds, compute_deck_public, count_played_rounds,
-    count_player_rounds_played, delete_player_decks, demote_unseated_players, find_player_index,
-    past_registration_cap, player_exists, players_in_other_active_rounds,
+    all_rounds_finished, collect_previous_rounds, compute_deck_public, compute_deck_winner,
+    count_played_rounds, count_player_rounds_played, delete_player_decks, demote_unseated_players,
+    find_player_index, past_registration_cap, player_exists, players_in_other_active_rounds,
     recompute_deck_publication, release_stamped_decks, require_can_edit_results, require_organizer,
     require_state, require_state_or_finished, stamp_round_decks, validate_enum,
 };
@@ -2464,11 +2464,19 @@ fn apply_event(
             if !actor.is_organizer && state == TournamentState::Playing && !*multideck && has_deck {
                 return Err(EngineError::DeckLockedPlaying);
             }
-            let is_public = compute_deck_public(tournament, player_uid);
             let mut deck_data = deck.clone();
-            deck_data[deck_object::PUBLIC] = is_public.into();
+            deck_data[deck_object::PUBLIC] = compute_deck_public(tournament, player_uid).into();
+            deck_data[deck_object::WINNER] = compute_deck_winner(tournament, player_uid).into();
             if !actor.is_organizer && state != TournamentState::Finished {
                 deck_data[deck_object::ROUND] = JsonValue::Null;
+            }
+            // SetDeckAttribution is the only thing that moves a credit once the
+            // deck exists, so an upload that replaces one carries none.
+            if decks.members().any(|d| {
+                d[deck_object::USER_UID].as_str() == Some(player_uid.as_str())
+                    && d[deck_object::ROUND].as_usize() == deck_data[deck_object::ROUND].as_usize()
+            }) {
+                deck_data.remove(deck_object::ATTRIBUTION);
             }
             tournament[tournament::PLAYERS][idx].remove(player::MISSING_DECKLIST);
             let op = json::object! {
@@ -2527,6 +2535,31 @@ fn apply_event(
                     }
                 }
             }
+            Ok(())
+        }
+
+        TournamentEvent::SetDeckAttribution {
+            player_uid,
+            round,
+            attribution,
+        } => {
+            if actor.uid != *player_uid {
+                return Err(EngineError::DeckAttributionForbidden);
+            }
+            let deck_uid = decks
+                .members()
+                .find(|d| {
+                    d[deck_object::USER_UID].as_str() == Some(player_uid.as_str())
+                        && d[deck_object::ROUND].as_usize() == *round
+                })
+                .and_then(|d| d[deck_object::UID].as_str())
+                .ok_or(EngineError::DeckNotFound)?;
+            let _ = deck_ops.push(json::object! {
+                arg::OP => "set_attribution",
+                arg::DECK_UID => deck_uid,
+                arg::PLAYER_UID => player_uid.as_str(),
+                arg::ATTRIBUTION => attribution.clone(),
+            });
             Ok(())
         }
 

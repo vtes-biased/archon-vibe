@@ -8,6 +8,7 @@ pub mod arg {
     pub const ACTOR_UID: &str = "actor_uid";
     pub const ADV: &str = "adv";
     pub const ALLOWED: &str = "allowed";
+    pub const ATTRIBUTION: &str = "attribution";
     pub const AUTHOR: &str = "author";
     pub const BANNED: &str = "banned";
     pub const BASELINE: &str = "baseline";
@@ -128,7 +129,7 @@ pub mod arg {
 }
 
 pub mod deck_object {
-    pub const AUTHOR: &str = "author";
+    pub const ATTRIBUTION: &str = "attribution";
     pub const CARDS: &str = "cards";
     pub const COMMENTS: &str = "comments";
     pub const NAME: &str = "name";
@@ -136,6 +137,7 @@ pub mod deck_object {
     pub const ROUND: &str = "round";
     pub const UID: &str = "uid";
     pub const USER_UID: &str = "user_uid";
+    pub const WINNER: &str = "winner";
 }
 
 pub mod finals_table {

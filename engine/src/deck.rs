@@ -3,7 +3,7 @@
 
 use crate::cards::{Card, CardKind, CardMap};
 use crate::error::EngineError;
-use crate::model::{arg, deck_object};
+use crate::model::arg;
 use json::JsonValue;
 use std::collections::HashMap;
 
@@ -53,10 +53,10 @@ impl Deck {
             cards[id.to_string()] = count.into();
         }
         json::object! {
-            deck_object::NAME => self.name.as_str(),
-            deck_object::AUTHOR => self.author.as_str(),
-            deck_object::COMMENTS => self.comments.as_str(),
-            deck_object::CARDS => cards
+            arg::NAME => self.name.as_str(),
+            arg::AUTHOR => self.author.as_str(),
+            arg::COMMENTS => self.comments.as_str(),
+            arg::CARDS => cards
         }
     }
 }

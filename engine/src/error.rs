@@ -13,6 +13,7 @@ pub enum EngineError {
     CheckInForbidden,
     DeckUploadForbidden,
     DeckDeleteForbidden,
+    DeckAttributionForbidden,
     ScoreForbidden,
     ScoreLocked,
     ScoreSetByOrganizer,
@@ -24,6 +25,7 @@ pub enum EngineError {
     PlayerDisqualified,
     PlayerSuspended,
     PlayerNotFound,
+    DeckNotFound,
     PlayerNotCheckedIn,
     PlayerAlreadyFinished,
     PlayerWrongState { current: String },
@@ -119,6 +121,7 @@ impl EngineError {
             CheckInForbidden => "tournament.check_in_forbidden",
             DeckUploadForbidden => "tournament.deck_upload_forbidden",
             DeckDeleteForbidden => "tournament.deck_delete_forbidden",
+            DeckAttributionForbidden => "tournament.deck_attribution_forbidden",
             ScoreForbidden => "tournament.score_forbidden",
             ScoreLocked => "tournament.score_locked",
             ScoreSetByOrganizer => "tournament.score_set_by_organizer",
@@ -130,6 +133,7 @@ impl EngineError {
             PlayerDisqualified => "tournament.player_disqualified",
             PlayerSuspended => "tournament.player_suspended",
             PlayerNotFound => "tournament.player_not_found",
+            DeckNotFound => "tournament.deck_not_found",
             PlayerNotCheckedIn => "tournament.player_not_checked_in",
             PlayerAlreadyFinished => "tournament.player_already_finished",
             PlayerWrongState { .. } => "tournament.player_wrong_state",
@@ -264,6 +268,9 @@ impl fmt::Display for EngineError {
             }
             DeckUploadForbidden => write!(f, "Only organizers or the player can upload a deck"),
             DeckDeleteForbidden => write!(f, "Only organizers or the player can delete a deck"),
+            DeckAttributionForbidden => {
+                write!(f, "Only the player can change their own deck's attribution")
+            }
             ScoreForbidden => write!(f, "Not authorized to score this table"),
             ScoreLocked => write!(f, "Table score is locked by judge"),
             ScoreSetByOrganizer => write!(f, "Score has been set by organiser"),
@@ -282,6 +289,7 @@ impl fmt::Display for EngineError {
             PlayerDisqualified => write!(f, "Player is disqualified and cannot participate"),
             PlayerSuspended => write!(f, "Player is suspended and cannot participate"),
             PlayerNotFound => write!(f, "Player not found"),
+            DeckNotFound => write!(f, "Deck not found"),
             PlayerNotCheckedIn => write!(f, "Player is not checked in"),
             PlayerAlreadyFinished => write!(f, "Player already finished"),
             PlayerWrongState { current } => {
