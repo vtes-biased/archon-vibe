@@ -63,16 +63,18 @@
       if (showPendingSlot) slots.push({ round: null, deck: myPending });
       return slots;
     }
-    // Slots by round index, never by count: a cancelled table shifts the count.
     const byRound = new Map(myDecks.map(d => [d.round, d]));
     const seated = (tables: Table[]) =>
       tables.some(t => t.state !== 'Cancelled' && t.seating.some(seat => seat.player_uid === myUid));
     const slots: RoundSlot[] = [];
     (tournament.rounds ?? []).forEach((tables, r) => {
-      if (seated(tables)) slots.push({ round: r, deck: byRound.get(r) ?? null });
+      if (seated(tables) || byRound.has(r)) slots.push({ round: r, deck: byRound.get(r) ?? null });
     });
     if (tournament.finals && seated([tournament.finals])) {
       slots.push({ round: roundCount, deck: byRound.get(roundCount) ?? null });
+    }
+    for (const deck of myStamped) {
+      if (!slots.some(slot => slot.round === deck.round)) slots.push({ round: deck.round, deck });
     }
     if (myPending) slots.push({ round: null, deck: myPending });
     return slots;
