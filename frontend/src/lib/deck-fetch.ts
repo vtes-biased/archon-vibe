@@ -7,7 +7,6 @@ import * as m from './paraglide/messages.js';
 
 export interface ParsedDeck {
   name: string;
-  author: string;
   comments: string;
   cards: Record<string, number>;
   warnings?: string[];
@@ -53,7 +52,6 @@ export async function parseDeckText(text: string): Promise<ParsedDeck> {
   }
   return {
     name: result.name || '',
-    author: result.author || '',
     comments: result.comments || '',
     cards: result.cards || {},
     warnings: warnings.length ? warnings : undefined,

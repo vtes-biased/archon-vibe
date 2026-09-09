@@ -54,7 +54,6 @@ impl Deck {
         }
         json::object! {
             arg::NAME => self.name.as_str(),
-            arg::AUTHOR => self.author.as_str(),
             arg::COMMENTS => self.comments.as_str(),
             arg::CARDS => cards
         }

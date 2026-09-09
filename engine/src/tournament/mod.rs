@@ -2470,8 +2470,6 @@ fn apply_event(
             if !actor.is_organizer && state != TournamentState::Finished {
                 deck_data[deck_object::ROUND] = JsonValue::Null;
             }
-            // SetDeckAttribution is the only thing that moves a credit once the
-            // deck exists, so an upload that replaces one carries none.
             if decks.members().any(|d| {
                 d[deck_object::USER_UID].as_str() == Some(player_uid.as_str())
                     && d[deck_object::ROUND].as_usize() == deck_data[deck_object::ROUND].as_usize()

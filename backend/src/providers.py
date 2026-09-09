@@ -57,7 +57,6 @@ async def _amaranth_cards_map(session: aiohttp.ClientSession) -> dict[str, Card]
 def _deck_to_dict(deck: Deck) -> dict:
     return {
         "name": deck.name or "",
-        "author": deck.author or "",
         "comments": deck.comment or "",
         "cards": {str(c.id): c.count for c in deck.cards if c.count > 0},
     }
@@ -66,7 +65,7 @@ def _deck_to_dict(deck: Deck) -> dict:
 async def fetch_deck_from_url(url: str) -> dict:
     """Fetch + resolve a deck from a supported deckbuilding URL.
 
-    Returns ``{"name", "author", "comments", "cards": {vekn_id_str: count}}`` with
+    Returns ``{"name", "comments", "cards": {vekn_id_str: count}}`` with
     all card ids resolved to VEKN ids.
     """
     parsed = urllib.parse.urlparse(url)

@@ -1,10 +1,28 @@
 //! JSON parsing for TournamentEvent.
 
-use crate::model::{arg, promo_distribution};
+use crate::model::{arg, deck_object, promo_distribution};
 use json::JsonValue;
 
 use super::types::{SeatScore, TournamentEvent};
 use crate::error::EngineError;
+
+/// The five credits a deck can carry, rebuilt field by field so a client cannot
+/// hand the store a shape `msgspec` will later refuse to decode.
+fn credit_from_json(value: &JsonValue) -> Result<JsonValue, EngineError> {
+    let kind = value[arg::KIND]
+        .as_str()
+        .ok_or("attribution kind required")?;
+    if !["Anonymous", "Owner", "Member", "Named", "Archive"].contains(&kind) {
+        return Err(EngineError::internal(format!(
+            "Invalid attribution kind: {kind}"
+        )));
+    }
+    Ok(json::object! {
+        arg::KIND => kind,
+        arg::VEKN_ID => value[arg::VEKN_ID].as_str().unwrap_or(""),
+        arg::NAME => value[arg::NAME].as_str().unwrap_or(""),
+    })
+}
 
 impl TournamentEvent {
     pub fn from_json(value: &JsonValue) -> Result<Self, EngineError> {
@@ -246,9 +264,13 @@ impl TournamentEvent {
                     .as_str()
                     .ok_or("player_uid required")?
                     .to_string();
-                let deck = value[arg::DECK].clone();
+                let mut deck = value[arg::DECK].clone();
                 if deck.is_null() {
                     return Err(EngineError::internal("deck required"));
+                }
+                if deck.has_key(deck_object::ATTRIBUTION) {
+                    deck[deck_object::ATTRIBUTION] =
+                        credit_from_json(&deck[deck_object::ATTRIBUTION])?;
                 }
                 let multideck = value[arg::MULTIDECK].as_bool().unwrap_or(false);
                 Ok(Self::UpsertDeck {
@@ -275,10 +297,7 @@ impl TournamentEvent {
                     .as_str()
                     .ok_or("player_uid required")?
                     .to_string();
-                let attribution = value[arg::ATTRIBUTION].clone();
-                if attribution.is_null() {
-                    return Err(EngineError::internal("attribution required"));
-                }
+                let attribution = credit_from_json(&value[arg::ATTRIBUTION])?;
                 Ok(Self::SetDeckAttribution {
                     player_uid,
                     round: value[arg::ROUND].as_usize(),

@@ -115,7 +115,7 @@
       const { fetchDeckFromUrl, parseDeckText } = await import('$lib/deck-fetch');
       const { getCards } = await import('$lib/cards');
 
-      let deck: { name: string; author: string; comments: string; cards: Record<string, number>; warnings?: string[] };
+      let deck: { name: string; comments: string; cards: Record<string, number>; warnings?: string[] };
       if (mode === 'text') {
         deck = await parseDeckText(deckText);
       } else {

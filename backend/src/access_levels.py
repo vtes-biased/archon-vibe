@@ -218,9 +218,6 @@ DECK_API_EXCLUDE = API_SYNC_FIELDS | {"public"}
 
 
 def _credited_deck(d: dict) -> dict:
-    """The row with its owner withheld where the credit is anonymous. The winner
-    is named whatever they chose — the TWDA is a public win registry and the
-    archive's stance is already that."""
     if d["attribution"]["kind"] != AttributionKind.ANONYMOUS or d.get("winner"):
         return dict(d)
     return {k: v for k, v in d.items() if k != "user_uid"}

@@ -700,8 +700,9 @@ finalist but an anonymous one.
 **One post-finish pass owns publication.** After every event that starts or ends
 on a `Finished` tournament, the engine recomputes each deck's `public` from the
 mode, the winner and the finalist flags — and its `winner` flag with it — then
-emits `set_publication` in both directions for every deck whose flags moved — skipping the decks the same event upserted or
-deleted, whose ops already carry the answer. There is no other writer: finishing,
+emits `set_publication` in both directions for every deck whose flags moved —
+skipping the decks the same event upserted or deleted, whose ops already carry
+the answer. There is no other writer: finishing,
 reopening, narrowing the mode, a finals rescore that moves the winner and an
 archival correction all publish and retract through it. The pass reads the flag
 off the decks payload the engine is handed, so the two payload builders carry it

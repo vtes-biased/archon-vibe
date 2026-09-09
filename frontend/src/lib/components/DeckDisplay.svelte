@@ -19,8 +19,6 @@
     deck,
     editable = false,
     tournamentUid = '',
-    playerUid = '',
-    playerName = undefined,
     multideck = false,
     format = '',
     onsaved,
@@ -30,8 +28,6 @@
     deck: DeckObject;
     editable?: boolean;
     tournamentUid?: string;
-    playerUid?: string;
-    playerName?: string;
     multideck?: boolean;
     format?: string;
     onsaved?: () => void;
@@ -49,7 +45,10 @@
   let credit = $state('');
   let creditError = $state<string | null>(null);
   const myUid = $derived(getAuthState().user?.uid);
-  const ownsDeck = $derived(!!tournamentUid && !!myUid && (playerUid || myUid) === myUid);
+  const ownsDeck = $derived(!!tournamentUid && !!myUid && deck.user_uid === myUid);
+  // An Owner credit resolves to no name and says nothing: the deck already sits
+  // under its owner. Only Anonymous is a statement worth printing.
+  const anonymous = $derived(deck.attribution.kind === 'Anonymous');
 
   $effect(() => {
     creditName(deck.attribution).then(n => credit = n);
@@ -91,7 +90,7 @@
     try {
       const { tournamentAction } = await import('$lib/tournament-actions');
       await tournamentAction(tournamentUid, 'SetDeckAttribution', {
-        player_uid: playerUid || myUid,
+        player_uid: deck.user_uid,
         round: deck.round,
         attribution: editedAttribution,
       });
@@ -130,7 +129,7 @@
     saveError = null;
     try {
       const { tournamentAction } = await import('$lib/tournament-actions');
-      const targetUid = playerUid || myUid;
+      const targetUid = deck.user_uid;
 
       const deckData: Record<string, unknown> = {
         name: editedName,
@@ -235,7 +234,7 @@
     <h4 class="text-sm font-semibold text-ink-strong mb-1">{deck.name}</h4>
   {/if}
   {#if editingCredit}
-    <AttributionPicker bind:attribution={editedAttribution} {playerUid} {playerName} />
+    <AttributionPicker bind:attribution={editedAttribution} />
     <div class="flex gap-2 mb-2">
       <Button variant="primary" size="lg" onclick={saveCredit}>{m.common_save()}</Button>
       <Button variant="secondary" size="lg" onclick={() => editingCredit = false}>{m.common_cancel()}</Button>
@@ -243,9 +242,9 @@
     {#if creditError}
       <p class="text-sm text-link mb-2">{creditError}</p>
     {/if}
-  {:else}
+  {:else if credit || anonymous || ownsDeck}
     <p class="text-xs text-ink-muted mb-2">
-      {credit ? m.deck_by_author({ author: credit }) : m.deck_credit_none()}
+      {#if credit}{m.deck_by_author({ author: credit })}{:else if anonymous}{m.deck_credit_none()}{/if}
       {#if ownsDeck}
         <button class="text-link underline ml-1" onclick={startEditingCredit}>{m.deck_credit_edit()}</button>
       {/if}

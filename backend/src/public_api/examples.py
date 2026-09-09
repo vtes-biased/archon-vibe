@@ -424,6 +424,7 @@ DECK = {
     "comments": "",
     "user_uid": "019f6a5e-c78e-733e-bf17-d246b2b4c7ef",
     "attribution": {"kind": "Archive", "vekn_id": ""},
+    "winner": True,
     "tournament_uid": "019f6a5f-b16b-7673-9218-a9b9b92ca380",
 }
 

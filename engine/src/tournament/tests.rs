@@ -1009,8 +1009,6 @@ fn test_owner_corrects_a_played_deck_after_finish() {
 
 #[test]
 fn test_replacing_a_deck_carries_no_credit() {
-    // SetDeckAttribution is the only way a credit moves once the deck exists —
-    // otherwise an organizer re-uploading would re-credit someone else's deck.
     let tournament = tournament_with_player("Waiting");
     let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
     let event = json::object! {
@@ -2219,18 +2217,21 @@ fn test_finals_rescore_moves_publication_with_the_winner() {
         run_event_with_decks(&tournament, &event, &make_organizer(), &decks.dump()).unwrap();
     let updated = json::parse(&updated_json).unwrap();
     assert_eq!(updated["winner"].as_str(), Some("p2"));
-    let mut flags: Vec<(&str, bool)> = deck_ops
+    // The crown moves with the publication: leaving `winner` on d1 would keep an
+    // anonymous deck owned after its owner stopped being the winner.
+    let mut flags: Vec<(&str, bool, bool)> = deck_ops
         .members()
         .filter(|op| op["op"].as_str() == Some("set_publication"))
         .map(|op| {
             (
                 op["deck_uid"].as_str().unwrap(),
                 op["public"].as_bool().unwrap(),
+                op["winner"].as_bool().unwrap(),
             )
         })
         .collect();
     flags.sort();
-    assert_eq!(flags, vec![("d1", false), ("d2", true)]);
+    assert_eq!(flags, vec![("d1", false, false), ("d2", true, true)]);
 }
 
 #[test]

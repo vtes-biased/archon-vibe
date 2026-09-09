@@ -477,8 +477,9 @@ a record we hold.
 `twda_import.py` reads `static.krcg.org/data/twda.json` and does two things:
 reconstructs the historic events the archive is the only record of, and gives every
 resolved winner their decklist (an `Archive` credit carrying the archived author's
-name, `public=True`, only where the winner has none for that tournament). Then it recomputes those winners' Hall of
-Fame lists, which is why that step follows the deck pass rather than preceding it:
+name, `public=True`, only where the winner has none for that tournament). Then it
+recomputes those winners' Hall of Fame lists, which is why that step follows the
+deck pass rather than preceding it:
 a reconstruction only counts once its deck is on record
 ([the rule](tournaments.md#configuration)). The backfill depends on the ordering
 too — it regenerates the snapshot immediately afterwards, and a win list computed
