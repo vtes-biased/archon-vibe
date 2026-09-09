@@ -70,11 +70,8 @@
     (tournament.rounds ?? []).forEach((tables, r) => {
       if (seated(tables) || byRound.has(r)) slots.push({ round: r, deck: byRound.get(r) ?? null });
     });
-    if (tournament.finals && seated([tournament.finals])) {
+    if ((tournament.finals && seated([tournament.finals])) || byRound.has(roundCount)) {
       slots.push({ round: roundCount, deck: byRound.get(roundCount) ?? null });
-    }
-    for (const deck of myStamped) {
-      if (!slots.some(slot => slot.round === deck.round)) slots.push({ round: deck.round, deck });
     }
     if (myPending) slots.push({ round: null, deck: myPending });
     return slots;
