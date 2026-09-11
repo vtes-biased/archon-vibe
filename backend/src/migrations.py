@@ -29,22 +29,15 @@ class Migration:
 
 
 def _type_the_deck_credit(
-    full: dict,
-    owner_vekn: str | None,
-    owner_name: str | None,
-    is_winner: bool | None,
-    credits_member: bool,
+    full: dict, owner_vekn: str | None, is_winner: bool | None, credits_member: bool
 ) -> None:
     author = full.pop("author", "") or ""
     stored = full.get("attribution")
-    # The old form stored `vekn_id or name`, so a member with no id who claimed
-    # their own deck stored their own name.
-    own = {i for i in (owner_vekn, owner_name) if i}
     if stored == "twda":
         credit = {"kind": "Archive", "name": author}
     elif not stored:
         credit = {"kind": "Anonymous"}
-    elif stored in own:
+    elif owner_vekn and stored == owner_vekn:
         credit = {"kind": "Owner"}
     elif credits_member:
         credit = {"kind": "Member", "vekn_id": stored}
@@ -61,7 +54,6 @@ MIGRATIONS: tuple[Migration, ...] = (
         pending="""
             SELECT d.uid,
                    u."full"->>'vekn_id',
-                   u."full"->>'name',
                    (d."full"->>'user_uid' = t."full"->>'winner'),
                    EXISTS (
                        SELECT 1 FROM objects m
