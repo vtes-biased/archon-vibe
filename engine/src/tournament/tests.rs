@@ -1058,6 +1058,32 @@ fn test_only_the_owner_sets_a_deck_credit() {
 }
 
 #[test]
+fn test_a_client_cannot_write_a_free_text_credit() {
+    let tournament = tournament_with_player("Playing");
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
+    let actor = make_player("player-1");
+    for attribution in [
+        json::object! { kind: "Archive", vekn_id: "", name: "Alice" },
+        json::object! { kind: "Named", vekn_id: "", name: "Alice" },
+        json::object! { kind: "Member", vekn_id: "", name: "" },
+    ] {
+        let event = json::object! {
+            type: "SetDeckAttribution",
+            player_uid: "player-1",
+            attribution: attribution,
+        };
+        assert!(run_event_with_decks(&tournament, &event, &actor, decks).is_err());
+    }
+    let event = json::object! {
+        type: "SetDeckAttribution",
+        player_uid: "player-1",
+        attribution: { kind: "Owner", vekn_id: "", name: "Alice" },
+    };
+    let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, decks).unwrap();
+    assert_eq!(deck_ops[0]["attribution"]["name"].as_str(), Some(""));
+}
+
+#[test]
 fn test_upsert_deck_clears_missing_decklist() {
     let mut tournament = tournament_with_player("Waiting");
     tournament["decklist_required"] = true.into();

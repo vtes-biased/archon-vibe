@@ -134,11 +134,15 @@ section. No issue reported this, so there is nobody to tell.
 
 **Migration** `deck-typed-credit`
 
-Gated by the commit that typed the deck credit. Every deck row held `author` plus
-a loose `attribution` string; the entry rewrites both into the typed field and
-stamps `winner`, mapping null to `Anonymous`, `"twda"` to `Archive`, the owner's
-own VEKN id to `Owner`, another member's to `Member`, and anything else to
-`Named`.
+Gated by the commit that typed the deck credit. Every deck row held `author`
+plus a loose `attribution` string; the entry rewrites both into the typed field
+and stamps `winner`. Null, `"twda"` and the owner's own VEKN id all become
+`Owner`: the upload form never recorded a self-credit, so a null is mostly an
+ordinary self-upload, and nothing stored separates it from a chosen anonymity —
+the editor reopened every null as anonymous, and until June the anonymous choice
+left the stored author standing. A `twda` deck is its winner's. Another member's
+id becomes `Member` and anything else `Archive`. No past deck becomes anonymous;
+an owner who wants that sets it.
 
 Nothing to run: the entry rewrote the rows before the process served. No row may
 still hold the old shape —
@@ -166,6 +170,7 @@ subsumes the retraction sweep that used to sit on this page, since a row whose
 member projection went NULL in the past has now had its `modified_at` bumped and
 tombstones on the next catch-up.
 
-Confirm on a member client that another member's anonymous decklist shows no
-owner and has left their profile, report both counts to the owner, and delete
-this section. No issue reported this, so there is nobody to tell.
+Then set one of your own published decks to Anonymous and confirm on another
+member's client that it shows no owner and has left your profile, report both
+counts to the owner, and delete this section. No issue reported this, so there
+is nobody to tell.

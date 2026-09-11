@@ -585,10 +585,11 @@ class TestDeckLeagueSanctionPromoApi:
 
     def test_public_deck_never_publishes_a_free_text_name(self):
         d = _make_deck(
-            public=True, attribution={"kind": "Named", "vekn_id": "", "name": "Alice"}
+            public=True,
+            attribution={"kind": "Archive", "vekn_id": "", "name": "Alice"},
         )
         assert compute_api(ObjectType.DECK, d)["attribution"] == {
-            "kind": "Named",
+            "kind": "Archive",
             "vekn_id": "",
         }
 

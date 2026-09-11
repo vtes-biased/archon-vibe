@@ -296,7 +296,7 @@ export interface FinalsTable extends Table {
   seed_order: string[];
 }
 
-export type AttributionKind = "Anonymous" | "Owner" | "Member" | "Named" | "Archive";
+export type AttributionKind = "Anonymous" | "Owner" | "Member" | "Archive";
 
 export interface DeckAttribution {
   kind: AttributionKind;

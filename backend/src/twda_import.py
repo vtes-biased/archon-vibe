@@ -438,9 +438,7 @@ async def _import_decks(
             name=entry.get("name", ""),
             comments=entry.get("comments", ""),
             cards=cards,
-            attribution=DeckAttribution(
-                kind=AttributionKind.ARCHIVE, name=entry.get("player", "")
-            ),
+            attribution=DeckAttribution(kind=AttributionKind.OWNER),
             public=True,
             winner=True,
         )

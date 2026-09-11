@@ -9,10 +9,15 @@ export async function creditName(attribution: DeckAttribution): Promise<string> 
       const user = await getUserByVekn(attribution.vekn_id);
       return user?.name ?? '';
     }
-    case 'Named':
     case 'Archive':
       return attribution.name;
     default:
       return '';
   }
+}
+
+/** What the engine's `credit_from_json` accepts from a client. */
+export function isSettableCredit(attribution: DeckAttribution): boolean {
+  return attribution.kind === 'Owner' || attribution.kind === 'Anonymous'
+    || (attribution.kind === 'Member' && !!attribution.vekn_id);
 }

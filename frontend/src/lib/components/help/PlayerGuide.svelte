@@ -435,10 +435,6 @@
         <input type="radio" name="ex-attribution" class="accent-accent" tabindex="-1" />
         {m.deck_upload_attr_member()}
       </label>
-      <label class="flex items-center gap-1 text-ink-bright">
-        <input type="radio" name="ex-attribution" class="accent-accent" tabindex="-1" />
-        {m.deck_upload_attr_named()}
-      </label>
     </div>
     <Button variant="primary" size="lg">{m.deck_upload_submit()}</Button>
   </div>

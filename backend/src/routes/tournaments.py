@@ -403,7 +403,7 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
     if credit.kind == AttributionKind.MEMBER:
         designer = await get_user_by_vekn_id(credit.vekn_id)
         designer_credit = designer.name if designer else ""
-    elif credit.kind in (AttributionKind.NAMED, AttributionKind.ARCHIVE):
+    elif credit.kind == AttributionKind.ARCHIVE:
         designer_credit = credit.name
     else:
         designer_credit = ""

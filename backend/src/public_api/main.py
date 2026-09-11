@@ -195,9 +195,9 @@ deck's disappearance is far more often a correction in progress than a deletion.
 ID. The same uid appears in the tournament's `players`, `standings` and `winner`.
 
 **`attribution` credits the designer, and carries members only.** Its `kind` is
-`Owner`, `Member` (with a `vekn_id`), `Named`, `Archive` or `Anonymous`; the two
-that name a non-member publish no name, because this API never carries free text
-a member did not consent to. **`Anonymous` withholds the owner as well** — such a
+`Owner`, `Member` (with a `vekn_id`), `Anonymous`, or `Archive` for a past credit
+that named someone we cannot resolve to a member — which publishes no name,
+because this API never carries free text a member did not consent to. **`Anonymous` withholds the owner as well** — such a
 deck arrives with no `user_uid` at all and can only be keyed on its own `uid`. The
 winner's deck is the exception and stays owned, the archive's own stance on a
 public win registry.

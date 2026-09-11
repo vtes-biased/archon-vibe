@@ -4,6 +4,7 @@
   import { getTournament } from '$lib/db';
   import { validateDeck, type ValidationError } from '$lib/engine';
   import type { DeckAttribution } from '$lib/types';
+  import { isSettableCredit } from '$lib/deck-credit';
   import { CircleX, TriangleAlert } from '@lucide/svelte';
   import AttributionPicker from '$lib/components/AttributionPicker.svelte';
   import Button from '$lib/components/Button.svelte';
@@ -272,7 +273,7 @@
       variant="primary"
       size="lg"
       loading={loading}
-      disabled={mode === 'text' ? !deckText.trim() : !deckUrl.trim()}
+      disabled={(mode === 'text' ? !deckText.trim() : !deckUrl.trim()) || !isSettableCredit(attribution)}
       onclick={upload}
     >
       {loading ? m.deck_upload_uploading() : m.deck_upload_submit()}

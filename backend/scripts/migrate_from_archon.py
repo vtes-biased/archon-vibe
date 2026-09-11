@@ -883,9 +883,7 @@ def _deck_obj(
         name=krcg.get("name") or "",
         comments=krcg.get("comments") or "",
         cards=flatten_deck(krcg),
-        # old archon never recorded designer-credit consent, so default to
-        # anonymous rather than fabricating self-attribution (privacy-safe).
-        attribution=DeckAttribution(kind=AttributionKind.ANONYMOUS),
+        attribution=DeckAttribution(kind=AttributionKind.OWNER),
         public=public,
         winner=winner,
     )

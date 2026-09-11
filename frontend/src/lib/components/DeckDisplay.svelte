@@ -1,7 +1,7 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
   import type { DeckAttribution, DeckObject, VtesCard } from "$lib/types";
-  import { creditName } from "$lib/deck-credit";
+  import { creditName, isSettableCredit } from "$lib/deck-credit";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { getCards } from "$lib/cards";
   import { normalizeSearch } from "$lib/utils";
@@ -234,7 +234,7 @@
   {#if editingCredit}
     <AttributionPicker bind:attribution={editedAttribution} />
     <div class="flex gap-2 mb-2">
-      <Button variant="primary" size="lg" onclick={saveCredit}>{m.common_save()}</Button>
+      <Button variant="primary" size="lg" disabled={!isSettableCredit(editedAttribution)} onclick={saveCredit}>{m.common_save()}</Button>
       <Button variant="secondary" size="lg" onclick={() => editingCredit = false}>{m.common_cancel()}</Button>
     </div>
     {#if creditError}

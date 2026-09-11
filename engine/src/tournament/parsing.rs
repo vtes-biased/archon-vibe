@@ -6,21 +6,28 @@ use json::JsonValue;
 use super::types::{SeatScore, TournamentEvent};
 use crate::error::EngineError;
 
-/// The five credits a deck can carry, rebuilt field by field so a client cannot
-/// hand the store a shape `msgspec` will later refuse to decode.
+/// The credits a client may set — never `Archive`, the one kind that keeps a
+/// name, so the store gains no free-text credit and `msgspec` no shape it refuses.
 fn credit_from_json(value: &JsonValue) -> Result<JsonValue, EngineError> {
     let kind = value[arg::KIND]
         .as_str()
         .ok_or("attribution kind required")?;
-    if !["Anonymous", "Owner", "Member", "Named", "Archive"].contains(&kind) {
-        return Err(EngineError::internal(format!(
-            "Invalid attribution kind: {kind}"
-        )));
-    }
+    let vekn_id = match kind {
+        "Anonymous" | "Owner" => "",
+        "Member" => value[arg::VEKN_ID]
+            .as_str()
+            .filter(|id| !id.is_empty())
+            .ok_or("a member credit needs a vekn_id")?,
+        _ => {
+            return Err(EngineError::internal(format!(
+                "Invalid attribution kind: {kind}"
+            )))
+        }
+    };
     Ok(json::object! {
         arg::KIND => kind,
-        arg::VEKN_ID => value[arg::VEKN_ID].as_str().unwrap_or(""),
-        arg::NAME => value[arg::NAME].as_str().unwrap_or(""),
+        arg::VEKN_ID => vekn_id,
+        arg::NAME => "",
     })
 }
 

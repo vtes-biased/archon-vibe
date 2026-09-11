@@ -680,7 +680,6 @@ class AttributionKind(StrEnum):
     ANONYMOUS = "Anonymous"
     OWNER = "Owner"
     MEMBER = "Member"
-    NAMED = "Named"
     ARCHIVE = "Archive"
 
 
@@ -699,8 +698,9 @@ class DeckAttribution(msgspec.Struct, kw_only=True, frozen=True):
     name: Annotated[
         str,
         msgspec.Meta(
-            description="The credited designer's name, on `Named` and `Archive`. "
-            "Never published: this API carries member credits only."
+            description="On `Archive` alone: the name a past credit held where no "
+            "member resolves it. Never published: this API carries member "
+            "credits only."
         ),
     ] = ""
 

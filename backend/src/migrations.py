@@ -33,16 +33,12 @@ def _type_the_deck_credit(
 ) -> None:
     author = full.pop("author", "") or ""
     stored = full.get("attribution")
-    if stored == "twda":
-        credit = {"kind": "Archive", "name": author}
-    elif not stored:
-        credit = {"kind": "Anonymous"}
-    elif owner_vekn and stored == owner_vekn:
+    if not stored or stored == "twda" or stored == owner_vekn:
         credit = {"kind": "Owner"}
     elif credits_member:
         credit = {"kind": "Member", "vekn_id": stored}
     else:
-        credit = {"kind": "Named", "name": author or stored}
+        credit = {"kind": "Archive", "name": author or stored}
     full["attribution"] = {"kind": "", "vekn_id": "", "name": ""} | credit
     full["winner"] = bool(is_winner)
 

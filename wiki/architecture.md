@@ -416,8 +416,12 @@ Finalists / All), and `winner` from whether the owner won — a fact the deck ro
 cannot otherwise reach, and which the projections need to spare the winner from
 anonymity ([tournaments](tournaments.md#decks)).
 
-**`attribution` is a typed credit**, one `kind` of `Anonymous`, `Owner`,
-`Member` (carrying a `vekn_id`), `Named` or `Archive` (each carrying a `name`).
+**`attribution` is a typed credit**, one `kind` of `Anonymous`, `Owner`, `Member`
+(carrying a `vekn_id`) or `Archive`. **No credit a client sets carries a name**: a
+designer's name as a bare string is personal data the TWDA already struggles to
+govern, so a designer is credited as a member or not at all, and the engine drops
+any name it is sent. `Archive` is the one exception — a past credit that named
+someone no member resolves — and nothing writes one any more.
 A member's display name is resolved at render rather than stored, so a rename
 follows the credit. Deduplication keys on `(tournament_uid, user_uid, round)` on
 both sides of the stack — except where the owner is withheld, and a deck with no

@@ -157,16 +157,8 @@ async def test_member_credit_naming_nobody_credits_nobody(test_db):
 
 
 @pytest.mark.asyncio
-async def test_named_non_member_is_credited_verbatim(test_db):
-    async with _published(
-        attribution=DeckAttribution(kind=AttributionKind.NAMED, name="Offline Designer")
-    ) as (_t, twda):
-        assert f"{CREDIT}Offline Designer" in twda
-
-
-@pytest.mark.asyncio
 async def test_archive_credit_passes_its_name_through(test_db):
-    """A reconstructed TWDA entry carries its archived author verbatim."""
+    """A past credit naming someone no member resolves still credits them."""
     async with _published(
         attribution=DeckAttribution(
             kind=AttributionKind.ARCHIVE, name="Archived Author"

@@ -19,20 +19,20 @@
   let results = $state<UserListItem[]>([]);
   let total = $state(0);
   let selectedIndex = $state(-1);
-  let search = $state(attribution.kind === 'Member' ? attribution.vekn_id : attribution.name);
+  let search = $state(attribution.kind === 'Member' ? attribution.vekn_id : '');
   const SEARCH_LIMIT = 10;
   // See UserPicker: guards against an earlier, slower query landing last.
   let searchSeq = 0;
 
   onMount(() => { warmUserIndex(); });
 
-  // The Archive credit is the TWDA's own and no picker offers it; a deck that
-  // holds one keeps it until the owner chooses something else.
-  const kinds = ['Owner', 'Anonymous', 'Member', 'Named'] as const;
+  // A deck holding a past Archive credit keeps it until the owner picks one of these.
+  const kinds = ['Owner', 'Anonymous', 'Member'] as const;
 
   function pick(kind: (typeof kinds)[number]) {
-    attribution = { kind, vekn_id: '', name: kind === 'Named' ? search.trim() : '' };
-    if (kind !== 'Member') results = [];
+    attribution = { kind, vekn_id: '', name: '' };
+    results = [];
+    search = '';
   }
 
   async function searchUsers() {
@@ -44,18 +44,15 @@
       total = 0;
       return;
     }
-    const r = await getFilteredUsers(undefined, undefined, search.trim());
+    const r = (await getFilteredUsers(undefined, undefined, search.trim())).filter(u => u.vekn_id);
     if (seq !== searchSeq) return;
     total = r.length;
     results = r.slice(0, SEARCH_LIMIT);
   }
 
   function selectUser(user: UserListItem) {
-    // A member with no VEKN id cannot be credited as one: they are a name.
-    attribution = user.vekn_id
-      ? { kind: 'Member', vekn_id: user.vekn_id, name: '' }
-      : { kind: 'Named', vekn_id: '', name: user.name };
-    search = user.name + (user.vekn_id ? ` (${user.vekn_id})` : '');
+    attribution = { kind: 'Member', vekn_id: user.vekn_id ?? '', name: '' };
+    search = `${user.name} (${user.vekn_id})`;
     results = [];
   }
 
@@ -80,9 +77,7 @@
     Owner: () => playerUid ? m.deck_upload_attr_player({ name: playerName || '?' }) : m.deck_upload_attr_self(),
     Anonymous: () => m.deck_upload_attr_anonymous(),
     Member: () => m.deck_upload_attr_member(),
-    Named: () => m.deck_upload_attr_named(),
   };
-  const searching = $derived(attribution.kind === 'Member' || attribution.kind === 'Named');
 </script>
 
 <div class="flex items-center gap-3 text-sm flex-wrap mb-2">
@@ -100,19 +95,14 @@
     </label>
   {/each}
 </div>
-{#if searching}
+{#if attribution.kind === 'Member'}
   <div class="relative mb-2">
     <input
       type="text"
       bind:value={search}
-      oninput={() => {
-        if (attribution.kind === 'Named') attribution = { kind: 'Named', vekn_id: '', name: search.trim() };
-        else searchUsers();
-      }}
+      oninput={searchUsers}
       onkeydown={handleKeydown}
-      placeholder={attribution.kind === 'Member'
-        ? m.deck_upload_attr_member_placeholder()
-        : m.deck_upload_attr_named_placeholder()}
+      placeholder={m.deck_upload_attr_member_placeholder()}
       autocomplete="off"
       autocorrect="off"
       autocapitalize="off"
@@ -127,9 +117,7 @@
             class="w-full px-3 py-2 text-left text-sm text-ink-bright transition-colors {i === selectedIndex ? 'bg-surface-active' : 'hover:bg-surface-hover'}"
           >
             {#if user.country}<span class="mr-1">{getCountryFlag(user.country)}</span>{/if}{user.name}
-            {#if user.vekn_id}
-              <span class="text-ink-faint ml-2">({user.vekn_id})</span>
-            {/if}
+            <span class="text-ink-faint ml-2">({user.vekn_id})</span>
           </button>
         {/each}
         {#if total > SEARCH_LIMIT}
