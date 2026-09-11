@@ -217,22 +217,23 @@ def compute_tournament_full(d: dict) -> dict:
 DECK_API_EXCLUDE = API_SYNC_FIELDS | {"public", "private"}
 
 
-def _credited_deck(d: dict) -> dict:
-    if d["attribution"]["kind"] != AttributionKind.ANONYMOUS or d.get("winner"):
-        return dict(d)
-    return {k: v for k, v in d.items() if k != "user_uid"}
+def _published_deck(d: dict) -> dict:
+    withheld = {"private"}
+    if d["attribution"]["kind"] == AttributionKind.ANONYMOUS and not d.get("winner"):
+        withheld.add("user_uid")
+    return {k: v for k, v in d.items() if k not in withheld}
 
 
 def compute_deck_member(d: dict) -> dict | None:
     if d.get("public"):
-        return _credited_deck(d)
+        return _published_deck(d)
     return None
 
 
 def compute_deck_api(d: dict) -> dict | None:
     if not d.get("public"):
         return None
-    proj = {k: v for k, v in _credited_deck(d).items() if k not in DECK_API_EXCLUDE}
+    proj = {k: v for k, v in _published_deck(d).items() if k not in DECK_API_EXCLUDE}
     proj["attribution"] = {k: v for k, v in proj["attribution"].items() if k != "name"}
     return proj
 

@@ -115,7 +115,7 @@
       });
       onsaved?.();
     } catch (err: any) {
-      box.checked = deck.private;
+      box.checked = deck.private ?? false;
       privacyError = toUserMessage(err, m.deck_error_save());
     }
   }

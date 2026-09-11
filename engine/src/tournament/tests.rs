@@ -1123,7 +1123,6 @@ fn test_a_private_deck_leaves_publication_but_the_winners_stays() {
             .collect()
     };
 
-    // The payload still says public: the event's own op must win over it.
     let event = json::object! { type: "SetDeckPrivate", player_uid: "p2", round: 3, private: true };
     let (_, deck_ops) =
         run_event_with_decks(&tournament, &event, &make_player("p2"), &decks).unwrap();
@@ -1134,7 +1133,6 @@ fn test_a_private_deck_leaves_publication_but_the_winners_stays() {
         run_event_with_decks(&tournament, &event, &make_player("p1"), &decks).unwrap();
     assert!(publication(&deck_ops).is_empty());
 
-    // A replacement keeps the stored flag, whatever the upload claims.
     let decks = decks.replace(
         r#""public":true,"winner":false,"private":false"#,
         r#""public":false,"winner":false,"private":true"#,

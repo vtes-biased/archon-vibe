@@ -609,6 +609,11 @@ class TestDeckLeagueSanctionPromoApi:
         assert compute_member(ObjectType.DECK, d)["user_uid"] == "u-001"
         assert compute_api(ObjectType.DECK, d)["user_uid"] == "u-001"
 
+    def test_private_winner_deck_publishes_without_the_flag(self):
+        d = _make_deck(public=True, winner=True, private=True)
+        assert "private" not in compute_member(ObjectType.DECK, d)
+        assert "private" not in compute_api(ObjectType.DECK, d)
+
     def test_private_deck_hidden(self):
         assert compute_api(ObjectType.DECK, _make_deck(public=False)) is None
 
