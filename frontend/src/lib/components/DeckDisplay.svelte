@@ -46,8 +46,6 @@
   let creditError = $state<string | null>(null);
   const myUid = $derived(getAuthState().user?.uid);
   const ownsDeck = $derived(!!tournamentUid && !!myUid && deck.user_uid === myUid);
-  // An Owner credit resolves to no name and says nothing: the deck already sits
-  // under its owner. Only Anonymous is a statement worth printing.
   const anonymous = $derived(deck.attribution.kind === 'Anonymous');
 
   $effect(() => {

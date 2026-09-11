@@ -32,7 +32,6 @@
     ))
       .filter((r): r is { deck: DeckObject; tournament: Tournament } =>
         !!r.tournament && !r.tournament.deleted_at && r.tournament.state === "Finished"
-        // An organizer holds the anonymous ones at full level and must not list them.
         && (owner || (r.deck.public
           && (r.deck.attribution.kind !== "Anonymous" || r.deck.winner))))
       .sort((a, b) => day(b.tournament).localeCompare(day(a.tournament)));

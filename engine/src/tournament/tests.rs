@@ -2217,8 +2217,6 @@ fn test_finals_rescore_moves_publication_with_the_winner() {
         run_event_with_decks(&tournament, &event, &make_organizer(), &decks.dump()).unwrap();
     let updated = json::parse(&updated_json).unwrap();
     assert_eq!(updated["winner"].as_str(), Some("p2"));
-    // The crown moves with the publication: leaving `winner` on d1 would keep an
-    // anonymous deck owned after its owner stopped being the winner.
     let mut flags: Vec<(&str, bool, bool)> = deck_ops
         .members()
         .filter(|op| op["op"].as_str() == Some("set_publication"))
