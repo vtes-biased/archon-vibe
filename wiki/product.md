@@ -85,9 +85,9 @@ league opts in, auto-updating standings, organizer Finish action and rank-1
 Champion crowning.
 
 **Ratings and Hall of Fame** — server-side rating from the best 8 tournaments in
-a trailing 18 months, rating points in finished standings, a rankings page with
-country and date filters, and a Hall of Fame for five wins that would have made
-the TWDA with the winning deck on record
+a trailing 18 months, rating points in finished standings, a rankings page per
+rating category with a country filter, and a Hall of Fame for five wins that
+would have made the TWDA with the winning deck on record
 ([the rule](tournaments.md#configuration)), stated on the page. A member profile
 carries the wins behind the count and their decklists on record — a decklist
 reaches a profile only once its tournament is Finished, and to anyone but its

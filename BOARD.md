@@ -25,3 +25,4 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 
 Board changes ride the commit that earns them.
 
+- Show the size of the filtered rankings list — a muted "{count} player(s)" on the pager row, as the tournaments and leagues lists already carry, tracking the active tab (Hall of Fame included) and country and counting across all pages. Done when the count appears on every rankings view, even when there's a single page, matches the filtered list, and the new string exists in all five locales; no wiki change, because the count follows an existing list idiom and changes no domain.
