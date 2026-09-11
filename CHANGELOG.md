@@ -10,6 +10,14 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- You can now change your password from your profile.
+- Fixed password reset links sometimes opening on "Link invalid".
+- Multiple decklist improvements.
+- Various fixes on the Discord bot.
+- Promo movements can now record several promos at once.
+
 ## v1.1.2 — 2026-09-02
 
 - A disqualification now applies only to the tournament it was issued at.
