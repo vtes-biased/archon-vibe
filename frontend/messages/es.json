@@ -482,6 +482,7 @@
   "rankings_col_points": "RtP",
   "rankings_unknown_player": "Desconocido",
   "rankings_page_info": "{current} / {total}",
+  "rankings_total_count": "{count} jugador(es)",
   "hof_page_title": "Hall of Fame",
   "hof_description": "Cinco o más victorias en torneo. Una victoria cuenta cuando el evento habría llegado a la TWDA — presencial, al menos 10 jugadores — y la lista del mazo ganador está registrada.",
   "hof_loading": "Cargando Hall of Fame...",

@@ -482,6 +482,7 @@
   "rankings_col_points": "RtP",
   "rankings_unknown_player": "Unknown",
   "rankings_page_info": "{current} / {total}",
+  "rankings_total_count": "{count} player(s)",
   "hof_page_title": "Hall of Fame",
   "hof_description": "Five or more tournament wins. A win counts when the event would have made the TWDA — in person, at least 10 players — and the winning decklist is on record.",
   "hof_loading": "Loading Hall of Fame...",

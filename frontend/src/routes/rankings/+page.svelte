@@ -231,27 +231,30 @@
         </table>
       </div>
 
-      {#if totalPages > 1}
-        <div class="flex items-center justify-center gap-2 mt-4">
-          <button
-            class="px-3 py-1 rounded text-sm {page > 0 ? 'text-ink-bright hover:bg-surface-hover/50' : 'text-ink-faint'}"
-            disabled={page === 0}
-            onclick={() => { page = Math.max(0, page - 1); }}
-          >
-            <ChevronLeft class="w-4 h-4 inline" />
-          </button>
-          <span class="text-sm text-ink-muted">
-            {m.rankings_page_info({ current: String(page + 1), total: String(totalPages) })}
-          </span>
-          <button
-            class="px-3 py-1 rounded text-sm {page < totalPages - 1 ? 'text-ink-bright hover:bg-surface-hover/50' : 'text-ink-faint'}"
-            disabled={page >= totalPages - 1}
-            onclick={() => { page = Math.min(totalPages - 1, page + 1); }}
-          >
-            <ChevronRight class="w-4 h-4 inline" />
-          </button>
-        </div>
-      {/if}
+      <div class="mt-4 flex items-center justify-between text-sm text-ink-muted">
+        <span>{m.rankings_total_count({ count: String(filtered.length) })}</span>
+        {#if totalPages > 1}
+          <div class="flex items-center gap-2">
+            <button
+              class="px-3 py-1 rounded {page > 0 ? 'text-ink-bright hover:bg-surface-hover/50' : 'text-ink-faint'}"
+              disabled={page === 0}
+              onclick={() => { page = Math.max(0, page - 1); }}
+            >
+              <ChevronLeft class="w-4 h-4 inline" />
+            </button>
+            <span>
+              {m.rankings_page_info({ current: String(page + 1), total: String(totalPages) })}
+            </span>
+            <button
+              class="px-3 py-1 rounded {page < totalPages - 1 ? 'text-ink-bright hover:bg-surface-hover/50' : 'text-ink-faint'}"
+              disabled={page >= totalPages - 1}
+              onclick={() => { page = Math.min(totalPages - 1, page + 1); }}
+            >
+              <ChevronRight class="w-4 h-4 inline" />
+            </button>
+          </div>
+        {/if}
+      </div>
     {/if}
   </div>
 </div>
