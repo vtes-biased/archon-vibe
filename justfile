@@ -331,10 +331,9 @@ test-smoke:
 # Rust engine is the exception — its version is bumped by hand in engine/Cargo.toml
 # + engine/pyproject.toml when the engine changes, independent of the release tag.
 # Cut a release: bump type (patch/minor/major) or explicit vX.Y.Z (e2e-gated)
-release bump:
+release bump="":
     #!/usr/bin/env bash
     set -euo pipefail
-    [ -z "$(git status --porcelain)" ] || { echo "working tree not clean — commit or stash first"; exit 1; }
     latest=$(git tag --list 'v*' --sort=-v:refname | head -n1)
     case "{{ bump }}" in
         patch|minor|major)
@@ -350,6 +349,7 @@ release bump:
         *) echo "usage: just release <patch|minor|major|vX.Y.Z>"; exit 1 ;;
     esac
     git rev-parse "$tag" >/dev/null 2>&1 && { echo "tag $tag already exists"; exit 1; }
+    [ -z "$(git status --porcelain)" ] || { echo "working tree not clean — commit or stash first"; exit 1; }
     # Nudges: discourage (but don't block) releasing on stale deps or with no notes
     # written. `if` keeps set -e from aborting.
     anyway=""

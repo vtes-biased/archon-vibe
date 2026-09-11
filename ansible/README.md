@@ -174,11 +174,12 @@ Environment secret.
 ## Cutting a release
 
 ```bash
-just release v1.2.3    # tags + pushes; CI runs e2e and, if green, creates the GitHub Release
+just release patch     # or minor, major, or an explicit v1.2.3
 ```
 
-`just release <tag>` validates the tag starts with `v`, the working tree is clean,
-and the tag doesn't already exist, then runs `git tag` + `git push origin <tag>`.
+`just release <patch|minor|major|vX.Y.Z>` derives the tag from the latest one,
+checks it doesn't already exist and the working tree is clean, then runs
+`git tag` + `git push origin <tag>`.
 From there:
 
 1. `.github/workflows/release.yml` runs the full Playwright E2E suite (isolated
