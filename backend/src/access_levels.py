@@ -214,7 +214,7 @@ def compute_tournament_full(d: dict) -> dict:
     return dict(d)
 
 
-DECK_API_EXCLUDE = API_SYNC_FIELDS | {"public"}
+DECK_API_EXCLUDE = API_SYNC_FIELDS | {"public", "private"}
 
 
 def _credited_deck(d: dict) -> dict:

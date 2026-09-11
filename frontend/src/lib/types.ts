@@ -407,6 +407,7 @@ export interface DeckObject extends BaseObject {
   attribution: DeckAttribution;
   public: boolean;
   winner: boolean;
+  private: boolean;
 }
 
 export type RatingCategory = "constructed_online" | "constructed_offline" | "limited_online" | "limited_offline";

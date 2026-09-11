@@ -731,6 +731,7 @@ class DeckObject(BaseObject, kw_only=True):
     attribution: DeckAttribution = msgspec.field(default_factory=DeckAttribution)
     public: bool = False  # engine-set from decklists_mode, not client-writable
     winner: bool = False  # engine-set: this event's winner, whom anonymity spares
+    private: bool = False
 
 
 class Standing(msgspec.Struct, kw_only=True, frozen=True):

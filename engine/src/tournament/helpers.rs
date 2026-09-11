@@ -268,10 +268,13 @@ pub(super) fn players_in_other_active_rounds(
         .collect()
 }
 
-pub(super) fn compute_deck_public(tournament: &JsonValue, player_uid: &str) -> bool {
+pub(super) fn compute_deck_public(tournament: &JsonValue, player_uid: &str, private: bool) -> bool {
     let state = tournament[tournament::STATE].as_str().unwrap_or("");
     if state != "Finished" {
         return false;
+    }
+    if private {
+        return tournament[tournament::WINNER].as_str() == Some(player_uid);
     }
     let mode = tournament[tournament::DECKLISTS_MODE]
         .as_str()
@@ -325,7 +328,15 @@ pub(super) fn recompute_deck_publication(
             if user_uid.is_empty() || deck_uid.is_empty() {
                 return None;
             }
-            let is_public = compute_deck_public(tournament, user_uid);
+            let private = match deck_ops.members().rfind(|op| {
+                op[arg::OP].as_str() == Some("set_private")
+                    && op[arg::DECK_UID].as_str() == Some(deck_uid)
+            }) {
+                Some(op) => op[arg::PRIVATE].as_bool(),
+                None => d[deck_object::PRIVATE].as_bool(),
+            }
+            .unwrap_or(false);
+            let is_public = compute_deck_public(tournament, user_uid, private);
             let is_winner = compute_deck_winner(tournament, user_uid);
             (d[deck_object::PUBLIC].as_bool().unwrap_or(false) != is_public
                 || d[deck_object::WINNER].as_bool().unwrap_or(false) != is_winner)

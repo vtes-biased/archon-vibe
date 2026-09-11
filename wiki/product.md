@@ -67,7 +67,9 @@ seat their own 4–5 pod. Never pushed to VEKN, never rated.
 **Decks** — the card database in IndexedDB; upload by paste (local, offline),
 deckbuilder URL (VDB / VTESDecks / Amaranth, backend-proxied, online only) or QR;
 Rust parse and validation; a typed designer credit the owner alone moves, whose
-anonymous setting withholds the owner too; decklist-required enforcement with
+anonymous setting withholds the owner too; a private flag, the owner's or an
+organizer's, that holds a submitted deck out of publication, the winner's
+excepted; decklist-required enforcement with
 override; multideck decks stamped with the round they were played in and locked by
 that stamp; post-tournament upload; visibility by `decklists_mode`; automatic TWDA
 pull request on finish.
@@ -185,7 +187,9 @@ and VEKN id only — the nickname is never shown.
 **Visibility during an ongoing event** is organizer-set: standings Private /
 Cutoff / Top 10 / Public, decklists Winner / Finalists / All applied only after
 finish. These are display defaults, not access boundaries — see
-[sync](sync.md#what-members-actually-receive).
+[sync](sync.md#what-members-actually-receive). A deck's private flag is the
+access boundary the mode is not: it keeps the deck from everyone but its
+organizers, the winner's excepted.
 
 ## Reference material
 

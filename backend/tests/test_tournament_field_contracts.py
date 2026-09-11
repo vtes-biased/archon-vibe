@@ -101,6 +101,7 @@ _ACTION_ANY_VALUE = {
     "config",
     "deck",
     "attribution",
+    "private",
     "multideck",
     "exclude_drawn",
     "count",

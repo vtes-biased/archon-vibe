@@ -251,6 +251,7 @@ _ACTION_STATES: dict[str, tuple[tuple[str, ...], str]] = {
     "UpsertDeck": (_ANY_STATE, ""),
     "DeleteDeck": (_ANY_STATE, ""),
     "SetDeckAttribution": (_ANY_STATE, ""),
+    "SetDeckPrivate": (_ANY_STATE, ""),
     "RaffleDraw": (("Waiting", "Playing", "Finished"), ""),
     "RaffleUndo": (_ANY_STATE, ""),
     "RaffleClear": (_ANY_STATE, ""),
@@ -269,6 +270,7 @@ _PLAYER_ACTIONS = frozenset(
         "UpsertDeck",
         "DeleteDeck",
         "SetDeckAttribution",
+        "SetDeckPrivate",
     }
 )
 
@@ -641,6 +643,11 @@ _ACTION_FIELDS: dict[str, dict] = {
         "description": "The typed credit, as `/v1/decks` publishes one. `Anonymous`"
         " withholds the owner too.",
     },
+    "private": {
+        **_BOOL,
+        "description": "Keep the decklist from `/v1/decks` whatever the event's"
+        " decklists mode — the winner's excepted.",
+    },
     "multideck": {
         **_BOOL,
         "description": "Address the round's deck rather than the event's single one.",
@@ -792,6 +799,12 @@ _ACTIONS: dict[str, tuple[str, tuple[str, ...], tuple[str, ...]]] = {
         "Re-credit one of your own decklists. It touches no cards, so it works on"
         " a deck the round it was played in has locked.",
         ("player_uid", "attribution"),
+        ("round",),
+    ),
+    "SetDeckPrivate": (
+        "Hold one of a player's decklists back from publication, or release it."
+        " Its organizers still see it, and the winner's publishes regardless.",
+        ("player_uid", "private"),
         ("round",),
     ),
     "RaffleDraw": (

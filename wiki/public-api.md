@@ -242,8 +242,9 @@ putting them in the reference too only gives them a second place to go stale.
 A recipe section closes the page, for the deck-archive and statistics apps this
 API exists for: `/v1/decks` and `/v1/export`, and the publication contract they
 turn on — a deck is served only once its event is Finished, only as far as
-`decklists_mode` allows, and a reopen withdraws it, so an absence is a correction
-in progress rather than a deletion
+`decklists_mode` allows, never once its owner or an organizer marked it private
+— the winner's excepted — and a reopen withdraws it, so an absence is a
+correction in progress or a player's choice rather than a deletion
 ([architecture](architecture.md#cards-and-decks)). A deck's owner is its
 `user_uid` — withheld entirely on an anonymous deck, the winner's excepted, so a
 consumer keys such a deck on its own uid — and its `attribution` is a typed
@@ -405,8 +406,9 @@ API process must see the same `SNAPSHOT_DIR`.
   record, a full (not quick-lane) deploy, then a registered `api:read` client
   exercising a daemon token, the throttle and the app's rejection of that token.
   Trigger: the owner's next prod window.
-- **User-level TWD opt-out** — a member asking not to have their name or deck in
-  the TWDA. Trigger: a member asks.
+- **TWD opt-out for a winner** — a member asking to keep their name or their
+  winning deck out of the TWDA. A private deck covers every other deck; the
+  winner's publishes regardless. Trigger: a member asks.
 - **League standings** — needs engine compute, or promo-stock-style cross-object
   reprojection on tournament save. Trigger: a consumer asks.
 - **A static mirror of the bulk export on `static.krcg.org`**. Trigger: the owner

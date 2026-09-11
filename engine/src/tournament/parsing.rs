@@ -311,6 +311,18 @@ impl TournamentEvent {
                     attribution,
                 })
             }
+            "SetDeckPrivate" => {
+                let player_uid = value[arg::PLAYER_UID]
+                    .as_str()
+                    .ok_or("player_uid required")?
+                    .to_string();
+                let private = value[arg::PRIVATE].as_bool().ok_or("private required")?;
+                Ok(Self::SetDeckPrivate {
+                    player_uid,
+                    round: value[arg::ROUND].as_usize(),
+                    private,
+                })
+            }
             "RaffleDraw" => {
                 let label = value[arg::LABEL]
                     .as_str()

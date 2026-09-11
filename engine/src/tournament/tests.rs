@@ -1083,6 +1083,75 @@ fn test_a_client_cannot_write_a_free_text_credit() {
 }
 
 #[test]
+fn test_the_owner_or_an_organizer_marks_a_deck_private() {
+    let tournament = tournament_with_player("Playing");
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
+    let event = json::object! {
+        type: "SetDeckPrivate",
+        player_uid: "player-1",
+        private: true,
+    };
+    assert!(run_event_with_decks(&tournament, &event, &make_player("player-2"), decks).is_err());
+    for actor in [make_player("player-1"), make_organizer()] {
+        let (_, deck_ops) = run_event_with_decks(&tournament, &event, &actor, decks).unwrap();
+        assert_eq!(deck_ops.len(), 1);
+        assert_eq!(deck_ops[0]["op"].as_str(), Some("set_private"));
+        assert_eq!(deck_ops[0]["deck_uid"].as_str(), Some("d1"));
+        assert_eq!(deck_ops[0]["private"].as_bool(), Some(true));
+    }
+}
+
+#[test]
+fn test_a_private_deck_leaves_publication_but_the_winners_stays() {
+    let mut tournament = finished_with_finals();
+    tournament["decklists_mode"] = "All".into();
+    let decks = json::array![
+        { uid: "d1", user_uid: "p1", round: 3, public: true, winner: true, private: false },
+        { uid: "d2", user_uid: "p2", round: 3, public: true, winner: false, private: false },
+    ]
+    .dump();
+    let publication = |deck_ops: &JsonValue| -> Vec<(String, bool)> {
+        deck_ops
+            .members()
+            .filter(|op| op["op"].as_str() == Some("set_publication"))
+            .map(|op| {
+                (
+                    op["deck_uid"].as_str().unwrap().to_string(),
+                    op["public"].as_bool().unwrap(),
+                )
+            })
+            .collect()
+    };
+
+    // The payload still says public: the event's own op must win over it.
+    let event = json::object! { type: "SetDeckPrivate", player_uid: "p2", round: 3, private: true };
+    let (_, deck_ops) =
+        run_event_with_decks(&tournament, &event, &make_player("p2"), &decks).unwrap();
+    assert_eq!(publication(&deck_ops), vec![("d2".to_string(), false)]);
+
+    let event = json::object! { type: "SetDeckPrivate", player_uid: "p1", round: 3, private: true };
+    let (_, deck_ops) =
+        run_event_with_decks(&tournament, &event, &make_player("p1"), &decks).unwrap();
+    assert!(publication(&deck_ops).is_empty());
+
+    // A replacement keeps the stored flag, whatever the upload claims.
+    let decks = decks.replace(
+        r#""public":true,"winner":false,"private":false"#,
+        r#""public":false,"winner":false,"private":true"#,
+    );
+    let event = json::object! {
+        type: "UpsertDeck",
+        player_uid: "p2",
+        deck: { name: "Fixed", comments: "", cards: {}, round: 3, private: false },
+        multideck: true,
+    };
+    let (_, deck_ops) =
+        run_event_with_decks(&tournament, &event, &make_player("p2"), &decks).unwrap();
+    assert_eq!(deck_ops[0]["deck"]["private"].as_bool(), Some(true));
+    assert_eq!(deck_ops[0]["deck"]["public"].as_bool(), Some(false));
+}
+
+#[test]
 fn test_upsert_deck_clears_missing_decklist() {
     let mut tournament = tournament_with_player("Waiting");
     tournament["decklist_required"] = true.into();

@@ -70,6 +70,7 @@ pub mod arg {
     pub const POOL: &str = "pool";
     pub const POSSIBLE: &str = "possible";
     pub const PRINTED_NAME: &str = "printed_name";
+    pub const PRIVATE: &str = "private";
     pub const PRIZE_PROMO_UID: &str = "prize_promo_uid";
     pub const PROMO_UID: &str = "promo_uid";
     pub const PROMOS: &str = "promos";
@@ -133,6 +134,7 @@ pub mod deck_object {
     pub const CARDS: &str = "cards";
     pub const COMMENTS: &str = "comments";
     pub const NAME: &str = "name";
+    pub const PRIVATE: &str = "private";
     pub const PUBLIC: &str = "public";
     pub const ROUND: &str = "round";
     pub const UID: &str = "uid";

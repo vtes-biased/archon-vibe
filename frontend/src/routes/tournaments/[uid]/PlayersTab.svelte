@@ -608,7 +608,7 @@
                 >{m.decks_replace()}</Button>
               {/if}
             {:else if slot.deck}
-              <DeckDisplay deck={slot.deck} onreplace={canEditDecks ? () => { uploadingFor = puid; uploadingRound = slot.round ?? undefined; } : undefined} />
+              <DeckDisplay deck={slot.deck} tournamentUid={tournament.uid} organizer={isOrganizer} onreplace={canEditDecks ? () => { uploadingFor = puid; uploadingRound = slot.round ?? undefined; } : undefined} />
             {:else if canEditDecks}
               <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} round={slot.round ?? undefined} multideck onuploaded={onUploaded} />
             {:else}
@@ -630,7 +630,7 @@
             >{m.decks_replace()}</Button>
           {/if}
         {:else}
-          <DeckDisplay deck={playerDecks[0]} onreplace={canEditDecks ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined} />
+          <DeckDisplay deck={playerDecks[0]} tournamentUid={tournament.uid} organizer={isOrganizer} onreplace={canEditDecks ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined} />
         {/if}
       {/if}
       {#if errors.length > 0 && playerDecks.some(d => !isDeckHiddenFromOrganizer(d.round))}

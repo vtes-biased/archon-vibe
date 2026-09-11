@@ -19,6 +19,7 @@
     deck,
     editable = false,
     tournamentUid = '',
+    organizer = false,
     multideck = false,
     format = '',
     onsaved,
@@ -28,6 +29,7 @@
     deck: DeckObject;
     editable?: boolean;
     tournamentUid?: string;
+    organizer?: boolean;
     multideck?: boolean;
     format?: string;
     onsaved?: () => void;
@@ -47,6 +49,8 @@
   const myUid = $derived(getAuthState().user?.uid);
   const ownsDeck = $derived(!!tournamentUid && !!myUid && deck.user_uid === myUid);
   const anonymous = $derived(deck.attribution.kind === 'Anonymous');
+  const canSetPrivate = $derived(!!tournamentUid && (ownsDeck || organizer));
+  let privacyError = $state<string | null>(null);
 
   $effect(() => {
     creditName(deck.attribution).then(n => credit = n);
@@ -96,6 +100,23 @@
       onsaved?.();
     } catch (e: any) {
       creditError = toUserMessage(e, m.deck_error_save());
+    }
+  }
+
+  async function setPrivate(e: Event) {
+    const box = e.currentTarget as HTMLInputElement;
+    privacyError = null;
+    try {
+      const { tournamentAction } = await import('$lib/tournament-actions');
+      await tournamentAction(tournamentUid, 'SetDeckPrivate', {
+        player_uid: deck.user_uid,
+        round: deck.round,
+        private: box.checked,
+      });
+      onsaved?.();
+    } catch (err: any) {
+      box.checked = deck.private;
+      privacyError = toUserMessage(err, m.deck_error_save());
     }
   }
 
@@ -247,6 +268,22 @@
         <button class="text-link underline ml-1" onclick={startEditingCredit}>{m.deck_credit_edit()}</button>
       {/if}
     </p>
+  {/if}
+
+  {#if canSetPrivate}
+    <label class="flex items-center gap-3 min-h-11 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={deck.private}
+        onchange={setPrivate}
+        class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent"
+      />
+      <span class="text-sm text-ink-bright">{m.deck_private_label()}</span>
+    </label>
+    <p class="text-xs text-ink-faint mb-2">{m.deck_private_hint()}</p>
+    {#if privacyError}
+      <p class="text-sm text-link mb-2">{privacyError}</p>
+    {/if}
   {/if}
 
   {#if editable || onreplace || ondelete}

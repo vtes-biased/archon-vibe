@@ -114,6 +114,7 @@ export type TournamentEventType =
   | 'UpsertDeck'
   | 'DeleteDeck'
   | 'SetDeckAttribution'
+  | 'SetDeckPrivate'
   | 'SetScore'
   | 'Override'
   | 'Unoverride'
@@ -155,6 +156,7 @@ export interface TournamentEvent {
   vekn_id?: string;
   deck?: { name: string; comments: string; cards: Record<string, number>; round?: number; attribution?: DeckAttribution };
   attribution?: DeckAttribution; // SetDeckAttribution
+  private?: boolean; // SetDeckPrivate
   deck_index?: number | null;
   multideck?: boolean;
   config?: Record<string, unknown>;
@@ -197,9 +199,9 @@ export function buildSanctionsPayload(sanctions: Sanction[], tournamentUid: stri
 }
 
 export interface DeckOp {
-  op: 'upsert' | 'delete' | 'set_round' | 'set_publication' | 'set_attribution';
+  op: 'upsert' | 'delete' | 'set_round' | 'set_publication' | 'set_attribution' | 'set_private';
   player_uid?: string;
-  deck?: { name: string; comments: string; cards: Record<string, number>; round?: number | null; public?: boolean; winner?: boolean; attribution?: DeckAttribution };
+  deck?: { name: string; comments: string; cards: Record<string, number>; round?: number | null; public?: boolean; winner?: boolean; private?: boolean; attribution?: DeckAttribution };
   deck_uid?: string;
   deck_index?: number | null; // delete: the deck's round stamp, null being the pending deck
   round?: number | null; // set_round: the round the deck was played in
@@ -207,6 +209,7 @@ export interface DeckOp {
   public?: boolean;
   winner?: boolean;
   attribution?: DeckAttribution;
+  private?: boolean;
 }
 
 export interface EngineResult {
@@ -222,6 +225,7 @@ function buildDecksPayload(decks: DeckObject[]): string {
       uid: d.uid,
       public: d.public,
       winner: d.winner,
+      private: d.private,
     }))
   );
 }

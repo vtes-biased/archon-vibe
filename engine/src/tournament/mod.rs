@@ -2465,15 +2465,20 @@ fn apply_event(
                 return Err(EngineError::DeckLockedPlaying);
             }
             let mut deck_data = deck.clone();
-            deck_data[deck_object::PUBLIC] = compute_deck_public(tournament, player_uid).into();
-            deck_data[deck_object::WINNER] = compute_deck_winner(tournament, player_uid).into();
             if !actor.is_organizer && state != TournamentState::Finished {
                 deck_data[deck_object::ROUND] = JsonValue::Null;
             }
-            if decks.members().any(|d| {
+            let replaced = decks.members().find(|d| {
                 d[deck_object::USER_UID].as_str() == Some(player_uid.as_str())
                     && d[deck_object::ROUND].as_usize() == deck_data[deck_object::ROUND].as_usize()
-            }) {
+            });
+            let private =
+                replaced.is_some_and(|d| d[deck_object::PRIVATE].as_bool().unwrap_or(false));
+            deck_data[deck_object::PRIVATE] = private.into();
+            deck_data[deck_object::PUBLIC] =
+                compute_deck_public(tournament, player_uid, private).into();
+            deck_data[deck_object::WINNER] = compute_deck_winner(tournament, player_uid).into();
+            if replaced.is_some() {
                 deck_data.remove(deck_object::ATTRIBUTION);
             }
             tournament[tournament::PLAYERS][idx].remove(player::MISSING_DECKLIST);
@@ -2557,6 +2562,30 @@ fn apply_event(
                 arg::DECK_UID => deck_uid,
                 arg::PLAYER_UID => player_uid.as_str(),
                 arg::ATTRIBUTION => attribution.clone(),
+            });
+            Ok(())
+        }
+
+        TournamentEvent::SetDeckPrivate {
+            player_uid,
+            round,
+            private,
+        } => {
+            if !actor.is_organizer && actor.uid != *player_uid {
+                return Err(EngineError::DeckPrivacyForbidden);
+            }
+            let deck_uid = decks
+                .members()
+                .find(|d| {
+                    d[deck_object::USER_UID].as_str() == Some(player_uid.as_str())
+                        && d[deck_object::ROUND].as_usize() == *round
+                })
+                .and_then(|d| d[deck_object::UID].as_str())
+                .ok_or(EngineError::DeckNotFound)?;
+            let _ = deck_ops.push(json::object! {
+                arg::OP => "set_private",
+                arg::DECK_UID => deck_uid,
+                arg::PRIVATE => *private,
             });
             Ok(())
         }

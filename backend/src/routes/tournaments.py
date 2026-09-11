@@ -89,6 +89,7 @@ _RATING_IRRELEVANT_ACTIONS = frozenset(
         "UpdateDeck",
         "DeleteDeck",
         "SetDeckAttribution",
+        "SetDeckPrivate",
         "SetPaymentStatus",
         "MarkAllPaid",
         "SetWaitlisted",
@@ -143,6 +144,7 @@ async def _build_decks_json(tournament_uid: str, conn=None) -> str:
                 "uid": d.uid,
                 "public": d.public,
                 "winner": d.winner,
+                "private": d.private,
             }
             for d in decks
         ]
@@ -230,6 +232,7 @@ async def _process_deck_ops(
                 )
             deck_obj.public = deck_data.get("public", False)
             deck_obj.winner = deck_data.get("winner", False)
+            deck_obj.private = deck_data.get("private", False)
             bd = await save_object_from_model(ObjectType.DECK, deck_obj)
             bd.org_uids = _org_uids
             affected.append(bd)
@@ -274,6 +277,16 @@ async def _process_deck_ops(
             target = next((d for d in existing_decks if d.uid == deck_uid), None)
             if target:
                 target.attribution = msgspec.convert(op["attribution"], DeckAttribution)
+                target.modified = datetime.now(UTC)
+                bd = await save_object_from_model(ObjectType.DECK, target)
+                bd.org_uids = _org_uids
+                affected.append(bd)
+
+        elif op_type == "set_private":
+            deck_uid = op.get("deck_uid")
+            target = next((d for d in existing_decks if d.uid == deck_uid), None)
+            if target:
+                target.private = op.get("private", False)
                 target.modified = datetime.now(UTC)
                 bd = await save_object_from_model(ObjectType.DECK, target)
                 bd.org_uids = _org_uids
@@ -1469,6 +1482,7 @@ class TournamentActionRequest(BaseModel):
     config: dict | None = None  # For UpdateConfig: partial config fields
     deck: dict | None = None
     attribution: dict | None = None  # For SetDeckAttribution
+    private: bool | None = None  # For SetDeckPrivate
     multideck: bool | None = None
     label: str | None = None
     pool: str | None = None
@@ -1736,8 +1750,8 @@ async def tournament_action(
         await maybe_submit_twda(updated)
         asyncio.create_task(_maybe_push_vekn(updated))
     elif is_finished:
-        # `set_publication` ops carry no player_uid: the archive and the Hall of
-        # Fame ask whether the deck exists, never whether it is visible. A credit
+        # Publication and privacy ops carry no player_uid: the archive and the Hall
+        # of Fame ask whether a deck exists, never whether it is visible. A credit
         # change does carry one — it rewrites the submission's Created-by line.
         winners = {tournament.winner, updated.winner} - {""}
         winner_deck_moved = any(op.get("player_uid") in winners for op in deck_ops)

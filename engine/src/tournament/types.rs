@@ -214,6 +214,11 @@ pub enum TournamentEvent {
         round: Option<usize>,
         attribution: JsonValue,
     },
+    SetDeckPrivate {
+        player_uid: String,
+        round: Option<usize>,
+        private: bool,
+    },
 
     RaffleDraw {
         label: String,

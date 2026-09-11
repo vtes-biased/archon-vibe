@@ -454,7 +454,9 @@ names nobody, an `Anonymous` or `Owner` one and a `Member` id no member holds
 alike, emits no line and no fallback: the typed credit keeps no loose string for
 one to fall back to. The winner's name appearing regardless is intentional — the
 TWDA is the public win registry, which is also why anonymity never withholds the
-winner's own `user_uid` ([tournaments](tournaments.md#decks)).
+winner's own `user_uid` ([tournaments](tournaments.md#decks)). Privacy never
+reaches the submission either: the winner's deck publishes whatever its owner
+chose, and the TWDA holds no other.
 
 ### Inbound
 

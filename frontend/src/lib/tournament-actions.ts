@@ -304,6 +304,7 @@ export async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, exi
         attribution: op.deck.attribution ?? existing?.attribution ?? ANONYMOUS,
         public: op.deck.public || false,
         winner: op.deck.winner || false,
+        private: op.deck.private || false,
       };
       await saveDeck(deckObj);
       affectedUids.push(deckObj.uid);
@@ -345,6 +346,14 @@ export async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, exi
       const target = existingDecks.find(d => d.uid === op.deck_uid);
       if (target) {
         target.attribution = op.attribution;
+        target.modified = new Date().toISOString();
+        await saveDeck(target);
+        affectedUids.push(target.uid);
+      }
+    } else if (op.op === 'set_private' && op.deck_uid) {
+      const target = existingDecks.find(d => d.uid === op.deck_uid);
+      if (target) {
+        target.private = op.private ?? false;
         target.modified = new Date().toISOString();
         await saveDeck(target);
         affectedUids.push(target.uid);

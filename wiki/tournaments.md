@@ -644,7 +644,7 @@ a table Finished, comment required), `Unoverride`.
 
 **Finals** — `SetToss`, `RandomToss`, `StartFinals`, `FinishFinals`.
 
-**Decks** — `UpsertDeck`, `DeleteDeck`, `SetDeckAttribution`. All deck mutations
+**Decks** — `UpsertDeck`, `DeleteDeck`, `SetDeckAttribution`, `SetDeckPrivate`. All deck mutations
 are engine `deck_ops` side effects; there are no REST deck endpoints.
 
 A multideck deck is **stamped with the round it was played in**. `DeckObject.round`
@@ -680,7 +680,7 @@ record on `/profile` and `/users/[uid]` gates on the tournament being held
 locally, not soft-deleted and `Finished`, plus `public` for anyone but the deck's
 owner, who is entitled to all of their own. The `public` leg is what answers for
 an organizer, since they hold every deck of their event at `full` whatever its
-state. **A profile also lists to anyone else only the decks that name their
+state, and what keeps a private deck on its owner's record alone. **A profile also lists to anyone else only the decks that name their
 owner** — an anonymous deck is on nobody's record but its owner's, and the
 organizer holding it at `full` is held to the same rule.
 
@@ -697,15 +697,29 @@ chose: the archive is a public win registry and the TWDA's stance is already
 that. In Finalists mode the deck list therefore names the winner and every
 finalist but an anonymous one.
 
+**Private is the disclosure boundary beside it.** `SetDeckPrivate` flags a deck
+already submitted — the upload form never offers it, and a replacement keeps the
+stored flag whatever the upload claims — on the word of its owner or an
+organizer, in any state, touching no content. A private deck is never published
+whatever `decklists_mode` says: its organizers hold it at `full` and nobody else
+does — no other member, not the public API, not its export. The winner's deck is
+the exception and publishes regardless, so the archive keeps its win registry.
+Credit and disclosure compose rather than replace each other: an anonymous deck
+still publishes, with no owner, and a private one keeps whatever credit it has.
+
 **One post-finish pass owns publication.** After every event that starts or ends
 on a `Finished` tournament, the engine recomputes each deck's `public` from the
-mode, the winner and the finalist flags — and its `winner` flag with it — then
+mode, the winner, the finalist flags and the deck's `private` — and its `winner`
+flag with it — then
 emits `set_publication` in both directions for every deck whose flags moved —
 skipping the decks the same event upserted or deleted, whose ops already carry
 the answer. There is no other writer: finishing,
 reopening, narrowing the mode, a finals rescore that moves the winner and an
-archival correction all publish and retract through it. The pass reads the flag
-off the decks payload the engine is handed, so the two payload builders carry it
+archival correction all publish and retract through it, and so does
+`SetDeckPrivate`: the payload predates the event, so the pass reads the event's
+own `set_private` ahead of it, and marking a published deck private retracts it
+at once. The pass reads the flags off the decks payload the engine is handed, so
+the two payload builders carry them
 ([hazards](hazards.md#two-implementations-of-one-gate)). The sanction routes reach
 it through `update_standings`, which takes the decks and returns deck ops for the
 same reason: a standings adjustment or a DQ on the final re-scores it and can move
@@ -766,6 +780,7 @@ and the VEKN record outranks the archive from that moment on.
 | Set score | players at the table during Playing; organizers whenever rounds exist |
 | Deck upload | players for their own deck — any of their own, naming its round, once Finished — organizers for any |
 | Set a deck's credit | the deck's owner alone, in any state |
+| Hold a deck private | the deck's owner or an organizer, in any state |
 | Correct an archival record | IC |
 | Everything else | organizers |
 
