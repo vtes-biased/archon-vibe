@@ -6,8 +6,8 @@ use json::JsonValue;
 use super::types::{SeatScore, TournamentEvent};
 use crate::error::EngineError;
 
-/// The credits a client may set — never `Archive`, the one kind that keeps a
-/// name, so the store gains no free-text credit and `msgspec` no shape it refuses.
+/// Rebuilt field by field, so a client cannot hand the store a shape `msgspec`
+/// refuses to decode.
 fn credit_from_json(value: &JsonValue) -> Result<JsonValue, EngineError> {
     let kind = value[arg::KIND]
         .as_str()

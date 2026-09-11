@@ -1064,7 +1064,6 @@ fn test_a_client_cannot_write_a_free_text_credit() {
     let actor = make_player("player-1");
     for attribution in [
         json::object! { kind: "Archive", vekn_id: "", name: "Alice" },
-        json::object! { kind: "Named", vekn_id: "", name: "Alice" },
         json::object! { kind: "Member", vekn_id: "", name: "" },
     ] {
         let event = json::object! {

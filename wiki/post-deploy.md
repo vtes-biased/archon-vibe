@@ -138,11 +138,12 @@ Gated by the commit that typed the deck credit. Every deck row held `author`
 plus a loose `attribution` string; the entry rewrites both into the typed field
 and stamps `winner`. Null, `"twda"` and the owner's own VEKN id all become
 `Owner`: the upload form never recorded a self-credit, so a null is mostly an
-ordinary self-upload, and nothing stored separates it from a chosen anonymity —
-the editor reopened every null as anonymous, and until June the anonymous choice
-left the stored author standing. A `twda` deck is its winner's. Another member's
-id becomes `Member` and anything else `Archive`. No past deck becomes anonymous;
-an owner who wants that sets it.
+ordinary self-upload, and nothing stored reliably separates it from a chosen
+anonymity: until June the anonymous choice left the author standing, and the
+editor reopened every null as anonymous, so even an empty author is as likely an
+edited self-upload. A `twda` deck is its winner's. Another member's id becomes
+`Member` and anything else `Archive`. No past deck becomes anonymous; an owner
+who wants that sets it.
 
 Nothing to run: the entry rewrote the rows before the process served. No row may
 still hold the old shape —

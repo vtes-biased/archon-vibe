@@ -26,7 +26,6 @@
 
   onMount(() => { warmUserIndex(); });
 
-  // A deck holding a past Archive credit keeps it until the owner picks one of these.
   const kinds = ['Owner', 'Anonymous', 'Member'] as const;
 
   function pick(kind: (typeof kinds)[number]) {

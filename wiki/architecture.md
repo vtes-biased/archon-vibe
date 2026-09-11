@@ -420,8 +420,8 @@ anonymity ([tournaments](tournaments.md#decks)).
 (carrying a `vekn_id`) or `Archive`. **No credit a client sets carries a name**: a
 designer's name as a bare string is personal data the TWDA already struggles to
 govern, so a designer is credited as a member or not at all, and the engine drops
-any name it is sent. `Archive` is the one exception — a past credit that named
-someone no member resolves — and nothing writes one any more.
+any name it is sent. `Archive` is the one exception, written only by the
+stored-value migration for a past credit naming someone no member resolves.
 A member's display name is resolved at render rather than stored, so a rename
 follows the credit. Deduplication keys on `(tournament_uid, user_uid, round)` on
 both sides of the stack — except where the owner is withheld, and a deck with no

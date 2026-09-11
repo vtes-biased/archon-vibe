@@ -158,7 +158,6 @@ async def test_member_credit_naming_nobody_credits_nobody(test_db):
 
 @pytest.mark.asyncio
 async def test_archive_credit_passes_its_name_through(test_db):
-    """A past credit naming someone no member resolves still credits them."""
     async with _published(
         attribution=DeckAttribution(
             kind=AttributionKind.ARCHIVE, name="Archived Author"
