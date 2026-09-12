@@ -24,3 +24,5 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
+
+- An organizer's edit to a tournament filed on vekn.net is reverted by the inbound sync within six hours — the app must own its name, finish and timezone, while vekn.net keeps the fields a mismatch would break. Done when an organizer's edit to those three survives a sync cycle unchanged, and `wiki/vekn.md` states which tournament fields the app owns, which vekn.net owns, and the rule that decides — context in [board/vekn-app-owned-fields.md](board/vekn-app-owned-fields.md).
