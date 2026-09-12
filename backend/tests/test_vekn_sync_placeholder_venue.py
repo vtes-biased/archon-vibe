@@ -51,12 +51,13 @@ async def test_sync_keeps_the_local_location_of_an_app_filed_event(test_db):
     async with db.get_connection() as conn:
         await db.save_tournament(local, conn=conn)
 
-    # vekn.net's view of the same event: renamed there, on the placeholder venue.
+    # On the placeholder venue, with a vekn-owned field changed so the refresh
+    # has something to write.
     await sync_all_tournaments(
         _StubClient(
             {
                 "event_id": event_id,
-                "event_name": "Budapest NQ 2026",
+                "event_name": "Budapest NQ",
                 "event_startdate": "2026-09-12",
                 "event_starttime": "10:00",
                 "eventtype_id": 2,
@@ -64,13 +65,14 @@ async def test_sync_keeps_the_local_location_of_an_app_filed_event(test_db):
                 "venue_id": str(PLACEHOLDER_VENUE_ID),
                 "venue_name": PLACEHOLDER_VENUE_NAME,
                 "venue_country": "AQ",
+                "proxies_allowed": "1",
                 "players": [],
             }
         )
     )
 
     stored = await db.get_tournament_by_uid(uid)
-    assert stored.name == "Budapest NQ 2026"  # the refresh did run
+    assert stored.proxies is True  # the refresh did run
     assert (stored.country, stored.timezone) == ("HU", "Europe/Budapest")
     assert stored.venue == "Sárkány Klub"
     assert stored.venue_url == "https://example.hu/klub"

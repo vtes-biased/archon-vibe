@@ -475,7 +475,6 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                         tournament = msgspec.structs.replace(
                             tournament,
                             country=existing.country,
-                            timezone=existing.timezone,
                             venue=existing.venue,
                             venue_url=existing.venue_url,
                             address=existing.address,
@@ -490,12 +489,9 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                         # Authority follows content: metadata-only refresh once local
                         # rounds exist, or the incoming event has no players to speak for.
                         meta_changed = (
-                            existing.name != tournament.name
-                            or existing.format != tournament.format
+                            existing.format != tournament.format
                             or existing.rank != tournament.rank
                             or existing.start != tournament.start
-                            or existing.finish != tournament.finish
-                            or existing.timezone != tournament.timezone
                             or existing.country != tournament.country
                             or existing.online != tournament.online
                             or existing.venue != tournament.venue
@@ -509,13 +505,10 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                             updated = msgspec.structs.replace(
                                 existing,
                                 modified=datetime.now(UTC),
-                                name=tournament.name,
                                 format=tournament.format,
                                 rank=tournament.rank,
                                 online=tournament.online,
                                 start=tournament.start,
-                                finish=tournament.finish,
-                                timezone=tournament.timezone,
                                 country=tournament.country,
                                 venue=tournament.venue,
                                 venue_url=tournament.venue_url,
@@ -543,16 +536,13 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                         else:
                             stats["unchanged"] += 1
                     else:
-                        # No local play data: VEKN is authoritative for everything,
-                        # including players/standings/winner.
+                        # No local play data: VEKN is authoritative for the play
+                        # data and the fields it owns.
                         changed = (
                             existing.state != tournament.state
-                            or existing.name != tournament.name
                             or existing.format != tournament.format
                             or existing.rank != tournament.rank
                             or existing.start != tournament.start
-                            or existing.finish != tournament.finish
-                            or existing.timezone != tournament.timezone
                             or existing.country != tournament.country
                             or existing.online != tournament.online
                             or existing.winner != tournament.winner
@@ -571,13 +561,14 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                             tournament = Tournament(
                                 uid=existing.uid,
                                 modified=datetime.now(UTC),
-                                name=tournament.name,
+                                # App-owned: filled at creation, never rewritten.
+                                name=existing.name,
+                                finish=existing.finish,
+                                timezone=existing.timezone,
                                 format=tournament.format,
                                 rank=tournament.rank,
                                 online=tournament.online,
                                 start=tournament.start,
-                                finish=tournament.finish,
-                                timezone=tournament.timezone,
                                 country=tournament.country,
                                 state=tournament.state,
                                 venue=tournament.venue,

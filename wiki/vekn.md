@@ -296,29 +296,45 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   an empty calendar entry used to reset an in-app event still taking registrations
   back to `Planned` and discard everyone registered — on every sync until its first
   round started.
+- **Which side owns a field is decided by what a mismatch costs**, not by who
+  wrote it first. vekn.net owns a field and the app freezes it where the two
+  values *must* agree — the push mechanically depends on it (`rounds`), ranking
+  has to come out the same on both sides (`rank`, `format`), or a divergence
+  misleads players trying to join (`start`). The app owns `name`, `finish` and
+  `timezone`, where the two are free to differ and the app is plainly the truth:
+  the sync fills them when it creates the row and **never modifies them again**
+  — an adopted local copy keeps the values it already held — so an organizer's
+  edit survives the cycle. Freezing everything instead would be
+  simpler and is wrong — it hands a filed event's title to a system the organizer
+  cannot edit it on. An end date added on vekn.net after the app created the row
+  is therefore set in the app, not imported. Everything else — `country`, `venue`,
+  `address`, `venue_url`, `map_url` — stays a vekn.net refresh.
 - **Event times are wall clock at the venue**, which is how `start`/`finish` are
-  stored: naive, paired with `timezone`. The sync writes VEKN's time verbatim and
-  fills `timezone` from a guess off the venue country and city; online events with
-  no venue keep the UTC default. Converting to UTC here made every reader that
-  anchors the naive value shift it twice.
+  stored: naive, paired with `timezone`. The sync writes VEKN's time verbatim
+  and, **at creation only**, fills `timezone` from a guess off the venue country
+  and city; online events with no venue keep the UTC default. Converting to UTC
+  here made every reader that anchors the naive value shift it twice.
 - **The placeholder venue is not authoritative for location.** An event we filed
   ([above](#push-constraints)) reads back on venue 9999, "Check on Archon" in
   `AQ`, which answers for no real place: the sync drops it and keeps whatever the
-  app holds for country, timezone, venue, venue url, address and map url. Taking
-  it at face value moved a Budapest national qualifier to Antarctica/UTC within
-  the hour and undid the organizer's re-entry on every run (gh-9).
+  app holds for country, venue, venue url, address and map url — `timezone` needs
+  no entry here, being app-owned on every linked event. Taking it at face value
+  moved a Budapest national qualifier to Antarctica/UTC within the hour and undid
+  the organizer's re-entry on every run (gh-9).
 - Carries `proxies_allowed` onto `proxies`, **except under a championship rank,
   which forbids proxies by rule**. A few vekn.net championships do set the flag,
   and importing that combination would block every later config edit on engine
-  legality. The calendar entry is create-only with no update endpoint, so the flag
-  is owned by vekn.net: the sync refreshes it like other descriptive metadata, and
-  the app's field is frozen once a tournament holds a vekn id.
+  legality. The sync reads the flag back, so a local edit would revert rather than
+  diverge — which puts it on vekn.net's side of the rule above: the sync refreshes
+  it like other descriptive metadata, and the app's field is frozen once a
+  tournament holds a vekn id.
 - Seeds venue autocomplete data.
 - Stamps `vekn_pushed_at = now` on finished imports so the batch never re-uploads
   them.
 - Rebuilds changed tournaments field by field, so local-only bookkeeping
-  (`checkin_code`, `twda_status`, `vekn_event_absent_at`) must be **explicitly
-  carried over** from the existing row or it resets on every re-sync.
+  (`checkin_code`, `twda_status`, `vekn_event_absent_at`) and the three app-owned
+  fields must be **explicitly carried over** from the existing row or they reset
+  on every re-sync.
 
 Each phase — member, tournament, TWDA — is wrapped independently: an exception or
 timeout logs an error and skips that phase for the cycle without aborting the
