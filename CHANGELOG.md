@@ -10,6 +10,12 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- Finish Tournament is now in the action bar after two rounds.
+- vekn.net no longer reverts a tournament's name or schedule.
+- Rankings now show the player count.
+
 ## v1.1.5 — 2026-09-11
 
 - You can now change your password from your profile.
