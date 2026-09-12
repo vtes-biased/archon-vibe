@@ -6,7 +6,7 @@
   import QrCheckinDisplay from "$lib/components/QrCheckinDisplay.svelte";
   import FinishedResults from "./FinishedResults.svelte";
   import InlineNotice from "$lib/components/InlineNotice.svelte";
-  import { Undo2, CheckCheck, Banknote, RotateCcw, Upload } from "@lucide/svelte";
+  import { Undo2, CheckCheck, Banknote, RotateCcw, Upload, TriangleAlert } from "@lucide/svelte";
   import { translateTournamentState, seatDisplay, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -22,6 +22,7 @@
     onImportCsv,
     onAddBanner,
     onRecordPromos,
+    onFinishTournament,
   }: {
     tournament: Tournament;
     standings: StandingEntry[];
@@ -33,6 +34,7 @@
     onImportCsv: () => void;
     onAddBanner: () => void;
     onRecordPromos: () => void;
+    onFinishTournament: () => void;
   } = $props();
 
   let showQrCode = $state(false);
@@ -268,6 +270,7 @@
         { label: m.payment_mark_all_paid(), icon: Banknote, onclick: () => doAction("MarkAllPaid"), disabled: actionLoading },
         ...(hasRounds && !tournament.online ? [{ label: m.overview_reset_checkin(), icon: RotateCcw, onclick: () => doAction("ResetCheckIn"), disabled: actionLoading }] : []),
         { label: m.overview_reopen_registration(), icon: Undo2, onclick: () => doAction("ReopenRegistration"), disabled: actionLoading },
+        ...(finalsQual.enough_rounds ? [{ label: m.overview_finish_tournament(), icon: TriangleAlert, onclick: onFinishTournament, disabled: actionLoading }] : []),
       ]} />
 
     {:else if tournament.state === "Playing"}

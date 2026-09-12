@@ -31,6 +31,7 @@
   import TabStrip from "$lib/components/TabStrip.svelte";
   import ArchonImportModal from "./ArchonImportModal.svelte";
   import CsvRegisterModal from "./CsvRegisterModal.svelte";
+  import FinishConfirmModal from "./FinishConfirmModal.svelte";
   import PlayersTab from "./PlayersTab.svelte";
   import RoundsTab from "./RoundsTab.svelte";
   import FinalsTab from "./FinalsTab.svelte";
@@ -190,6 +191,7 @@ import TournamentModals from "./TournamentModals.svelte";
   }
   let showArchonImport = $state(false);
   let showCsvImport = $state(false);
+  let showFinishConfirm = $state(false);
 
   const tabs = $derived.by(() => {
     const t: { id: TabId; label: string; icon: typeof Users }[] = [
@@ -980,6 +982,7 @@ import TournamentModals from "./TournamentModals.svelte";
             onImportCsv={() => (showCsvImport = true)}
             onAddBanner={() => bannerComp?.openCropper()}
             onRecordPromos={() => openTools('promos')}
+            onFinishTournament={() => (showFinishConfirm = true)}
           />
 
           <TabStrip {tabs} bind:active={activeTab} />
@@ -1093,7 +1096,6 @@ import TournamentModals from "./TournamentModals.svelte";
     {playerInfo}
     {standings}
     sanctions={tournamentSanctions}
-    {decksByUser}
     {doAction}
     {actionLoading}
     {bannerItem}
@@ -1101,9 +1103,22 @@ import TournamentModals from "./TournamentModals.svelte";
     {archonImportItem}
     {syncVeknItem}
     {canDelete}
+    onFinishTournament={() => (showFinishConfirm = true)}
     onDelete={() => (showDeleteConfirm = true)}
   />
 {/if}
 
 <ArchonImportModal bind:show={showArchonImport} tournamentUid={uid} {hasRounds} />
 <CsvRegisterModal bind:show={showCsvImport} tournamentUid={uid} onImported={() => load()} />
+
+{#if tournament && showFinishConfirm}
+  <FinishConfirmModal
+    {tournament}
+    {standings}
+    {playerInfo}
+    {decksByUser}
+    {actionLoading}
+    onConfirm={async () => { await doAction("FinishTournament"); showFinishConfirm = false; showTools = false; }}
+    onClose={() => (showFinishConfirm = false)}
+  />
+{/if}

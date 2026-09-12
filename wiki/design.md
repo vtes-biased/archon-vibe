@@ -637,6 +637,11 @@ Standing decisions:
   promos feed the report from check-in on
   ([tournaments](tournaments.md#engine-event-catalog)), so Tools stays the
   any-state path while the bar names the moment.
+- **Finish Tournament also stands in the action bar's More menu**, from the
+  moment a Waiting tournament has two played rounds and finals become one exit
+  among two rather than the only one. Same shape as the CSV import and the
+  Finished promo CTA: Tools keeps the any-state path, the bar names the moment,
+  and one confirmation modal lives on the page so both open it.
 - **The description drops out of the organizer view only** — organizers wrote it,
   players still need it.
 - **Posted announcements fold with the composer**, one section the organizer

@@ -12,7 +12,6 @@
   import QrCheckinDisplay from "$lib/components/QrCheckinDisplay.svelte";
   import RaffleSection from "./RaffleSection.svelte";
   import ReopenConfirmModal from "./ReopenConfirmModal.svelte";
-  import FinishConfirmModal from "./FinishConfirmModal.svelte";
   import Button from "$lib/components/Button.svelte";
   import { copyResults, downloadResults } from "$lib/copy-results";
   import { buildCsv, downloadCsv } from "$lib/csv";
@@ -22,7 +21,6 @@
   import { getAuthState } from "$lib/stores/auth.svelte";
   import type { TournamentEventType } from "$lib/engine";
   import { ChevronDown, ChevronRight, X, Settings2, Users, Upload, CloudUpload, QrCode, Gift, Ticket, ClipboardCopy, Download, Undo2, Trash2, Image, TriangleAlert, ScrollText } from "@lucide/svelte";
-  import type { DeckObject } from "$lib/types";
   import * as m from '$lib/paraglide/messages.js';
 
   type ActionItem = { label: string; icon?: Component<any>; onclick: () => void; disabled?: boolean };
@@ -43,7 +41,6 @@
     playerInfo,
     standings,
     sanctions,
-    decksByUser,
     doAction,
     actionLoading = false,
     bannerItem,
@@ -51,6 +48,7 @@
     archonImportItem,
     syncVeknItem,
     canDelete,
+    onFinishTournament,
     onDelete,
   }: {
     open?: boolean;
@@ -61,8 +59,6 @@
     playerInfo: PlayerInfoMap;
     standings: StandingEntry[];
     sanctions: Sanction[];
-    /** Only for the finish-confirmation modal's winner-deck warning. */
-    decksByUser: Record<string, DeckObject[]>;
     doAction: (action: TournamentEventType, body?: any) => Promise<string | null>;
     actionLoading?: boolean;
     bannerItem: ActionItem;
@@ -72,13 +68,11 @@
         and "report results" during Wrap up. */
     syncVeknItem: (ActionItem & { group: GroupId }) | null;
     canDelete: boolean;
+    onFinishTournament: () => void;
     onDelete: () => void;
   } = $props();
 
   let showReopenConfirm = $state(false);
-  let showFinishConfirm = $state(false);
-  // Ending WITHOUT a final is the exception; the normal path is the action
-  // bar's Start finals -> Finish finals.
   const canFinishEarly = $derived(tournament.state === "Waiting");
   const hasStandings = $derived(standings.length > 0);
   const isFinished = $derived(tournament.state === "Finished");
@@ -262,7 +256,7 @@
           {/if}
           {#if syncVeknItem?.group === "wrapup"}{@render actionRow(syncVeknItem, CloudUpload)}{/if}
           {#if canFinishEarly}
-            {@render actionRow({ label: m.overview_finish_tournament(), onclick: () => (showFinishConfirm = true), disabled: actionLoading }, TriangleAlert)}
+            {@render actionRow({ label: m.overview_finish_tournament(), onclick: onFinishTournament, disabled: actionLoading }, TriangleAlert)}
           {/if}
           {#if isFinished}
             {@render actionRow({ label: m.overview_reopen_tournament(), onclick: () => (showReopenConfirm = true), disabled: actionLoading }, Undo2)}
@@ -312,18 +306,6 @@
 {#snippet rafflePanel()}
   <RaffleSection {tournament} {playerInfo} isOrganizer={true} {sanctions} {doAction} {actionLoading} />
 {/snippet}
-
-{#if showFinishConfirm}
-  <FinishConfirmModal
-    {tournament}
-    {standings}
-    {playerInfo}
-    {decksByUser}
-    {actionLoading}
-    onConfirm={async () => { await doAction("FinishTournament"); showFinishConfirm = false; open = false; }}
-    onClose={() => (showFinishConfirm = false)}
-  />
-{/if}
 
 {#if showReopenConfirm}
   <ReopenConfirmModal

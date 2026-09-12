@@ -24,5 +24,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
-
-- Finish Tournament stands in the action bar's More menu, not only in Tools › Wrap Up, once a Waiting tournament has two played rounds — the moment finals become one exit among two rather than the only one. Done when that menu item opens the same confirmation the Tools entry does, the Tools entry stays as the any-state path, and `wiki/design.md` records the placement as a standing decision alongside the promo-CTA and CSV-import precedents it follows.
