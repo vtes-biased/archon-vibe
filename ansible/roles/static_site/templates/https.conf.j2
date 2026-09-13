@@ -18,8 +18,6 @@ server {
 
   ssl_protocols TLSv1.2 TLSv1.3;
   ssl_prefer_server_ciphers off;
-  # Uniquely named zone: legacy archon on this box declares shared:SSL (a
-  # different size), and same-name/different-size aborts nginx -t.
   ssl_session_cache shared:archonvibe_ssl:10m;
   ssl_session_timeout 5m;
   ssl_stapling on;

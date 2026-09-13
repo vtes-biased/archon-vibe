@@ -1,9 +1,6 @@
 ---
 # Secrets live in vault.yml and are referenced via {{ vault_* }} below.
 
-# Beta runs alongside the legacy `archon` on the server-setup frankfurt host, so
-# everything is namespaced `new_archon` to avoid collisions (user, paths, db,
-# services). service_name flows to the shared nginx_site role.
 service_name: new_archon         # shared identifier (nginx_site tag, db name)
 archon_user: new_archon          # unprivileged runtime user (== db role for PG peer auth)
 archon_group: new_archon
@@ -19,11 +16,9 @@ site_url_base: "https://{{ domain_main }}"
 legal_terms_url: "{{ site_url_base }}/legal/terms"
 legal_privacy_url: "{{ site_url_base }}/legal/privacy"
 
-# 8007 is taken by the co-located legacy-archon beta's uvicorn on this box, so
-# beta uses the +8 pair (8008/9008); the whole 8xxx/9xxx band is otherwise free.
 backend_port: 8008
-bot_port: 9008                    # paired with backend_port at +8 for this env
-api_port: 7008                    # same +8 pairing, one band down
+bot_port: 9008
+api_port: 7008
 
 opt_root: /opt/new_archon
 backend_site_root: "{{ opt_root }}/backend"
