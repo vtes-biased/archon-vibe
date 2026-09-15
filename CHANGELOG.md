@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.1.7 — 2026-09-15
 
 - Fixed QR check-in, which refused every player with "Authentication required".
 
