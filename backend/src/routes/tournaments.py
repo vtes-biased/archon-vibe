@@ -1779,6 +1779,7 @@ class QrCheckinRequest(BaseModel):
 async def qr_checkin(
     uid: str,
     request: QrCheckinRequest,
+    http_request: Request,
     current_user: OptionalUser = None,
 ) -> Response:
     """Self check-in via QR code scanned at the venue."""
@@ -1794,7 +1795,8 @@ async def qr_checkin(
     return await tournament_action(
         uid,
         TournamentActionRequest(type="CheckIn", player_uid=current_user.uid),
-        current_user,
+        http_request=http_request,
+        current_user=current_user,
     )
 
 

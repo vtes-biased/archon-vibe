@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 import pytest
 from src import db
-from src.models import Tournament, User
+from src.models import Player, PlayerState, Tournament, TournamentState, User
 
 from tests.conftest import make_auth_header, seed_tournament
 
@@ -30,3 +30,31 @@ async def test_qr_checkin_rejects_empty_stored_code(test_client):
     finally:
         async with db.get_connection() as conn:
             await conn.execute("DELETE FROM objects WHERE uid = 'qr-trn-1'")
+
+
+@pytest.mark.asyncio
+async def test_qr_checkin_checks_in_the_scanning_player(test_client):
+    await db.save_user(
+        User(uid="qr-user-2", modified=NOW, name="Quinn Rider", vekn_id="1000002")
+    )
+    await seed_tournament(
+        Tournament(
+            uid="qr-trn-2",
+            modified=NOW,
+            name="Cup",
+            state=TournamentState.WAITING,
+            checkin_code="door",
+            players=[Player(user_uid="qr-user-2")],
+        )
+    )
+    try:
+        resp = await test_client.post(
+            "/api/tournaments/qr-trn-2/qr-checkin",
+            json={"code": "door"},
+            headers=make_auth_header("qr-user-2"),
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["players"][0]["state"] == PlayerState.CHECKED_IN
+    finally:
+        async with db.get_connection() as conn:
+            await conn.execute("DELETE FROM objects WHERE uid = 'qr-trn-2'")
