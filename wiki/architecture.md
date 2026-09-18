@@ -132,6 +132,29 @@ migration extends deploy downtime by its own runtime, so a corpus-scale rewrite
 stays a post-deploy script with a stated, accepted window; `reproject_public.py`
 is the standing example.
 
+## Outbound HTTP
+
+Every backend call to Discord, VEKN, GitHub and the deck providers goes through
+one process-wide `aiohttp.ClientSession` — `http_client.session()`, created on
+first use and closed in the `lifespan` teardown. A session owns a connection pool
+and a TLS context, so a session per call meant a full handshake per request,
+worst on the login path a tournament morning hammers. Its default timeout is
+`total=20, connect=10, sock_read=15`, which must stay under nginx's 60s
+`proxy_read_timeout` because the manual push-vekn route runs its VEKN calls
+inline on the request; a caller needing longer passes `timeout=` per request, as
+the TWDA archive fetch (120s) and the TWDA PR flow (30s) do.
+
+Two callers keep their own session deliberately: the [Web Push](#web-push)
+fan-out, which wants its own bounded connector per batch, and `link_preview.py`,
+which must stay isolated for its SSRF guard
+([hazards](hazards.md#outbound-fetches)).
+
+The session binds to the event loop that first created it, and nothing marks it
+stale when that loop dies. Production runs one loop, but anything that runs
+several — the test suite gives each test its own — must close it between them,
+exactly as it closes the database pool. Scripts `await http_client.close()` in
+the same `finally` that closes the pool.
+
 ## Event system
 
 **Business events** — domain actions like `Tournament.RoundStart`, processed by
@@ -616,7 +639,8 @@ force beta and prod to share a keypair.
 Send path: pure builders return locale-independent *specs*, and `render_payload`
 localizes per subscription in that row's stored locale — a user may carry a French
 phone and an English laptop. Delivery is native async over a single shared
-`aiohttp.ClientSession` per fan-out, whose connector pools keep-alive connections
+`aiohttp.ClientSession` per fan-out — not the shared one
+([above](#outbound-http)) — whose bounded connector pools keep-alive connections
 per push host (most Chrome subscriptions share `fcm.googleapis.com`), so a fan-out
 reuses connections instead of a fresh TLS handshake per push. `pywebpush` owns the
 RFC 8291 payload encryption and RFC 8292 VAPID signing; we own only the transport.

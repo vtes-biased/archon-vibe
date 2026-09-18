@@ -7,10 +7,10 @@ from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 from uuid import uuid7
 
-import aiohttp
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import RedirectResponse
 
+from ... import http_client
 from ...accounts import merge_users
 from ...broadcast import broadcast_precomputed
 from ...db import (
@@ -120,50 +120,50 @@ async def discord_callback(
     link_mode = stored.get("link_mode", False)
     user_uid_from_state = stored.get("user_uid")
 
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.post(
-                f"{discord_api_base()}/oauth2/token",
-                data={
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "grant_type": "authorization_code",
-                    "code": code,
-                    "redirect_uri": redirect_uri,
-                },
-            ) as token_response:
-                if token_response.status != 200:
-                    error_text = await token_response.text()
-                    logger.error(f"Discord token exchange failed: {error_text}")
-                    return RedirectResponse(
-                        url=f"{frontend_url}/login?error=discord_token_failed",
-                        status_code=302,
-                    )
-                discord_tokens = await token_response.json()
-        except Exception as e:
-            logger.error(f"Discord token exchange error: {e}")
-            return RedirectResponse(
-                url=f"{frontend_url}/login?error=discord_error", status_code=302
-            )
+    session = http_client.session()
+    try:
+        async with session.post(
+            f"{discord_api_base()}/oauth2/token",
+            data={
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": redirect_uri,
+            },
+        ) as token_response:
+            if token_response.status != 200:
+                error_text = await token_response.text()
+                logger.error(f"Discord token exchange failed: {error_text}")
+                return RedirectResponse(
+                    url=f"{frontend_url}/login?error=discord_token_failed",
+                    status_code=302,
+                )
+            discord_tokens = await token_response.json()
+    except Exception as e:
+        logger.error(f"Discord token exchange error: {e}")
+        return RedirectResponse(
+            url=f"{frontend_url}/login?error=discord_error", status_code=302
+        )
 
-        try:
-            async with session.get(
-                f"{discord_api_base()}/users/@me",
-                headers={"Authorization": f"Bearer {discord_tokens['access_token']}"},
-            ) as user_response:
-                if user_response.status != 200:
-                    error_text = await user_response.text()
-                    logger.error(f"Discord user fetch failed: {error_text}")
-                    return RedirectResponse(
-                        url=f"{frontend_url}/login?error=discord_user_failed",
-                        status_code=302,
-                    )
-                discord_user = await user_response.json()
-        except Exception as e:
-            logger.error(f"Discord user fetch error: {e}")
-            return RedirectResponse(
-                url=f"{frontend_url}/login?error=discord_error", status_code=302
-            )
+    try:
+        async with session.get(
+            f"{discord_api_base()}/users/@me",
+            headers={"Authorization": f"Bearer {discord_tokens['access_token']}"},
+        ) as user_response:
+            if user_response.status != 200:
+                error_text = await user_response.text()
+                logger.error(f"Discord user fetch failed: {error_text}")
+                return RedirectResponse(
+                    url=f"{frontend_url}/login?error=discord_user_failed",
+                    status_code=302,
+                )
+            discord_user = await user_response.json()
+    except Exception as e:
+        logger.error(f"Discord user fetch error: {e}")
+        return RedirectResponse(
+            url=f"{frontend_url}/login?error=discord_error", status_code=302
+        )
 
     discord_id = discord_user["id"]
     discord_username = discord_user.get("username", "")

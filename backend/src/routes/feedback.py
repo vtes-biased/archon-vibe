@@ -14,7 +14,7 @@ import msgspec
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, Field
 
-from .. import github_app
+from .. import github_app, http_client
 from ..middleware.auth import CurrentUser
 
 router = APIRouter(prefix="/api/feedback", tags=["feedback"])
@@ -61,7 +61,7 @@ def _rate_limited(user_uid: str) -> bool:
 
 
 async def _resolve_login(
-    session: aiohttp.ClientSession, github_id: str | None, fallback: str | None
+    headers: dict[str, str], github_id: str | None, fallback: str | None
 ) -> str | None:
     """Live @handle for a linked GitHub account, resolved from the stable numeric id
     — github_login is a point-in-time snapshot (renames, recycled handles) that could
@@ -69,7 +69,9 @@ async def _resolve_login(
     if not github_id:
         return fallback
     try:
-        async with session.get(f"/user/{github_id}") as resp:
+        async with http_client.session().get(
+            f"https://api.github.com/user/{github_id}", headers=headers
+        ) as resp:
             if resp.status != 200:
                 return fallback
             return (await resp.json(content_type=None)).get("login") or fallback
@@ -121,56 +123,53 @@ async def submit_feedback(body: FeedbackRequest, current_user: CurrentUser) -> R
             FEEDBACK_GITHUB_INSTALLATION_ID,
             {"issues": "write"},
         )
-        async with aiohttp.ClientSession(
-            base_url="https://api.github.com",
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": github_app.GH_API_VERSION,
-            },
-            timeout=aiohttp.ClientTimeout(total=15.0),
-        ) as session:
-            # Identity in the public issue: VEKN id, plus the linked GitHub @handle (a
-            # public handle) so the reporter can be mentioned. No other PII (no-PII rule).
-            mention = await _resolve_login(
-                session, current_user.github_id, current_user.github_login
-            )
-            who = f"@{mention} ({vekn})" if mention else vekn
-            meta = [
-                f"- **Submitted by:** {who} — role: {roles}",
-                f"- **App version:** {body.app_version or 'unknown'}",
-            ]
-            if body.route:
-                meta.append(f"- **Page:** `{body.route}`")
-            if body.locale:
-                meta.append(f"- **Locale:** {body.locale}")
-            if body.user_agent:
-                meta.append(f"- **User agent:** {body.user_agent}")
-            issue_body = body.description.strip() + "\n\n---\n" + "\n".join(meta)
+        gh_headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": github_app.GH_API_VERSION,
+        }
+        # Identity in the public issue: VEKN id, plus the linked GitHub @handle (a
+        # public handle) so the reporter can be mentioned. No other PII (no-PII rule).
+        mention = await _resolve_login(
+            gh_headers, current_user.github_id, current_user.github_login
+        )
+        who = f"@{mention} ({vekn})" if mention else vekn
+        meta = [
+            f"- **Submitted by:** {who} — role: {roles}",
+            f"- **App version:** {body.app_version or 'unknown'}",
+        ]
+        if body.route:
+            meta.append(f"- **Page:** `{body.route}`")
+        if body.locale:
+            meta.append(f"- **Locale:** {body.locale}")
+        if body.user_agent:
+            meta.append(f"- **User agent:** {body.user_agent}")
+        issue_body = body.description.strip() + "\n\n---\n" + "\n".join(meta)
 
-            issue: dict = {
-                "title": f"[{prefix}] {body.title}",
-                "body": issue_body,
-                "labels": ["feedback", category_label],
-            }
-            # Non-collaborator assignees are silently dropped by the API; the
-            # body @-mention still notifies them.
-            if mention:
-                issue["assignees"] = [mention]
-            async with session.post(
-                f"/repos/{FEEDBACK_TARGET_REPO}/issues",
-                json=issue,
-            ) as resp:
-                text = await resp.text()
-                if resp.status != 201:
-                    logger.error(
-                        "Feedback issue creation failed: %s %s", resp.status, text[:500]
-                    )
-                    raise HTTPException(
-                        status_code=502,
-                        detail="Could not file feedback right now; please try again later",
-                    )
-                data = json.loads(text)
+        issue: dict = {
+            "title": f"[{prefix}] {body.title}",
+            "body": issue_body,
+            "labels": ["feedback", category_label],
+        }
+        # Non-collaborator assignees are silently dropped by the API; the
+        # body @-mention still notifies them.
+        if mention:
+            issue["assignees"] = [mention]
+        async with http_client.session().post(
+            f"https://api.github.com/repos/{FEEDBACK_TARGET_REPO}/issues",
+            headers=gh_headers,
+            json=issue,
+        ) as resp:
+            text = await resp.text()
+            if resp.status != 201:
+                logger.error(
+                    "Feedback issue creation failed: %s %s", resp.status, text[:500]
+                )
+                raise HTTPException(
+                    status_code=502,
+                    detail="Could not file feedback right now; please try again later",
+                )
+            data = json.loads(text)
     # ValueError = non-201 token fetch; OSError = unreadable key file; PyJWTError =
     # bad key content — all degrade to a clean 502 instead of a raw 500.
     except (aiohttp.ClientError, TimeoutError, ValueError, OSError, jwt.PyJWTError):

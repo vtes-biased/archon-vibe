@@ -6,7 +6,7 @@ import logging
 import os
 import time
 
-import aiohttp
+from . import http_client
 
 logger = logging.getLogger(__name__)
 
@@ -64,20 +64,16 @@ async def get_installation_token(
     TimeoutError propagate to the caller's transport handling.
     """
     app_jwt = create_jwt(client_id, private_key)
-    async with aiohttp.ClientSession(
-        base_url="https://api.github.com",
-        timeout=aiohttp.ClientTimeout(total=15.0),
-    ) as session:
-        async with session.post(
-            f"/app/installations/{installation_id}/access_tokens",
-            headers={
-                "Authorization": f"Bearer {app_jwt}",
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": GH_API_VERSION,
-            },
-            json={"permissions": permissions},
-        ) as resp:
-            if resp.status != 201:
-                raise InstallationTokenError(resp.status, (await resp.text())[:500])
-            data = await resp.json(content_type=None)
-            return data["token"]
+    async with http_client.session().post(
+        f"https://api.github.com/app/installations/{installation_id}/access_tokens",
+        headers={
+            "Authorization": f"Bearer {app_jwt}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": GH_API_VERSION,
+        },
+        json={"permissions": permissions},
+    ) as resp:
+        if resp.status != 201:
+            raise InstallationTokenError(resp.status, (await resp.text())[:500])
+        data = await resp.json(content_type=None)
+        return data["token"]

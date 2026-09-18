@@ -7,8 +7,7 @@ auto-assigned roles based on Archon organization/judge/playtest levels.
 import logging
 import os
 
-import aiohttp
-
+from .. import http_client
 from ..db import delete_transient_token, get_transient_token, store_transient_token
 from ..models import Role
 
@@ -74,15 +73,14 @@ async def register_metadata() -> None:
     url = f"{discord_api_base()}/v10/applications/{client_id}/role-connections/metadata"
     headers = {"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"}
 
-    async with aiohttp.ClientSession() as session:
-        async with session.put(url, json=METADATA, headers=headers) as resp:
-            if resp.status == 200:
-                logger.info("Discord Linked Roles: metadata registered successfully")
-            else:
-                text = await resp.text()
-                logger.error(
-                    f"Discord Linked Roles: metadata registration failed ({resp.status}): {text}"
-                )
+    async with http_client.session().put(url, json=METADATA, headers=headers) as resp:
+        if resp.status == 200:
+            logger.info("Discord Linked Roles: metadata registered successfully")
+        else:
+            text = await resp.text()
+            logger.error(
+                f"Discord Linked Roles: metadata registration failed ({resp.status}): {text}"
+            )
 
 
 async def push_role_metadata(user, access_token: str) -> bool:
@@ -104,16 +102,13 @@ async def push_role_metadata(user, access_token: str) -> bool:
         "metadata": metadata,
     }
 
-    async with aiohttp.ClientSession() as session:
-        async with session.put(url, json=body, headers=headers) as resp:
-            if resp.status == 200:
-                logger.info(
-                    f"Discord Linked Roles: pushed metadata for user {user.uid}"
-                )
-                return True
-            text = await resp.text()
-            logger.error(f"Discord Linked Roles: push failed ({resp.status}): {text}")
-            return False
+    async with http_client.session().put(url, json=body, headers=headers) as resp:
+        if resp.status == 200:
+            logger.info(f"Discord Linked Roles: pushed metadata for user {user.uid}")
+            return True
+        text = await resp.text()
+        logger.error(f"Discord Linked Roles: push failed ({resp.status}): {text}")
+        return False
 
 
 async def refresh_discord_token(refresh_token: str) -> dict | None:
@@ -122,20 +117,19 @@ async def refresh_discord_token(refresh_token: str) -> dict | None:
     if not client_id or not client_secret:
         return None
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            f"{discord_api_base()}/oauth2/token",
-            data={
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "grant_type": "refresh_token",
-                "refresh_token": refresh_token,
-            },
-        ) as resp:
-            if resp.status == 200:
-                return await resp.json()
-            logger.warning(f"Discord token refresh failed ({resp.status})")
-            return None
+    async with http_client.session().post(
+        f"{discord_api_base()}/oauth2/token",
+        data={
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+        },
+    ) as resp:
+        if resp.status == 200:
+            return await resp.json()
+        logger.warning(f"Discord token refresh failed ({resp.status})")
+        return None
 
 
 async def sync_user_discord_roles(user_uid: str) -> None:

@@ -39,7 +39,7 @@ except ModuleNotFoundError:
 if not _have_backend:
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from backend.src import db  # noqa: E402
+from backend.src import db, http_client  # noqa: E402
 from backend.src.ratings import recompute_wins  # noqa: E402
 from backend.src.snapshots import generate_snapshots  # noqa: E402
 from backend.src.twda_import import (  # noqa: E402
@@ -93,6 +93,7 @@ async def run(args: argparse.Namespace) -> int:
         print(await generate_snapshots())
         return 0
     finally:
+        await http_client.close()
         await db.close_db()
 
 

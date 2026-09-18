@@ -520,9 +520,6 @@ class VEKNSyncService:
     def __init__(self) -> None:
         self.client = VEKNAPIClient()
 
-    async def close(self) -> None:
-        await self.client.close()
-
     def _map_vekn_to_user(self, vekn_player: dict[str, Any]) -> dict[str, Any]:
         name = f"{vekn_player.get('firstname', '')} {vekn_player.get('lastname', '')}".strip()
         vekn_id = str(vekn_player.get("veknid", ""))

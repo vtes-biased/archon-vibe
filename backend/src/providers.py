@@ -11,6 +11,8 @@ from krcg import loader, providers
 from krcg.collections import CardDict
 from krcg.models import Card, Deck
 
+from . import http_client
+
 logger = logging.getLogger(__name__)
 
 
@@ -71,22 +73,22 @@ async def fetch_deck_from_url(url: str) -> dict:
     parsed = urllib.parse.urlparse(url)
     netloc = _NETLOC_ALIASES.get(parsed.netloc, parsed.netloc)
     cards = _cards_dict()
+    session = http_client.session()
     try:
-        async with aiohttp.ClientSession() as session:
-            if netloc == "amaranth.vtes.co.nz":
-                amap = await _amaranth_cards_map(session)
-                deck = await providers.fetch_amaranth(
-                    session, parsed, cards, amaranth_map=amap
-                )
-            elif netloc == "vdb.im":
-                deck = await providers.fetch_vdb(session, parsed, cards)
-            elif netloc == "vtesdecks.com":
-                deck = await providers.fetch_vtesdecks(session, parsed, cards)
-            else:
-                raise DeckFetchError(
-                    f"Unsupported deck URL provider: {parsed.netloc}",
-                    "deck_fetch.bad_link",
-                )
+        if netloc == "amaranth.vtes.co.nz":
+            amap = await _amaranth_cards_map(session)
+            deck = await providers.fetch_amaranth(
+                session, parsed, cards, amaranth_map=amap
+            )
+        elif netloc == "vdb.im":
+            deck = await providers.fetch_vdb(session, parsed, cards)
+        elif netloc == "vtesdecks.com":
+            deck = await providers.fetch_vtesdecks(session, parsed, cards)
+        else:
+            raise DeckFetchError(
+                f"Unsupported deck URL provider: {parsed.netloc}",
+                "deck_fetch.bad_link",
+            )
     except DeckFetchError:
         raise
     except KeyError as e:

@@ -20,6 +20,7 @@ from uuid import uuid7
 
 import aiohttp
 
+from . import http_client
 from .broadcast import broadcast_precomputed
 from .data.timezones import CITY_TZ_OVERRIDES, COUNTRY_TIMEZONE
 from .db import (
@@ -452,9 +453,9 @@ async def _import_decks(
 
 
 async def _fetch_twda() -> list[dict]:
-    timeout = aiohttp.ClientTimeout(total=120.0)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        async with session.get(TWDA_URL) as resp:
-            resp.raise_for_status()
-            # content_type=None: static.krcg.org may not serve application/json.
-            return await resp.json(content_type=None)
+    async with http_client.session().get(
+        TWDA_URL, timeout=aiohttp.ClientTimeout(total=120.0)
+    ) as resp:
+        resp.raise_for_status()
+        # content_type=None: static.krcg.org may not serve application/json.
+        return await resp.json(content_type=None)

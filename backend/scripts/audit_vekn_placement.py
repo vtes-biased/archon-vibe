@@ -37,7 +37,7 @@ except ModuleNotFoundError:
 if not _have_backend:
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from backend.src import db  # noqa: E402
+from backend.src import db, http_client  # noqa: E402
 from backend.src.db import decode_json, get_user_by_uid  # noqa: E402
 from backend.src.models import ObjectType, Tournament  # noqa: E402
 from backend.src.ratings import _final_standings  # noqa: E402
@@ -183,7 +183,7 @@ async def run(args: argparse.Namespace) -> int:
             print(f"awaiting approval: {','.join(no_placement)}")
         return 0
     finally:
-        await client.close()
+        await http_client.close()
         await db.close_db()
 
 

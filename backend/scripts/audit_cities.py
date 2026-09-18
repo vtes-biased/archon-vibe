@@ -17,6 +17,7 @@ from collections import Counter, defaultdict
 # Ensure package imports work when run from backend/
 sys.path.insert(0, ".")
 
+from src import http_client  # noqa: E402
 from src.geonames import load_countries, match_city  # noqa: E402
 from src.vekn_api import VEKNAPIClient  # noqa: E402
 from src.vekn_sync import FIX_CITIES  # noqa: E402
@@ -35,7 +36,7 @@ async def main() -> None:
     try:
         players = await client.fetch_all_members()
     finally:
-        await client.close()
+        await http_client.close()
     print(f"Fetched {len(players)} members\n")
 
     matched = 0

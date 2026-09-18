@@ -38,15 +38,11 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def vekn_push_client() -> AsyncIterator[VEKNAPIClient | None]:
-    """Yield a VEKNAPIClient when VEKN_PUSH is enabled (else None); always closes it."""
+    """Yield a VEKNAPIClient when VEKN_PUSH is enabled, else None."""
     if os.getenv("VEKN_PUSH", "").lower() != "true":
         yield None
         return
-    client = VEKNAPIClient()
-    try:
-        yield client
-    finally:
-        await client.close()
+    yield VEKNAPIClient()
 
 
 # Reverse of EVENT_TYPE_MAP — lossy: several VEKN types map to the same

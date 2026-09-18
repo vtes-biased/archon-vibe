@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from . import http_client
 from .broadcast import (
     SSEConnection,
     _sse_connections,
@@ -496,9 +497,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if _scheduler:
         _scheduler.shutdown()
         logger.info("Scheduler shut down")
-    if _sync_service:
-        await _sync_service.close()
-        logger.info("VEKN sync service closed")
+    await http_client.close()
     await close_db()
 
 

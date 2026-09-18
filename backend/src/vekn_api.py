@@ -5,6 +5,8 @@ from typing import Any
 
 import aiohttp
 
+from . import http_client
+
 logger = logging.getLogger(__name__)
 
 # VEKN API error messages translation (from Joomla language files)
@@ -69,19 +71,6 @@ class VEKNAPIClient:
         self.username = os.getenv("VEKN_API_USERNAME")
         self.password = os.getenv("VEKN_API_PASSWORD")
         self._auth_token: str | None = None
-        self._session: aiohttp.ClientSession | None = None
-
-    def _get_session(self) -> aiohttp.ClientSession:
-        if self._session is None or self._session.closed:
-            # Must complete under nginx's 60s proxy_read_timeout — the manual
-            # push-vekn route runs these calls inline on the request.
-            timeout = aiohttp.ClientTimeout(total=20, connect=10, sock_read=15)
-            self._session = aiohttp.ClientSession(timeout=timeout)
-        return self._session
-
-    async def close(self) -> None:
-        if self._session and not self._session.closed:
-            await self._session.close()
 
     async def _authenticate(self) -> None:
         # All failures here are batch-fatal (bad/missing creds, transport down)
@@ -97,7 +86,7 @@ class VEKNAPIClient:
             )
 
         try:
-            session = self._get_session()
+            session = http_client.session()
             async with session.post(
                 f"{self.base_url}/index.php",
                 params={"app": "vekn", "resource": "login", "format": "raw"},
@@ -156,7 +145,7 @@ class VEKNAPIClient:
             if self._auth_token:
                 params["key"] = self._auth_token
 
-            session = self._get_session()
+            session = http_client.session()
             async with session.get(
                 f"{self.base_url}/index.php",
                 params=params,
@@ -221,7 +210,7 @@ class VEKNAPIClient:
         ("Y-m-d"/"H:i") — a combined value leaves two empty and 400s.
         """
         await self._ensure_authenticated()
-        session = self._get_session()
+        session = http_client.session()
 
         form_data = {
             "name": name,
@@ -270,7 +259,7 @@ class VEKNAPIClient:
 
     async def upload_results(self, vekn_event_id: str, archondata: str) -> None:
         await self._ensure_authenticated()
-        session = self._get_session()
+        session = http_client.session()
 
         headers: dict[str, str] = {}
         if self._auth_token:
@@ -308,7 +297,7 @@ class VEKNAPIClient:
         city: str = "",
     ) -> None:
         await self._ensure_authenticated()
-        session = self._get_session()
+        session = http_client.session()
 
         headers: dict[str, str] = {}
         if self._auth_token:
@@ -348,7 +337,7 @@ class VEKNAPIClient:
             return {}
         await self._ensure_authenticated()
         try:
-            session = self._get_session()
+            session = http_client.session()
             headers: dict[str, str] = {}
             if self._auth_token:
                 headers["Authorization"] = f"Bearer {self._auth_token}"
@@ -384,7 +373,7 @@ class VEKNAPIClient:
             if self._auth_token:
                 params["key"] = self._auth_token
 
-            session = self._get_session()
+            session = http_client.session()
             async with session.get(
                 f"{self.base_url}/index.php", params=params
             ) as response:

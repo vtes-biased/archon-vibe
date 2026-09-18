@@ -50,7 +50,7 @@ _ensure_test_db_exists()
 import importlib
 import types
 
-from src import db
+from src import db, http_client
 from src.main import app
 from src.routes.auth import create_access_token
 
@@ -89,6 +89,7 @@ async def test_db() -> AsyncIterator[None]:
         await conn.execute("DELETE FROM objects WHERE type = 'user'")
         await conn.execute("DELETE FROM auth_methods")
 
+    await http_client.close()
     await db.close_db()
 
 

@@ -10,10 +10,10 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
-import aiohttp
 from fastapi import APIRouter, Header, HTTPException, Query, Response
 from fastapi.responses import RedirectResponse
 
+from ... import http_client
 from ...broadcast import broadcast_precomputed
 from ...db import (
     delete_transient_token,
@@ -108,50 +108,45 @@ async def github_callback(
             url=f"{frontend_url}{redirect_path}?github_error={err}", status_code=302
         )
 
-    async with aiohttp.ClientSession(
-        timeout=aiohttp.ClientTimeout(total=15.0)
-    ) as session:
-        # GitHub returns HTTP 200 even on error, so check for access_token.
-        try:
-            async with session.post(
-                "https://github.com/login/oauth/access_token",
-                headers={"Accept": "application/json"},
-                data={
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "code": code,
-                    "redirect_uri": redirect_uri,
-                },
-            ) as token_response:
-                tokens = await token_response.json(content_type=None)
-        except Exception as e:
-            logger.error(f"GitHub token exchange error: {e}")
-            return fail("github_error")
-        access_token = tokens.get("access_token")
-        if not access_token:
-            logger.error(
-                f"GitHub token exchange failed: "
-                f"{tokens.get('error_description') or tokens}"
-            )
-            return fail("github_token_failed")
+    session = http_client.session()
+    # GitHub returns HTTP 200 even on error, so check for access_token.
+    try:
+        async with session.post(
+            "https://github.com/login/oauth/access_token",
+            headers={"Accept": "application/json"},
+            data={
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "code": code,
+                "redirect_uri": redirect_uri,
+            },
+        ) as token_response:
+            tokens = await token_response.json(content_type=None)
+    except Exception as e:
+        logger.error(f"GitHub token exchange error: {e}")
+        return fail("github_error")
+    access_token = tokens.get("access_token")
+    if not access_token:
+        logger.error(
+            f"GitHub token exchange failed: {tokens.get('error_description') or tokens}"
+        )
+        return fail("github_token_failed")
 
-        try:
-            async with session.get(
-                "https://api.github.com/user",
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Accept": "application/vnd.github+json",
-                },
-            ) as user_response:
-                if user_response.status != 200:
-                    logger.error(
-                        f"GitHub user fetch failed: {await user_response.text()}"
-                    )
-                    return fail("github_user_failed")
-                github_user = await user_response.json()
-        except Exception as e:
-            logger.error(f"GitHub user fetch error: {e}")
-            return fail("github_error")
+    try:
+        async with session.get(
+            "https://api.github.com/user",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/vnd.github+json",
+            },
+        ) as user_response:
+            if user_response.status != 200:
+                logger.error(f"GitHub user fetch failed: {await user_response.text()}")
+                return fail("github_user_failed")
+            github_user = await user_response.json()
+    except Exception as e:
+        logger.error(f"GitHub user fetch error: {e}")
+        return fail("github_error")
 
     gh_id = github_user.get("id")
     github_login = github_user.get("login")

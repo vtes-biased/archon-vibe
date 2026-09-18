@@ -68,7 +68,7 @@ if not _have_backend:
 import msgspec  # noqa: E402
 from archon_engine import PyEngine  # noqa: E402
 
-from backend.src import db  # noqa: E402
+from backend.src import db, http_client  # noqa: E402
 from backend.src.models import Tournament, TournamentState  # noqa: E402
 from backend.src.vekn_api import VEKNAPIClient, VEKNAPIConnectionError  # noqa: E402
 
@@ -205,7 +205,7 @@ async def probe_both_vekn(decisions: list[str]) -> int:
             decisions.append(f"{keep.uid}\t{','.join(drop)}\t{live[0]}")
             actionable += 1
     finally:
-        await client.close()
+        await http_client.close()
     print(
         f"\n{len(small)} both-vekn group(s) probed; {actionable} resolvable locally; "
         f"{all_live} all-live (vekn.net's record to reconcile); "

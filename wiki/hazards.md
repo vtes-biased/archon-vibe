@@ -497,6 +497,17 @@ keeps that acceptable is that the response is a title rather than a body.
 Anything else that comes to fetch a user-supplied URL goes through that module
 instead of growing its own guard.
 
+**`link_preview.py` builds its own `aiohttp.ClientSession` per fetch and must
+keep doing so** — it is the one caller exempt from the shared outbound session
+([architecture](architecture.md#outbound-http)). The guard resolves the host
+itself and then hands aiohttp a URL to connect to, with `allow_redirects=False`
+so every hop is re-checked; its correctness therefore rests on nothing between
+the check and the connect being carried over from an earlier request. A session
+created and closed inside the fetch guarantees that — an empty connection pool
+and an empty DNS cache on every call, and a pool that never mixes
+member-supplied hosts with the first-party ones. Folding it into the shared
+session to "finish the job" is the mistake this entry exists to stop.
+
 ## Deploy
 
 **The boot auto-reload fires on every device the first time it opens after a
