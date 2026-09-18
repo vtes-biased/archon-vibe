@@ -142,7 +142,9 @@ worst on the login path a tournament morning hammers. Its default timeout is
 `total=20, connect=10, sock_read=15`, which must stay under nginx's 60s
 `proxy_read_timeout` because the manual push-vekn route runs its VEKN calls
 inline on the request; a caller needing longer passes `timeout=` per request, as
-the TWDA archive fetch (120s) and the TWDA PR flow (30s) do.
+the TWDA archive fetch (120s) and the TWDA PR flow (30s) do. The deck providers
+cannot: krcg owns those `session.get` calls and passes no timeout, so for
+Amaranth, VDB and VTESDecks the session default is a hard ceiling.
 
 It carries a `DummyCookieJar`, so it stores nothing a host sets. Every caller
 authenticates by header or query parameter — VEKN by `Authorization: Bearer` or
