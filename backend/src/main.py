@@ -260,16 +260,16 @@ async def run_vekn_push() -> None:
     try:
         from .vekn_push import batch_push, vekn_push_client
 
-        async with vekn_push_client() as client:
-            if client is None:
-                return
-            logger.info("Starting VEKN batch push")
-            stats = await batch_push(client)
-            logger.info(f"VEKN batch push complete: {stats}")
-            if stats.get("aborted"):
-                record_error("batch_push", "aborted — VEKN unreachable")
-            else:
-                record_success("batch_push", stats)
+        client = vekn_push_client()
+        if client is None:
+            return
+        logger.info("Starting VEKN batch push")
+        stats = await batch_push(client)
+        logger.info(f"VEKN batch push complete: {stats}")
+        if stats.get("aborted"):
+            record_error("batch_push", "aborted — VEKN unreachable")
+        else:
+            record_success("batch_push", stats)
     except Exception as e:
         logger.error(f"Error during VEKN batch push: {e}", exc_info=True)
         record_error("batch_push", str(e))

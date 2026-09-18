@@ -299,9 +299,9 @@ async def _maybe_push_vekn(tournament: Tournament) -> None:
     try:
         from ..vekn_push import push_tournament_results, vekn_push_client
 
-        async with vekn_push_client() as client:
-            if client is not None:
-                await push_tournament_results(client, tournament)
+        client = vekn_push_client()
+        if client is not None:
+            await push_tournament_results(client, tournament)
     except Exception:
         logger.exception("Failed to push VEKN results")
 
@@ -375,9 +375,9 @@ async def _maybe_push_vekn_event(tournament: Tournament) -> None:
     try:
         from ..vekn_push import push_tournament_event, vekn_push_client
 
-        async with vekn_push_client() as client:
-            if client is not None:
-                await push_tournament_event(client, tournament)
+        client = vekn_push_client()
+        if client is not None:
+            await push_tournament_event(client, tournament)
     except Exception:
         logger.exception("Failed to push VEKN event")
     # After the attempt, never before: a successful push writes the vekn event id
@@ -695,40 +695,40 @@ async def push_vekn(
     )
 
     try:
-        async with vekn_push_client() as client:
-            if client is None:
-                raise HTTPException(status_code=400, detail="VEKN sync is not enabled")
-            if not tournament.external_ids.get("vekn"):
-                # push_tournament_event saves external_ids.vekn + broadcasts on success.
-                event_id = await push_tournament_event(
-                    client, tournament, raise_api_errors=True
+        client = vekn_push_client()
+        if client is None:
+            raise HTTPException(status_code=400, detail="VEKN sync is not enabled")
+        if not tournament.external_ids.get("vekn"):
+            # push_tournament_event saves external_ids.vekn + broadcasts on success.
+            event_id = await push_tournament_event(
+                client, tournament, raise_api_errors=True
+            )
+            if not event_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "VEKN sync failed — needs a name (≥3 chars), a start "
+                        "date, and an organizer with a VEKN ID"
+                    ),
                 )
-                if not event_id:
+            tournament = await get_tournament_by_uid(uid) or tournament
+        if tournament.state == TournamentState.FINISHED:
+            if not tournament.vekn_pushed_at:
+                # A manual publish must report a real outcome — don't swallow a
+                # failed results push (e.g. a finalist with no VEKN ID) as success.
+                if not await push_tournament_results(
+                    client, tournament, raise_api_errors=True
+                ):
                     raise HTTPException(
                         status_code=400,
                         detail=(
-                            "VEKN sync failed — needs a name (≥3 chars), a start "
-                            "date, and an organizer with a VEKN ID"
+                            "Results couldn't be published to VEKN — check that "
+                            "every player (including finalists) has a VEKN ID, "
+                            "then try again."
                         ),
                     )
                 tournament = await get_tournament_by_uid(uid) or tournament
-            if tournament.state == TournamentState.FINISHED:
-                if not tournament.vekn_pushed_at:
-                    # A manual publish must report a real outcome — don't swallow a
-                    # failed results push (e.g. a finalist with no VEKN ID) as success.
-                    if not await push_tournament_results(
-                        client, tournament, raise_api_errors=True
-                    ):
-                        raise HTTPException(
-                            status_code=400,
-                            detail=(
-                                "Results couldn't be published to VEKN — check that "
-                                "every player (including finalists) has a VEKN ID, "
-                                "then try again."
-                            ),
-                        )
-                    tournament = await get_tournament_by_uid(uid) or tournament
-                await maybe_submit_twda(tournament)
+            await maybe_submit_twda(tournament)
     except VEKNAPIConnectionError as e:
         raise HTTPException(
             status_code=502, detail="VEKN API is unavailable, try again later"

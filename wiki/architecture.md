@@ -144,6 +144,12 @@ worst on the login path a tournament morning hammers. Its default timeout is
 inline on the request; a caller needing longer passes `timeout=` per request, as
 the TWDA archive fetch (120s) and the TWDA PR flow (30s) do.
 
+It carries a `DummyCookieJar`, so it stores nothing a host sets. Every caller
+authenticates by header or query parameter — VEKN by `Authorization: Bearer` or
+its `key` param, the rest by header — so no cookie is ever wanted, and one jar
+behind a process-wide session would otherwise carry one user's OAuth exchange
+into the next caller's request.
+
 Two callers keep their own session deliberately: the [Web Push](#web-push)
 fan-out, which wants its own bounded connector per batch, and `link_preview.py`,
 which must stay isolated for its SSRF guard

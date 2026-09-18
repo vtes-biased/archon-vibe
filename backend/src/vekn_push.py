@@ -1,7 +1,5 @@
 import logging
 import os
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 import msgspec
@@ -36,13 +34,11 @@ from .vekn_api import (
 logger = logging.getLogger(__name__)
 
 
-@asynccontextmanager
-async def vekn_push_client() -> AsyncIterator[VEKNAPIClient | None]:
-    """Yield a VEKNAPIClient when VEKN_PUSH is enabled, else None."""
+def vekn_push_client() -> VEKNAPIClient | None:
+    """A VEKNAPIClient when VEKN_PUSH is enabled, else None."""
     if os.getenv("VEKN_PUSH", "").lower() != "true":
-        yield None
-        return
-    yield VEKNAPIClient()
+        return None
+    return VEKNAPIClient()
 
 
 # Reverse of EVENT_TYPE_MAP — lossy: several VEKN types map to the same
@@ -382,9 +378,9 @@ async def push_member_background(user: User) -> None:
     Failures are log-only — vekn_synced stays false, so batch_push retries hourly.
     """
     try:
-        async with vekn_push_client() as client:
-            if client is not None:
-                await push_member(client, user)
+        client = vekn_push_client()
+        if client is not None:
+            await push_member(client, user)
     except Exception:
         logger.exception(f"Failed to push member {user.vekn_id} to VEKN")
 
