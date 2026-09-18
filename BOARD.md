@@ -24,3 +24,5 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
+
+Reuse one outbound HTTP session instead of building a fresh TLS client per call — every backend caller that talks to Discord, VEKN, deck providers and GitHub currently pays a full handshake per request, worst on the login path a tournament morning hammers. Done when no `aiohttp.ClientSession(` remains in `backend/src` outside the lifespan singleton, the push fan-out, and the link-preview SSRF guard; `wiki/architecture.md` records the shared transport and `wiki/hazards.md` records why link-preview is exempt. Context and prod measurements in `board/shared-http-session.md`.
