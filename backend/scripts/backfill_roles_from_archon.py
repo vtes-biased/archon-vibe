@@ -64,7 +64,7 @@ except ModuleNotFoundError:
 if not _have_backend:
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from backend.src import db  # noqa: E402
+from backend.src import db, http_client  # noqa: E402
 from backend.src.models import Role  # noqa: E402
 
 # Must match migrate_from_archon.ROLE_MAP. Inlined rather than imported — legacy
@@ -306,6 +306,7 @@ async def run(args: argparse.Namespace) -> None:
         print(f"Applied to {len(written)} users.")
         await push_discord(written)
     finally:
+        await http_client.close()
         await db.close_db()
 
 
