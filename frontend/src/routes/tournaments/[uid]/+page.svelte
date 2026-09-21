@@ -298,8 +298,6 @@ import TournamentModals from "./TournamentModals.svelte";
     return standings;
   });
 
-  // Cutoff score: the 5th-place threshold for finals selection, shown only
-  // once a round is fully completed.
   const cutoffScore = $derived.by(() => {
     if (tournament?.state === "Finished" || tournament?.finals) return null;
     if ((tournament?.standings_mode ?? "Private") !== "Cutoff") return null;

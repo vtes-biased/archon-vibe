@@ -49,8 +49,6 @@
     cutoffScore: { gw: number; vp: number; tp: number } | null;
   } = $props();
 
-  // Printable standings sheet — mirrors the print-seating pattern (RoundsTab) and the
-  // player-visible standings (playerStandings).
   function esc(s: string): string {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
@@ -64,7 +62,6 @@
 
     let body: string;
     if (playerStandings.length === 0 && cutoffScore) {
-      // Cutoff mode pre-finish: only the top-5 threshold is public, not the list.
       body = `<div style="font-size:14pt;padding:8px 0">${esc(m.tournament_cutoff_threshold())} <strong>${esc(formatScore(cutoffScore.gw, cutoffScore.vp, cutoffScore.tp))}</strong></div>`;
     } else {
       let rows = '';
