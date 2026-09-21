@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { Announcement } from "$lib/types";
-  import { showToast } from "$lib/stores/toast.svelte";
   import { Megaphone, X } from "@lucide/svelte";
   import FoldableSection from "$lib/components/FoldableSection.svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -60,7 +59,7 @@
   const history = $derived(sorted.filter((a) => dismissed.has(a.id)));
 
   // Post-event, announcements are archival: only the most recent shows as a calm,
-  // non-dismissible banner, the rest drop into history, and no arrival toast fires.
+  // non-dismissible banner and the rest drop into history.
   const finished = $derived(tournamentState === "Finished");
   const shown = $derived(finished ? sorted.slice(0, 1) : active);
   const rest = $derived(finished ? sorted.slice(1) : history);
@@ -68,26 +67,6 @@
   function formatTime(iso: string): string {
     return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
-
-  // Arrival cue: toast announcements that land after mount (not pre-existing,
-  // not already dismissed on this device). Floats over whatever the player is doing.
-  let baseline = $state(false);
-  const reacted = new Set<string>();
-  $effect(() => {
-    const ids = announcements.map((a) => a.id);
-    if (!baseline) {
-      ids.forEach((id) => reacted.add(id));
-      baseline = true;
-      return;
-    }
-    for (const a of announcements) {
-      if (reacted.has(a.id)) continue;
-      reacted.add(a.id);
-      if (!finished && !dismissed.has(a.id)) {
-        showToast({ type: "info", message: a.body.slice(0, 120) });
-      }
-    }
-  });
 </script>
 
 {#if shown.length > 0 || rest.length > 0}
