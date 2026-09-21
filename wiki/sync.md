@@ -828,10 +828,8 @@ preserves unknown JSON keys.
 first, then by email, else creates a member. The VEKN-id match never cross-checks
 the name, so a transposed digit in a hand-typed id silently binds the seat — and
 the event's results and ratings — to the wrong real member. The email step
-normalizes the venue-typed address once and then makes two lookups against it:
-the email auth-method identifier, catching a member who logs in with a password
-they set themselves, then `contact_email`, catching one who holds an address of
-record but no login ([access](access.md#the-email-of-record)). It reconciles by
+resolves the venue-typed address through every place a member's address is held
+([access](access.md#the-email-of-record)). It reconciles by
 email alone, so an offline "create" for someone who already holds an account under
 another email mints a duplicate. Both risks are why the go-online
 summary lists players matched and accounts created for the organizer to review.

@@ -29,6 +29,9 @@ ON auth_methods((data->>'user_uid'));
 -- Unique constraint on method_type + identifier (e.g., only one email per address)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_methods_type_identifier
 ON auth_methods((data->>'method_type'), (data->>'identifier'));
+CREATE INDEX IF NOT EXISTS idx_auth_methods_discord_email
+ON auth_methods(LOWER(data->>'email'))
+WHERE data->>'method_type' = 'discord';
 DROP TRIGGER IF EXISTS auth_methods_modified_trigger ON auth_methods;
 CREATE TRIGGER auth_methods_modified_trigger
 BEFORE INSERT OR UPDATE ON auth_methods
@@ -215,6 +218,9 @@ ON objects(type, uid);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_objects_user_vekn_id
 ON objects(("full"->>'vekn_id'))
 WHERE type = 'user' AND "full"->>'vekn_id' IS NOT NULL AND "full"->>'vekn_id' != '';
+CREATE INDEX IF NOT EXISTS idx_objects_user_contact_email
+ON objects(LOWER("full"->>'contact_email'))
+WHERE type = 'user';
 DROP INDEX IF EXISTS idx_objects_user_calendar_token;
 CREATE INDEX IF NOT EXISTS idx_objects_user_calendar_token_column
 ON objects(calendar_token)

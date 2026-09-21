@@ -29,7 +29,6 @@ from ..db import (
     delete_banner,
     ensure_event_code,
     get_all_leagues,
-    get_auth_method_by_identifier,
     get_banner,
     get_connection,
     get_decks_for_tournament,
@@ -38,7 +37,7 @@ from ..db import (
     get_sanctions_for_user,
     get_sanctions_for_users,
     get_tournament_by_uid,
-    get_user_by_contact_email,
+    get_user_by_email,
     get_user_by_uid,
     get_user_by_vekn_id,
     resolve_event_code,
@@ -1349,9 +1348,7 @@ async def bulk_register(
         if row.vekn_id and row.vekn_id.strip():
             user = await get_user_by_vekn_id(row.vekn_id.strip())
         if user is None and row.email and row.email.strip():
-            am = await get_auth_method_by_identifier("email", row.email.strip().lower())
-            if am:
-                user = await get_user_by_uid(am.user_uid)
+            user = await get_user_by_email(row.email)
         if user is None:
             unmatched.append({"row": i, "name": label, "reason": "not_found"})
             continue
@@ -2157,12 +2154,7 @@ async def _resolve_or_create_offline_player(
             return player_data.temp_uid, user, False
 
     if email:
-        user = None
-        auth_method = await get_auth_method_by_identifier("email", email)
-        if auth_method:
-            user = await get_user_by_uid(auth_method.user_uid)
-        if not user:
-            user = await get_user_by_contact_email(email)
+        user = await get_user_by_email(email)
         if user:
             if not user.vekn_id:
                 user.vekn_id = await allocate_next_vekn_id()

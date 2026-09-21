@@ -10,7 +10,7 @@ This policy explains what we process, why, and the rights you have under the UK 
 
 ## What we collect
 
-- **Account & sign-in** — depending on how you sign in: your email address, a password or passkey credential, and/or your Discord account ID and the token Discord issues. Some sign-in methods don't require an email at all.
+- **Account & sign-in** — depending on how you sign in: your email address, a password or passkey credential, and/or your Discord account ID, the email address Discord reports for it, and the token Discord issues. Some sign-in methods don't require an email at all.
 - **VEKN profile** — your VEKN ID, name and profile details, synchronised from vekn.net.
 - **Tournament activity** — the events and leagues you join, your results and rankings, decks you submit, and any sanctions recorded against you.
 - **Location** — the city and time-zone you set for events (resolved against the GeoNames database).

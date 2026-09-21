@@ -11,7 +11,7 @@ from .. import community_links, permissions
 from ..broadcast import broadcast_precomputed, broadcast_resync
 from ..db import (
     allocate_next_vekn_id,
-    get_user_by_contact_email,
+    get_user_by_email,
     get_user_by_uid,
     soft_delete_user,
 )
@@ -92,7 +92,7 @@ async def create_user(
     # Door-dedup: an existing email match 409s with the matched uid instead of
     # minting a duplicate, so the caller pivots to sponsor+register that account.
     if email:
-        existing = await get_user_by_contact_email(email)
+        existing = await get_user_by_email(email)
         if existing:
             return JSONResponse(
                 status_code=409,

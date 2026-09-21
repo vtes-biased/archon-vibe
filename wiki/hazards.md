@@ -347,10 +347,14 @@ field the same way.
 **An email auth method's `identifier` is matched exactly**, so every reader must
 fold the address it is handed to lowercase — that is how it is written on every
 path. A raw address finds nothing and falls silently through to the caller's next
-branch rather than erroring. `contact_email` is the opposite, compared `LOWER()`
-on both sides in SQL, so the two halves of an email lookup do not normalize alike
-([access](access.md#the-email-of-record)). Two readers make both lookups: the
-registration row import and go-online's offline player resolution.
+branch rather than erroring. `contact_email` and the stored Discord email are the
+opposite, compared `LOWER()` on both sides in SQL, so the sources of an email
+lookup do not normalize alike
+([access](access.md#the-email-of-record)). Resolving a member from an address is
+`db.get_user_by_email`, which folds for every source; a reader that queries one
+source directly misses members the others would find, and one that reads
+`contact_email` directly skips the never-activated gate, letting whoever typed an
+address into their profile claim its owner's login.
 
 **Role writes have two out-of-band consumers** — the Discord Linked Roles push,
 which fires on any role delta with no periodic reconcile, and the resync

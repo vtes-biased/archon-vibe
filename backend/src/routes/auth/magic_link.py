@@ -14,7 +14,7 @@ from ...db import (
     delete_transient_token,
     get_auth_method_by_identifier,
     get_transient_token,
-    get_user_by_contact_email,
+    get_user_by_email,
     insert_auth_method,
     save_user,
     store_transient_token,
@@ -106,8 +106,8 @@ async def request_magic_link(
 
     existing_email_auth = await get_auth_method_by_identifier("email", email)
 
-    discord_user = await get_user_by_contact_email(email)
-    discord_user_uid = discord_user.uid if discord_user else None
+    record_user = await get_user_by_email(email)
+    record_user_uid = record_user.uid if record_user else None
 
     if purpose == "signup":
         if existing_email_auth:
@@ -116,7 +116,7 @@ async def request_magic_link(
                 detail="Email already registered. Use password login or reset.",
             )
     elif purpose == "reset":
-        if not existing_email_auth and not discord_user_uid:
+        if not existing_email_auth and not record_user_uid:
             raise HTTPException(
                 status_code=404,
                 detail="No account found with this email.",
@@ -129,7 +129,8 @@ async def request_magic_link(
         {
             "email": email,
             "purpose": purpose,
-            "discord_user_uid": discord_user_uid,
+            # Legacy key name: renaming it strands links in flight across a deploy.
+            "discord_user_uid": record_user_uid,
             "user_uid": link_user_uid,
         },
         expires_at,
@@ -205,7 +206,7 @@ async def set_password(request: SetPasswordRequest) -> Response:
 
     email = stored["email"]
     purpose = stored["purpose"]
-    discord_user_uid = stored.get("discord_user_uid")
+    record_user_uid = stored.get("discord_user_uid")
     now = datetime.now(UTC)
 
     password_hash = ph.hash(request.password)
@@ -220,8 +221,8 @@ async def set_password(request: SetPasswordRequest) -> Response:
         link_user_uid = stored.get("user_uid")
         if link_user_uid:
             user_uid = link_user_uid
-        elif discord_user_uid:
-            user_uid = discord_user_uid
+        elif record_user_uid:
+            user_uid = record_user_uid
         else:
             user = User(
                 uid=str(uuid7()),
@@ -261,8 +262,8 @@ async def set_password(request: SetPasswordRequest) -> Response:
             )
             await update_auth_method(updated_auth)
 
-        elif discord_user_uid:
-            user_uid = discord_user_uid
+        elif record_user_uid:
+            user_uid = record_user_uid
             auth_method = AuthMethod(
                 uid=str(uuid7()),
                 modified=now,

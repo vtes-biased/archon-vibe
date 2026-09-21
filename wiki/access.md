@@ -107,7 +107,7 @@ session is invalidated on purpose.
 | Email + password | register, login, and change from the profile — `POST /auth/me/password` rewrites the credential on the session alone | `routes/auth/email_password.py`, `routes/auth/profile.py` |
 | Magic link | signup, password reset, invite; the link stays valid until the password is actually set, not merely verified | `email_service.py` |
 | WebAuthn / passkeys | FIDO2; four endpoints — `register/{options,verify}` to add to an existing authenticated account, and `create/{options,verify}` unauthenticated to create a new user | `passkeys.svelte.ts` |
-| Discord OAuth | `GET /auth/discord/authorize` (`?link=true` attaches the Discord ID to the authenticated user) → callback; login matches by Discord ID or creates a user | `routes/auth/discord.py` |
+| Discord OAuth | `GET /auth/discord/authorize` (`?link=true` attaches the Discord ID to the authenticated user) → callback; login matches by Discord ID, then by the Discord email when verified (see [the email of record](#the-email-of-record)), or creates a user; every login stores that verified email on the Discord auth method | `routes/auth/discord.py` |
 | GitHub OAuth | **link-only**, not a login method; stores `github_login`/`github_id` on User (full-only), used to @-mention a reporter on their feedback issue | `routes/auth/github.py` |
 
 **Password, passkey and Discord login honour `/login?redirect=<path>`** (magic
@@ -144,7 +144,7 @@ session.
 An expired or already-used link routes to `/login?recover=1`, the reset form under
 wording that fits someone who has never had a password. That is the invited
 member's way back in: a member created with an email address carries a contact
-address and no email auth method, and the `reset` purpose creates the login on
+address and no login of any kind, and the `reset` purpose creates the login on
 exactly that basis. A one-click resend is not buildable — an expired transient
 token is gone from storage, so the server cannot recover the address to resend
 to, and for the same reason the page cannot tell which purpose the dead link
@@ -154,22 +154,34 @@ cannot serve: a signup link that expired before any account existed.
 ### The email of record
 
 `contact_email` is the account's address of record, not an address the member
-chose to publish — its name reads the other way round. It is what door-dedup
-409s on, what the account merge carries to the survivor, what the `reset`
-purpose recovers a login from for someone who never had a password, where the
-invite is sent, and what the VEKN registry push submits, falling back to
+chose to publish — its name reads the other way round. It is what the account
+merge carries to the survivor, what a `reset`, a magic-link signup or a first
+Discord login with that verified address lands on when the account has never had
+a login,
+where the invite is sent, and what the VEKN
+registry push submits, falling back to
 `<vekn_id>@placeholder.vekn.net` when there is none. It becomes a published
 address for exactly two roles: an NC's or Prince's row carries it into the member
 projection in plaintext and into the public one base64-cloaked, a harvester
 speed-bump rather than access control. Every other member's reaches only the
 holder and full-access readers, and no `api` projection carries it at all.
 
-**Case is folded at the lookup, not at the row, and the two lookups differ on
-which.** `contact_email` is compared `LOWER()` on both sides in SQL, so a row
-keeps whatever case its writer supplied and no caller has to think about it. An
-email **auth method's** `identifier` is compared exactly, so it is lowercased on
-every write and every reader must lowercase too — a hand-typed venue address
+**Case is folded at the lookup, not at the row, and the sources differ on
+which.** `contact_email` and the stored Discord email are compared `LOWER()` on
+both sides in SQL, so a row keeps whatever case its writer supplied and no caller
+has to think about it. An email **auth method's** `identifier` is compared
+exactly, so it is lowercased on every write and every reader must lowercase too — a hand-typed venue address
 passed through raw finds no one.
+
+**A member is found by address in three places, in order**: an email login's
+address, the verified email Discord last reported for a linked Discord login, then
+the address of record — the last only on an account that has never had a login.
+The Discord email is kept on the auth method, never projected, so a member who
+first signed in by Discord gets that account back from a magic-link signup, a
+registration import or door-dedup with the same address. A deleted account matches
+none of them. The address of record is self-editable and never verified, so
+letting it claim an activated account would hand a stranger's first login to
+whoever typed their address into a profile.
 
 A `+tag` subaddress is deliberately not canonicalized: this is the address we
 actually send to and hand to the VEKN registry, so folding `a+vtes@x.com` to

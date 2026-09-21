@@ -289,6 +289,10 @@ class AuthMethod(msgspec.Struct, kw_only=True):
     sign_count: Annotated[
         int, msgspec.Meta(description="WebAuthn signature counter.")
     ] = 0
+    email: Annotated[
+        str | None,
+        msgspec.Meta(description="Verified email Discord reported at the last login."),
+    ] = None
 
 
 class User(BaseObject, kw_only=True):

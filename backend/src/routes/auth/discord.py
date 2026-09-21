@@ -17,6 +17,7 @@ from ...db import (
     delete_transient_token,
     get_auth_method_by_identifier,
     get_transient_token,
+    get_user_by_email,
     get_user_by_uid,
     insert_auth_method,
     save_user,
@@ -210,6 +211,7 @@ async def discord_callback(
                 user_uid=user_uid_from_state,
                 method_type=AuthMethodType.DISCORD,
                 identifier=discord_id,
+                email=discord_email,
                 credential_hash=None,
                 verified=True,
                 created_at=now,
@@ -262,6 +264,7 @@ async def discord_callback(
                 verified=existing_auth.verified,
                 created_at=existing_auth.created_at,
                 last_used_at=now,
+                email=discord_email,
             )
             await update_auth_method(updated_auth)
 
@@ -275,24 +278,19 @@ async def discord_callback(
                 user.modified = now
                 await save_user(user)
         else:
-            email_auth_user_uid = None
-            if discord_email:
-                email_auth = await get_auth_method_by_identifier(
-                    "email", discord_email.lower()
-                )
-                if email_auth:
-                    email_auth_user_uid = email_auth.user_uid
+            user = await get_user_by_email(discord_email) if discord_email else None
 
             now = datetime.now(UTC)
 
-            if email_auth_user_uid:
-                user_uid = email_auth_user_uid
+            if user:
+                user_uid = user.uid
                 auth_method = AuthMethod(
                     uid=str(uuid7()),
                     modified=now,
                     user_uid=user_uid,
                     method_type=AuthMethodType.DISCORD,
                     identifier=discord_id,
+                    email=discord_email,
                     credential_hash=None,
                     verified=True,
                     created_at=now,
@@ -302,26 +300,24 @@ async def discord_callback(
 
                 # Pin in local_modifications (fields in ARCHON_USER_FIELDS) so the
                 # nightly merge won't revert them.
-                user = await get_user_by_uid(user_uid)
-                if user:
-                    changed = False
-                    local_mods = set(user.local_modifications)
-                    if user.discord_id != discord_id:
-                        user.discord_id = discord_id
-                        local_mods.add("discord_id")
-                        changed = True
-                    if not user.contact_discord:
-                        user.contact_discord = discord_username
-                        local_mods.add("contact_discord")
-                        changed = True
-                    if not user.nickname and discord_global_name:
-                        user.nickname = discord_global_name
-                        local_mods.add("nickname")
-                        changed = True
-                    if changed:
-                        user.local_modifications = local_mods
-                        user.modified = now
-                        await save_user(user)
+                changed = False
+                local_mods = set(user.local_modifications)
+                if user.discord_id != discord_id:
+                    user.discord_id = discord_id
+                    local_mods.add("discord_id")
+                    changed = True
+                if not user.contact_discord:
+                    user.contact_discord = discord_username
+                    local_mods.add("contact_discord")
+                    changed = True
+                if not user.nickname and discord_global_name:
+                    user.nickname = discord_global_name
+                    local_mods.add("nickname")
+                    changed = True
+                if changed:
+                    user.local_modifications = local_mods
+                    user.modified = now
+                    await save_user(user)
             else:
                 user = User(
                     uid=str(uuid7()),
@@ -341,6 +337,7 @@ async def discord_callback(
                     user_uid=user_uid,
                     method_type=AuthMethodType.DISCORD,
                     identifier=discord_id,
+                    email=discord_email,
                     credential_hash=None,
                     verified=True,
                     created_at=now,

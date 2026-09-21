@@ -663,22 +663,31 @@ async def soft_delete_user(uid: str) -> tuple[User, BroadcastData] | None:
     return user, bd
 
 
-async def get_user_by_contact_email(email: str) -> User | None:
-    """Find a live user by contact_email (account-merge + door-dedup lookup).
-    Skips soft-deleted rows — a merged/tombstoned duplicate must neither block a
-    fresh create nor be a merge target. ORDER BY uid + LIMIT 1 gives a stable pick
-    across legacy duplicate emails."""
-    async with get_connection() as conn:
+async def get_user_by_email(email: str) -> User | None:
+    async with _acquire() as conn:
         result = await conn.execute(
-            """SELECT "full" FROM objects
-            WHERE type = 'user' AND LOWER("full"->>'contact_email') = LOWER(%s)
-              AND deleted_at IS NULL ORDER BY uid LIMIT 1""",
-            (email,),
+            """SELECT m."full" FROM (
+                SELECT 1 AS rank, o.uid, o."full" FROM auth_methods a
+                JOIN objects o ON o.uid = a.data->>'user_uid' AND o.type = 'user'
+                WHERE a.data->>'method_type' = 'email' AND o.deleted_at IS NULL
+                  AND a.data->>'identifier' = LOWER(%(email)s)
+                UNION ALL
+                SELECT 2, o.uid, o."full" FROM auth_methods a
+                JOIN objects o ON o.uid = a.data->>'user_uid' AND o.type = 'user'
+                WHERE a.data->>'method_type' = 'discord' AND o.deleted_at IS NULL
+                  AND LOWER(a.data->>'email') = LOWER(%(email)s)
+                UNION ALL
+                SELECT 3, o.uid, o."full" FROM objects o
+                WHERE o.type = 'user' AND o.deleted_at IS NULL
+                  AND LOWER(o."full"->>'contact_email') = LOWER(%(email)s)
+                  AND NOT EXISTS (
+                    SELECT 1 FROM auth_methods l WHERE l.data->>'user_uid' = o.uid
+                  )
+            ) m ORDER BY m.rank, m.uid LIMIT 1""",
+            {"email": email.strip()},
         )
         row = await result.fetchone()
-        if row:
-            return decode_json(row[0], User)
-        return None
+        return decode_json(row[0], User) if row else None
 
 
 async def get_user_by_calendar_token(token: str) -> User | None:
