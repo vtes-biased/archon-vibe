@@ -1503,7 +1503,7 @@ async def _handle_sanction_update(
     player_discord_id = await store.get_discord_id_by_archon_uid(user_uid)
     player_mention = f"<@{player_discord_id}>" if player_discord_id else user_uid[:8]
 
-    judges_msg, player_msg = format_sanction(
+    judges_msg, table_msg, lobby_msg = format_sanction(
         level, category, subcategory, description, round_number, player_mention
     )
 
@@ -1522,9 +1522,9 @@ async def _handle_sanction_update(
             _table_channels.get(key, []),
         )
         if target:
-            posted_to_table = await _post(bot, target, player_msg)
+            posted_to_table = await _post(bot, target, table_msg)
     if not posted_to_table:
-        await _post(bot, lobby_id, player_msg)
+        await _post(bot, lobby_id, lobby_msg)
 
 
 async def _handle_judge_call(

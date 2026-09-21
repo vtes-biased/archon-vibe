@@ -864,8 +864,9 @@ the member profile, the members list and tournament pages alike. Each sanction i
 judged against its own tournament, so an organizer does not read the reason of a
 player's sanction from another event. A membership-level sanction, or one whose
 tournament is missing from the local index, shows its reason only to the global
-roles and the member. The Discord bot's table or lobby post still carries the
-reason.
+roles and the member. The Discord bot posts the reason to the judges channel and
+to the player's table channel, never to the lobby it falls back to when the
+player has no live table.
 
 **A sanction is bound to its scope at issuance**: Caution, Warning, Standings
 Adjustment and Disqualification are issued against a tournament and carry its

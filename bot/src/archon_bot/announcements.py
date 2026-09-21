@@ -233,7 +233,7 @@ def format_sanction(
     description: str,
     round_number: int | None,
     player_mention: str,
-) -> tuple[str, str]:
+) -> tuple[str, str, str]:
     """``category`` is expected already space-normalized; ``subcategory`` raw."""
     level_label = _SANCTION_LEVEL_LABELS.get(level, level)
     level_emoji = _SANCTION_LEVEL_EMOJI.get(level, "")
@@ -245,8 +245,8 @@ def format_sanction(
         f"Category: {category}{subcategory_info}\n"
         f"_{description}_"
     )
-    player_msg = (
-        f"{level_emoji} {player_mention} received a **{level_label}**{round_info}\n"
-        f"_{description}_"
+    lobby_msg = (
+        f"{level_emoji} {player_mention} received a **{level_label}**{round_info}"
     )
-    return judges_msg, player_msg
+    table_msg = f"{lobby_msg}\n_{description}_"
+    return judges_msg, table_msg, lobby_msg
