@@ -178,16 +178,16 @@
       // Editable until the round closes, not until every table reads Finished:
       // a player-scored table carries no judge_uid, so the engine allows
       // SetScore while Playing.
-      .filter(({ round, r }) => r === lastRoundIdx || round.some(t => t.state !== "Finished"))
+      .filter(({ round, r }) => r === lastRoundIdx || round.some(t => t.state !== "Finished" && t.state !== "Cancelled"))
       .map(({ round, r }) => {
         const tIdx = round.findIndex(t => t.seating.some(s => s.player_uid === userUid));
-        return tIdx >= 0 ? { roundIdx: r, tableIdx: tIdx, table: round[tIdx]! } : null;
+        return tIdx >= 0 && round[tIdx]!.state !== "Cancelled" ? { roundIdx: r, tableIdx: tIdx, table: round[tIdx]! } : null;
       })
       .filter((x): x is { roundIdx: number; tableIdx: number; table: typeof tournament.rounds[0][0] } => x !== null);
   });
 
   const hasParallelRounds = $derived(myActiveRounds.length > 1 || (
-    tournament.rounds?.filter(r => r.some(t => t.state !== "Finished")).length ?? 0
+    tournament.rounds?.filter(r => r.some(t => t.state !== "Finished" && t.state !== "Cancelled")).length ?? 0
   ) > 1);
 
   // History is whatever isn't live: deferring to myActiveRounds keeps the
@@ -201,13 +201,14 @@
       if (active.has(r)) continue;
       const round = tournament.rounds[r]!;
       const tIdx = round.findIndex(t => t.seating.some(s => s.player_uid === userUid));
-      if (tIdx >= 0) {
+      const table = round[tIdx];
+      if (table && table.state !== "Cancelled") {
         result.push({
           round: r + 1,
           roundIdx: r,
           tableIdx: tIdx,
           tableLabel: tableLabel(tournament.table_rooms, tIdx) ?? m.rounds_table_n({ n: String(tIdx + 1) }),
-          table: round[tIdx]!,
+          table,
         });
       }
     }
