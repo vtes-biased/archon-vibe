@@ -411,9 +411,12 @@ function sortSearchResults(entries: UserIndexEntry[], terms: string[]): UserList
     // inside a comparator redoes the work O(n log n) times.
     entries.sort((a, b) =>
       (a.nameNorm.startsWith(lead) ? 0 : 1) - (b.nameNorm.startsWith(lead) ? 0 : 1) ||
+      (a.nameNorm ? 0 : 1) - (b.nameNorm ? 0 : 1) ||
       a.user.name.localeCompare(b.user.name));
   } else {
-    entries.sort((a, b) => a.user.name.localeCompare(b.user.name));
+    entries.sort((a, b) =>
+      (a.nameNorm ? 0 : 1) - (b.nameNorm ? 0 : 1) ||
+      a.user.name.localeCompare(b.user.name));
   }
   return entries.map(e => e.user);
 }

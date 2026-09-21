@@ -24,6 +24,7 @@ omitted from the rows below.
 |---|---|
 | `sponsor_member`, `create_tournament` | NC, Prince — global (a visiting official can sponsor abroad) |
 | `edit_member_profile`, `manage_vekn`, `mark_deceased` | NC — own country |
+| `list_non_member` | NC, Prince — own country (the user's country; a countryless one is IC's alone) |
 | `merge_accounts`, `delete_member`, `force_unlock_tournament`, `manage_promos`, `run_admin_sync`, `promote_link_global`, `set_archival_results` | nobody |
 | `moderate_link`, `promote_link_national` | NC — own country |
 | `organize_tournament` | NC — own country; explicit organizer |
@@ -46,6 +47,12 @@ NC curates every link serving their country wherever its owner lives
 `set_archival_results` is IC-only rather than organizer, because the rows it
 applies to have no real organizer: a TWDA reconstruction has none at all, and an
 import's is whatever upstream claimed. Invalidation authority is IC's anyway (9.4).
+
+`list_non_member` is a display rule, not a sync one: every user still reaches
+every member, and a non-member's profile link and the organizer's add-player search
+stay open, so an official sponsoring abroad still finds them. The members directory
+lists only users holding a VEKN ID; the officials' "No VEKN" toggle swaps that for
+the non-members the viewer holds this capability over.
 
 Two rows carry a security rationale. `merge_accounts` is IC-only because a merge
 **unions both accounts' roles** — anyone who could merge could land a role by

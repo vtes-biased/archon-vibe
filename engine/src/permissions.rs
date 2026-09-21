@@ -175,6 +175,7 @@ pub enum Capability {
     DeleteMember,
     MarkDeceased,
     ManageVekn,
+    ListNonMember,
     MergeAccounts,
     CreateTournament,
     OrganizeTournament,
@@ -292,6 +293,16 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC, or the member's national coordinator, can manage VEKN IDs",
         deny_scope: Some("You can only manage VEKN IDs for users in your country"),
+    },
+    Rule {
+        capability: Capability::ListNonMember,
+        name: "list_non_member",
+        global: &[IC],
+        same_country: &[NC, Prince],
+        self_service: false,
+        organizer: false,
+        deny: "You don't have permission to list users without a VEKN ID",
+        deny_scope: None,
     },
     // IC-only: the merge unions both accounts' roles, so anyone who could merge
     // could land a role by absorbing a shell that carries it.

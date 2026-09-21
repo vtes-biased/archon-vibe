@@ -10,7 +10,7 @@
   import Badge, { badgeToneClass } from "$lib/components/Badge.svelte";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { isOfficial as engineIsOfficial, canSponsorMember } from "$lib/engine";
+  import { isOfficial as engineIsOfficial, canSponsorMember, canListNonMember } from "$lib/engine";
   import { displayContext } from "$lib/displayContext";
   import type { User as UserType, Role } from "$lib/types";
   import type { UserListItem } from "$lib/db";
@@ -153,16 +153,22 @@
         users = sanctionChecks.filter(({ passes }) => passes).map(({ user }) => user);
       }
 
-      // Sponsor / VEKN filters (officials only — coopted_by is full-projection).
+      // Sponsor filters (officials only — coopted_by is full-projection).
       if (sponsor === "mine") {
         const myUid = getAuthState().user?.uid;
         users = users.filter((u) => !!myUid && u.coopted_by === myUid);
       } else if (sponsor === "none") {
         users = users.filter((u) => !u.coopted_by);
       }
-      if (noVekn) {
-        users = users.filter((u) => !u.vekn_id);
-      }
+      const viewer = getAuthState().user;
+      const listable = new Map<string | null, boolean>();
+      users = users.filter((u) => {
+        if (!noVekn) return !!u.vekn_id;
+        if (u.vekn_id) return false;
+        const country = u.country ?? null;
+        if (!listable.has(country)) listable.set(country, canListNonMember(viewer, country));
+        return listable.get(country)!;
+      });
 
       filteredUsers = users;
 

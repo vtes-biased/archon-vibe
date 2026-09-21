@@ -419,6 +419,10 @@ export function canManageVekn(actor: UserContext | null, target: UserContext): P
   return checkPermission('manage_vekn', actor, { target });
 }
 
+export function canListNonMember(actor: UserContext | null, targetCountry: string | null): boolean {
+  return checkPermission('list_non_member', actor, { targetCountry }).allowed;
+}
+
 export function canMergeAccounts(actor: UserContext | null): PermissionResult {
   return checkPermission('merge_accounts', actor);
 }
