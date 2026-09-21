@@ -619,7 +619,9 @@ CRUD-on-save — the same carve-out as the timer, not processed by the engine.
 to the most recent 20 with a 280-character body limit. `POST /{uid}/announce` and
 `DELETE /{uid}/announce/{id}` are organizer-only and online-only, returning 423
 while offline. Member-projected automatically, since the member projection is a
-denylist. Banners are dismissible per-device via localStorage.
+denylist. Banners are dismissible per-device via localStorage, and there is no
+in-app toast on arrival: the banner and the push already carry it. Once the event
+is finished only the latest shows, not dismissible, and the rest fold into history.
 
 ### Call for judge
 

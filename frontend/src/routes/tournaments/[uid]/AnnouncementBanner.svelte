@@ -58,8 +58,6 @@
   const active = $derived(sorted.filter((a) => !dismissed.has(a.id)));
   const history = $derived(sorted.filter((a) => dismissed.has(a.id)));
 
-  // Post-event, announcements are archival: only the most recent shows as a calm,
-  // non-dismissible banner and the rest drop into history.
   const finished = $derived(tournamentState === "Finished");
   const shown = $derived(finished ? sorted.slice(0, 1) : active);
   const rest = $derived(finished ? sorted.slice(1) : history);
