@@ -24,3 +24,5 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
+
+- Link player names in a tournament's standings and its winner line to the member's public profile, as organizer names already are (`PlayerView.svelte:664,:776,:812`, `FinishedResults.svelte:78`, pattern at `+page.svelte:929`); the organizer roster and seating rows keep their controls and stay unlinked. gh-20, from a Prince comparing against vekn.net event results. **Done when:** clicking a name in any standings table or on the winner line of a tournament page opens that member's profile, signed in or not. Doc-impact: none — a link on an existing surface, no recorded decision changes.
