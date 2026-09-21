@@ -218,10 +218,11 @@ import TournamentModals from "./TournamentModals.svelte";
   $effect(() => {
     if (!tabs.some(t => t.id === activeTab)) activeTab = tabs[0]?.id ?? 'players';
   });
-  let landedOnSetup = false;
+  let landed = false;
   $effect(() => {
-    if (landedOnSetup || !tournament) return;
-    landedOnSetup = true;
+    if (landed || !tournament || !auth.user) return;
+    landed = true;
+    viewAsPlayer = !!currentPlayerEntry && !(tournament.organizers_uids ?? []).includes(auth.user.uid);
     if (showOrganizerView && tournament.state === "Planned") activeTab = 'setup';
   });
 
