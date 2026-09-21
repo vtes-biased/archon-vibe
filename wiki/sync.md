@@ -139,7 +139,7 @@ results are rendered client-side from data the client already holds.
 |---|---|---|
 | Config | — always shipped | shown |
 | Players | no — full per-player data shipped | per-player results hidden mid-event |
-| Standings | no | per `standings_mode` |
+| Standings | no | per `standings_mode` until the finals are seated, then full |
 | Decks | **yes** — per-deck `public` flag, and `user_uid` on an anonymous one | — |
 | Finals | no — shipped | hidden until finished |
 | My tables | no — all tables shipped | only the viewer's own |

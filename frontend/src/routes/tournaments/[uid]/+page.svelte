@@ -291,7 +291,7 @@ import TournamentModals from "./TournamentModals.svelte";
   const playerStandings = $derived.by(() => {
     if (!standings.length) return [];
     const mode = tournament?.standings_mode ?? "Private";
-    if (tournament?.state === "Finished") return standings;
+    if (tournament?.state === "Finished" || tournament?.finals) return standings;
     if (mode === "Private") return [];
     if (mode === "Cutoff") return [];
     if (mode === "Top 10") return standings.slice(0, 10);
@@ -301,7 +301,7 @@ import TournamentModals from "./TournamentModals.svelte";
   // Cutoff score: the 5th-place threshold for finals selection, shown only
   // once a round is fully completed.
   const cutoffScore = $derived.by(() => {
-    if (tournament?.state === "Finished") return null;
+    if (tournament?.state === "Finished" || tournament?.finals) return null;
     if ((tournament?.standings_mode ?? "Private") !== "Cutoff") return null;
     const rounds = tournament?.rounds?.length ?? 0;
     // During Playing, the last round is in progress, so completed = rounds - 1

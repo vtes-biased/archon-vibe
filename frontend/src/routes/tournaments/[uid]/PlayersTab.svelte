@@ -50,7 +50,7 @@
   } = $props();
 
   // Printable standings sheet — mirrors the print-seating pattern (RoundsTab) and the
-  // player-visible standings (honors standings_mode + finished state via playerStandings).
+  // player-visible standings (playerStandings).
   function esc(s: string): string {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
@@ -58,7 +58,7 @@
   function printStandings() {
     const title = esc(tournament.name || m.tournament_fallback_title());
     const finished = tournament.state === "Finished";
-    const modeLabel = !finished && tournament.standings_mode !== "Public"
+    const modeLabel = !finished && !tournament.finals && tournament.standings_mode !== "Public"
       ? ` <span style="font-size:13pt;color:#888;font-weight:normal">(${esc(translateStandingsMode(tournament.standings_mode))})</span>`
       : '';
 

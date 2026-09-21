@@ -642,7 +642,7 @@
       <div class="border-t border-line pt-4">
         <h3 class="text-sm font-medium text-ink-strong mb-2">
           {m.tournament_standings()}
-          {#if tournament.standings_mode !== "Public"}
+          {#if tournament.standings_mode !== "Public" && !tournament.finals}
             <span class="text-xs text-ink-faint font-normal ml-1">({translateStandingsMode(tournament.standings_mode)})</span>
           {/if}
         </h3>
@@ -659,7 +659,7 @@
           <tbody>
             {#each playerStandings as entry, idx}
               <tr class="{idx < 5 ? 'text-ink-strong' : 'text-ink-muted'} border-t border-line">
-                <td class="py-1 pr-2 text-ink-faint">{#if entry.unplaced}—{:else}<RankCell rank={entry.rank} finalist={entry.finalist} />{/if}</td>
+                <td class="py-1 pr-2 text-ink-faint">{#if entry.unplaced}—{:else}{entry.rank}{/if}</td>
                 <td class="py-1 pr-2">
                   <span class="inline-flex items-center gap-1">
                     <a href="/users/{entry.user_uid}" class="hover:text-link">{seatDisplay(entry.user_uid)}</a>
