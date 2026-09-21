@@ -432,10 +432,17 @@ rule.
 
 **Table labels** — a table is named by the sign the player walks to: `Main Hall 3`
 under a configured room, the room name alone when it holds a single table, and a
-localized `Table N` when no room covers the index. The engine's `tableLabel` is the
-only implementation; the seating grid, player view, printed seating sheet,
-judge-call banner and both Web Push bodies each render it with their own localized
-fallback.
+localized `Table N` when no room covers the index. Numbering starts at the event's
+first table number and runs on across rooms (Main Hall ×5 then Annex ×4 puts
+`Annex 6`…`Annex 9` on the wall), unless the organizer restarts it in each room,
+where every room reads 1…n; a table outside any room always reads first number +
+position. A missing switch reads as restart and only creation sets it on, so
+events set up before it existed keep their labels without a stored-value rewrite.
+The engine's `tableLabel` is the only implementation and hands back both the room
+label and the number; the seating grid, player view, printed seating sheet,
+judge-call banner and both Web Push bodies localize `Table N` from that number.
+The Discord bot holds no room config and reads first number + position for its
+messages and table channels.
 
 **Create and edit share sections, not initial state** — a form used for both
 (TournamentFields' `mode` prop) keeps the same sections but differs in what starts

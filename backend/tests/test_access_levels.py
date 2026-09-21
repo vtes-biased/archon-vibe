@@ -685,6 +685,8 @@ _TOURNAMENT_MEMBER_VISIBLE = {
     "open_rounds",
     "self_organized_rounds",
     "table_rooms",
+    "first_table_number",
+    "continue_room_numbering",
     "round_time",
     "finals_time",
     "banner_path",

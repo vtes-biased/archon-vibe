@@ -349,6 +349,7 @@ async def _maybe_push_judge_call(
     tournament: Tournament,
     table: int,
     table_label: str | None,
+    table_number: int,
     player_name: str,
     exclude_uid: str,
 ) -> None:
@@ -362,6 +363,7 @@ async def _maybe_push_judge_call(
             tournament_name=tournament.name,
             table=table,
             table_label=table_label,
+            table_number=table_number,
             player_name=player_name,
         )
         uids = [u for u in (tournament.organizers_uids or []) if u != exclude_uid]
@@ -909,6 +911,8 @@ class CreateTournamentRequest(BaseModel):
     open_rounds: bool = False
     self_organized_rounds: bool = False
     table_rooms: list[dict] = Field(default_factory=list)
+    first_table_number: int = 1
+    continue_room_numbering: bool = True
     league_uid: str | None = None
     round_time: int = 0
     finals_time: int = 0
@@ -2046,21 +2050,26 @@ async def call_judge(
     table = current_round[request.table]
     if not any(s.player_uid == user.uid for s in table.seating):
         raise HTTPException(status_code=403, detail="You are not seated at this table")
-    table_label = _engine.table_label(
-        msgspec.json.encode(tournament.table_rooms).decode(), request.table
+    numbering = {
+        "table_rooms": tournament.table_rooms,
+        "first_table_number": tournament.first_table_number,
+        "continue_room_numbering": tournament.continue_room_numbering,
+    }
+    sign = json.loads(
+        _engine.table_label(msgspec.json.encode(numbering).decode(), request.table)
     )
-    # Web Push the same organizer audience as the SSE broadcast, so one away from
-    # the screen is alerted too. Fire-and-forget, exclude caller.
+    table_label, table_number = sign["label"], sign["number"]
     await broadcast_judge_call(
         tournament_uid=tournament.uid,
         table=request.table,
         table_label=table_label,
+        table_number=table_number,
         player_name=user.name,
         organizer_uids=tournament.organizers_uids,
     )
     asyncio.create_task(
         _maybe_push_judge_call(
-            tournament, request.table, table_label, user.name, user.uid
+            tournament, request.table, table_label, table_number, user.name, user.uid
         )
     )
     return Response(status_code=204)

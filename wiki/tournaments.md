@@ -26,6 +26,8 @@ server (PyO3) behave identically.
 | `decklists_mode` | Winner / Finalists / All | applied by the post-finish pass, [below](#engine-event-catalog) |
 | `round_time`, `finals_time` | seconds; `round_time` 0 = untimed, `finals_time` 0 = use `round_time` | the shared timer |
 | `table_rooms` | named rooms over table ranges | labels in seating, print and player views |
+| `first_table_number` | int ≥ 1, default 1 | the number of the first table, for venues numbering continuously |
+| `continue_room_numbering` | bool, on for new events | room tables continue the event's numbering; off, each room restarts at 1, as twin events sharing a hall may want |
 
 **Ranking eligibility** — the engine's `ranking_eligibility` is the single
 predicate behind the rating inclusion filter, the ranked/unranked badge and the

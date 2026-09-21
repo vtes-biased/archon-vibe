@@ -72,6 +72,7 @@ def format_round_seating(
     tables_player_uids: list[list[str]],
     players: list,
     *,
+    first_table_number: int = 1,
     discord_id_map: dict | None = None,
     user_names: dict | None = None,
 ) -> str:
@@ -87,7 +88,7 @@ def format_round_seating(
             )
             for uid in player_uids
         ]
-        lines.append(f"**Table {ti + 1}**: {' → '.join(seat_names)}")
+        lines.append(f"**Table {first_table_number + ti}**: {' → '.join(seat_names)}")
     lines.append(
         f"\nJoin your table's voice channel and use {command_mention('report')} when the round ends."
     )
@@ -120,7 +121,7 @@ def format_finals(
 
 
 def format_table_seating(
-    table_index: int,
+    table_number: int,
     table: dict,
     players: list,
     *,
@@ -129,7 +130,7 @@ def format_table_seating(
     discord_id_map: dict | None = None,
     user_names: dict | None = None,
 ) -> str:
-    label = "Finals" if is_finals else f"Table {table_index + 1}"
+    label = "Finals" if is_finals else f"Table {table_number}"
     lines = [f"**{label} — Seating** (prey → predator)"]
     for i, s in enumerate(table.get("seating", [])):
         uid = s.get("player_uid", "")
@@ -157,14 +158,14 @@ def _fmt_vp(vp) -> str:
 
 
 def format_table_result(
-    table_index: int,
+    table_number: int,
     table: dict,
     players: list,
     *,
     is_finals: bool = False,
     user_names: dict | None = None,
 ) -> str:
-    label = "Finals" if is_finals else f"Table {table_index + 1}"
+    label = "Finals" if is_finals else f"Table {table_number}"
     lines = [f"**Results reported — {label}**"]
     for s in table.get("seating", []):
         name = player_display(s.get("player_uid", ""), players, user_names=user_names)

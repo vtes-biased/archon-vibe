@@ -239,6 +239,7 @@ async def broadcast_judge_call(
     tournament_uid: str,
     table: int,
     table_label: str | None,
+    table_number: int,
     player_name: str,
     organizer_uids: list[str] | None = None,
 ) -> None:
@@ -249,6 +250,7 @@ async def broadcast_judge_call(
             "tournament_uid": tournament_uid,
             "table": table,
             "table_label": table_label,
+            "table_number": table_number,
             "player_name": player_name,
         },
     }

@@ -4468,3 +4468,27 @@ fn test_waitlisted_player_skipped_by_check_in_all_and_spared_by_no_show_sweep() 
     );
     assert!(tournament["players"][4]["waitlisted"].as_bool().unwrap());
 }
+
+#[test]
+fn test_table_label_numbering() {
+    let label = |t: &JsonValue, i| {
+        table_label(t, i)
+            .0
+            .unwrap_or_else(|| format!("Table {}", table_label(t, i).1))
+    };
+    let bare = json::object! { "table_rooms": [], "first_table_number": 15 };
+    assert_eq!(label(&bare, 0), "Table 15");
+    let rooms = json::array![
+        { "name": "Main Hall", "count": 5 },
+        { "name": "Annex", "count": 4 },
+    ];
+    let continuing = json::object! { "table_rooms": rooms.clone(), "first_table_number": 1, "continue_room_numbering": true };
+    assert_eq!(label(&continuing, 5), "Annex 6");
+    assert_eq!(label(&continuing, 8), "Annex 9");
+    let restarting = json::object! { "table_rooms": rooms.clone(), "first_table_number": 1, "continue_room_numbering": false };
+    assert_eq!(label(&restarting, 5), "Annex 1");
+    assert_eq!(label(&restarting, 8), "Annex 4");
+    assert_eq!(label(&restarting, 9), "Table 10");
+    let before_numbering = json::object! { "table_rooms": rooms };
+    assert_eq!(label(&before_numbering, 5), "Annex 1");
+}

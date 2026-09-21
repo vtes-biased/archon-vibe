@@ -444,6 +444,8 @@ export interface CreateTournamentData {
   multideck?: boolean;
   decklist_required?: boolean;
   table_rooms?: { name: string; count: number }[];
+  first_table_number?: number;
+  continue_room_numbering?: boolean;
   league_uid?: string | null;
   round_time?: number;
   finals_time?: number;

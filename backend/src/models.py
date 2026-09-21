@@ -566,6 +566,17 @@ class TournamentConfig(TournamentMinimal, kw_only=True):
         False  # open rounds: registered players may seat their own pod
     )
     table_rooms: list[Room] = msgspec.field(default_factory=list)
+    first_table_number: Annotated[
+        int, msgspec.Meta(description="Number of the first table.")
+    ] = 1
+    # Deliberately not creation's default: absent must read as restart, or every
+    # event set up before the switch existed changes its room labels.
+    continue_room_numbering: Annotated[
+        bool,
+        msgspec.Meta(
+            description="Room tables continue the event's numbering instead of each room restarting at 1."
+        ),
+    ] = False
     round_time: Annotated[
         int, msgspec.Meta(description="Round length in seconds. 0 means untimed.")
     ] = 0

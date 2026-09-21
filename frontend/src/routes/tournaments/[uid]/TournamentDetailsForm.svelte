@@ -225,7 +225,7 @@
 {#snippet venueExtra()}
   <TableRoomsEditor
     tournamentUid={tournament.uid}
-    tableRooms={tournament.table_rooms ?? []}
+    numbering={tournament}
     onupdate={(t) => { tournament = t; }}
   />
 {/snippet}

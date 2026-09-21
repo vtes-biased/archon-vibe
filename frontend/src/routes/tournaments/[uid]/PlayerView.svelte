@@ -207,7 +207,7 @@
           round: r + 1,
           roundIdx: r,
           tableIdx: tIdx,
-          tableLabel: tableLabel(tournament.table_rooms, tIdx) ?? m.rounds_table_n({ n: String(tIdx + 1) }),
+          tableLabel: tableLabel(tournament, tIdx),
           table,
         });
       }
@@ -550,7 +550,7 @@
           <div class="border-t border-line pt-4">
             <div class="flex items-center justify-between mb-2">
               <h3 class="text-sm font-medium text-ink-strong">
-                {#if hasParallelRounds}{m.rounds_round_n({ n: String(roundIdx + 1) })} · {/if}{m.tournament_your_table({ label: tableLabel(tournament.table_rooms, myTableIdx) ?? m.rounds_table_n({ n: String(myTableIdx + 1) }) })}
+                {#if hasParallelRounds}{m.rounds_round_n({ n: String(roundIdx + 1) })} · {/if}{m.tournament_your_table({ label: tableLabel(tournament, myTableIdx) })}
               </h3>
               <span class="text-xs px-2 py-0.5 rounded {myTable.state === 'Finished' ? 'badge-success' : myTable.state === 'Invalid' ? 'bg-accent-soft/60 text-link-soft' : 'badge-pending'}">
                 {translateTableState(myTable.state)}

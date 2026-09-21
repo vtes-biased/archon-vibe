@@ -33,7 +33,7 @@
   <FoldableSection title={m.rooms_title()} bind:open={roomsOpen}>
     <TableRoomsEditor
       tournamentUid={tournament.uid}
-      tableRooms={tournament.table_rooms ?? []}
+      numbering={tournament}
       onupdate={(t) => { tournament = t; }}
     />
   </FoldableSection>

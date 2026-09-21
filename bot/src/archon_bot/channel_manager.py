@@ -59,7 +59,7 @@ def desired_channels(obj: dict) -> list[DesiredChannel]:
     round_number = len(rounds)
     return [
         DesiredChannel(
-            _table_channel_name(i + 1, round_number),
+            _table_channel_name(obj.get("first_table_number", 1) + i, round_number),
             _seat_uids(table.get("seating", [])) | organizer_uids,
         )
         for i, table in enumerate(rounds[-1])

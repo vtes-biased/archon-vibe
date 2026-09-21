@@ -407,8 +407,9 @@ write.
 |---|---|---|
 | `judge_call` | explicit tournament organizers only | a player requests a judge at their table |
 
-Payload `{tournament_uid, table, table_label, player_name}`, `table_label` null
-when no room covers the table — each reader renders its own "Table N", the Discord
+Payload `{tournament_uid, table, table_label, table_number, player_name}`:
+`table` is the index, `table_label` null when no room covers the table, and each
+reader then renders its own localized "Table N" from `table_number`, the Discord
 bot included, since it holds no room config. The frontend accumulates calls in
 component state, auto-dismisses after 120s and plays a chime.
 

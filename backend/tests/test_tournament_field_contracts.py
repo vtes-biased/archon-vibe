@@ -42,6 +42,8 @@ SAMPLE_CONFIG = {
     "open_rounds": True,
     "self_organized_rounds": True,
     "table_rooms": [{"name": "Cellar", "count": 2}],
+    "first_table_number": 15,
+    "continue_room_numbering": False,
     "league_uid": "league-0001",
     "round_time": 7200,
     "finals_time": 5400,

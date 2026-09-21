@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Tournament } from "$lib/types";
+  import type { TableNumbering } from "$lib/engine";
   import { tournamentAction } from "$lib/tournament-actions";
   import { showToast } from "$lib/stores/toast.svelte";
   import { Plus, X, ChevronUp, ChevronDown } from "@lucide/svelte";
@@ -7,34 +8,38 @@
 
   let {
     tournamentUid,
-    tableRooms,
+    numbering,
     onupdate,
   }: {
     tournamentUid: string;
-    tableRooms: { name: string; count: number }[];
+    numbering: TableNumbering;
     onupdate: (tournament: Tournament) => void;
   } = $props();
 
   // svelte-ignore state_referenced_locally
-  const initialRooms = tableRooms;
+  const initial = numbering;
   let rooms = $state<{ name: string; count: number }[]>(
-    initialRooms?.length ? initialRooms.map(r => ({ ...r })) : []
+    initial.table_rooms?.length ? initial.table_rooms.map(r => ({ ...r })) : []
   );
+  let firstNumber = $state<number>(initial.first_table_number ?? 1);
+  let restart = $state<boolean>(!(initial.continue_room_numbering ?? false));
 
   const totalCount = $derived(rooms.reduce((sum, r) => sum + r.count, 0));
 
   // Cleared count binds to null; name may be blank on a fresh row. Saving is
   // suspended while any row is invalid — say so instead of silently no-oping.
   const hasInvalidRow = $derived(rooms.some(r => !r.name.trim() || !(r.count >= 1)));
+  const firstNumberValid = $derived(Number.isInteger(firstNumber) && firstNumber >= 1);
 
   let saving = $state(false);
 
   async function save() {
-    if (hasInvalidRow) return;
+    if (hasInvalidRow || !firstNumberValid) return;
     saving = true;
     try {
       const cleaned = rooms.map(r => ({ name: r.name.trim(), count: r.count }));
-      const updated = await tournamentAction(tournamentUid, 'UpdateConfig', { config: { table_rooms: cleaned } });
+      const config = { table_rooms: cleaned, first_table_number: firstNumber, continue_room_numbering: !restart };
+      const updated = await tournamentAction(tournamentUid, 'UpdateConfig', { config });
       onupdate(updated);
     } catch {
       showToast({ type: "error", message: m.table_rooms_error_save() });
@@ -78,6 +83,21 @@
 </script>
 
 <div>
+  <label class="flex items-center justify-between gap-2 mb-2 text-sm text-ink">
+    {m.rooms_first_number()}
+    <input
+      type="number"
+      bind:value={firstNumber}
+      onchange={save}
+      min={1}
+      max={999}
+      class="w-20 px-2 py-1 min-h-[44px] text-sm bg-surface-muted border rounded text-ink-strong text-center focus:border-accent-strong-hover focus:outline-none {firstNumberValid ? 'border-line-strong' : 'border-warn'}"
+    />
+  </label>
+  {#if !firstNumberValid}
+    <p class="text-xs text-warn mb-2">{m.rooms_first_number_hint()}</p>
+  {/if}
+
   {#if rooms.length > 0}
     <div class="flex items-center justify-end mb-2">
       <span class="text-xs text-ink-faint">{m.rooms_total({ count: String(totalCount) })}</span>
@@ -128,6 +148,12 @@
     </div>
     {#if hasInvalidRow}
       <p class="text-xs text-warn mb-2">{m.rooms_validation_hint()}</p>
+    {/if}
+    {#if rooms.length > 1}
+      <label class="flex items-center gap-2 min-h-[44px] mb-2 text-sm text-ink cursor-pointer">
+        <input type="checkbox" bind:checked={restart} onchange={save} disabled={saving} class="w-5 h-5 rounded border-line-strong bg-surface-card text-accent focus:ring-accent" />
+        {m.rooms_restart_numbering()}
+      </label>
     {/if}
     <p class="text-xs text-ink-faint mb-2">{m.rooms_hint()}</p>
   {:else}

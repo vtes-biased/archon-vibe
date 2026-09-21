@@ -530,7 +530,11 @@ def compute_result_announcements(
             (
                 table_chs[i],
                 format_table_result(
-                    i, table, players, is_finals=is_finals, user_names=user_names
+                    cur_obj.get("first_table_number", 1) + i,
+                    table,
+                    players,
+                    is_finals=is_finals,
+                    user_names=user_names,
                 ),
             )
         )
@@ -660,7 +664,9 @@ def clock_tables(obj: dict, table_chs: list[int]) -> tuple[str, list[ClockTable]
             ClockTable(
                 index=i,
                 channel_id=table_chs[i],
-                label="Finals" if is_finals else f"Table {i + 1}",
+                label="Finals"
+                if is_finals
+                else f"Table {obj.get('first_table_number', 1) + i}",
                 total=total + extra_map.get(str(i), 0),
             )
         )
@@ -1235,7 +1241,7 @@ async def _emit_announcements(
                 bot,
                 ch_id,
                 format_table_seating(
-                    i,
+                    obj.get("first_table_number", 1) + i,
                     tables[i],
                     players,
                     is_finals=tag == "finals",
@@ -1327,6 +1333,7 @@ async def _announce_round_seating(
             round_count,
             tables_data,
             players,
+            first_table_number=obj.get("first_table_number", 1),
             discord_id_map=discord_id_map,
             user_names=_user_names[key],
         ),
@@ -1425,7 +1432,9 @@ async def _announce_seating_update(
             )
             for s in table.get("seating", [])
         ]
-        lines.append(f"**Table {ti + 1}**: {' → '.join(seat_names)}")
+        lines.append(
+            f"**Table {obj.get('first_table_number', 1) + ti}**: {' → '.join(seat_names)}"
+        )
     await _post(bot, announcement_id, "\n".join(lines))
     await _warn_unlinked_players(
         bot, judges_id, all_player_uids, discord_id_map, players, _user_names[key]
@@ -1537,8 +1546,7 @@ async def _handle_judge_call(
     link = await store.get_tournament_link(guild_id, tournament_uid)
     if not link:
         return
-    table = data.get("table", 0)
-    table_label = data.get("table_label") or f"Table {table + 1}"
+    table_label = data.get("table_label") or f"Table {data.get('table_number')}"
     player_name = data.get("player_name", "Unknown")
     await _post(
         bot,

@@ -38,25 +38,34 @@ use standings::{
     update_standings,
 };
 
-/// Room-aware table label. `None` when no room covers `table_idx`.
-pub fn table_label(table_rooms: &JsonValue, table_idx: usize) -> Option<String> {
+pub fn table_label(tournament: &JsonValue, table_idx: usize) -> (Option<String>, usize) {
+    let first = tournament[tournament::FIRST_TABLE_NUMBER]
+        .as_usize()
+        .unwrap_or(1);
+    let continuing = tournament[tournament::CONTINUE_ROOM_NUMBERING]
+        .as_bool()
+        .unwrap_or(false);
+    let number = first + table_idx;
     let mut offset = 0usize;
-    for room in table_rooms.members() {
+    for room in tournament[tournament::TABLE_ROOMS].members() {
         let count = room[room::COUNT].as_usize().unwrap_or(0);
         let name = room[room::NAME].as_str().unwrap_or("");
         if table_idx < offset + count {
-            return Some(if count == 1 {
+            let label = if count == 1 {
                 name.to_string()
+            } else if continuing {
+                format!("{name} {number}")
             } else {
                 format!("{name} {}", table_idx - offset + 1)
-            });
+            };
+            return (Some(label), number);
         }
         offset += count;
     }
-    None
+    (None, number)
 }
 
-pub const CONFIG_FIELDS: [&str; 27] = [
+pub const CONFIG_FIELDS: [&str; 29] = [
     tournament_config::NAME,
     tournament_config::FORMAT,
     tournament_config::RANK,
@@ -81,6 +90,8 @@ pub const CONFIG_FIELDS: [&str; 27] = [
     tournament_config::OPEN_ROUNDS,
     tournament_config::SELF_ORGANIZED_ROUNDS,
     tournament_config::TABLE_ROOMS,
+    tournament_config::FIRST_TABLE_NUMBER,
+    tournament_config::CONTINUE_ROOM_NUMBERING,
     tournament_config::LEAGUE_UID,
     tournament_config::ROUND_TIME,
     tournament_config::FINALS_TIME,
@@ -122,6 +133,11 @@ fn validate_config_fields(config: &JsonValue) -> Result<(), EngineError> {
                 return Err(EngineError::NameRequired);
             }
         }
+    }
+    if config.has_key(tournament_config::FIRST_TABLE_NUMBER)
+        && !matches!(config[tournament_config::FIRST_TABLE_NUMBER].as_u32(), Some(n) if n >= 1)
+    {
+        return Err(EngineError::InvalidTable);
     }
     // self_organized_rounds implies open_rounds; reject the combo here so the
     // invariant is enforced by the engine, not just the UI form.
@@ -269,6 +285,8 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
         } else {
             json::array![]
         },
+        tournament::FIRST_TABLE_NUMBER => config[tournament_config::FIRST_TABLE_NUMBER].as_u32().unwrap_or(1),
+        tournament::CONTINUE_ROOM_NUMBERING => config[tournament_config::CONTINUE_ROOM_NUMBERING].as_bool().unwrap_or(true),
         tournament::LEAGUE_UID => config[tournament_config::LEAGUE_UID].clone(),
         tournament::ROUND_TIME => config[tournament_config::ROUND_TIME].as_u32().unwrap_or(0),
         tournament::FINALS_TIME => config[tournament_config::FINALS_TIME].as_u32().unwrap_or(0),

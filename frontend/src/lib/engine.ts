@@ -1,6 +1,7 @@
 import type { CommunityLinkType, DeckAttribution, DeckObject, LinkMedia, LinkPlacement, RafflePool, Sanction, SanctionCategory, SanctionLevel, SanctionSubcategory, Tournament, User } from './types';
 import { getAllLeagues } from './db';
 import { callEngine, getEngine, initEngine } from './engine-instance';
+import * as m from './paraglide/messages.js';
 
 export function scoreSeatingSync(
   rounds: string[][][]
@@ -72,12 +73,14 @@ export function checkTableVpsSync(vps: number[]): VpIssue | null {
   return JSON.parse(callEngine(() => getEngine().checkTableVps(JSON.stringify({ vps }))));
 }
 
-/** Room-aware table label ("Main Hall 3"), or null when no room covers the index. */
-export function tableLabel(
-  tableRooms: { name: string; count: number }[] | undefined,
-  tableIndex: number,
-): string | null {
-  return callEngine(() => getEngine().tableLabel(JSON.stringify(tableRooms ?? []), tableIndex)) ?? null;
+export type TableNumbering = Pick<Tournament, 'table_rooms' | 'first_table_number' | 'continue_room_numbering'>;
+
+export function tableLabel(numbering: TableNumbering, tableIndex: number): string {
+  const { table_rooms, first_table_number, continue_room_numbering } = numbering;
+  const sign: { label: string | null; number: number } = JSON.parse(
+    callEngine(() => getEngine().tableLabel(JSON.stringify({ table_rooms, first_table_number, continue_room_numbering }), tableIndex)),
+  );
+  return sign.label ?? m.rounds_table_n({ n: String(sign.number) });
 }
 
 export type TournamentEventType =

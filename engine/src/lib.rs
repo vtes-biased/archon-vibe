@@ -330,13 +330,12 @@ mod shared {
     }
 
     pub fn table_label_json(
-        rooms_json: &str,
+        tournament_json: &str,
         table_idx: usize,
-    ) -> Result<Option<String>, EngineError> {
-        Ok(super::tournament::table_label(
-            &json::parse(rooms_json)?,
-            table_idx,
-        ))
+    ) -> Result<String, EngineError> {
+        let (label, number) =
+            super::tournament::table_label(&json::parse(tournament_json)?, table_idx);
+        Ok(json::object! { "label": label, "number": number }.dump())
     }
 
     pub fn compute_player_issues_json(config_json: &str) -> Result<String, EngineError> {
@@ -633,10 +632,10 @@ mod wasm {
         #[wasm_bindgen(js_name = tableLabel)]
         pub fn table_label(
             &self,
-            rooms_json: &str,
+            tournament_json: &str,
             table_idx: usize,
-        ) -> Result<Option<String>, String> {
-            table_label_json(rooms_json, table_idx).map_err(|e| e.to_json())
+        ) -> Result<String, String> {
+            js_str(table_label_json(tournament_json, table_idx))
         }
 
         #[wasm_bindgen(js_name = computePlayerIssues)]
@@ -941,9 +940,8 @@ mod python {
             py_str(sort_standings_json(standings_json))
         }
 
-        fn table_label(&self, rooms_json: &str, table_idx: usize) -> PyResult<Option<String>> {
-            table_label_json(rooms_json, table_idx)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_json()))
+        fn table_label(&self, tournament_json: &str, table_idx: usize) -> PyResult<String> {
+            py_str(table_label_json(tournament_json, table_idx))
         }
 
         fn compute_player_issues(&self, config_json: &str) -> PyResult<String> {

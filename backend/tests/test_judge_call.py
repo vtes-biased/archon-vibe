@@ -44,6 +44,7 @@ async def test_judge_call_only_sent_to_explicit_organizers():
             tournament_uid="t1",
             table=2,
             table_label="Room A 3",
+            table_number=3,
             player_name="Alice",
             organizer_uids=["org1"],
         )
@@ -71,6 +72,7 @@ async def test_judge_call_not_sent_to_other_tournament_organizer():
             tournament_uid="t1",
             table=0,
             table_label=None,
+            table_number=1,
             player_name="Bob",
             organizer_uids=["org1"],
         )

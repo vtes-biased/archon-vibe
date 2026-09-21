@@ -60,6 +60,7 @@ export interface JudgeCallData {
   tournament_uid: string;
   table: number;
   table_label: string | null;
+  table_number: number;
   player_name: string;
 }
 

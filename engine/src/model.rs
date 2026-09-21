@@ -240,6 +240,7 @@ pub mod tournament {
     pub const FINALS: &str = "finals";
     pub const FINALS_TIME: &str = "finals_time";
     pub const FINISH: &str = "finish";
+    pub const FIRST_TABLE_NUMBER: &str = "first_table_number";
     pub const FORMAT: &str = "format";
     pub const LEAGUE_UID: &str = "league_uid";
     pub const MAP_URL: &str = "map_url";
@@ -258,6 +259,7 @@ pub mod tournament {
     pub const RAFFLES: &str = "raffles";
     pub const RANK: &str = "rank";
     pub const REGISTRATION_URL: &str = "registration_url";
+    pub const CONTINUE_ROOM_NUMBERING: &str = "continue_room_numbering";
     pub const REPORTED_PLAYER_COUNT: &str = "reported_player_count";
     pub const ROUND_TIME: &str = "round_time";
     pub const ROUNDS: &str = "rounds";
@@ -282,6 +284,7 @@ pub mod tournament_config {
     pub const DESCRIPTION: &str = "description";
     pub const FINALS_TIME: &str = "finals_time";
     pub const FINISH: &str = "finish";
+    pub const FIRST_TABLE_NUMBER: &str = "first_table_number";
     pub const FORMAT: &str = "format";
     pub const LEAGUE_UID: &str = "league_uid";
     pub const MAP_URL: &str = "map_url";
@@ -294,6 +297,7 @@ pub mod tournament_config {
     pub const PROXIES: &str = "proxies";
     pub const RANK: &str = "rank";
     pub const REGISTRATION_URL: &str = "registration_url";
+    pub const CONTINUE_ROOM_NUMBERING: &str = "continue_room_numbering";
     pub const ROUND_TIME: &str = "round_time";
     pub const SELF_ORGANIZED_ROUNDS: &str = "self_organized_rounds";
     pub const STANDINGS_MODE: &str = "standings_mode";

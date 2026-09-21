@@ -136,6 +136,7 @@
           {playerInfo}
           playerIssues={new Map()}
           isFinals={true}
+          numbering={tournament}
           online={tournament.online}
           onchange={() => {}}
         />

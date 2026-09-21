@@ -120,14 +120,21 @@ def _round_seat_spec(
         "kind": "seating_round",
         "title": t.name,
         "round": round_no,
-        "table": table_idx + 1,
         "seat": seat_idx + 1,
         "url": f"/tournaments/{t.uid}",
         "tag": f"seating-{t.uid}-{round_no}",
     }
-    label = _engine.table_label(msgspec.json.encode(t.table_rooms).decode(), table_idx)
-    if label:
-        spec["table_label"] = label
+    numbering = {
+        "table_rooms": t.table_rooms,
+        "first_table_number": t.first_table_number,
+        "continue_room_numbering": t.continue_room_numbering,
+    }
+    sign = json.loads(
+        _engine.table_label(msgspec.json.encode(numbering).decode(), table_idx)
+    )
+    spec["table"] = sign["number"]
+    if sign["label"]:
+        spec["table_label"] = sign["label"]
     return spec
 
 
@@ -220,15 +227,14 @@ def build_judge_call_spec(
     tournament_name: str,
     table: int,
     table_label: str | None,
+    table_number: int,
     player_name: str,
 ) -> dict:
     spec = {
         "kind": "judge",
         "title": tournament_name,
         "player": player_name,
-        "table": table + 1,
-        # ?table= mirrors the seating-push pattern; frontend deep-link
-        # consumption of the param rides the notification-deep-link work.
+        "table": table_number,
         "url": f"/tournaments/{tournament_uid}?table={table}",
         "tag": f"judge-{tournament_uid}-{table}",
         # Re-alert even if a prior call at this table is still on screen — the

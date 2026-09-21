@@ -351,6 +351,8 @@ export interface Tournament extends BaseObject {
   open_rounds?: boolean; // non-VEKN house format: per-player cap, not pushed to VEKN, not ranked
   self_organized_rounds?: boolean; // open-rounds: let registered players seat their own pod (#274)
   table_rooms?: Room[];
+  first_table_number?: number;
+  continue_room_numbering?: boolean;
 
   // Full data (varies by level)
   external_ids?: Record<string, string>;

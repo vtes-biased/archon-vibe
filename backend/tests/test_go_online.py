@@ -521,6 +521,8 @@ _FROM_OFFLINE_SNAPSHOT = {
     "open_rounds",
     "self_organized_rounds",
     "table_rooms",
+    "first_table_number",
+    "continue_room_numbering",
     "round_time",
     "finals_time",
     "players",
