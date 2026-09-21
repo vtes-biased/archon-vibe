@@ -241,8 +241,6 @@ async def organizer_tournament_uids(user_uid: str) -> list[str]:
     async with get_connection() as conn:
         rows = await (
             await conn.execute(
-                # Literal type (not a %s param) so the planner can prove the partial
-                # index's WHERE predicate; @> (not ?) so its jsonb_path_ops opclass applies.
                 "SELECT uid FROM objects WHERE type = 'tournament' "
                 "AND (\"full\"->'organizers_uids') @> %s::jsonb AND deleted_at IS NULL",
                 (_encoder.encode([user_uid]).decode(),),

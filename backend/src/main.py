@@ -1069,8 +1069,6 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
                 frames.extend(_sse_object_lines("promos", [r[0] for r in rows]))
                 count += len(rows)
 
-        # Literal type (not %s) so the partial index's `type = 'tournament'`
-        # predicate provably holds; @> (not ?) so its jsonb_path_ops applies.
         rows = await (
             await db_conn.execute(
                 "SELECT uid, \"full\"::text FROM objects WHERE type = 'tournament' "
