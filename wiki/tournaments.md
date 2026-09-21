@@ -856,6 +856,17 @@ issue them are [domain](domain/judging.md); the app's visibility rules are here.
 The filtering is a **display rule**: all sanction records sync to every member's
 client at member level. IC and Ethics see every level on every surface.
 
+**The reason is a display rule too.** A sanction's category, subcategory and
+description show only to IC, Ethics, the Rulemonger, the NC of its tournament's
+country, that tournament's organizers and the sanctioned member
+(`view_sanction_reason`); everyone else sees its level, dates and tournament, on
+the member profile, the members list and tournament pages alike. Each sanction is
+judged against its own tournament, so an organizer does not read the reason of a
+player's sanction from another event. A membership-level sanction, or one whose
+tournament is missing from the local index, shows its reason only to the global
+roles and the member. The Discord bot's table or lobby post still carries the
+reason.
+
 **A sanction is bound to its scope at issuance**: Caution, Warning, Standings
 Adjustment and Disqualification are issued against a tournament and carry its
 `tournament_uid`; Suspension and Probation are membership-level and carry none.

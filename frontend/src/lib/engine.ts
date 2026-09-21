@@ -360,7 +360,7 @@ function checkPermission(
     };
     // For a resource-scoped capability, "same country" means the resource's
     // — an NC is an implicit organizer of their country's tournaments.
-    if (!target && context.targetCountry === undefined) {
+    if (context.targetCountry === undefined) {
       request.target_country = resource.country ?? null;
     }
   }
@@ -508,6 +508,14 @@ export function canIssueTournamentSanction(
 
 export function canIssueRestrictedSanction(actor: UserContext | null): PermissionResult {
   return checkPermission('issue_restricted_sanction', actor);
+}
+
+export function canViewSanctionReason(
+  actor: UserContext | null,
+  sanction: { user_uid: string },
+  tournament: Resource | undefined
+): boolean {
+  return checkPermission('view_sanction_reason', actor, { target: { uid: sanction.user_uid }, resource: tournament }).allowed;
 }
 
 export function isOrganizer(

@@ -1,6 +1,9 @@
 <script lang="ts">
   import type { Sanction } from "$lib/types";
   import { removeTournamentSanction } from "$lib/sanction-actions";
+  import { getTournamentListItems, type TournamentListItem } from "$lib/db";
+  import { canViewSanctionReason } from "$lib/engine";
+  import { getAuthState } from "$lib/stores/auth.svelte";
   import { showToast } from "$lib/stores/toast.svelte";
   import SanctionBadge from "./SanctionBadge.svelte";
   import Button from '$lib/components/Button.svelte';
@@ -22,6 +25,17 @@
   } = $props();
 
   let deleting = $state(false);
+
+  let tournaments = $state<Map<string, TournamentListItem>>(new Map());
+  $effect(() => {
+    getTournamentListItems().then((items) => {
+      tournaments = new Map(items.map((t) => [t.uid, t]));
+    });
+  });
+
+  const auth = $derived(getAuthState());
+  const showReason = (s: Sanction) =>
+    canViewSanctionReason(auth.user, s, s.tournament_uid ? tournaments.get(s.tournament_uid) : undefined);
 
   // Same filter as the SanctionIndicator dot
   const active = $derived(sanctions.filter(s => !s.lifted_at && !s.deleted_at));
@@ -66,17 +80,20 @@
     </div>
     <div class="p-6 space-y-2">
       {#each active as sanction (sanction.uid)}
+        {@const canSeeReason = showReason(sanction)}
         <div class="flex items-start justify-between gap-2 p-3 bg-surface-muted rounded border border-line-strong">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
-              <SanctionBadge {sanction} />
+              <SanctionBadge {sanction} showReason={canSeeReason} />
               {#if sanction.tournament_uid !== tournamentUid}
                 <span class="text-xs px-1.5 py-0.5 rounded bg-surface-hover text-ink-muted">{m.sanction_other_event()}</span>
               {:else if sanction.round_number !== null && sanction.round_number !== undefined}
                 <span class="text-xs text-ink-faint">{m.sanction_round_label({ round: String(sanction.round_number + 1) })}</span>
               {/if}
             </div>
-            <p class="mt-1 text-sm text-ink">{sanction.description}</p>
+            {#if canSeeReason}
+              <p class="mt-1 text-sm text-ink">{sanction.description}</p>
+            {/if}
             <p class="mt-1 text-xs text-ink-faint">{m.sanction_issued({ date: new Date(sanction.issued_at).toLocaleDateString() })}</p>
           </div>
           <!-- Organizer delete is scoped to this tournament's own sanctions -->

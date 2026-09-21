@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { User, Sanction, SanctionLevel, SanctionCategory } from "$lib/types";
   import { createSanction, updateSanction, deleteSanctionApi } from "$lib/api";
-  import { getActiveSanctionsForUser, getTournamentListItems } from "$lib/db";
+  import { getActiveSanctionsForUser, getTournamentListItems, type TournamentListItem } from "$lib/db";
+  import { canViewSanctionReason } from "$lib/engine";
+  import { getAuthState } from "$lib/stores/auth.svelte";
   import { visibleSanctions } from "$lib/utils";
   import { showToast } from "$lib/stores/toast.svelte";
   import SanctionBadge from "./SanctionBadge.svelte";
@@ -43,12 +45,16 @@
     });
   });
 
-  let tournamentNames = $state<Map<string, string>>(new Map());
+  let tournaments = $state<Map<string, TournamentListItem>>(new Map());
   $effect(() => {
     getTournamentListItems().then((items) => {
-      tournamentNames = new Map(items.map((t) => [t.uid, t.name]));
+      tournaments = new Map(items.map((t) => [t.uid, t]));
     });
   });
+
+  const auth = $derived(getAuthState());
+  const showReason = (s: Sanction) =>
+    canViewSanctionReason(auth.user, s, s.tournament_uid ? tournaments.get(s.tournament_uid) : undefined);
 
   // Cautions are private to their tournament — never surfaced in the directory.
   const shownSanctions = $derived(visibleSanctions(userSanctions));
@@ -220,7 +226,7 @@
       <span class="font-medium">{m.sanction_mgr_title()}:</span>
       <div class="flex flex-wrap gap-1">
         {#each shownSanctions as sanction (sanction.uid)}
-          <SanctionBadge {sanction} />
+          <SanctionBadge {sanction} showReason={showReason(sanction)} />
         {/each}
       </div>
     </div>
@@ -233,20 +239,23 @@
         {#if shownSanctions.length > 0}
           <div class="space-y-2 {canIssueSanctions ? 'mb-4' : ''}">
             {#each shownSanctions as sanction (sanction.uid)}
+              {@const canSeeReason = showReason(sanction)}
               <div class="flex items-center justify-between gap-2 p-3 bg-surface-muted rounded border border-line-strong">
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
-                    <SanctionBadge {sanction} />
-                    <span class="text-sm text-ink truncate">{sanction.description}</span>
+                    <SanctionBadge {sanction} showReason={canSeeReason} />
+                    {#if canSeeReason}
+                      <span class="text-sm text-ink truncate">{sanction.description}</span>
+                    {/if}
                   </div>
                   <div class="text-xs text-ink-faint mt-1">
                     {formatDate(sanction.issued_at)}
                     {#if sanction.expires_at}
                       → {formatDate(sanction.expires_at)}
                     {/if}
-                    {#if sanction.tournament_uid && tournamentNames.has(sanction.tournament_uid)}
+                    {#if sanction.tournament_uid && tournaments.has(sanction.tournament_uid)}
                       · <a href="/tournaments/{sanction.tournament_uid}" class="underline hover:text-ink">
-                        {tournamentNames.get(sanction.tournament_uid)}
+                        {tournaments.get(sanction.tournament_uid)?.name}
                       </a>
                     {/if}
                   </div>
@@ -429,7 +438,7 @@
         <div>
           {#if editLevelLocked}
             <div class="block text-sm font-medium text-ink-muted mb-1">{m.common_level()}</div>
-            <SanctionBadge sanction={editingSanction} />
+            <SanctionBadge sanction={editingSanction} showReason />
           {:else}
             <label for="edit-sanction-level" class="block text-sm font-medium text-ink-muted mb-1">
               {m.common_level()}

@@ -4,7 +4,7 @@
   import Badge, { type BadgeTone } from "$lib/components/Badge.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
-  let { sanction }: { sanction: Sanction } = $props();
+  let { sanction, showReason }: { sanction: Sanction; showReason: boolean } = $props();
 
   const isLifted = $derived(sanction.lifted_at !== null);
   const isExpired = $derived.by(() => {
@@ -44,7 +44,7 @@
   };
 
   const tooltipText = $derived.by(() => {
-    let text = `${label}: ${sanction.description}\n${m.sanction_issued({ date: formatDate(sanction.issued_at) })}`;
+    let text = `${showReason ? `${label}: ${sanction.description}` : label}\n${m.sanction_issued({ date: formatDate(sanction.issued_at) })}`;
     if (sanction.expires_at) {
       text += `\n${m.sanction_expires({ date: formatDate(sanction.expires_at) })}`;
     }

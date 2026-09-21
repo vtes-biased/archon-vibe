@@ -33,6 +33,7 @@ omitted from the rows below.
 | `issue_tournament_sanction` | Ethics — global; tournament organizer |
 | `lift_tournament_sanction` | Rulemonger — global; NC — the tournament's country |
 | `delete_organizer_sanction` | tournament organizer, while the tournament is unfinished |
+| `view_sanction_reason` | Ethics, Rulemonger — global; NC — the tournament's country; tournament organizer; the sanctioned member |
 | `record_promo_intake`, `view_full_promo_ledger` | NC — global (the inventory chain is not country-scoped) |
 | `manage_oauth_clients` | DEV — global |
 | `manage_nda` | PTC — global (request, upload, view and download playtest NDA records) |
