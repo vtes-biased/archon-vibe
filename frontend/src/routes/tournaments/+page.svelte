@@ -15,6 +15,7 @@
   import { Loader2, Trophy, Calendar, Copy, Check, Plus, SlidersHorizontal, X } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
+  import { getLocale } from '$lib/paraglide/runtime.js';
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
   // Subscription URLs get pasted into external calendar apps, so they must be
@@ -188,12 +189,13 @@
     try {
       const tz = t.online ? undefined : t.timezone || "UTC";
       const opts: Intl.DateTimeFormatOptions = {
+        weekday: "short",
         year: "numeric",
         month: "short",
         day: "numeric",
         ...(tz ? { timeZone: tz } : {}),
       };
-      return zonedDate(t.start, t.timezone || "UTC").toLocaleDateString(undefined, opts);
+      return zonedDate(t.start, t.timezone || "UTC").toLocaleDateString(getLocale(), opts);
     } catch {
       return t.start;
     }

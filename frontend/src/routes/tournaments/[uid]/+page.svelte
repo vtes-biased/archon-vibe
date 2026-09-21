@@ -23,6 +23,7 @@
   import Badge from "$lib/components/Badge.svelte";
   import { showToast } from "$lib/stores/toast.svelte";
   import * as m from '$lib/paraglide/messages.js';
+  import { getLocale } from '$lib/paraglide/runtime.js';
 
   // null = validation unavailable for player's own deck, treated as no blocking errors — never gates
   let myDeckErrors = $state<ValidationError[] | null>([]);
@@ -568,12 +569,12 @@ import TournamentModals from "./TournamentModals.svelte";
     try {
       const tz = tournament.online ? undefined : tournament.timezone || "UTC";
       const opts: Intl.DateTimeFormatOptions = {
-        year: "numeric", month: "short", day: "numeric",
+        weekday: "short", year: "numeric", month: "short", day: "numeric",
         hour: "2-digit", minute: "2-digit",
         timeZoneName: "short",
         ...(tz ? { timeZone: tz } : {}),
       };
-      return zonedDate(iso, tournament.timezone || "UTC").toLocaleString(undefined, opts);
+      return zonedDate(iso, tournament.timezone || "UTC").toLocaleString(getLocale(), opts);
     } catch { return iso; }
   }
 
@@ -582,7 +583,7 @@ import TournamentModals from "./TournamentModals.svelte";
     const tournamentTz = tournament.timezone || "UTC";
     if (tournamentTz === browserTz) return null;
     try {
-      return zonedDate(iso, tournamentTz).toLocaleString(undefined, {
+      return zonedDate(iso, tournamentTz).toLocaleString(getLocale(), {
         hour: "2-digit", minute: "2-digit",
         timeZoneName: "short",
       });
@@ -849,6 +850,9 @@ import TournamentModals from "./TournamentModals.svelte";
             <div class="text-ink-bright">{formatDate(tournament.start)}</div>
             {#if formatDateLocal(tournament.start)}
               <div class="text-xs text-ink-faint">{formatDateLocal(tournament.start)} {m.tournament_in_timezone()}</div>
+            {/if}
+            {#if tournament.finish}
+              <div class="text-ink-bright">– {formatDate(tournament.finish)}</div>
             {/if}
             <!-- Server-generated download — hidden offline (dead link otherwise) -->
             {#if tournament.start && tournament.state !== "Finished" && isBrowserOnline()}
