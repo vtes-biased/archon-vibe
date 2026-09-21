@@ -504,7 +504,7 @@
                 <div class="min-w-0">
                   <span class="min-w-0 inline-flex items-center gap-1.5">
                     <span class="text-ink-faint text-xs tabular-nums shrink-0">{m.tournament_seat_n({ n: String(j + 1) })}</span>
-                    <span class="text-ink truncate min-w-0">{seatDisplay(seat.player_uid)}</span>
+                    <span class="text-ink min-w-0 break-words">{seatDisplay(seat.player_uid)}</span>
                     {#if isMe}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_you()}</span>
                     {:else if isPrey}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_prey()}</span>
                     {:else if isPredator}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_predator()}</span>{/if}
@@ -588,7 +588,7 @@
                   <div class="flex items-center justify-between gap-2 mb-1.5 text-sm">
                     <span class="min-w-0 inline-flex items-center gap-1.5">
                       <span class="text-ink-faint text-xs tabular-nums shrink-0">{m.tournament_seat_n({ n: String(j + 1) })}</span>
-                      <span class="text-ink truncate min-w-0">{seatDisplay(seat.player_uid)}</span>
+                      <span class="text-ink min-w-0 break-words">{seatDisplay(seat.player_uid)}</span>
                       {#if isMe}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_you()}</span>
                       {:else if isPrey}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_prey()}</span>
                       {:else if isPredator}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_predator()}</span>{/if}
@@ -662,7 +662,7 @@
                 <td class="py-1 pr-2 text-ink-faint">{#if entry.unplaced}—{:else}<RankCell rank={entry.rank} finalist={entry.finalist} />{/if}</td>
                 <td class="py-1 pr-2">
                   <span class="inline-flex items-center gap-1">
-                    {seatDisplay(entry.user_uid)}
+                    <a href="/users/{entry.user_uid}" class="hover:text-link">{seatDisplay(entry.user_uid)}</a>
                     <SanctionIndicator sanctions={sanctionsForPlayer(entry.user_uid)} />
                     {#if entry.disqualified}<span class="text-xs text-link">{m.tournament_disqualified()}</span>{/if}
                   </span>
@@ -774,7 +774,7 @@
     {#if tournament.winner}
       <div class="banner-highlight border rounded-lg p-4">
         <div class="text-ink-faint text-sm">{m.tournament_winner()}</div>
-        <div class="text-xl font-medium text-ink-strong">{seatDisplay(tournament.winner)}</div>
+        <a href="/users/{tournament.winner}" class="block text-xl font-medium text-ink-strong hover:text-link">{seatDisplay(tournament.winner)}</a>
       </div>
     {/if}
     <!-- Unranked events: state the rule inline (a player's missing winner/
@@ -810,7 +810,7 @@
                   <td class="py-1 pr-2 text-ink-faint">{#if entry.unplaced}—{:else}<RankCell rank={entry.rank} finalist={entry.finalist} />{/if}</td>
                   <td class="py-1 pr-2">
                     <span class="inline-flex items-center gap-1">
-                      {seatDisplay(entry.user_uid)}
+                      <a href="/users/{entry.user_uid}" class="hover:text-link">{seatDisplay(entry.user_uid)}</a>
                       <SanctionIndicator sanctions={sanctionsForPlayer(entry.user_uid)} />
                       {#if entry.disqualified}<span class="text-xs text-link">{m.tournament_disqualified()}</span>{/if}
                     </span>

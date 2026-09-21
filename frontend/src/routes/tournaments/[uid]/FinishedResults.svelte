@@ -75,7 +75,7 @@
   {#if tournament.winner}
     <div class="banner-highlight border rounded-lg p-4">
       <div class="text-ink-faint text-sm">{m.tournament_winner()}</div>
-      <div class="text-xl font-medium text-ink-strong">{seatDisplay(tournament.winner)}</div>
+      <a href="/users/{tournament.winner}" class="block text-xl font-medium text-ink-strong hover:text-link">{seatDisplay(tournament.winner)}</a>
     </div>
   {/if}
 

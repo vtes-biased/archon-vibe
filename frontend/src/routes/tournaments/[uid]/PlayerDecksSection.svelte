@@ -358,13 +358,13 @@
                   <div class="flex-1 min-w-0">
                     {#if showIdentity}
                       {#if isWinnerDeck}
-                        <span class="text-sm font-semibold text-highlight truncate flex items-center gap-1.5">
+                        <span class="text-sm font-semibold text-highlight flex items-center gap-1.5">
                           <Trophy class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                          <span class="truncate">{seatDisplay(uid, playerInfo, tournament.online)}</span>
+                          <span class="min-w-0 break-words">{seatDisplay(uid, playerInfo, tournament.online)}</span>
                           <span class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded badge-highlight shrink-0">{m.tournament_winner()}</span>
                         </span>
                       {:else}
-                        <span class="text-sm text-ink-bright truncate block">{seatDisplay(uid, playerInfo, tournament.online)}</span>
+                        <span class="text-sm text-ink-bright block break-words">{seatDisplay(uid, playerInfo, tournament.online)}</span>
                       {/if}
                     {/if}
                     <span class="text-ink-muted truncate block {showIdentity ? 'text-xs' : 'text-sm'}">

@@ -926,7 +926,7 @@ import TournamentModals from "./TournamentModals.svelte";
           <div>
             <div class="text-ink-faint">{m.tournament_info_organizers()}</div>
             <div class="text-ink-bright">
-              {#each tournament.organizers_uids as ouid, i}{#if i > 0}<span>, </span>{/if}<a href="/users/{ouid}" class="text-link hover:text-link-soft">{organizerNames[ouid] || "…"}</a>{/each}
+              {#each tournament.organizers_uids as ouid, i}{#if i > 0}{", "}{/if}<a href="/users/{ouid}" class="text-link hover:text-link-soft">{organizerNames[ouid] || "…"}</a>{/each}
             </div>
           </div>
           {/if}
