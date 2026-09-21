@@ -975,10 +975,10 @@ async def _scoped_catchup_frames(
         srows = await (
             await conn.execute(
                 'SELECT public::text, member::text, "full"::text, modified_at '
-                "FROM objects WHERE type = %s "
+                "FROM objects WHERE type = 'sanction' "
                 "AND \"full\"->>'tournament_uid' = %s AND deleted_at IS NULL "
                 "ORDER BY modified_at ASC",
-                (ObjectType.SANCTION, tournament_uid),
+                (tournament_uid,),
             )
         ).fetchall()
         sjson: list[str] = []
@@ -1023,9 +1023,9 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
         # Own decks at full level, even when member=null.
         rows = await (
             await db_conn.execute(
-                'SELECT "full"::text FROM objects WHERE type = %s '
+                "SELECT \"full\"::text FROM objects WHERE type = 'deck' "
                 "AND \"full\"->>'user_uid' = %s AND deleted_at IS NULL",
-                (ObjectType.DECK, viewer.uid),
+                (viewer.uid,),
             )
         ).fetchall()
         if rows:
@@ -1035,9 +1035,9 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
         if viewer.country and Role.NC in viewer.roles:
             rows = await (
                 await db_conn.execute(
-                    'SELECT "full"::text FROM objects WHERE type = %s '
+                    "SELECT \"full\"::text FROM objects WHERE type = 'user' "
                     "AND \"full\"->>'country' = %s AND deleted_at IS NULL",
-                    (ObjectType.USER, viewer.country),
+                    (viewer.country,),
                 )
             ).fetchall()
             if rows:
@@ -1046,9 +1046,9 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
 
             rows = await (
                 await db_conn.execute(
-                    'SELECT "full"::text FROM objects WHERE type = %s '
+                    "SELECT \"full\"::text FROM objects WHERE type = 'tournament' "
                     "AND \"full\"->>'country' = %s AND deleted_at IS NULL",
-                    (ObjectType.TOURNAMENT, viewer.country),
+                    (viewer.country,),
                 )
             ).fetchall()
             if rows:
@@ -1086,10 +1086,10 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
             placeholders = ", ".join(["%s"] * len(t_uids))
             deck_rows = await (
                 await db_conn.execute(
-                    f'SELECT "full"::text FROM objects WHERE type = %s '  # ty: ignore[invalid-argument-type]
+                    f"SELECT \"full\"::text FROM objects WHERE type = 'deck' "  # ty: ignore[invalid-argument-type]
                     f"AND \"full\"->>'tournament_uid' IN ({placeholders}) "
                     f"AND deleted_at IS NULL",
-                    (ObjectType.DECK, *t_uids),
+                    t_uids,
                 )
             ).fetchall()
             if deck_rows:

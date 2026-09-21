@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, Response
 
 from ..db import get_user_by_calendar_token
 from ..geonames import get_countries_on_continent
-from ..models import ObjectType, Tournament, TournamentState
+from ..models import Tournament, TournamentState
 
 router = APIRouter(prefix="/api/calendar", tags=["calendar"])
 
@@ -190,24 +190,28 @@ async def tournament_calendar(
     if token and not league:
         user = await get_user_by_calendar_token(token)
 
-    # Finished events are excluded except for personal feeds, which keep them
-    # within FINISHED_WINDOW_DAYS (keyed on finish, falling back to start).
+    query = """
+        SELECT "full", "full"->>'start' FROM objects
+        WHERE type = 'tournament' AND deleted_at IS NULL
+          AND "full"->>'state' <> 'Finished'
+          AND ("full"->>'start' IS NULL OR (
+            "full"->>'start' >= %s AND ("full"->>'start')::timestamp >= %s::timestamp
+          ))
+    """
+    params: tuple = (cutoff[:10], cutoff)
+    if user is not None:
+        query += """
+        UNION ALL
+        SELECT "full", "full"->>'start' FROM objects
+        WHERE type = 'tournament' AND deleted_at IS NULL
+          AND "full"->>'state' = 'Finished'
+          AND COALESCE("full"->>'finish', "full"->>'start', "full"->>'modified') >= %s
+          AND COALESCE("full"->>'finish', "full"->>'start', "full"->>'modified')::timestamp
+              >= %s::timestamp
+        """
+        params += (finished_cutoff[:10], finished_cutoff)
     async with get_connection() as conn:
-        result = await conn.execute(
-            """
-            SELECT "full" FROM objects
-            WHERE type = %s
-              AND deleted_at IS NULL
-              AND (
-                ("full"->>'state' != 'Finished'
-                  AND ("full"->>'start' IS NULL OR ("full"->>'start')::timestamp >= %s::timestamp))
-                OR (%s AND "full"->>'state' = 'Finished'
-                  AND (COALESCE("full"->>'finish', "full"->>'start'))::timestamp >= %s::timestamp)
-              )
-            ORDER BY "full"->>'start' ASC
-            """,
-            (ObjectType.TOURNAMENT, cutoff, user is not None, finished_cutoff),
-        )
+        result = await conn.execute(query + " ORDER BY 2 ASC", params)
         rows = await result.fetchall()
 
     tournaments = [decode_json(row[0], Tournament) for row in rows]

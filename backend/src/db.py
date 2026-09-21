@@ -745,7 +745,8 @@ async def get_user_by_vekn_id(
     async with _acquire(conn) as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
-            WHERE type = 'user' AND "full"->>'vekn_id' = %s LIMIT 1""",
+            WHERE type = 'user' AND "full"->>'vekn_id' = %s
+              AND "full"->>'vekn_id' != '' LIMIT 1""",
             (vekn_id,),
         )
         row = await result.fetchone()
@@ -816,25 +817,27 @@ async def allocate_next_vekn_id() -> str:
 
             result = await conn.execute(
                 """
-                WITH used_ids AS (
-                    SELECT ("full"->>'vekn_id')::integer AS vekn_id
-                    FROM objects
-                    WHERE type = 'user'
-                      AND "full"->>'vekn_id' IS NOT NULL
-                      AND "full"->>'vekn_id' ~ '^[0-9]+$'
-                      AND ("full"->>'vekn_id')::integer >= %s
-                ),
-                candidates AS (
-                    SELECT generate_series(%s, COALESCE((SELECT MAX(vekn_id) FROM used_ids), %s) + 1) AS candidate
-                )
-                SELECT MIN(candidate) AS next_id
-                FROM candidates
-                WHERE candidate NOT IN (SELECT vekn_id FROM used_ids)
+                SELECT CASE WHEN NOT EXISTS (
+                    SELECT 1 FROM objects
+                    WHERE type = 'user' AND "full"->>'vekn_id' ~ '^[0-9]{1,9}$'
+                      AND ("full"->>'vekn_id')::integer = %(min)s
+                ) THEN %(min)s ELSE (
+                    SELECT (u."full"->>'vekn_id')::integer + 1 FROM objects u
+                    WHERE u.type = 'user' AND u."full"->>'vekn_id' ~ '^[0-9]{1,9}$'
+                      AND (u."full"->>'vekn_id')::integer >= %(min)s
+                      AND NOT EXISTS (
+                          SELECT 1 FROM objects n
+                          WHERE n.type = 'user' AND n."full"->>'vekn_id' ~ '^[0-9]{1,9}$'
+                            AND (n."full"->>'vekn_id')::integer
+                                = (u."full"->>'vekn_id')::integer + 1
+                      )
+                    ORDER BY (u."full"->>'vekn_id')::integer LIMIT 1
+                ) END
                 """,
-                (min_vekn_id, min_vekn_id, min_vekn_id),
+                {"min": min_vekn_id},
             )
             row = await result.fetchone()
-            return str(row[0]) if row and row[0] is not None else str(min_vekn_id)
+            return str(row[0])
 
 
 async def insert_auth_method(auth_method: AuthMethod) -> None:
@@ -1080,19 +1083,18 @@ async def get_tournament_by_event_code(code: str) -> Tournament | None:
         result = await conn.execute(
             """SELECT "full" FROM objects
             WHERE type = 'tournament' AND deleted_at IS NULL
-              AND lower("full"->>'event_code') = lower(%s) LIMIT 1""",
+              AND lower("full"->>'event_code') = lower(%s)
+              AND coalesce("full"->>'event_code', '') <> '' LIMIT 1""",
             (code,),
         )
         row = await result.fetchone()
         if row:
             return decode_json(row[0], Tournament)
-    return await get_tournament_by_external_id("vekn", code)
+    return await get_tournament_by_vekn_event_id(code)
 
 
-async def get_tournament_by_external_id(
-    platform: str, ext_id: str
-) -> Tournament | None:
-    """Get a LIVE tournament by external ID (e.g., platform='vekn', ext_id='123').
+async def get_tournament_by_vekn_event_id(event_id: str) -> Tournament | None:
+    """Get a LIVE tournament by its VEKN event id.
 
     Skips soft-deleted holders: the legacy-archon merge tombstones round-less
     duplicates of an event id, so matching one here would refresh the dead
@@ -1101,9 +1103,9 @@ async def get_tournament_by_external_id(
     async with get_connection() as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
-            WHERE type = 'tournament' AND "full"->'external_ids'->>%s = %s
+            WHERE type = 'tournament' AND "full"->'external_ids'->>'vekn' = %s
               AND deleted_at IS NULL LIMIT 1""",
-            (platform, ext_id),
+            (event_id,),
         )
         row = await result.fetchone()
         if row:
@@ -1119,7 +1121,7 @@ async def _event_code_taken(code: str, conn: psycopg.AsyncConnection) -> bool:
     result = await conn.execute(
         """SELECT 1 FROM objects
         WHERE type = 'tournament' AND lower("full"->>'event_code') = lower(%s)
-        LIMIT 1""",
+          AND coalesce("full"->>'event_code', '') <> '' LIMIT 1""",
         (code,),
     )
     return await result.fetchone() is not None
@@ -1309,7 +1311,7 @@ _HOF_WINS_QUERY = """
     WHERE t.type = 'tournament'
       AND t.deleted_at IS NULL
       AND t."full"->>'state' = 'Finished'
-      AND COALESCE(t."full"->>'winner', '') <> ''
+      AND t."full"->>'winner' <> ''
       AND (t."full"->>'online') IS DISTINCT FROM 'true'
       AND (t."full"->>'open_rounds') IS DISTINCT FROM 'true'
       AND (t."full"->>'self_organized_rounds') IS DISTINCT FROM 'true'
@@ -1407,9 +1409,11 @@ async def get_finished_tournaments_for_category(
               AND "full"->>'state' = 'Finished'
               AND "full"->>'format' = %s
               AND ("full"->>'online')::boolean = %s
+              AND COALESCE("full"->>'finish', "full"->>'start', "full"->>'modified')
+                  >= %s
               AND COALESCE("full"->>'finish', "full"->>'start', "full"->>'modified')::timestamp
                   >= %s::timestamp""",
-            (format_value, online, since_date),
+            (format_value, online, since_date[:10], since_date),
         )
         rows = await result.fetchall()
         return [decode_json(row[0], Tournament) for row in rows]
@@ -1884,7 +1888,7 @@ async def get_users_with_promo_stock_keys(promo_uids: list[str]) -> list[str]:
     async with get_connection() as conn:
         result = await conn.execute(
             """SELECT uid FROM objects WHERE type = 'user' AND deleted_at IS NULL
-              AND coalesce("full"->'promo_stock', '{}'::jsonb) ?| %s::text[]""",
+              AND "full"->'promo_stock' ?| %s::text[]""",
             (promo_uids,),
         )
         rows = await result.fetchall()

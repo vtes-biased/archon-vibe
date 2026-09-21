@@ -234,28 +234,61 @@ WHERE type = 'tournament' AND "full"->'external_ids'->>'vekn' IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_objects_tournament_event_code
 ON objects(lower("full"->>'event_code'))
 WHERE type = 'tournament' AND coalesce("full"->>'event_code', '') <> '';
--- Tournament TWDA external ID lookup — the reconstruction resolves every archive
--- entry through it on each run, so without this it seq-scans the corpus per entry.
+-- The TWDA reconstruction, resolving every archive entry on each run.
 CREATE INDEX IF NOT EXISTS idx_objects_tournament_twda
 ON objects(("full"->'external_ids'->>'twda'))
 WHERE type = 'tournament' AND "full"->'external_ids'->>'twda' IS NOT NULL;
--- Its twin, so the OR over both keys can BitmapOr instead of falling back to the
--- seq scan the index above exists to prevent.
+-- Its twin, so the OR over both keys can BitmapOr.
 CREATE INDEX IF NOT EXISTS idx_objects_tournament_twda_entry
 ON objects(("full"->'external_ids'->>'twda_entry'))
 WHERE type = 'tournament' AND "full"->'external_ids'->>'twda_entry' IS NOT NULL;
--- Hall of Fame recompute, which runs on every finish, winner-deck write and merge.
--- Without it each one seq-scans the tournament corpus, detoasting `full` per row
--- just to read the winner — and the whole point of `wins` is to be precomputed.
+-- Hall of Fame recompute, on every finish, winner-deck write and merge.
 CREATE INDEX IF NOT EXISTS idx_objects_tournament_winner
 ON objects(("full"->>'winner'))
 WHERE type = 'tournament' AND "full"->>'winner' <> '';
--- Backs the personal-overlay organizer lookup (`organizers_uids @> [uid]`), run on every
--- member reconnect (ungated by `since`) — else a seq-scan of all tournaments each time.
--- jsonb_path_ops is smaller than the default opclass and supports @> (but not `?`, hence @>).
+-- The personal-overlay organizer lookup, on every member reconnect.
+-- jsonb_path_ops supports @> but not `?`, hence @>.
 CREATE INDEX IF NOT EXISTS idx_objects_tournament_organizers
 ON objects USING GIN (("full"->'organizers_uids') jsonb_path_ops)
 WHERE type = 'tournament';
+-- The league page's event count.
+CREATE INDEX IF NOT EXISTS idx_objects_tournament_league
+ON objects(("full"->>'league_uid'))
+WHERE type = 'tournament';
+-- The NC overlay on every reconnect: the country's members and events.
+CREATE INDEX IF NOT EXISTS idx_objects_user_country
+ON objects(("full"->>'country'))
+WHERE type = 'user';
+CREATE INDEX IF NOT EXISTS idx_objects_tournament_country
+ON objects(("full"->>'country'))
+WHERE type = 'tournament';
+-- A merge re-pointing the members the absorbed account co-opted.
+CREATE INDEX IF NOT EXISTS idx_objects_user_coopted_by
+ON objects(("full"->>'coopted_by'))
+WHERE type = 'user';
+-- The next free VEKN id, walked in order under the allocation lock.
+CREATE INDEX IF NOT EXISTS idx_objects_user_vekn_id_int
+ON objects((("full"->>'vekn_id')::integer))
+WHERE type = 'user' AND "full"->>'vekn_id' ~ '^[0-9]{1,9}$';
+-- The calendar feed's coming events.
+CREATE INDEX IF NOT EXISTS idx_objects_tournament_upcoming
+ON objects(("full"->>'start'))
+WHERE type = 'tournament' AND deleted_at IS NULL AND "full"->>'state' <> 'Finished';
+-- Lets the planner price the index above: without it, most tournaments look unfinished.
+CREATE STATISTICS IF NOT EXISTS objects_state_stats
+ON ("full"->>'state') FROM objects;
+-- The rating window and the personal feed's recent results, by finish date.
+CREATE INDEX IF NOT EXISTS idx_objects_tournament_finished
+ON objects((COALESCE("full"->>'finish', "full"->>'start', "full"->>'modified')))
+WHERE type = 'tournament' AND deleted_at IS NULL AND "full"->>'state' = 'Finished';
+-- The promo stock recompute.
+CREATE INDEX IF NOT EXISTS idx_objects_tournament_promos
+ON objects(uid)
+WHERE type = 'tournament' AND deleted_at IS NULL
+  AND jsonb_array_length(coalesce("full"->'promos_distributed', '[]'::jsonb)) > 0;
+CREATE INDEX IF NOT EXISTS idx_objects_user_promo_stock
+ON objects USING GIN (("full"->'promo_stock'))
+WHERE type = 'user';
 -- Deck lookups by tournament and user
 CREATE INDEX IF NOT EXISTS idx_objects_deck_tournament
 ON objects(("full"->>'tournament_uid'))
@@ -285,8 +318,6 @@ BEFORE INSERT OR UPDATE ON objects
 FOR EACH ROW
 EXECUTE FUNCTION update_objects_modified_at();
 
--- Note: vekn_id_counter table is no longer used.
--- VEKN IDs are now allocated by finding the first gap >= 1000000.
 
 -- NDA records - playtest NDA requests and signature evidence (sealed PDF or
 -- uploaded scan).

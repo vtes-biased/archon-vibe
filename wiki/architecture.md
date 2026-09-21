@@ -85,6 +85,50 @@ all connections via their locks, any further acquire blocks and deadlocks.
   fixed exemplar (object plus `avatars`/`banners`/`push_subscriptions` side rows,
   since there is no FK cascade).
 
+### Indexes
+
+`objects` and `auth_methods` grow with membership, so every query on them is
+served by an index in `schema.sql` unless it is named on the scan list below. A
+change that adds or alters a `WHERE` on either table lands the index in the same
+diff, with a one-line comment naming the reader it serves. Served means the JSONB
+expression sits in the plan's `Index Cond` (or a bitmap scan's `Recheck Cond`),
+not its `Filter`: `idx_objects_type` puts an index scan under any `WHERE type =
+'x'` while still reading the whole type. The check runs against the dev database
+at production size, parameters written as literals:
+
+    docker compose exec -T db psql -U archon -d archon -c "SET enable_seqscan = off; EXPLAIN <query>"
+
+An index serves an expression only when the query's parses to the same tree —
+same operator, cast and wrapping function — and a partial index only when the
+query states its `WHERE` verbatim with `type` as a literal. The planner proves
+neither `coalesce(x, '') <> ''` from `lower(x) = $1` nor `type = 'deck'` from a
+bound `type` in a generic plan.
+A predicate on a JSONB field with no statistics is guessed near-universal, which
+can price a partial index out of its own query — hence `objects_state_stats`.
+A timestamp cast is not immutable, so a date window is bounded on the stored ISO
+text by its date prefix and decided by the cast. Replacing an index follows
+[hazards](hazards.md) — a new name and an explicit drop of the old.
+
+The scans that stay, each deliberate:
+
+- **Whole-corpus by design**: the `/snapshot` stream and the `/stream`
+  catch-up ([sync](sync.md)), `purge_deleted_objects`.
+- **Scheduled jobs**, a scan per run rather than per request: the VEKN member and
+  tournament syncs (with `find_same_event_tournaments` per synced event), the
+  hourly VEKN push, the sanction cleanup, the full rating, Hall of Fame and promo
+  stock recomputes, the TWDA sync.
+- **Once per boot**: the migration guards and `_stamp_missing_event_codes`.
+- **Small partitions**: `league` and `promo` rows, read whole through
+  `idx_objects_type`.
+- **Rare official actions**: `count_promo_references` on an IC deleting a promo.
+- **Public API list filters** and `/v1/community-links`: they walk the `(type,
+  uid)` stream order and stop at the page size, so only a filter matching almost
+  nothing reads the whole type.
+
+Every other table is bounded — tens of rows, or per-user side rows read by key —
+and ops scripts under `backend/scripts/` run once with the owner watching; neither
+is held to this.
+
 ### Stored-value migrations
 
 `objects` is schemaless, so there are no *schema* migrations — but a field's

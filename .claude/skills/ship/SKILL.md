@@ -117,6 +117,13 @@ non-local interdependency is not. Prefer the design a fresh agent can understand
 from the files in front of it. Before touching a subsystem named in
 `wiki/hazards.md`, read that entry — those are the traps that have already bitten.
 
+**A query on a growing table lands with its index.** A `WHERE` you add or change on
+`objects` or `auth_methods` ships with the `schema.sql` index that serves it — same
+expression, partial predicate written verbatim, `type` as a literal — or joins the
+scan list in `wiki/architecture.md#indexes` with its reason. Re-plan it with that
+page's recipe: the expression must sit in `Index Cond`, not `Filter`. The reviewer
+blocks on anything else.
+
 **Tests: the default is zero.** Add one only for a real regression with
 consequences, asserted at an interface, against the shipped artifact, one per
 invariant. Import shared constants rather than copying them. **Mocks are banned by

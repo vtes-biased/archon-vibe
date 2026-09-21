@@ -44,6 +44,13 @@ for an agent without today's context. Check the change against
 respected. A new non-local coupling that nothing warns about is a **blocking**
 finding.
 
+A `WHERE` the diff adds or changes on `objects` or `auth_methods` is served by an
+index in `schema.sql` — same expression, its partial predicate stated verbatim,
+`type` a literal — or the query is on the scan list in
+`wiki/architecture.md#indexes`. A JSONB expression filtered there with neither is
+a **blocking** finding. Do not take the index at its word: re-plan the query with
+that page's recipe and require the expression in `Index Cond`, not `Filter`.
+
 **3. Trinity respected.** Code changed, the wiki updated, the board line deleted.
 A behavioral change with no wiki edit is a finding unless the absence is justified
 in the diff's own terms. Watch specifically for: a new field that changes what

@@ -152,9 +152,10 @@ async def list_tournaments(
 async def get_tournament(code_or_uid: str) -> Response:
     """A tournament by its short event code (case-insensitive) or its uid."""
     row = await _one(
-        f'SELECT "api"::text FROM objects WHERE type = %s AND {_VISIBLE} '
-        "AND (uid = %s OR lower(\"full\"->>'event_code') = lower(%s))",
-        (ObjectType.TOURNAMENT, code_or_uid, code_or_uid),
+        f"SELECT \"api\"::text FROM objects WHERE type = 'tournament' AND {_VISIBLE} "
+        "AND (uid = %s OR (lower(\"full\"->>'event_code') = lower(%s) "
+        "AND coalesce(\"full\"->>'event_code', '') <> ''))",
+        (code_or_uid, code_or_uid),
     )
     if not row:
         raise HTTPException(404, "Tournament not found")
@@ -228,9 +229,9 @@ async def get_user(uid_or_vekn_id: str) -> Response:
     result becomes a member.
     """
     row = await _one(
-        f'SELECT "api"::text FROM objects WHERE type = %s AND {_VISIBLE} '
-        "AND (uid = %s OR \"full\"->>'vekn_id' = %s)",
-        (ObjectType.USER, uid_or_vekn_id, uid_or_vekn_id),
+        f"SELECT \"api\"::text FROM objects WHERE type = 'user' AND {_VISIBLE} "
+        "AND (uid = %s OR (\"full\"->>'vekn_id' = %s AND \"full\"->>'vekn_id' != ''))",
+        (uid_or_vekn_id, uid_or_vekn_id),
     )
     if not row:
         raise HTTPException(404, "User not found")

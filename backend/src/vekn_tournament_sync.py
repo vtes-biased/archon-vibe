@@ -16,7 +16,7 @@ from .db import (
     find_same_event_tournaments,
     find_vekn_absence_candidates,
     get_connection,
-    get_tournament_by_external_id,
+    get_tournament_by_vekn_event_id,
     resolve_event_code,
     save_tournament,
     tournament_transaction,
@@ -457,7 +457,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                 continue
 
             # Unlocked lookup — re-verified under the transaction below.
-            existing_ref = await get_tournament_by_external_id("vekn", str(event_id))
+            existing_ref = await get_tournament_by_vekn_event_id(str(event_id))
             if existing_ref is None:
                 existing_ref = await _adopt_same_event(tournament, event_id)
                 if existing_ref is not None:
