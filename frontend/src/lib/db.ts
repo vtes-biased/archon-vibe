@@ -801,8 +801,14 @@ export async function getTournamentsNaming(userUid: string): Promise<Tournament[
     playedByUid = userUid;
     playedByPromise = (async () => {
       const db = await getDB();
-      const all = await db.getAll('tournaments');
-      return new Map(all.filter(t => namesMember(t, userUid)).map(t => [t.uid, t]));
+      const found = new Map<string, Tournament>();
+      let after: string | undefined;
+      for (;;) {
+        const batch = await db.getAll('tournaments', after === undefined ? undefined : IDBKeyRange.lowerBound(after, true), 500);
+        for (const t of batch) if (namesMember(t, userUid)) found.set(t.uid, t);
+        if (batch.length < 500) return found;
+        after = batch[batch.length - 1]!.uid;
+      }
     })();
   }
   return [...(await playedByPromise).values()];

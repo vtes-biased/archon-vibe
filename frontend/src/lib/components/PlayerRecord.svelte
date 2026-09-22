@@ -21,6 +21,7 @@
   let events = $state<PlayedEvent[]>([]);
   let undocumented = $state<TournamentListItem[]>([]);
   let expandedDeck = $state<string | null>(null);
+  let viewedUid: string | undefined;
 
   function day(t: { start: string | null }): string {
     return t.start?.slice(0, 10) ?? "";
@@ -35,6 +36,7 @@
 
   async function load(uid: string, winUids: string[], owner: boolean) {
     const won = await Promise.all(winUids.map(u => getTournament(u)));
+    if (uid !== viewedUid) return;
     wins = won
       .filter((t): t is Tournament => !!t)
       .sort((a, b) => day(b).localeCompare(day(a)));
@@ -51,7 +53,9 @@
       }
     }
     const finished = [...named.values()].filter(t => !t.deleted_at && t.state === "Finished");
-    events = (await Promise.all(finished.map(t => playedEvent(t, uid, shown.get(t.uid)))))
+    const played = await Promise.all(finished.map(t => playedEvent(t, uid, shown.get(t.uid))));
+    if (uid !== viewedUid) return;
+    events = played
       .filter((e): e is PlayedEvent => !!e)
       .sort((a, b) => day(b.tournament).localeCompare(day(a.tournament)));
 
@@ -60,7 +64,9 @@
       return;
     }
     const owned = new Set(mine.map(d => d.tournament_uid));
-    undocumented = (await getTournamentListItems())
+    const listed = await getTournamentListItems();
+    if (uid !== viewedUid) return;
+    undocumented = listed
       .filter(t => t.winner === uid && !t.deleted_at && !owned.has(t.uid))
       .sort((a, b) => day(b).localeCompare(day(a)));
   }
@@ -68,6 +74,7 @@
   $effect(() => {
     const uid = user?.uid;
     const winUids = user?.wins ?? [];
+    viewedUid = uid;
     if (!uid) {
       wins = [];
       events = [];
