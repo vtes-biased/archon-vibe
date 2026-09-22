@@ -173,8 +173,9 @@ Nothing in the tree records that an entry has run, so its proof is a section in
 outliving the other. That death condition is what an entry is for and what keeps
 the per-boot guard queries near zero. `_stamp_missing_event_codes`, the boot
 sweep started behind serving, is deliberately not an entry: it mints a missing value rather than
-repairing an unreadable one, nothing breaks while a code is absent, and it has no
-condition under which it would ever be deleted.
+repairing an unreadable one, nothing breaks while a code is absent, and it dies
+with the calendar push at [stage 1](vekn-decommission.md#stamp-the-event-code-at-creation-and-drop-the-boot-sweep)
+of the decommission rather than when a database answers 0.
 
 The mechanism is for **bounded** row counts — tens to low thousands. A pre-serve
 migration extends deploy downtime by its own runtime, so a corpus-scale rewrite

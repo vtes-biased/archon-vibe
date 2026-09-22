@@ -409,6 +409,21 @@ Reconstructions: `01a028a7-1cf7-72e2-840c-fb514352ede1`,
 `01a028a7-4f22-7589-8a2d-b5419892b1b3`,
 `01a028a5-fafe-71c6-8df4-974e6545d144`.
 
+### Stamp the event code at creation and drop the boot sweep
+
+**Deferred ask** — make `POST /api/tournaments` stamp its event code inline like
+every other creation path, and delete `_stamp_missing_event_codes` with its
+query. Done when a tournament created through the route carries a code in the
+same save, and [architecture](architecture.md#the-short-event-code) no longer
+describes a boot sweep.
+
+The route waits for the calendar push today because a successful push supplies
+the vekn id the code should be. The push runs as an in-memory task, so a restart
+while it is in flight leaves the row with no code. The hourly batch push can't
+repair it, because its candidate query skips open-rounds, self-organized and
+TWDA-linked events, and it runs only where `VEKN_PUSH` is on. With the calendar
+push gone there is nothing to wait for, and the sweep has nothing left to catch.
+
 ## Trigger: stage 2 — the member roster sync retires
 
 ### Prince / NC divergence — legacy archon vs the app
