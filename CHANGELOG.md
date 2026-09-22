@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.2.0 — 2026-09-22
 
 - Your profile now lists every tournament you played, with your deck and place.
 - You can hide a tournament from your agenda or add one it missed, and your calendar feed follows.
