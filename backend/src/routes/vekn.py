@@ -73,6 +73,12 @@ async def claim_vekn_id(
     vekn_user = await get_user_by_vekn_id(request.vekn_id)
     if not vekn_user:
         raise HTTPException(status_code=404, detail="VEKN ID not found")
+    # An anonymized record has no auth methods, so it reads as unclaimed here —
+    # but merge_users refuses it as the survivor.
+    if vekn_user.anonymized_at:
+        raise HTTPException(
+            status_code=400, detail="This VEKN ID belongs to an anonymized member"
+        )
 
     if await is_vekn_id_claimed(request.vekn_id):
         raise HTTPException(
@@ -248,6 +254,12 @@ async def link_vekn_to_user(
     vekn_user = await get_user_by_vekn_id(request.vekn_id)
     if not vekn_user:
         raise HTTPException(status_code=404, detail="VEKN ID not found")
+    # An anonymized record has no auth methods, so it reads as unclaimed here —
+    # but merge_users refuses it as the survivor.
+    if vekn_user.anonymized_at:
+        raise HTTPException(
+            status_code=400, detail="This VEKN ID belongs to an anonymized member"
+        )
 
     _require_manager_for_user(manager, vekn_user)
 

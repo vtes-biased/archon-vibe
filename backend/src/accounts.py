@@ -137,7 +137,7 @@ async def merge_users(
     if not delete_user_obj:
         return keep_user, []
     # A uid holding a vekn_id is immovable and never soft-deleted — this is the one
-    # chokepoint enforcing it for callers (admin, discord-link) that don't guarantee it structurally.
+    # chokepoint enforcing it for callers that don't guarantee it structurally.
     if delete_user_obj.vekn_id:
         raise ValueError(
             "Cannot merge an account that holds a VEKN ID — VEKN identities are "
@@ -346,8 +346,6 @@ def _scrub(tournament: Tournament, anonymized_uids: set[str]) -> bool:
 
 
 async def scrub_anonymized_copies(tournament: Tournament) -> None:
-    """For a device snapshot about to overwrite the row: it may predate an
-    anonymization and carry the names the sweep already scrubbed."""
     uids = {p.user_uid for p in tournament.players if p.user_uid and p.display_name}
     uids |= {a.author_uid for a in tournament.announcements}
     if not uids:

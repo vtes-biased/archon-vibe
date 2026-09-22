@@ -1060,8 +1060,9 @@ lands ([hazards](hazards.md)). The record is not soft-deleted, since the next sy
 would recreate it with its PII. `models.is_active_account` refuses it alongside a
 deleted one at every sign-in and login-flow write — token minting, `/auth/refresh`,
 `get_current_user`, the `/stream` token, the Discord and GitHub callbacks — so live
-sessions die at their next request; profile edits and a merge into it are refused,
-and the hourly member push skips it. Results, ratings, wins, sanctions, NDA records
+sessions die at their next request; profile edits, a VEKN claim or link onto it and a
+merge into it are refused, the hourly member push skips it, and a results push
+sends their row with blank names. Results, ratings, wins, sanctions, NDA records
 and past TWDA archive credits stay attached. What was already sent — Discord posts,
 TWDA pull requests, a passkey's display name on the member's authenticator — is out
 of reach, and a connected bot keeps the old name until it reconnects.

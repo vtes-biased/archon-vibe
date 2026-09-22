@@ -69,7 +69,7 @@ def verify_token(token: str, expected_type: str = "access") -> str:
 
 async def assert_account_active(user_uid: str) -> None:
     """A soft-deleted user keeps its auth_method rows, so a surviving credential
-    must re-check deleted_at before minting — the same guard get_current_user
+    must re-check the account before minting — the same guard get_current_user
     and /auth/refresh apply."""
     user = await get_user_by_uid(user_uid)
     if not is_active_account(user):
@@ -80,8 +80,7 @@ async def assert_account_active(user_uid: str) -> None:
 async def refresh_token_endpoint(request: RefreshRequest) -> Response:
     user_uid = verify_token(request.refresh_token, expected_type="refresh")
 
-    # Refresh mints a fresh 7d token pair, so an IC-deleted/merge-absorbed
-    # account must not renew here.
+    # Refresh mints a fresh 7d token pair, so an inactive account must not renew here.
     user = await get_user_by_uid(user_uid)
     if not is_active_account(user):
         raise HTTPException(status_code=401, detail="User not found")

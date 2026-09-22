@@ -112,7 +112,7 @@ def generate_archondata(
             placed += 1
             placement = placed
 
-        name_parts = (user.name or "").split(maxsplit=1)
+        name_parts = ("" if user.anonymized_at else user.name or "").split(maxsplit=1)
         first = name_parts[0] if name_parts else ""
         last = name_parts[1] if len(name_parts) > 1 else ""
         city = user.city or ""
