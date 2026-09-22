@@ -71,8 +71,9 @@ seat their own 4–5 pod. Never pushed to VEKN, never rated.
 deckbuilder URL (VDB / VTESDecks / Amaranth, backend-proxied, online only) or QR;
 Rust parse and validation; a comment shown under the deck's name, filled from the
 deckbuilder's description on link import, editable by the owner and by an organizer
-wherever they may replace the deck, and written to the TWDA entry; a typed designer credit the owner alone moves, whose
-anonymous setting withholds the owner too; a private flag, the owner's or an
+wherever they may replace the deck, and written to the TWDA entry; a typed designer
+credit the owner alone moves, whose anonymous setting withholds the owner too; a
+private flag, the owner's or an
 organizer's, that holds a submitted deck out of publication, the winner's
 excepted; a log of which organizer opened which player's decklist during the
 event, shown to the organizers and to the deck's owner; decklist-required enforcement with
