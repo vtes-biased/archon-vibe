@@ -2608,6 +2608,37 @@ fn apply_event(
             Ok(())
         }
 
+        TournamentEvent::ViewDeck { player_uid, round } => {
+            require_organizer(actor)?;
+            if actor.uid == *player_uid || state == TournamentState::Finished {
+                return Ok(());
+            }
+            let deck_uid = decks
+                .members()
+                .find(|d| {
+                    d[deck_object::USER_UID].as_str() == Some(player_uid.as_str())
+                        && d[deck_object::ROUND].as_usize() == *round
+                })
+                .and_then(|d| d[deck_object::UID].as_str())
+                .ok_or(EngineError::DeckNotFound)?;
+            let rounds = tournament[tournament::ROUNDS].len();
+            if rounds == 0 {
+                return Ok(());
+            }
+            let viewed_in = if tournament[tournament::FINALS].is_null() {
+                rounds - 1
+            } else {
+                rounds
+            };
+            let _ = deck_ops.push(json::object! {
+                arg::OP => "log_view",
+                arg::DECK_UID => deck_uid,
+                arg::USER_UID => actor.uid.as_str(),
+                arg::ROUND => viewed_in,
+            });
+            Ok(())
+        }
+
         TournamentEvent::RaffleDraw {
             label,
             pool,

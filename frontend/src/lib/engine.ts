@@ -118,6 +118,7 @@ export type TournamentEventType =
   | 'DeleteDeck'
   | 'SetDeckAttribution'
   | 'SetDeckPrivate'
+  | 'ViewDeck'
   | 'SetScore'
   | 'Override'
   | 'Unoverride'
@@ -202,12 +203,13 @@ export function buildSanctionsPayload(sanctions: Sanction[], tournamentUid: stri
 }
 
 export interface DeckOp {
-  op: 'upsert' | 'delete' | 'set_round' | 'set_publication' | 'set_attribution' | 'set_private';
+  op: 'upsert' | 'delete' | 'set_round' | 'set_publication' | 'set_attribution' | 'set_private' | 'log_view';
   player_uid?: string;
   deck?: { name: string; comments: string; cards: Record<string, number>; round?: number | null; public?: boolean; winner?: boolean; private?: boolean; attribution?: DeckAttribution };
   deck_uid?: string;
   deck_index?: number | null; // delete: the deck's round stamp, null being the pending deck
-  round?: number | null; // set_round: the round the deck was played in
+  round?: number | null; // set_round: the round the deck was played in; log_view: the round it was viewed in
+  user_uid?: string; // log_view: the viewing organizer
   multideck?: boolean;
   public?: boolean;
   winner?: boolean;

@@ -57,6 +57,7 @@ from ..models import (
     AttributionKind,
     DeckAttribution,
     DeckObject,
+    DeckView,
     ObjectType,
     PlayerState,
     Role,
@@ -89,6 +90,7 @@ _RATING_IRRELEVANT_ACTIONS = frozenset(
         "DeleteDeck",
         "SetDeckAttribution",
         "SetDeckPrivate",
+        "ViewDeck",
         "SetPaymentStatus",
         "MarkAllPaid",
         "SetWaitlisted",
@@ -286,6 +288,17 @@ async def _process_deck_ops(
             target = next((d for d in existing_decks if d.uid == deck_uid), None)
             if target:
                 target.private = op.get("private", False)
+                target.modified = datetime.now(UTC)
+                bd = await save_object_from_model(ObjectType.DECK, target)
+                bd.org_uids = _org_uids
+                affected.append(bd)
+
+        elif op_type == "log_view":
+            deck_uid = op.get("deck_uid")
+            viewer_uid = op["user_uid"]
+            target = next((d for d in existing_decks if d.uid == deck_uid), None)
+            if target and all(v.user_uid != viewer_uid for v in target.views):
+                target.views.append(DeckView(user_uid=viewer_uid, round=op["round"]))
                 target.modified = datetime.now(UTC)
                 bd = await save_object_from_model(ObjectType.DECK, target)
                 bd.org_uids = _org_uids

@@ -617,6 +617,11 @@ class TestDeckLeagueSanctionPromoApi:
     def test_private_deck_hidden(self):
         assert compute_api(ObjectType.DECK, _make_deck(public=False)) is None
 
+    def test_organizer_view_log_stays_at_full(self):
+        d = _make_deck(public=True, views=[{"user_uid": "u-org", "round": 1}])
+        assert "views" not in compute_member(ObjectType.DECK, d)
+        assert "views" not in compute_api(ObjectType.DECK, d)
+
     def test_league_keeps_its_organizers(self):
         result = compute_api(ObjectType.LEAGUE, _make_league())
         assert result["name"] == "French National League"

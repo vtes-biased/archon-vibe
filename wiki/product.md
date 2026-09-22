@@ -70,7 +70,8 @@ deckbuilder URL (VDB / VTESDecks / Amaranth, backend-proxied, online only) or QR
 Rust parse and validation; a typed designer credit the owner alone moves, whose
 anonymous setting withholds the owner too; a private flag, the owner's or an
 organizer's, that holds a submitted deck out of publication, the winner's
-excepted; decklist-required enforcement with
+excepted; a log of which organizer opened which player's decklist during the
+event, shown to the organizers and to the deck's owner; decklist-required enforcement with
 override; multideck decks stamped with the round they were played in and locked by
 that stamp; post-tournament upload; visibility by `decklists_mode`; automatic TWDA
 pull request on finish.

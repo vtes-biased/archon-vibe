@@ -5,6 +5,7 @@
   import { getDecksByTournamentGrouped } from "$lib/db";
   import DeckUpload from "$lib/components/DeckUpload.svelte";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
+  import DeckViews from "$lib/components/DeckViews.svelte";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { tournamentAction } from "$lib/tournament-actions";
   import { toUserMessage } from "$lib/errors";
@@ -249,6 +250,7 @@
                 onreplace={editable ? () => { uploadingFor = myUid; uploadingRound = slot.round ?? undefined; } : undefined}
                 ondelete={editable ? () => { confirmDeleteRound = slot.round; } : undefined}
               />
+              <DeckViews views={slot.deck.views ?? []} {roundCount} />
               {#if confirmDeleteRound === slot.round}
                 {@render deleteConfirm(slot.round)}
               {/if}
@@ -283,6 +285,7 @@
                 <DeckUpload tournamentUid={tournament.uid} onuploaded={onUploaded} />
               {:else}
                 <DeckDisplay deck={myDecks[0]} editable={singleDeckEditable} tournamentUid={tournament.uid} format={tournament.format} onreplace={singleDeckEditable ? () => uploadingFor = myUid : undefined} ondelete={singleDeckEditable ? () => { confirmDeleteRound = null; } : undefined} />
+                <DeckViews views={myDecks[0].views ?? []} {roundCount} />
                 {#if confirmDeleteRound === null}
                   {@render deleteConfirm(null)}
                 {/if}

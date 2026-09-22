@@ -728,6 +728,11 @@ class DeckAttribution(msgspec.Struct, kw_only=True, frozen=True):
     ] = ""
 
 
+class DeckView(msgspec.Struct, kw_only=True, frozen=True):
+    user_uid: str
+    round: int
+
+
 class DeckObject(BaseObject, kw_only=True):
     tournament_uid: Annotated[
         str, msgspec.Meta(description="Uid of the tournament the deck was played in.")
@@ -755,6 +760,7 @@ class DeckObject(BaseObject, kw_only=True):
     public: bool = False  # engine-set from decklists_mode, not client-writable
     winner: bool = False  # engine-set: this event's winner, whom anonymity spares
     private: bool = False
+    views: list[DeckView] = msgspec.field(default_factory=list)
 
 
 class Standing(msgspec.Struct, kw_only=True, frozen=True):

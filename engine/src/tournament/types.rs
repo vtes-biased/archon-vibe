@@ -219,6 +219,10 @@ pub enum TournamentEvent {
         round: Option<usize>,
         private: bool,
     },
+    ViewDeck {
+        player_uid: String,
+        round: Option<usize>,
+    },
 
     RaffleDraw {
         label: String,

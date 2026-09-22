@@ -829,6 +829,7 @@ _UNDOCUMENTED_ACTIONS: dict[str, str] = {
     "UpdateDeck": "spelling of UpsertDeck",
     "ReopenTournament": "refused for a third-party token",
     "ReportPromos": "needs `promos`, which the request model does not carry",
+    "ViewDeck": "logs an organizer opening a decklist on the app's roster",
 }
 
 

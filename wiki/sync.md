@@ -27,7 +27,7 @@ through the separate API process ([public-api](public-api.md)).
 | user | NC/Prince with contact + community links; IC without contact; any other user with non-empty community links as a minimal no-name row (country, roles, links) | all users — no contact except an NC's or Prince's published one, no `deceased_by_uid`, no `github_login`/`github_id`; `deceased_at` included; anyone with non-empty community links gets those included | everything except the owner-only `calendar_token`, `agenda_hidden` and `agenda_added` ([architecture](architecture.md#data-model)) | only users holding a `vekn_id`: uid, the id, country, roles, the four `CategoryRating` fields, `wins`, community links with their moderation value — no name, nickname, contact, city or avatar |
 | tournament | the event-page fields — config, venue/address/map, description, rules flags, `banner_path`: everything an unauthenticated visitor needs to decide whether to attend | all except `checkin_code`, `vekn_pushed_at`, `vekn_results_stale`, `vekn_event_absent_at`, `twda_status` | everything | the member projection minus `announcements`, `raffles`, `promos_distributed`, `promo_stock_source_uid`, `offline_device_id`, and minus each player's `display_name`, `missing_decklist`, `payment_status` and `waitlisted` |
 | sanction | none | full data | full data | none, permanently |
-| deck | none | full data when `public = true`, else none — **minus `user_uid`** where the credit is `Anonymous` and the deck is not the winner's, and always minus `private`, which on the one private deck published — the winner's — would publish the very wish it overrode | full data | the member rule minus `public`, which the rule already pins to `true` and so carries no information at this level, and with the credit's free-text `name` dropped: this level carries member credits only |
+| deck | none | full data when `public = true`, else none — **minus `user_uid`** where the credit is `Anonymous` and the deck is not the winner's, and always minus `private`, which on the one private deck published — the winner's — would publish the very wish it overrode, and minus `views`, the organizer view log | full data, so the view log reaches the event's organizers, the owner through the overlay, and IC alone | the member rule minus `public`, which the rule already pins to `true` and so carries no information at this level, and with the credit's free-text `name` dropped: this level carries member credits only |
 | league | full data **except `organizers_uids`** | full data | full data | full data, organizers included — the same call as a tournament's |
 | promo | catalog only, no `holdings` | same as public | everything including `holdings` | none |
 
@@ -127,7 +127,8 @@ Two real server-side boundaries exist inside the member level:
   A deck ships only when the engine sets its `public` flag. That row *is* access
   control — and it is the one place a member row is *partial*: an anonymous
   deck's `user_uid` is withheld from it, the winner's excepted. The owner is
-  spared by the personal overlay, which serves their own decks at `full` and is
+  spared by the personal overlay, which serves their own decks at `full` — the
+  organizer view log included — and is
   drained **after** the member corpus, so their own row wins.
 - The five excluded tournament fields above.
 

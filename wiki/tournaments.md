@@ -646,7 +646,7 @@ a table Finished, comment required), `Unoverride`.
 
 **Finals** — `SetToss`, `RandomToss`, `StartFinals`, `FinishFinals`.
 
-**Decks** — `UpsertDeck`, `DeleteDeck`, `SetDeckAttribution`, `SetDeckPrivate`. All deck mutations
+**Decks** — `UpsertDeck`, `DeleteDeck`, `SetDeckAttribution`, `SetDeckPrivate`, `ViewDeck`. All deck mutations
 are engine `deck_ops` side effects; there are no REST deck endpoints.
 
 A multideck deck is **stamped with the round it was played in**. `DeckObject.round`
@@ -676,6 +676,16 @@ round existing; until then the panel shows that a deck was submitted, and offers
 to replace it, without opening it. The roster's decks-in tally and its
 missing/problems filters count submitted decks either way — the chase asks who
 still owes a decklist, which is a question about check-in, not about contents.
+
+**Until the event finishes, an organizer opens another player's played deck
+deliberately.** The roster shows its name behind "View decklist", which fires
+`ViewDeck`: the engine emits a `log_view` op naming the organizer and the round in
+progress — `len(rounds)` once the finals are seated — and does nothing on the
+organizer's own deck or once `Finished`. The processor keeps one entry per
+organizer per deck and drops a repeat, so re-opening adds nothing and an offline
+replay converges. The log shows on the deck row to the event's organizers and on
+the owner's own deck. It deters casual peeking and enforces nothing: the deck is
+already on the organizer's device.
 
 **A profile lists a decklist only once its event published it.** The player
 record on `/profile` and `/users/[uid]` gates on the tournament being held

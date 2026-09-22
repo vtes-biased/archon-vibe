@@ -216,11 +216,11 @@ def compute_tournament_full(d: dict) -> dict:
     return dict(d)
 
 
-DECK_API_EXCLUDE = API_SYNC_FIELDS | {"public", "private"}
+DECK_API_EXCLUDE = API_SYNC_FIELDS | {"public", "private", "views"}
 
 
 def _published_deck(d: dict) -> dict:
-    withheld = {"private"}
+    withheld = {"private", "views"}
     if d["attribution"]["kind"] == AttributionKind.ANONYMOUS and not d.get("winner"):
         withheld.add("user_uid")
     return {k: v for k, v in d.items() if k not in withheld}
