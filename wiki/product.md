@@ -70,16 +70,15 @@ seat their own 4–5 pod. Never pushed to VEKN, never rated.
 **Decks** — the card database in IndexedDB; upload by paste (local, offline),
 deckbuilder URL (VDB / VTESDecks / Amaranth, backend-proxied, online only) or QR;
 Rust parse and validation; a comment shown under the deck's name, filled from the
-deckbuilder's description on link import, editable by the owner and by an organizer
-wherever they may replace the deck, and written to the TWDA entry; a typed designer
-credit the owner alone moves, whose anonymous setting withholds the owner too; a
-private flag, the owner's or an
-organizer's, that holds a submitted deck out of publication, the winner's
-excepted; a log of which organizer opened which player's decklist during the
-event, shown to the organizers and to the deck's owner; decklist-required enforcement with
-override; multideck decks stamped with the round they were played in and locked by
-that stamp; post-tournament upload; visibility by `decklists_mode`; automatic TWDA
-pull request on finish.
+deckbuilder's description on link import, editable by the owner and by an
+organizer wherever they may replace the deck, and written to the TWDA entry; a
+typed designer credit the owner alone moves, whose anonymous setting withholds the
+owner too; a private flag, the owner's or an organizer's, that holds a submitted
+deck out of publication, the winner's excepted; a log of which organizer opened
+which player's decklist during the event, shown to the organizers and to the
+deck's owner; decklist-required enforcement with override; multideck decks stamped
+with the round they were played in and locked by that stamp; post-tournament
+upload; visibility by `decklists_mode`; automatic TWDA pull request on finish.
 
 **Sanctions** — event-level (Caution, Warning, Standings Adjustment,
 Disqualification) and VEKN-wide (Suspension, Probation, Ban), with Judges Guide v2
