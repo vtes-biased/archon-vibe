@@ -41,6 +41,7 @@
   let cardImageUrl = $state<string | null>(null);
   let editedCards = $state<Record<string, number>>({});
   let editedName = $state('');
+  let editedComments = $state('');
   let editing = $state(false);
   let editingCredit = $state(false);
   let editedAttribution = $state<DeckAttribution>({ kind: 'Anonymous', vekn_id: '', name: '' });
@@ -77,6 +78,7 @@
   function startEditing() {
     editedCards = { ...deck.cards };
     editedName = deck.name;
+    editedComments = deck.comments;
     editing = true;
     saveError = null;
   }
@@ -152,7 +154,7 @@
 
       const deckData: Record<string, unknown> = {
         name: editedName,
-        comments: deck.comments,
+        comments: editedComments,
         cards: editedCards,
         round: deck.round,
       };
@@ -243,6 +245,12 @@
     placeholder={m.deck_upload_name_placeholder()}
     class="w-full px-3 py-2 mb-2 bg-surface-muted border border-line-strong rounded-lg text-ink-bright placeholder-ink-faint text-sm"
   />
+  <textarea
+    bind:value={editedComments}
+    rows="3"
+    placeholder={m.deck_comments_placeholder()}
+    class="w-full px-3 py-2 mb-2 bg-surface-muted border border-line-strong rounded-lg text-ink-bright placeholder-ink-faint text-sm"
+  ></textarea>
 
   <div class="mb-3">
     <CardSearch onselect={addCard} />
@@ -251,6 +259,9 @@
 {:else}
   {#if deck.name}
     <h4 class="text-sm font-semibold text-ink-strong mb-1">{deck.name}</h4>
+  {/if}
+  {#if deck.comments}
+    <p class="text-sm text-ink whitespace-pre-line break-words mb-2">{deck.comments}</p>
   {/if}
   {#if editingCredit}
     <AttributionPicker bind:attribution={editedAttribution} />

@@ -24,5 +24,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
-
-- Show a deck's comment under its name on the deck view and make it editable in the deck editor, for the owner and for organizers under the same rules as the rest of the list. It is already filled from the deckbuilder's description on link import, kept from pasted text and written to the TWDA entry; today it is never shown and the editor can't change it. It follows the deck's own visibility. **Done when:** a deck imported from a VDB link that has a description shows that text on the deck view; the owner and an organizer can each change it and the change reaches the other's device; the finished event's TWDA entry carries the edited text; and `wiki/product.md` (Decks) names the comment.

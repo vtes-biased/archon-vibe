@@ -148,6 +148,7 @@
   "deck_upload_paste": "Coller un Deck",
   "deck_upload_from_url": "Depuis une URL",
   "deck_upload_name_placeholder": "Nom du deck (optionnel)",
+  "deck_comments_placeholder": "Commentaires (optionnel)",
   "deck_upload_text_placeholder": "Collez votre liste de deck ici...",
   "deck_upload_url_placeholder": "URL VDB, VTESDecks, ou Amaranth",
   "deck_upload_supported_sites": "Sites pris en charge : vdb.im, vtesdecks.com, amaranth.vtes.co.nz",

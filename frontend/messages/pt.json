@@ -148,6 +148,7 @@
   "deck_upload_paste": "Colar Deck",
   "deck_upload_from_url": "De URL",
   "deck_upload_name_placeholder": "Nome do deck (opcional)",
+  "deck_comments_placeholder": "Comentários (opcional)",
   "deck_upload_text_placeholder": "Cole sua lista de deck aqui...",
   "deck_upload_url_placeholder": "URL VDB, VTESDecks, ou Amaranth",
   "deck_upload_supported_sites": "Suportados: vdb.im, vtesdecks.com, amaranth.vtes.co.nz",
