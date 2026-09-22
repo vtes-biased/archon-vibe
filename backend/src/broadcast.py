@@ -97,8 +97,6 @@ def _conn_label(conn: SSEConnection) -> str:
 def deck_org_uids(
     private: bool, tournament_state: str | None, organizers_uids: list[str]
 ) -> list[str]:
-    """The organizers a deck frame is stamped with, so entitled to it at full:
-    none on a private deck once its event is finished."""
     if private and tournament_state == TournamentState.FINISHED:
         return []
     return organizers_uids

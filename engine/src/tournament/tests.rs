@@ -1102,7 +1102,7 @@ fn test_the_owner_or_an_organizer_marks_a_deck_private() {
 }
 
 #[test]
-fn test_only_the_owner_releases_a_private_deck_once_finished() {
+fn test_only_the_owner_touches_a_private_deck_once_finished() {
     let tournament = tournament_with_player("Finished");
     let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "private": true}]"#;
     let event = json::object! {
@@ -1110,8 +1110,26 @@ fn test_only_the_owner_releases_a_private_deck_once_finished() {
         player_uid: "player-1",
         private: false,
     };
-    assert!(run_event_with_decks(&tournament, &event, &make_organizer(), decks).is_err());
+    assert!(matches!(
+        run_event_with_decks(&tournament, &event, &make_organizer(), decks),
+        Err(EngineError::DeckPrivateOwnerOnly)
+    ));
     assert!(run_event_with_decks(&tournament, &event, &make_player("player-1"), decks).is_ok());
+    let replace = json::object! {
+        type: "UpsertDeck",
+        player_uid: "player-1",
+        deck: { name: "", comments: "", cards: {} },
+        multideck: false,
+    };
+    assert!(matches!(
+        run_event_with_decks(&tournament, &replace, &make_organizer(), decks),
+        Err(EngineError::DeckPrivateOwnerOnly)
+    ));
+    let delete = json::object! { type: "DeleteDeck", player_uid: "player-1", multideck: false };
+    assert!(matches!(
+        run_event_with_decks(&tournament, &delete, &make_organizer(), decks),
+        Err(EngineError::DeckPrivateOwnerOnly)
+    ));
 }
 
 #[test]

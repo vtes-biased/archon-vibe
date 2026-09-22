@@ -2492,6 +2492,9 @@ fn apply_event(
             });
             let private =
                 replaced.is_some_and(|d| d[deck_object::PRIVATE].as_bool().unwrap_or(false));
+            if private && actor.uid != *player_uid && state == TournamentState::Finished {
+                return Err(EngineError::DeckPrivateOwnerOnly);
+            }
             deck_data[deck_object::PRIVATE] = private.into();
             deck_data[deck_object::PUBLIC] =
                 compute_deck_public(tournament, player_uid, private).into();
@@ -2528,6 +2531,14 @@ fn apply_event(
                 if state == TournamentState::Playing && !*multideck {
                     return Err(EngineError::DeckLockedPlaying);
                 }
+            }
+            let deletes_private = decks.members().any(|d| {
+                d[deck_object::USER_UID].as_str() == Some(player_uid.as_str())
+                    && (!*multideck || d[deck_object::ROUND].as_usize() == *deck_index)
+                    && d[deck_object::PRIVATE].as_bool().unwrap_or(false)
+            });
+            if deletes_private && actor.uid != *player_uid && state == TournamentState::Finished {
+                return Err(EngineError::DeckPrivateOwnerOnly);
             }
             let op = json::object! {
                 arg::OP => "delete",
@@ -2593,7 +2604,7 @@ fn apply_event(
                 return Err(EngineError::DeckPrivacyForbidden);
             }
             if !*private && actor.uid != *player_uid && state == TournamentState::Finished {
-                return Err(EngineError::DeckReleaseOwnerOnly);
+                return Err(EngineError::DeckPrivateOwnerOnly);
             }
             let deck_uid = decks
                 .members()

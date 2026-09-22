@@ -1729,7 +1729,7 @@
   "err_tournament_deck_upload_forbidden": "Seuls les organisateurs ou le joueur peuvent télécharger un deck",
   "err_tournament_deck_attribution_forbidden": "Seul le joueur peut changer l'attribution de son propre deck",
   "err_tournament_deck_privacy_forbidden": "Seuls les organisateurs ou le joueur peuvent rendre un deck privé",
-  "err_tournament_deck_release_owner_only": "Une fois le tournoi terminé, seul le joueur peut rendre public un deck privé",
+  "err_tournament_deck_private_owner_only": "Une fois le tournoi terminé, seul le joueur peut modifier un deck privé",
   "err_tournament_deck_not_found": "Deck introuvable",
   "err_tournament_deck_delete_forbidden": "Seuls les organisateurs ou le joueur peuvent supprimer un deck",
   "err_tournament_score_forbidden": "Non autorisé à scorer cette table",

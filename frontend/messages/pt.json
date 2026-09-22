@@ -1729,7 +1729,7 @@
   "err_tournament_deck_upload_forbidden": "Somente organizadores ou o jogador podem enviar um deck",
   "err_tournament_deck_attribution_forbidden": "Apenas o jogador pode alterar a atribuição do seu próprio deck",
   "err_tournament_deck_privacy_forbidden": "Somente organizadores ou o jogador podem tornar um deck privado",
-  "err_tournament_deck_release_owner_only": "Depois que o torneio termina, somente o jogador pode tornar público um deck privado",
+  "err_tournament_deck_private_owner_only": "Depois que o torneio termina, somente o jogador pode alterar um deck privado",
   "err_tournament_deck_not_found": "Deck não encontrado",
   "err_tournament_deck_delete_forbidden": "Somente organizadores ou o jogador podem excluir um deck",
   "err_tournament_score_forbidden": "Não autorizado a pontuar esta mesa",

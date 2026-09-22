@@ -369,7 +369,8 @@ a resync re-delivers the lower projection ([sync](sync.md#access-entitlement)).
 after it, must push organizers their decks.** The organizer stamp changes
 without any projection column retracting, so `broadcast_precomputed` sends the
 organizer nothing and their copy of a private deck survives. The action route and
-go-online call `_withdraw_private_decks` or `_push_decks_to_organizers`; a new
+go-online call `_withdraw_private_decks` or `_push_decks`, and so does the archon
+import, which finishes an event outside the engine; a new
 writer of either fact has to as well ([sync](sync.md#targeted-overlay-invalidation-no-resync)).
 
 **A deck frame that reaches `broadcast_precomputed` without its `org_uids` stamp

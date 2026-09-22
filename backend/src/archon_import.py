@@ -442,6 +442,13 @@ async def apply_archon_import(
         broadcast_tournament_event(tournament_bd)
 
     try:
+        from .routes.tournaments import _withdraw_private_decks
+
+        await _withdraw_private_decks(tournament)
+    except Exception:
+        logger.exception(f"Error withdrawing private decks for {tournament_uid}")
+
+    try:
         from .ratings import (
             rating_category_for_tournament,
             recompute_ratings_for_players,

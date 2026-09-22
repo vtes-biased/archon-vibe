@@ -544,7 +544,7 @@ transition is delivered as a single update:
   frame to carry either the demotion or the eviction.
 
 Every targeted frame carries the recomputed access version. Organizer add/remove
-uses this: the new organizer gets the tournament and its private decks at full, and
+uses this: the new organizer gets the tournament and the non-public decks they are entitled to at full, and
 the removed organizer gets the tournament downgraded plus a tombstone per private
 deck — no full resync. An **offline** organizer change is still caught by the
 fingerprint's organizer-set term at the next connect, which is why the resync

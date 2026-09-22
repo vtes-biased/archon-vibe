@@ -716,8 +716,10 @@ organizer, in any state, touching no content. A private deck is never published
 whatever `decklists_mode` says: its organizers hold it at `full` and nobody else
 does — no other member, not the public API, not its export. **Once `Finished`,
 its organizers lose it too**: the event no longer needs it, and it stays with its
-owner and IC alone. The engine then refuses a release from anyone but the owner,
-which would otherwise hand the deck back to the organizer releasing it. The winner's deck is
+owner and IC alone. The engine then refuses anyone but the owner releasing,
+replacing or deleting it: a release would hand the deck back, and the organizer's
+roster, no longer holding it, shows the player deckless and offers an upload
+that would overwrite it blind. The winner's deck is
 the exception and publishes regardless, so the archive keeps its win registry.
 Credit and disclosure compose rather than replace each other: an anonymous deck
 still publishes, with no owner, and a private one keeps whatever credit it has.
@@ -793,9 +795,9 @@ and the VEKN record outranks the archive from that moment on.
 | Register / Unregister | any authenticated member, during Registration |
 | Self-organize a round | registered players, open rounds with `self_organized_rounds`, Waiting/Playing, no finals |
 | Set score | players at the table during Playing; organizers whenever rounds exist |
-| Deck upload | players for their own deck — any of their own, naming its round, once Finished — organizers for any |
+| Deck upload / delete | players for their own deck — any of their own, naming its round, once Finished — organizers for any but a private one once Finished |
 | Set a deck's credit | the deck's owner alone, in any state |
-| Hold a deck private | the deck's owner or an organizer, in any state |
+| Hold a deck private | the deck's owner or an organizer, in any state; releasing it once Finished, the owner alone |
 | Correct an archival record | IC |
 | Everything else | organizers |
 

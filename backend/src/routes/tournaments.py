@@ -189,12 +189,10 @@ async def _process_deck_ops(
     deck_ops: list,
     tournament_uid: str,
     tournament: Tournament,
-    existing_decks: list[DeckObject] | None = None,
 ) -> list[BroadcastData]:
     if not deck_ops:
         return []
-    if existing_decks is None:
-        existing_decks = await get_decks_for_tournament(tournament_uid)
+    existing_decks = await get_decks_for_tournament(tournament_uid)
 
     def stamp(bd: BroadcastData, deck: DeckObject) -> BroadcastData:
         bd.org_uids = deck_org_uids(
@@ -627,35 +625,34 @@ async def _invalidate_organizer_view(
     if not user:
         return
     av = await compute_access_version(user)
-    org_uids = tournament.organizers_uids
     broadcast_personal(
         user_uid,
         obj_type=ObjectType.TOURNAMENT,
         uid=tournament.uid,
         full_dict=msgspec.to_builtins(tournament),
         country=tournament.country,
-        org_uids=org_uids,
+        org_uids=tournament.organizers_uids,
         modified_at=modified_at,
         access_version=av,
     )
-    for deck in await get_decks_for_tournament(tournament.uid):
-        broadcast_personal(
-            user_uid,
-            obj_type=ObjectType.DECK,
-            uid=deck.uid,
-            full_dict=msgspec.to_builtins(deck),
-            org_uids=org_uids,
-            obj_user_uid=deck.user_uid,
-            modified_at=modified_at,
-            access_version=av,
-        )
+    _push_decks(
+        tournament,
+        [user_uid],
+        await get_decks_for_tournament(tournament.uid),
+        modified_at=modified_at,
+        access_version=av,
+    )
 
 
-def _push_decks_to_organizers(tournament: Tournament, decks: list[DeckObject]) -> None:
-    """Deliver each organizer's current entitlement to these decks. Losing a
-    private deck at finish retracts no projection column, so no shared frame
-    carries the eviction."""
-    for user_uid in tournament.organizers_uids:
+def _push_decks(
+    tournament: Tournament,
+    user_uids: list[str],
+    decks: list[DeckObject],
+    *,
+    modified_at: str | None = None,
+    access_version: str | None = None,
+) -> None:
+    for user_uid in user_uids:
         for deck in decks:
             broadcast_personal(
                 user_uid,
@@ -666,22 +663,26 @@ def _push_decks_to_organizers(tournament: Tournament, decks: list[DeckObject]) -
                     deck.private, tournament.state, tournament.organizers_uids
                 ),
                 obj_user_uid=deck.user_uid,
+                modified_at=modified_at,
+                access_version=access_version,
             )
 
 
 async def _withdraw_private_decks(tournament: Tournament) -> None:
-    """On entering Finished. The re-save is what reaches an organizer offline
-    now: their next catch-up streams a member tombstone for every deck row
-    modified since."""
-    decks = [d for d in await get_decks_for_tournament(tournament.uid) if d.private]
-    for deck in decks:
-        deck.modified = datetime.now(UTC)
-        bd = await save_object_from_model(ObjectType.DECK, deck)
-        bd.org_uids = deck_org_uids(
-            deck.private, tournament.state, tournament.organizers_uids
-        )
+    """The no-op re-save is what evicts the decks from an organizer offline now."""
+    bds = []
+    async with tournament_transaction(tournament.uid):
+        decks = [d for d in await get_decks_for_tournament(tournament.uid) if d.private]
+        for deck in decks:
+            deck.modified = datetime.now(UTC)
+            bd = await save_object_from_model(ObjectType.DECK, deck)
+            bd.org_uids = deck_org_uids(
+                deck.private, tournament.state, tournament.organizers_uids
+            )
+            bds.append(bd)
+    for bd in bds:
         broadcast_precomputed(bd)
-    _push_decks_to_organizers(tournament, decks)
+    _push_decks(tournament, tournament.organizers_uids, decks)
 
 
 @router.post("/{uid}/organizers")
@@ -715,8 +716,8 @@ async def add_organizer(
 
     if bd is not None:
         broadcast_precomputed(bd)
-        # broadcast_precomputed never delivers decks — grant the new organizer
-        # full access to the tournament's private decks separately.
+        # broadcast_precomputed never delivers decks — push the new organizer
+        # the non-public ones they are now entitled to separately.
         await _invalidate_organizer_view(tournament, body.user_uid, bd.modified_at)
 
     return Response(
@@ -1768,8 +1769,9 @@ async def tournament_action(
     elif was_finished != is_finished or (
         is_finished and any(op.get("op") == "set_private" for op in deck_ops)
     ):
-        _push_decks_to_organizers(
+        _push_decks(
             updated,
+            updated.organizers_uids,
             [d for d in await get_decks_for_tournament(uid) if d.private],
         )
 

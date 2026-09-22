@@ -1729,7 +1729,7 @@
   "err_tournament_deck_upload_forbidden": "Only organizers or the player can upload a deck",
   "err_tournament_deck_attribution_forbidden": "Only the player can change their own deck's attribution",
   "err_tournament_deck_privacy_forbidden": "Only organizers or the player can make a deck private",
-  "err_tournament_deck_release_owner_only": "Once the event is finished, only the player can make a private deck public",
+  "err_tournament_deck_private_owner_only": "Once the event is finished, only the player can change a private deck",
   "err_tournament_deck_not_found": "Deck not found",
   "err_tournament_deck_delete_forbidden": "Only organizers or the player can delete a deck",
   "err_tournament_score_forbidden": "Not authorized to score this table",

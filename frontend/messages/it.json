@@ -1729,7 +1729,7 @@
   "err_tournament_deck_upload_forbidden": "Solo gli organizzatori o il giocatore possono caricare un deck",
   "err_tournament_deck_attribution_forbidden": "Solo il giocatore può cambiare l'attribuzione del proprio deck",
   "err_tournament_deck_privacy_forbidden": "Solo gli organizzatori o il giocatore possono rendere privato un mazzo",
-  "err_tournament_deck_release_owner_only": "Una volta concluso il torneo, solo il giocatore può rendere pubblico un mazzo privato",
+  "err_tournament_deck_private_owner_only": "Una volta concluso il torneo, solo il giocatore può modificare un mazzo privato",
   "err_tournament_deck_not_found": "Deck non trovato",
   "err_tournament_deck_delete_forbidden": "Solo gli organizzatori o il giocatore possono eliminare un deck",
   "err_tournament_score_forbidden": "Non autorizzato a segnare il punteggio di questo tavolo",
