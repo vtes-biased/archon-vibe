@@ -123,10 +123,12 @@
                 onclick={() => expandedDeck = open ? null : deck.uid}
                 aria-expanded={open}
                 aria-label={m.user_detail_show_deck({ name: deck.name || t.name })}
-                class="-ml-3 min-h-[44px] min-w-[44px] flex items-center justify-center shrink-0 text-ink-muted hover:text-link"
+                class="-ml-3 -my-2 min-h-[44px] w-8 flex items-center justify-center shrink-0 text-ink-muted hover:text-link"
               >
                 {#if open}<ChevronDown class="w-4 h-4" aria-hidden="true" />{:else}<ChevronRight class="w-4 h-4" aria-hidden="true" />{/if}
               </button>
+            {:else}
+              <span class="-ml-3 w-8 shrink-0" aria-hidden="true"></span>
             {/if}
             <a href="/tournaments/{t.uid}" class="min-w-0 text-ink-strong hover:text-link">{t.name}</a>
             {#if hofWins.has(t.uid)}
@@ -140,7 +142,6 @@
           </div>
           {#if open && deck}
             <div class="mt-3 mb-2">
-              {#if deck.name}<p class="font-medium text-ink mb-2">{deck.name}</p>{/if}
               <!-- No `format`: validation is read-only noise here, and a 2005 archive
                    deck fails today's legality rules for reasons its player cannot act on. -->
               <DeckDisplay {deck} />
