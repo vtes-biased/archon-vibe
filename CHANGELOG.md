@@ -10,6 +10,22 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- Your profile now lists every tournament you played, with your deck and place.
+- You can hide a tournament from your agenda or add one it missed, and your calendar feed follows.
+- Tournament dates now show the day of the week.
+- Player names in standings link to their profile, and long names wrap instead of being cut.
+- Players see the full preliminary standings as soon as the finals start.
+- An official registered to play a tournament now opens it on the player view.
+- Tournament announcements no longer pop up an extra notice on arrival.
+- Organizers can set the first table number and choose whether each room restarts at 1.
+- Organizers can search for a player to find their table and seat in the current round.
+- A deck's comment now shows under its name and can be edited.
+- Organizers opening your decklist are now logged, and your private deck is hidden from them once the tournament ends.
+- A sanction's reason is now shown only to officials, the tournament's organizers and the sanctioned player.
+- A member can now be anonymized on request.
+
 ## v1.1.7 — 2026-09-15
 
 - Fixed QR check-in, which refused every player with "Authentication required".
