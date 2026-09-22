@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from .. import permissions
+from ..accounts import scrub_anonymized_copies
 from ..broadcast import (
     broadcast_judge_call,
     broadcast_personal,
@@ -2481,6 +2482,7 @@ async def go_online(
         # hourly batch's, which stops running entirely at the decommission.
         if not updated.event_code:
             updated.event_code = await resolve_event_code(updated, tx_conn)
+        await scrub_anonymized_copies(updated)
         tournament_bd = await save_object(
             ObjectType.TOURNAMENT,
             updated.uid,
@@ -2709,6 +2711,7 @@ async def sync_offline(
         updated = msgspec.convert(tournament_data, Tournament)
         updated.modified = datetime.now(UTC)
         _normalize_wall_clock(updated)
+        await scrub_anonymized_copies(updated)
         await save_object(
             ObjectType.TOURNAMENT,
             updated.uid,

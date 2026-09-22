@@ -23,6 +23,7 @@ from ...db import (
     store_transient_token,
 )
 from ...middleware.auth import CurrentUser
+from ...models import is_active_account
 from ._tokens import verify_token
 
 router = APIRouter()
@@ -156,7 +157,7 @@ async def github_callback(
     github_id = str(gh_id)
 
     user = await get_user_by_uid(user_uid)
-    if not user or user.deleted_at:
+    if not is_active_account(user):
         return fail("github_error")
     if user.github_id != github_id or user.github_login != github_login:
         user.github_id = github_id

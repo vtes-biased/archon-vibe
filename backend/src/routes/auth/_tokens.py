@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from ...db import get_user_by_uid
 from ...jwt_config import AUDIENCE_APP, decode, sign
+from ...models import is_active_account
 
 router = APIRouter()
 encoder = msgspec.json.Encoder()
@@ -71,7 +72,7 @@ async def assert_account_active(user_uid: str) -> None:
     must re-check deleted_at before minting — the same guard get_current_user
     and /auth/refresh apply."""
     user = await get_user_by_uid(user_uid)
-    if not user or user.deleted_at or user.anonymized_at:
+    if not is_active_account(user):
         raise HTTPException(status_code=403, detail="This account is no longer active")
 
 
@@ -82,7 +83,7 @@ async def refresh_token_endpoint(request: RefreshRequest) -> Response:
     # Refresh mints a fresh 7d token pair, so an IC-deleted/merge-absorbed
     # account must not renew here.
     user = await get_user_by_uid(user_uid)
-    if not user or user.deleted_at or user.anonymized_at:
+    if not is_active_account(user):
         raise HTTPException(status_code=401, detail="User not found")
 
     access_token, expires_in = create_access_token(user_uid)

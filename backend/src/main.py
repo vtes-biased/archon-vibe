@@ -51,6 +51,7 @@ from .models import (
     ObjectType,
     Role,
     User,
+    is_active_account,
 )
 from .roles_hook import register_metadata
 from .routes import (
@@ -693,9 +694,7 @@ async def _resolve_user_from_token(token: str | None) -> User | None:
         from .db import get_user_by_uid
 
         user = await get_user_by_uid(user_uid)
-        if not user or user.deleted_at or user.anonymized_at:
-            return None
-        return user
+        return user if is_active_account(user) else None
     except Exception:
         return None
 

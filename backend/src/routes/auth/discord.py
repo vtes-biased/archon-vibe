@@ -24,7 +24,7 @@ from ...db import (
     store_transient_token,
     update_auth_method,
 )
-from ...models import AuthMethod, AuthMethodType, User
+from ...models import AuthMethod, AuthMethodType, User, is_active_account
 from ...roles_hook import discord_api_base, push_role_metadata
 from ._tokens import create_access_token, create_refresh_token, verify_token
 
@@ -177,6 +177,10 @@ async def discord_callback(
 
     if link_mode and user_uid_from_state:
         redirect_path = stored.get("redirect") or "/profile"
+        if not is_active_account(await get_user_by_uid(user_uid_from_state)):
+            return RedirectResponse(
+                url=f"{frontend_url}/login?error=account_deleted", status_code=302
+            )
         if existing_auth:
             if existing_auth.user_uid == user_uid_from_state:
                 return RedirectResponse(
@@ -350,7 +354,7 @@ async def discord_callback(
         # A tombstoned (IC-deleted) account keeps its Discord auth method — block a
         # fresh login from re-minting for it (a new signup has a live uid, passes).
         login_user = await get_user_by_uid(user_uid)
-        if not login_user or login_user.deleted_at:
+        if not is_active_account(login_user):
             return RedirectResponse(
                 url=f"{frontend_url}/login?error=account_deleted", status_code=302
             )

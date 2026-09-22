@@ -8,7 +8,7 @@ from fastapi import Depends, Header, HTTPException, Request
 from ..db import get_user_by_uid
 from ..db_oauth import get_oauth_token_by_jti
 from ..jwt_config import AUDIENCE_APP, decode
-from ..models import User
+from ..models import User, is_active_account
 
 _OAUTH_BARRED_SUBPATHS = frozenset(
     {
@@ -123,7 +123,7 @@ async def get_current_user(
 
     user = await get_user_by_uid(user_uid)
     # This is the single resolution point every first-party handler funnels through.
-    if not user or user.deleted_at or user.anonymized_at:
+    if not is_active_account(user):
         raise HTTPException(status_code=401, detail="User not found")
 
     return user

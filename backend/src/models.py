@@ -353,7 +353,7 @@ class User(BaseObject, kw_only=True):
         datetime | None,
         msgspec.Meta(description="UTC instant the member's identity was wiped."),
     ] = None
-    anonymized_by_uid: str | None = None  # audit only; full projection only
+    anonymized_by_uid: str | None = None
 
     vekn_synced: bool = False
     vekn_synced_at: Annotated[
@@ -387,6 +387,11 @@ class User(BaseObject, kw_only=True):
     wins: Annotated[
         list[str], msgspec.Meta(description="Uids of the tournaments this member won.")
     ] = msgspec.field(default_factory=list)
+
+
+def is_active_account(user: User | None) -> bool:
+    """Whether this uid may sign in or be written to by a login flow."""
+    return user is not None and not user.deleted_at and not user.anonymized_at
 
 
 class Score(msgspec.Struct, kw_only=True, frozen=True):

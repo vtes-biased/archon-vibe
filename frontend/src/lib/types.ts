@@ -115,7 +115,7 @@ export interface User extends BaseObject {
   deceased_at?: string | null;
   deceased_by_uid?: string | null; // full projection only
   anonymized_at?: string | null;
-  anonymized_by_uid?: string | null; // full projection only
+  anonymized_by_uid?: string | null;
 
   vekn_synced?: boolean;
   vekn_synced_at?: string | null;

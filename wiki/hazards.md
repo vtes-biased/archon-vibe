@@ -10,13 +10,20 @@ documented; this page carries the cross-cutting ones and indexes the rest.
 ## Fields silently dropped
 
 **A hand-rebuilt `User` or `Sanction` drops every field its author did not
-enumerate** — prefer `msgspec.structs.replace`. Nine sites carry a field list of
+enumerate** — prefer `msgspec.structs.replace`. These sites carry a field list of
 their own: go-online's server-wins re-pull, the detach split's two clear-lists,
 the anonymize wipe, the member projection denylist, the api projection's three (a User allowlist and
 a Tournament and a Player denylist), `/action`'s copy into `event_data` and the
 tournament config set. Each derives what it can from the model it mirrors and
 asserts the judgement that remains exhaustive against the struct, so a new field
 fails a test instead of leaking — [testing](testing.md#traps) names the guards.
+
+**A device snapshot restores what a server-side sweep scrubbed.** go-online and
+sync-offline overwrite a tournament's `players` and `announcements` with the
+device's copy, which can predate an anonymization and carry the Discord
+`display_name` and `author_name` the sweep cleared. Both run
+`accounts.scrub_anonymized_copies` before saving; a new copy of a member's name on a
+tournament must be scrubbed there too, or the next go-online republishes it.
 
 **`vekn_id` is deliberately absent from `TournamentActionRequest`.** `/action`
 derives `event_data` from that model, so a key reaches the Rust `TournamentEvent`

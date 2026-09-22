@@ -513,4 +513,41 @@ def test_every_user_field_is_classified_by_the_split():
     classified = set().union(*groups)
     assert classified == {f.name for f in msgspec.structs.fields(User)}
     assert len(classified) == sum(len(g) for g in groups)
-    assert accounts.PERSONAL_FIELDS <= accounts.ANONYMIZED_FIELDS
+
+
+# An unclassified field survives anonymization — PII kept on a record that no
+# longer names anyone. Owner columns are cleared by clear_owner_columns instead.
+_ANONYMIZE_KEPT = {
+    "uid",
+    "modified",
+    "deleted_at",
+    "country",
+    "vekn_id",
+    "roles",
+    "promo_stock",
+    "coopted_by",
+    "coopted_at",
+    "deceased_at",
+    "deceased_by_uid",
+    "anonymized_at",
+    "anonymized_by_uid",
+    "vekn_synced",
+    "vekn_synced_at",
+    "local_modifications",
+    "vekn_prefix",
+    "calendar_token",
+    "agenda_hidden",
+    "agenda_added",
+    "constructed_online",
+    "constructed_offline",
+    "limited_online",
+    "limited_offline",
+    "wins",
+}
+
+
+def test_every_user_field_is_classified_by_anonymize():
+    assert not (accounts.ANONYMIZED_FIELDS & _ANONYMIZE_KEPT)
+    assert accounts.ANONYMIZED_FIELDS | _ANONYMIZE_KEPT == {
+        f.name for f in msgspec.structs.fields(User)
+    }

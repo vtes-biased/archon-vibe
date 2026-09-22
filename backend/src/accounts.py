@@ -22,6 +22,7 @@ from .db import (
     get_connection,
     get_sanctions_for_user,
     get_user_by_uid,
+    get_users_by_uids,
     remap_nda_user,
     save_object,
     save_object_from_model,
@@ -35,7 +36,14 @@ from .db_oauth import (
     get_oauth_consents_by_user,
     revoke_oauth_tokens_for_user_client,
 )
-from .models import AuthMethod, DeckObject, ObjectType, SanctionLevel, User
+from .models import (
+    AuthMethod,
+    DeckObject,
+    ObjectType,
+    SanctionLevel,
+    Tournament,
+    User,
+)
 from .ratings import recompute_wins
 
 
@@ -312,24 +320,40 @@ async def detach_user_from_vekn(
 
 
 ANONYMIZED_NAME = "Anonymized member"
-ANONYMIZED_FIELDS = frozenset(
-    {
-        "name",
-        "nickname",
-        "city",
-        "city_geoname_id",
-        "state",
-        "avatar_path",
-        "contact_email",
-        "contact_discord",
-        "discord_id",
-        "contact_phone",
-        "phone_is_whatsapp",
-        "github_login",
-        "github_id",
-        "community_links",
-    }
-)
+ANONYMIZED_FIELDS = PERSONAL_FIELDS | {
+    "name",
+    "city",
+    "city_geoname_id",
+    "state",
+    "community_links",
+}
+
+
+def _scrub(tournament: Tournament, anonymized_uids: set[str]) -> bool:
+    changed = False
+    for player in tournament.players:
+        if player.user_uid in anonymized_uids and player.display_name:
+            player.display_name = None
+            changed = True
+    for announcement in tournament.announcements:
+        if (
+            announcement.author_uid in anonymized_uids
+            and announcement.author_name != ANONYMIZED_NAME
+        ):
+            announcement.author_name = ANONYMIZED_NAME
+            changed = True
+    return changed
+
+
+async def scrub_anonymized_copies(tournament: Tournament) -> None:
+    """For a device snapshot about to overwrite the row: it may predate an
+    anonymization and carry the names the sweep already scrubbed."""
+    uids = {p.user_uid for p in tournament.players if p.user_uid and p.display_name}
+    uids |= {a.author_uid for a in tournament.announcements}
+    if not uids:
+        return
+    users = await get_users_by_uids(uids)
+    _scrub(tournament, {uid for uid, u in users.items() if u.anonymized_at})
 
 
 async def _scrub_tournament_copies(user_uid: str) -> list[BroadcastData]:
@@ -346,21 +370,7 @@ async def _scrub_tournament_copies(user_uid: str) -> list[BroadcastData]:
     broadcasts = []
     for uid in uids:
         async with tournament_transaction(uid) as (tournament, tx_conn):
-            if tournament is None:
-                continue
-            changed = False
-            for player in tournament.players:
-                if player.user_uid == user_uid and player.display_name:
-                    player.display_name = None
-                    changed = True
-            for announcement in tournament.announcements:
-                if (
-                    announcement.author_uid == user_uid
-                    and announcement.author_name != ANONYMIZED_NAME
-                ):
-                    announcement.author_name = ANONYMIZED_NAME
-                    changed = True
-            if not changed:
+            if tournament is None or not _scrub(tournament, {user_uid}):
                 continue
             tournament.modified = datetime.now(UTC)
             broadcasts.append(

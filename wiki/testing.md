@@ -132,7 +132,7 @@ that file first; if the sensitive field is already pinned there, a further
 model field fails one of them rather than leaking. `test_go_online.py` classifies
 every `Tournament` field as server-owned, merged, stamped or carried from the
 device's snapshot; `test_account_surgery.py` classifies every `User` field across
-the detach split and holds the anonymize wipe to a superset of its personal half; `test_access_levels.py` holds the member-visible complement of
+the detach split and again as wiped or kept by anonymization; `test_access_levels.py` holds the member-visible complement of
 the tournament denylist, the api-visible complement of the tournament and player
 api denylists and the withheld complement of the user api allowlist, and pins
 `compute_user_full` to withholding exactly the owner-only columns;
