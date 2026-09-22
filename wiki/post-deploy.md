@@ -175,3 +175,26 @@ Then set one of your own published decks to Anonymous and confirm on another
 member's client that it shows no owner and has left your profile, report both
 counts to the owner, and delete this section. No issue reported this, so there
 is nobody to tell.
+
+## Evict past private decks from their organizers' devices
+
+Gated by the commit that withholds a finished event's private decks from its
+organizers (`49be3df0`). Its own finish path re-saves the decks it withholds,
+but events finished before it never had that re-save, so their organizers keep a
+local copy: the overlay stops sending those decks, and nothing tombstones them.
+Touching the rows moves `modified_at` (the `objects` BEFORE-UPDATE trigger stamps
+it), and every organizer's next catch-up then streams a member tombstone for each.
+Running it earlier is wasted: the old overlay would re-send the decks at `full`
+on the next connect.
+
+```sql
+UPDATE objects d SET modified_at = d.modified_at
+FROM objects t
+WHERE d.type = 'deck' AND d.deleted_at IS NULL
+  AND (d."full"->>'private')::boolean
+  AND t.type = 'tournament' AND t.uid = d."full"->>'tournament_uid'
+  AND t."full"->>'state' = 'Finished';
+```
+
+The `UPDATE`'s row count is the record. Nothing to tell anyone; delete this
+section once it has run.
