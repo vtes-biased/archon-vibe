@@ -120,9 +120,11 @@ def compute_user_api(d: dict) -> dict | None:
     return _pick(d, USER_API_FIELDS)
 
 
+_USER_OWNER_ONLY_FIELDS = {"calendar_token", "agenda_hidden", "agenda_added"}
+
+
 def compute_user_full(d: dict) -> dict:
-    # calendar_token is private, only ever surfaced via /auth/me.
-    return {k: v for k, v in d.items() if k != "calendar_token"}
+    return {k: v for k, v in d.items() if k not in _USER_OWNER_ONLY_FIELDS}
 
 
 # A missing bool reads as False after JSON — never omit one to withhold it.

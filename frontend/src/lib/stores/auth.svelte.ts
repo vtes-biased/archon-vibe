@@ -152,7 +152,10 @@ function registerOwnUserSync(): void {
     const current = authState.user;
     if (!synced || !current || synced.uid !== current.uid) return;
     if (synced.modified === current.modified) return;
-    setAuthState({ user: { ...synced, calendar_token: current.calendar_token } });
+    setAuthState({ user: { ...synced, calendar_token: current.calendar_token, agenda_hidden: current.agenda_hidden, agenda_added: current.agenda_added } });
+    void fetchCurrentUser().then((result) => {
+      if (result && authState.user?.uid === result.user.uid) setAuthState({ user: result.user, authMethods: result.auth_methods });
+    });
   });
 }
 
@@ -650,5 +653,26 @@ export async function generateCalendarToken(): Promise<{ calendar_token: string;
     return data;
   } catch {
     return null;
+  }
+}
+
+export async function setAgendaEntry(tournamentUid: string, entry: "hidden" | "added" | null): Promise<string | null> {
+  try {
+    const response = await authorizedFetch(`${API_BASE}/auth/me/agenda/${tournamentUid}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entry }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return data.detail || m.tournaments_agenda_error();
+    }
+    const data = await response.json();
+    if (authState.user) {
+      setAuthState({ user: { ...authState.user, agenda_hidden: data.agenda_hidden, agenda_added: data.agenda_added } });
+    }
+    return null;
+  } catch (e) {
+    return toUserMessage(e, m.tournaments_agenda_error());
   }
 }

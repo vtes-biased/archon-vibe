@@ -4,6 +4,7 @@ import type { User, Role, Sanction, Tournament, DeckObject, League, Promo, VtesC
 import type { TournamentEvent } from './engine';
 import { expandRolesForFilter } from './roles';
 import { normalizeSearch, searchTokens } from './utils';
+import { filterAgenda, type AgendaViewer } from './agenda';
 
 export function getDeviceId(): string {
   let id = localStorage.getItem('archon_device_id');
@@ -781,7 +782,7 @@ async function getTournamentIndex(): Promise<Map<string, TournamentListItem>> {
   return tournamentIndexPromise;
 }
 
-function getMemberPlaying(userUid: string): Promise<Set<string>> {
+export function getMemberPlaying(userUid: string): Promise<Set<string>> {
   if (!memberPlayingPromise || memberPlayingUid !== userUid) {
     memberPlayingUid = userUid;
     memberPlayingPromise = (async () => {
@@ -938,42 +939,25 @@ export async function getFilteredTournaments(
   return { items: items.slice(start, start + pageSize), total, upcomingCount };
 }
 
-/** Matches if the user organizes or participates in it (any state), or — for non-finished events —
- * it's in their country, online (if included), or an NC/CC championship on their continent. */
 export async function getAgendaTournaments(
-  userUid: string,
-  userCountry: string,
-  continentCountries: string[],
+  viewer: AgendaViewer,
   filters: { state?: TournamentStateFilter; includeOnline?: boolean; format?: string; rank?: string; search?: string },
   page = 0,
   pageSize = 50,
 ): Promise<FilteredTournamentsResult> {
-  const [index, playing] = await Promise.all([getTournamentIndex(), getMemberPlaying(userUid)]);
-  const continentSet = new Set(continentCountries);
+  const [index, playing] = await Promise.all([getTournamentIndex(), getMemberPlaying(viewer.uid)]);
   const cutoff = todayCutoff();
   const q = filters.search?.trim() ? normalizeSearch(filters.search.trim()) : '';
 
-  const onAgenda = (t: TournamentListItem) => {
-    if (t.organizers_uids?.includes(userUid)) return true;
-    if (playing.has(t.uid)) return true;
-    if (t.state === 'Finished') return false;
-    if (t.country === userCountry) return true;
-    if (filters.includeOnline && t.online) return true;
-    if (t.country && continentSet.has(t.country)) {
-      if (t.rank === 'National Championship' || t.rank === 'Continental Championship') return true;
-    }
-    return false;
-  };
-
-  const items: TournamentListItem[] = [];
+  const candidates: TournamentListItem[] = [];
   for (const t of index.values()) {
-    if (!onAgenda(t)) continue;
     if (filters.state && filters.state !== 'all' && !matchesState(t, filters.state, cutoff)) continue;
     if (filters.format && filters.format !== 'all' && t.format !== filters.format) continue;
     if (filters.rank && filters.rank !== 'all' && t.rank !== filters.rank) continue;
     if (q && !normalizeSearch(t.name).includes(q)) continue;
-    items.push(t);
+    candidates.push(t);
   }
+  const items = filterAgenda(candidates, viewer, playing, filters.includeOnline);
 
   const upcomingCount = sortUpcomingFirst(items);
 

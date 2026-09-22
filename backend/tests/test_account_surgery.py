@@ -481,7 +481,14 @@ async def test_abandon_allowed_without_active_suspension(test_client):
 # An unclassified personal/login field leaks onto the abandoned VEKN record for
 # the next claimant; an unclassified uid-keyed one hands the personal account
 # standing, stock or reach it holds none of.
-_SPLIT_HANDLED = {"uid", "modified", "calendar_token", "local_modifications"}
+_SPLIT_HANDLED = {
+    "uid",
+    "modified",
+    "calendar_token",
+    "agenda_hidden",
+    "agenda_added",
+    "local_modifications",
+}
 _SPLIT_SHARED = {
     "deleted_at",
     "name",

@@ -5,7 +5,8 @@
   import { deleteTournamentApi, syncTournamentVekn, qrCheckin } from "$lib/api";
   import { tournamentAction, setTableScore } from "$lib/tournament-actions";
   import { getCountries, getCountryFlag } from "$lib/geonames";
-  import { getAuthState } from "$lib/stores/auth.svelte";
+  import { getAuthState, setAgendaEntry } from "$lib/stores/auth.svelte";
+  import { agendaViewer, filterAgenda, agendaToggleEntry } from "$lib/agenda";
   import { canTakeTournamentOffline, canForceUnlockTournament } from "$lib/engine";
   import { syncManager } from "$lib/sync";
   import { getUser, getTournament, getTournamentContextSanctions, getDeviceId, getDecksByTournamentGrouped, getLeague, saveTournament } from "$lib/db";
@@ -16,7 +17,7 @@
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime, OfflineLockLostError } from "$lib/stores/offline.svelte";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
   import { openLastView } from "$lib/last-view";
-  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Wrench, Settings2, ExternalLink, MapPin, CloudOff, CloudAlert, Upload, CloudUpload, Share2, CalendarPlus } from "@lucide/svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Wrench, Settings2, ExternalLink, MapPin, CloudOff, CloudAlert, Upload, CloudUpload, Share2, CalendarPlus, BookmarkPlus, BookmarkMinus } from "@lucide/svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from "$lib/components/Button.svelte";
   import TournamentBanner from "$lib/components/TournamentBanner.svelte";
@@ -62,6 +63,9 @@ import TournamentModals from "./TournamentModals.svelte";
 
   const auth = $derived(getAuthState());
   const uid = $derived($page.params.uid as string);
+  const agenda = $derived(auth.isAuthenticated ? agendaViewer(auth.user) : null);
+  const playingHere = $derived(new Set(agenda && tournament?.players?.some(p => p.user_uid === agenda.uid) ? [tournament.uid] : []));
+  const onMyAgenda = $derived(!!agenda && !!tournament && filterAgenda([tournament], agenda, playingHere).length === 1);
   const isOrganizer = $derived(
     tournament ? engineIsOrganizer(auth.user, tournament) : false
   );
@@ -500,6 +504,11 @@ import TournamentModals from "./TournamentModals.svelte";
     }
   }
 
+  async function toggleAgenda() {
+    if (!agenda || !tournament) return;
+    error = await setAgendaEntry(tournament.uid, agendaToggleEntry(tournament, agenda, playingHere));
+  }
+
   async function shareEvent() {
     const url = eventUrl(window.location.origin, { uid, event_code: tournament?.event_code });
     if (navigator.share) {
@@ -820,6 +829,12 @@ import TournamentModals from "./TournamentModals.svelte";
             <Share2 class="w-4 h-4" aria-hidden="true" />
             {m.tournament_share()}
           </Button>
+          {#if agenda}
+            <Button variant="ghost" size="md" onclick={toggleAgenda} disabled={!isBrowserOnline()}>
+              {#if onMyAgenda}<BookmarkMinus class="w-4 h-4" aria-hidden="true" />{:else}<BookmarkPlus class="w-4 h-4" aria-hidden="true" />{/if}
+              {onMyAgenda ? m.tournaments_agenda_remove() : m.tournaments_agenda_add()}
+            </Button>
+          {/if}
           {#if showOrganizerView && !tournament.offline_mode && canGoOffline}
             <Button variant="ghost" size="md" onclick={() => showGoOfflineConfirm = true}>
               <WifiOff class="w-4 h-4" />

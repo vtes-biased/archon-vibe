@@ -1,16 +1,20 @@
 """iCal calendar feed endpoint for tournament subscriptions."""
 
+import json
 import os
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from archon_engine import PyEngine
 from fastapi import APIRouter, HTTPException, Query, Response
 
 from ..db import get_user_by_calendar_token
 from ..geonames import get_countries_on_continent
-from ..models import Tournament, TournamentState
+from ..models import Tournament
 
 router = APIRouter(prefix="/api/calendar", tags=["calendar"])
+
+_engine = PyEngine()
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
@@ -101,33 +105,38 @@ def _tournament_to_vevent(t: Tournament, now_str: str) -> str:
     return "\r\n".join(lines)
 
 
-def _matches_agenda(
-    t: Tournament,
+def _agenda_filter(
+    tournaments: list[Tournament],
     user_uid: str,
     user_country: str | None,
     continent_countries: list[str],
     include_online: bool,
-) -> bool:
-    """include_online gates only the discovery branch below — events the user
-    organizes or plays in always stay in their feed regardless."""
-    # Finished events reach this function only within FINISHED_WINDOW_DAYS
-    # (bounded by the caller's SQL), so these two branches need no state check.
-    if t.organizers_uids and user_uid in t.organizers_uids:
-        return True
-    if t.players and any(p.user_uid == user_uid for p in t.players):
-        return True
-    # Discovery below is upcoming-only: finished events never match by
-    # geography/online — only the own-event branches above keep them.
-    if t.state == TournamentState.FINISHED:
-        return False
-    if t.online:
-        return include_online
-    if user_country and t.country == user_country:
-        return True
-    if continent_countries and t.country in continent_countries:
-        if t.rank in ("National Championship", "Continental Championship"):
-            return True
-    return False
+    hidden: list[str],
+    added: list[str],
+) -> list[Tournament]:
+    viewer = {
+        "uid": user_uid,
+        "country": user_country,
+        "continent_countries": continent_countries,
+        "hidden": hidden,
+        "added": added,
+    }
+    events = [
+        {
+            "uid": t.uid,
+            "state": t.state,
+            "country": t.country,
+            "online": t.online,
+            "rank": t.rank,
+            "organizers_uids": t.organizers_uids,
+            "playing": any(p.user_uid == user_uid for p in t.players),
+        }
+        for t in tournaments
+    ]
+    on = json.loads(
+        _engine.agenda_filter(json.dumps(viewer), json.dumps(events), include_online)
+    )
+    return [t for t, keep in zip(tournaments, on, strict=True) if keep]
 
 
 @router.get("/tournaments/{uid}.ics")
@@ -220,12 +229,17 @@ async def tournament_calendar(
     if league:
         tournaments = [t for t in tournaments if t.league_uid == league]
     elif user and user.country:
-        continent_countries = get_countries_on_continent(user.country)
-        tournaments = [
-            t
-            for t in tournaments
-            if _matches_agenda(t, user.uid, user.country, continent_countries, online)
-        ]
+        # Finished events arrive only within FINISHED_WINDOW_DAYS (bounded by
+        # the SQL above), so the engine's own-event branches need no date check.
+        tournaments = _agenda_filter(
+            tournaments,
+            user.uid,
+            user.country,
+            get_countries_on_continent(user.country),
+            online,
+            user.agenda_hidden or [],
+            user.agenda_added or [],
+        )
     else:
         # Public filtering
         filtered = []

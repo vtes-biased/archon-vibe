@@ -4,6 +4,7 @@ import os
 import secrets
 import time
 from datetime import UTC, datetime
+from typing import Literal
 
 import msgspec
 from argon2 import PasswordHasher
@@ -19,9 +20,12 @@ from ...community_links import (
     validated_type,
 )
 from ...db import (
+    get_agenda,
     get_auth_methods_for_user,
     get_calendar_token,
+    get_tournament_by_uid,
     save_user,
+    set_agenda_entry,
     update_auth_method,
 )
 from ...geonames import stored_country
@@ -63,8 +67,8 @@ class PasswordChangeRequest(BaseModel):
 async def get_me(current_user: CurrentUser) -> Response:
     user = current_user
 
-    # Surface the owner's calendar feed token (kept out of all projections).
     user.calendar_token = await get_calendar_token(user.uid)
+    user.agenda_hidden, user.agenda_added = await get_agenda(user.uid)
 
     auth_methods = await get_auth_methods_for_user(user.uid)
     methods_info = [
@@ -184,8 +188,8 @@ async def update_current_user(
     bd = await save_user(user)
     broadcast_precomputed(bd)
 
-    # Surface the owner's calendar feed token (preserved by COALESCE, not in "full").
     user.calendar_token = await get_calendar_token(user.uid)
+    user.agenda_hidden, user.agenda_added = await get_agenda(user.uid)
 
     auth_methods = await get_auth_methods_for_user(user.uid)
     methods_info = [
@@ -271,6 +275,32 @@ async def read_link_title(url: str, current_user: CurrentUser) -> Response:
         raise HTTPException(status_code=422, detail=str(e)) from None
     return Response(
         content=encoder.encode({"title": title}), media_type="application/json"
+    )
+
+
+class AgendaEntryRequest(BaseModel):
+    entry: Literal["hidden", "added"] | None = None
+
+
+@router.put("/me/agenda/{tournament_uid}")
+async def set_agenda(
+    tournament_uid: str, request: AgendaEntryRequest, current_user: CurrentUser
+) -> Response:
+    if not current_user.vekn_id:
+        raise HTTPException(status_code=403, detail="VEKN membership required")
+    if request.entry is not None:
+        tournament = await get_tournament_by_uid(tournament_uid)
+        if tournament is None or tournament.deleted_at is not None:
+            raise HTTPException(status_code=404, detail="Tournament not found")
+    hidden, added = await set_agenda_entry(
+        current_user.uid, tournament_uid, request.entry
+    )
+    user = current_user
+    user.modified = datetime.now(UTC)
+    broadcast_precomputed(await save_user(user))
+    return Response(
+        content=encoder.encode({"agenda_hidden": hidden, "agenda_added": added}),
+        media_type="application/json",
     )
 
 

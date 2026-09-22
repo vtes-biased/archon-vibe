@@ -11,9 +11,10 @@ import msgspec
 
 from .db import (
     BroadcastData,
-    clear_calendar_token,
+    clear_owner_columns,
     decode_json,
     encode_json,
+    get_agenda,
     get_calendar_token,
     get_connection,
     get_sanctions_for_user,
@@ -129,6 +130,10 @@ async def merge_users(
     merged_calendar_token = await get_calendar_token(
         delete_uid
     ) or await get_calendar_token(keep_uid)
+    claimed_agenda = await get_agenda(delete_uid)
+    merged_hidden, merged_added = (
+        claimed_agenda if any(claimed_agenda) else await get_agenda(keep_uid)
+    )
 
     # msgspec.structs.replace keeps every unlisted field; only fields with a
     # real merge policy are overridden below.
@@ -158,6 +163,8 @@ async def merge_users(
         | delete_user_obj.local_modifications,
         vekn_prefix=keep_user.vekn_prefix or delete_user_obj.vekn_prefix,
         calendar_token=merged_calendar_token,
+        agenda_hidden=merged_hidden,
+        agenda_added=merged_added,
     )
 
     merged_bd = await save_user(merged)
@@ -256,13 +263,16 @@ async def detach_user_from_vekn(
     # calendar_token lives outside "full"; carry it to the personal account so the
     # existing .ics URL resolves, clearing the orphan's first so it's never duplicated.
     feed_token = await get_calendar_token(user_uid)
-    await clear_calendar_token(user_uid)
+    agenda_hidden, agenda_added = await get_agenda(user_uid)
+    await clear_owner_columns(user_uid)
 
     personal = msgspec.structs.replace(
         user,
         uid=new_uid,
         modified=now,
         calendar_token=feed_token,
+        agenda_hidden=agenda_hidden,
+        agenda_added=agenda_added,
         local_modifications=set(),
         **_defaults(UID_KEYED_FIELDS),
     )
@@ -273,11 +283,13 @@ async def detach_user_from_vekn(
     await remap_nda_user(user_uid, new_uid)
 
     # Sanctions/decks are NOT reassigned — they key on this stable uid.
-    # calendar_token=None here is a no-op via COALESCE (already cleared above).
+    # The owner columns at None are a no-op via COALESCE (already cleared above).
     vekn_record = msgspec.structs.replace(
         user,
         modified=now,
         calendar_token=None,
+        agenda_hidden=None,
+        agenda_added=None,
         local_modifications=set(),
         **_defaults(PERSONAL_FIELDS),
     )

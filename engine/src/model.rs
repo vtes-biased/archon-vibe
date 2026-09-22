@@ -6,6 +6,7 @@
 pub mod arg {
     pub const ACTOR: &str = "actor";
     pub const ACTOR_UID: &str = "actor_uid";
+    pub const ADDED: &str = "added";
     pub const ADV: &str = "adv";
     pub const ALLOWED: &str = "allowed";
     pub const ATTRIBUTION: &str = "attribution";
@@ -21,6 +22,7 @@ pub mod arg {
     pub const COMMENT: &str = "comment";
     pub const COMMENTS: &str = "comments";
     pub const CONFIG: &str = "config";
+    pub const CONTINENT_COUNTRIES: &str = "continent_countries";
     pub const COUNT: &str = "count";
     pub const COUNTRY: &str = "country";
     pub const DECK: &str = "deck";
@@ -40,6 +42,7 @@ pub mod arg {
     pub const GW: &str = "gw";
     pub const HAS_NDA: &str = "has_nda";
     pub const HAS_TIES: &str = "has_ties";
+    pub const HIDDEN: &str = "hidden";
     pub const IS_ORGANIZER: &str = "is_organizer";
     pub const KEY: &str = "key";
     pub const KIND: &str = "kind";
@@ -62,6 +65,7 @@ pub mod arg {
     pub const ORGANIZERS_UIDS: &str = "organizers_uids";
     pub const PARAMS: &str = "params";
     pub const PLACEMENT: &str = "placement";
+    pub const PLAYING: &str = "playing";
     pub const PLAYER_COUNT: &str = "player_count";
     pub const PLAYER_UID: &str = "player_uid";
     pub const PLAYER_UIDS: &str = "player_uids";

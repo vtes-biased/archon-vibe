@@ -335,9 +335,12 @@ async def save_object(
     api_json = _encoder.encode(api).decode("utf-8") if api is not None else None
     full_json = _encoder.encode(full).decode("utf-8")
 
-    # calendar_token lives outside the JSONB projections and must never be
-    # broadcast. A NULL write here COALESCEs — only clear_calendar_token() drops it.
-    cal_token = full_data.get("calendar_token") if obj_type == ObjectType.USER else None
+    # The owner-only columns live outside the JSONB projections and must never
+    # be broadcast. A NULL write here COALESCEs — only clear_owner_columns() drops them.
+    is_user = obj_type == ObjectType.USER
+    cal_token = full_data.get("calendar_token") if is_user else None
+    agenda_hidden = full_data.get("agenda_hidden") if is_user else None
+    agenda_added = full_data.get("agenda_added") if is_user else None
 
     query = """
         WITH prev AS (
@@ -345,8 +348,10 @@ async def save_object(
                    "member" IS NOT NULL AS had_member
             FROM objects WHERE uid = %s
         )
-        INSERT INTO objects (uid, type, deleted_at, "public", "member", "api", "full", calendar_token)
-        VALUES (%s, %s, %s::timestamp, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb, %s)
+        INSERT INTO objects (uid, type, deleted_at, "public", "member", "api", "full",
+                             calendar_token, agenda_hidden, agenda_added)
+        VALUES (%s, %s, %s::timestamp, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb,
+                %s, %s, %s)
         ON CONFLICT (uid) DO UPDATE SET
             type = EXCLUDED.type,
             deleted_at = EXCLUDED.deleted_at,
@@ -354,7 +359,9 @@ async def save_object(
             "member" = EXCLUDED."member",
             "api" = EXCLUDED."api",
             "full" = EXCLUDED."full",
-            calendar_token = COALESCE(EXCLUDED.calendar_token, objects.calendar_token)
+            calendar_token = COALESCE(EXCLUDED.calendar_token, objects.calendar_token),
+            agenda_hidden = COALESCE(EXCLUDED.agenda_hidden, objects.agenda_hidden),
+            agenda_added = COALESCE(EXCLUDED.agenda_added, objects.agenda_added)
         RETURNING modified_at,
                   (SELECT had_public FROM prev),
                   (SELECT had_member FROM prev)
@@ -369,6 +376,8 @@ async def save_object(
         api_json,
         full_json,
         cal_token,
+        agenda_hidden,
+        agenda_added,
     )
 
     if conn:
@@ -693,19 +702,22 @@ async def get_user_by_calendar_token(token: str) -> User | None:
 
     Skips soft-deleted users so a revoked/merged account's feed stops resolving.
     The returned User has no calendar_token set (stripped from "full"); the
-    caller already holds the token and only needs the user identity.
+    caller already holds the token. Its agenda lists are read alongside.
     """
     async with get_connection() as conn:
         result = await conn.execute(
-            """SELECT "full" FROM objects
+            """SELECT "full", agenda_hidden, agenda_added FROM objects
             WHERE type = 'user' AND calendar_token = %s
               AND deleted_at IS NULL LIMIT 1""",
             (token,),
         )
         row = await result.fetchone()
-        if row:
-            return decode_json(row[0], User)
-        return None
+        if not row:
+            return None
+        user = decode_json(row[0], User)
+        user.agenda_hidden = row[1] or []
+        user.agenda_added = row[2] or []
+        return user
 
 
 async def get_calendar_token(uid: str) -> str | None:
@@ -723,16 +735,49 @@ async def get_calendar_token(uid: str) -> str | None:
     return row[0] if row else None
 
 
-async def clear_calendar_token(uid: str) -> None:
-    """Explicitly clear a user's calendar_token.
+async def get_agenda(uid: str) -> tuple[list[str], list[str]]:
+    """Read a user's (agenda_hidden, agenda_added), owner-only like the token."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            "SELECT agenda_hidden, agenda_added FROM objects WHERE uid = %s",
+            (uid,),
+        )
+        row = await result.fetchone()
+    return (row[0] or [], row[1] or []) if row else ([], [])
 
-    save_object COALESCEs the token (a NULL write preserves the existing value),
-    so account surgery that orphans a record (strip/split VEKN) must clear the
-    feed token here rather than by writing None through the User model.
+
+async def set_agenda_entry(
+    uid: str, tournament_uid: str, entry: str | None
+) -> tuple[list[str], list[str]]:
+    """Put one tournament in `entry` ("hidden", "added" or neither)."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """UPDATE objects SET
+                agenda_hidden = array_remove(COALESCE(agenda_hidden, '{}'), %(t)s::text)
+                    || CASE WHEN %(e)s::text = 'hidden' THEN ARRAY[%(t)s::text]
+                       ELSE '{}'::text[] END,
+                agenda_added = array_remove(COALESCE(agenda_added, '{}'), %(t)s::text)
+                    || CASE WHEN %(e)s::text = 'added' THEN ARRAY[%(t)s::text]
+                       ELSE '{}'::text[] END
+            WHERE uid = %(u)s
+            RETURNING agenda_hidden, agenda_added""",
+            {"t": tournament_uid, "e": entry, "u": uid},
+        )
+        row = await result.fetchone()
+    return (row[0], row[1]) if row else ([], [])
+
+
+async def clear_owner_columns(uid: str) -> None:
+    """Explicitly clear a user's calendar_token and agenda lists.
+
+    save_object COALESCEs them (a NULL write preserves the existing value),
+    so account surgery that orphans a record (strip/split VEKN) must clear
+    them here rather than by writing None through the User model.
     """
     async with get_connection() as conn:
         await conn.execute(
-            "UPDATE objects SET calendar_token = NULL WHERE uid = %s",
+            """UPDATE objects SET calendar_token = NULL, agenda_hidden = NULL,
+                agenda_added = NULL WHERE uid = %s""",
             (uid,),
         )
 

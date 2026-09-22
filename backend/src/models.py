@@ -365,6 +365,14 @@ class User(BaseObject, kw_only=True):
         ),
     ] = None
     calendar_token: str | None = None
+    agenda_hidden: Annotated[
+        list[str] | None,
+        msgspec.Meta(description="Tournament uids the member took off their agenda."),
+    ] = None
+    agenda_added: Annotated[
+        list[str] | None,
+        msgspec.Meta(description="Tournament uids the member put on their agenda."),
+    ] = None
 
     constructed_online: CategoryRating | None = None
     constructed_offline: CategoryRating | None = None

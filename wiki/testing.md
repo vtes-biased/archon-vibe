@@ -121,7 +121,7 @@ context managers.
 
 **`test_access_levels.py` is the only place in the backend suite that asserts
 projection field membership.** Everything else mentioning `"public"` asserts row
-sets, sizes, or the `calendar_token` exclusion — never which keys a projection
+sets, sizes, or the owner-only column exclusion — never which keys a projection
 carries. That is deliberate: it makes "have I just made a field public without
 noticing?" a one-file question, and the file is pure-unit with no DB, so it runs
 even on a skipped-DB run. When reviewing a widened or narrowed projection, read
@@ -135,7 +135,7 @@ device's snapshot; `test_account_surgery.py` classifies every `User` field acros
 the detach split; `test_access_levels.py` holds the member-visible complement of
 the tournament denylist, the api-visible complement of the tournament and player
 api denylists and the withheld complement of the user api allowlist, and pins
-`compute_user_full` to withholding exactly `calendar_token`;
+`compute_user_full` to withholding exactly the owner-only columns;
 `test_tournament_field_contracts.py` classifies every
 `TournamentActionRequest` field as truthy-only or any-value, and compares the
 engine's `CONFIG_FIELDS`, `TournamentConfig` and `CreateTournamentRequest` while

@@ -26,7 +26,8 @@ All synced objects live in one `objects` table with pre-computed access-level
 columns — `public` / `member` / `full` JSONB, NULL when not visible at that level,
 `full` NOT NULL — plus `api`, the third-party read API's projection, which no app
 client is ever served ([sync](sync.md#access-levels)), plus `type`, `modified_at`,
-`deleted_at` and `calendar_token`.
+`deleted_at` and the owner-only `calendar_token`, `agenda_hidden` and
+`agenda_added`.
 Index `(type, modified_at, uid)`. The trade-off bought: a single schemaless table
 (no migrations for schema changes), pre-computed projections (zero read-time
 filtering), fast iteration.
@@ -35,12 +36,14 @@ Synced types: **User, Sanction, Tournament, DeckObject, League, Promo**. VtesCar
 is static data loaded into IndexedDB. DeckObject is standalone, not embedded in
 Tournament.
 
-`calendar_token` is the one non-projected column — a per-user `.ics` feed secret
-that must reach nobody but its owner, and no projection is that narrow: the three
-synced ones are broadcast (`full` reaches non-owners) and `api` is published. It
-is a 1:1 column rather than a table to avoid a join on the hot
-`get_user_by_uid` path; `save_object` COALESCEs it so token-less writes preserve
-it, and `clear_calendar_token()` is the explicit drop path.
+**The owner-only columns** hold user data that must reach nobody but its owner,
+and no projection is that narrow: the three synced ones are broadcast (`full`
+reaches non-owners) and `api` is published. `calendar_token` is the `.ics` feed
+secret; `agenda_hidden` and `agenda_added` are the member's
+[agenda overrides](#calendar). They are 1:1 columns rather than a table to avoid a
+join on the hot `get_user_by_uid` path; `save_object` COALESCEs them so writers
+that loaded a `User` from `full` (where they are `None`) preserve them, and
+`clear_owner_columns()` is the explicit drop path.
 
 **Soft delete** sets `deleted_at = now()`; SSE broadcasts the deleted object so
 clients — including ones offline during the delete — remove it from IndexedDB on
@@ -390,6 +393,7 @@ rebuilds both targets; build one directly with `wasm-pack` or `maturin develop`
 | `deck.rs` | deck parse/validate, TWDA export, `library_type_order_json` |
 | `ratings.rs` | rating points, `ranking_eligibility`, the two player counts |
 | `league.rs` | league standings (RTP/Score/GP) |
+| `agenda.rs` | agenda matching and the member's overrides, for the app's agenda and the personal feed |
 | `cards.rs` | card database lookup and name normalization |
 | `error.rs` | the error taxonomy |
 
@@ -920,9 +924,21 @@ from any feed.
 `calendar_token` is nullable on User, generated on demand, stripped from SSE, only
 visible via `/auth/me`, and backed by a partial index.
 
-Agenda matching: the user organizes the event (any state), participates in it (any
-state), or — non-finished only — it is in their country, online, or an NC-level
-championship on their continent.
+Agenda matching (`agenda.rs`, one batch call per list or feed): the user organizes
+the event (any state), participates in it (any state), or — non-finished only — it
+is online, in their country, or an NC-level championship on their continent. The
+online filter drops an online event whatever its country.
+
+**The member's overrides beat the matching**, in the app's agenda view and the
+personal feed alike: a tournament in `agenda_hidden` is off whatever matched it —
+own events included — and one in `agenda_added` is on as if it were their own
+(any state, whatever the online filter). One toggle on each list row and on the
+tournament page flips an event by undoing its override if it has one, else adding
+the opposite. `PUT /auth/me/agenda/{uid}` moves one uid in a single `UPDATE`, so
+two devices editing different events never drop each other's, then bumps the
+user row: the lists travel only on `/auth/me`, and that bump is what makes the
+owner's other devices re-read it. Both lists follow the person through account
+surgery with the feed token.
 
 Personal feeds keep recently-finished own events for 90 days keyed on `finish`:
 subscribed calendars reconcile on every poll, so an event leaving the feed is

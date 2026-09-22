@@ -197,11 +197,16 @@ CREATE TABLE IF NOT EXISTS objects (
     -- more private than the most-private projection and gets its own
     -- column, never serialized into any JSONB level. save_object
     -- COALESCEs it (NULL writes preserve), so RMW keeps it; clearing
-    -- goes through clear_calendar_token().
-    calendar_token TEXT
+    -- goes through clear_owner_columns().
+    calendar_token TEXT,
+    -- A member's agenda overrides, private for the same reason as the token.
+    agenda_hidden TEXT[],
+    agenda_added TEXT[]
 );
 -- Migrate existing deployments to the dedicated column (see above).
 ALTER TABLE objects ADD COLUMN IF NOT EXISTS calendar_token TEXT;
+ALTER TABLE objects ADD COLUMN IF NOT EXISTS agenda_hidden TEXT[];
+ALTER TABLE objects ADD COLUMN IF NOT EXISTS agenda_added TEXT[];
 ALTER TABLE objects ADD COLUMN IF NOT EXISTS "api" JSONB;
 -- Composite index for SSE catch-up queries (type + modified_at + uid)
 CREATE INDEX IF NOT EXISTS idx_objects_type_modified

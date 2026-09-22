@@ -1,10 +1,11 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
   import { untrack } from "svelte";
-  import { getFilteredTournaments, getAgendaTournaments, getLeague, type TournamentListItem, type TournamentStateFilter } from "$lib/db";
+  import { getFilteredTournaments, getAgendaTournaments, getMemberPlaying, getLeague, type TournamentListItem, type TournamentStateFilter } from "$lib/db";
+  import { agendaViewer, filterAgenda, agendaToggleEntry } from "$lib/agenda";
   import { syncManager } from "$lib/sync";
-  import { getCountries, getSortedCountries, getCountryFlag, getCountriesOnContinent } from "$lib/geonames";
-  import { getAuthState, generateCalendarToken } from "$lib/stores/auth.svelte";
+  import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
+  import { getAuthState, generateCalendarToken, setAgendaEntry } from "$lib/stores/auth.svelte";
   import { canCreateTournament } from "$lib/engine";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
   import type { TournamentFormat, TournamentRank } from "$lib/types";
@@ -12,7 +13,7 @@
   import Badge from "$lib/components/Badge.svelte";
   import { zonedDate } from "$lib/utils";
   import { syncQueryParams, currentParams, readPageParam, pageParam } from "$lib/url-filters";
-  import { Loader2, Trophy, Calendar, Copy, Check, Plus, SlidersHorizontal, X } from "@lucide/svelte";
+  import { Loader2, Trophy, Calendar, BookmarkPlus, BookmarkMinus, Copy, Check, Plus, SlidersHorizontal, X } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
   import { getLocale } from '$lib/paraglide/runtime.js';
@@ -54,6 +55,9 @@
   const VIEW_PREF_KEY = "archon:tournaments-view";
   const auth = $derived(getAuthState());
   const canUseAgenda = $derived(auth.isAuthenticated && auth.user?.vekn_id && auth.user?.country);
+  const viewer = $derived(auth.isAuthenticated ? agendaViewer(auth.user) : null);
+  let playing = $state<Set<string>>(new Set());
+  const onAgendaUids = $derived(new Set(viewer ? filterAgenda(tournaments, viewer, playing).map(t => t.uid) : []));
   const urlView = urlParams.get("view");
   const storedView = localStorage.getItem(VIEW_PREF_KEY);
   const initialView = [urlView, storedView].find(v => v === "agenda" || v === "all");
@@ -144,13 +148,10 @@
 
   async function loadTournaments() {
     try {
-      if (viewMode === "agenda" && canUseAgenda) {
-        const user = auth.user!;
-        const continentCountries = user.country ? getCountriesOnContinent(user.country) : [];
+      if (viewer) playing = await getMemberPlaying(viewer.uid);
+      if (viewMode === "agenda" && viewer) {
         const result = await getAgendaTournaments(
-          user.uid,
-          user.country!,
-          continentCountries,
+          viewer,
           { state: selectedState, includeOnline, format: selectedFormat, rank: selectedRank, search: debouncedSearch },
           page,
           PAGE_SIZE,
@@ -184,6 +185,12 @@
     }
   }
 
+  async function toggleAgenda(t: TournamentListItem) {
+    if (!viewer) return;
+    const failure = await setAgendaEntry(t.uid, agendaToggleEntry(t, viewer, playing));
+    error = failure;
+  }
+
   function formatDate(t: TournamentListItem): string {
     if (!t.start) return "—";
     try {
@@ -211,6 +218,7 @@
     const _vm = viewMode;
     const _p = page;
     const _a = auth.isAuthenticated;
+    const _v = viewer;
     untrack(() => loadTournaments());
   });
 
@@ -452,7 +460,7 @@
 
     {#if tournaments.length > 0}
       <div class="bg-surface-card rounded-lg shadow overflow-hidden border border-line">
-        <div class="hidden sm:grid sm:grid-cols-12 gap-4 px-6 py-3 bg-surface-muted text-sm font-medium text-ink border-b border-line-strong">
+        <div class="hidden sm:grid sm:grid-cols-12 gap-4 px-6 {viewer ? 'pr-[4.75rem]' : ''} py-3 bg-surface-muted text-sm font-medium text-ink border-b border-line-strong">
           <div class="col-span-4">{m.tournaments_col_name()}</div>
           <div class="col-span-2">{m.tournaments_col_date()}</div>
           <div class="col-span-2">{m.tournaments_col_country()}</div>
@@ -467,9 +475,10 @@
                 {m.tournaments_past_divider()}
               </div>
             {/if}
+            <div class="flex items-center hover:bg-surface-muted/50 transition-colors">
             <a
               href="/tournaments/{tournament.uid}"
-              class="block px-6 py-4 hover:bg-surface-muted/50 transition-colors"
+              class="block flex-1 min-w-0 px-6 py-4"
             >
               <div class="sm:hidden space-y-2">
                 <div class="flex items-start justify-between">
@@ -534,6 +543,21 @@
                 </div>
               </div>
             </a>
+            {#if viewer}
+              {@const on = onAgendaUids.has(tournament.uid)}
+              {@const label = on ? m.tournaments_agenda_remove() : m.tournaments_agenda_add()}
+              <button
+                type="button"
+                onclick={() => toggleAgenda(tournament)}
+                disabled={!isBrowserOnline()}
+                title={label}
+                aria-label={label}
+                class="mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-ink-faint hover:bg-surface-hover hover:text-ink-bright disabled:opacity-40"
+              >
+                {#if on}<BookmarkMinus class="w-5 h-5" aria-hidden="true" />{:else}<BookmarkPlus class="w-5 h-5" aria-hidden="true" />{/if}
+              </button>
+            {/if}
+            </div>
           {/each}
         </div>
       </div>

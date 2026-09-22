@@ -750,6 +750,8 @@ _USER_API_WITHHELD = {
     "local_modifications",
     "vekn_prefix",
     "calendar_token",
+    "agenda_hidden",
+    "agenda_added",
 }
 
 _PLAYER_API_VISIBLE = {
@@ -787,7 +789,11 @@ class TestProjectionCompleteness:
             f.name for f in msgspec.structs.fields(Player)
         }
 
-    def test_user_full_withholds_only_calendar_token(self):
+    def test_user_full_withholds_only_owner_columns(self):
         every = {f.name: None for f in msgspec.structs.fields(User)}
         result = compute_full(ObjectType.USER, every)
-        assert set(every) - set(result) == {"calendar_token"}
+        assert set(every) - set(result) == {
+            "calendar_token",
+            "agenda_hidden",
+            "agenda_added",
+        }

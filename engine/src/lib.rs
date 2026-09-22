@@ -2,6 +2,7 @@ pub mod model;
 use crate::model::arg;
 use json::JsonValue;
 
+pub mod agenda;
 pub mod cards;
 pub mod community;
 pub mod deck;
@@ -69,6 +70,30 @@ mod shared {
             .map(JsonValue::from)
             .collect();
         Ok(JsonValue::Array(names).dump())
+    }
+
+    /// One entry per event, in order: whether it sits on the viewer's agenda.
+    pub fn agenda_filter_json(
+        viewer_json: &str,
+        events_json: &str,
+        include_online: bool,
+    ) -> Result<String, EngineError> {
+        let viewer = json::parse(viewer_json)?;
+        let events = json::parse(events_json)?;
+        let on: Vec<JsonValue> = events
+            .members()
+            .map(|e| crate::agenda::on_agenda(&viewer, e, include_online).into())
+            .collect();
+        Ok(JsonValue::Array(on).dump())
+    }
+
+    pub fn agenda_toggle_entry_json(
+        viewer_json: &str,
+        event_json: &str,
+    ) -> Result<String, EngineError> {
+        let entry =
+            crate::agenda::toggle_entry(&json::parse(viewer_json)?, &json::parse(event_json)?);
+        Ok(entry.map_or(JsonValue::Null, JsonValue::from).dump())
     }
 
     pub fn is_official_json(actor_json: &str) -> Result<bool, EngineError> {
@@ -419,6 +444,25 @@ mod wasm {
             is_official_json(actor_json).map_err(|e| e.to_json())
         }
 
+        #[wasm_bindgen(js_name = agendaFilter)]
+        pub fn agenda_filter(
+            &self,
+            viewer_json: &str,
+            events_json: &str,
+            include_online: bool,
+        ) -> Result<String, String> {
+            js_str(agenda_filter_json(viewer_json, events_json, include_online))
+        }
+
+        #[wasm_bindgen(js_name = agendaToggleEntry)]
+        pub fn agenda_toggle_entry(
+            &self,
+            viewer_json: &str,
+            event_json: &str,
+        ) -> Result<String, String> {
+            js_str(agenda_toggle_entry_json(viewer_json, event_json))
+        }
+
         #[wasm_bindgen(js_name = canChangeCountry)]
         pub fn can_change_country(
             &self,
@@ -744,6 +788,15 @@ mod python {
         fn is_official(&self, actor_json: &str) -> PyResult<bool> {
             is_official_json(actor_json)
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_json()))
+        }
+
+        fn agenda_filter(
+            &self,
+            viewer_json: &str,
+            events_json: &str,
+            include_online: bool,
+        ) -> PyResult<String> {
+            py_str(agenda_filter_json(viewer_json, events_json, include_online))
         }
 
         fn can_link_tournament_to_league(

@@ -3,6 +3,7 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid7
 
+import msgspec
 import pytest
 from src import db
 from src.models import (
@@ -15,10 +16,12 @@ from src.models import (
 )
 from src.routes.calendar import (
     FINISHED_WINDOW_DAYS,
-    _matches_agenda,
+    _agenda_filter,
     _tournament_to_vevent,
     tournament_calendar,
 )
+
+from tests.conftest import make_auth_header
 
 NOW = datetime.now(UTC)
 JUNE_15_10AM = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
@@ -53,6 +56,10 @@ def _make_tournament(
         finish=finish,
         **kwargs,
     )
+
+
+def _matches_agenda(t, user_uid, country, continent, online):
+    return _agenda_filter([t], user_uid, country, continent, online, [], []) == [t]
 
 
 class TestMatchesAgenda:
@@ -249,12 +256,12 @@ async def test_calendar_token_preserved_by_unhydrated_writer(test_db):
 
 
 @pytest.mark.asyncio
-async def test_clear_calendar_token(test_db):
-    """clear_calendar_token drops the feed token even though save_object COALESCEs."""
+async def test_clear_owner_columns(test_db):
+    """clear_owner_columns drops the feed token even though save_object COALESCEs."""
     user = _make_user(token="revoke-me")
     await db.save_user(user)
 
-    await db.clear_calendar_token(user.uid)
+    await db.clear_owner_columns(user.uid)
 
     assert await db.get_calendar_token(user.uid) is None
     assert await db.get_user_by_calendar_token("revoke-me") is None
@@ -346,3 +353,43 @@ async def test_personal_feed_keeps_recently_finished_own_events(test_db):
 
     anonymous = await feed(None)
     assert recent_own.uid not in anonymous
+
+
+@pytest.mark.asyncio
+async def test_agenda_overrides_reach_the_owner_and_their_feed_only(test_client):
+    user = msgspec.structs.replace(_make_user(token="agenda-feed"), vekn_id="7000001")
+    await db.save_user(user)
+    own = _make_tournament(
+        uid=str(uuid7()), country="US", organizers_uids=[user.uid], start=NOW
+    )
+    far = _make_tournament(uid=str(uuid7()), country="JP", start=NOW)
+    async with db.get_connection() as conn:
+        for t in (own, far):
+            await db.save_tournament(t, conn=conn)
+
+    headers = make_auth_header(user.uid)
+    for uid, entry in ((own.uid, "hidden"), (far.uid, "added")):
+        resp = await test_client.put(
+            f"/auth/me/agenda/{uid}", json={"entry": entry}, headers=headers
+        )
+        assert resp.status_code == 200
+
+    me = (await test_client.get("/auth/me", headers=headers)).json()["user"]
+    assert me["agenda_hidden"] == [own.uid]
+    assert me["agenda_added"] == [far.uid]
+    async with db.get_connection() as conn:
+        row = await (
+            await conn.execute(
+                'SELECT "full", "member" FROM objects WHERE uid = %s', (user.uid,)
+            )
+        ).fetchone()
+    for projection in row:
+        assert "agenda_hidden" not in projection
+        assert "agenda_added" not in projection
+
+    resp = await tournament_calendar(
+        token="agenda-feed", country=None, online=True, format=None, league=None
+    )
+    feed = resp.body.decode()
+    assert far.uid in feed
+    assert own.uid not in feed

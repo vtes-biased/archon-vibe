@@ -474,12 +474,14 @@ its number while `deleted_at`-filtered lookups disagree, so a seed insert can cr
 on a reserved number. Reachable on steady-state nightly merges, since an admin
 user-delete keeps the `vekn_id`.
 
-**`authState.user` adopts its own sync frame, minus `calendar_token`.** The
+**`authState.user` adopts its own sync frame, minus the owner-only fields.** The
 signed-in user's row arrives over SSE like anyone else's, and every other surface
 reads that synced copy — so auth adopts it wholesale rather than merging field by
-field, and carries `calendar_token` forward because no projection holds it. **A
-second non-projected field on `User` must join that carry-forward** or it is
-wiped the first time the row syncs.
+field, and carries `calendar_token` and the two agenda lists forward because no
+projection holds them, then re-reads `/auth/me` — on **any** bump of the own row,
+a rating recompute or VEKN sync as much as an agenda edit, since only the re-read
+brings in a change made on another device. **A further owner-only field on `User` must join that carry-forward** or
+it is wiped the first time the row syncs.
 
 The adoption is what makes a second writer on a `User` field safe: `PATCH
 /auth/me` replaces the **whole** `community_links` array, so an owner saving from
