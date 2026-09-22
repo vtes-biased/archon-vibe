@@ -386,7 +386,7 @@ that has drifted. A chevron points **right closed
 and down open** everywhere — a rotating one is not an alternative and has no
 exception. `just fold-grammar` ([dev](dev.md#lint-gates)) holds both halves.
 
-Seven surfaces fold outside the shell, for a structural reason and not a visual
+Eight surfaces fold outside the shell, for a structural reason and not a visual
 preference:
 
 - **A list row folds in place** — the whole row is the target and the chevron
@@ -394,7 +394,9 @@ preference:
   would have to throw away: `PlayersTab`'s player card, `PlayerDecksSection`'s
   visible decks, and `CommunityCountryCard`. `RoundsTab`'s round and table headers
   fold this way too because their rows carry sibling action buttons, which cannot
-  nest inside the shell's own button.
+  nest inside the shell's own button, and so does `PlayerRecord`'s events-played
+  row, whose title is the link to the event and opens the deck from a leading
+  chevron.
 - **`ToolsSheet`** — the sheet's grammar is full-bleed menu rows, and a boxed
   section inside it breaks the rhythm the sheet is scanned by.
 - **`FoldableDescription`** — closed, it renders the excerpt instead of hiding the
@@ -531,7 +533,8 @@ and roles are the page's subject, not tab content. Below it:
 - **Profile** — contact details and community links; on the public page also the
   sponsor note and whatever VEKN, NDA and sanction controls the viewer's access
   grants.
-- **Play record** — ratings, then the wins and the decklists. The
+- **Play record** — ratings, then the wins and the events played, each event
+  carrying its decklist rather than a separate deck list. The
   undocumented-decklist nudge sits between them on the viewer's own record,
   by whichever route they reached it: it is actionable by the player alone and
   reads as a reproach on anyone else's page.

@@ -713,6 +713,8 @@ export async function clearAllTournaments(): Promise<void> {
   tournamentIndexPromise = null;
   memberPlayingPromise = null;
   memberPlayingUid = null;
+  playedByPromise = null;
+  playedByUid = null;
 }
 
 export interface TournamentListItem {
@@ -759,6 +761,15 @@ let tournamentIndexPromise: Promise<Map<string, TournamentListItem>> | null = nu
 let memberPlayingPromise: Promise<Set<string>> | null = null;
 let memberPlayingUid: string | null = null;
 
+let playedByPromise: Promise<Map<string, Tournament>> | null = null;
+let playedByUid: string | null = null;
+
+function namesMember(t: Tournament, userUid: string): boolean {
+  return t.winner === userUid
+    || !!t.players?.some(pl => pl.user_uid === userUid)
+    || !!t.standings?.some(s => s.user_uid === userUid);
+}
+
 async function getTournamentIndex(): Promise<Map<string, TournamentListItem>> {
   if (!tournamentIndexPromise) {
     tournamentIndexPromise = (async () => {
@@ -784,6 +795,19 @@ function getMemberPlaying(userUid: string): Promise<Set<string>> {
   return memberPlayingPromise;
 }
 
+/** Candidates only: whether the member actually played, and where they placed, is the caller's reading. */
+export async function getTournamentsNaming(userUid: string): Promise<Tournament[]> {
+  if (!playedByPromise || playedByUid !== userUid) {
+    playedByUid = userUid;
+    playedByPromise = (async () => {
+      const db = await getDB();
+      const all = await db.getAll('tournaments');
+      return new Map(all.filter(t => namesMember(t, userUid)).map(t => [t.uid, t]));
+    })();
+  }
+  return [...(await playedByPromise).values()];
+}
+
 function patchTournamentIndex(t: Tournament): void {
   if (tournamentIndexPromise) void tournamentIndexPromise.then(idx => idx.set(t.uid, projectTournament(t)));
   const uid = memberPlayingUid;
@@ -791,11 +815,17 @@ function patchTournamentIndex(t: Tournament): void {
     const plays = !!t.players?.some(pl => pl.user_uid === uid);
     void memberPlayingPromise.then(set => { if (plays) set.add(t.uid); else set.delete(t.uid); });
   }
+  const viewed = playedByUid;
+  if (viewed && playedByPromise) {
+    const named = namesMember(t, viewed);
+    void playedByPromise.then(map => { if (named) map.set(t.uid, t); else map.delete(t.uid); });
+  }
 }
 
 function dropFromTournamentIndex(uid: string): void {
   if (tournamentIndexPromise) void tournamentIndexPromise.then(idx => idx.delete(uid));
   if (memberPlayingPromise) void memberPlayingPromise.then(set => set.delete(uid));
+  if (playedByPromise) void playedByPromise.then(map => map.delete(uid));
 }
 
 export async function getTournamentListItems(): Promise<TournamentListItem[]> {

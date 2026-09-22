@@ -53,6 +53,9 @@ ALLOW = {
     "frontend/src/routes/tournaments/[uid]/RoundsTab.svelte": (
         "the header row carries sibling action buttons, which cannot nest in the shell's button"
     ),
+    "frontend/src/lib/components/PlayerRecord.svelte": (
+        "the row's title is a link to the event, which cannot nest in the shell's button"
+    ),
     "frontend/src/lib/components/ScoreLegend.svelte": (
         "a native <details>: closed it is an icon, open it floats over the row beside it"
     ),

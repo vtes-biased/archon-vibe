@@ -90,10 +90,12 @@ a trailing 18 months, rating points in finished standings, a rankings page per
 rating category with a country filter, and a Hall of Fame for five wins that
 would have made the TWDA with the winning deck on record
 ([the rule](tournaments.md#configuration)), stated on the page. A member profile
-carries the wins behind the count and their decklists on record — a decklist
-reaches a profile only once its tournament is Finished, and to anyone but its
-owner only once that event published it *and* it names its owner; your own also
-lists the events you won with no decklist attached. The formula and the
+carries the wins behind the count, then every finished event the member played —
+newest first, whatever its age or rating eligibility, with date, country and final
+place — each folding open to its decklist on record. A decklist reaches a profile
+only once its tournament is Finished, and to anyone but its owner only once that
+event published it *and* it names its owner; your own also lists the events you
+won with no decklist attached. The formula and the
 standing warning about vekn.net's stored value are [domain](domain/vekn.md#ratings).
 
 **Live-event surfaces** — shared round timer (online only, one global clock,
