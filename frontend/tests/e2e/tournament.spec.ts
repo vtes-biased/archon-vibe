@@ -205,7 +205,7 @@ test.describe('Tournament lifecycle', () => {
     const winnerBanner = page.locator('.banner-highlight').filter({ hasText: 'Winner' });
     await expect(winnerBanner).toBeVisible({ timeout: 2_000 });
     // Banner shows "Name (vekn_id)" — strip the id to match plain names
-    const winnerName = (await winnerBanner.locator('div').nth(1).innerText())
+    const winnerName = (await winnerBanner.getByRole('link').innerText())
       .replace(/\s*\(\d+\)\s*$/, '')
       .trim();
     expect(state.player_names).toContain(winnerName);
