@@ -152,8 +152,10 @@ two places, and a single wrapping transaction would stamp every row with the sam
 `CURRENT_TIMESTAMP`, which a catch-up cursor's strict `modified_at > since` can
 split across.
 
-The lifespan runs it right after `init_db`, before the app serves — **not** from
-`init_db` itself, which fourteen ops scripts call and which a report-only run
+The lifespan runs it right after `init_db`, before the app serves — the only work
+besides the schema load that may hold a restart, so its guards read through
+`batch_read_connection` rather than risk the 30s request guard on a cold cache.
+**Not** from `init_db` itself, which fourteen ops scripts call and which a report-only run
 must never mutate through. A failure propagates and the process does not serve:
 the rows an entry targets are exactly the ones the running code cannot read, so
 serving half-migrated restores the outage the mechanism removes, unbounded and
@@ -169,8 +171,8 @@ Nothing in the tree records that an entry has run, so its proof is a section in
 [post-deploy](post-deploy.md) and the two die in one commit —
 `just migration-pairing` ([dev](dev.md#lint-gates)) fails on either half
 outliving the other. That death condition is what an entry is for and what keeps
-the per-boot guard queries near zero. `_stamp_missing_event_codes`, which runs
-beside it, is deliberately not an entry: it mints a missing value rather than
+the per-boot guard queries near zero. `_stamp_missing_event_codes`, the boot
+sweep started behind serving, is deliberately not an entry: it mints a missing value rather than
 repairing an unreadable one, nothing breaks while a code is absent, and it has no
 condition under which it would ever be deleted.
 
@@ -990,9 +992,11 @@ fires, since a successful push is what supplies the vekn id the event should car
 (`_maybe_push_vekn_event`). Every other ingress knows its answer at insert and
 stamps inline, go-online included — an event created offline has only the hourly
 batch push ahead of it, and that push stops entirely at the decommission, so it
-mints rather than waits. A row that reaches neither — a restart in between — is swept at
-startup, capped at 100, over which it names `backfill_event_codes.py` rather than
-minting a corpus before the app answers. Uniqueness is a unique index on
+mints rather than waits. A row that reaches neither — a restart in between — is swept
+in the background at boot, capped at 100, over which it names
+`backfill_event_codes.py`. The sweep takes only rows last modified before the
+process started: one created since has its push in flight, and minting first
+would pre-empt the vekn id that push is about to supply. Uniqueness is a unique index on
 `lower(event_code)` spanning soft-deleted rows, so a code is never reissued and a
 mint collision is simply retried.
 
@@ -1073,6 +1077,7 @@ rounds, tables, seating, scores and players, matching players by VEKN ID.
 
 | Job | Schedule | Module |
 |---|---|---|
+| Event-code sweep, Discord Linked Roles registration | once, at startup | `main.py`, `roles_hook` |
 | VEKN sync (members, tournaments) | at startup, then every `VEKN_SYNC_INTERVAL_HOURS` | `vekn_sync.py`, `vekn_tournament_sync.py` |
 | Snapshot rebuild, only if the corpus moved | at startup, then checked every 15 min | `snapshots.py` |
 | OAuth cleanup | hourly | `db_oauth.py` |
@@ -1082,6 +1087,12 @@ rounds, tables, seating, scores and players, matching players by VEKN ID.
 | Promo stock recompute | daily, 02:00 UTC | `promo_stock.py` |
 | Rating recompute (ratings, then Hall of Fame wins) | daily, 02:30 UTC | `ratings.py` |
 | TWDA sync (reconstruction + winner decks) | daily, 05:00 UTC, own flag | `twda_import.py` |
+
+**A restart serves within seconds**: the lifespan awaits only the schema load and
+pending [stored-value migrations](#stored-value-migrations); every "at startup" job
+is a task started behind serving. A job's full-corpus reads — including the member
+sync's co-opted-by inference — go through `batch_read_connection`, since the 30s
+guard fails them on a cold cache.
 
 **Every daily job is a `CronTrigger` at a pinned UTC hour, never an interval** —
 an interval job of a day or more can never fire here

@@ -9,6 +9,7 @@ import time
 import zipfile
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Annotated
 
 import msgspec
@@ -51,6 +52,7 @@ from .models import (
     Role,
     User,
 )
+from .roles_hook import register_metadata
 from .routes import (
     admin,
     auth,
@@ -200,8 +202,6 @@ async def run_vekn_sync() -> None:
 async def run_sanction_cleanup() -> None:
     """Soft-delete sanctions past 18 months, then hard-delete ones soft-deleted
     >30 days ago (scheduled task)."""
-    from datetime import UTC, datetime
-
     try:
         logger.info("Starting sanction cleanup")
 
@@ -317,13 +317,11 @@ async def run_oauth_cleanup() -> None:
 _MAX_EVENT_CODE_STAMPS = 100
 
 
-async def _stamp_missing_event_codes() -> None:
-    """Over the cap this is a corpus that needs `backfill_event_codes.py`, not a
-    startup path minting thousands of codes before the app answers."""
+async def _stamp_missing_event_codes(booted_at: datetime) -> None:
     from .db import ensure_event_code, tournament_uids_without_event_code
 
     try:
-        uids = await tournament_uids_without_event_code()
+        uids = await tournament_uids_without_event_code(booted_at)
         if not uids:
             return
         if len(uids) > _MAX_EVENT_CODE_STAMPS:
@@ -334,7 +332,9 @@ async def _stamp_missing_event_codes() -> None:
             )
             return
         for uid in uids:
-            await ensure_event_code(uid)
+            bd = await ensure_event_code(uid)
+            if bd:
+                broadcast_precomputed(bd)
         logger.info(f"Stamped event codes on {len(uids)} tournaments")
     except Exception:
         logger.exception("Failed to stamp missing event codes")
@@ -359,17 +359,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     _shutdown_event = asyncio.Event()
     _install_fast_shutdown_signals()
+    booted_at = datetime.now(UTC)
     await init_db()
     await run_migrations()
-    await _stamp_missing_event_codes()
 
-    if os.getenv("DISCORD_CLIENTID"):
-        try:
-            from .roles_hook import register_metadata
-
-            await register_metadata()
-        except Exception:
-            logger.exception("Failed to register Discord Linked Roles metadata")
+    asyncio.create_task(_stamp_missing_event_codes(booted_at))
+    asyncio.create_task(register_metadata())
 
     _scheduler = AsyncIOScheduler()
 
@@ -1134,7 +1129,7 @@ async def stream_updates(
 
     level = _viewer_level(stream_user)
 
-    from datetime import UTC, datetime, timedelta
+    from datetime import timedelta
 
     def _parse_ts(ts: str | None) -> datetime | None:
         if not ts:

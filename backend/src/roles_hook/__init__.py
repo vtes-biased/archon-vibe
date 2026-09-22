@@ -73,14 +73,19 @@ async def register_metadata() -> None:
     url = f"{discord_api_base()}/v10/applications/{client_id}/role-connections/metadata"
     headers = {"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"}
 
-    async with http_client.session().put(url, json=METADATA, headers=headers) as resp:
-        if resp.status == 200:
-            logger.info("Discord Linked Roles: metadata registered successfully")
-        else:
-            text = await resp.text()
-            logger.error(
-                f"Discord Linked Roles: metadata registration failed ({resp.status}): {text}"
-            )
+    try:
+        async with http_client.session().put(
+            url, json=METADATA, headers=headers
+        ) as resp:
+            if resp.status == 200:
+                logger.info("Discord Linked Roles: metadata registered successfully")
+            else:
+                text = await resp.text()
+                logger.error(
+                    f"Discord Linked Roles: metadata registration failed ({resp.status}): {text}"
+                )
+    except Exception:
+        logger.exception("Failed to register Discord Linked Roles metadata")
 
 
 async def push_role_metadata(user, access_token: str) -> bool:

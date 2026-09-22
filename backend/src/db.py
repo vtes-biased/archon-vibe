@@ -128,11 +128,11 @@ async def get_connection() -> AsyncIterator[psycopg.AsyncConnection]:
 async def batch_read_connection(
     statement_timeout_ms: int = 120_000,
 ) -> AsyncIterator[psycopg.AsyncConnection]:
-    """Pooled connection with a relaxed statement_timeout for full-corpus batch
-    jobs (snapshot gen, VEKN push) that outlast the 30s request guard.
+    """Pooled connection with a relaxed statement_timeout for batch jobs and boot
+    scans that can outlast the 30s request guard on a cold cache.
 
-    Autocommit pool has no reset hook, so the caller must RESET on release;
-    `SET` can't bind-param, hence the `int()` interpolation.
+    Autocommit pool has no reset hook, hence the RESET on release; `SET` can't
+    bind-param, hence the `int()` interpolation.
     """
     async with get_connection() as conn:
         await conn.execute(f"SET statement_timeout = {int(statement_timeout_ms)}")
@@ -808,7 +808,7 @@ async def is_vekn_id_claimed(vekn_id: str) -> bool:
 
 
 async def get_users_by_vekn_prefix(prefix: str) -> list[User]:
-    async with get_connection() as conn:
+    async with batch_read_connection() as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
             WHERE type = 'user' AND "full"->>'vekn_id' LIKE %s || '%%'""",
@@ -821,7 +821,7 @@ async def get_users_by_vekn_prefix(prefix: str) -> list[User]:
 async def get_users_with_vekn_prefix() -> list[User]:
     """Get all users with a non-empty vekn_prefix (in practice Princes and NCs,
     but the query filters on the prefix alone — no role predicate)."""
-    async with get_connection() as conn:
+    async with batch_read_connection() as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
             WHERE type = 'user'
@@ -833,7 +833,7 @@ async def get_users_with_vekn_prefix() -> list[User]:
 
 
 async def get_users_without_coopted_by() -> list[User]:
-    async with get_connection() as conn:
+    async with batch_read_connection() as conn:
         result = await conn.execute(
             """SELECT "full" FROM objects
             WHERE type = 'user'
@@ -1205,14 +1205,14 @@ async def ensure_event_code(uid: str) -> BroadcastData | None:
         return await save_tournament(fresh, conn=tx_conn)
 
 
-async def tournament_uids_without_event_code() -> list[str]:
-    """Live rows a creation path never got to stamp — a restart between the insert
-    and the push task. Without the sweep they would have no handle at all."""
-    async with get_connection() as conn:
+async def tournament_uids_without_event_code(before: datetime) -> list[str]:
+    async with batch_read_connection() as conn:
         result = await conn.execute(
             """SELECT uid FROM objects
             WHERE type = 'tournament' AND deleted_at IS NULL
-              AND coalesce("full"->>'event_code', '') = ''"""
+              AND coalesce("full"->>'event_code', '') = ''
+              AND modified_at < %s""",
+            (before,),
         )
         return [row[0] for row in await result.fetchall()]
 

@@ -37,7 +37,7 @@ async def run_migrations(*, apply: bool = True) -> dict[str, int]:
     """Rewrite every pending row, entry by entry, and return the counts."""
     counts: dict[str, int] = {}
     for migration in MIGRATIONS:
-        async with db.get_connection() as conn:
+        async with db.batch_read_connection() as conn:
             result = await conn.execute(migration.pending)
             rows = await result.fetchall()
         if not rows:

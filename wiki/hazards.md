@@ -638,7 +638,10 @@ Its [post-deploy](post-deploy.md) section is deleted only once **every**
 long-lived database answers 0 — beta included; prod-only proof strands beta on
 the old values with nothing left in the tree to re-apply. And the row count must
 be bounded, tens to low thousands: a pre-serve migration extends deploy downtime
-by its own runtime, so a corpus-scale rewrite stays a post-deploy script.
+by its own runtime, so a corpus-scale rewrite stays a post-deploy script. It is
+the only thing besides the schema load allowed ahead of serving, and its guard runs
+on the relaxed batch timeout — under the 30s request guard a cold-cache scan
+would fail startup rather than slow it.
 
 **Changing an existing index in the schema file needs an explicit `DROP INDEX IF
 EXISTS` of the old name.** The file is applied at every startup with `CREATE …
