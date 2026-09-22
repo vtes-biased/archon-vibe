@@ -518,7 +518,7 @@ would restate what the sentence already says.
 ## Member profile
 
 Two surfaces show one member: `/profile`, the owner's own, and `/users/[uid]`, the
-public one. A top player's record — four rating categories, wins, decklists — runs
+public one. A top player's record — four rating categories, the events played and their decklists — runs
 about 950px on a phone with the account stack another screen behind it, so both are
 tabbed.
 
@@ -533,9 +533,10 @@ and roles are the page's subject, not tab content. Below it:
 - **Profile** — contact details and community links; on the public page also the
   sponsor note and whatever VEKN, NDA and sanction controls the viewer's access
   grants.
-- **Play record** — ratings, then the wins and the events played, each event
-  carrying its decklist rather than a separate deck list. The
-  undocumented-decklist nudge sits between them on the viewer's own record,
+- **Play record** — ratings, then one list of the events played, wins and finals
+  marked on their rows, each event carrying its decklist rather than a separate
+  wins or deck list. The undocumented-decklist nudge sits between them on the
+  viewer's own record,
   by whichever route they reached it: it is actionable by the player alone and
   reads as a reproach on anyone else's page.
 - **Account** — linked accounts, authorized apps, the member's own playtest NDA

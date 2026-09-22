@@ -6,7 +6,7 @@
   import { getCountryFlag } from "$lib/geonames";
   import { computeStandings, playedPlayerUids } from "$lib/tournament-utils";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
-  import { Trophy, TriangleAlert, ChevronDown, ChevronRight } from "@lucide/svelte";
+  import { Trophy, Medal, TriangleAlert, ChevronDown, ChevronRight } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let { user }: { user: User | undefined } = $props();
@@ -14,13 +14,15 @@
   interface PlayedEvent {
     tournament: Tournament;
     place: number | null;
+    finish: "win" | "final" | null;
     deck: DeckObject | undefined;
   }
 
-  let wins = $state<Tournament[]>([]);
   let events = $state<PlayedEvent[]>([]);
   let undocumented = $state<TournamentListItem[]>([]);
   let expandedDeck = $state<string | null>(null);
+  const winCount = $derived(events.filter(e => e.finish === "win").length);
+  const finalCount = $derived(events.filter(e => e.finish !== null).length);
   let viewedUid: string | undefined;
 
   function day(t: { start: string | null }): string {
@@ -31,16 +33,11 @@
     const entry = computeStandings(t, await getSanctionsForTournament(t.uid)).find(e => e.user_uid === uid);
     const played = t.rounds?.length ? playedPlayerUids(t).has(uid) : !!entry && !entry.unplaced;
     if (!played && !deck && t.winner !== uid) return null;
-    return { tournament: t, place: entry && !entry.unplaced ? entry.rank : null, deck };
+    const finish = t.winner === uid || entry?.finalist_position === 1 ? "win" : entry?.finalist ? "final" : null;
+    return { tournament: t, place: entry && !entry.unplaced ? entry.rank : null, finish, deck };
   }
 
-  async function load(uid: string, winUids: string[], owner: boolean) {
-    const won = await Promise.all(winUids.map(u => getTournament(u)));
-    if (uid !== viewedUid) return;
-    wins = won
-      .filter((t): t is Tournament => !!t)
-      .sort((a, b) => day(b).localeCompare(day(a)));
-
+  async function load(uid: string, owner: boolean) {
     const mine = await getDecksByUser(uid);
     const shown = new Map(mine
       .filter(d => owner || (d.public && (d.attribution.kind !== "Anonymous" || d.winner)))
@@ -73,37 +70,15 @@
 
   $effect(() => {
     const uid = user?.uid;
-    const winUids = user?.wins ?? [];
     viewedUid = uid;
     if (!uid) {
-      wins = [];
       events = [];
       undocumented = [];
       return;
     }
-    load(uid, winUids, getAuthState().user?.uid === uid);
+    load(uid, getAuthState().user?.uid === uid);
   });
 </script>
-
-{#if wins.length}
-  <section class="mt-6">
-    <h2 class="text-lg font-semibold text-ink-bright mb-3">
-      {m.user_detail_wins({ count: String(wins.length) })}
-    </h2>
-    <ul class="bg-surface-card border border-line rounded-lg divide-y divide-line">
-      {#each wins as t}
-        <li class="px-4 py-2 text-sm flex items-baseline gap-2">
-          <Trophy class="w-3.5 h-3.5 shrink-0 text-highlight self-center" aria-hidden="true" />
-          <a href="/tournaments/{t.uid}" class="text-ink-strong hover:text-link">{t.name}</a>
-          <span class="text-xs text-ink-faint ml-auto whitespace-nowrap">
-            {#if t.country}{getCountryFlag(t.country)}{/if}
-            {day(t)}
-          </span>
-        </li>
-      {/each}
-    </ul>
-  </section>
-{/if}
 
 {#if undocumented.length}
   <section class="mt-6 rounded-lg border border-accent-strong/50 bg-accent-soft/30 p-4 space-y-2">
@@ -124,11 +99,14 @@
 
 {#if events.length}
   <section class="mt-6">
-    <h2 class="text-lg font-semibold text-ink-bright mb-3">
+    <h2 class="text-lg font-semibold text-ink-bright">
       {m.user_detail_events({ count: String(events.length) })}
     </h2>
+    <p class="text-sm text-ink-muted mb-3">
+      {m.user_detail_events_summary({ wins: String(winCount), finals: String(finalCount) })}
+    </p>
     <ul class="bg-surface-card border border-line rounded-lg divide-y divide-line">
-      {#each events as { tournament: t, place, deck } (t.uid)}
+      {#each events as { tournament: t, place, finish, deck } (t.uid)}
         {@const open = !!deck && expandedDeck === deck.uid}
         <li class="px-4 py-2 text-sm">
           <div class="flex items-center gap-2">
@@ -143,8 +121,12 @@
                 {#if open}<ChevronDown class="w-4 h-4" aria-hidden="true" />{:else}<ChevronRight class="w-4 h-4" aria-hidden="true" />{/if}
               </button>
             {/if}
-            {#if t.winner === user?.uid}
+            {#if finish === "win"}
               <Trophy class="w-3.5 h-3.5 shrink-0 text-highlight" aria-hidden="true" />
+              <span class="sr-only">{m.tournament_winner()}</span>
+            {:else if finish === "final"}
+              <Medal class="w-3.5 h-3.5 shrink-0 text-ink-muted" aria-hidden="true" />
+              <span class="sr-only">{m.tournament_finalist()}</span>
             {/if}
             <a href="/tournaments/{t.uid}" class="min-w-0 text-ink-strong hover:text-link">{t.name}</a>
             <span class="text-xs text-ink-faint ml-auto whitespace-nowrap">
