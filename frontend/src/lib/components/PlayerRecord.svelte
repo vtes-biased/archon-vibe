@@ -103,14 +103,18 @@
     <h2 class="text-lg font-semibold text-ink-bright">
       {m.user_detail_events({ count: String(events.length) })}
     </h2>
-    <p class="text-sm text-ink-muted mb-3">
-      {m.user_detail_events_summary({ wins: String(winCount), hof: String(hofWins.size), finals: String(finalCount) })}
+    <p class="text-sm text-ink-muted mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span class="whitespace-nowrap">{m.user_detail_wins_count({ count: String(winCount) })}</span>
+      {#if hofWins.size}
+        <span class="whitespace-nowrap text-[10px] px-1 py-0.5 rounded badge-highlight">{m.user_detail_hof_count({ count: String(hofWins.size) })}</span>
+      {/if}
+      <span class="whitespace-nowrap">{m.user_detail_finals_count({ count: String(finalCount) })}</span>
     </p>
     <ul class="bg-surface-card border border-line rounded-lg divide-y divide-line">
       {#each events as { tournament: t, place, finalist, deck } (t.uid)}
         {@const open = !!deck && expandedDeck === deck.uid}
         <li class="px-4 py-2 text-sm">
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-x-2">
             {#if deck}
               <button
                 type="button"
