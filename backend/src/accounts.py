@@ -14,6 +14,8 @@ from .db import (
     BroadcastData,
     clear_owner_columns,
     decode_json,
+    delete_avatar,
+    delete_transient_token,
     encode_json,
     get_agenda,
     get_calendar_token,
@@ -21,10 +23,17 @@ from .db import (
     get_sanctions_for_user,
     get_user_by_uid,
     remap_nda_user,
+    save_object,
     save_object_from_model,
     save_sanction,
     save_user,
     soft_delete_user,
+    tournament_transaction,
+)
+from .db_oauth import (
+    delete_oauth_consent,
+    get_oauth_consents_by_user,
+    revoke_oauth_tokens_for_user_client,
 )
 from .models import AuthMethod, DeckObject, ObjectType, SanctionLevel, User
 from .ratings import recompute_wins
@@ -126,6 +135,8 @@ async def merge_users(
             "Cannot merge an account that holds a VEKN ID — VEKN identities are "
             "immovable and are never merged away (keep the VEKN account as the survivor)"
         )
+    if keep_user.anonymized_at:
+        raise ValueError("Cannot merge into an anonymized member")
 
     # calendar_token lives outside "full", read explicitly; prefer the
     # claiming account's feed, like the contact fields below.
@@ -298,3 +309,98 @@ async def detach_user_from_vekn(
     vekn_bd = await save_user(vekn_record)
 
     return personal, vekn_record, [personal_bd, vekn_bd]
+
+
+ANONYMIZED_NAME = "Anonymized member"
+ANONYMIZED_FIELDS = frozenset(
+    {
+        "name",
+        "nickname",
+        "city",
+        "city_geoname_id",
+        "state",
+        "avatar_path",
+        "contact_email",
+        "contact_discord",
+        "discord_id",
+        "contact_phone",
+        "phone_is_whatsapp",
+        "github_login",
+        "github_id",
+        "community_links",
+    }
+)
+
+
+async def _scrub_tournament_copies(user_uid: str) -> list[BroadcastData]:
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT uid FROM objects WHERE type = 'tournament' AND (
+                "full"->'players' @> jsonb_build_array(jsonb_build_object('user_uid', %(u)s::text))
+                OR "full"->'announcements'
+                    @> jsonb_build_array(jsonb_build_object('author_uid', %(u)s::text))
+            )""",
+            {"u": user_uid},
+        )
+        uids = [row[0] for row in await result.fetchall()]
+    broadcasts = []
+    for uid in uids:
+        async with tournament_transaction(uid) as (tournament, tx_conn):
+            if tournament is None:
+                continue
+            changed = False
+            for player in tournament.players:
+                if player.user_uid == user_uid and player.display_name:
+                    player.display_name = None
+                    changed = True
+            for announcement in tournament.announcements:
+                if (
+                    announcement.author_uid == user_uid
+                    and announcement.author_name != ANONYMIZED_NAME
+                ):
+                    announcement.author_name = ANONYMIZED_NAME
+                    changed = True
+            if not changed:
+                continue
+            tournament.modified = datetime.now(UTC)
+            broadcasts.append(
+                await save_object(
+                    ObjectType.TOURNAMENT,
+                    tournament.uid,
+                    msgspec.to_builtins(tournament),
+                    conn=tx_conn,
+                )
+            )
+    return broadcasts
+
+
+async def anonymize_user(user: User, by_uid: str) -> tuple[User, list[BroadcastData]]:
+    """The user row is saved last: until it carries anonymized_at
+    nothing is marked done, so a failure midway is retried whole."""
+    async with get_connection() as conn:
+        async with conn.transaction():
+            await conn.execute(
+                "DELETE FROM auth_methods WHERE data->>'user_uid' = %s", (user.uid,)
+            )
+            await conn.execute(
+                "DELETE FROM push_subscriptions WHERE user_uid = %s", (user.uid,)
+            )
+    for consent in await get_oauth_consents_by_user(user.uid):
+        await revoke_oauth_tokens_for_user_client(user.uid, consent.client_id)
+        await delete_oauth_consent(user.uid, consent.client_id)
+    await delete_transient_token(f"discord_rc:{user.uid}")
+    await delete_avatar(user.uid)
+    await clear_owner_columns(user.uid)
+    broadcasts = await _scrub_tournament_copies(user.uid)
+
+    now = datetime.now(UTC)
+    anonymized = msgspec.structs.replace(
+        user,
+        modified=now,
+        anonymized_at=now,
+        anonymized_by_uid=by_uid,
+        local_modifications=user.local_modifications | ANONYMIZED_FIELDS,
+        **(_defaults(ANONYMIZED_FIELDS) | {"name": ANONYMIZED_NAME}),
+    )
+    broadcasts.append(await save_user(anonymized))
+    return anonymized, broadcasts

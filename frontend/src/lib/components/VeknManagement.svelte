@@ -1,9 +1,9 @@
 <script lang="ts">
   import type { User } from "$lib/types";
   import type { UserListItem } from "$lib/db";
-  import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased, deleteMember } from "$lib/api";
+  import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased, deleteMember, anonymizeMember } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2, Trash2, TriangleAlert, ArrowLeftRight } from "@lucide/svelte";
+  import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2, Trash2, TriangleAlert, ArrowLeftRight, EyeOff } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import UserPicker from '$lib/components/UserPicker.svelte';
   import Badge from '$lib/components/Badge.svelte';
@@ -17,6 +17,7 @@
     canMarkDeceased = false,
     canDelete = false,
     canMerge = false,
+    canAnonymize = false,
     // Cross-country official: sponsoring is allowed anywhere, but link/
     // delete/abandon stay country-scoped — render only the Sponsor action.
     sponsorOnly = false,
@@ -27,10 +28,12 @@
     canMarkDeceased?: boolean;
     canDelete?: boolean;
     canMerge?: boolean;
+    canAnonymize?: boolean;
     sponsorOnly?: boolean;
   } = $props();
 
   const isDeceased = $derived(!!user.deceased_at);
+  const isAnonymized = $derived(!!user.anonymized_at);
 
   const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
   // Strict false: undefined means the viewer's projection omits the field
@@ -43,6 +46,7 @@
   let showForceAbandonConfirm = $state(false);
   let showMergeModal = $state(false);
   let showDeleteConfirm = $state(false);
+  let showAnonymizeConfirm = $state(false);
   let linkVeknIdInput = $state("");
   let mergeTarget = $state<UserListItem | null>(null);
   let processingAction = $state(false);
@@ -134,6 +138,20 @@
     }
   }
 
+  async function handleAnonymize() {
+    processingAction = true;
+    try {
+      const updated = await anonymizeMember(user.uid);
+      showToast({ type: "success", message: m.member_anonymized_toast() });
+      showAnonymizeConfirm = false;
+      onaction(updated);
+    } catch {
+      // Error toast shown by apiRequest
+    } finally {
+      processingAction = false;
+    }
+  }
+
   async function handleMerge() {
     if (!mergeKeep || !mergeDrop || mergeBlocked) return;
     // Read before the reset below clears what these derive from.
@@ -198,7 +216,7 @@
           {m.vekn_force_abandon()}
         </Button>
       {/if}
-      {#if canMerge}
+      {#if canMerge && !isAnonymized}
         <Button variant="secondary" size="md" onclick={() => { mergeTarget = null; showMergeModal = true; }} title={m.vekn_merge_modal_title()}>
           <GitMerge class="inline w-3.5 h-3.5 mr-1" />
           {m.vekn_merge()}
@@ -222,6 +240,23 @@
           <Button variant="secondary" size="md" class="shrink-0" disabled={processingAction} onclick={handleDeceased}>
             {#if !isDeceased}<Flower2 class="w-3.5 h-3.5" aria-hidden="true" />{/if}
             {isDeceased ? m.deceased_clear() : m.deceased_mark()}
+          </Button>
+        {/if}
+      </div>
+    {/if}
+
+    {#if isAnonymized || (user.vekn_id && canAnonymize)}
+      <div class="mt-3 pt-3 border-t border-line flex items-center justify-between gap-2">
+        {#if isAnonymized}
+          <span class="text-sm text-ink inline-flex items-center gap-1.5">
+            <EyeOff class="w-4 h-4 text-ink-muted" aria-hidden="true" />
+            {m.member_anonymized_status()}
+          </span>
+        {:else}
+          <span></span>
+          <Button variant="danger" size="md" class="shrink-0" disabled={processingAction} onclick={() => (showAnonymizeConfirm = true)}>
+            <EyeOff class="w-3.5 h-3.5" aria-hidden="true" />
+            {m.member_anonymize()}
           </Button>
         {/if}
       </div>
@@ -461,6 +496,45 @@
           </Button>
         </div>
       </form>
+    </div>
+  </div>
+{/if}
+
+{#if showAnonymizeConfirm}
+  <div
+    role="presentation"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    onclick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) showAnonymizeConfirm = false; }}
+  >
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="anonymize-modal-title"
+      tabindex="-1"
+      use:focusOnMount
+      onkeydown={(e) => e.key === 'Escape' && (showAnonymizeConfirm = false)}
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
+    >
+      <div class="p-6 border-b border-line">
+        <h2 id="anonymize-modal-title" class="text-xl font-medium text-link">{m.member_anonymize_modal_title()}</h2>
+      </div>
+      <div class="p-6">
+        <p class="text-ink mb-4">
+          {m.member_anonymize_confirm({ name: user.name })}
+        </p>
+        <p class="text-sm text-link mb-6">
+          {m.member_anonymize_warning()}
+        </p>
+        <div class="flex gap-2">
+          <Button variant="danger" size="lg" class="flex-1" loading={processingAction} onclick={handleAnonymize}>
+            <EyeOff class="w-4 h-4" aria-hidden="true" />
+            {m.member_anonymize()}
+          </Button>
+          <Button variant="secondary" size="lg" disabled={processingAction} onclick={() => (showAnonymizeConfirm = false)}>
+            {m.common_cancel()}
+          </Button>
+        </div>
+      </div>
     </div>
   </div>
 {/if}

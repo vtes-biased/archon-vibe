@@ -692,7 +692,10 @@ async def _resolve_user_from_token(token: str | None) -> User | None:
             return None
         from .db import get_user_by_uid
 
-        return await get_user_by_uid(user_uid)
+        user = await get_user_by_uid(user_uid)
+        if not user or user.deleted_at or user.anonymized_at:
+            return None
+        return user
     except Exception:
         return None
 

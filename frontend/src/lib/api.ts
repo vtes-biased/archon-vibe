@@ -200,6 +200,11 @@ export async function setMemberDeceased(uid: string, deceased: boolean): Promise
   );
 }
 
+/** Irreversibly wipe a VEKN member's identity (IC only). */
+export async function anonymizeMember(uid: string): Promise<User> {
+  return apiRequest<User>(`/api/users/${uid}/anonymize`, { method: 'POST' });
+}
+
 /** Soft-delete a VEKN-less member (IC only). Returns the soft-deleted user. */
 export async function deleteMember(uid: string): Promise<User> {
   return apiRequest<User>(`/api/users/${uid}`, { method: 'DELETE' });

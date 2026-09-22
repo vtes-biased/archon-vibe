@@ -750,6 +750,8 @@ _USER_API_WITHHELD = {
     "coopted_at",
     "deceased_at",
     "deceased_by_uid",
+    "anonymized_at",
+    "anonymized_by_uid",
     "vekn_synced",
     "vekn_synced_at",
     "local_modifications",

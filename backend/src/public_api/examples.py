@@ -705,6 +705,7 @@ STREAM_PARTICIPANT = {
     "avatar_path": None,
     "discord_id": None,
     "deceased_at": None,
+    "anonymized_at": None,
     "vekn_prefix": None,
     "constructed_online": None,
     "constructed_offline": None,

@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from .. import community_links, permissions
+from .. import accounts, community_links, permissions
 from ..broadcast import broadcast_precomputed, broadcast_resync
 from ..db import (
     allocate_next_vekn_id,
@@ -177,6 +177,10 @@ async def update_user(
         field is not None
         for field in (name, country, city, city_geoname_id, state, nickname)
     )
+    if edits_profile and user.anonymized_at:
+        raise HTTPException(
+            status_code=400, detail="An anonymized member's profile cannot be edited"
+        )
     if not permissions.can_edit_user(current_user, user) and (
         edits_profile or roles is None
     ):
@@ -536,6 +540,34 @@ async def set_deceased(
     bd = await db_save_user(target)
     broadcast_precomputed(bd)
     return Response(content=encoder.encode(target), media_type="application/json")
+
+
+@router.post("/{uid}/anonymize")
+async def anonymize_member(uid: str, current_user: CurrentUser) -> Response:
+    if current_user.uid == uid:
+        raise HTTPException(
+            status_code=403, detail="You cannot anonymize your own account"
+        )
+
+    if not permissions.can_anonymize_member(current_user):
+        raise HTTPException(status_code=403, detail="Only IC can anonymize members")
+
+    target = await get_user_by_uid(uid)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not target.vekn_id:
+        raise HTTPException(
+            status_code=400,
+            detail="VEKN-less members cannot be anonymized; delete them instead",
+        )
+    if target.anonymized_at:
+        raise HTTPException(status_code=400, detail="Member is already anonymized")
+
+    user, broadcasts = await accounts.anonymize_user(target, current_user.uid)
+    for bd in broadcasts:
+        broadcast_precomputed(bd)
+    return Response(content=encoder.encode(user), media_type="application/json")
 
 
 @router.delete("/{uid}")

@@ -119,6 +119,11 @@ def can_delete_member(actor: User) -> bool:
     return _check("delete_member", actor)
 
 
+def can_anonymize_member(actor: User) -> bool:
+    """Wipe a member's identity. The target-must-hold-a-VEKN-id rule is at the route."""
+    return _check("anonymize_member", actor)
+
+
 def can_moderate_link(actor: User, link_country: str | None) -> bool:
     """Hide or clear a community link, scoped to the country the link serves
     (self-moderation included)."""

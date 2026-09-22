@@ -50,9 +50,9 @@ _USER_LINKS_ONLY_FIELDS = {
 _USER_MEMBER_FIELDS = (
     _USER_PUBLIC_FIELDS
     | {"vekn_id", "city", "city_geoname_id", "state", "nickname", "avatar_path"}
-    # In-memoriam marker — members see the flag/date (not deceased_by_uid, which
-    # is administrative and stays full-only).
-    | {"deceased_at"}
+    # Status markers — members see the date, not the *_by_uid attribution,
+    # which is administrative and stays full-only.
+    | {"deceased_at", "anonymized_at"}
     # Not contact info: the bot's judges-channel sync maps organizers through
     # this id, and organizers need no NC/Prince role.
     | {"discord_id"}

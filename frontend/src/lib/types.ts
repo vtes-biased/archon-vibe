@@ -114,6 +114,8 @@ export interface User extends BaseObject {
   // history/ratings preserved. Member projection carries deceased_at only.
   deceased_at?: string | null;
   deceased_by_uid?: string | null; // full projection only
+  anonymized_at?: string | null;
+  anonymized_by_uid?: string | null; // full projection only
 
   vekn_synced?: boolean;
   vekn_synced_at?: string | null;

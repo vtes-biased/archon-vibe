@@ -349,6 +349,12 @@ class User(BaseObject, kw_only=True):
     ] = None
     deceased_by_uid: str | None = None  # audit only; full projection only
 
+    anonymized_at: Annotated[
+        datetime | None,
+        msgspec.Meta(description="UTC instant the member's identity was wiped."),
+    ] = None
+    anonymized_by_uid: str | None = None  # audit only; full projection only
+
     vekn_synced: bool = False
     vekn_synced_at: Annotated[
         datetime | None, msgspec.Meta(description="UTC instant of the last VEKN sync.")

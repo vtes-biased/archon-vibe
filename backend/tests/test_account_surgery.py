@@ -498,6 +498,8 @@ _SPLIT_SHARED = {
     "state",
     "deceased_at",
     "deceased_by_uid",
+    "anonymized_at",
+    "anonymized_by_uid",
 }
 
 
@@ -511,3 +513,4 @@ def test_every_user_field_is_classified_by_the_split():
     classified = set().union(*groups)
     assert classified == {f.name for f in msgspec.structs.fields(User)}
     assert len(classified) == sum(len(g) for g in groups)
+    assert accounts.PERSONAL_FIELDS <= accounts.ANONYMIZED_FIELDS

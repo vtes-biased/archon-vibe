@@ -122,9 +122,8 @@ async def get_current_user(
         ) from err
 
     user = await get_user_by_uid(user_uid)
-    # deleted_at is set only by soft_delete_user (delete/merge) — this is the
-    # single resolution point every first-party handler funnels through.
-    if not user or user.deleted_at:
+    # This is the single resolution point every first-party handler funnels through.
+    if not user or user.deleted_at or user.anonymized_at:
         raise HTTPException(status_code=401, detail="User not found")
 
     return user

@@ -444,6 +444,11 @@ export function canDeleteMember(actor: UserContext | null): PermissionResult {
   return checkPermission('delete_member', actor);
 }
 
+/** The target-must-hold-a-VEKN-id rule is enforced by the route, not here. */
+export function canAnonymizeMember(actor: UserContext | null): PermissionResult {
+  return checkPermission('anonymize_member', actor);
+}
+
 /** Scoped to the country the link serves, which need not be its owner's. */
 export function canModerateLink(
   actor: UserContext | null,

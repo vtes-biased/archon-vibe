@@ -123,7 +123,9 @@ The scans that stay, each deliberate:
 - **Once per boot**: the migration guards and `_stamp_missing_event_codes`.
 - **Small partitions**: `league` and `promo` rows, read whole through
   `idx_objects_type`.
-- **Rare official actions**: `count_promo_references` on an IC deleting a promo.
+- **Rare official actions**: `count_promo_references` on an IC deleting a promo,
+  and the anonymize sweep for tournaments naming the member as player or
+  announcement author.
 - **Public API list filters** and `/v1/community-links`: they walk the `(type,
   uid)` stream order and stop at the page size, so only a filter matching almost
   nothing reads the whole type.
@@ -1042,6 +1044,25 @@ to VEKN, and tracked in `local_modifications` to block a VEKN-sync overwrite.
 
 **Delete member.** `DELETE /api/users/{uid}`, IC-only, soft-deletes a
 VEKN-**less** account — the mirror of deceased, which targets VEKN-bearing ones.
+
+**Anonymize member.** `POST /api/users/{uid}/anonymize`, IC-only, requires a
+`vekn_id`, irreversible and never pushed to VEKN. `accounts.ANONYMIZED_FIELDS` is
+reset to defaults — name, nickname, contact, city, avatar, GitHub and community
+links — with `name` set to the literal `"Anonymized member"`, so every surface that
+reads `user.name` (lists, standings, decklists, the TWDA header, the bot) needs no
+branch of its own. Those fields are pinned in `local_modifications` against the
+VEKN member sync and the legacy merge, and `anonymized_at`/`anonymized_by_uid`
+stamp it. Auth methods, push subscriptions, OAuth tokens and consents, the Linked
+Roles token, the avatar bytes and the owner columns are deleted; the member's
+Discord `display_name` and their `author_name` on announcements are scrubbed from
+every tournament. The record is not soft-deleted, since the next sync would
+recreate it with its PII. `anonymized_at` is refused wherever `deleted_at` is — token
+minting, `/auth/refresh`, `get_current_user`, the `/stream` token — so live
+sessions die at their next request; profile edits and a merge into it are refused,
+and the hourly member push skips it. Results, ratings, wins, sanctions, NDA records
+and past TWDA archive credits stay attached. What was already sent — Discord posts,
+TWDA pull requests, a passkey's display name on the member's authenticator — is out
+of reach, and a connected bot keeps the old name until it reconnects.
 
 **Immovable-uid invariant**: a uid carrying a `vekn_id` is never re-keyed and
 never soft-deleted. Everything keyed to it — sanctions, decks, tournament results,

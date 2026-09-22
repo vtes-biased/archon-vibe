@@ -173,6 +173,7 @@ pub enum Capability {
     SponsorMember,
     EditMemberProfile,
     DeleteMember,
+    AnonymizeMember,
     MarkDeceased,
     ManageVekn,
     ListNonMember,
@@ -272,6 +273,16 @@ pub const CAPABILITIES: &[Rule] = &[
         self_service: false,
         organizer: false,
         deny: "Only IC can delete members",
+        deny_scope: None,
+    },
+    Rule {
+        capability: Capability::AnonymizeMember,
+        name: "anonymize_member",
+        global: &[IC],
+        same_country: &[],
+        self_service: false,
+        organizer: false,
+        deny: "Only IC can anonymize members",
         deny_scope: None,
     },
     Rule {
@@ -1111,6 +1122,13 @@ mod tests {
             &ctx(vec![Prince], Some("FR")),
             Some("FR")
         ));
+    }
+
+    #[test]
+    fn test_anonymize_member_is_ic_only() {
+        let cap = Capability::AnonymizeMember;
+        assert!(over_country(cap, &ctx(vec![IC], None), Some("FR")));
+        assert!(!over_country(cap, &ctx(vec![NC], Some("FR")), Some("FR")));
     }
 
     #[test]

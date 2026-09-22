@@ -450,6 +450,8 @@ async def batch_push(client: VEKNAPIClient) -> dict:
 
         for row in rows:
             u = decode_json(row[0], User)
+            if u.anonymized_at:
+                continue
             try:
                 if await push_member(client, u):
                     stats["members_pushed"] += 1

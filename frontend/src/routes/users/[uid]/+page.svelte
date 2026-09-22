@@ -4,7 +4,7 @@
   import { getUser } from "$lib/db";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canEditUser, canManageVekn, canMarkDeceased, canDeleteMember, canSponsorMember, canMergeAccounts, canIssueRestrictedSanction, canManageNda } from "$lib/engine";
+  import { canEditUser, canManageVekn, canMarkDeceased, canDeleteMember, canAnonymizeMember, canSponsorMember, canMergeAccounts, canIssueRestrictedSanction, canManageNda } from "$lib/engine";
   import type { User } from "$lib/types";
   import { getNdaStatus, type NdaStatus } from "$lib/api";
   import UserComponent from "$lib/components/User.svelte";
@@ -57,7 +57,7 @@
   const auth = $derived(getAuthState());
 
   const canEdit = $derived.by(() => {
-    if (!auth.user || !user) return false;
+    if (!auth.user || !user || user.anonymized_at) return false;
     try {
       return canEditUser(auth.user, user).allowed;
     } catch {
@@ -91,6 +91,16 @@
     if (auth.user.uid === user.uid) return false;
     try {
       return canDeleteMember(auth.user).allowed;
+    } catch {
+      return false;
+    }
+  });
+
+  const canAnonymize = $derived.by(() => {
+    if (!auth.user || !user || !isOnline) return false;
+    if (auth.user.uid === user.uid) return false;
+    try {
+      return canAnonymizeMember(auth.user).allowed;
     } catch {
       return false;
     }
@@ -264,7 +274,7 @@
 
       {#if canManage || sponsorOnly}
         <div class="mt-6">
-          <VeknManagement {user} {sponsorOnly} {canMerge} onaction={handleUserUpdated} ondelete={handleMemberDeleted} canMarkDeceased={canManageDeceased} canDelete={canDelete} />
+          <VeknManagement {user} {sponsorOnly} {canMerge} onaction={handleUserUpdated} ondelete={handleMemberDeleted} canMarkDeceased={canManageDeceased} canDelete={canDelete} {canAnonymize} />
         </div>
       {/if}
 

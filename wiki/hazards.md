@@ -10,9 +10,9 @@ documented; this page carries the cross-cutting ones and indexes the rest.
 ## Fields silently dropped
 
 **A hand-rebuilt `User` or `Sanction` drops every field its author did not
-enumerate** — prefer `msgspec.structs.replace`. Eight sites carry a field list of
+enumerate** — prefer `msgspec.structs.replace`. Nine sites carry a field list of
 their own: go-online's server-wins re-pull, the detach split's two clear-lists,
-the member projection denylist, the api projection's three (a User allowlist and
+the anonymize wipe, the member projection denylist, the api projection's three (a User allowlist and
 a Tournament and a Player denylist), `/action`'s copy into `event_data` and the
 tournament config set. Each derives what it can from the model it mirrors and
 asserts the judgement that remains exhaustive against the struct, so a new field

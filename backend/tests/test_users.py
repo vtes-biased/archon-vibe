@@ -358,3 +358,102 @@ async def test_delete_member(test_db, test_client: AsyncClient):
     assert resp.status_code == 200
     deleted = await db.get_user_by_uid(junk.uid)
     assert deleted is not None and deleted.deleted_at is not None
+
+
+@pytest.mark.asyncio
+async def test_anonymize_member(test_db, test_client: AsyncClient):
+    """The wipe must reach every copy of the name, end the sign-in, and survive
+    the next VEKN member sync — the record keeps its uid and VEKN id."""
+    from src.accounts import ANONYMIZED_NAME
+    from src.models import Announcement, AuthMethod, AuthMethodType, Player, Tournament
+    from src.routes.auth import create_refresh_token
+    from src.vekn_sync import VEKNSyncService
+
+    from tests.conftest import seed_tournament
+
+    ic = await _mk_user("US", [Role.IC], vekn="4000011")
+    member = User(
+        uid=str(uuid7()),
+        modified=datetime.now(UTC),
+        name="Real Name",
+        nickname="Nick",
+        country="FR",
+        city="Paris",
+        vekn_id="4000012",
+        contact_email="real@example.com",
+        local_modifications=set(),
+    )
+    await db.save_user(member)
+    await db.insert_auth_method(
+        AuthMethod(
+            uid=str(uuid7()),
+            modified=datetime.now(UTC),
+            user_uid=member.uid,
+            method_type=AuthMethodType.EMAIL,
+            identifier="real@example.com",
+            credential_hash="hash",
+            verified=True,
+        )
+    )
+    await seed_tournament(
+        Tournament(
+            uid="trn-anon",
+            modified=datetime.now(UTC),
+            name="Cup",
+            players=[Player(user_uid=member.uid, display_name="Discord Nick")],
+            announcements=[
+                Announcement(
+                    id="a1",
+                    body="hi",
+                    created_at=datetime.now(UTC),
+                    author_uid=member.uid,
+                    author_name="Real Name",
+                )
+            ],
+        )
+    )
+    refresh = create_refresh_token(member.uid)
+    try:
+        resp = await test_client.post(
+            f"/api/users/{member.uid}/anonymize",
+            headers=make_auth_header(member.uid),
+        )
+        assert resp.status_code == 403
+
+        resp = await test_client.post(
+            f"/api/users/{member.uid}/anonymize", headers=make_auth_header(ic.uid)
+        )
+        assert resp.status_code == 200
+
+        stored = await db.get_user_by_uid(member.uid)
+        assert stored.name == ANONYMIZED_NAME
+        assert (stored.nickname, stored.city, stored.contact_email) == (None,) * 3
+        assert (stored.vekn_id, stored.country) == ("4000012", "FR")
+        assert stored.anonymized_at is not None
+        assert await db.get_auth_methods_for_user(member.uid) == []
+
+        t = await db.get_tournament_by_uid("trn-anon")
+        assert t.players[0].display_name is None
+        assert t.announcements[0].author_name == ANONYMIZED_NAME
+
+        resp = await test_client.post("/auth/refresh", json={"refresh_token": refresh})
+        assert resp.status_code == 401
+
+        await VEKNSyncService().sync_player(
+            {
+                "veknid": 4000012,
+                "firstname": "Real",
+                "lastname": "Name",
+                "city": "Paris",
+            }
+        )
+        resynced = await db.get_user_by_uid(member.uid)
+        assert (resynced.name, resynced.city) == (ANONYMIZED_NAME, None)
+
+        resp = await test_client.post(
+            f"/api/users/{member.uid}/anonymize", headers=make_auth_header(ic.uid)
+        )
+        assert resp.status_code == 400
+    finally:
+        async with db.get_connection() as conn:
+            await conn.execute("DELETE FROM objects WHERE uid = 'trn-anon'")

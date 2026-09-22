@@ -50,7 +50,9 @@ Sheriff, Rulemonger, Ethics, PTC, Playtester, DEV), playtest NDA click-to-sign
 with sealed-PDF records gating the PT role and retrievable by the member from
 their own Account tab, IC-only account merge, cooptation tracking,
 privacy-filtered directory of VEKN members (non-members only to the officials
-of their country, [access](access.md)), in-memoriam flag for deceased members.
+of their country, [access](access.md)), in-memoriam flag for deceased members,
+IC-only irreversible anonymization of a VEKN member, who then reads "Anonymized
+member" wherever a name appears.
 
 **Tournaments** — full config, the Planned→Registration→Waiting→Playing→Finished
 state machine with reopen, registration and check-in, simulated-annealing seating
