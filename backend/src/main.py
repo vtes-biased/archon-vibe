@@ -25,6 +25,7 @@ from .broadcast import (
     _sse_connections,
     _wake_sse_connections,
     broadcast_precomputed,
+    deck_org_uids,
     encoder,
 )
 from .db import (
@@ -1071,28 +1072,35 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
 
         rows = await (
             await db_conn.execute(
-                "SELECT uid, \"full\"::text FROM objects WHERE type = 'tournament' "
+                'SELECT uid, "full"::text, "full"->>\'state\' FROM objects '
+                "WHERE type = 'tournament' "
                 "AND (\"full\"->'organizers_uids') @> %s::jsonb AND deleted_at IS NULL",
                 (msgspec.json.encode([viewer.uid]).decode(),),
             )
         ).fetchall()
         if rows:
-            t_uids = [r[0] for r in rows]
+            t_state = {r[0]: r[2] for r in rows}
             frames.extend(_sse_object_lines("tournaments", [r[1] for r in rows]))
             count += len(rows)
 
-            placeholders = ", ".join(["%s"] * len(t_uids))
+            placeholders = ", ".join(["%s"] * len(t_state))
             deck_rows = await (
                 await db_conn.execute(
-                    f"SELECT \"full\"::text FROM objects WHERE type = 'deck' "  # ty: ignore[invalid-argument-type]
+                    f'SELECT "full"::text, "full"->>\'tournament_uid\', '  # ty: ignore[invalid-argument-type]
+                    f"(\"full\"->>'private')::boolean FROM objects WHERE type = 'deck' "
                     f"AND \"full\"->>'tournament_uid' IN ({placeholders}) "
                     f"AND deleted_at IS NULL",
-                    t_uids,
+                    list(t_state),
                 )
             ).fetchall()
-            if deck_rows:
-                frames.extend(_sse_object_lines("decks", [r[0] for r in deck_rows]))
-                count += len(deck_rows)
+            deck_json = [
+                r[0]
+                for r in deck_rows
+                if deck_org_uids(bool(r[2]), t_state[r[1]], [viewer.uid])
+            ]
+            if deck_json:
+                frames.extend(_sse_object_lines("decks", deck_json))
+                count += len(deck_json)
 
     return frames, count
 

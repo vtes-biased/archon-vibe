@@ -18,6 +18,7 @@ from ..broadcast import (
     broadcast_judge_call,
     broadcast_personal,
     broadcast_precomputed,
+    deck_org_uids,
     entitled_level,
 )
 from ..card_data import cards_json_text
@@ -187,15 +188,20 @@ async def _build_sanctions_json(
 async def _process_deck_ops(
     deck_ops: list,
     tournament_uid: str,
+    tournament: Tournament,
     existing_decks: list[DeckObject] | None = None,
-    org_uids: list[str] | None = None,
 ) -> list[BroadcastData]:
     if not deck_ops:
         return []
     if existing_decks is None:
         existing_decks = await get_decks_for_tournament(tournament_uid)
 
-    _org_uids = org_uids or []
+    def stamp(bd: BroadcastData, deck: DeckObject) -> BroadcastData:
+        bd.org_uids = deck_org_uids(
+            deck.private, tournament.state, tournament.organizers_uids
+        )
+        return bd
+
     affected: list[BroadcastData] = []
     for op in deck_ops:
         op_type = op.get("op")
@@ -234,9 +240,9 @@ async def _process_deck_ops(
             deck_obj.public = deck_data.get("public", False)
             deck_obj.winner = deck_data.get("winner", False)
             deck_obj.private = deck_data.get("private", False)
-            bd = await save_object_from_model(ObjectType.DECK, deck_obj)
-            bd.org_uids = _org_uids
-            affected.append(bd)
+            affected.append(
+                stamp(await save_object_from_model(ObjectType.DECK, deck_obj), deck_obj)
+            )
 
         elif op_type == "delete":
             player_uid = op["player_uid"]
@@ -248,9 +254,9 @@ async def _process_deck_ops(
                         continue
                     d.deleted_at = datetime.now(UTC)
                     d.modified = datetime.now(UTC)
-                    bd = await save_object_from_model(ObjectType.DECK, d)
-                    bd.org_uids = _org_uids
-                    affected.append(bd)
+                    affected.append(
+                        stamp(await save_object_from_model(ObjectType.DECK, d), d)
+                    )
 
         elif op_type == "set_round":
             deck_uid = op.get("deck_uid")
@@ -258,9 +264,9 @@ async def _process_deck_ops(
             if target:
                 target.round = op.get("round")
                 target.modified = datetime.now(UTC)
-                bd = await save_object_from_model(ObjectType.DECK, target)
-                bd.org_uids = _org_uids
-                affected.append(bd)
+                affected.append(
+                    stamp(await save_object_from_model(ObjectType.DECK, target), target)
+                )
 
         elif op_type == "set_publication":
             deck_uid = op.get("deck_uid")
@@ -269,9 +275,9 @@ async def _process_deck_ops(
                 target.public = op.get("public", False)
                 target.winner = op.get("winner", False)
                 target.modified = datetime.now(UTC)
-                bd = await save_object_from_model(ObjectType.DECK, target)
-                bd.org_uids = _org_uids
-                affected.append(bd)
+                affected.append(
+                    stamp(await save_object_from_model(ObjectType.DECK, target), target)
+                )
 
         elif op_type == "set_attribution":
             deck_uid = op.get("deck_uid")
@@ -279,9 +285,9 @@ async def _process_deck_ops(
             if target:
                 target.attribution = msgspec.convert(op["attribution"], DeckAttribution)
                 target.modified = datetime.now(UTC)
-                bd = await save_object_from_model(ObjectType.DECK, target)
-                bd.org_uids = _org_uids
-                affected.append(bd)
+                affected.append(
+                    stamp(await save_object_from_model(ObjectType.DECK, target), target)
+                )
 
         elif op_type == "set_private":
             deck_uid = op.get("deck_uid")
@@ -289,20 +295,29 @@ async def _process_deck_ops(
             if target:
                 target.private = op.get("private", False)
                 target.modified = datetime.now(UTC)
-                bd = await save_object_from_model(ObjectType.DECK, target)
-                bd.org_uids = _org_uids
-                affected.append(bd)
+                affected.append(
+                    stamp(await save_object_from_model(ObjectType.DECK, target), target)
+                )
 
         elif op_type == "log_view":
             deck_uid = op.get("deck_uid")
             viewer_uid = op["user_uid"]
-            target = next((d for d in existing_decks if d.uid == deck_uid), None)
-            if target and all(v.user_uid != viewer_uid for v in target.views):
-                target.views.append(DeckView(user_uid=viewer_uid, round=op["round"]))
-                target.modified = datetime.now(UTC)
-                bd = await save_object_from_model(ObjectType.DECK, target)
-                bd.org_uids = _org_uids
-                affected.append(bd)
+            # Re-read under the row lock: two organizers opening the same deck
+            # at once would otherwise each append to a stale list.
+            async with tournament_transaction(tournament_uid):
+                decks = await get_decks_for_tournament(tournament_uid)
+                target = next((d for d in decks if d.uid == deck_uid), None)
+                if target and all(v.user_uid != viewer_uid for v in target.views):
+                    target.views.append(
+                        DeckView(user_uid=viewer_uid, round=op["round"])
+                    )
+                    target.modified = datetime.now(UTC)
+                    affected.append(
+                        stamp(
+                            await save_object_from_model(ObjectType.DECK, target),
+                            target,
+                        )
+                    )
 
     return affected
 
@@ -634,6 +649,39 @@ async def _invalidate_organizer_view(
             modified_at=modified_at,
             access_version=av,
         )
+
+
+def _push_decks_to_organizers(tournament: Tournament, decks: list[DeckObject]) -> None:
+    """Deliver each organizer's current entitlement to these decks. Losing a
+    private deck at finish retracts no projection column, so no shared frame
+    carries the eviction."""
+    for user_uid in tournament.organizers_uids:
+        for deck in decks:
+            broadcast_personal(
+                user_uid,
+                obj_type=ObjectType.DECK,
+                uid=deck.uid,
+                full_dict=msgspec.to_builtins(deck),
+                org_uids=deck_org_uids(
+                    deck.private, tournament.state, tournament.organizers_uids
+                ),
+                obj_user_uid=deck.user_uid,
+            )
+
+
+async def _withdraw_private_decks(tournament: Tournament) -> None:
+    """On entering Finished. The re-save is what reaches an organizer offline
+    now: their next catch-up streams a member tombstone for every deck row
+    modified since."""
+    decks = [d for d in await get_decks_for_tournament(tournament.uid) if d.private]
+    for deck in decks:
+        deck.modified = datetime.now(UTC)
+        bd = await save_object_from_model(ObjectType.DECK, deck)
+        bd.org_uids = deck_org_uids(
+            deck.private, tournament.state, tournament.organizers_uids
+        )
+        broadcast_precomputed(bd)
+    _push_decks_to_organizers(tournament, decks)
 
 
 @router.post("/{uid}/organizers")
@@ -1709,9 +1757,21 @@ async def tournament_action(
     # Below runs unlocked — the tournament row's FOR UPDATE lock was released.
     logger.info(f"Tournament {uid} action {request.type} by {current_user.uid}")
 
-    deck_bds = await _process_deck_ops(deck_ops, uid, org_uids=updated.organizers_uids)
+    deck_bds = await _process_deck_ops(deck_ops, uid, updated)
     for bd in deck_bds:
         broadcast_precomputed(bd)
+
+    was_finished = pre_state == TournamentState.FINISHED
+    is_finished = updated.state == TournamentState.FINISHED
+    if is_finished and not was_finished:
+        await _withdraw_private_decks(updated)
+    elif was_finished != is_finished or (
+        is_finished and any(op.get("op") == "set_private" for op in deck_ops)
+    ):
+        _push_decks_to_organizers(
+            updated,
+            [d for d in await get_decks_for_tournament(uid) if d.private],
+        )
 
     broadcast_precomputed(tournament_bd)
 
@@ -1729,8 +1789,6 @@ async def tournament_action(
 
     # Recompute on entering/leaving Finished, or on a result-affecting action on
     # an already-finished tournament (see _RATING_IRRELEVANT_ACTIONS for the skip list).
-    was_finished = pre_state == TournamentState.FINISHED
-    is_finished = updated.state == TournamentState.FINISHED
     state_changed = was_finished != is_finished
     results_may_change = is_finished and request.type not in _RATING_IRRELEVANT_ACTIONS
     if state_changed or results_may_change:
@@ -2456,7 +2514,9 @@ async def go_online(
                     else DeckAttribution(kind=AttributionKind.ANONYMOUS)
                 )
             bd = await save_object_from_model(ObjectType.DECK, deck_obj, conn=tx_conn)
-            bd.org_uids = updated.organizers_uids
+            bd.org_uids = deck_org_uids(
+                deck_obj.private, updated.state, updated.organizers_uids
+            )
             pending_bds.append(bd)
 
     # --- Transaction committed, row lock released ---
@@ -2466,6 +2526,8 @@ async def go_online(
 
     for bd in pending_bds:
         broadcast_precomputed(bd)
+    if updated.state == TournamentState.FINISHED:
+        await _withdraw_private_decks(updated)
 
     if request.offline_sanctions:
         # One authoritative recompute over the now-saved sanctions, server-side

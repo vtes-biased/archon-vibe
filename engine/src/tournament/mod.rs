@@ -2592,6 +2592,9 @@ fn apply_event(
             if !actor.is_organizer && actor.uid != *player_uid {
                 return Err(EngineError::DeckPrivacyForbidden);
             }
+            if !*private && actor.uid != *player_uid && state == TournamentState::Finished {
+                return Err(EngineError::DeckReleaseOwnerOnly);
+            }
             let deck_uid = decks
                 .members()
                 .find(|d| {

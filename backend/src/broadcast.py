@@ -10,7 +10,7 @@ import msgspec
 
 from .access_levels import compute_full, compute_member, compute_public
 from .db import BroadcastData
-from .models import ObjectType, Role, User
+from .models import ObjectType, Role, TournamentState, User
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +92,16 @@ def _conn_label(conn: SSEConnection) -> str:
         f"tournament={conn.tournament_uid}" if conn.tournament_uid else "full-corpus"
     )
     return f"user={user} {scope}"
+
+
+def deck_org_uids(
+    private: bool, tournament_state: str | None, organizers_uids: list[str]
+) -> list[str]:
+    """The organizers a deck frame is stamped with, so entitled to it at full:
+    none on a private deck once its event is finished."""
+    if private and tournament_state == TournamentState.FINISHED:
+        return []
+    return organizers_uids
 
 
 def entitled_level(

@@ -803,7 +803,8 @@ _ACTIONS: dict[str, tuple[str, tuple[str, ...], tuple[str, ...]]] = {
     ),
     "SetDeckPrivate": (
         "Hold one of a player's decklists back from publication, or release it."
-        " Its organizers still see it, and the winner's publishes regardless.",
+        " Its organizers see it until the event finishes, after which only its"
+        " player may release it. The winner's publishes regardless.",
         ("player_uid", "private"),
         ("round",),
     ),

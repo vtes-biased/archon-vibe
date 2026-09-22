@@ -691,8 +691,8 @@ already on the organizer's device.
 record on `/profile` and `/users/[uid]` gates on the tournament being held
 locally, not soft-deleted and `Finished`, plus `public` for anyone but the deck's
 owner, who is entitled to all of their own. The `public` leg is what answers for
-an organizer, since they hold every deck of their event at `full` whatever its
-state, and what keeps a private deck on its owner's record alone. **A profile also lists to anyone else only the decks that name their
+an organizer, since they hold every non-private deck of their event at `full`
+whatever its state, and what keeps a private deck on its owner's record alone. **A profile also lists to anyone else only the decks that name their
 owner** — an anonymous deck is on nobody's record but its owner's, and the
 organizer holding it at `full` is held to the same rule.
 
@@ -714,7 +714,10 @@ already submitted — the upload form never offers it, and a replacement keeps t
 stored flag whatever the upload claims — on the word of its owner or an
 organizer, in any state, touching no content. A private deck is never published
 whatever `decklists_mode` says: its organizers hold it at `full` and nobody else
-does — no other member, not the public API, not its export. The winner's deck is
+does — no other member, not the public API, not its export. **Once `Finished`,
+its organizers lose it too**: the event no longer needs it, and it stays with its
+owner and IC alone. The engine then refuses a release from anyone but the owner,
+which would otherwise hand the deck back to the organizer releasing it. The winner's deck is
 the exception and publishes regardless, so the archive keeps its win registry.
 Credit and disclosure compose rather than replace each other: an anonymous deck
 still publishes, with no owner, and a private one keeps whatever credit it has.

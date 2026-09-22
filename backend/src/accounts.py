@@ -9,6 +9,7 @@ from uuid import uuid7
 
 import msgspec
 
+from .broadcast import deck_org_uids
 from .db import (
     BroadcastData,
     clear_owner_columns,
@@ -65,7 +66,8 @@ async def reassign_decks(from_user_uid: str, to_user_uid: str) -> list[Broadcast
     async with get_connection() as conn:
         result = await conn.execute(
             """SELECT d."full"::text,
-                      coalesce(t."full"->'organizers_uids', '[]'::jsonb)
+                      coalesce(t."full"->'organizers_uids', '[]'::jsonb),
+                      t."full"->>'state'
             FROM objects d
             LEFT JOIN objects t
               ON t.type = 'tournament' AND t.uid = d."full"->>'tournament_uid'
@@ -79,7 +81,7 @@ async def reassign_decks(from_user_uid: str, to_user_uid: str) -> list[Broadcast
         bd = await save_object_from_model(
             ObjectType.DECK, msgspec.structs.replace(deck, user_uid=to_user_uid)
         )
-        bd.org_uids = row[1]
+        bd.org_uids = deck_org_uids(deck.private, row[2], row[1])
         broadcasts.append(bd)
     return broadcasts
 

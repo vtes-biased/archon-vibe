@@ -1102,6 +1102,19 @@ fn test_the_owner_or_an_organizer_marks_a_deck_private() {
 }
 
 #[test]
+fn test_only_the_owner_releases_a_private_deck_once_finished() {
+    let tournament = tournament_with_player("Finished");
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "private": true}]"#;
+    let event = json::object! {
+        type: "SetDeckPrivate",
+        player_uid: "player-1",
+        private: false,
+    };
+    assert!(run_event_with_decks(&tournament, &event, &make_organizer(), decks).is_err());
+    assert!(run_event_with_decks(&tournament, &event, &make_player("player-1"), decks).is_ok());
+}
+
+#[test]
 fn test_a_private_deck_leaves_publication_but_the_winners_stays() {
     let mut tournament = finished_with_finals();
     tournament["decklists_mode"] = "All".into();

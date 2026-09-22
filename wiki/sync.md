@@ -329,7 +329,8 @@ connections can be routed without re-reading the DB. `org_uids` is **not**
 auto-populated for decks, which carry no `organizers_uids` of their own, so every
 path that writes a deck stamps it manually after the save: the deck-ops processor,
 the go-online replay, the TWDA import, and the account merge that reassigns a
-deck. An unstamped deck frame projects at member level, where a non-public deck is
+deck. The stamp comes from `deck_org_uids`, which is empty on a private deck of a
+finished event, and the personal overlay filters organizers' decks through it. An unstamped deck frame projects at member level, where a non-public deck is
 `None` — so the tournament's organizer misses the update until their next
 reconnect, and when that `None` is a **retraction** the frame *deletes* the deck
 from their IndexedDB rather than merely withholding it.
@@ -548,6 +549,13 @@ the removed organizer gets the tournament downgraded plus a tombstone per privat
 deck — no full resync. An **offline** organizer change is still caught by the
 fingerprint's organizer-set term at the next connect, which is why the resync
 remains the offline fallback.
+
+A private deck's organizers lose it when its event finishes, which retracts no
+column either. Entering `Finished` — by action or by go-online — re-saves each
+private deck, so an organizer away now meets a member tombstone at the next
+catch-up, and pushes each connected organizer a targeted tombstone. A reopen and
+a post-finish privacy flip push the same way, since they too move an organizer's
+entitlement without moving a projection.
 
 **Triggers** — VEKN operations that gain or lose a `vekn_id`; organizer add/remove;
 gaining or losing an **overlay-granting** role (`NC`/`IC` — the closed set the level

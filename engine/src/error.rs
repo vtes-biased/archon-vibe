@@ -15,6 +15,7 @@ pub enum EngineError {
     DeckDeleteForbidden,
     DeckAttributionForbidden,
     DeckPrivacyForbidden,
+    DeckReleaseOwnerOnly,
     ScoreForbidden,
     ScoreLocked,
     ScoreSetByOrganizer,
@@ -124,6 +125,7 @@ impl EngineError {
             DeckDeleteForbidden => "tournament.deck_delete_forbidden",
             DeckAttributionForbidden => "tournament.deck_attribution_forbidden",
             DeckPrivacyForbidden => "tournament.deck_privacy_forbidden",
+            DeckReleaseOwnerOnly => "tournament.deck_release_owner_only",
             ScoreForbidden => "tournament.score_forbidden",
             ScoreLocked => "tournament.score_locked",
             ScoreSetByOrganizer => "tournament.score_set_by_organizer",
@@ -275,6 +277,9 @@ impl fmt::Display for EngineError {
             }
             DeckPrivacyForbidden => {
                 write!(f, "Only organizers or the player can make a deck private")
+            }
+            DeckReleaseOwnerOnly => {
+                write!(f, "Once the event is finished, only the player can make a private deck public")
             }
             ScoreForbidden => write!(f, "Not authorized to score this table"),
             ScoreLocked => write!(f, "Table score is locked by judge"),

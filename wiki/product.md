@@ -194,7 +194,7 @@ Cutoff / Top 10 / Public, decklists Winner / Finalists / All applied only after
 finish. These are display defaults, not access boundaries — see
 [sync](sync.md#what-members-actually-receive). A deck's private flag is the
 access boundary the mode is not: it keeps the deck from everyone but its
-organizers, the winner's excepted.
+organizers, and once the event is finished from them too, the winner's excepted.
 
 ## Reference material
 

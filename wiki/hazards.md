@@ -365,6 +365,13 @@ skips both silently ([access](access.md#capabilities)).
 non-country, non-own-object full grant must also be added to the overlay frames, or
 a resync re-delivers the lower projection ([sync](sync.md#access-entitlement)).
 
+**A write that moves a tournament across `Finished`, or a deck's `private` flag
+after it, must push organizers their decks.** The organizer stamp changes
+without any projection column retracting, so `broadcast_precomputed` sends the
+organizer nothing and their copy of a private deck survives. The action route and
+go-online call `_withdraw_private_decks` or `_push_decks_to_organizers`; a new
+writer of either fact has to as well ([sync](sync.md#targeted-overlay-invalidation-no-resync)).
+
 **A deck frame that reaches `broadcast_precomputed` without its `org_uids` stamp
 now deletes the organizer's copy**, where it used to merely withhold an update: a
 deck losing its `public` flag retracts at member level, and the organizer's

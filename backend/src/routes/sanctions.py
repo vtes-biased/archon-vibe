@@ -227,9 +227,7 @@ async def _apply_sanction_to_tournament(
 
     from .tournaments import _process_deck_ops, maybe_submit_twda
 
-    for deck_bd in await _process_deck_ops(
-        deck_ops, tournament_uid, org_uids=tournament.organizers_uids
-    ):
+    for deck_bd in await _process_deck_ops(deck_ops, tournament_uid, tournament):
         broadcast_precomputed(deck_bd)
     if (
         tournament.state == TournamentState.FINISHED
