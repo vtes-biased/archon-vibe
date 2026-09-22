@@ -1044,7 +1044,7 @@
   "user_detail_no_rating": "Aucune donnée de classement disponible.",
   "user_detail_no_contact": "Aucune coordonnée partagée.",
   "user_detail_events": "Tournois joués ({count})",
-  "user_detail_events_summary": "Victoires : {wins} · Finales : {finals}",
+  "user_detail_events_summary": "Victoires : {wins} ({hof} pour le Hall of Fame) · Finales : {finals}",
   "user_detail_show_deck": "Afficher la liste : {name}",
   "payment_column": "Paiement",
   "payment_pending": "En attente",

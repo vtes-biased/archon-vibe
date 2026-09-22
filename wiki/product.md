@@ -92,7 +92,8 @@ would have made the TWDA with the winning deck on record
 ([the rule](tournaments.md#configuration)), stated on the page. A member profile
 lists every finished event the member played — newest first, whatever its age or
 rating eligibility, with date, country and final place, wins and finals marked and
-counted — each folding open to its decklist on record. A decklist reaches a profile
+counted, and the wins behind the Hall of Fame count flagged — each folding open to
+its decklist on record. A decklist reaches a profile
 only once its tournament is Finished, and to anyone but its owner only once that
 event published it *and* it names its owner; your own also lists the events you
 won with no decklist attached. The formula and the

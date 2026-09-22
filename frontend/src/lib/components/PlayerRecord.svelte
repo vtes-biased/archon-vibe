@@ -6,7 +6,8 @@
   import { getCountryFlag } from "$lib/geonames";
   import { computeStandings, playedPlayerUids } from "$lib/tournament-utils";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
-  import { Trophy, Medal, TriangleAlert, ChevronDown, ChevronRight } from "@lucide/svelte";
+  import RankCell from "$lib/components/RankCell.svelte";
+  import { TriangleAlert, ChevronDown, ChevronRight } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   let { user }: { user: User | undefined } = $props();
@@ -14,15 +15,16 @@
   interface PlayedEvent {
     tournament: Tournament;
     place: number | null;
-    finish: "win" | "final" | null;
+    finalist: boolean;
     deck: DeckObject | undefined;
   }
 
   let events = $state<PlayedEvent[]>([]);
   let undocumented = $state<TournamentListItem[]>([]);
   let expandedDeck = $state<string | null>(null);
-  const winCount = $derived(events.filter(e => e.finish === "win").length);
-  const finalCount = $derived(events.filter(e => e.finish !== null).length);
+  const winCount = $derived(events.filter(e => e.place === 1).length);
+  const finalCount = $derived(events.filter(e => e.place === 1 || e.finalist).length);
+  const hofWins = $derived(new Set(user?.wins ?? []));
   let viewedUid: string | undefined;
 
   function day(t: { start: string | null }): string {
@@ -33,8 +35,7 @@
     const entry = computeStandings(t, await getSanctionsForTournament(t.uid)).find(e => e.user_uid === uid);
     const played = t.rounds?.length ? playedPlayerUids(t).has(uid) : !!entry && !entry.unplaced;
     if (!played && !deck && t.winner !== uid) return null;
-    const finish = t.winner === uid || entry?.finalist_position === 1 ? "win" : entry?.finalist ? "final" : null;
-    return { tournament: t, place: entry && !entry.unplaced ? entry.rank : null, finish, deck };
+    return { tournament: t, place: entry && !entry.unplaced ? entry.rank : null, finalist: !!entry?.finalist, deck };
   }
 
   async function load(uid: string, owner: boolean) {
@@ -103,10 +104,10 @@
       {m.user_detail_events({ count: String(events.length) })}
     </h2>
     <p class="text-sm text-ink-muted mb-3">
-      {m.user_detail_events_summary({ wins: String(winCount), finals: String(finalCount) })}
+      {m.user_detail_events_summary({ wins: String(winCount), hof: String(hofWins.size), finals: String(finalCount) })}
     </p>
     <ul class="bg-surface-card border border-line rounded-lg divide-y divide-line">
-      {#each events as { tournament: t, place, finish, deck } (t.uid)}
+      {#each events as { tournament: t, place, finalist, deck } (t.uid)}
         {@const open = !!deck && expandedDeck === deck.uid}
         <li class="px-4 py-2 text-sm">
           <div class="flex items-center gap-2">
@@ -121,16 +122,12 @@
                 {#if open}<ChevronDown class="w-4 h-4" aria-hidden="true" />{:else}<ChevronRight class="w-4 h-4" aria-hidden="true" />{/if}
               </button>
             {/if}
-            {#if finish === "win"}
-              <Trophy class="w-3.5 h-3.5 shrink-0 text-highlight" aria-hidden="true" />
-              <span class="sr-only">{m.tournament_winner()}</span>
-            {:else if finish === "final"}
-              <Medal class="w-3.5 h-3.5 shrink-0 text-ink-muted" aria-hidden="true" />
-              <span class="sr-only">{m.tournament_finalist()}</span>
-            {/if}
             <a href="/tournaments/{t.uid}" class="min-w-0 text-ink-strong hover:text-link">{t.name}</a>
+            {#if hofWins.has(t.uid)}
+              <span class="shrink-0 text-[10px] px-1 py-0.5 rounded badge-highlight">{m.hof_page_title()}</span>
+            {/if}
             <span class="text-xs text-ink-faint ml-auto whitespace-nowrap">
-              <span class="tabular-nums text-ink-muted mr-1">{place === null ? "—" : `#${place}`}</span>
+              <span class="tabular-nums text-ink-muted mr-1">{#if place === null}—{:else}<RankCell rank={place} {finalist} hash />{/if}</span>
               {#if t.country}{getCountryFlag(t.country)}{/if}
               {day(t)}
             </span>

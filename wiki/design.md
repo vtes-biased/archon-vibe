@@ -533,10 +533,11 @@ and roles are the page's subject, not tab content. Below it:
 - **Profile** — contact details and community links; on the public page also the
   sponsor note and whatever VEKN, NDA and sanction controls the viewer's access
   grants.
-- **Play record** — ratings, then one list of the events played, wins and finals
-  marked on their rows, each event carrying its decklist rather than a separate
-  wins or deck list. The undocumented-decklist nudge sits between them on the
-  viewer's own record,
+- **Play record** — ratings, then one list of the events played, each event
+  carrying its decklist rather than a separate wins or deck list. The place reads
+  through `RankCell`, as in the standings — the winner's trophy, a finalist's
+  pill — and a win behind the Hall of Fame count carries a pill of the same kind.
+  The undocumented-decklist nudge sits above the list on the viewer's own record,
   by whichever route they reached it: it is actionable by the player alone and
   reads as a reproach on anyone else's page.
 - **Account** — linked accounts, authorized apps, the member's own playtest NDA
@@ -555,11 +556,11 @@ is sign-in gated, so it would lead them to a prompt.
 
 Two constraints the structure has to keep. An **OAuth return lands on Account**:
 the Discord and GitHub link confirmations render inside that tab and are invisible
-anywhere else. And the **undocumented-decklist nudge sits beside the wins it
-names**, never below the decklists — tabs already put it one gesture deep, which is
-this structure's accepted cost. The count and the wins behind it stay together for
-the same reason [tournaments](tournaments.md) states: the number is auditable
-rather than asserted.
+anywhere else. And the **undocumented-decklist nudge sits above the events
+it names**, never below them — tabs already put it one gesture deep, which is this
+structure's accepted cost. The count and the wins behind it stay together for the
+same reason [tournaments](tournaments.md) states: the number is auditable rather
+than asserted.
 
 ## League page
 

@@ -1044,7 +1044,7 @@
   "user_detail_no_rating": "No hay datos de calificación disponibles.",
   "user_detail_no_contact": "No ha compartido datos de contacto.",
   "user_detail_events": "Torneos jugados ({count})",
-  "user_detail_events_summary": "Victorias: {wins} · Finales: {finals}",
+  "user_detail_events_summary": "Victorias: {wins} ({hof} para el Hall of Fame) · Finales: {finals}",
   "user_detail_show_deck": "Ver la lista de mazo: {name}",
   "payment_column": "Pago",
   "payment_pending": "Pendiente",

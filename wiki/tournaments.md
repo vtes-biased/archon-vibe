@@ -64,8 +64,8 @@ members over a data gap. An event whose result sheet we hold answers the questio
 itself and is held to the answer.
 
 The rankings page states that criterion under its Hall of Fame tab, and a member's
-profile lists the wins behind their count alongside their decklists on record, so
-the number is auditable rather than asserted. A player's own profile also gathers
+profile marks the wins behind their count on its list of events played, so the
+number is auditable rather than asserted. A player's own profile also gathers
 the events they won with no decklist of theirs attached — the same pair the
 tournament page nudges on, and deliberately not the Hall of Fame predicate
 inverted, which stays server-side.
