@@ -321,14 +321,18 @@ an exclusive accordion, which would take away the feedback that is the edit's on
 confirmation. Only genuinely irreversible or externally visible actions gate behind
 a confirm step.
 
-**Unactionable match** — a member the organizer cannot add is listed disabled with
-its reason, never filtered out of the results: an empty dropdown reads as "no such
-member" and invites minting the duplicate only an IC can merge back. Holds for the
-add-player search and the create-and-register dedup review, and the reason wins
-over any other block on the same row — already registered, then suspended. Where
-the list is capped, addable rows rank ahead of blocked ones before the cap, and a
-"no match" branch tests for an addable match rather than an empty list: a blocked
-row must never displace one the organizer can act on, nor stand in for it.
+**Unactionable match** — a member the organizer cannot act on is listed disabled
+with its reason, never filtered out of the results: an empty dropdown reads as "no
+such member" and invites minting the duplicate only an IC can merge back. Holds for
+the add-player search and the create-and-register dedup review, and the reason wins
+over any other block on the same row — already registered, then suspended. In the
+add-player search an already-registered match is actionable rather than blocked:
+tapping it jumps to their roster row, highlighted, clearing any filter hiding it,
+and those matches rank first — the organizer typing a registered name is most often
+looking for that player. Where the list is capped, actionable rows rank ahead of
+blocked ones before the cap, and a "no match" branch tests for an addable match
+rather than an empty list: a blocked row must never displace one the organizer can
+act on, nor stand in for it.
 
 **The first viewport shows the work.** A list surface reaches its first rows
 without scrolling on a 393×852 phone: the search field and the view toggle stay in
@@ -656,6 +660,9 @@ Standing decisions:
   and one confirmation modal lives on the page so both open it.
 - **The description drops out of the organizer view only** — organizers wrote it,
   players still need it.
+- **The Rounds tab finds a player through a search icon**, not a standing field:
+  each match reads its table and seat in the latest round it sits in, and tapping
+  it opens that round on the highlighted seat without collapsing any other.
 - **Posted announcements fold with the composer**, one section the organizer
   opens to write or to re-read, its header count naming what the fold hides.
   They are what anyone came to read on the *player* banner; on the console the

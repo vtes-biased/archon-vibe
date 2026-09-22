@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from "svelte";
   import type { Tournament, User, Player, DeckObject, Sanction } from "$lib/types";
   import type { UserListItem } from "$lib/db";
   type DeckMap = Record<string, DeckObject[]>;
@@ -344,6 +345,21 @@
   // Trigger dot: a filter is hiding players. Sort is excluded — it reorders,
   // it never hides, so it needs no warning.
   const filtersActive = $derived(paymentFilter !== 'all' || deckFilter !== 'all');
+
+  let foundPlayer = $state<string | null>(null);
+  let foundTimer: ReturnType<typeof setTimeout> | undefined;
+  async function findPlayer(uid: string) {
+    if (!filteredPlayers.some(p => p.user_uid === uid)) {
+      paymentFilter = 'all';
+      deckFilter = 'all';
+    }
+    foundPlayer = uid;
+    clearTimeout(foundTimer);
+    foundTimer = setTimeout(() => foundPlayer = null, 3000);
+    await tick();
+    const rows = document.querySelectorAll<HTMLElement>(`[data-player-row="${uid}"]`);
+    [...rows].find(el => el.getClientRects().length > 0)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 
   // Modal entry points (modal internals live in CreateAndRegisterModal)
   let sponsorTarget = $state<UserListItem | null>(null);
@@ -705,7 +721,7 @@
         {/if}
       </p>
       {#if isOrganizer}
-        <AddPlayerForm {tournament} onadd={addPlayerByUser} oncreate={() => showCreateModal = true} />
+        <AddPlayerForm {tournament} onadd={addPlayerByUser} onfind={findPlayer} oncreate={() => showCreateModal = true} />
       {/if}
     </div>
     <!-- Cap reached: sign-ups now waitlist, and the organizer adding a player still never does -->
@@ -837,7 +853,7 @@
              can't contain one. -->
         {@const expandable = isOrganizer && !doorMode && !editingToss}
         {@const open = doorMode || expandedCard === puid}
-        <div class="bg-surface-muted/50 rounded-lg {isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'ring-1 ring-accent-soft-border' : ''}">
+        <div data-player-row={puid} class="bg-surface-muted/50 rounded-lg transition-shadow {foundPlayer === puid ? 'ring-2 ring-select' : isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'ring-1 ring-accent-soft-border' : ''}">
           {#if expandable}
             <button type="button" class="w-full text-left p-3" onclick={() => toggleCard(puid)} aria-expanded={open}>
               {@render cardSummary(player, puid, true, open)}
@@ -946,7 +962,7 @@
             {@const standingsIdx = entry ? standings.indexOf(entry) : -1}
             {@const isTop5 = standingsIdx >= 0 && standingsIdx < 5}
             {@const isTied = entry ? tiedUids.has(entry.user_uid) : false}
-            <tr class="{entry?.unplaced ? 'text-ink-faint' : (isTop5 && playerSort === 'standings' ? 'text-ink-strong font-medium' : 'text-ink')} {isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'bg-accent-soft/10' : ''} border-t border-line-strong">
+            <tr data-player-row={puid} class="{entry?.unplaced ? 'text-ink-faint' : (isTop5 && playerSort === 'standings' ? 'text-ink-strong font-medium' : 'text-ink')} {foundPlayer === puid ? 'bg-select-soft/40' : isTied && playerSort === 'standings' && (isTop5 || standingsIdx <= 5) ? 'bg-accent-soft/10' : ''} border-t border-line-strong transition-colors">
               {#if playerSort === 'standings' && standings.length > 0}
                 <td class="py-1.5 pr-2 text-ink-faint">{entry?.unplaced ? "—" : (entry?.rank ?? "—")}</td>
               {/if}

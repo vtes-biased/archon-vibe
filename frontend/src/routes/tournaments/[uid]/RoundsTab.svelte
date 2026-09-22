@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from "svelte";
   import { toUserMessage } from '$lib/errors';
   import type { Tournament, Table, Sanction } from "$lib/types";
   import { tournamentAction } from "$lib/tournament-actions";
@@ -10,12 +11,13 @@
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
   import Button from '$lib/components/Button.svelte';
-  import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users, Settings2 } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users, Settings2, Search } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import VpInput from "$lib/components/VpInput.svelte";
   import { seatDisplay as seatDisplayUtil, seatDisplayParts, vpOptions, translateTableState, translatePlayerState, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
   import { showToast } from "$lib/stores/toast.svelte";
+  import { searchTokens, matchesAllTerms } from "$lib/utils";
 
   let {
     tournament = $bindable(),
@@ -93,6 +95,43 @@
       }
     }
   });
+
+  let findOpen = $state(false);
+  let findQuery = $state("");
+  let foundSeat = $state<string | null>(null);
+  let foundTimer: ReturnType<typeof setTimeout> | undefined;
+  const findResults = $derived.by(() => {
+    const terms = searchTokens(findQuery);
+    if (terms.length === 0) return [];
+    const results: { uid: string; seat: { r: number; i: number; j: number } | null }[] = [];
+    for (const p of tournament.players ?? []) {
+      const uid = p.user_uid;
+      const info = uid ? playerInfo[uid] : undefined;
+      if (!uid || !info) continue;
+      const tokens = [...searchTokens(info.name), ...(info.nickname ? searchTokens(info.nickname) : []), ...(info.display_name ? searchTokens(info.display_name) : []), ...(info.vekn ? [info.vekn] : [])];
+      if (!matchesAllTerms(tokens, terms)) continue;
+      let seat: { r: number; i: number; j: number } | null = null;
+      const rounds = tournament.rounds ?? [];
+      for (let r = rounds.length - 1; r >= 0 && !seat; r--) {
+        const i = rounds[r]!.findIndex(t => t.state !== 'Cancelled' && t.seating.some(s => s.player_uid === uid));
+        if (i >= 0) seat = { r, i, j: rounds[r]![i]!.seating.findIndex(s => s.player_uid === uid) };
+      }
+      results.push({ uid, seat });
+    }
+    return results.sort((a, b) => Number(!a.seat) - Number(!b.seat)).slice(0, 10);
+  });
+
+  async function findSeat(seat: { r: number; i: number; j: number }) {
+    expandedRounds = new Set([...expandedRounds, seat.r]);
+    const key = `${seat.r}:${seat.i}:${seat.j}`;
+    foundSeat = key;
+    clearTimeout(foundTimer);
+    foundTimer = setTimeout(() => foundSeat = null, 3000);
+    findOpen = false;
+    findQuery = "";
+    await tick();
+    document.querySelector(`[data-seat="${key}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 
   const inProgressRoundCount = $derived(
     tournament.rounds?.filter(r => r.some(t => t.state !== "Finished")).length ?? 0
@@ -500,6 +539,57 @@
       {(tournament.standings?.length ?? 0) > 0 ? m.rounds_no_rounds_recorded() : m.rounds_no_rounds()}
     </p>
   {:else}
+    {#if isOrganizer}
+      {#if findOpen}
+        <div class="relative">
+          <!-- svelte-ignore a11y_autofocus -->
+          <input
+            type="text"
+            bind:value={findQuery}
+            onkeydown={(e) => { if (e.key === "Escape") { findOpen = false; findQuery = ""; } }}
+            placeholder={m.rounds_find_placeholder()}
+            aria-label={m.rounds_find_player()}
+            autofocus
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            class="w-full pl-3 pr-10 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright focus:border-line-strong focus:outline-none"
+          />
+          <button
+            onclick={() => { findOpen = false; findQuery = ""; }}
+            class="absolute right-0 top-0 h-full px-3 text-ink-faint hover:text-ink-strong"
+            title={m.common_close()}
+          ><X class="w-4 h-4" aria-hidden="true" /></button>
+          {#if findResults.length > 0}
+            <div class="absolute z-10 mt-1 w-full bg-surface-card border border-line-strong rounded-lg divide-y divide-line max-h-64 overflow-y-auto shadow-lg">
+              {#each findResults as res (res.uid)}
+                {@const seat = res.seat}
+                <button
+                  onclick={() => seat && findSeat(seat)}
+                  disabled={!seat}
+                  class="w-full px-3 py-2 min-h-[44px] flex items-center justify-between gap-2 text-left text-sm transition-colors {seat ? 'text-ink-bright hover:bg-surface-hover' : 'text-ink-faint'}"
+                >
+                  <span class="truncate">{seatDisplay(res.uid)}</span>
+                  <span class="text-xs shrink-0 {seat ? 'text-ink-muted' : 'text-ink-faint'}">
+                    {seat ? m.rounds_find_location({ table: tableLabel(tournament, seat.i), seat: String(seat.j + 1) }) : m.rounds_not_seated()}
+                  </span>
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {:else}
+        <div class="flex justify-end">
+          <button
+            onclick={() => findOpen = true}
+            class="p-2 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center text-ink-faint hover:text-ink-strong transition-colors"
+            title={m.rounds_find_player()}
+            aria-label={m.rounds_find_player()}
+          ><Search class="w-4 h-4" aria-hidden="true" /></button>
+        </div>
+      {/if}
+    {/if}
     {#if isOrganizer && currentRoundIdx >= 0 && !hasParallelRounds}
       <div class="flex items-center justify-between flex-wrap gap-2">
         <div class="flex items-center gap-3">
@@ -772,7 +862,7 @@
                     {@const preview = previewScoresSync(tournament, tournamentSanctions, r, i, tVps)}
                     {@const tGws = preview ? preview.gw : table.seating.map(s => s.result.gw)}
                     {@const tTps = preview ? preview.tp : table.seating.map(s => s.result.tp)}
-                    <div class="py-2.5">
+                    <div data-seat="{r}:{i}:{j}" class="py-2.5 transition-colors {foundSeat === `${r}:${i}:${j}` ? 'bg-select-soft/40 -mx-2 px-2 rounded' : ''}">
                       <div class="flex items-center justify-between gap-2 text-sm">
                         <span class="text-ink inline-flex items-center gap-1 min-w-0">
                           {seatDisplay(seat.player_uid)}

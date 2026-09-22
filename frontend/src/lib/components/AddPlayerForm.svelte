@@ -11,10 +11,12 @@
   let {
     tournament,
     onadd,
+    onfind,
     oncreate,
   }: {
     tournament: Tournament;
     onadd: (user: UserListItem) => void;
+    onfind: (uid: string) => void;
     oncreate?: () => void;
   } = $props();
 
@@ -48,8 +50,8 @@
     // the path to first paint.
     const barred = await getRegistrationBarredUids();
     if (seq !== searchSeq) return;
-    const addable = (u: UserListItem) => !registeredUids.has(u.uid) && !barred.has(u.uid);
-    const ranked = [...results.filter(addable), ...results.filter(u => !addable(u))];
+    const tier = (u: UserListItem) => registeredUids.has(u.uid) ? 0 : barred.has(u.uid) ? 2 : 1;
+    const ranked = [0, 1, 2].flatMap(t => results.filter(u => tier(u) === t));
     searchTotal = ranked.length;
     searchResults = ranked.slice(0, SEARCH_LIMIT);
     suspendedUids = barred;
@@ -66,7 +68,9 @@
     } else if (e.key === "Enter" && selectedIndex >= 0) {
       e.preventDefault();
       const user = searchResults[selectedIndex];
-      if (user && !suspendedUids.has(user.uid) && !registeredUids.has(user.uid)) chooseUser(user);
+      if (!user) return;
+      if (registeredUids.has(user.uid)) findUser(user);
+      else if (!suspendedUids.has(user.uid)) chooseUser(user);
     }
   }
 
@@ -83,6 +87,13 @@
   function confirmDeceased() {
     if (pendingDeceased) selectUser(pendingDeceased);
     pendingDeceased = null;
+  }
+
+  function findUser(user: UserListItem) {
+    onfind(user.uid);
+    playerSearch = "";
+    searchResults = [];
+    suspendedUids = new Set();
   }
 
   function selectUser(user: UserListItem) {
@@ -118,15 +129,14 @@
       {#each searchResults as user, i}
         {@const isRegistered = registeredUids.has(user.uid)}
         {@const isSuspended = !isRegistered && suspendedUids.has(user.uid)}
-        {@const isBlocked = isRegistered || isSuspended}
         <button
           id="player-search-option-{i}"
           role="option"
           aria-selected={i === selectedIndex}
-          aria-disabled={isBlocked}
-          onclick={() => !isBlocked && chooseUser(user)}
-          disabled={isBlocked}
-          class="w-full px-3 py-2 text-left text-sm transition-colors {isBlocked ? 'text-ink-faint' : 'text-ink-bright'} {i === selectedIndex && !isBlocked ? 'bg-surface-active' : isBlocked ? '' : 'hover:bg-surface-hover'}"
+          aria-disabled={isSuspended}
+          onclick={() => isRegistered ? findUser(user) : !isSuspended && chooseUser(user)}
+          disabled={isSuspended}
+          class="w-full px-3 py-2 text-left text-sm transition-colors {isSuspended ? 'text-ink-faint' : 'text-ink-bright'} {i === selectedIndex && !isSuspended ? 'bg-surface-active' : isSuspended ? '' : 'hover:bg-surface-hover'}"
         >
           <span class="inline-flex items-center gap-1">
             {#if user.country}<span class="mr-1">{getCountryFlag(user.country)}</span>{/if}{user.name}
