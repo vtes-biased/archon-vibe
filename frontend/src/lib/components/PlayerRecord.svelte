@@ -15,6 +15,7 @@
   interface PlayedEvent {
     tournament: Tournament;
     place: number | null;
+    won: boolean;
     finalist: boolean;
     deck: DeckObject | undefined;
   }
@@ -22,8 +23,8 @@
   let events = $state<PlayedEvent[]>([]);
   let undocumented = $state<TournamentListItem[]>([]);
   let expandedDeck = $state<string | null>(null);
-  const winCount = $derived(events.filter(e => e.place === 1).length);
-  const finalCount = $derived(events.filter(e => e.place === 1 || e.finalist).length);
+  const winCount = $derived(events.filter(e => e.won).length);
+  const finalCount = $derived(events.filter(e => e.won || e.finalist).length);
   const hofWins = $derived(new Set(user?.wins ?? []));
   let viewedUid: string | undefined;
 
@@ -35,7 +36,8 @@
     const entry = computeStandings(t, await getSanctionsForTournament(t.uid)).find(e => e.user_uid === uid);
     const played = t.rounds?.length ? playedPlayerUids(t).has(uid) : !!entry && !entry.unplaced;
     if (!played && !deck && t.winner !== uid) return null;
-    return { tournament: t, place: entry && !entry.unplaced ? entry.rank : null, finalist: !!entry?.finalist, deck };
+    const place = entry && !entry.unplaced ? entry.rank : null;
+    return { tournament: t, place, won: t.winner === uid || place === 1, finalist: !!entry?.finalist, deck };
   }
 
   async function load(uid: string, owner: boolean) {
@@ -111,7 +113,7 @@
       <span class="whitespace-nowrap">{m.user_detail_finals_count({ count: String(finalCount) })}</span>
     </p>
     <ul class="bg-surface-card border border-line rounded-lg divide-y divide-line">
-      {#each events as { tournament: t, place, finalist, deck } (t.uid)}
+      {#each events as { tournament: t, place, won, finalist, deck } (t.uid)}
         {@const open = !!deck && expandedDeck === deck.uid}
         <li class="px-4 py-2 text-sm">
           <div class="flex flex-wrap items-center gap-x-2">
@@ -131,7 +133,7 @@
               <span class="shrink-0 text-[10px] px-1 py-0.5 rounded badge-highlight">{m.hof_page_title()}</span>
             {/if}
             <span class="text-xs text-ink-faint ml-auto whitespace-nowrap">
-              <span class="tabular-nums text-ink-muted mr-1">{#if place === null}—{:else}<RankCell rank={place} {finalist} hash />{/if}</span>
+              <span class="tabular-nums text-ink-muted mr-1">{#if won}<RankCell rank={1} hash />{:else if place === null}—{:else}<RankCell rank={place} {finalist} hash />{/if}</span>
               {#if t.country}{getCountryFlag(t.country)}{/if}
               {day(t)}
             </span>
