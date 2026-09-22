@@ -28,46 +28,7 @@ class Migration:
     rewrite: Callable[..., None]
 
 
-def _type_the_deck_credit(
-    full: dict, owner_vekn: str | None, is_winner: bool | None, credits_member: bool
-) -> None:
-    author = full.pop("author", "") or ""
-    stored = full.get("attribution")
-    if not stored or stored == "twda" or stored == owner_vekn:
-        credit = {"kind": "Owner"}
-    elif credits_member:
-        credit = {"kind": "Member", "vekn_id": stored}
-    else:
-        credit = {"kind": "Archive", "name": author or stored}
-    full["attribution"] = {"kind": "", "vekn_id": "", "name": ""} | credit
-    full["winner"] = bool(is_winner)
-
-
-MIGRATIONS: tuple[Migration, ...] = (
-    Migration(
-        name="deck-typed-credit",
-        obj_type=ObjectType.DECK,
-        pending="""
-            SELECT d.uid,
-                   u."full"->>'vekn_id',
-                   (d."full"->>'user_uid' = t."full"->>'winner'),
-                   EXISTS (
-                       SELECT 1 FROM objects m
-                       WHERE m.type = 'user'
-                         AND m."full"->>'vekn_id' = d."full"->>'attribution'
-                   )
-            FROM objects d
-            LEFT JOIN objects u
-              ON u.type = 'user' AND u.uid = d."full"->>'user_uid'
-            LEFT JOIN objects t
-              ON t.type = 'tournament' AND t.uid = d."full"->>'tournament_uid'
-            WHERE d.type = 'deck'
-              AND (jsonb_typeof(d."full"->'attribution') IS DISTINCT FROM 'object'
-                   OR d."full" ? 'author')
-        """,
-        rewrite=_type_the_deck_credit,
-    ),
-)
+MIGRATIONS: tuple[Migration, ...] = ()
 
 _LOCK_ROW = 'SELECT "full", deleted_at FROM objects WHERE uid = %s FOR UPDATE'
 

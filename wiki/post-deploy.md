@@ -130,52 +130,6 @@ sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
 The count query then answers 0. Report the number to the owner and delete this
 section. No issue reported this, so there is nobody to tell.
 
-## Prove the deck credit typing applied
-
-**Migration** `deck-typed-credit`
-
-Gated by the commit that typed the deck credit. Every deck row held `author`
-plus a loose `attribution` string; the entry rewrites both into the typed field
-and stamps `winner`. Null, `"twda"` and the owner's own VEKN id all become
-`Owner`: the upload form never recorded a self-credit, so a null is mostly an
-ordinary self-upload, and nothing stored reliably separates it from a chosen
-anonymity: until June the anonymous choice left the author standing, and the
-editor reopened every null as anonymous, so even an empty author is as likely an
-edited self-upload. A `twda` deck is its winner's. Another member's id becomes
-`Member` and anything else `Archive`. No past deck becomes anonymous; an owner
-who wants that sets it.
-
-Nothing to run: the entry rewrote the rows before the process served. No row may
-still hold the old shape —
-
-```sql
-SELECT count(*) FROM objects
-WHERE type = 'deck'
-  AND (jsonb_typeof("full"->'attribution') IS DISTINCT FROM 'object'
-       OR "full" ? 'author');
-```
-
-— and no published deck may still carry an owner it is no longer entitled to:
-
-```sql
-SELECT count(*) FROM objects
-WHERE type = 'deck' AND "member" IS NOT NULL
-  AND "member"->'attribution'->>'kind' = 'Anonymous'
-  AND NOT ("full"->>'winner')::boolean
-  AND "member" ? 'user_uid';
-```
-
-Both answer 0. The re-save also recomputed every deck's four projections, which
-is what carries the new boundary to the members already holding a row — and it
-subsumes the retraction sweep that used to sit on this page, since a row whose
-member projection went NULL in the past has now had its `modified_at` bumped and
-tombstones on the next catch-up.
-
-Then set one of your own published decks to Anonymous and confirm on another
-member's client that it shows no owner and has left your profile, report both
-counts to the owner, and delete this section. No issue reported this, so there
-is nobody to tell.
-
 ## Evict past private decks from their organizers' devices
 
 Gated by the commit that withholds a finished event's private decks from its
