@@ -113,11 +113,7 @@ _TWDA_SCORE_RE = re.compile(r"(?:(\d+)GW([\d.]+))?(?:\+([\d.]+))?")
 
 
 async def _twda_scores() -> dict[str, _TwdaScore]:
-    """Archive entry id -> its round count and winner score line.
-
-    Raises on failure rather than returning nothing: a cycle run without the
-    archive would rebuild every filled legacy sheet back to its folded form.
-    """
+    """Archive entry id -> its round count and winner score line."""
     async with http_client.session().get(
         TWDA_URL, timeout=aiohttp.ClientTimeout(total=120.0)
     ) as resp:
@@ -132,10 +128,7 @@ def _map_vekn_to_tournament(
     venue_data: dict[str, str] | None = None,
     twda: _TwdaScore | None = None,
 ) -> Tournament | None:
-    """Map a VEKN event (+ optional venue_data from /venue/<id>) to a Tournament.
-
-    `twda` is the archive entry settled onto this event; it fills only what a
-    legacy sheet does not carry."""
+    """Map a VEKN event (+ optional venue_data from /venue/<id>) to a Tournament."""
     event_id = data.get("event_id")
     if not event_id:
         return None
@@ -281,8 +274,6 @@ def _map_vekn_to_tournament(
                 prelim_gw, vp_prelim, vp_finals, tp, toss = 0, 0.0, 0.0, 0, 0
             if is_finalist and pos == "1":
                 winner_uid = user_uid
-                # The archive's gw/vp is sometimes the total, so only the
-                # folded shape of the sheet itself confirms it as the prelim.
                 archived = twda_final_vp > 0 and twda_prelim in (
                     None,
                     (prelim_gw - 1, vp_prelim - twda_final_vp),
@@ -514,7 +505,14 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
 
     uid_by_vekn_id = await _uids_by_vekn_id()
     logger.info(f"Loaded {len(uid_by_vekn_id)} users by VEKN ID")
-    twda_scores = await _twda_scores()
+    twda_scores: dict[str, _TwdaScore] | None
+    try:
+        twda_scores = await _twda_scores()
+    except (aiohttp.ClientError, TimeoutError, msgspec.DecodeError) as e:
+        logger.warning(
+            f"VEKN tournament sync: TWDA unreachable, archive rows held: {e}"
+        )
+        twda_scores = None
 
     venue_cache: dict[str, dict[str, str]] = {}
 
@@ -560,11 +558,11 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                     tx_conn,
                 ):
                     existing = existing or existing_ref  # hard-deleted between reads
-                    twda = twda_scores.get(
-                        existing.external_ids.get("twda_entry")
-                        or existing.external_ids.get("twda")
-                        or ""
-                    )
+                    archive_key = existing.external_ids.get(
+                        "twda_entry"
+                    ) or existing.external_ids.get("twda")
+                    held = bool(archive_key) and twda_scores is None
+                    twda = (twda_scores or {}).get(archive_key or "")
                     if twda:
                         tournament = (
                             _map_vekn_to_tournament(
@@ -659,7 +657,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                             or existing.standings != tournament.standings
                             or existing.finals != tournament.finals
                         )
-                        if changed:
+                        if changed and not held:
                             tournament = Tournament(
                                 uid=existing.uid,
                                 modified=datetime.now(UTC),

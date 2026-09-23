@@ -290,11 +290,12 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   folded into their prelim, and print that way on the finals tab. Measured offline
   on 834 legacy sheets matched to an entry: 530 round counts filled, 194 finals
   split.
-- **The sync fetches the archive itself, every cycle, and a failed fetch fails the
-  cycle.** Anything the TWDA job wrote onto a vekn import would be rebuilt away six
-  hours later, so the fill sits on the incoming side of the one writer; a cycle
-  run without the archive would fold every filled sheet back and flip it forward
-  on the next.
+- **The sync fetches the archive itself, every cycle.** Anything the TWDA job
+  wrote onto a vekn import would be rebuilt away six hours later, so the fill sits
+  on the incoming side of the one writer. A failed fetch holds only the rows
+  carrying an archive key — rebuilt without it, a filled sheet would fold back and
+  flip forward on the next cycle — and the rest of the calendar syncs as usual, so
+  the archive's CDN never stalls a new event.
 - **A GW above the sheet's own round count is the winner's final, or a wrong
   count.** A winner at exactly rounds + 1 with nobody else above it carries the
   final GW, and loses it like a legacy winner (eight sheets, 2013–2025 — 12009 and
@@ -392,8 +393,8 @@ each disagreement under its class. It reads a vekn.net sheet through the importe
 so what the rules already correct does not show.
 
 *(Measured 2026-09-23 on production, 9,486 finished events against a full vekn.net
-scan and the archive. The GW rows are before the first sync that applies the
-rules [above](#tournaments); the rest do not move with them.)*
+scan and the archive, before the first sync that applies the rules
+[above](#tournaments) — which only the stored-row line moves.)*
 
 | Class | Found | What stands |
 |---|---|---|
@@ -406,6 +407,7 @@ rules [above](#tournaments); the rest do not move with them.)*
 | vekn.net vs archive: the winner's name | 28 | vekn.net's winner, under the name Archon holds |
 | An archive reconstruction of an event vekn.net holds | 79 | merged into the vekn.net copy, three excepted |
 | A GW above a known round count, once imported | 0 | — |
+| A GW above a known round count, as stored before that sync | 6 | corrected by that sync |
 
 **The winner's name is Archon's.** A member may change their name here, so an
 archive entry naming the winner differently is no disagreement about who won.
