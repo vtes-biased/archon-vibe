@@ -153,25 +153,12 @@ WHERE d.type = 'deck' AND d.deleted_at IS NULL
 The `UPDATE`'s row count is the record. Nothing to tell anyone; delete this
 section once it has run.
 
-## Time a cold restart and watch the co-opted-by inference
+## Watch the co-opted-by inference on production
 
-Gated by "Serve a backend restart within seconds", which puts the event-code
-sweep and the Linked Roles registration behind serving
-([architecture](architecture.md#scheduled-background-tasks)).
-Before it is live a restart still awaits both, and the member sync's co-opted-by
-reads still run under the 30s guard, so either check would measure the old code.
+Gated by "Serve a backend restart within seconds" (`4d4c22f1`), which moves the
+member sync's co-opted-by reads out from under the 30s guard
+([architecture](architecture.md#scheduled-background-tasks)). Before it is live
+they time out on production, so an earlier sync measures the old code.
 
-On beta, restart cold and time process start to first answer and to an accepted
-SSE reconnection:
-
-```sh
-sudo systemctl restart new-archon-backend
-sudo journalctl -u new-archon-backend --since "-2 min" --no-pager \
-  | grep -E "Started new|Waiting for application startup|startup complete"
-```
-
-Proof is `Application startup complete` under 10 s after `Started`, with no
-`Stamped`, `event code` or `Linked Roles` line ahead of it, and a signed-in tab
-reconnecting its stream in that window. On production, the next VEKN member sync
-must log `Inferred coopted_by:` — before this commit it timed out there. Report
-both to the owner and delete this section.
+The next VEKN member sync on production must log `Inferred coopted_by:`. Report it
+to the owner and delete this section.
