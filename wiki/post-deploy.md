@@ -63,3 +63,20 @@ The first returns no rows — vekn events 9915, 7713, 8754, 5793, 6580, 9166 and
 2804 among them — and so does the third; legacy sheets carry no round count, so
 it covers the few pre-2011 sheets in the newer format. The second reads about 520 winners at 0 prelim GW out of about
 2,980, against about 65 before. Report both to the owner and delete this section.
+
+## Strip deckbuilder noise from the deck comments stored before it
+
+Gated by `d24e5f4d`. A deck-link import strips the deckbuilder's noise from that
+commit on, and the TWDA export publishes the stored comment verbatim, so a comment
+imported earlier keeps its restated header until this runs. The owner's go/no-go is
+on the report: a dev copy of the archive reported 1 of 930, a stray score line.
+
+```sh
+sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
+  /opt/archon/backend/.venv/bin/python \
+  /opt/archon/backend/scripts/strip_deck_comment_noise.py'
+```
+
+Rerun with `--apply` once every before/after pair reads as noise only. It worked
+when a third run reports `0 of N`. Delete this section and
+`backend/scripts/strip_deck_comment_noise.py` together.
