@@ -223,9 +223,8 @@ async def run(args: argparse.Namespace) -> int:
                 vekn_id = ext.get("vekn")
                 event = events.get(vekn_id or "")
                 sheet = _sheet(event) if event else []
-                entry = entries.get(ext.get("twda_entry") or ext.get("twda") or "") or (
-                    entry_by_vekn.get(vekn_id or "")
-                )
+                keyed = entries.get(ext.get("twda_entry") or ext.get("twda") or "")
+                entry = keyed or entry_by_vekn.get(vekn_id or "")
                 ref = f"{vekn_id or '-'}/{uid}"
                 final_vp = {s["player_uid"]: s["result"].get("vp", 0) for s in seats}
                 prelim = {s["user_uid"]: s for s in standings}
@@ -302,7 +301,7 @@ async def run(args: argparse.Namespace) -> int:
 
                 mapped = None
                 if sheet and not n_rounds:
-                    twda = msgspec.convert(entry, _TwdaScore) if entry else None
+                    twda = msgspec.convert(keyed, _TwdaScore) if keyed else None
                     mapped = _map_vekn_to_tournament(
                         {**event, "players": sheet}, uid_by_vekn_id, twda=twda
                     )

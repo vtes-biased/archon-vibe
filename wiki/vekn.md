@@ -275,21 +275,23 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   `pos` 1, the other finalists all at `pos` 2, everyone else at 6 — and it runs to
   December 2010. The sync takes the winner's final GW back out, except where that
   would leave the winner below an eliminated player's GW: a finalist qualified on
-  prelim GW, so such a sheet was never folded (about 7% of them). The finalists'
-  folded VP stays, since these sheets carry no `vpf` to subtract. The `vpf`-bearing
+  prelim GW, so such a sheet was never folded (about 7% of them). The other
+  finalists' folded VP stays, since these sheets carry no `vpf` to subtract. The `vpf`-bearing
   sheets vekn.net's newer format filed from late 2008 are prelim-only, which is why
   the rule keys on `vpf` and not on the date alone.
 - **A legacy sheet takes what it lacks from its archive entry** — the one settled
   onto the row as `twda_entry` or `twda` ([below](#inbound)). The entry's `NR+F`
   is the round count, and its `+Z in final` moves the winner's final VP out of the
-  prelim into a `finals` seat, but only on a sheet the rule above already reads as
-  folded; an `XGWY` beside it is trusted only where it is exactly the sheet minus
-  that final, because the archive's own lines are sometimes the total (archon's
-  submissions wrote them so). The fill therefore never changes a winner's total,
-  only where it sits. The other finalists' seats carry 0 VP, their final still
-  folded into their prelim, and print that way on the finals tab. Measured offline
-  on 834 legacy sheets matched to an entry: 530 round counts filled, 194 finals
-  split.
+  prelim into a `finals` seat, together with the final GW, wherever the sheet reads
+  as folded — by the rule above, or by the winner sitting at exactly that round
+  count plus one ([below](#tournaments)). An `XGWY` beside it must then be exactly
+  the sheet minus that final, which alone also marks the sheet folded, or nothing
+  is split: the archive's own lines are sometimes the total (archon's submissions
+  wrote them so). The fill therefore
+  never changes a winner's total, only where it sits. The other finalists' seats
+  carry 0 VP, their final still folded into their prelim, and print that way on the
+  finals tab. Measured offline on 834 legacy sheets matched to an entry: 530 round
+  counts filled, 194 finals split.
 - **The sync fetches the archive itself, every cycle.** Anything the TWDA job
   wrote onto a vekn import would be rebuilt away six hours later, so the fill sits
   on the incoming side of the one writer. A failed fetch holds only the rows
@@ -298,10 +300,10 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   the archive's CDN never stalls a new event.
 - **A GW above the sheet's own round count is the winner's final, or a wrong
   count.** A winner at exactly rounds + 1 with nobody else above it carries the
-  final GW, and loses it like a legacy winner (eight sheets, 2013–2025 — 12009 and
-  12503 among them, which looked like wrong counts and are not). Anyone else above
-  it means the round count is wrong — 7300, 8523, 9474, 9667, each a `2R` with a
-  3-GW non-winner — and it imports as unknown (0) rather than as a guess. That
+  final GW, and loses it like a legacy winner (eight sheets, 2013–2025). Anyone
+  else above it means the round count is wrong — 7300, 8523, 9474, 9667, each a
+  `2R` with a 3-GW non-winner — and it imports as unknown (0) rather than as a
+  guess. That
   winner's VP stays as filed: legacy archon pushed `vp` with the final folded in
   ([domain](domain/vekn.md#never-chase-veknnets-stored-rtp)), so a folded VP is
   common and no single sheet tells it from a real one.
@@ -657,9 +659,13 @@ calendar push's `UNCREATED_EVENTS_QUERY`, `resolve_event_code` and the event-cod
 backfill, the Hall of Fame's no-attestation grandfather, the duplicate report's
 refusal to propose, and the tournament page's archival badge. A settled attach
 carries `external_ids['twda_entry']` instead — *this event is the one that entry
-describes* — which gates nothing but the sync's own recognition. Reusing `twda`
-would move all seven at once, most concretely admitting rounds-less imports to the
-Hall of Fame and handing them the archive's file key as their public event code.
+describes* — which gates nothing but the TWDA sync's own recognition and the
+tournament sync's legacy-sheet fill. That fill, and its hold on a failed archive
+fetch ([above](#tournaments)), read either key alike, as *the entry this row
+describes*, and are the one reader indifferent to which key it finds. Reusing
+`twda` would move all seven at once, most concretely admitting rounds-less imports
+to the Hall of Fame and handing them the archive's file key as their public event
+code.
 
 **A stale-target warning names only a decision that never applied**, since one
 that did is on the corpus and never re-read. What remains points at a tournament
