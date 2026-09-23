@@ -440,8 +440,9 @@ fires on the finish action; on any later action on the Finished event that moves
 the winner or a winner's deck — the post-finish pass
 ([tournaments](tournaments.md#engine-event-catalog)), so late uploads, owner
 corrections and a rescored final all reach the archive, the open pull request
-taking the new file and a merged one getting a fresh request; on the manual
-organizer publish; on the batch after a successful results push, covering events
+taking the new file and a merged one getting a fresh request; on a config edit
+of the Finished event that moves its country or online flag, the header's place;
+on the manual organizer publish; on the batch after a successful results push, covering events
 finished offline or whose VEKN event id only just arrived; and on go-online for a
 tournament finished offline. In a multideck event the archived deck is the one
 stamped at the finals index; none on record is `no_deck`.
@@ -452,9 +453,10 @@ decks aren't archived), Storyline format (a deck can only be there from a
 pre-switch format, outside what the archive describes), fewer than 10 players
 played, unranked per the engine's
 `ranking_eligibility` (the same predicate as the ranked badge — the championship
-rank axis never gates TWDA), no event code yet, GitHub App unconfigured, or the
-winner has no deck — or `failed`, whose reason is `step[:http-status]`: the call
-that failed (`deck`, `config`, `auth`, `fork_sync`, `fork_ref`, `branch`,
+rank axis never gates TWDA), no event code yet, no place (neither a country nor
+the online flag, which would publish an empty place line — setting one submits),
+GitHub App unconfigured, or the winner has no deck — or `failed`, whose reason is
+`step[:http-status]`: the call that failed (`deck`, `config`, `auth`, `fork_sync`, `fork_ref`, `branch`,
 `commit`, `pull_request`, or `internal` for an unexpected error) and what the API
 answered. It is organizer/full projection only and shows as a status line on the
 finished-tournament organizer view, which names the failing step and offers the

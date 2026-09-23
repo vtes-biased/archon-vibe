@@ -351,6 +351,7 @@
   "twda_reason_unranked": "gli eventi non classificati non vengono archiviati",
   "twda_reason_too_few_players": "meno di 10 giocatori hanno giocato",
   "twda_reason_no_event_code": "questo torneo non ha ancora un codice breve",
+  "twda_reason_no_place": "l'evento non ha un paese né è segnato come online — impostane uno per inviarlo",
   "twda_reason_not_configured": "l'invio al TWDA non è configurato su questo server",
   "twda_reason_no_deck": "il vincitore non ha un mazzo",
   "twda_failed_deck": "il mazzo del vincitore non è stato preparato",

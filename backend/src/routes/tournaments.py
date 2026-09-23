@@ -583,6 +583,8 @@ async def maybe_submit_twda(tournament: Tournament) -> None:
         outcome = (TwdaOutcome.SKIPPED, "unranked", "")
     elif not tournament.event_code:
         outcome = (TwdaOutcome.SKIPPED, "no_event_code", "")
+    elif not tournament.online and not tournament.country:
+        outcome = (TwdaOutcome.SKIPPED, "no_place", "")
     elif not is_configured():
         outcome = (TwdaOutcome.SKIPPED, "not_configured", "")
     else:
@@ -1866,8 +1868,14 @@ async def tournament_action(
         # change does carry one — it rewrites the submission's Created-by line.
         winners = {tournament.winner, updated.winner} - {""}
         winner_deck_moved = any(op.get("player_uid") in winners for op in deck_ops)
-        if tournament.winner != updated.winner or winner_deck_moved:
+        winner_moved = tournament.winner != updated.winner or winner_deck_moved
+        place_moved = (tournament.country, tournament.online) != (
+            updated.country,
+            updated.online,
+        )
+        if winner_moved or place_moved:
             asyncio.create_task(maybe_submit_twda(updated))
+        if winner_moved:
             try:
                 from ..ratings import recompute_wins
 

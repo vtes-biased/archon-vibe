@@ -40,6 +40,7 @@
       case "no_event_code":
       case "no_vekn_event": // legacy stored reason, from when the vekn id was the key
         return m.twda_reason_no_event_code();
+      case "no_place": return m.twda_reason_no_place();
       case "not_configured": return m.twda_reason_not_configured();
       case "no_deck": return m.twda_reason_no_deck();
       default: return code;

@@ -56,6 +56,7 @@ async def _published(
     winner_name: str = "Winner Wendy",
     winner_vekn: str = "1000001",
     seated: int = TWDA_MIN_PLAYERS,
+    country: str | None = "FR",
 ):
     """Seed a finished event whose winner has a deck, and yield its TWDA text."""
     winner = _user(str(uuid7()), winner_name, winner_vekn)
@@ -78,7 +79,7 @@ async def _published(
         rank=TournamentRank.BASIC,
         state=TournamentState.FINISHED,
         start=datetime(2025, 6, 1, tzinfo=UTC),
-        country="FR",
+        country=country,
         external_ids={"vekn": "12345"},
         # What the backfill leaves on a vekn-bearing row: the submission keys on
         # the code, and the code of such a row is its vekn event id.
@@ -200,3 +201,16 @@ async def test_below_participation_floor_skips_twda(test_db):
         assert stored.twda_status is not None
         assert stored.twda_status.outcome == TwdaOutcome.SKIPPED
         assert stored.twda_status.reason == "too_few_players"
+
+
+@pytest.mark.asyncio
+async def test_event_with_no_place_skips_twda(test_db):
+    async with _published(
+        attribution=DeckAttribution(kind=AttributionKind.ANONYMOUS), country=None
+    ) as (tournament, _twda):
+        await maybe_submit_twda(tournament)
+        stored = await db.get_tournament_by_uid(tournament.uid)
+        assert stored is not None
+        assert stored.twda_status is not None
+        assert stored.twda_status.outcome == TwdaOutcome.SKIPPED
+        assert stored.twda_status.reason == "no_place"
