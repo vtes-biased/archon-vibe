@@ -556,12 +556,11 @@ pub fn library_type_order_json() -> String {
 fn header_field(line: &str) -> Option<(&str, &str)> {
     let (key, value) = line.split_once(':')?;
     let key = key.trim();
-    let words = key.split_whitespace().count();
-    let is_key = (1..=3).contains(&words)
+    let is_key = (1..=3).contains(&key.split_whitespace().count())
         && key
             .chars()
             .all(|c| c.is_alphabetic() || c == ' ' || c == '.');
-    (is_key && (value.is_empty() || value.starts_with(' '))).then_some((key, value.trim()))
+    (is_key && value.starts_with(' ') && !value.trim().is_empty()).then_some((key, value.trim()))
 }
 
 fn is_counted_section(line: &str) -> bool {
@@ -569,13 +568,16 @@ fn is_counted_section(line: &str) -> bool {
         return false;
     };
     let head = line[..open].trim();
+    let digits = line[open + 1..]
+        .trim_start()
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .count();
     (1..=2).contains(&head.split_whitespace().count())
         && head
             .chars()
             .all(|c| c.is_alphabetic() || c == ' ' || c == '/' || c == '-')
-        && line[open + 1..]
-            .trim_start()
-            .starts_with(|c: char| c.is_ascii_digit())
+        && (1..=3).contains(&digits)
 }
 
 fn is_revision_stamp(line: &str) -> bool {
@@ -603,36 +605,53 @@ fn is_rule(line: &str) -> bool {
     line.len() >= 3 && line.chars().all(|c| "=-_*~#".contains(c))
 }
 
-/// Drops what a deckbuilder leaves in a deck's description when a text list is
-/// imported into it, keeping what the player wrote.
 pub fn strip_deckbuilder_noise(comments: &str) -> String {
-    let mut out: Vec<String> = Vec::new();
-    let mut leading = true;
-    for raw in comments.lines() {
+    let lines: Vec<&str> = comments.lines().collect();
+    let mut block_end = 0;
+    let mut fields = 0;
+    let mut sections = 0;
+    let mut description = "";
+    for (i, raw) in lines.iter().enumerate() {
+        let line = raw.trim();
+        if line.is_empty() || is_revision_stamp(line) || is_score_line(line) || is_rule(line) {
+            block_end = i + 1;
+            continue;
+        }
+        match header_field(line) {
+            Some((key, value)) if key.to_lowercase().starts_with("descr") => {
+                block_end = i + 1;
+                description = value;
+                break;
+            }
+            Some((_, value)) if value.split_whitespace().count() <= 6 => fields += 1,
+            None if is_counted_section(line) => sections += 1,
+            _ => break,
+        }
+        block_end = i + 1;
+    }
+
+    let mut out: Vec<&str> = Vec::new();
+    let body = if fields >= 2 || sections >= 2 {
+        if !description.is_empty() {
+            out.push(description);
+        }
+        &lines[block_end..]
+    } else {
+        &lines[..]
+    };
+    let mut after_drop = false;
+    for raw in body {
         let line = raw.trim();
         if line.is_empty() {
-            if out.last().is_some_and(|l| !l.is_empty()) {
-                out.push(String::new());
+            if !out.is_empty() && !(after_drop && out.last() == Some(&"")) {
+                out.push("");
             }
-            continue;
+        } else if is_revision_stamp(line) || is_score_line(line) || is_rule(line) {
+            after_drop = true;
+        } else {
+            out.push(raw.trim_end());
+            after_drop = false;
         }
-        if leading {
-            if let Some((key, value)) = header_field(line) {
-                if key.to_lowercase().starts_with("descr") && !value.is_empty() {
-                    out.push(value.to_string());
-                }
-                continue;
-            }
-        }
-        leading = false;
-        if is_counted_section(line)
-            || is_revision_stamp(line)
-            || is_score_line(line)
-            || is_rule(line)
-        {
-            continue;
-        }
-        out.push(raw.trim_end().to_string());
     }
     while out.last().is_some_and(|l| l.is_empty()) {
         out.pop();
@@ -678,12 +697,11 @@ pub fn export_twda(
     if !deck.author.is_empty() {
         lines.push(format!("Created by: {}", deck.author));
     }
-    let comments = strip_deckbuilder_noise(&deck.comments);
-    if !comments.is_empty() {
+    if !deck.comments.is_empty() {
         lines.push(String::new());
-        lines.push(comments.clone());
+        lines.push(deck.comments.clone());
     }
-    if !deck.name.is_empty() || !deck.author.is_empty() || !comments.is_empty() {
+    if !deck.name.is_empty() || !deck.author.is_empty() || !deck.comments.is_empty() {
         lines.push(String::new());
     }
 
@@ -942,13 +960,36 @@ mod tests {
             strip_deckbuilder_noise(stamped),
             "original author Frederic Pin"
         );
-        let described = "Description: Gangrel wall with Garou\n=====\nLibrary (90 cards)\n\n\n\
-            Tech: Deflection over Wake\nPlayed at Nationals (2026) with no changes\n";
+        let described = "Deck Name: Wraith wall\nAuthor: ezmariel\n\
+            Description: Gangrel wall with Garou\n\n=====\n\nTech: Deflection over Wake\n\
+            Won Nationals (2026)\n";
         assert_eq!(
             strip_deckbuilder_noise(described),
-            "Gangrel wall with Garou\n\nTech: Deflection over Wake\n\
-            Played at Nationals (2026) with no changes"
+            "Gangrel wall with Garou\n\nTech: Deflection over Wake\nWon Nationals (2026)"
         );
+        let typed =
+            "Final Table:\nCristiano Vaz: Nosferatu V5 Primogen > Anderson: Protean Barons\n\
+            Strategy: bleed early\nGangrel (5 vampires) plus allies\n[2025-06-07]\n";
+        assert_eq!(
+            strip_deckbuilder_noise(typed),
+            "Final Table:\nCristiano Vaz: Nosferatu V5 Primogen > Anderson: Protean Barons\n\
+            Strategy: bleed early\nGangrel (5 vampires) plus allies"
+        );
+        let archived = "Report: https://www.vekn.net/forum/79533\n\n\
+            Description: Stolen Police Cruiser\n\n\nSeating";
+        assert_eq!(strip_deckbuilder_noise(archived), archived);
+        for text in [
+            imported,
+            twda_header,
+            stamped,
+            described,
+            typed,
+            archived,
+            "[2025-06-07]\nNote: blah",
+        ] {
+            let once = strip_deckbuilder_noise(text);
+            assert_eq!(strip_deckbuilder_noise(&once), once);
+        }
     }
 
     #[test]

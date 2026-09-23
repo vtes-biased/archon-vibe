@@ -485,20 +485,26 @@ with the finals seat's VP beside it — never the aggregated `result`, which alr
 folds the final in and would read to the archive as a double count. It is the
 archive's most common wording.
 
-**Comments**: the deck's comment follows the deck list, stripped of what a
-deckbuilder leaves behind when a text list is imported into it — the lines it could
-not parse land in its description, which a deck-link import copies into `comments`.
-`strip_deckbuilder_noise` (engine) runs on that import, so the player sees and edits
-what will publish, and again on export, which covers comments stored before it and
-typed ones alike. It matches shapes, never a language's vocabulary: a **leading** run
-of `Key: value` lines (a key of one to three words — `Nombre del mazo:`, `Date:`,
-`Location:`), a section line (one or two words, then a bracket opening on a count —
-`Cripta (12 cartas, …)`, `Master (14)`), a bare `[YYYY-MM-DD]` revision stamp, a
-TWDA score line (`— 2GW8 …`) and a rule of `=`/`-`. A `Key: value` line past the
-first line of prose is the player's (`Tech: Deflection`) and stays. The one word it
-knows is a leading `descr…` key, whose value is the description another deckbuilder
-held and is kept without its label. Card lines that did not resolve (`1 Khadija
-Al-Kindi`) survive: telling them from prose would take the card map.
+**Comments**: the deck's comment follows the deck list verbatim. What a deckbuilder
+leaves behind when a text list is imported into it — the lines it could not parse
+land in its description, which a deck-link import copies into `comments` — is
+stripped **once, at that import**, by `strip_deckbuilder_noise` (engine): the player
+sees and edits exactly what will publish, and a comment typed in the app is never
+touched. It matches shapes, never a language's vocabulary, and biases to keeping:
+
+- a **leading block** is dropped only when it holds two or more `Key: value` fields
+  (a key of one to three words, a value of at most six — `Nombre del mazo:`,
+  `Date:`, `Location:`) or two or more section lines (one or two words, then a
+  bracket opening on a count of at most three digits — `Cripta (12 cartas, …)`,
+  `Master (14)`). One such line is a player's (`Strategy: bleed early`, `Won
+  Nationals (2026)`), and so is anything past the first line of prose;
+- a leading `descr…` field closes the block and keeps its value without the label —
+  it is the description another deckbuilder held — and never counts toward the two;
+- anywhere: a bare `[YYYY-MM-DD]` revision stamp, a TWDA score line (`— 2GW8 …`),
+  a rule of `=`/`-`.
+
+It is idempotent. Card lines that did not resolve (`1 Khadija Al-Kindi`) survive:
+telling them from prose would take the card map.
 
 **Designer credit**: the winner's name is always in the header; a separate optional
 `Created by: <name>` line is emitted only when the deck is credited to someone
