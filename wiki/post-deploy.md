@@ -66,7 +66,7 @@ it covers the few pre-2011 sheets in the newer format. The second reads about 52
 
 ## Audit results across vekn.net, the TWDA and Archon after the first tournament sync
 
-Gated by `GATE`. The script ships in that commit, and the round-count and archive
+Gated by `8db70191`. The script ships in that commit, and the round-count and archive
 rules reach the stored rows only on the first tournament sync after the deploy (or
 the admin *Run now*); an audit before that reads the old imports. It scans vekn.net
 itself (about a minute) and peaks around 150 MB, so run it with the box quiet.
