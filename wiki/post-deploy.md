@@ -165,7 +165,7 @@ to the owner and delete this section.
 
 ## Check the old VEKN sheets after the first tournament sync
 
-Gated by `eaa55484`. The sync rebuilds any rounds-less import whose standings differ,
+Gated by `7836e944`. The sync rebuilds any rounds-less import whose standings differ,
 so the first scheduled tournament sync after the deploy (or the admin *Run now*)
 rewrites the legacy sheets on its own; running the check before that reads the
 old imports. Nothing to run but the queries.
