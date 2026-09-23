@@ -553,6 +553,93 @@ pub fn library_type_order_json() -> String {
     .dump()
 }
 
+fn header_field(line: &str) -> Option<(&str, &str)> {
+    let (key, value) = line.split_once(':')?;
+    let key = key.trim();
+    let words = key.split_whitespace().count();
+    let is_key = (1..=3).contains(&words)
+        && key
+            .chars()
+            .all(|c| c.is_alphabetic() || c == ' ' || c == '.');
+    (is_key && (value.is_empty() || value.starts_with(' '))).then_some((key, value.trim()))
+}
+
+fn is_counted_section(line: &str) -> bool {
+    let Some(open) = line.find(['(', '[']) else {
+        return false;
+    };
+    let head = line[..open].trim();
+    (1..=2).contains(&head.split_whitespace().count())
+        && head
+            .chars()
+            .all(|c| c.is_alphabetic() || c == ' ' || c == '/' || c == '-')
+        && line[open + 1..]
+            .trim_start()
+            .starts_with(|c: char| c.is_ascii_digit())
+}
+
+fn is_revision_stamp(line: &str) -> bool {
+    let b = line.as_bytes();
+    b.len() == 12
+        && b[0] == b'['
+        && b[11] == b']'
+        && b[5] == b'-'
+        && b[8] == b'-'
+        && [1, 2, 3, 4, 6, 7, 9, 10]
+            .iter()
+            .all(|&i| b[i].is_ascii_digit())
+}
+
+fn is_score_line(line: &str) -> bool {
+    let rest = line.trim_start_matches(['-', '\u{2013}', '\u{2014}']);
+    rest.len() < line.len()
+        && rest
+            .trim_start()
+            .trim_start_matches(|c: char| c.is_ascii_digit() || c == '.')
+            .starts_with("GW")
+}
+
+fn is_rule(line: &str) -> bool {
+    line.len() >= 3 && line.chars().all(|c| "=-_*~#".contains(c))
+}
+
+/// Drops what a deckbuilder leaves in a deck's description when a text list is
+/// imported into it, keeping what the player wrote.
+pub fn strip_deckbuilder_noise(comments: &str) -> String {
+    let mut out: Vec<String> = Vec::new();
+    let mut leading = true;
+    for raw in comments.lines() {
+        let line = raw.trim();
+        if line.is_empty() {
+            if out.last().is_some_and(|l| !l.is_empty()) {
+                out.push(String::new());
+            }
+            continue;
+        }
+        if leading {
+            if let Some((key, value)) = header_field(line) {
+                if key.to_lowercase().starts_with("descr") && !value.is_empty() {
+                    out.push(value.to_string());
+                }
+                continue;
+            }
+        }
+        leading = false;
+        if is_counted_section(line)
+            || is_revision_stamp(line)
+            || is_score_line(line)
+            || is_rule(line)
+        {
+            continue;
+        }
+        out.push(raw.trim_end().to_string());
+    }
+    while out.last().is_some_and(|l| l.is_empty()) {
+        out.pop();
+    }
+    out.join("\n")
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn export_twda(
     deck: &Deck,
@@ -591,7 +678,12 @@ pub fn export_twda(
     if !deck.author.is_empty() {
         lines.push(format!("Created by: {}", deck.author));
     }
-    if !deck.name.is_empty() || !deck.author.is_empty() {
+    let comments = strip_deckbuilder_noise(&deck.comments);
+    if !comments.is_empty() {
+        lines.push(String::new());
+        lines.push(comments.clone());
+    }
+    if !deck.name.is_empty() || !deck.author.is_empty() || !comments.is_empty() {
         lines.push(String::new());
     }
 
@@ -835,6 +927,28 @@ mod tests {
         let named = parse_deck(&format!("Vote Lock\n{text}"), &cm).unwrap();
         assert_eq!(named.deck.name, "Vote Lock");
         assert!(result.unrecognized_lines.is_empty());
+    }
+
+    #[test]
+    fn test_strip_deckbuilder_noise() {
+        let imported = "Nombre del mazo: Djeneba y amigos\nAutor: Juanjo romero Paniagua\n\n\
+            Cripta (12 cartas, mín.=23, máx.=36, promedio=7,17)Deck Name: djeneba\n";
+        assert_eq!(strip_deckbuilder_noise(imported), "");
+        let twda_header = "Date: 2025-07-05\nPlayers: 56\nEvent: Grand Prix 2025 - Poland\n\
+            Location: Warsaw, Poland\n\n\u{2014} 2GW8 + 3vp in final\n";
+        assert_eq!(strip_deckbuilder_noise(twda_header), "");
+        let stamped = "[2026-08-21] \n[2025-06-07] \noriginal author Frederic Pin\n";
+        assert_eq!(
+            strip_deckbuilder_noise(stamped),
+            "original author Frederic Pin"
+        );
+        let described = "Description: Gangrel wall with Garou\n=====\nLibrary (90 cards)\n\n\n\
+            Tech: Deflection over Wake\nPlayed at Nationals (2026) with no changes\n";
+        assert_eq!(
+            strip_deckbuilder_noise(described),
+            "Gangrel wall with Garou\n\nTech: Deflection over Wake\n\
+            Played at Nationals (2026) with no changes"
+        );
     }
 
     #[test]

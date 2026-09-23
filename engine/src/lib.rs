@@ -1032,6 +1032,10 @@ mod python {
             }))
         }
 
+        fn strip_deckbuilder_noise(&self, comments: &str) -> String {
+            super::deck::strip_deckbuilder_noise(comments)
+        }
+
         fn check_table_vps(&self, vps: Vec<f64>) -> PyResult<Option<String>> {
             Ok(super::tournament::check_table_vps(&vps).map(|e| format!("{:?}", e)))
         }

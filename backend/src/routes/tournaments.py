@@ -453,6 +453,7 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
         {
             "name": winner_deck.name,
             "author": designer_credit,
+            "comments": winner_deck.comments,
             "cards": winner_deck.cards,
         }
     )
@@ -1242,6 +1243,7 @@ async def fetch_deck_proxy(
         logger.exception("Failed to fetch deck from URL")
         raise HTTPException(status_code=400, detail=f"Failed to fetch deck: {e}") from e
 
+    result["comments"] = _engine.strip_deckbuilder_noise(result["comments"])
     return Response(
         content=msgspec.json.encode(result),
         media_type="application/json",
