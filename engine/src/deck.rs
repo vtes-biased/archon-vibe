@@ -361,7 +361,8 @@ pub fn parse_deck(text: &str, card_map: &CardMap) -> Result<ParseResult, EngineE
             *deck.cards.entry(card_id).or_insert(0) += count;
         } else if !found_card
             && !is_comment_line(line)
-            && !is_section_header(line)
+            && !(is_section_header(line)
+                && line.contains(|c: char| c == '(' || c == ':' || c.is_ascii_digit()))
             && line.chars().any(char::is_alphanumeric)
         {
             header_lines.push(line.trim().to_string());
@@ -831,6 +832,8 @@ mod tests {
         let result = parse_deck(text, &cm).unwrap();
         assert_eq!(result.deck.name, "");
         assert_eq!(result.deck.cards.len(), 2);
+        let named = parse_deck(&format!("Vote Lock\n{text}"), &cm).unwrap();
+        assert_eq!(named.deck.name, "Vote Lock");
         assert!(result.unrecognized_lines.is_empty());
     }
 
