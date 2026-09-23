@@ -176,11 +176,43 @@ def _map_vekn_to_tournament(
         winner_uid = ""
         finalists: list[tuple[str, int, float]] = []  # (user_uid, pos, vpf)
 
-        for vp_data in vekn_players:
-            vekn_id = str(vp_data.get("veknid") or "")
-            user_uid = uid_by_vekn_id.get(vekn_id)
-            if not user_uid:
+        unplaced = 1_000_000
+
+        def placement(row: dict[str, Any]) -> int:
+            pos = str(row.get("pos") or "")
+            flagged = "1" in (str(row.get("dq") or "0"), str(row.get("wd") or "0"))
+            return int(pos) if pos.isdigit() and not flagged else unplaced
+
+        rows_by_vekn_id: dict[str, dict[str, Any]] = {}
+        for row in vekn_players:
+            vekn_id = str(row.get("veknid") or "")
+            if vekn_id not in uid_by_vekn_id:
                 continue
+            kept = rows_by_vekn_id.setdefault(vekn_id, row)
+            if kept is not row:
+                if placement(row) < placement(kept):
+                    rows_by_vekn_id[vekn_id], row = row, kept
+                logger.info(
+                    f"VEKN event {event_id}: member {vekn_id} listed twice, "
+                    f"dropped row {row}"
+                )
+
+        legacy_sheet = (
+            start is not None
+            and start < datetime(2011, 1, 1)
+            and not any(float(row.get("vpf") or 0) for row in vekn_players)
+        )
+        best_eliminated_gw = max(
+            (
+                int(row.get("gw", 0) or 0)
+                for row in vekn_players
+                if 5 < placement(row) < unplaced
+            ),
+            default=0,
+        )
+
+        for vp_data in rows_by_vekn_id.values():
+            user_uid = uid_by_vekn_id[str(vp_data.get("veknid") or "")]
 
             # `pos` on a dq'd or withdrawn row is the field size, not a placement,
             # so in a small field reading it as one crowns that player a finalist.
@@ -198,6 +230,8 @@ def _map_vekn_to_tournament(
                 prelim_gw, vp_prelim, vp_finals, tp, toss = 0, 0.0, 0.0, 0, 0
             if is_finalist and pos == "1":
                 winner_uid = user_uid
+                if legacy_sheet and prelim_gw - 1 >= best_eliminated_gw:
+                    prelim_gw -= 1
             if is_finalist:
                 finalists.append((user_uid, int(pos), vp_finals))
 

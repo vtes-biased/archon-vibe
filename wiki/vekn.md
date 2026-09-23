@@ -270,6 +270,18 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   shape of a native or ETL-imported tournament. A summary-only winner with no
   `vpf` instead gets the tournament-win GW from the engine's rating rule, with no
   finals object.
+- **A sheet dated before 2011 with no `vpf` folds the final into its prelim
+  totals.** That is vekn.net's legacy format — no round count, the winner at
+  `pos` 1, the other finalists all at `pos` 2, everyone else at 6 — and it runs to
+  December 2010. The sync takes the winner's final GW back out, except where that
+  would leave the winner below an eliminated player's GW: a finalist qualified on
+  prelim GW, so such a sheet was never folded (about 7% of them). The finalists'
+  folded VP stays, since these sheets carry no `vpf` to subtract. The `vpf`-bearing
+  sheets vekn.net's newer format filed from late 2008 are prelim-only, which is why
+  the rule keys on `vpf` and not on the date alone.
+- **A member listed twice on one sheet keeps one row** — the better placed, the
+  first on a tie — and the sync logs the dropped one. vekn.net carries the
+  duplicate itself, sometimes with a second real score that belongs to nobody else.
 - **`dq` and `wd` say `pos` is not a placement.** Each participant carries both
   beside `pos`, and vekn.net files a flagged row at `pos` = field size — so reading
   it as a placement crowns that player a finalist in a field of five. Neither flag

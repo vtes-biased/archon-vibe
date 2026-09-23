@@ -162,3 +162,29 @@ they time out on production, so an earlier sync measures the old code.
 
 The next VEKN member sync on production must log `Inferred coopted_by:`. Report it
 to the owner and delete this section.
+
+## Check the old VEKN sheets after the first tournament sync
+
+Gated by `eaa55484`. The sync rebuilds any rounds-less import whose standings differ,
+so the first scheduled tournament sync after the deploy (or the admin *Run now*)
+rewrites the legacy sheets on its own; running the check before that reads the
+old imports. Nothing to run but the queries.
+
+```sql
+SELECT "full"->'external_ids'->>'vekn' AS vekn
+FROM objects
+WHERE type = 'tournament' AND "full"->'external_ids' ? 'vekn'
+  AND jsonb_array_length("full"->'standings')
+      <> (SELECT count(DISTINCT s->>'user_uid')
+          FROM jsonb_array_elements("full"->'standings') s);
+
+SELECT count(*) FILTER (WHERE (s->>'gw')::float = 0) AS winners_at_zero,
+       count(*) AS winners
+FROM objects t, jsonb_array_elements(t."full"->'standings') s
+WHERE t.type = 'tournament' AND t."full"->'external_ids' ? 'vekn'
+  AND t."full"->>'start' < '2011' AND s->>'user_uid' = t."full"->>'winner';
+```
+
+The first returns no rows — vekn events 9915, 7713, 8754, 5793, 6580, 9166 and
+2804 among them. The second reads about 520 winners at 0 prelim GW out of about
+2,980, against about 65 before. Report both to the owner and delete this section.

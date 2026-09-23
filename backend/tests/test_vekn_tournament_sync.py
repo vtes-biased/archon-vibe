@@ -171,3 +171,30 @@ def test_flagged_row_never_reaches_the_finalist_or_winner_test():
     assert "u3" not in {s.player_uid for s in t.finals.seating}
     assert "u4" not in {s.player_uid for s in t.finals.seating}
     assert [s.user_uid for s in t.standings][-1] == "u3"
+
+
+def test_legacy_sheet_takes_the_final_gw_back_out_of_the_prelim():
+    users = {str(i): f"u{i}" for i in range(1, 7)}
+    legacy = _final_event() | {"event_startdate": "2009-03-01", "rounds": "0R"}
+    legacy["players"] = [p | {"vpf": "0"} for p in legacy["players"]]
+    t = _map_vekn_to_tournament(legacy, users)
+    winner = next(s for s in t.standings if s.user_uid == "u1")
+    assert winner.gw == 0.0
+    assert next(p for p in t.players if p.user_uid == "u1").result.gw == 1
+
+    new_format = _final_event() | {"event_startdate": "2009-03-01", "rounds": "0R"}
+    t = _map_vekn_to_tournament(new_format, users)
+    assert next(s for s in t.standings if s.user_uid == "u1").gw == 1.0
+
+
+def test_member_listed_twice_keeps_the_placed_row():
+    users = {str(i): f"u{i}" for i in range(1, 7)}
+    event = _final_event()
+    event["players"].append(
+        {"pos": "6", "veknid": "1", "gw": "0", "vp": "0.5", "vpf": "0", "tp": "12"}
+    )
+    t = _map_vekn_to_tournament(event, users)
+    assert [p.user_uid for p in t.players].count("u1") == 1
+    assert [s.user_uid for s in t.standings].count("u1") == 1
+    assert t.winner == "u1"
+    assert next(s for s in t.standings if s.user_uid == "u1").vp == 3.0
