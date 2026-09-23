@@ -30,16 +30,6 @@ answers whether a given deploy has made it actionable — the same check
 gates it and why, what to run, what proves it worked, and what it owes afterwards:
 people to tell, and the wiki text that dies with it.
 
-## Watch the co-opted-by inference on production
-
-Gated by "Serve a backend restart within seconds" (`4d4c22f1`), which moves the
-member sync's co-opted-by reads out from under the 30s guard
-([architecture](architecture.md#scheduled-background-tasks)). Before it is live
-they time out on production, so an earlier sync measures the old code.
-
-The next VEKN member sync on production must log `Inferred coopted_by:`. Report it
-to the owner and delete this section.
-
 ## Check the old VEKN sheets after the first tournament sync
 
 Gated by `7836e944`. The sync rebuilds any rounds-less import whose standings differ,
