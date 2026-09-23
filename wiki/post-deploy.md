@@ -183,8 +183,16 @@ SELECT count(*) FILTER (WHERE (s->>'gw')::float = 0) AS winners_at_zero,
 FROM objects t, jsonb_array_elements(t."full"->'standings') s
 WHERE t.type = 'tournament' AND t."full"->'external_ids' ? 'vekn'
   AND t."full"->>'start' < '2011' AND s->>'user_uid' = t."full"->>'winner';
+
+SELECT t."full"->'external_ids'->>'vekn' AS vekn
+FROM objects t, jsonb_array_elements(t."full"->'standings') s
+WHERE t.type = 'tournament' AND t."full"->'external_ids' ? 'vekn'
+  AND t."full"->>'start' < '2011'
+  AND (t."full"->>'max_rounds')::int > 0
+  AND (s->>'gw')::float > (t."full"->>'max_rounds')::int;
 ```
 
 The first returns no rows — vekn events 9915, 7713, 8754, 5793, 6580, 9166 and
-2804 among them. The second reads about 520 winners at 0 prelim GW out of about
+2804 among them — and so does the third; legacy sheets carry no round count, so
+it covers the few pre-2011 sheets in the newer format. The second reads about 520 winners at 0 prelim GW out of about
 2,980, against about 65 before. Report both to the owner and delete this section.
