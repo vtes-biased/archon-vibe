@@ -453,7 +453,6 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
         {
             "name": winner_deck.name,
             "author": designer_credit,
-            "comments": winner_deck.comments,
             "cards": winner_deck.cards,
         }
     )

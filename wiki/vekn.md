@@ -485,6 +485,13 @@ with the finals seat's VP beside it — never the aggregated `result`, which alr
 folds the final in and would read to the archive as a double count. It is the
 archive's most common wording.
 
+**No description**: the deck's `comments` never reach the archive. They are the
+deckbuilder's free-text description, copied verbatim by a deck-link import, and in
+practice carry pasted exports in the player's language, earlier TWDA headers and
+revision stamps: `Nombre del mazo:` and `Cripta (12 cartas…)` restated the header
+of 13379, and no language-agnostic filter tells them from a player's note. The
+maintainer adds commentary by hand when an entry deserves it.
+
 **Designer credit**: the winner's name is always in the header; a separate optional
 `Created by: <name>` line is emitted only when the deck is credited to someone
 else — a `Member` credit resolved to that member's current name, or the name a

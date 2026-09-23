@@ -359,7 +359,11 @@ pub fn parse_deck(text: &str, card_map: &CardMap) -> Result<ParseResult, EngineE
         if let Some((card_id, count)) = parse_card_line(line, card_map) {
             found_card = true;
             *deck.cards.entry(card_id).or_insert(0) += count;
-        } else if !found_card && !line.trim().is_empty() && !is_comment_line(line) {
+        } else if !found_card
+            && !is_comment_line(line)
+            && !is_section_header(line)
+            && line.chars().any(char::is_alphanumeric)
+        {
             header_lines.push(line.trim().to_string());
         } else if found_card
             && !line.trim().is_empty()
@@ -586,11 +590,7 @@ pub fn export_twda(
     if !deck.author.is_empty() {
         lines.push(format!("Created by: {}", deck.author));
     }
-    if !deck.comments.is_empty() {
-        lines.push(String::new());
-        lines.push(deck.comments.clone());
-    }
-    if !deck.name.is_empty() || !deck.author.is_empty() || !deck.comments.is_empty() {
+    if !deck.name.is_empty() || !deck.author.is_empty() {
         lines.push(String::new());
     }
 
@@ -827,8 +827,9 @@ mod tests {
     #[test]
     fn test_section_headers_skipped() {
         let cm = CardMap::load(test_cards_json()).unwrap();
-        let text = "Crypt (12 cards)\n2x Aabbt Kindred\nLibrary (61 cards)\n2x .44 Magnum\n";
+        let text = "=====\nCrypt (12 cards; Capacity min=1 max=9 avg=5.8)\n2x Aabbt Kindred\nLibrary (61 cards)\n2x .44 Magnum\n";
         let result = parse_deck(text, &cm).unwrap();
+        assert_eq!(result.deck.name, "");
         assert_eq!(result.deck.cards.len(), 2);
         assert!(result.unrecognized_lines.is_empty());
     }
