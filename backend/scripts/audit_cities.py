@@ -34,7 +34,7 @@ async def main() -> None:
     print("Fetching all VEKN members...")
     client = VEKNAPIClient()
     try:
-        players = await client.fetch_all_members()
+        players = [p async for p in client.fetch_all_members()]
     finally:
         await http_client.close()
     print(f"Fetched {len(players)} members\n")

@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 from uuid import uuid7
 
 import aiohttp
+import msgspec
 
 from . import http_client
 from .broadcast import broadcast_precomputed
@@ -71,24 +72,39 @@ def extract_vekn_event_id(entry: dict) -> str | None:
     return None
 
 
-def _flatten_twda_cards(entry: dict) -> dict[str, int]:
-    """Flatten TWDA crypt/library dicts into {card_id_str: count}.
+class _TwdaCard(msgspec.Struct):
+    id: int
+    count: int = 1
 
-    Crypt: {count, cards: [{id, count, name}, ...]}
-    Library: {count, cards: [{type, count, cards: [{id, count, name}, ...]}, ...]}
-    """
-    cards: dict[str, int] = {}
-    # Crypt cards are flat
-    for card in entry.get("crypt", {}).get("cards", []):
-        card_id = card.get("id")
-        if card_id is not None:
-            cards[str(card_id)] = card.get("count", 1)
-    # Library cards are nested by type
-    for group in entry.get("library", {}).get("cards", []):
-        for card in group.get("cards", []):
-            card_id = card.get("id")
-            if card_id is not None:
-                cards[str(card_id)] = card.get("count", 1)
+
+class _TwdaCards(msgspec.Struct):
+    cards: list[_TwdaCard] = []
+
+
+class _TwdaLibrary(msgspec.Struct):
+    cards: list[_TwdaCards] = []
+
+
+class TwdaEntry(msgspec.Struct):
+    """Only the archive fields we read — the rest is dropped at parse time."""
+
+    id: str
+    event: str = ""
+    place: str = ""
+    date: str = ""
+    tournament_format: str = ""
+    players_count: int = 0
+    name: str = ""
+    comments: str = ""
+    crypt: _TwdaCards = msgspec.field(default_factory=_TwdaCards)
+    library: _TwdaLibrary = msgspec.field(default_factory=_TwdaLibrary)
+
+
+def _flatten_twda_cards(entry: TwdaEntry) -> dict[str, int]:
+    """{card_id_str: count} over the flat crypt and the type-grouped library."""
+    cards = {str(card.id): card.count for card in entry.crypt.cards}
+    for group in entry.library.cards:
+        cards.update((str(card.id), card.count) for card in group.cards)
     return cards
 
 
@@ -169,9 +185,9 @@ def _twda_timezone(country: str | None, city: str) -> str:
     return COUNTRY_TIMEZONE.get(country, "UTC")
 
 
-def _twda_place(entry: dict) -> tuple[str | None, str]:
+def _twda_place(entry: TwdaEntry) -> tuple[str | None, str]:
     """(ISO country, city) from `place` — "City (STATE), Country"."""
-    place = (entry.get("place") or "").strip()
+    place = entry.place.strip()
     if not place:
         return None, ""
     head, _, tail = place.rpartition(",")
@@ -179,7 +195,9 @@ def _twda_place(entry: dict) -> tuple[str | None, str]:
     return country, head.split("(")[0].strip()
 
 
-def reconstructed_tournament(entry: dict, winner_uid: str, now: datetime) -> Tournament:
+def reconstructed_tournament(
+    entry: TwdaEntry, winner_uid: str, now: datetime
+) -> Tournament:
     """The canonical rounds-less archival shape, as the VEKN and archon imports
     already write it — with the attested field size the archive supplies.
 
@@ -191,15 +209,15 @@ def reconstructed_tournament(entry: dict, winner_uid: str, now: datetime) -> Tou
     arithmetic trusts a measurement.
     """
     country, city = _twda_place(entry)
-    day = entry.get("date", "")
+    day = entry.date
     start = datetime.strptime(day, "%Y-%m-%d") if _ISO_DATE_RE.match(day) else None
-    rounds = re.match(r"\s*(\d+)", str(entry.get("tournament_format") or ""))
+    rounds = re.match(r"\s*(\d+)", entry.tournament_format)
     return Tournament(
         uid=str(uuid7()),
         modified=now,
-        name=entry.get("event") or f"VTES Tournament — {city or country or day}",
+        name=entry.event or f"VTES Tournament — {city or country or day}",
         format=TournamentFormat.Standard,
-        online=(entry.get("place") or "").strip().lower() == "online",
+        online=entry.place.strip().lower() == "online",
         start=start,
         finish=start,
         timezone=_twda_timezone(country, city),
@@ -209,7 +227,7 @@ def reconstructed_tournament(entry: dict, winner_uid: str, now: datetime) -> Tou
         # The archive's own file key. Never `vekn`: these have no vekn.net row,
         # and never `vekn_pushed_at`, which would mean "we exchanged results with
         # vekn.net" and would permanently block deleting a bad reconstruction.
-        external_ids={"twda": str(entry.get("id", ""))},
+        external_ids={"twda": entry.id},
         players=[
             Player(user_uid=winner_uid, state=PlayerState.FINISHED, finalist=True)
         ],
@@ -217,7 +235,7 @@ def reconstructed_tournament(entry: dict, winner_uid: str, now: datetime) -> Tou
         winner=winner_uid,
         # The only field that survives to say how big this was. `players_count`
         # is absent on ~100 entries; 0 there means "unattested", same as anywhere.
-        reported_player_count=int(entry.get("players_count") or 0),
+        reported_player_count=entry.players_count,
     )
 
 
@@ -322,8 +340,8 @@ async def run_twda_sync(
     pending = sum(
         1
         for entry in entries
-        if str(entry.get("id", "")) not in known
-        and decisions.get(str(entry.get("id", "")), ("", ""))[0] in ("attach", "create")
+        if entry.id not in known
+        and decisions.get(entry.id, ("", ""))[0] in ("attach", "create")
     )
     # A run this size is the initial backfill, not a delta, whatever invoked it.
     # Write nothing and say so: the decks below still land for everything already
@@ -339,7 +357,7 @@ async def run_twda_sync(
         )
 
     for entry in entries:
-        entry_id = str(entry.get("id", ""))
+        entry_id = entry.id
         existing = known.get(entry_id)
         if existing:
             resolved[entry_id] = existing
@@ -369,7 +387,7 @@ async def run_twda_sync(
     # A settled row whose entry left the archive — renamed upstream, or withdrawn.
     # Never auto-repaired: the row may hold a corrected result or a deck, and only
     # a human can tell a rename from a retraction.
-    orphaned = sorted(set(known) - {str(e.get("id", "")) for e in entries})
+    orphaned = sorted(set(known) - {e.id for e in entries})
     stats["orphaned"] = len(orphaned)
     if orphaned:
         logger.warning(
@@ -398,7 +416,7 @@ async def run_twda_sync(
 
 
 async def _import_decks(
-    entries: list[dict],
+    entries: list[TwdaEntry],
     resolved: dict[str, str],
     now: datetime,
     broadcast: bool,
@@ -417,7 +435,7 @@ async def _import_decks(
     stale: list[str] = []
     touched: set[str] = set()
     for entry in entries:
-        entry_id = str(entry.get("id", ""))
+        entry_id = entry.id
         tournament_uid = resolved.get(entry_id)
         if not tournament_uid:
             continue
@@ -436,8 +454,8 @@ async def _import_decks(
             modified=now,
             tournament_uid=tournament_uid,
             user_uid=winner_uid,
-            name=entry.get("name", ""),
-            comments=entry.get("comments", ""),
+            name=entry.name,
+            comments=entry.comments,
             cards=cards,
             attribution=DeckAttribution(kind=AttributionKind.OWNER),
             public=True,
@@ -452,10 +470,9 @@ async def _import_decks(
     return created, stale, touched
 
 
-async def _fetch_twda() -> list[dict]:
+async def _fetch_twda() -> list[TwdaEntry]:
     async with http_client.session().get(
         TWDA_URL, timeout=aiohttp.ClientTimeout(total=120.0)
     ) as resp:
         resp.raise_for_status()
-        # content_type=None: static.krcg.org may not serve application/json.
-        return await resp.json(content_type=None)
+        return msgspec.json.decode(await resp.read(), type=list[TwdaEntry])

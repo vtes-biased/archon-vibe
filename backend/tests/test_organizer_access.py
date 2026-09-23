@@ -123,9 +123,9 @@ class TestCanLinkTournamentToLeague:
 class TestVeknOrganizerMapping:
     def _users_by_vekn(self):
         return {
-            "1000001": _user("uid-org", roles=[]),
-            "2000001": _user("uid-player1", roles=[]),
-            "3000001": _user("uid-player2", roles=[]),
+            "1000001": "uid-org",
+            "2000001": "uid-player1",
+            "3000001": "uid-player2",
         }
 
     def test_organizer_mapped_from_veknid(self):

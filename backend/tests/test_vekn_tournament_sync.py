@@ -4,19 +4,10 @@ the `vekn_pushed_at` stamp set here and by batch_push's own rounds-non-empty
 guard — belt-and-suspenders. `_map_vekn_to_tournament` is pure, no DB/mocks.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime
 
-from src.models import PlayerState, User
+from src.models import PlayerState
 from src.vekn_tournament_sync import _map_vekn_to_tournament
-
-
-def _user(uid: str, vekn_id: str) -> User:
-    return User(
-        uid=uid,
-        modified=datetime(2025, 1, 1, tzinfo=UTC),
-        name=f"Player {uid}",
-        vekn_id=vekn_id,
-    )
 
 
 # A 2-type (Standard Constructed) finished event with one known player.
@@ -47,7 +38,7 @@ def _planned_event() -> dict:
 
 
 def test_finished_import_stamps_vekn_pushed_at():
-    users = {"1000001": _user("u1", "1000001")}
+    users = {"1000001": "u1"}
     t = _map_vekn_to_tournament(_finished_event(), users)
     assert t is not None
     # Finished import: standings populated FROM vekn.net but no in-app rounds.
@@ -60,7 +51,7 @@ def test_import_populates_round_count():
     # VEKN's calendar 'rounds' field is the preliminary round count; the sync
     # maps it onto max_rounds (the app's "number of rounds"), not just for
     # open-rounds events.
-    users = {"1000001": _user("u1", "1000001")}
+    users = {"1000001": "u1"}
     t = _map_vekn_to_tournament(_finished_event(), users)
     assert t is not None and t.max_rounds == 3
 
@@ -119,7 +110,7 @@ def test_import_standings_prelim_only_and_reconstructs_finals():
     # The #340 contract: standings carry PRELIM-only scores (winner's +1 finals
     # GW and everyone's vpf excluded); the final lives in a reconstructed
     # finals object with winner +1 GW and each seat's vp = vpf.
-    users = {str(i): _user(f"u{i}", str(i)) for i in range(1, 7)}
+    users = {str(i): f"u{i}" for i in range(1, 7)}
     t = _map_vekn_to_tournament(_final_event(), users)
     assert t is not None
 
@@ -137,7 +128,7 @@ def test_import_standings_prelim_only_and_reconstructs_finals():
 def test_no_final_import_omits_finals_but_keeps_winner():
     # No final played (all vpf=0) → no finals object, but the winner is still set
     # so the engine's tournament-win GW rule credits it. Standings stay prelim-only.
-    users = {"1000001": _user("u1", "1000001")}
+    users = {"1000001": "u1"}
     t = _map_vekn_to_tournament(_finished_event(), users)
     assert t is not None
     assert t.finals is None
@@ -165,7 +156,7 @@ def _flagged_event() -> dict:
 
 
 def test_flagged_row_never_reaches_the_finalist_or_winner_test():
-    users = {str(i): _user(f"u{i}", str(i)) for i in range(1, 6)}
+    users = {str(i): f"u{i}" for i in range(1, 6)}
     t = _map_vekn_to_tournament(_flagged_event(), users)
     assert t is not None
 

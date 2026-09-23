@@ -4,6 +4,7 @@ no separate Rating table."""
 
 import calendar
 import logging
+from contextlib import aclosing
 from datetime import UTC, datetime
 
 import msgspec
@@ -13,11 +14,11 @@ from .db import (
     BroadcastData,
     decode_json,
     get_all_tournament_wins,
-    get_finished_tournaments_for_category,
     get_sanctions_for_tournament,
     get_user_uids_with_wins,
     get_users_by_uids,
     save_user,
+    stream_finished_tournaments_for_category,
     stream_objects_new,
 )
 from .models import (
@@ -35,6 +36,7 @@ logger = logging.getLogger(__name__)
 # Rolling window for rating computation
 RATING_WINDOW_MONTHS = 18
 TOP_N = 8
+_USER_BATCH = 500
 
 _engine = PyEngine()
 
@@ -190,84 +192,61 @@ async def recompute_ratings_for_players(
         RatingCategory.LIMITED_ONLINE,
     )
 
-    all_tournaments: list[Tournament] = []
+    entries_by_user: dict[str, list[TournamentRatingEntry]] = {
+        uid: [] for uid in player_uids
+    }
     for fmt in formats:
-        all_tournaments.extend(
-            await get_finished_tournaments_for_category(fmt, online, cutoff_str)
-        )
-
-    # Precomputed once per tournament, not per (user, tournament) — avoids
-    # re-scanning rounds and re-encoding O(players) times.
-    played_by_t: dict[str, set[str]] = {}
-    json_by_t: dict[str, str] = {}
-    count_by_t: dict[str, int] = {}
-    positions_by_t: dict[str, dict[str, tuple[int, int]]] = {}
-    eligible: list[Tournament] = []
-    for t in all_tournaments:
-        t_json = msgspec.json.encode(t).decode()
-        # Same single-sourced predicate the frontend ranked/unranked badge displays.
-        if _engine.ranking_eligibility(t_json) != "eligible":
-            continue
-        eligible.append(t)
-        played_by_t[t.uid] = _players_with_rounds(t)
-        json_by_t[t.uid] = t_json
-        # Who earns an entry vs how big the field was: two questions, two counts.
-        count_by_t[t.uid] = _engine.attested_player_count(t_json)
-        positions_by_t[t.uid] = _final_positions(t)
-    all_tournaments = eligible
-
-    users_by_uid = await get_users_by_uids(player_uids)
+        async with aclosing(
+            stream_finished_tournaments_for_category(fmt, online, cutoff_str)
+        ) as tournaments:
+            async for t in tournaments:
+                players = _players_with_rounds(t) & player_uids
+                if not players:
+                    continue
+                t_json = msgspec.json.encode(t).decode()
+                # Same single-sourced predicate the frontend ranked/unranked badge displays.
+                if _engine.ranking_eligibility(t_json) != "eligible":
+                    continue
+                sanctions = await get_sanctions_for_tournament(t.uid)
+                sanctions_json = msgspec.json.encode(sanctions).decode()
+                # Who earns an entry vs how big the field was: two questions, two counts.
+                count = _engine.attested_player_count(t_json)
+                positions = _final_positions(t)
+                for user_uid in players:
+                    if _is_disqualified(t, sanctions, user_uid):
+                        continue  # DQ'd: no rating entry, no participation base
+                    if _is_non_competing(t, user_uid):
+                        continue  # proxy: non-competing official stood in — no rating
+                    entries_by_user[user_uid].append(
+                        _compute_entry(
+                            t, t_json, sanctions_json, user_uid, count, positions
+                        )
+                    )
 
     updated_users: list[tuple[User, BroadcastData]] = []
-    sanctions_cache: dict[str, list] = {}
-    sanctions_json_cache: dict[str, str] = {}
+    uids = sorted(player_uids)
+    for i in range(0, len(uids), _USER_BATCH):
+        users_by_uid = await get_users_by_uids(set(uids[i : i + _USER_BATCH]))
+        for user_uid, user in users_by_uid.items():
+            entries = entries_by_user[user_uid]
+            # Explicit tie-break so the no-change comparison below isn't fooled by the
+            # unordered tournament fetch varying row order between runs.
+            entries.sort(key=lambda e: (-e.points, e.tournament_uid))
+            top_entries = entries[:TOP_N]
+            total = sum(e.points for e in top_entries)
 
-    for user_uid in player_uids:
-        user = users_by_uid.get(user_uid)
-        if not user:
-            continue
+            cat_rating = CategoryRating(total=total, tournaments=entries)
 
-        entries: list[TournamentRatingEntry] = []
-        for t in all_tournaments:
-            if user_uid not in played_by_t[t.uid]:
+            # No-change guard: skip the JSONB upsert + SSE delta when it didn't move —
+            # keeps `modified` meaningful and avoids churning the corpus daily.
+            if cat_rating == getattr(user, category.value):
                 continue
-            if t.uid not in sanctions_cache:
-                sanc = await get_sanctions_for_tournament(t.uid)
-                sanctions_cache[t.uid] = sanc
-                sanctions_json_cache[t.uid] = msgspec.json.encode(sanc).decode()
-            if _is_disqualified(t, sanctions_cache[t.uid], user_uid):
-                continue  # DQ'd: no rating entry, no participation base
-            if _is_non_competing(t, user_uid):
-                continue  # proxy: non-competing official stood in — no rating
-            entries.append(
-                _compute_entry(
-                    t,
-                    json_by_t[t.uid],
-                    sanctions_json_cache[t.uid],
-                    user_uid,
-                    count_by_t[t.uid],
-                    positions_by_t[t.uid],
-                )
-            )
 
-        # Explicit tie-break so the no-change comparison below isn't fooled by the
-        # unordered tournament fetch varying row order between runs.
-        entries.sort(key=lambda e: (-e.points, e.tournament_uid))
-        top_entries = entries[:TOP_N]
-        total = sum(e.points for e in top_entries)
+            setattr(user, category.value, cat_rating)
+            user.modified = now
 
-        cat_rating = CategoryRating(total=total, tournaments=entries)
-
-        # No-change guard: skip the JSONB upsert + SSE delta when it didn't move —
-        # keeps `modified` meaningful and avoids churning the corpus daily.
-        if cat_rating == getattr(user, category.value):
-            continue
-
-        setattr(user, category.value, cat_rating)
-        user.modified = now
-
-        bd = await save_user(user)
-        updated_users.append((user, bd))
+            bd = await save_user(user)
+            updated_users.append((user, bd))
 
     logger.info(f"Recomputed {len(updated_users)} ratings for {category.value}")
     return updated_users

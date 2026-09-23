@@ -11,7 +11,6 @@ from archon_engine import PyEngine
 from .broadcast import broadcast_precomputed
 from .data.timezones import CITY_TZ_OVERRIDES, COUNTRY_TIMEZONE
 from .db import (
-    decode_json,
     find_duplicate_tournament_groups,
     find_same_event_tournaments,
     find_vekn_absence_candidates,
@@ -35,7 +34,6 @@ from .models import (
     TournamentFormat,
     TournamentRank,
     TournamentState,
-    User,
 )
 from .vekn_api import PLACEHOLDER_VENUE_ID, VEKNAPIClient
 
@@ -104,7 +102,7 @@ def _parse_date(date_str: str | None, time_str: str | None = None) -> datetime |
 
 def _map_vekn_to_tournament(
     data: dict[str, Any],
-    users_by_vekn_id: dict[str, User],
+    uid_by_vekn_id: dict[str, str],
     venue_data: dict[str, str] | None = None,
 ) -> Tournament | None:
     """Map a VEKN event (+ optional venue_data from /venue/<id>) to a Tournament."""
@@ -163,8 +161,8 @@ def _map_vekn_to_tournament(
             map_url = f"https://www.google.com/maps/search/?api=1&query={quote(' '.join(parts))}"
 
     organizer_vekn = str(data.get("organizer_veknid") or "")
-    organizer_user = users_by_vekn_id.get(organizer_vekn)
-    organizers_uids = [organizer_user.uid] if organizer_user else []
+    organizer_uid = uid_by_vekn_id.get(organizer_vekn)
+    organizers_uids = [organizer_uid] if organizer_uid else []
 
     max_rounds = _parse_rounds(data.get("rounds"))
 
@@ -180,8 +178,8 @@ def _map_vekn_to_tournament(
 
         for vp_data in vekn_players:
             vekn_id = str(vp_data.get("veknid") or "")
-            user = users_by_vekn_id.get(vekn_id)
-            if not user:
+            user_uid = uid_by_vekn_id.get(vekn_id)
+            if not user_uid:
                 continue
 
             # `pos` on a dq'd or withdrawn row is the field size, not a placement,
@@ -199,15 +197,15 @@ def _map_vekn_to_tournament(
             if disqualified:
                 prelim_gw, vp_prelim, vp_finals, tp, toss = 0, 0.0, 0.0, 0, 0
             if is_finalist and pos == "1":
-                winner_uid = user.uid
+                winner_uid = user_uid
             if is_finalist:
-                finalists.append((user.uid, int(pos), vp_finals))
+                finalists.append((user_uid, int(pos), vp_finals))
 
             # result aggregates prelim+finals; standings stay prelim-only (the
             # finals object below carries the rest).
             players.append(
                 Player(
-                    user_uid=user.uid,
+                    user_uid=user_uid,
                     state=PlayerState.DISQUALIFIED
                     if disqualified
                     else PlayerState.FINISHED,
@@ -223,7 +221,7 @@ def _map_vekn_to_tournament(
             )
             standings.append(
                 Standing(
-                    user_uid=user.uid,
+                    user_uid=user_uid,
                     gw=float(prelim_gw),
                     vp=vp_prelim,
                     tp=tp,
@@ -312,20 +310,14 @@ def _map_vekn_to_tournament(
         )
 
 
-async def _build_users_by_vekn_id() -> dict[str, User]:
-    result_map: dict[str, User] = {}
+async def _uids_by_vekn_id() -> dict[str, str]:
     async with get_connection() as conn:
         cursor = await conn.execute(
-            """SELECT "full" FROM objects
+            """SELECT "full"->>'vekn_id', uid FROM objects
             WHERE type = %s AND "full"->>'vekn_id' IS NOT NULL AND "full"->>'vekn_id' != ''""",
             (ObjectType.USER,),
         )
-        rows = await cursor.fetchall()
-        for row in rows:
-            user = decode_json(row[0], User)
-            if user.vekn_id:
-                result_map[user.vekn_id] = user
-    return result_map
+        return dict(await cursor.fetchall())
 
 
 async def _adopt_same_event(tournament: Tournament, event_id: Any) -> Tournament | None:
@@ -422,8 +414,8 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
         "total": 0,
     }
 
-    users_by_vekn_id = await _build_users_by_vekn_id()
-    logger.info(f"Loaded {len(users_by_vekn_id)} users by VEKN ID")
+    uid_by_vekn_id = await _uids_by_vekn_id()
+    logger.info(f"Loaded {len(uid_by_vekn_id)} users by VEKN ID")
 
     venue_cache: dict[str, dict[str, str]] = {}
 
@@ -449,9 +441,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                 venue_cache[venue_id] = await client.fetch_venue(venue_id)
             venue_data = venue_cache.get(venue_id, {})
 
-            tournament = _map_vekn_to_tournament(
-                event_data, users_by_vekn_id, venue_data
-            )
+            tournament = _map_vekn_to_tournament(event_data, uid_by_vekn_id, venue_data)
             if not tournament:
                 stats["skipped"] += 1
                 continue

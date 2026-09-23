@@ -142,6 +142,16 @@ behind. PostgreSQL is sized to the pools that actually connect — 20 slots agai
 the app's 8 and the public API's 4, leaving the superuser reserve of 3 and
 headroom for pg_dump and ad-hoc psql — not to a client count the box never sees.
 
+**The backend's resident size is its jobs' peak, not its idle footprint.** glibc
+keeps freed heap, so whatever a job materializes stays resident until the daily
+`RuntimeMaxSec` restart — and that restart re-runs the VEKN chain at boot. Every
+scheduled job therefore streams or holds a narrow projection: a `vekn_id → uid`
+map rather than 19k decoded users, the archive decoded into only the fields the
+TWDA sync reads, rating tournaments by cursor and users in batches. Measured on
+beta at production corpus size (36.7k objects): imports 103 MB, the rating
+recompute +44 MB, the TWDA fetch +22 MB. fpdf is imported on the first NDA
+render for the same reason — idle, it is 34 MB.
+
 Because the backend ships as an installed wheel, **bundled data files must load
 through `importlib.resources`**, never `Path(__file__)`
 ([dogmas](dogmas.md#dependencies-and-data)).

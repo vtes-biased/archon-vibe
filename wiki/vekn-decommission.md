@@ -424,6 +424,19 @@ repair it, because its candidate query skips open-rounds, self-organized and
 TWDA-linked events, and it runs only where `VEKN_PUSH` is on. With the calendar
 push gone there is nothing to wait for, and the sweep has nothing left to catch.
 
+### Retire the daily TWDA sync
+
+**Deferred ask** — delete the scheduled `run_twda_sync` and its row in
+[architecture](architecture.md#scheduled-background-tasks), keeping `backfill_twda.py` as the
+manual reconciliation. Done when no scheduled job fetches the archive.
+
+It downloads and parses the whole 12 MB archive every day, on a box with no
+memory to spare, to pick up entries that arrived by routes other than ours. Once
+vekn.net no longer takes events, the app's own pull request on finish should be
+the only clean way a decklist reaches the TWDA, and syncing the archive back
+into the corpus it came from buys nothing. Re-check at the trigger that no other
+submission route survived before deleting.
+
 ## Trigger: stage 2 — the member roster sync retires
 
 ### Prince / NC divergence — legacy archon vs the app

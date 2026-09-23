@@ -643,10 +643,8 @@ class VEKNSyncService:
         stats = {"created": 0, "updated": 0, "unchanged": 0, "errors": 0, "total": 0}
 
         try:
-            players = await self.client.fetch_all_members()
-            stats["total"] = len(players)
-
-            for player in players:
+            async for player in self.client.fetch_all_members():
+                stats["total"] += 1
                 try:
                     _, action = await self.sync_player(player)
                     stats[action] += 1

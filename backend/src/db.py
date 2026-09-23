@@ -1437,29 +1437,33 @@ async def get_user_uids_with_wins() -> set[str]:
         return {row[0] for row in await result.fetchall()}
 
 
-async def get_finished_tournaments_for_category(
-    format_value: str, online: bool, since_date: str
-) -> list[Tournament]:
-    """Get all live FINISHED tournaments matching format/online within date window."""
-    async with get_connection() as conn:
+async def stream_finished_tournaments_for_category(
+    format_value: str, online: bool, since_date: str, batch_size: int = 50
+) -> AsyncIterator[Tournament]:
+    """Live FINISHED tournaments matching format/online within the date window,
+    decoded one batch at a time. Drive under `contextlib.aclosing`, like
+    `stream_objects_snapshot`."""
+    async with get_connection() as conn, conn.transaction():
         # finish is optional (the engine never stamps it) — fall back to start
         # then modified, mirroring ratings.py. A soft-deleted tournament keeps
         # state='Finished', hence deleted_at IS NULL.
-        result = await conn.execute(
-            """SELECT "full" FROM objects
-            WHERE type = 'tournament'
-              AND deleted_at IS NULL
-              AND "full"->>'state' = 'Finished'
-              AND "full"->>'format' = %s
-              AND ("full"->>'online')::boolean = %s
-              AND COALESCE("full"->>'finish', "full"->>'start', "full"->>'modified')
-                  >= %s
-              AND COALESCE("full"->>'finish', "full"->>'start', "full"->>'modified')::timestamp
-                  >= %s::timestamp""",
-            (format_value, online, since_date[:10], since_date),
-        )
-        rows = await result.fetchall()
-        return [decode_json(row[0], Tournament) for row in rows]
+        async with conn.cursor(name="finished_for_category") as cur:
+            await cur.execute(
+                """SELECT "full" FROM objects
+                WHERE type = 'tournament'
+                  AND deleted_at IS NULL
+                  AND "full"->>'state' = 'Finished'
+                  AND "full"->>'format' = %s
+                  AND ("full"->>'online')::boolean = %s
+                  AND COALESCE("full"->>'finish', "full"->>'start', "full"->>'modified')
+                      >= %s
+                  AND COALESCE("full"->>'finish', "full"->>'start', "full"->>'modified')::timestamp
+                      >= %s::timestamp""",
+                (format_value, online, since_date[:10], since_date),
+            )
+            while rows := await cur.fetchmany(batch_size):
+                for row in rows:
+                    yield decode_json(row[0], Tournament)
 
 
 async def save_league(league: League) -> BroadcastData:

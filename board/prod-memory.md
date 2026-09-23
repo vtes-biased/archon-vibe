@@ -18,8 +18,26 @@ Doc-impact: `wiki/dev.md` (Deployment — memory breakdown and working headroom)
   absent from the top 15 (likely swapped out).
 - systemd reports `MemoryCurrent=[not set]` for the three archon units: no
   per-unit accounting for them.
-- The backend logs "Snapshots unchanged at 36683 objects, skipped" every 15 min
-  — prime suspect for the resident size.
+- The backend logs "Snapshots unchanged at 36683 objects, skipped" every 15 min.
+  Ruled out: generation streams, a full rebuild costs +10 MB, a skip 20 ms.
+
+## Beta attribution (2026-09-23, same 36,683-object corpus)
+
+One boot of the old code: imports 134 MB (fpdf alone 34), idle 156, member
+fetch +36, `_build_users_by_vekn_id` +65 (19k decoded users for a uid lookup),
+settled at 292 MB, HWM 333. Standalone: rating pass 2 +72 MB, TWDA fetch +69 MB.
+glibc retains freed heap (`malloc_trim(0)` returns it), so each peak stays
+resident until the daily `RuntimeMaxSec` restart, and every boot re-runs the
+VEKN chain. The cuts in the landing commit, re-measured on beta: imports 103 MB,
+uid map no measurable peak, TWDA +22, full rating recompute +44 (0 users
+changed, so the rewrite is equivalent).
+
+## What prod still has to show
+
+Whether the stall episodes line up with the backend's boot chain (its restart
+time moves daily with `RuntimeMaxSec`) or with backup/restore-verify, and
+whether they stop once the deploy carrying the cuts is live. The prod unit
+names may differ from beta's `new-archon-*`.
 
 Current tuning (keep or change explicitly): `postgresql_shared_buffers: 96MB`,
 `postgresql_max_connections: 20`, `DB_POOL_MAX_SIZE: 8`,
@@ -27,10 +45,10 @@ Current tuning (keep or change explicitly): `postgresql_shared_buffers: 96MB`,
 
 ## Measurement commands (owner executes on prod)
 
-Uptime and a baseline:
+Uptime, a baseline, and when the backend last booted:
 
 ```
-ssh ubuntu@46.226.104.123 'uptime -s; cat /proc/pressure/memory; free -m'
+ssh ubuntu@46.226.104.123 'uptime -s; cat /proc/pressure/memory; free -m; systemctl list-units --no-legend "*archon*backend*" | cut -d" " -f1 | xargs -r systemctl show -p Id -p ActiveEnterTimestamp'
 ```
 
 Around the 03:00 UTC backup (run before ~02:55 and after ~03:15), and around a

@@ -62,7 +62,7 @@ async def run(args: argparse.Namespace) -> int:
         todo = 0
         settle = 0
         for entry in entries:
-            entry_id = str(entry.get("id", ""))
+            entry_id = entry.id
             action = decisions.get(entry_id, ("unresolved", ""))[0]
             by_action[action] = by_action.get(action, 0) + 1
             if entry_id in held:

@@ -7,9 +7,6 @@ import hashlib
 from datetime import UTC, datetime
 from importlib import resources
 
-from fpdf import FPDF
-from fpdf.enums import XPos, YPos
-
 NDA_VERSION = 1
 
 NDA_TEMPLATE = """\
@@ -157,6 +154,10 @@ def build_sealed_pdf(
     record_uid: str,
     signed_at: datetime,
 ) -> bytes:
+    # Lazy: fpdf is ~34 MB resident once imported.
+    from fpdf import FPDF
+    from fpdf.enums import XPos, YPos
+
     pdf = FPDF()
     pdf.set_title("Black Chantry Productions - Confidentiality and NDA")
     pdf.set_auto_page_break(auto=True, margin=18)

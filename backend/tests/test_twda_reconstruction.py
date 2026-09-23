@@ -9,21 +9,20 @@ from datetime import UTC, datetime
 
 import msgspec
 from archon_engine import PyEngine
-from src.twda_import import reconstructed_tournament
+from src.twda_import import TwdaEntry, reconstructed_tournament
 
 WINNER = "019f1a00-78c6-775b-9abe-ee9d668bd22e"
 
 
-def _entry() -> dict:
-    return {
-        "id": "2007krakow",
-        "date": "2007-03-17",
-        "event": "Polish National Championship",
-        "place": "Kraków, Poland",
-        "player": "Marcin Watras",
-        "players_count": 42,
-        "tournament_format": "3R+F",
-    }
+def _entry() -> TwdaEntry:
+    return TwdaEntry(
+        id="2007krakow",
+        date="2007-03-17",
+        event="Polish National Championship",
+        place="Kraków, Poland",
+        players_count=42,
+        tournament_format="3R+F",
+    )
 
 
 def test_reconstruction_shape():

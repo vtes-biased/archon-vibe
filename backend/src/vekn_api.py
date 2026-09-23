@@ -526,13 +526,12 @@ class VEKNAPIClient:
 
         return unique_players
 
-    async def fetch_all_members(self) -> list[dict[str, Any]]:
+    async def fetch_all_members(self) -> AsyncIterator[dict[str, Any]]:
         """Fetch all VEKN members: 7-digit IDs (0000000-9999999), 100 results max
         per query — search by prefix, subdividing recursively for full coverage.
         """
         await self._ensure_authenticated()
 
-        all_players: list[dict[str, Any]] = []
         seen_ids: set[str] = set()
 
         # API pads 2-digit prefixes into ranges: "00"->0000000-0099999.
@@ -540,10 +539,10 @@ class VEKNAPIClient:
             prefix_str = f"{prefix:02d}"
             try:
                 players = await self._fetch_by_prefix(prefix_str, seen_ids)
-                all_players.extend(players)
             except VEKNAPIError as e:
                 logger.error(f"Error fetching players for prefix {prefix_str}: {e}")
                 continue
+            for player in players:
+                yield player
 
-        logger.info(f"Total unique players fetched: {len(all_players)}")
-        return all_players
+        logger.info(f"Total unique players fetched: {len(seen_ids)}")
