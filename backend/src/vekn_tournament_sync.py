@@ -200,6 +200,7 @@ def _map_vekn_to_tournament(
         legacy_sheet = (
             start is not None
             and start < datetime(2011, 1, 1)
+            and not max_rounds
             and not any(float(row.get("vpf") or 0) for row in vekn_players)
         )
         best_eliminated_gw = max(
@@ -207,6 +208,7 @@ def _map_vekn_to_tournament(
                 int(row.get("gw", 0) or 0)
                 for row in vekn_players
                 if 5 < placement(row) < unplaced
+                and rows_by_vekn_id.get(str(row.get("veknid") or ""), row) is row
             ),
             default=0,
         )
