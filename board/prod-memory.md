@@ -10,7 +10,6 @@ Doc-impact: `wiki/dev.md` (Deployment — memory breakdown and working headroom)
 - `/proc/pressure/memory` at sample time: all averages 0.00, but cumulative
   `some total=15211262975` µs (≈4.2 h) and `full total=13612888908` µs (≈3.8 h)
   since boot — episodes are total stalls (thrashing), not a steady squeeze.
-  Uptime not yet captured, so the rate is unknown.
 - `vmstat 5 6`: si/so 0 during the sample; since-boot average ≈9 kB/s each way.
 - RSS: backend `uvicorn` **350 MB** (single worker); postgres backends ~113 MB
   each, mostly the 96 MB shared_buffers counted repeatedly — the unit's
@@ -40,30 +39,49 @@ VEKN chain. The cuts in the landing commit, re-measured on beta: imports 103 MB,
 uid map no measurable peak, TWDA +22, full rating recompute +44 (0 users
 changed, so the rewrite is equivalent).
 
-## What prod still has to show
+## Landed
 
-Whether the stall episodes line up with the backend's boot chain (its restart
-time moves daily with `RuntimeMaxSec`) or with backup/restore-verify, and
-whether they stop once the deploy carrying the cuts is live. The prod unit
-names may differ from beta's `new-archon-*`.
+`4e76ad6f` (the streaming cuts, `wiki/dev.md` rule) and `19413c3b` (review
+fixes) are on main, **not yet deployed to prod**. Prod units: `archon-backend`,
+`archon-bot`, `archon-public-api`; no systemd memory accounting, so read RSS
+from `/proc`.
 
 Current tuning (keep or change explicitly): `postgresql_shared_buffers: 96MB`,
 `postgresql_max_connections: 20`, `DB_POOL_MAX_SIZE: 8`,
 `PUBLIC_API_DB_POOL_MAX_SIZE: 4`, swapfile enabled.
 
-## Measurement commands (owner executes on prod)
+## Resume here (owner executes every prod command)
 
-Uptime, a baseline, and when the backend last booted:
+A per-minute sampler has run on prod since **2026-09-23 05:49 UTC**, writing
+`/tmp/psi.log` lines of `<UTC time> total=<cumulative full-stall µs> <MB available>`.
 
-```
-ssh ubuntu@46.226.104.123 'uptime -s; cat /proc/pressure/memory; free -m; systemctl list-units --no-legend "*archon*backend*" | cut -d" " -f1 | xargs -r systemctl show -p Id -p ActiveEnterTimestamp'
-```
+1. **Collect the pre-deploy day** (any time after 2026-09-24 ~06:00 UTC). This
+   prints the log, stops the sampler, and lists the backend's job runs:
 
-Around the 03:00 UTC backup (run before ~02:55 and after ~03:15), and around a
-deploy or a Wednesday 06:00 UTC restore-verify:
+   ```
+   ssh ubuntu@46.226.104.123 'cat /tmp/psi.log; pkill -f "psi.log"; journalctl -u archon-backend --since "-25h" --no-pager | grep -E "Running job|Starting|complete" | cut -c1-160'
+   ```
 
-```
-ssh ubuntu@46.226.104.123 'date -u; cat /proc/pressure/memory; ps -eo rss,comm --sort=-rss | head -8'
-```
+2. **Attribute.** Per-minute deltas of `total`; match each jump against: 01:00
+   sanction cleanup, 01:30 purge, 02:00 promo stock, 02:30 rating recompute,
+   03:00 backup, 05:00 TWDA sync, Wednesday 06:00 restore-verify, the hourly
+   VEKN push, and the backend's daily `RuntimeMaxSec` restart (~09:35-09:40 UTC,
+   drifting) with its boot VEKN chain.
+3. **Deploy** a release carrying `19413c3b` to prod (owner's call on timing).
+4. **Restart the sampler** (same command as its first launch):
 
-The delta of `full total` across a window attributes the stall to what ran in it.
+   ```
+   ssh ubuntu@46.226.104.123 'nohup sh -c "while :; do echo \$(date -u +%FT%TZ) \$(grep full /proc/pressure/memory | cut -d\" \" -f5) \$(free -m | awk \"/Mem/{print \\\$7}\"); sleep 60; done" > /tmp/psi.log 2>&1 &'
+   ```
+
+   and a day later collect it with step 1's command.
+5. **Backend settled size and peak** after that day, once its boot chain has run:
+
+   ```
+   ssh ubuntu@46.226.104.123 'grep -E "VmRSS|VmHWM" /proc/$(systemctl show archon-backend -p MainPID --value)/status; free -m'
+   ```
+
+6. **Close the line**: the Deployment section of `wiki/dev.md` gets the
+   backend's settled RSS and HWM, the box's memory breakdown and working
+   headroom; delete the board line and this file. If stalls remain, name what
+   drives them — a further cut is an ordinary `/intake` line.
