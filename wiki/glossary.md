@@ -79,7 +79,7 @@ especially for house-format and beta-ish features.
 | lowest qualifier | tête de série la plus basse | cabeza de serie más baja | cabeça de chave mais baixa | testa di serie più bassa |
 | toss | tirage | sorteo | sorteio | sorteggio |
 | raffle | Tirage au sort (full) / tirage (compact labels) | sorteo | sorteio | estrazione |
-| check-in | Enregistrement / Pointer⁵ | registro (de asistencia) / registrarse | check-in | check-in |
+| check-in | pointer / pointage / pointé⁵ | check-in (hacer check-in, con check-in) | check-in (fazer check-in, com check-in) | check-in (fare il check-in, check-in fatto) |
 | player | joueur | jugador | jogador | giocatore |
 | organizer | organisateur | organizador | organizador | organizzatore |
 | co-organizer | co-organisateur | coorganizador (no hyphen) | co-organizador | Co-organizzatore |
@@ -118,7 +118,8 @@ especially for house-format and beta-ish features.
 | call judge | Appeler l'arbitre | Llamar al juez | Chamar juiz | Chiama il giudice |
 | feedback | Commentaires | Comentarios | Feedback | Feedback |
 | register (someone else) | inscrire | inscribir | inscrever | iscrivere¹⁰ |
-| register (self, reflexive) | s'inscrire | registrarse | registrar-se | registrarsi |
+| register (self, reflexive) | s'inscrire | inscribirse | inscrever-se | iscriversi |
+| waitlist / promote off it | liste d'attente / Accepter | lista de espera / Admitir | lista de espera / Admitir | lista d'attesa / Ammetti |
 | email | email | correo electrónico | e-mail | email |
 | official (VEKN role) | officiel | oficial | oficial | ufficiale |
 | registration desk | bureau des inscriptions | mostrador de inscripciones | balcão de inscrições | banco iscrizioni |
@@ -168,10 +169,9 @@ seating ritual specifically.
 ⁴ The Spanish UI label `finals_seed` renders a literal "Semilla #{n}" while prose
 uses the correct official *cabeza de serie*. The two disagree in-file. Use *cabeza
 de serie* for new prose; don't silently fix the label.
-⁵ French has four real check-in words: `og_*` organizer guide uses
-*pointer/pointage/pointé*; `pg_*`, the player's own action, uses
-*s'enregistrer/Enregistré*; `state_checkin` is the state badge *Enregistrement*;
-and enum references use the enum word. Never "En attente".
+⁵ French check-in is *pointer/pointage/pointé* everywhere — state badge, player
+guide and organizer guide alike — and never reflexive (*se pointer* is slang).
+*Enregistrer* means save/record only. Never "En attente".
 ⁶ Italian *giudice*, never *arbitro*.
 ⁷ French sanction levels are counter-intuitive: the *milder* level (Caution) takes
 the more formal-sounding word. Grep `sanction_level_caution` /
@@ -180,9 +180,10 @@ the more formal-sounding word. Grep `sanction_level_caution` /
 `og_deck_management` guide is the exception and uses its own doc-level word.
 ⁹ Portuguese has no dominant timer word: match the closest sibling in the same key
 cluster.
-¹⁰ The *action* of registering a player for a tournament is always
-inscrire/inscribir/inscrever/iscrivere across all four — never the
-registrare/registrarse family.
+¹⁰ Tournament registration, by the player or for them, is always the
+inscrire/inscribir/inscrever/iscrivere family, and check-in never borrows it. The
+registrar/registrare family is kept for account sign-up (es/it), recording, VEKN
+sanctioning and OAuth-app or passkey registration.
 ¹¹ French translates these; es/pt/it keep the English loanwords. Always check the
 locale's own tab labels.
 ¹² Portuguese breaks from the others and translates "rating" here. Never "pontos
