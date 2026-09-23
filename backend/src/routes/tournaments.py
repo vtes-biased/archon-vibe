@@ -457,9 +457,40 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
             "cards": winner_deck.cards,
         }
     )
-    tournament_date = tournament.start or tournament.modified.isoformat()
+
+    def us_date(d: datetime) -> str:
+        suffix = (
+            "th"
+            if 11 <= d.day % 100 <= 13
+            else {1: "st", 2: "nd", 3: "rd"}.get(d.day % 10, "th")
+        )
+        return f"{d.strftime('%B')} {d.day}{suffix} {d.year}"
+
+    start = tournament.start or tournament.modified
+    tournament_date = us_date(start)
+    if tournament.finish and tournament.finish.date() != start.date():
+        tournament_date += f" -- {us_date(tournament.finish)}"
     rounds_count = len(tournament.rounds)
-    tournament_format = f"{rounds_count}R" + ("+F" if tournament.finals else "")
+    tournament_format = f"{rounds_count}R" + (
+        "+F" if tournament.finals else " (no final)"
+    )
+
+    standing = next(
+        (s for s in tournament.standings if s.user_uid == tournament.winner), None
+    )
+    winner_score = ""
+    if standing:
+        winner_score = f"{int(standing.gw)}GW{standing.vp:g}"
+        finals_seat = next(
+            (
+                s
+                for s in (tournament.finals.seating if tournament.finals else [])
+                if s.player_uid == tournament.winner
+            ),
+            None,
+        )
+        if finals_seat:
+            winner_score += f" + {finals_seat.result.vp:g}vp in final"
     from ..twda import frontend_url
 
     # The archive keeps this line forever, so it must be the citable form. Two
@@ -476,12 +507,17 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
     return _engine.export_twda(
         deck_json,
         tournament.name,
-        str(tournament_date),
-        named["name"] if named else (tournament.country or ""),
+        tournament_date,
+        "Online"
+        if tournament.online
+        else named["name"]
+        if named
+        else (tournament.country or ""),
         tournament_format,
         f"{frontend_url()}{handle}",
         len([p for p in tournament.players if not p.waitlisted]),
         player_name,
+        winner_score,
     )
 
 

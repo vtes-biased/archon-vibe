@@ -559,6 +559,7 @@ pub fn export_twda(
     tournament_url: &str,
     player_count: u32,
     player_name: &str,
+    winner_score: &str,
 ) -> String {
     let mut lines = Vec::new();
 
@@ -571,10 +572,13 @@ pub fn export_twda(
     lines.push(format!("{player_count} players"));
     lines.push(player_name.to_string());
     if !tournament_url.is_empty() {
-        lines.push(String::new());
         lines.push(tournament_url.to_string());
     }
     lines.push(String::new());
+    if !winner_score.is_empty() {
+        lines.push(format!("-- {winner_score}"));
+        lines.push(String::new());
+    }
 
     if !deck.name.is_empty() {
         lines.push(format!("Deck Name: {}", deck.name));

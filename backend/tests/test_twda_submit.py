@@ -1,4 +1,4 @@
-"""TWDA submission designer credit: the published entry credits the deck's typed
+"""TWDA submission: the header layout the archive expects, and the designer credit:
 `attribution` and nothing else — a credit that names nobody must never leak a
 name into an archive that keeps it forever.
 
@@ -17,9 +17,12 @@ from src.models import (
     AttributionKind,
     DeckAttribution,
     DeckObject,
+    FinalsTable,
     ObjectType,
     Player,
+    Score,
     Seat,
+    Standing,
     Table,
     TableState,
     Tournament,
@@ -88,6 +91,11 @@ async def _published(
                 for i in range(0, len(seats), 5)
             ]
         ],
+        standings=[Standing(user_uid=winner.uid, gw=1, vp=4.5)],
+        finals=FinalsTable(
+            seating=[Seat(player_uid=winner.uid, result=Score(gw=1, vp=3))],
+            seed_order=[winner.uid],
+        ),
     )
     deck = DeckObject(
         uid=str(uuid7()),
@@ -106,6 +114,19 @@ async def _published(
         async with db.get_connection() as conn:
             await conn.execute("DELETE FROM objects WHERE uid = %s", (deck.uid,))
             await conn.execute("DELETE FROM objects WHERE uid = %s", (tournament.uid,))
+
+
+@pytest.mark.asyncio
+async def test_header_follows_the_archive_convention(test_db):
+    async with _published(attribution=DeckAttribution(kind=AttributionKind.OWNER)) as (
+        _t,
+        twda,
+    ):
+        lines = twda.splitlines()
+        assert lines[2] == "June 1st 2025"
+        assert lines[3] == "1R+F"
+        assert lines[6].startswith("http") and lines[6].endswith("/t/12345")
+        assert lines[7:10] == ["", "-- 1GW4.5 + 3vp in final", ""]
 
 
 @pytest.mark.asyncio

@@ -462,6 +462,15 @@ re-save retry **only** for a transient answer — 5xx, 408, 429, or no status at
 all except `config`. A 4xx is a refusal and an unreadable App key a
 misconfiguration: both repeat identically, so neither offers the retry.
 
+**Header**: the archive's own convention, which its maintainer reviews against —
+the date in US form with no time (`August 29th 2026`, ` -- <end>` for a multi-day
+event), `Online` as the place of an online event, `NR+F` or `NR (no final)`, and the
+event link directly under the winner's name. Then a score line,
+`-- 1GW4.5 + 3vp in final`: the winner's **standings** row, which is prelim-only,
+with the finals seat's VP beside it — never the aggregated `result`, which already
+folds the final in and would read to the archive as a double count. It is the
+archive's most common wording.
+
 **Designer credit**: the winner's name is always in the header; a separate optional
 `Created by: <name>` line is emitted only when the deck is credited to someone
 else — a `Member` credit resolved to that member's current name, or the name a

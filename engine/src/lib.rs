@@ -260,6 +260,7 @@ mod shared {
         tournament_url: &str,
         player_count: u32,
         player_name: &str,
+        winner_score: &str,
     ) -> Result<String, EngineError> {
         let value = json::parse(deck_json)?;
         let d = deck_from_json(&value, true)?;
@@ -273,6 +274,7 @@ mod shared {
             tournament_url,
             player_count,
             player_name,
+            winner_score,
         ))
     }
 
@@ -1012,6 +1014,7 @@ mod python {
             tournament_url: &str,
             player_count: u32,
             player_name: &str,
+            winner_score: &str,
         ) -> PyResult<String> {
             py_str(with_card_map(&self.cards, |cm| {
                 export_twda_json(
@@ -1024,6 +1027,7 @@ mod python {
                     tournament_url,
                     player_count,
                     player_name,
+                    winner_score,
                 )
             }))
         }
