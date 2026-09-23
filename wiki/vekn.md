@@ -485,21 +485,24 @@ with the finals seat's VP beside it — never the aggregated `result`, which alr
 folds the final in and would read to the archive as a double count. It is the
 archive's most common wording.
 
-**Comments**: the deck's comment follows the deck list verbatim. What a deckbuilder
+**Comments**: the deck's comment sits verbatim under the name and credit, ahead of
+the crypt. What a deckbuilder
 leaves behind when a text list is imported into it — the lines it could not parse
 land in its description, which a deck-link import copies into `comments` — is
 stripped **once, at that import**, by `strip_deckbuilder_noise` (engine): the player
 sees and edits exactly what will publish, and a comment typed in the app is never
 touched. It matches shapes, never a language's vocabulary, and biases to keeping:
 
-- a **leading block** is dropped only when it holds two or more `Key: value` fields
-  (a key of one to three words, a value of at most six — `Nombre del mazo:`,
-  `Date:`, `Location:`) or two or more section lines (one or two words, then a
-  bracket opening on a count of at most three digits — `Cripta (12 cartas, …)`,
-  `Master (14)`). One such line is a player's (`Strategy: bleed early`, `Won
-  Nationals (2026)`), and so is anything past the first line of prose;
-- a leading `descr…` field closes the block and keeps its value without the label —
-  it is the description another deckbuilder held — and never counts toward the two;
+- a **leading block** is dropped only when it holds three or more markers:
+  `Key: value` fields (a key of one to three words, a value of at most six —
+  `Nombre del mazo:`, `Date:`, `Location:`) and section lines (one or two words,
+  then a bracket opening on a count of at most three digits — `Cripta (12 cartas,
+  …)`, `Master (14)`). Every restated header carries three or more; two are a
+  player's (`Strategy: …` over `Tech: …`, `Won Nationals (1st)`), and so is
+  anything past the first line of prose;
+- a leading `descr…` field counts as a marker, closes the block and, when the
+  block goes, keeps its value without the label — it is the description another
+  deckbuilder held;
 - anywhere: a bare `[YYYY-MM-DD]` revision stamp, a TWDA score line (`— 2GW8 …`),
   a rule of `=`/`-`.
 

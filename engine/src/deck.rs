@@ -619,6 +619,7 @@ pub fn strip_deckbuilder_noise(comments: &str) -> String {
         }
         match header_field(line) {
             Some((key, value)) if key.to_lowercase().starts_with("descr") => {
+                fields += 1;
                 block_end = i + 1;
                 description = value;
                 break;
@@ -631,7 +632,7 @@ pub fn strip_deckbuilder_noise(comments: &str) -> String {
     }
 
     let mut out: Vec<&str> = Vec::new();
-    let body = if fields >= 2 || sections >= 2 {
+    let body = if fields + sections >= 3 {
         if !description.is_empty() {
             out.push(description);
         }
@@ -967,6 +968,10 @@ mod tests {
             strip_deckbuilder_noise(described),
             "Gangrel wall with Garou\n\nTech: Deflection over Wake\nWon Nationals (2026)"
         );
+        let notes = "Strategy: bleed early\nTech: Deflection over Wake";
+        assert_eq!(strip_deckbuilder_noise(notes), notes);
+        let placings = "Won Nationals (1st)\nPlayed Worlds (2nd)";
+        assert_eq!(strip_deckbuilder_noise(placings), placings);
         let typed =
             "Final Table:\nCristiano Vaz: Nosferatu V5 Primogen > Anderson: Protean Barons\n\
             Strategy: bleed early\nGangrel (5 vampires) plus allies\n[2025-06-07]\n";
@@ -985,6 +990,8 @@ mod tests {
             described,
             typed,
             archived,
+            notes,
+            placings,
             "[2025-06-07]\nNote: blah",
         ] {
             let once = strip_deckbuilder_noise(text);

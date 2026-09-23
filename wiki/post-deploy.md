@@ -68,8 +68,10 @@ it covers the few pre-2011 sheets in the newer format. The second reads about 52
 
 Gated by `d24e5f4d`. A deck-link import strips the deckbuilder's noise from that
 commit on, and the TWDA export publishes the stored comment verbatim, so a comment
-imported earlier keeps its restated header until this runs. The owner's go/no-go is
-on the report: a dev copy of the archive reported 1 of 930, a stray score line.
+imported earlier keeps its restated header until this runs. Events the TWDA sync
+created are left out — their comments are the archive's own text. The go/no-go is
+the owner's, on the production report's count and pairs; a dev copy holding 930
+archive comments reported 1, a stray score line.
 
 ```sh
 sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \

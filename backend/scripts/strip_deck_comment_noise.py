@@ -1,10 +1,5 @@
 """Strip deckbuilder import noise from the deck comments stored before the import did.
 
-A deck-link import now runs the engine's `strip_deckbuilder_noise` on the
-description it copies into `comments`; the decks imported before it still hold
-the restated headers, crypt lines and revision stamps, and the TWDA export
-publishes a comment verbatim. This script is that one-off.
-
     # report what would change (safe, read-only)
     /opt/archon/backend/.venv/bin/python \\
       /opt/archon/backend/scripts/strip_deck_comment_noise.py
@@ -12,7 +7,6 @@ publishes a comment verbatim. This script is that one-off.
     # rewrite them
     … strip_deck_comment_noise.py --apply
 
-Idempotent: a stripped comment strips to itself, so a second run reports nothing.
 No SSE broadcast — this runs outside the web process, so clients pick the change
 up on their next reconnect.
 """
@@ -37,10 +31,12 @@ from backend.src import db  # noqa: E402
 from backend.src.models import ObjectType  # noqa: E402
 
 COMMENTED_DECKS_QUERY = """
-    SELECT uid, "full"->>'comments' FROM objects
-    WHERE type = 'deck'
-      AND "full"->>'deleted_at' IS NULL
-      AND coalesce("full"->>'comments', '') <> ''
+    SELECT d.uid, d."full"->>'comments' FROM objects d
+    JOIN objects t ON t.uid = d."full"->>'tournament_uid' AND t.type = 'tournament'
+    WHERE d.type = 'deck'
+      AND d."full"->>'deleted_at' IS NULL
+      AND coalesce(d."full"->>'comments', '') <> ''
+      AND t."full"->'external_ids'->>'twda' IS NULL
 """
 
 _LOCK_ROW = 'SELECT "full" FROM objects WHERE uid = %s FOR UPDATE'
