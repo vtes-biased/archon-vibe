@@ -6,8 +6,9 @@ guard — belt-and-suspenders. `_map_vekn_to_tournament` is pure, no DB/mocks.
 
 from datetime import datetime
 
+import msgspec
 from src.models import PlayerState
-from src.vekn_tournament_sync import _map_vekn_to_tournament
+from src.vekn_tournament_sync import _map_vekn_to_tournament, _TwdaScore
 
 
 # A 2-type (Standard Constructed) finished event with one known player.
@@ -198,3 +199,37 @@ def test_member_listed_twice_keeps_the_placed_row():
     assert [s.user_uid for s in t.standings].count("u1") == 1
     assert t.winner == "u1"
     assert next(s for s in t.standings if s.user_uid == "u1").vp == 3.0
+
+
+def test_gw_above_the_round_count_is_the_final_or_a_wrong_count():
+    users = {str(i): f"u{i}" for i in range(1, 7)}
+    event = _final_event() | {"rounds": "2R+F"}
+    event["players"][0] |= {"gw": "3"}
+    t = _map_vekn_to_tournament(event, users)
+    assert next(s for s in t.standings if s.user_uid == "u1").gw == 2.0
+
+    event["players"][1] |= {"gw": "3"}
+    t = _map_vekn_to_tournament(event, users)
+    assert next(s for s in t.standings if s.user_uid == "u1").gw == 3.0
+    assert t.max_rounds == 0
+
+
+def test_legacy_sheet_takes_round_count_and_final_vp_from_its_archive_entry():
+    users = {str(i): f"u{i}" for i in range(1, 7)}
+    legacy = _final_event() | {"event_startdate": "2009-03-01", "rounds": "0R"}
+    legacy["players"] = [p | {"vpf": "0"} for p in legacy["players"]]
+    legacy["players"][0] |= {"gw": "3", "vp": "9"}
+    entry = _TwdaScore(id="2009x", tournament_format="3R+F", score="2GW6+3")
+    t = _map_vekn_to_tournament(legacy, users, twda=entry)
+    assert t.max_rounds == 3
+    winner = next(s for s in t.standings if s.user_uid == "u1")
+    assert (winner.gw, winner.vp) == (2.0, 6.0)
+    seats = {s.player_uid: s.result for s in t.finals.seating}
+    assert (seats["u1"].gw, seats["u1"].vp) == (1, 3.0)
+    assert seats["u2"].vp == 0.0
+
+    t = _map_vekn_to_tournament(
+        legacy, users, twda=msgspec.structs.replace(entry, score="+3")
+    )
+    winner = next(s for s in t.standings if s.user_uid == "u1")
+    assert (winner.gw, winner.vp) == (2.0, 6.0)

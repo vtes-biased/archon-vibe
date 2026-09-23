@@ -5,9 +5,11 @@ from typing import Any
 from urllib.parse import quote
 from uuid import uuid7
 
+import aiohttp
 import msgspec
 from archon_engine import PyEngine
 
+from . import http_client
 from .broadcast import broadcast_precomputed
 from .data.timezones import CITY_TZ_OVERRIDES, COUNTRY_TIMEZONE
 from .db import (
@@ -35,6 +37,7 @@ from .models import (
     TournamentRank,
     TournamentState,
 )
+from .twda_import import TWDA_URL
 from .vekn_api import PLACEHOLDER_VENUE_ID, VEKNAPIClient
 
 logger = logging.getLogger(__name__)
@@ -100,12 +103,39 @@ def _parse_date(date_str: str | None, time_str: str | None = None) -> datetime |
         return None
 
 
+class _TwdaScore(msgspec.Struct):
+    id: str
+    tournament_format: str = ""
+    score: str = ""
+
+
+_TWDA_SCORE_RE = re.compile(r"(?:(\d+)GW([\d.]+))?(?:\+([\d.]+))?")
+
+
+async def _twda_scores() -> dict[str, _TwdaScore]:
+    """Archive entry id -> its round count and winner score line.
+
+    Raises on failure rather than returning nothing: a cycle run without the
+    archive would rebuild every filled legacy sheet back to its folded form.
+    """
+    async with http_client.session().get(
+        TWDA_URL, timeout=aiohttp.ClientTimeout(total=120.0)
+    ) as resp:
+        resp.raise_for_status()
+        entries = msgspec.json.decode(await resp.read(), type=list[_TwdaScore])
+    return {entry.id: entry for entry in entries}
+
+
 def _map_vekn_to_tournament(
     data: dict[str, Any],
     uid_by_vekn_id: dict[str, str],
     venue_data: dict[str, str] | None = None,
+    twda: _TwdaScore | None = None,
 ) -> Tournament | None:
-    """Map a VEKN event (+ optional venue_data from /venue/<id>) to a Tournament."""
+    """Map a VEKN event (+ optional venue_data from /venue/<id>) to a Tournament.
+
+    `twda` is the archive entry settled onto this event; it fills only what a
+    legacy sheet does not carry."""
     event_id = data.get("event_id")
     if not event_id:
         return None
@@ -213,6 +243,29 @@ def _map_vekn_to_tournament(
             default=0,
         )
 
+        twda_prelim: tuple[int, float] | None = None
+        twda_final_vp = 0.0
+        if legacy_sheet and twda:
+            max_rounds = _parse_rounds(twda.tournament_format)
+            score = _TWDA_SCORE_RE.fullmatch(twda.score)
+            # With no final part the line is a total, so it splits nothing.
+            if score and score.group(3):
+                twda_final_vp = float(score.group(3))
+                if score.group(1):
+                    twda_prelim = (int(score.group(1)), float(score.group(2)))
+
+        over_rounds = [
+            row for row in vekn_players if int(row.get("gw", 0) or 0) > max_rounds
+        ]
+        winner_carries_final = (
+            max_rounds > 0
+            and len(over_rounds) == 1
+            and placement(over_rounds[0]) == 1
+            and int(over_rounds[0].get("gw", 0) or 0) == max_rounds + 1
+        )
+        if over_rounds and not winner_carries_final:
+            max_rounds = 0
+
         for vp_data in rows_by_vekn_id.values():
             user_uid = uid_by_vekn_id[str(vp_data.get("veknid") or "")]
 
@@ -228,8 +281,21 @@ def _map_vekn_to_tournament(
                 prelim_gw, vp_prelim, vp_finals, tp, toss = 0, 0.0, 0.0, 0, 0
             if is_finalist and pos == "1":
                 winner_uid = user_uid
-                if legacy_sheet and prelim_gw - 1 >= best_eliminated_gw:
+                # The archive's gw/vp is sometimes the total, so only the
+                # folded shape of the sheet itself confirms it as the prelim.
+                archived = twda_final_vp > 0 and twda_prelim in (
+                    None,
+                    (prelim_gw - 1, vp_prelim - twda_final_vp),
+                )
+                if (
+                    winner_carries_final
+                    or (legacy_sheet and prelim_gw - 1 >= best_eliminated_gw)
+                    or (archived and twda_prelim)
+                ):
                     prelim_gw -= 1
+                    if archived and vp_prelim >= twda_final_vp:
+                        vp_prelim -= twda_final_vp
+                        vp_finals = twda_final_vp
             if is_finalist:
                 finalists.append((user_uid, int(pos), vp_finals))
 
@@ -448,6 +514,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
 
     uid_by_vekn_id = await _uids_by_vekn_id()
     logger.info(f"Loaded {len(uid_by_vekn_id)} users by VEKN ID")
+    twda_scores = await _twda_scores()
 
     venue_cache: dict[str, dict[str, str]] = {}
 
@@ -493,6 +560,18 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                     tx_conn,
                 ):
                     existing = existing or existing_ref  # hard-deleted between reads
+                    twda = twda_scores.get(
+                        existing.external_ids.get("twda_entry")
+                        or existing.external_ids.get("twda")
+                        or ""
+                    )
+                    if twda:
+                        tournament = (
+                            _map_vekn_to_tournament(
+                                event_data, uid_by_vekn_id, venue_data, twda
+                            )
+                            or tournament
+                        )
                     if placeholder_venue:
                         tournament = msgspec.structs.replace(
                             tournament,
@@ -574,6 +653,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                             or existing.map_url != tournament.map_url
                             or existing.proxies != tournament.proxies
                             or len(existing.players) != len(tournament.players)
+                            or existing.max_rounds != tournament.max_rounds
                             # Also compares play data, so a VEKN-side score correction
                             # is picked up and legacy folded imports self-heal.
                             or existing.standings != tournament.standings

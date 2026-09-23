@@ -64,6 +64,26 @@ The first returns no rows — vekn events 9915, 7713, 8754, 5793, 6580, 9166 and
 it covers the few pre-2011 sheets in the newer format. The second reads about 520 winners at 0 prelim GW out of about
 2,980, against about 65 before. Report both to the owner and delete this section.
 
+## Audit results across vekn.net, the TWDA and Archon after the first tournament sync
+
+Gated by `GATE`. The script ships in that commit, and the round-count and archive
+rules reach the stored rows only on the first tournament sync after the deploy (or
+the admin *Run now*); an audit before that reads the old imports. It scans vekn.net
+itself (about a minute) and peaks around 150 MB, so run it with the box quiet.
+
+```sh
+sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
+  /opt/archon/backend/.venv/bin/python \
+  /opt/archon/backend/scripts/audit_results.py' > /tmp/audit-results.txt
+head -20 /tmp/audit-results.txt
+```
+
+It worked when the summary holds no `ours prelim-gw` line — the six rows over their
+round count on 2026-09-23 (7300, 7396, 8450, 9474, 9667, 11962) are gone after the
+re-sync. Report the summary to the owner against the table in
+[vekn](vekn.md#results-across-the-three-sources), drop that table's pre-sync note,
+and delete this section.
+
 ## Strip deckbuilder noise from the deck comments stored before it
 
 Gated by `d24e5f4d`. A deck-link import strips the deckbuilder's noise from that

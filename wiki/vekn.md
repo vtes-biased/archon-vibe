@@ -279,6 +279,31 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   folded VP stays, since these sheets carry no `vpf` to subtract. The `vpf`-bearing
   sheets vekn.net's newer format filed from late 2008 are prelim-only, which is why
   the rule keys on `vpf` and not on the date alone.
+- **A legacy sheet takes what it lacks from its archive entry** — the one settled
+  onto the row as `twda_entry` or `twda` ([below](#inbound)). The entry's `NR+F`
+  is the round count, and its `+Z in final` moves the winner's final VP out of the
+  prelim into a `finals` seat, but only on a sheet the rule above already reads as
+  folded; an `XGWY` beside it is trusted only where it is exactly the sheet minus
+  that final, because the archive's own lines are sometimes the total (archon's
+  submissions wrote them so). The fill therefore never changes a winner's total,
+  only where it sits. The other finalists' seats carry 0 VP, their final still
+  folded into their prelim, and print that way on the finals tab. Measured offline
+  on 834 legacy sheets matched to an entry: 530 round counts filled, 194 finals
+  split.
+- **The sync fetches the archive itself, every cycle, and a failed fetch fails the
+  cycle.** Anything the TWDA job wrote onto a vekn import would be rebuilt away six
+  hours later, so the fill sits on the incoming side of the one writer; a cycle
+  run without the archive would fold every filled sheet back and flip it forward
+  on the next.
+- **A GW above the sheet's own round count is the winner's final, or a wrong
+  count.** A winner at exactly rounds + 1 with nobody else above it carries the
+  final GW, and loses it like a legacy winner (eight sheets, 2013–2025 — 12009 and
+  12503 among them, which looked like wrong counts and are not). Anyone else above
+  it means the round count is wrong — 7300, 8523, 9474, 9667, each a `2R` with a
+  3-GW non-winner — and it imports as unknown (0) rather than as a guess. That
+  winner's VP stays as filed: legacy archon pushed `vp` with the final folded in
+  ([domain](domain/vekn.md#never-chase-veknnets-stored-rtp)), so a folded VP is
+  common and no single sheet tells it from a real one.
 - **A member listed twice on one sheet keeps one row** — the better placed, the
   first on a tie — and the sync logs the dropped one. vekn.net carries the
   duplicate itself, sometimes with a second real score that belongs to nobody else.
@@ -351,6 +376,50 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
 Each phase — member, tournament, TWDA — is wrapped independently: an exception or
 timeout logs an error and skips that phase for the cycle without aborting the
 others.
+
+### Results across the three sources
+
+**Truth follows provenance.** An event with rounds here — run in the app, or
+merged from legacy archon — is Archon's, and vekn.net's sheet of it is a copy
+frozen at upload. A rounds-less vekn import is vekn.net's, read through the rules
+[above](#tournaments). An event vekn.net does not hold is the archive's
+reconstruction. No source corrects another outside those rules: the results
+upload is write-once, and the archive is not ours to edit.
+
+`backend/scripts/audit_results.py` compares every event more than one source
+describes — winner, finalists, prelim GW/VP, round count, field size — and prints
+each disagreement under its class. It reads a vekn.net sheet through the importer,
+so what the rules already correct does not show.
+
+*(Measured 2026-09-23 on production, 9,486 finished events against a full vekn.net
+scan and the archive. The GW rows are before the first sync that applies the
+rules [above](#tournaments); the rest do not move with them.)*
+
+| Class | Found | What stands |
+|---|---|---|
+| Archon vs vekn.net: the sheet's prelim holds the final | 178 events | Archon — legacy archon's upload, frozen upstream |
+| Archon vs vekn.net: winner or finalists | 15 | Archon — the list [with the maintainers](#placements-handed-to-the-vekn-api-maintainers), plus 13388 |
+| Archon vs vekn.net: a no-final event's rows 1–5 (12642, 13471) | 2 | Archon — our own push numbers them by prelim standing |
+| Archon vs vekn.net: fewer rounds played than the calendar declares | 6 | Archon |
+| Archon vs archive: the winner's score line | 33 | Archon — archon's submissions wrote totals |
+| vekn.net vs archive: round count, field size, winner's score line | 36, 173, 92 | vekn.net |
+| vekn.net vs archive: the winner's name | 28 | vekn.net's winner, under the name Archon holds |
+| An archive reconstruction of an event vekn.net holds | 79 | merged into the vekn.net copy, three excepted |
+| A GW above a known round count, once imported | 0 | — |
+
+**The winner's name is Archon's.** A member may change their name here, so an
+archive entry naming the winner differently is no disagreement about who won.
+Eleven of the 28 are spellings of one person; the other 17 name someone else,
+four of them Vivica for Alexander Båskman (1776, 4126, 7343, 13120), and the
+archive's deck stays with vekn.net's winner there too.
+
+**A reconstruction of an event vekn.net holds was merged**, keeping the vekn.net
+copy with the archive key transplanted, where the winner, the day and the field
+size agree (66), and on the owner's ruling for ten more whose field size or name
+drifted — the two Origins 2007 events among them, which took the archive's names.
+Three stay two events: *Blood League part IV* against 11478 and *SuperHappyFunSlide
+Day 2* against 5581, each a different event won by the same player a day apart, and
+*GenCon NAC Qualifier* against 1380. The audit reports those three every run.
 
 ### The event vekn.net no longer has
 
@@ -524,7 +593,9 @@ chose, and the TWDA holds no other.
 ### Inbound
 
 **The VEKN record outranks the archive.** Where both describe the same event, the
-VEKN result stands and the TWDA fills only what the record does not carry. The
+VEKN result stands and the TWDA fills only what the record does not carry — on a
+legacy sheet the round count and the winner's final VP, written by the tournament
+sync ([above](#tournaments)), never by this job. The
 concrete consequence is that `reported_player_count` is stamped **only where
 `players_with_rounds` is zero** — no rounds and no standings row carrying a score,
 which is the archival reconstructions and nothing else — and **never on a VEKN
