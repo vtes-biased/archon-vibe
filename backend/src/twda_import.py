@@ -86,8 +86,6 @@ class _TwdaLibrary(msgspec.Struct):
 
 
 class TwdaEntry(msgspec.Struct):
-    """Only the archive fields we read — the rest is dropped at parse time."""
-
     id: str
     event: str = ""
     place: str = ""

@@ -1438,12 +1438,17 @@ async def get_user_uids_with_wins() -> set[str]:
 
 
 async def stream_finished_tournaments_for_category(
-    format_value: str, online: bool, since_date: str, batch_size: int = 50
+    conn: psycopg.AsyncConnection,
+    format_value: str,
+    online: bool,
+    since_date: str,
+    batch_size: int = 50,
 ) -> AsyncIterator[Tournament]:
     """Live FINISHED tournaments matching format/online within the date window,
-    decoded one batch at a time. Drive under `contextlib.aclosing`, like
+    decoded one batch at a time. `conn` is caller-owned: reads the caller makes
+    between batches go through it too. Drive under `contextlib.aclosing`, like
     `stream_objects_snapshot`."""
-    async with get_connection() as conn, conn.transaction():
+    async with conn.transaction():
         # finish is optional (the engine never stamps it) — fall back to start
         # then modified, mirroring ratings.py. A soft-deleted tournament keeps
         # state='Finished', hence deleted_at IS NULL.

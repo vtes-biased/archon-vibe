@@ -154,7 +154,6 @@ def build_sealed_pdf(
     record_uid: str,
     signed_at: datetime,
 ) -> bytes:
-    # Lazy: fpdf is ~34 MB resident once imported.
     from fpdf import FPDF
     from fpdf.enums import XPos, YPos
 

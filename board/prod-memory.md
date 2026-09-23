@@ -21,6 +21,14 @@ Doc-impact: `wiki/dev.md` (Deployment — memory breakdown and working headroom)
 - The backend logs "Snapshots unchanged at 36683 objects, skipped" every 15 min.
   Ruled out: generation streams, a full rebuild costs +10 MB, a skip 20 ms.
 
+## Prod baseline (2026-09-23, owner-run)
+
+Up since 2026-08-24 16:54 (29.5 days): `full total` 13,614 s ≈ 7.7 min/day on
+average, possibly bursty. 210 MB available, 326 MB swap. `archon-backend` last
+entered active 2026-09-22 09:35 UTC, so its daily restart falls near 09:35-09:40
+UTC — clear of the 03:00 backup and 05:00 TWDA sync. Next: a day of per-minute
+`/tmp/psi.log` samples before the deploy, a day after.
+
 ## Beta attribution (2026-09-23, same 36,683-object corpus)
 
 One boot of the old code: imports 134 MB (fpdf alone 34), idle 156, member

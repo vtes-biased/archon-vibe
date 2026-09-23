@@ -14,6 +14,7 @@ from .db import (
     BroadcastData,
     decode_json,
     get_all_tournament_wins,
+    get_connection,
     get_sanctions_for_tournament,
     get_user_uids_with_wins,
     get_users_by_uids,
@@ -195,33 +196,34 @@ async def recompute_ratings_for_players(
     entries_by_user: dict[str, list[TournamentRatingEntry]] = {
         uid: [] for uid in player_uids
     }
-    for fmt in formats:
-        async with aclosing(
-            stream_finished_tournaments_for_category(fmt, online, cutoff_str)
-        ) as tournaments:
-            async for t in tournaments:
-                players = _players_with_rounds(t) & player_uids
-                if not players:
-                    continue
-                t_json = msgspec.json.encode(t).decode()
-                # Same single-sourced predicate the frontend ranked/unranked badge displays.
-                if _engine.ranking_eligibility(t_json) != "eligible":
-                    continue
-                sanctions = await get_sanctions_for_tournament(t.uid)
-                sanctions_json = msgspec.json.encode(sanctions).decode()
-                # Who earns an entry vs how big the field was: two questions, two counts.
-                count = _engine.attested_player_count(t_json)
-                positions = _final_positions(t)
-                for user_uid in players:
-                    if _is_disqualified(t, sanctions, user_uid):
-                        continue  # DQ'd: no rating entry, no participation base
-                    if _is_non_competing(t, user_uid):
-                        continue  # proxy: non-competing official stood in — no rating
-                    entries_by_user[user_uid].append(
-                        _compute_entry(
-                            t, t_json, sanctions_json, user_uid, count, positions
+    async with get_connection() as conn:
+        for fmt in formats:
+            async with aclosing(
+                stream_finished_tournaments_for_category(conn, fmt, online, cutoff_str)
+            ) as tournaments:
+                async for t in tournaments:
+                    players = _players_with_rounds(t) & player_uids
+                    if not players:
+                        continue
+                    t_json = msgspec.json.encode(t).decode()
+                    # Same single-sourced predicate the frontend ranked/unranked badge displays.
+                    if _engine.ranking_eligibility(t_json) != "eligible":
+                        continue
+                    sanctions = await get_sanctions_for_tournament(t.uid, conn=conn)
+                    sanctions_json = msgspec.json.encode(sanctions).decode()
+                    # Who earns an entry vs how big the field was: two questions, two counts.
+                    count = _engine.attested_player_count(t_json)
+                    positions = _final_positions(t)
+                    for user_uid in players:
+                        if _is_disqualified(t, sanctions, user_uid):
+                            continue  # DQ'd: no rating entry, no participation base
+                        if _is_non_competing(t, user_uid):
+                            continue  # proxy: non-competing official stood in — no rating
+                        entries_by_user[user_uid].append(
+                            _compute_entry(
+                                t, t_json, sanctions_json, user_uid, count, positions
+                            )
                         )
-                    )
 
     updated_users: list[tuple[User, BroadcastData]] = []
     uids = sorted(player_uids)
