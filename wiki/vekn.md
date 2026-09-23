@@ -417,10 +417,10 @@ Eleven of the 28 are spellings of one person; the other 17 name someone else,
 four of them Vivica for Alexander Båskman (1776, 4126, 7343, 13120), and the
 archive's deck stays with vekn.net's winner there too.
 
-**A reconstruction of an event vekn.net holds was merged**, keeping the vekn.net
-copy with the archive key transplanted, where the winner, the day and the field
-size agree (66), and on the owner's ruling for ten more whose field size or name
-drifted — the two Origins 2007 events among them, which took the archive's names.
+**A reconstruction of an event vekn.net holds was merged** on 2026-09-23, keeping
+the vekn.net copy — and its name — with the archive key transplanted, where the
+winner, the day and the field size agree (66), and on the owner's ruling for ten
+more whose field size or name drifted.
 Three stay two events: *Blood League part IV* against 11478 and *SuperHappyFunSlide
 Day 2* against 5581, each a different event won by the same player a day apart, and
 *GenCon NAC Qualifier* against 1380. The audit reports those three every run.
