@@ -604,14 +604,14 @@ resolves the level, computes `X-Access-Version`, and answers with
 directory — nginx serves the pre-gzipped file via sendfile, one page-cached
 copy shared across every client, so a room-sized cold connect never runs its
 bytes through Python at all. The handoff is a deployment pairing: the backend
-emits the header only when `SNAPSHOT_ACCEL_PREFIX` is set, and the inventory
-sets it beside the `static_site` role param that renders the location, so a
+emits the header only when `SNAPSHOT_ACCEL_PREFIX` is set, and the deploy
+sets it beside the vhost parameter that renders the location, so a
 backend with no nginx in front streams itself. Two traps live in that
 location: an internal redirect drops custom upstream headers, so it re-emits
 the load-bearing `X-Access-Version` from `$upstream_http_x_access_version`;
 and nginx reads the files as `www-data`, which is why the snapshots dir is
 setgid `www-data` with its perms asserted on **every** deploy
-(`ansible/tasks/snapshot_dirs.yml`) and the generator chmods its temp files
+(`deploy/deploy.py`) and the generator chmods its temp files
 to 0640 before the rename.
 
 The app's own path remains for dev, for the fallback and for the zip export:

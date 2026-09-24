@@ -1,12 +1,10 @@
 # Archon Ansible deploy
 
-Provisions and deploys `archon-vibe` (FastAPI backend, Svelte/Vite PWA frontend,
-Discord bot, PostgreSQL 17, nginx + Let's Encrypt) to one of two targets:
+This tree deploys production only; beta deploys with pyinfra from `deploy/` (see `wiki/dev.md`).
 
-| env  | host                     | main domain             | bot domain                 |
-|------|--------------------------|-------------------------|----------------------------|
-| beta | server-setup (frankfurt) | `archon.krcg.org`       | `bot.archon.krcg.org`      |
-| prod | `vekn.net` VPS           | `archon.vekn.net`       | `bot.archon.vekn.net`      |
+Provisions and deploys `archon-vibe` (FastAPI backend, Svelte/Vite PWA frontend,
+Discord bot, PostgreSQL 17, nginx + Let's Encrypt) to production: the `vekn.net`
+VPS, serving `archon.vekn.net` (main) and `bot.archon.vekn.net` (bot).
 
 Build strategy: all deployable artifacts (Rust engine wheel, backend wheel, bot
 wheel, frontend static dist) are built **by GitHub Actions** (`.github/workflows/
@@ -19,17 +17,16 @@ build`. `just deploy-*` (run from `ansible/`) is a friendly wrapper over
 (runs the same from a laptop or a CI runner).
 
 The `just build-*` recipes still build everything locally for development, and
-`SOURCE=local just deploy-<env>` deploys a local build instead of the Release
-(handy for testing an un-released change on beta).
+`SOURCE=local just deploy-prod` deploys a local build instead of the Release
+(handy for testing an un-released change before cutting a release).
 
-Runtime Python is managed by **uv** (same version on both hosts, pinned via
-`python_version` in `group_vars/all/vars.yml` — currently `3.14`). uv downloads
+Runtime Python is managed by **uv** (pinned via `python_version` in
+`group_vars/all/vars.yml` — currently `3.14`). uv downloads
 python-build-standalone binaries into `/opt/uv/python`, independent of the
 distro. No third-party PPAs; no abi3 tricks in the Rust engine build.
 
 PostgreSQL 17 is installed from the official PGDG apt repository (maintained
-upstream by the PostgreSQL Global Development Group) so both environments run
-the same major version.
+upstream by the PostgreSQL Global Development Group).
 
 ## Prerequisites
 
@@ -42,12 +39,10 @@ On your workstation:
 - Only for `SOURCE=local` builds: Docker Desktop (manylinux PyO3 wheel),
   Node 24 (matches CI), and `wasm-pack` (frontend WASM engine).
 
-On each server (first time only):
-- **prod** (before `just bootstrap-prod`): a non-root admin user with
-  passwordless sudo (see `inventories/prod/hosts.ini` — `ansible_user` must be
-  that account) and SSH key auth.
-- **beta**: nothing to prepare — the foundation, `deploy` user included, comes
-  from server-setup.
+On the server (first time only):
+- Before `just bootstrap-prod`: a non-root admin user with passwordless sudo
+  (see `inventories/prod/hosts.ini` — `ansible_user` must be that account) and
+  SSH key auth.
 - DNS A/AAAA records pointing at the server for both the main domain and the
   `bot.<main-domain>` subdomain (certbot HTTP-01 needs them before deploy).
 
@@ -57,60 +52,53 @@ On each server (first time only):
 cd ansible
 just galaxy                               # ansible collections (incl. server-setup foundation)
 
-# Vault password: each env's lives age-encrypted in secrets/<env>.vault-pass.age and
+# Vault password: it lives age-encrypted in secrets/prod.vault-pass.age and
 # the deploy recipes decrypt it for you — see "Vault passwords" below for adding your
 # key, creating/rotating a password, and editing vault.yml.
-
-# beta (frankfurt) is server-setup-provisioned — there is no beta bootstrap.
-# `just deploy-beta` is the only beta entrypoint (it creates the app user and
-# the DB/role itself, via server-setup's postgres_db role).
-just deploy-beta
 
 just bootstrap-prod                        # prod: full provision (archon's own roles)
 ```
 
 ## Vault passwords
 
-Each env (`beta`, `prod`) has its **own** ansible-vault password. We don't pass
-them around by hand — each is stored **in the repo, age-encrypted**, decryptable
-only by the admins whose public keys are listed in `secrets/age-recipients.txt`:
+Production has its **own** ansible-vault password. It's not passed around by
+hand — it's stored **in the repo, age-encrypted**, decryptable only by the
+admins whose public keys are listed in `secrets/age-recipients.txt`:
 
 ```
 ansible/secrets/
-├── age-recipients.txt   # admins' PUBLIC keys — decrypt BOTH env passwords
-├── beta.vault-pass.age  # beta vault password, age-encrypted to that list
+├── age-recipients.txt   # admins' PUBLIC keys — decrypt the vault password
 └── prod.vault-pass.age  # prod vault password, age-encrypted to that list
 ```
 
-Both the recipients list (public keys) and the `*.age` files (ciphertext) are
+Both the recipients list (public keys) and the `*.age` file (ciphertext) are
 **safe to commit**; `secrets/.gitignore` whitelists only those, so a plaintext
 password can't slip in. Install [`age`](https://github.com/FiloSottile/age) first:
 `brew install age` / `apt install age` / `winget install FiloSottile.age`.
 
 ### Use it (local deploy)
 
-Decrypt the env's password into its git-ignored `.<env>.vault_pass` with **your**
+Decrypt the password into the git-ignored `.prod.vault_pass` with **your**
 age/SSH key, then run the deploy — the `just` deploy/provision recipes default
-`ANSIBLE_VAULT_PASSWORD_FILE` to that per-env file for you:
+`ANSIBLE_VAULT_PASSWORD_FILE` to that file for you:
 
 ```bash
 cd ansible
-age -d -i ~/.ssh/id_ed25519 -o .beta.vault_pass secrets/beta.vault-pass.age   # fill .beta.vault_pass
-just deploy-beta            # recipe points ansible-vault at ./.beta.vault_pass
-rm -f .beta.vault_pass      # plaintext on disk; git-ignored, but remove when done
+age -d -i ~/.ssh/id_ed25519 -o .prod.vault_pass secrets/prod.vault-pass.age   # fill .prod.vault_pass
+just deploy-prod            # recipe points ansible-vault at ./.prod.vault_pass
+rm -f .prod.vault_pass      # plaintext on disk; git-ignored, but remove when done
 ```
 
 Choose your identity with `-i` (`~/.ssh/id_ed25519`, `~/.ssh/id_rsa`, or an age key
-like `~/.config/age/keys.txt`). Same for prod (`prod.vault-pass.age` →
-`.prod.vault_pass` → `just deploy-prod`). For a one-off `ansible-vault` command (not
-a recipe), point it at the same file: `ANSIBLE_VAULT_PASSWORD_FILE=.beta.vault_pass
-ansible-vault edit inventories/beta/group_vars/all/vault.yml`.
+like `~/.config/age/keys.txt`). For a one-off `ansible-vault` command (not a
+recipe), point it at the same file: `ANSIBLE_VAULT_PASSWORD_FILE=.prod.vault_pass
+ansible-vault edit inventories/prod/group_vars/all/vault.yml`.
 
 > **A set `ANSIBLE_VAULT_PASSWORD_FILE` overrides this.** The recipe default only
 > kicks in when the variable is *unset* — an exported value (yours or CI's) is
 > respected as-is, and the env var also beats any `ansible.cfg` `vault_password_file`.
 > So keep your *global* default in `~/.ansible.cfg` (`[defaults]` → `vault_password_file`),
-> not a shell `export`, or it'll shadow the recipe's per-env `.<env>.vault_pass` here.
+> not a shell `export`, or it'll shadow the recipe's `.prod.vault_pass` here.
 
 ### Become a recipient
 
@@ -132,25 +120,24 @@ Make sure your key is in `age-recipients.txt` (above), then generate the passwor
 
 ```bash
 # fresh random password, age-encrypted to the recipients (-a = armored, diff-friendly):
-openssl rand -base64 32 | tr -d '\n' | age -R secrets/age-recipients.txt -a -o secrets/beta.vault-pass.age
 openssl rand -base64 32 | tr -d '\n' | age -R secrets/age-recipients.txt -a -o secrets/prod.vault-pass.age
 ```
 
-After **first** creating a password, encrypt that env's `vault.yml` with it (decrypt
-to the per-env file, then encrypt):
+After **first** creating a password, encrypt `vault.yml` with it (decrypt to the
+plaintext file, then encrypt):
 
 ```bash
-age -d -i ~/.ssh/id_ed25519 -o .beta.vault_pass secrets/beta.vault-pass.age
-ANSIBLE_VAULT_PASSWORD_FILE=.beta.vault_pass ansible-vault encrypt inventories/beta/group_vars/all/vault.yml
+age -d -i ~/.ssh/id_ed25519 -o .prod.vault_pass secrets/prod.vault-pass.age
+ANSIBLE_VAULT_PASSWORD_FILE=.prod.vault_pass ansible-vault encrypt inventories/prod/group_vars/all/vault.yml
 ```
 
 To **rotate recipients** (add/remove an admin) without changing the password,
 re-encrypt the existing password to the updated list — age can't re-wrap in place:
 
 ```bash
-$EDITOR secrets/age-recipients.txt    # add/remove keys, then per env:
-age -d -i ~/.ssh/id_ed25519 secrets/beta.vault-pass.age | age -R secrets/age-recipients.txt -a -o secrets/beta.vault-pass.age.new
-mv secrets/beta.vault-pass.age.new secrets/beta.vault-pass.age
+$EDITOR secrets/age-recipients.txt    # add/remove keys, then:
+age -d -i ~/.ssh/id_ed25519 secrets/prod.vault-pass.age | age -R secrets/age-recipients.txt -a -o secrets/prod.vault-pass.age.new
+mv secrets/prod.vault-pass.age.new secrets/prod.vault-pass.age
 ```
 
 Commit the updated `*.age` / `age-recipients.txt`.
@@ -158,13 +145,12 @@ Commit the updated `*.age` / `age-recipients.txt`.
 ### CI mirror (GitHub Environment secret)
 
 CI can't read a `*.age` (no admin key in the runner), and GitHub secrets are
-**write-only** anyway (`gh`/the API set but never read a value back). So each env's
+**write-only** anyway (`gh`/the API set but never read a value back). So production's
 GitHub **Environment secret** `ANSIBLE_VAULT_PASSWORD` holds the same password and
 `deploy.yml` writes it to `.vault_pass` for the run. Mirror it from the age file
 (decrypt → `gh`, never on disk) whenever you create or rotate a password:
 
 ```bash
-age -d -i ~/.ssh/id_ed25519 secrets/beta.vault-pass.age | gh secret set ANSIBLE_VAULT_PASSWORD --env beta       --repo vtes-biased/archon-vibe
 age -d -i ~/.ssh/id_ed25519 secrets/prod.vault-pass.age | gh secret set ANSIBLE_VAULT_PASSWORD --env production --repo vtes-biased/archon-vibe
 ```
 
@@ -190,9 +176,8 @@ From there:
    to build and attach the wheel / frontend dist assets — no `release:
    published` event handoff (a `github.token`-created Release never fires it),
    so no PAT/token is needed.
-4. Deploy is a separate manual step — run `just deploy-beta` / `deploy-prod`
-   from the laptop (see [Routine updates](#routine-updates) below); nothing
-   auto-deploys.
+4. Deploy is a separate manual step — run `just deploy-prod` from the laptop
+   (see [Routine updates](#routine-updates) below); nothing auto-deploys.
 
 To run the E2E suite without cutting a release (e.g. on `main`), use
 `workflow_dispatch` on `release.yml` in the Actions tab.
@@ -200,11 +185,10 @@ To run the E2E suite without cutting a release (e.g. on `main`), use
 ## Routine updates
 
 ```bash
-just deploy-beta                           # deploy latest Release to beta
-just deploy-prod                           # same for prod
+just deploy-prod                           # deploy latest Release to prod
 RELEASE_TAG=v1.2.3 just deploy-prod        # deploy a specific Release
-SOURCE=local just deploy-beta              # build locally + deploy (un-released change)
-QUICK=1 just deploy-beta                   # version bump only: ship artifacts, skip provisioning
+SOURCE=local just deploy-prod              # build locally + deploy (un-released change)
+QUICK=1 just deploy-prod                   # version bump only: ship artifacts, skip provisioning
 ```
 
 `QUICK=1` passes `--tags app`, running only the artifact-shipping roles
@@ -228,8 +212,7 @@ FULL=1 REBOOT=1 just upgrade-prod          # dist-upgrade + reboot (major kernel
 
 The `system_upgrade` role stops the backend + bot services before rebooting,
 restarts them afterwards, and then **fails the play** if nginx, postgres, the
-backend or the bot is not running. Prod only: beta (frankfurt) system updates,
-reboots included, are owned by server-setup's own upgrade pipeline.
+backend or the bot is not running.
 
 ## Layout
 
@@ -239,15 +222,14 @@ ansible/
 ├── requirements.yml      # collection pins (incl. lionel_panhaleux.server_setup from git)
 ├── justfile              # deploy + local-build recipes (wraps ansible-playbook)
 ├── galaxy_collections/   # collections installed by `just galaxy` (git-ignored)
-├── inventories/<env>/    # hosts.ini + group_vars/{all.yml, vault.yml}
+├── inventories/prod/     # hosts.ini + group_vars/{all.yml, vault.yml}
 ├── playbooks/
 │   ├── bootstrap.yml     # common role only
 │   ├── database.yml      # postgresql role
 │   ├── deploy.yml        # prod: backend + frontend + bot (standalone)
-│   ├── deploy-beta.yml   # beta: app on the server-setup foundation (frankfurt)
 │   ├── upgrade.yml       # system_upgrade role
 │   └── site.yml          # bootstrap + database + deploy
-├── tasks/                # fetch_release.yml (shared self-fetch) + app_user.yml (beta)
+├── tasks/                # fetch_release.yml (shared self-fetch) + app_user.yml
 ├── vars/                 # release_artifacts.yml (shared artifact resolution)
 ├── roles/
 │   ├── common/           # base packages, admin user, ufw, unattended-upgrades

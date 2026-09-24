@@ -1,0 +1,23 @@
+{% if modern_http2 %}
+  listen 443 ssl;
+  listen [::]:443 ssl;
+  http2 on;
+{% else %}
+{# nginx < 1.25.1 (Ubuntu 24.04's 1.24) predates the http2 directive #}
+  listen 443 ssl http2;
+  listen [::]:443 ssl http2;
+{% endif %}
+  server_name {{ domain }};
+
+  ssl_certificate     /etc/letsencrypt/live/{{ domain }}/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/{{ domain }}/privkey.pem;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
+  ssl_prefer_server_ciphers off;
+  # server-setup's sites share this zone: the name and size must match theirs
+  ssl_session_cache shared:SSL:10m;
+  ssl_session_timeout 1d;
+  ssl_session_tickets off;
+
+  access_log syslog:server=unix:/dev/log,nohostname;
+  error_log syslog:server=unix:/dev/log,nohostname;

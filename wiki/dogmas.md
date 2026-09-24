@@ -200,9 +200,8 @@ The backend ships as an installed wheel in CI; `files()` resolves there,
 
 **Personal data and secrets are never committed.** The repo is public and CI
 publishes wheels as release assets, so PII bundled into the package ships inside
-the public wheel. Deliver it out of band: an `ansible-vault` file decrypted at
-deploy to an env-pointed runtime path, with an untracked dev copy and graceful
-absence.
+the public wheel. Deliver it out of band: an encrypted file decrypted at deploy
+to an env-pointed runtime path, with an untracked dev copy and graceful absence.
 
 ## Git
 

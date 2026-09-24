@@ -1,27 +1,26 @@
 """Guardrail: no frontend SPA page route may be shadowed by a backend-proxied
 nginx prefix — a page under a backend prefix 404s against the API instead of
 booting the SPA (bit us twice: /oauth/consent, /auth/email/verify, since
-relocated). Reads the proxied-prefix list from the `static_site` role default,
-the same source nginx renders from, so the check can't drift from the deployed
-config.
+relocated). Reads the proxied-prefix list from `deploy/routes.py`, the same
+source nginx renders from, so the check can't drift from the deployed config.
 """
 
+import importlib.util
 from pathlib import Path
 
 import yaml
 
 _REPO = Path(__file__).resolve().parents[2]
 _ROUTES = _REPO / "frontend" / "src" / "routes"
-_STATIC_SITE_DEFAULTS = (
-    _REPO / "ansible" / "roles" / "static_site" / "defaults" / "main.yml"
-)
 
 
 def _backend_prefixes() -> list[str]:
-    data = yaml.safe_load(_STATIC_SITE_DEFAULTS.read_text())
-    prefixes = list(data["static_site_backend_paths_default"])
-    prefixes.append(data["static_site_sse_path_default"])
-    return prefixes
+    spec = importlib.util.spec_from_file_location(
+        "routes", _REPO / "deploy" / "routes.py"
+    )
+    routes = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(routes)
+    return [*routes.BACKEND_PATHS, routes.SSE_PATH]
 
 
 def _page_routes() -> list[str]:
@@ -49,6 +48,14 @@ def test_no_frontend_route_shadowed_by_backend_prefix() -> None:
         for prefix in prefixes
         if _shadowed_by(route, prefix)
     }
+    # production renders from the Ansible role until it moves to deploy/
+    ansible = _REPO / "ansible" / "roles" / "static_site" / "defaults" / "main.yml"
+    if ansible.exists():
+        data = yaml.safe_load(ansible.read_text())
+        assert [
+            *data["static_site_backend_paths_default"],
+            data["static_site_sse_path_default"],
+        ] == prefixes, "deploy/routes.py and the static_site role disagree"
     assert not offenders, (
         "Frontend page routes shadowed by a backend nginx prefix — these would "
         f"404 against the API instead of booting the SPA: {offenders}. Move the "

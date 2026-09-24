@@ -320,6 +320,11 @@ test-smoke:
     VITE_API_URL="" npm run build
     npm run test:smoke
 
+# --dry only shows; RELEASE_TAG=vX.Y.Z pins a release, BUILD_DIR=<dir, relative to deploy/> a local build
+# Deploy beta with pyinfra: shows every change, then asks
+deploy-beta *flags:
+    cd deploy && uv run --group deploy pyinfra inventory.py deploy.py --limit beta --diff {{ flags }}
+
 # release.yml runs e2e on the pushed tag and, only if green, creates the GitHub
 # Release, then builds + attaches the artifacts in the same run. Examples:
 #   just release patch   # v0.1.10 -> v0.1.11

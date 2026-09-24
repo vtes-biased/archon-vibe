@@ -128,12 +128,13 @@ Its `test` profile backs `just test-e2e` ([testing](testing.md)).
 
 ## Deployment
 
-Real deployment is **wheels plus systemd via Ansible**, under `ansible/`. There is
-no Docker production path. Production runs on a 945 MB single-core VPS with a
+Real deployment is **wheels plus systemd**. Beta deploys with **pyinfra** from
+`deploy/`; production still deploys with Ansible from `ansible/` until it moves
+over. There is no Docker production path. Production runs on a 945 MB single-core VPS with a
 24 GB disk, which is why the connection pool is small and bulk table loads are
 forbidden ([architecture](architecture.md#database-access)).
 
-The `common` role guarantees the box's baseline beyond what it installs: the
+On production, the Ansible `common` role guarantees the box's baseline beyond what it installs: the
 daemons a single-disk VM never uses (multipath, fwupd, ModemManager, udisks2,
 VMware guest tools) and rsyslog — a second copy of what the journal already
 keeps — are purged, the journal is capped at 256 MB, apt keeps no downloaded
@@ -156,16 +157,38 @@ Because the backend ships as an installed wheel, **bundled data files must load
 through `importlib.resources`**, never `Path(__file__)`
 ([dogmas](dogmas.md#dependencies-and-data)).
 
-Vault secrets are edited in place — `just vault-edit-beta` / `just vault-edit-prod`
-from `ansible/`, committing the re-encrypted file. The per-env password files are
-gitignored; an admin decrypts them from `ansible/secrets/<env>.vault-pass.age`.
+**Beta runs on frankfurt, a [server-setup](https://github.com/lionel-panhaleux/server-setup)
+box**: that repo owns the system (packages, postgres cluster, backups, Alloy,
+nginx's default server), and `deploy/` only deploys the app, importing
+`server_setup` (the `deploy` dependency group, pinned to a commit). `just
+deploy-beta` shows every change, then asks; `--dry` only shows, `RELEASE_TAG`
+pins a release and `BUILD_DIR` deploys a local build (a `frontend-dist/`
+directory there is packed in place of the release tarball). `deploy/deploy.py`
+derives every path, unit and database from the environment's `name` in
+`deploy/group_data/`, which holds what differs between environments. A service
+restarts only when its wheel, requirements, env file or unit changed; the venv
+install and the frontend swap compare a marker on the box with the hash of what
+is deployed, so re-running a deploy that failed halfway finishes it. A
+certificate renews through `/var/www/certbot`. The backend's ops scripts are
+copied from the working tree, not from the release being deployed.
 
-**A role's `defaults/main.yml` is its parameter contract.** Every `r.*` key the
+Beta's vhosts send `Strict-Transport-Security: max-age=31536000` (this host only,
+no `includeSubDomains`), a year-long promise every browser keeps, and pass the
+client address as `X-Forwarded-For`. Production's Ansible vhosts do neither
+until production moves to `deploy/`.
+
+Beta's secrets are `deploy/secrets/beta.sops.yaml` and the files under
+`deploy/secrets/beta/`, encrypted with sops to the keys `deploy/.sops.yaml`
+names; identifiers stay readable beside the secret they pair with. Edit with
+`sops secrets/beta.sops.yaml` from `deploy/`. Production's are still ansible-vault
+files, edited with `just vault-edit-prod` from `ansible/`; their password files
+are gitignored, and an admin decrypts them from
+`ansible/secrets/prod.vault-pass.age`.
+
+**An Ansible role's `defaults/main.yml` is its parameter contract.** Every `r.*` key the
 role reads is listed there, and is either required — asserted in the role, so
 omission fails the play — or carries a `*_default` that makes omission correct.
-The playbooks pass only what genuinely differs between beta and prod, so a
-parameter added to one caller and not the other can no longer be silently
-skipped on the other. A role resolves its defaults into `_`-prefixed facts, and
+A role resolves its defaults into `_`-prefixed facts, and
 those are host-scoped: they outlive the role that set them, so each role must set
 every `_` fact it reads rather than inherit a same-named one from an earlier role.
 
@@ -211,8 +234,9 @@ because the backend's own `/` is the health check.
 
 ### Backups
 
-Production only — `ansible/roles/db_backup`, gated on `db_backup_enabled`; the
-beta playbook never runs it. Daily at 03:00 UTC a systemd timer dumps every
+Production only — `ansible/roles/db_backup`, gated on `db_backup_enabled`.
+Beta's database is excluded from server-setup's cluster backup: beta is reseeded
+at will. Daily at 03:00 UTC a systemd timer dumps every
 non-template database in the cluster except `postgres` itself (`pg_dump -F c`,
 one file per DB) plus the cluster globals — login roles and password hashes,
 without which a full-cluster restore has no roles to connect as — into
@@ -260,7 +284,7 @@ Copy `.env.example` to `.env`. **Local dev works with no `.env` at all** — eve
 variable has a sensible default. Production requires explicit configuration.
 
 **Core** — `DATABASE_URL`; `JWT_PRIVATE_KEY` and `JWT_PUBLIC_KEYS` (`just
-jwt-keys`, one pair per environment, both ansible-vault vars —
+jwt-keys`, one pair per environment, both deploy secrets —
 [access](access.md#authentication)); `ENVIRONMENT`, which anything but
 `development` makes those two mandatory;
 `FRONTEND_URL`, the public frontend origin used for OAuth redirects, calendar links
@@ -282,7 +306,7 @@ needs `DISCORD_CLIENTID`, `DISCORD_SECRET` and `DISCORD_REDIRECT_URI`, plus
 `TWDA_SYNC_ENABLED` ([vekn](vekn.md#feature-flags)).
 
 **Web Push** — `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`; generate
-with `just vapid-keys`. The private key and subject are ansible-vault secrets. The
+with `just vapid-keys`. The private key is a deploy secret. The
 public key is served at runtime, never baked into the build
 ([architecture](architecture.md#web-push)).
 
@@ -336,7 +360,8 @@ engine/     Rust core — the single source of business logic
 backend/    FastAPI service
 frontend/   Svelte PWA
 bot/        Discord tournament bot (separate process)
-ansible/    deployment
+deploy/     pyinfra deploy (beta)
+ansible/    Ansible deploy (production, until it moves to deploy/)
 reference/  official VEKN and VTES documents (external, not ours to edit)
 scripts/    build and data tooling
 wiki/       this wiki

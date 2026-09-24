@@ -93,6 +93,7 @@ INCOMING/
 
 # Ansible
 ansible/build/
+deploy/build/
 ansible/.ansible_facts/
 ansible/.ansible/
 

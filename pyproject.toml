@@ -91,7 +91,13 @@ extra-paths = ["engine"]
 [tool.ty.rules]
 dataclass-field-order = "ignore"
 
+[tool.uv.sources]
+server-setup = { git = "https://github.com/lionel-panhaleux/server-setup", rev = "b73401bd5c0148d6a9252e498c7f271989dbd73b" }
+
 [dependency-groups]
+deploy = [
+    "server-setup",
+]
 dev = [
     "maturin>=1.12.4",
     "ruff>=0.7.0",

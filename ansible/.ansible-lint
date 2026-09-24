@@ -13,7 +13,6 @@ exclude_paths:
   - .ansible_facts/
   - .cache/
   - galaxy_collections/     # third-party collections installed via `just galaxy`
-  - inventories/beta/group_vars/vault.yml
   - inventories/prod/group_vars/vault.yml
 
 # A single `r` dict is passed into parameterised roles rather than prefixing

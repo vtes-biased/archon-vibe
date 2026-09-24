@@ -1,4 +1,4 @@
-# Run from this directory: `just deploy-beta`, `just bootstrap-prod`, … (dev
+# Run from this directory: `just deploy-prod`, `just bootstrap-prod`, … (dev
 # tasks live in the repo-root justfile). Deployed artifacts are built by GitHub
 # Actions and attached to the published Release, so servers never run
 # cargo/maturin/npm/uv.
@@ -9,7 +9,6 @@ manylinux := "quay.io/pypa/manylinux_2_28_x86_64"
 
 # Recipes that reach the vault default ANSIBLE_VAULT_PASSWORD_FILE to these when
 # not already set. lint/build recipes are left out so they run with no password.
-vault_pass_beta := justfile_directory() / ".beta.vault_pass"
 vault_pass_prod := justfile_directory() / ".prod.vault_pass"
 
 default:
@@ -84,8 +83,8 @@ build-frontend:
 # Build every deployable artifact
 build-all: build-engine-wheel build-backend build-bot build-frontend
 
-# Beta has no bootstrap: server-setup owns the frankfurt foundation, and
-# `just deploy-beta` is the only beta entrypoint.
+# Beta deploys with pyinfra from deploy/ (`just deploy-beta` at the repo root).
+# A local build for it: `just build-all` here, then BUILD_DIR=../ansible/build.
 
 # Prod foundation only (common role: packages+psycopg2, archon user, dirs, uv, nginx, ufw)
 foundation-prod: galaxy
@@ -99,24 +98,9 @@ dry-foundation-prod: galaxy
 bootstrap-prod: galaxy
     ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/site.yml
 
-# Beta's DB/role is created by deploy-beta.yml via server-setup's postgres_db role.
 # Install/configure PostgreSQL + archon DB/user on prod
 database-prod:
     ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/database.yml
-
-# Deploy archon-vibe to beta/frankfurt (RELEASE_TAG=… / SOURCE=local / QUICK=1)
-deploy-beta:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    export ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_beta}}}"
-    # A full deploy runs collection-backed roles; QUICK=1's artifact-only
-    # lane (--tags app) touches none, so it skips this.
-    if [ -z "${QUICK:-}" ]; then just galaxy; fi
-    extra=""
-    if [ -n "${RELEASE_TAG:-}" ]; then extra="-e release_tag=${RELEASE_TAG}"; fi
-    if [ "${SOURCE:-}" = local ]; then just build-all; extra="$extra -e artifact_source=local"; fi
-    if [ -n "${QUICK:-}" ]; then extra="$extra --tags app"; fi
-    uv run --project {{repo_root}} ansible-playbook -i inventories/beta playbooks/deploy-beta.yml $extra
 
 # Deploy backend/frontend/bot to prod (RELEASE_TAG=… / SOURCE=local / QUICK=1)
 deploy-prod:
@@ -138,7 +122,6 @@ deploy-prod:
         echo "$pending post-deploy action(s) parked in wiki/post-deploy.md — run /post-deploy"
     fi
 
-# No beta variant: frankfurt system updates (apt + reboots) belong to server-setup.
 # apt upgrade + (optional) reboot on prod (FULL=1 REBOOT=1)
 upgrade-prod:
     #!/usr/bin/env bash
@@ -149,10 +132,6 @@ upgrade-prod:
     if [ -n "${REBOOT:-}" ]; then extra="$extra -e upgrade_reboot=true"; fi
     uv run --project {{repo_root}} ansible-playbook -i inventories/prod playbooks/upgrade.yml $extra
 
-# Edit beta's vault in $EDITOR (default vi); commit the re-encrypted file
-vault-edit-beta:
-    ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_beta}}}" uv run --project {{repo_root}} ansible-vault edit inventories/beta/group_vars/all/vault.yml
-
 # Edit prod's vault in $EDITOR (default vi); commit the re-encrypted file
 vault-edit-prod:
     ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_prod}}}" uv run --project {{repo_root}} ansible-vault edit inventories/prod/group_vars/all/vault.yml
@@ -161,16 +140,6 @@ vault-edit-prod:
 lint: galaxy
     uv run --project {{repo_root}} yamllint -s .
     uv run --project {{repo_root}} ansible-lint
-
-# Dry-run (check mode) of the beta deploy; the release fetch runs for real, localhost-only (RELEASE_TAG=… / SOURCE=local)
-dry-deploy-beta: galaxy
-    #!/usr/bin/env bash
-    set -euo pipefail
-    export ANSIBLE_VAULT_PASSWORD_FILE="${ANSIBLE_VAULT_PASSWORD_FILE:-{{vault_pass_beta}}}"
-    extra=""
-    if [ -n "${RELEASE_TAG:-}" ]; then extra="-e release_tag=${RELEASE_TAG}"; fi
-    if [ "${SOURCE:-}" = local ]; then just build-all; extra="$extra -e artifact_source=local"; fi
-    uv run --project {{repo_root}} ansible-playbook -i inventories/beta playbooks/deploy-beta.yml --check --diff $extra
 
 # Dry-run (check mode) of `deploy-prod` — the pre-flight that fires the roles' parameter asserts (RELEASE_TAG=… / SOURCE=local)
 dry-deploy-prod: galaxy

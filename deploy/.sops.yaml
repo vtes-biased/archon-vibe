@@ -1,0 +1,20 @@
+keys:
+  beta: &beta
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE+Fa+dmnpPBYM0G7xPupl+GkVdF6YFmZ/NkpyqOzWoI  # lionel-panhaleux
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDlN9QsXPGklb1BhEyGYankvkqoKGFlls4O0UWKe/YKf  # deploy (~/.ssh/deploy)
+  prod: &prod
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE+Fa+dmnpPBYM0G7xPupl+GkVdF6YFmZ/NkpyqOzWoI  # lionel-panhaleux
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHKNdBQ0YRx8ZnlrpkynqRVrNe5zMSLePRAMAu6cgUgC  # archon deploy (~/.ssh/id_archon)
+
+creation_rules:
+  # identifiers stay readable next to the secret they pair with
+  - path_regex: secrets/beta\.sops\.yaml$
+    unencrypted_regex: _(client_id|installation_id|public_keys?|username)$
+    age: *beta
+  - path_regex: secrets/beta/
+    age: *beta
+  - path_regex: secrets/prod\.sops\.yaml$
+    unencrypted_regex: _(client_id|installation_id|public_keys?|username)$
+    age: *prod
+  - path_regex: secrets/prod/
+    age: *prod

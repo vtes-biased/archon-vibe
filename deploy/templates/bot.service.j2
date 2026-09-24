@@ -1,0 +1,30 @@
+[Unit]
+Description={{ unit }}-bot (archon Discord bot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ name }}
+Group={{ name }}
+WorkingDirectory={{ bot_root }}
+EnvironmentFile={{ env_dir }}/{{ unit }}-bot.env
+ExecStart={{ bot_root }}/.venv/bin/archon-bot
+Restart=always
+RestartSec=5
+TimeoutStartSec=30
+
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths={{ bot_root }} {{ bot_state_dir }}
+
+[Install]
+WantedBy=multi-user.target

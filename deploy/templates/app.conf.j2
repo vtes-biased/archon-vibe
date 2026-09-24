@@ -1,0 +1,151 @@
+{# add_header is all-or-nothing per level: a location that sets any header
+   inherits none from its server, so every such location repeats these #}
+{% macro headers(pad="    ") %}
+{{ pad }}add_header Strict-Transport-Security "max-age=31536000" always;
+{{ pad }}add_header X-Frame-Options "SAMEORIGIN" always;
+{{ pad }}add_header X-Content-Type-Options "nosniff" always;
+{{ pad }}add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+{%- endmacro %}
+{# nginx is the only hop: pass the client address, not a client-supplied chain #}
+{% macro proxy_headers() %}
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Host $http_host;
+    proxy_http_version 1.1;
+{%- endmacro %}
+# Curated to *preview* bots, NOT search engines (Googlebot/Bingbot render JS
+# and must index the real SPA route). Ground truth: github.com/monperrus/crawler-user-agents.
+map $http_user_agent $is_social_bot {
+  default 0;
+  "~*facebookexternalhit|Facebot|meta-externalagent|Twitterbot|Discordbot|redditbot|Slackbot|Slack-ImgProxy|TelegramBot|WhatsApp|LinkedInBot|Pinterest|SkypeUriPreview|vkShare|Embedly|Iframely|FlipboardProxy|Bluesky|Mastodon|Applebot" 1;
+}
+
+{% include "http.j2" %}
+
+server {
+{% include "tls.j2" %}
+
+  root {{ dist }};
+  index index.html;
+  charset utf-8;
+  client_max_body_size 10M;
+
+{{ headers("  ") }}
+
+  gzip on;
+  gzip_vary on;
+  gzip_min_length 1024;
+  gzip_proxied any;
+  gzip_types
+    text/css text/javascript text/xml text/plain
+    application/javascript application/json application/xml application/rss+xml application/wasm
+    font/truetype font/opentype
+    image/svg+xml;
+  gzip_static on;
+
+  # Same-origin is load-bearing: the client reads the /snapshot
+  # `X-Access-Version` response header, which a split-origin deploy would drop.
+{% for path in backend_paths %}
+  location {{ path }} {
+{% if path == "/snapshot" %}
+    # Unbuffered on purpose: buffering spools each response for its slow client,
+    # re-adding the memory and disk cost the backend's from-disk stream avoids.
+    proxy_buffering off;
+{% endif %}
+{{ proxy_headers() }}
+    proxy_pass http://127.0.0.1:{{ backend_port }};
+  }
+{% endfor %}
+
+  location {{ snapshot_accel_prefix }}/ {
+    internal;
+    alias {{ snapshot_dir }}/;
+    max_ranges 0;
+    gzip off;
+    types { }  # force default_type past mime.types' .gz entry
+    default_type application/x-ndjson;
+    add_header Content-Encoding gzip always;
+    add_header X-Access-Version $upstream_http_x_access_version always;
+{{ headers() }}
+  }
+
+  location {{ sse_path }} {
+{{ proxy_headers() }}
+    proxy_set_header Connection '';
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 1d;
+    gzip off;
+    chunked_transfer_encoding on;
+    proxy_pass http://127.0.0.1:{{ backend_port }};
+  }
+
+  # `if`+`return` is the safe escape from a location — NOT proxy_pass inside if;
+  # the named locations do the actual proxy.
+{% for pattern in ("^/t/[0-9a-zA-Z]+$", "^/(tournaments|leagues)/[0-9a-fA-F-]+$", "^/help/[a-z0-9-]+$") %}
+  location ~ {{ pattern }} {
+    error_page 418 = @og_stub;
+    if ($is_social_bot) { return 418; }
+    try_files $uri $uri.html /200.html;
+    add_header Cache-Control "public, must-revalidate, max-age=0";
+{{ headers() }}
+  }
+{% endfor %}
+  # Its own named location: preserving the URI would reach the backend's `/`
+  # health check.
+  location = / {
+    error_page 418 = @og_site;
+    if ($is_social_bot) { return 418; }
+    try_files /index.html =404;
+    add_header Cache-Control "public, must-revalidate, max-age=0";
+{{ headers() }}
+  }
+  location @og_site {
+{{ proxy_headers() }}
+    # A named location refuses a proxy_pass URI, so the path is rewritten here.
+    rewrite ^ /og/site break;
+    proxy_pass http://127.0.0.1:{{ backend_port }};
+  }
+  location @og_stub {
+{{ proxy_headers() }}
+    proxy_pass http://127.0.0.1:{{ backend_port }};
+  }
+
+  location ~ ^/(sw|registerSW|workbox-).*\.js$ {
+    add_header Cache-Control "no-cache, no-store, must-revalidate";
+{{ headers() }}
+  }
+
+  location ^~ /_app/ {
+    add_header Cache-Control "public, max-age=31536000, immutable";
+{{ headers() }}
+  }
+  location ^~ /assets/ {
+    add_header Cache-Control "public, max-age=31536000, immutable";
+{{ headers() }}
+  }
+
+  location ~ ^/manifest(-beta)?\.webmanifest$ {
+    types { application/manifest+json webmanifest; }
+    add_header Cache-Control "public, must-revalidate, max-age=3600";
+{{ headers() }}
+  }
+
+  location ~* \.(?:jpg|jpeg|png|svg|gif|webp|ico|avif)$ {
+    add_header Cache-Control "public, must-revalidate, max-age=3600";
+{{ headers() }}
+  }
+
+  location ~* \.(?:html|css|json)$ {
+    add_header Cache-Control "public, must-revalidate, max-age=0";
+{{ headers() }}
+  }
+
+  # Deliberately NO `$uri/` term: it would match the bare tournaments/ dir (no
+  # index.html inside) and nginx would 403 instead of booting the SPA router.
+  location / {
+    try_files $uri $uri.html /200.html;
+    add_header Cache-Control "public, must-revalidate, max-age=0";
+{{ headers() }}
+  }
+}

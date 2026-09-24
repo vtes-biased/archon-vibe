@@ -1,0 +1,37 @@
+[Unit]
+Description={{ unit }}-public-api (archon public read API)
+After=network-online.target postgresql.service {{ unit }}-backend.service
+Wants=network-online.target
+# One wheel, two units: a deploy restarts the app when the wheel changes, and
+# PartOf propagates that restart here. Without it this process keeps old code.
+PartOf={{ unit }}-backend.service
+
+[Service]
+Type=simple
+User={{ name }}
+Group={{ name }}
+WorkingDirectory={{ backend_root }}
+EnvironmentFile={{ env_dir }}/{{ unit }}-public-api.env
+ExecStart={{ backend_root }}/.venv/bin/uvicorn --host 127.0.0.1 --port {{ api_port }} --log-level info --timeout-graceful-shutdown 5 backend.src.public_api.main:app
+# The NDJSON stream and bulk export hold a socket and a file fd per reader,
+# tight against the 1024 default — running out truncates responses mid-body.
+LimitNOFILE=65536
+Restart=always
+RestartSec=3
+TimeoutStartSec=30
+TimeoutStopSec=15
+KillMode=mixed
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths={{ backend_root }}
+
+[Install]
+WantedBy=multi-user.target

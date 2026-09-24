@@ -9,8 +9,8 @@ name: Release
 #
 #   git push origin v1.2.3  ->  e2e  ->  (green) create release  ->  artifacts  ->  manual deploy
 #
-# A tag that fails e2e never becomes a release. Nothing auto-deploys — deploy.yml
-# stays manual + approval-gated. `just release <tag>` wraps the tag-and-push step.
+# A tag that fails e2e never becomes a release. Nothing auto-deploys: a deploy is
+# run by hand from a laptop. `just release <tag>` wraps the tag-and-push step.
 #
 # workflow_dispatch runs the E2E suite ad hoc (e.g. on main) WITHOUT creating a
 # release — the create-release job is guarded to tag pushes only.

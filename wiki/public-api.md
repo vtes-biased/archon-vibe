@@ -313,12 +313,10 @@ without a token.
 ## Deployment
 
 A second systemd unit off the **backend's own wheel and venv** — nothing is
-installed for it — on its own vhost at `api.<domain>`, ansible role `public_api`.
-The unit is `PartOf` the backend's, so the deploy that restarts the app for a new
-wheel restarts this process too; without that it would serve yesterday's code
-after a quick-lane deploy, and the role is untagged precisely because it needs no
-lane of its own. Its environment is derived from the app's in the inventory rather
-than repeated: `JWT_PUBLIC_KEYS` off the app's (or no token it is handed ever
+installed for it — on its own vhost at `api.<domain>`. The unit is `PartOf` the
+backend's, so the deploy that restarts the app for a new wheel restarts this
+process too; without that it would serve yesterday's code. Its environment is
+derived from the app's rather than repeated: `JWT_PUBLIC_KEYS` off the app's (or no token it is handed ever
 verifies), one `DATABASE_URL`, one `SNAPSHOT_DIR` (or `/v1/export` has no file),
 and the app's `ENVIRONMENT` — without which its key guard reads `"development"`
 ([hazards](hazards.md#two-implementations-of-one-gate)).
