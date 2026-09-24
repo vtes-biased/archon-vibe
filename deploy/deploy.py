@@ -274,9 +274,8 @@ venv(
     backend,
 )
 
-database_url = (
-    f"postgresql://{name}:{secrets['db_password']}@/{name}?host=/var/run/postgresql"
-)
+# peer auth over the socket: the app runs as the OS user that owns its database
+database_url = f"postgresql:///{name}?host=/var/run/postgresql"
 backend_env = {
     "PYTHONOPTIMIZE": 1,
     "ENVIRONMENT": d.environment,
@@ -329,15 +328,13 @@ backend_env = {
     "GITHUB_OAUTH_CLIENT_ID": secrets["github_oauth_client_id"],
     "GITHUB_OAUTH_SECRET": secrets["github_oauth_secret"],
     "GITHUB_OAUTH_REDIRECT_URI": f"{site}/auth/github/callback",
+    "OFFICIALS_CONTACTS_FILE": f"{env_dir}/officials_contacts.json",
     **d.backend_env_extra,
 }
 backend.append(
     put_secret(
         f"{unit}-backend env",
-        env_file(backend_env)
-        + "# Runtime path for the deploy-delivered officials contacts (see role tasks).\n"
-        + "# The backend skips gracefully if the file isn't present.\n"
-        + f"OFFICIALS_CONTACTS_FILE={env_dir}/officials_contacts.json\n",
+        env_file(backend_env),
         f"{env_dir}/{unit}-backend.env",
         group=name,
         mode="640",

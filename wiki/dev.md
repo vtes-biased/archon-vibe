@@ -170,7 +170,9 @@ restarts only when its wheel, requirements, env file or unit changed; the venv
 install and the frontend swap compare a marker on the box with the hash of what
 is deployed, so re-running a deploy that failed halfway finishes it. A
 certificate renews through `/var/www/certbot`. The backend's ops scripts are
-copied from the working tree, not from the release being deployed.
+copied from the working tree, not from the release being deployed. Beta's app,
+public API and bot connect to the database by peer auth over the socket, as
+the OS user that owns it: the role has no password.
 
 Beta's vhosts send `Strict-Transport-Security: max-age=31536000` (this host only,
 no `includeSubDomains`), a year-long promise every browser keeps, and pass the
