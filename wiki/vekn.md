@@ -552,7 +552,12 @@ misconfiguration: both repeat identically, so neither offers the retry.
 **Header**: the archive's own convention, which its maintainer reviews against —
 the date in US form with no time (`August 29th 2026`, ` -- <end>` for a multi-day
 event), `Online` as the place of an online event, `NR+F` or `NR (no final)`, and the
-event link directly under the winner's name. Then a score line,
+event link directly under the winner's name. An in-person event's place is its
+country alone, short of the archive's `City, Country`: a tournament holds no
+structured city — a synced event folds its venue's into free-text `address`, an
+app-created one has only what the organizer typed — and parsing one out would put
+guesses on a permanent line, so the maintainer completes the city by hand. A
+tournament city field is what would change that. Then a score line,
 `-- 1GW4.5 + 3vp in final`: the winner's **standings** row, which is prelim-only,
 with the finals seat's VP beside it — never the aggregated `result`, which already
 folds the final in and would read to the archive as a double count. It is the
