@@ -399,12 +399,11 @@ API process must see the same `SNAPSHOT_DIR`.
 
 ## Deferred
 
-- **Prod rollout** — beta is live and verified; prod repeats the same three
-  steps with `api.archon.vekn.net`, port 7007, unit `archon-public-api`: the A
-  record, `public_api = True` in `deploy/group_data/prod.py` and `just
-  deploy-prod`, then a registered `api:read` client
-  exercising a daemon token, the throttle and the app's rejection of that token.
-  Trigger: the owner's next prod window.
+- **Prod rollout** — beta is live and verified; prod has the
+  `api.archon.vekn.net` A record and `public_api = True`, so the next `just
+  deploy-prod` issues the certificate and starts `archon-public-api` on port 7007.
+  Left: a registered `api:read` client exercising a daemon token, the throttle
+  and the app's rejection of that token. Trigger: that deploy.
 - **TWD opt-out for a winner** — a member asking to keep their name or their
   winning deck out of the TWDA. A private deck covers every other deck; the
   winner's publishes regardless. Trigger: a member asks.

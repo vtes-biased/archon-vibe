@@ -4,8 +4,7 @@ domain = "archon.vekn.net"
 backend_port = 8007
 bot_port = 9007
 api_port = 7007
-# api.archon.vekn.net has no DNS record: certbot would fail the deploy
-public_api = False
+public_api = True
 
 environment = "production"
 app_name = "Archon"
