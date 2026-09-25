@@ -5,6 +5,7 @@ keys:
   prod: &prod
     - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE+Fa+dmnpPBYM0G7xPupl+GkVdF6YFmZ/NkpyqOzWoI  # lionel-panhaleux
     - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHKNdBQ0YRx8ZnlrpkynqRVrNe5zMSLePRAMAu6cgUgC  # archon deploy (~/.ssh/id_archon)
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILry5cxe3vALpPMRv8367uwfflP8qOwD5zOwYFzbUwZT  # vripoll
 
 creation_rules:
   # identifiers stay readable next to the secret they pair with
