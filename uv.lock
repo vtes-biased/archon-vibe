@@ -258,7 +258,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-deploy = [{ name = "server-setup", git = "https://github.com/lionel-panhaleux/server-setup?rev=d88a210da144e5892c85a6865b445b1c14314370" }]
+deploy = [{ name = "server-setup", git = "https://github.com/lionel-panhaleux/server-setup?rev=9f69c29ba4fa5bffcda136147c8826a523b33e8d" }]
 dev = [
     { name = "ansible-core", specifier = ">=2.17" },
     { name = "ansible-lint", specifier = ">=25.0" },
@@ -2024,7 +2024,7 @@ wheels = [
 [[package]]
 name = "server-setup"
 version = "2.0.0"
-source = { git = "https://github.com/lionel-panhaleux/server-setup?rev=d88a210da144e5892c85a6865b445b1c14314370#d88a210da144e5892c85a6865b445b1c14314370" }
+source = { git = "https://github.com/lionel-panhaleux/server-setup?rev=9f69c29ba4fa5bffcda136147c8826a523b33e8d#9f69c29ba4fa5bffcda136147c8826a523b33e8d" }
 dependencies = [
     { name = "pyinfra" },
 ]

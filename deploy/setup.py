@@ -12,12 +12,15 @@ secrets = load(
 )
 
 s.packages(postgres_version="17")
-files.file(
-    name="Retire the Ansible journal cap",
-    path="/etc/systemd/journald.conf.d/50-cap.conf",
-    present=False,
-)
-s.services(journal_max_use="256M", fail2ban=False)
+# drop-ins sorting after server-setup's would override it
+for conf in ("50-cap.conf", "retention.conf"):
+    files.file(
+        name=f"Retire {conf}",
+        path=f"/etc/systemd/journald.conf.d/{conf}",
+        present=False,
+    )
+# the privacy policy promises server logs are kept only briefly
+s.services(journal_max_use="256M", journal_max_age="1month", fail2ban=False)
 s.nginx()
 s.ssh()
 s.firewall()
