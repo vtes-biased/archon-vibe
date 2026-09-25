@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.2.4 — 2026-09-25
 
 - The tournament list can now be filtered by a date range and by several countries at once.
 - Your search text on the tournament and member lists is kept when you come back through the menu.
