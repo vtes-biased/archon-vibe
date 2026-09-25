@@ -36,7 +36,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # the tag is the version, as hatch-vcs makes it for the backend wheel
       - name: Stamp the engine version from the tag
         if: inputs.tag != ''
         env:

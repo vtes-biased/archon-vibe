@@ -1,6 +1,5 @@
 [package]
 name = "archon-engine"
-# CI stamps the release tag here before building the wheel: never bumped by hand
 version = "0.2.2"
 edition = "2021"
 

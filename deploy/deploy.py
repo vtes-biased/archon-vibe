@@ -90,7 +90,6 @@ def digest(*paths: Path) -> str:
 
 
 def wheel_dir(root: str, wheels: list[Path]) -> str:
-    # never overwrite a wheel in place: --diff would read the binary as text and crash
     return f"{root}/wheels/{digest(*wheels)}"
 
 
@@ -124,8 +123,8 @@ def venv(
                 f"{pip} --requirement {root}/requirements.txt",
                 f"{pip} {' '.join(f'--reinstall-package {p}' for p in reinstall)} "
                 + " ".join(f"{wheel_dir(root, wheels)}/{w.name}" for w in wheels),
-                f"echo {expected} > {root}/.venv/.deployed",
                 f"find {root}/wheels -mindepth 1 -maxdepth 1 ! -name {digest(*wheels)} -exec rm -rf {{}} +",
+                f"echo {expected} > {root}/.venv/.deployed",
             ],
             _sudo_user=name,
             _env=UV_ENV,
@@ -229,6 +228,13 @@ backend_wheels = [
     artifact(build, "archon-*.whl"),
 ]
 backend_requirements = artifact(build, "backend-requirements.txt")
+files.directory(
+    name="Backend wheels root",
+    path=f"{backend_root}/wheels",
+    user=name,
+    group=name,
+    mode="755",
+)
 files.directory(
     name="Backend wheels",
     path=wheel_dir(backend_root, backend_wheels),
@@ -394,6 +400,13 @@ if d.public_api:
 files.directory(name="Bot root", path=bot_root, user=name, group=name, mode="755")
 files.directory(name="Bot state", path=bot_state_dir, user=name, group=name, mode="750")
 bot_wheel = artifact(build, "archon_discord_bot-*.whl")
+files.directory(
+    name="Bot wheels root",
+    path=f"{bot_root}/wheels",
+    user=name,
+    group=name,
+    mode="755",
+)
 files.directory(
     name="Bot wheels",
     path=wheel_dir(bot_root, [bot_wheel]),
