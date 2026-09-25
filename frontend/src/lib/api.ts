@@ -200,6 +200,14 @@ export async function setMemberDeceased(uid: string, deceased: boolean): Promise
   );
 }
 
+/** Correct or clear (null) who sponsored a member (IC or same-country NC). */
+export async function setMemberSponsor(uid: string, sponsorUid: string | null): Promise<User> {
+  return apiRequest<User>(
+    `/api/users/${uid}/sponsor`,
+    { method: 'PATCH', body: JSON.stringify({ sponsor_uid: sponsorUid }) },
+  );
+}
+
 /** Irreversibly wipe a VEKN member's identity (IC only). */
 export async function anonymizeMember(uid: string): Promise<User> {
   return apiRequest<User>(`/api/users/${uid}/anonymize`, { method: 'POST' });

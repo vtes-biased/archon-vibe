@@ -542,6 +542,63 @@ async def set_deceased(
     return Response(content=encoder.encode(target), media_type="application/json")
 
 
+class SponsorEditRequest(BaseModel):
+    """JSON body for PATCH /api/users/{uid}/sponsor. None clears the sponsor."""
+
+    sponsor_uid: str | None
+
+
+@router.patch("/{uid}/sponsor")
+async def set_sponsor(
+    uid: str, body: SponsorEditRequest, current_user: CurrentUser
+) -> Response:
+    """Correct or clear who sponsored a member."""
+    if current_user.uid == uid:
+        raise HTTPException(
+            status_code=403, detail="You cannot change your own sponsor"
+        )
+
+    target = await get_user_by_uid(uid)
+    if not target or target.deleted_at:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not permissions.can_manage_vekn(current_user, target):
+        raise HTTPException(
+            status_code=403,
+            detail="Only IC, or the member's national coordinator, can change a sponsor",
+        )
+
+    if not target.vekn_id or target.anonymized_at:
+        raise HTTPException(
+            status_code=400, detail="Only a VEKN member's sponsor can be changed"
+        )
+
+    if body.sponsor_uid is not None:
+        if body.sponsor_uid == uid:
+            raise HTTPException(
+                status_code=400, detail="A member cannot sponsor themselves"
+            )
+        sponsor = await get_user_by_uid(body.sponsor_uid)
+        if not sponsor or sponsor.deleted_at or not sponsor.vekn_id:
+            raise HTTPException(
+                status_code=400, detail="The sponsor must be a VEKN member"
+            )
+
+    local_mods = set(target.local_modifications)
+    local_mods.add("coopted_by")
+    target = msgspec.structs.replace(
+        target,
+        modified=datetime.now(UTC),
+        coopted_by=body.sponsor_uid,
+        coopted_at=target.coopted_at if body.sponsor_uid else None,
+        local_modifications=local_mods,
+    )
+
+    bd = await db_save_user(target)
+    broadcast_precomputed(bd)
+    return Response(content=encoder.encode(target), media_type="application/json")
+
+
 @router.post("/{uid}/anonymize")
 async def anonymize_member(uid: str, current_user: CurrentUser) -> Response:
     if current_user.uid == uid:

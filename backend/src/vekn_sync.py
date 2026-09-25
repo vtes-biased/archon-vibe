@@ -677,7 +677,7 @@ class VEKNSyncService:
 
     async def _infer_coopted_by(self) -> int:
         """Prefix-matches VEKN IDs against a Prince/NC's vekn_prefix; sets
-        coopted_by only when unset."""
+        coopted_by only when unset and not pinned by an official edit."""
         sponsors = await get_users_with_vekn_prefix()
         if not sponsors:
             return 0
@@ -694,7 +694,7 @@ class VEKNSyncService:
             for user in sponsored_users:
                 if user.uid == sponsor.uid:
                     continue
-                if user.coopted_by:
+                if user.coopted_by or "coopted_by" in user.local_modifications:
                     continue
 
                 # Mutate in place — a from-scratch User(...) would drop new fields.
@@ -711,7 +711,11 @@ class VEKNSyncService:
         """Two-phase fallback: city-level Prince match, then country-level NC
         match. Skips ambiguous cases (multiple candidates for one city/country)."""
         sponsors = await get_users_with_vekn_prefix()
-        orphans = await get_users_without_coopted_by()
+        orphans = [
+            u
+            for u in await get_users_without_coopted_by()
+            if "coopted_by" not in u.local_modifications
+        ]
         if not sponsors or not orphans:
             return 0
 

@@ -274,7 +274,7 @@
 
       {#if canManage || sponsorOnly}
         <div class="mt-6">
-          <VeknManagement {user} {sponsorOnly} {canMerge} onaction={handleUserUpdated} ondelete={handleMemberDeleted} canMarkDeceased={canManageDeceased} canDelete={canDelete} {canAnonymize} />
+          <VeknManagement {user} {sponsorOnly} {canMerge} onaction={handleUserUpdated} ondelete={handleMemberDeleted} canMarkDeceased={canManageDeceased} canDelete={canDelete} {canAnonymize} {sponsorName} />
         </div>
       {/if}
 

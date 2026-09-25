@@ -254,7 +254,8 @@ four in the archon file's terms and the `+F` must be added back —
   legacy ETL ran keeps only its bootstrap seed, and the ETL's richer role data
   never lands for that member. This is the intended end state: roles are
   app-managed and archon is the system of record for them.
-- Infers `coopted_by` relationships.
+- Infers `coopted_by` relationships, only where the field is unset and not in
+  `local_modifications`.
 - Non-destructive: fields recorded in `local_modifications` by the profile and user
   edit routes are never overwritten.
 
@@ -813,16 +814,26 @@ syncs:
 | Data | Writer |
 |---|---|
 | identity — name, country, city, state | VEKN sync |
-| contact, nickname, discord, `coopted_by`, community links | archon sync |
+| contact, nickname, discord, community links | archon sync |
+| `coopted_by` | archon sync, VEKN sync inference (fill-only), an official's edit |
 | roles | nobody — seeded once by whichever creates the row first, app-managed thereafter |
 | sanctions, leagues | archon sync, upsert by source uid |
 | rich play data — rounds, seatings, decks, finals | archon sync |
 | `local_modifications` fields | nobody — local edits trump both syncs |
 
-`coopted_by` carries an extra rule: `remap_coopted_by` is its sole writer, running
-once the full uid map is known, and an **unresolved sponsor is never written** —
-legacy refs dangle and rotate uid nightly, and chasing them rewrote ~10k users
-every night, all re-downloaded by every client at its next reconnect.
+`coopted_by` carries extra rules. Within the archon sync `remap_coopted_by` is its
+sole writer, running once the full uid map is known, and an **unresolved sponsor is
+never written** — legacy refs dangle and rotate uid nightly, and chasing them
+rewrote ~10k users every night, all re-downloaded by every client at its next
+reconnect. Outside the syncs it is stamped when a member is minted — sponsor,
+create, or an organizer's registration issuing the id.
+
+**An official's edit pins it.** IC, or the member's NC, sets the sponsor to any
+live VEKN member or clears it (`PATCH /users/{uid}/sponsor`), and the field joins
+`local_modifications` either way: both syncs then leave it alone, so a cleared
+sponsor stays cleared instead of being re-inferred. Setting keeps `coopted_at` —
+the official corrects who, not when; clearing drops it. An account merge takes
+the sponsor from whichever side is pinned, the survivor first.
 
 **Tournament matching** in merge mode, at most one live tournament per vekn event
 id: by uid → idempotent update; else by `external_ids.archon` or

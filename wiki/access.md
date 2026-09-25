@@ -60,6 +60,10 @@ absorbing a shell account that carries it. `sponsor_member` is a single capabili
 covering both minting the member and issuing the VEKN ID — splitting them invited
 the two halves to drift.
 
+`manage_vekn` also covers correcting or clearing a member's recorded sponsor. It
+is not `sponsor_member`: sponsoring abroad is open to a visiting Prince, but
+rewriting who co-opted a member is the record-keeping of the member's own country.
+
 **Appointments** — NC grants **Prince** in their own country; PTC grants **PT**;
 Rulemonger grants **Judge** and **Sheriff**; everything else is IC's. **A target
 must hold a `vekn_id` to hold any role**, and **granting PT requires an NDA on

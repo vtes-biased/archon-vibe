@@ -100,7 +100,7 @@ def can_change_country(actor: User, target: User) -> bool:
 
 
 def can_manage_vekn(actor: User, target: User) -> bool:
-    """Link or force-abandon a target's VEKN ID."""
+    """Link or force-abandon a target's VEKN ID, or correct their sponsor."""
     return _check("manage_vekn", actor, target=target)
 
 

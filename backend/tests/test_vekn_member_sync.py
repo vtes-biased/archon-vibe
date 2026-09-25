@@ -1,7 +1,8 @@
 """VEKN member sync role seeding (vekn_sync.sync_player): CREATE seeds derived
 roles (Prince/NC/IC); UPDATE never writes roles, so app-managed roles survive
-re-sync — the contract restored after 364a7ec's removal of it. Runs end-to-end
-against the real DB, no mocks.
+re-sync — the contract restored after 364a7ec's removal of it. Its coopted_by
+inference skips a sponsor an official pinned. Runs end-to-end against the real
+DB, no mocks.
 """
 
 import pytest
@@ -62,3 +63,28 @@ async def test_update_never_writes_roles(test_db):
 
     after = await get_user_by_uid(created.uid)
     assert after.roles == [Role.IC], "app-granted role survives a sync re-derive"
+
+
+@pytest.mark.asyncio
+async def test_inference_respects_a_cleared_sponsor_pin(test_db):
+    import msgspec
+    from src.db import get_user_by_uid, save_user
+
+    async def seed(vekn_id: int, **fields):
+        user, _ = await VEKNSyncService().sync_player(
+            {"veknid": vekn_id, "firstname": "M", "lastname": str(vekn_id)},
+            city_index(),
+        )
+        user = msgspec.structs.replace(user, country="FR", **fields)
+        await save_user(user)
+        return user
+
+    nc = await seed(1000800, vekn_prefix="10008", roles=[Role.NC])
+    pinned = await seed(1000801, coopted_by=None, local_modifications={"coopted_by"})
+    free = await seed(1000802, coopted_by=None)
+
+    await VEKNSyncService()._infer_coopted_by()
+    await VEKNSyncService()._infer_coopted_by_city()
+
+    assert (await get_user_by_uid(free.uid)).coopted_by == nc.uid
+    assert (await get_user_by_uid(pinned.uid)).coopted_by is None

@@ -1,9 +1,9 @@
 <script lang="ts">
   import type { User } from "$lib/types";
   import type { UserListItem } from "$lib/db";
-  import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased, deleteMember, anonymizeMember } from "$lib/api";
+  import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased, setMemberSponsor, deleteMember, anonymizeMember } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2, Trash2, TriangleAlert, ArrowLeftRight, EyeOff } from "@lucide/svelte";
+  import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2, Trash2, TriangleAlert, ArrowLeftRight, EyeOff, Handshake } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import UserPicker from '$lib/components/UserPicker.svelte';
   import Badge from '$lib/components/Badge.svelte';
@@ -18,6 +18,7 @@
     canDelete = false,
     canMerge = false,
     canAnonymize = false,
+    sponsorName,
     // Cross-country official: sponsoring is allowed anywhere, but link/
     // delete/abandon stay country-scoped — render only the Sponsor action.
     sponsorOnly = false,
@@ -29,6 +30,7 @@
     canDelete?: boolean;
     canMerge?: boolean;
     canAnonymize?: boolean;
+    sponsorName?: string;
     sponsorOnly?: boolean;
   } = $props();
 
@@ -47,6 +49,7 @@
   let showMergeModal = $state(false);
   let showDeleteConfirm = $state(false);
   let showAnonymizeConfirm = $state(false);
+  let showSponsorEdit = $state(false);
   let linkVeknIdInput = $state("");
   let mergeTarget = $state<UserListItem | null>(null);
   let processingAction = $state(false);
@@ -116,6 +119,23 @@
         type: "success",
         message: isDeceased ? m.deceased_cleared_toast() : m.deceased_marked_toast(),
       });
+      onaction(updated);
+    } catch {
+      // Error toast shown by apiRequest
+    } finally {
+      processingAction = false;
+    }
+  }
+
+  async function handleSponsorEdit(sponsorUid: string | null) {
+    processingAction = true;
+    try {
+      const updated = await setMemberSponsor(user.uid, sponsorUid);
+      showToast({
+        type: "success",
+        message: sponsorUid ? m.sponsor_edit_saved_toast() : m.sponsor_edit_cleared_toast(),
+      });
+      showSponsorEdit = false;
       onaction(updated);
     } catch {
       // Error toast shown by apiRequest
@@ -242,6 +262,29 @@
             {isDeceased ? m.deceased_clear() : m.deceased_mark()}
           </Button>
         {/if}
+      </div>
+    {/if}
+
+    {#if !sponsorOnly && user.vekn_id && !isAnonymized}
+      <div class="mt-3 pt-3 border-t border-line flex flex-wrap items-center justify-between gap-2">
+        <span class="text-sm text-ink inline-flex items-center gap-1.5">
+          <Handshake class="w-4 h-4 text-ink-muted" aria-hidden="true" />
+          {#if user.coopted_by}
+            {m.sponsor_edit_label({ name: sponsorName ?? m.sponsor_edit_unresolved() })}
+          {:else}
+            {m.sponsor_edit_none()}
+          {/if}
+        </span>
+        <div class="flex gap-2 shrink-0">
+          <Button variant="secondary" size="md" disabled={processingAction} onclick={() => (showSponsorEdit = true)}>
+            {m.sponsor_edit_change()}
+          </Button>
+          {#if user.coopted_by}
+            <Button variant="secondary" size="md" disabled={processingAction} onclick={() => handleSponsorEdit(null)}>
+              {m.sponsor_edit_clear()}
+            </Button>
+          {/if}
+        </div>
       </div>
     {/if}
 
@@ -496,6 +539,43 @@
           </Button>
         </div>
       </form>
+    </div>
+  </div>
+{/if}
+
+{#if showSponsorEdit}
+  <div
+    role="presentation"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    onclick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) showSponsorEdit = false; }}
+  >
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="sponsor-edit-modal-title"
+      tabindex="-1"
+      use:focusOnMount
+      onkeydown={(e) => e.key === 'Escape' && (showSponsorEdit = false)}
+      class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
+    >
+      <div class="p-6 border-b border-line">
+        <h2 id="sponsor-edit-modal-title" class="text-xl font-medium text-ink-strong">{m.sponsor_edit_modal_title({ name: user.name })}</h2>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label for="sponsor-edit-search" class="block text-sm font-medium text-ink-muted mb-1">
+            {m.sponsor_edit_search_label()}
+          </label>
+          <UserPicker
+            inputId="sponsor-edit-search"
+            excludeUids={[user.uid]}
+            onselect={(u) => handleSponsorEdit(u.uid)}
+          />
+        </div>
+        <Button variant="secondary" size="lg" class="w-full" disabled={processingAction} onclick={() => (showSponsorEdit = false)}>
+          {m.common_cancel()}
+        </Button>
+      </div>
     </div>
   </div>
 {/if}

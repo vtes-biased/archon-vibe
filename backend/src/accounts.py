@@ -156,6 +156,13 @@ async def merge_users(
         claimed_agenda if any(claimed_agenda) else await get_agenda(keep_uid)
     )
 
+    if "coopted_by" in keep_user.local_modifications:
+        sponsor_side = keep_user
+    elif "coopted_by" in delete_user_obj.local_modifications:
+        sponsor_side = delete_user_obj
+    else:
+        sponsor_side = keep_user if keep_user.coopted_by else delete_user_obj
+
     # msgspec.structs.replace keeps every unlisted field; only fields with a
     # real merge policy are overridden below.
     merged = msgspec.structs.replace(
@@ -176,8 +183,8 @@ async def merge_users(
         phone_is_whatsapp=delete_user_obj.phone_is_whatsapp
         or keep_user.phone_is_whatsapp,
         community_links=keep_user.community_links or delete_user_obj.community_links,
-        coopted_by=keep_user.coopted_by or delete_user_obj.coopted_by,
-        coopted_at=keep_user.coopted_at or delete_user_obj.coopted_at,
+        coopted_by=sponsor_side.coopted_by,
+        coopted_at=sponsor_side.coopted_at,
         vekn_synced=keep_user.vekn_synced or delete_user_obj.vekn_synced,
         vekn_synced_at=keep_user.vekn_synced_at or delete_user_obj.vekn_synced_at,
         local_modifications=keep_user.local_modifications
