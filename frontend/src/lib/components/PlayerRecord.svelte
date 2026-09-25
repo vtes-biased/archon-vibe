@@ -5,6 +5,7 @@
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { getCountryFlag } from "$lib/geonames";
   import { computeStandings, playedPlayerUids } from "$lib/tournament-utils";
+  import { attestedPlayerCount } from "$lib/engine";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
   import { TriangleAlert, ChevronDown, ChevronRight } from "@lucide/svelte";
@@ -15,6 +16,7 @@
   interface PlayedEvent {
     tournament: Tournament;
     place: number | null;
+    field: number | undefined;
     won: boolean;
     finalist: boolean;
     deck: DeckObject | undefined;
@@ -37,7 +39,7 @@
     const played = t.rounds?.length ? playedPlayerUids(t).has(uid) : !!entry && !entry.unplaced;
     if (!played && !deck && t.winner !== uid) return null;
     const place = entry && !entry.unplaced ? entry.rank : null;
-    return { tournament: t, place, won: t.winner === uid || place === 1, finalist: !!entry?.finalist, deck };
+    return { tournament: t, place, field: attestedPlayerCount(t) || undefined, won: t.winner === uid || place === 1, finalist: !!entry?.finalist, deck };
   }
 
   async function load(uid: string, owner: boolean) {
@@ -113,7 +115,7 @@
       <span class="whitespace-nowrap">{m.user_detail_finals_count({ count: String(finalCount) })}</span>
     </p>
     <ul class="bg-surface-card border border-line rounded-lg divide-y divide-line">
-      {#each events as { tournament: t, place, won, finalist, deck } (t.uid)}
+      {#each events as { tournament: t, place, field, won, finalist, deck } (t.uid)}
         {@const open = !!deck && expandedDeck === deck.uid}
         <li class="px-4 py-2 text-sm">
           <div class="flex flex-wrap items-center gap-x-2">
@@ -135,7 +137,7 @@
               <span class="shrink-0 text-[10px] px-1 py-0.5 rounded badge-highlight">{m.hof_page_title()}</span>
             {/if}
             <span class="text-xs text-ink-faint ml-auto whitespace-nowrap">
-              <span class="tabular-nums text-ink-muted mr-1">{#if won}<RankCell rank={1} hash />{:else if place === null}—{:else}<RankCell rank={place} {finalist} hash />{/if}</span>
+              <span class="tabular-nums text-ink-muted mr-1">{#if won}<RankCell rank={1} hash total={field} />{:else if place === null}—{:else}<RankCell rank={place} {finalist} hash total={field} />{/if}</span>
               {#if t.country}{getCountryFlag(t.country)}{/if}
               {day(t)}
             </span>
