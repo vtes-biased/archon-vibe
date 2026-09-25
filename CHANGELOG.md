@@ -10,6 +10,17 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- Deck comments imported from a deckbuilder link no longer carry its leftover headers and stamps.
+- A pasted decklist that starts with its name, like "Vote Lock", now keeps that name.
+- Winning decks sent to the TWDA now follow the archive's own format, with your comment and none of the import noise.
+- A finished tournament with no country or online flag now waits for one before its winning deck goes to the TWDA.
+- Help texts are shorter, and translations no longer mix up registration and check-in.
+- The server now uses much less memory, for fewer slowdowns at busy moments.
+- Historic results have been reconciled across vekn.net, the TWDA and Archon.
+- Old vekn.net results no longer count the final twice for the winner or list a player twice.
+
 ## v1.2.0 — 2026-09-22
 
 - Your profile now lists every tournament you played, with your deck and place.
