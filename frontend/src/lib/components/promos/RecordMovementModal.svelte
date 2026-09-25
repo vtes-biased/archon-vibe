@@ -4,7 +4,6 @@
   import { createPromoLedgerEntries } from "$lib/api";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { getCountryFlag } from "$lib/geonames";
-  import { showToast } from "$lib/stores/toast.svelte";
   import Button from "$lib/components/Button.svelte";
   import UserPicker from "$lib/components/UserPicker.svelte";
   import { Plus, X } from "@lucide/svelte";
@@ -89,7 +88,6 @@
         // Local noon → stable calendar date in every timezone.
         happened_at: new Date(`${happenedAt}T12:00:00`).toISOString(),
       });
-      showToast({ type: "success", message: m.promo_movement_recorded() });
       onrecorded();
       onclose();
     } catch {

@@ -75,7 +75,6 @@
       newRedirectUris = "";
       newScopes = ["profile:read"];
       await loadClients();
-      showToast({ type: "success", message: m.developer_client_registered() });
     } catch {
       // handled by apiRequest
     }
@@ -91,7 +90,6 @@
       displayedSecret = result.client_secret;
       displayedClientId = result.client_id;
       confirmAction = null;
-      showToast({ type: "success", message: m.developer_secret_regenerated() });
     } catch {
       // handled
     }
@@ -102,7 +100,6 @@
       await apiRequest(`/oauth/clients/${clientId}`, { method: "DELETE" });
       confirmAction = null;
       await loadClients();
-      showToast({ type: "success", message: m.developer_client_deactivated() });
     } catch {
       // handled
     }

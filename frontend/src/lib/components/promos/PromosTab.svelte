@@ -69,7 +69,6 @@
   async function toggleActive(promo: Promo) {
     try {
       await updatePromo(promo.uid, { active: !promo.active });
-      showToast({ type: "success", message: promo.active ? m.promo_retired_toast() : m.promo_reactivated_toast() });
       await loadData();
     } catch {
       // Error toast shown by apiRequest
@@ -79,7 +78,6 @@
   async function handleDelete(promo: Promo) {
     try {
       await deletePromoCatalogEntry(promo.uid);
-      showToast({ type: "success", message: m.promo_deleted_toast() });
       await loadData();
     } catch (e) {
       // The helper suppresses the toast; 409 (referenced) gets the retire hint.

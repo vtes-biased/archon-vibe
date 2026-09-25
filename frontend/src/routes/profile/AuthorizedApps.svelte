@@ -1,6 +1,5 @@
 <script lang="ts">
   import { apiRequest } from "$lib/api";
-  import { showToast } from "$lib/stores/toast.svelte";
   import { Loader2, AppWindow, TriangleAlert } from "@lucide/svelte";
   import FoldableSection from "$lib/components/FoldableSection.svelte";
   import Button from "$lib/components/Button.svelte";
@@ -75,7 +74,6 @@
       await apiRequest(`/oauth/consents/${app.client_id}`, { method: "DELETE" });
       apps = apps.filter((a) => a.client_id !== app.client_id);
       confirmRevoke = null;
-      showToast({ type: "success", message: m.authorized_apps_revoked() });
     } catch {
       // handled by apiRequest
     }

@@ -4,7 +4,6 @@
   import { getAllLeagues } from "$lib/db";
   import { ApiError, createPromo, updatePromo, deletePromoCatalogEntry, uploadPromoImage, deletePromoImage, type PromoPayload } from "$lib/api";
   import { promoImageUrl } from "$lib/promo-utils";
-  import { showToast } from "$lib/stores/toast.svelte";
   import { toUserMessage } from "$lib/errors";
   import Button from "$lib/components/Button.svelte";
   import { Trash2, TriangleAlert, X } from "@lucide/svelte";
@@ -134,7 +133,6 @@
       // Toast shown by apiRequest — the promo itself saved; image can be re-edited.
     }
     saving = false;
-    showToast({ type: "success", message: promo ? m.promo_updated_toast() : m.promo_created_toast() });
     onsaved();
     onclose();
   }
@@ -146,7 +144,6 @@
     deleteError = "";
     try {
       await deletePromoCatalogEntry(promo.uid);
-      showToast({ type: "success", message: m.promo_deleted_toast() });
       onsaved();
       onclose();
     } catch (e) {
@@ -163,7 +160,6 @@
     deleting = true;
     try {
       await updatePromo(promo.uid, { active: false });
-      showToast({ type: "success", message: m.promo_retired_toast() });
       onsaved();
       onclose();
     } catch {

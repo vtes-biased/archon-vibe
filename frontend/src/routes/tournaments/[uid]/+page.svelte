@@ -493,7 +493,6 @@ import TournamentModals from "./TournamentModals.svelte";
     try {
       await goOffline(uid);
       showGoOfflineConfirm = false;
-      showToast({ type: 'success', message: m.offline_now_offline() });
     } catch (e) {
       showToast({ type: 'error', message: toUserMessage(e, m.offline_error_go_offline()) });
     } finally {
@@ -530,7 +529,6 @@ import TournamentModals from "./TournamentModals.svelte";
       tournament = await goOnline(uid);
       await loadPlayerNames();
       showGoOnlineConfirm = false;
-      showToast({ type: 'success', message: m.offline_back_online() });
     } catch (e) {
       // Lock-lost already surfaced a persistent toast at the source.
       if (e instanceof OfflineLockLostError) { showGoOnlineConfirm = false; }
@@ -545,7 +543,6 @@ import TournamentModals from "./TournamentModals.svelte";
     try {
       await forceTakeover(uid);
       showForceTakeoverConfirm = false;
-      showToast({ type: 'success', message: m.offline_takeover_success() });
     } catch (e) {
       showToast({ type: 'error', message: toUserMessage(e, m.offline_error_takeover()) });
     } finally {
@@ -558,7 +555,6 @@ import TournamentModals from "./TournamentModals.svelte";
     try {
       await forceUnlock(uid);
       showForceUnlockConfirm = false;
-      showToast({ type: 'success', message: m.offline_unlock_success() });
     } catch (e) {
       showToast({ type: 'error', message: toUserMessage(e, m.offline_error_unlock()) });
     } finally {

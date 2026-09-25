@@ -198,7 +198,6 @@
     claimingVekn = true;
     try {
       const result = await claimVeknId(claimVeknIdInput.trim());
-      showToast({ type: "success", message: result.message });
       showClaimModal = false;
       claimVeknIdInput = "";
       // storeTokensFromCallback handles: store tokens, fetch /auth/me, set auth state, sync refresh
@@ -214,7 +213,6 @@
     abandoningVekn = true;
     try {
       const result = await abandonVeknId();
-      showToast({ type: "success", message: result.message });
       showAbandonConfirm = false;
       await storeTokensFromCallback(result.access_token, result.refresh_token);
     } catch {

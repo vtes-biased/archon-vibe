@@ -55,7 +55,6 @@
         players: roster,
         reported_player_count: count,
       }));
-      showToast({ type: "success", message: m.archival_saved() });
     } catch (e) {
       showToast({ type: "error", message: toUserMessage(e, m.archival_error_save()) });
     } finally {

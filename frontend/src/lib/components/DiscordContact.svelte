@@ -16,7 +16,6 @@
       await navigator.clipboard.writeText(username);
       copied = true;
       setTimeout(() => { copied = false; }, 2000);
-      showToast({ type: "success", message: m.discord_username_copied() });
     } catch {
       // Copy is the primary path — never fail silently (the username stays visible to type manually)
       showToast({ type: "error", message: m.discord_copy_failed() });

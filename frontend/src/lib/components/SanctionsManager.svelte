@@ -5,7 +5,6 @@
   import { canViewSanctionReason } from "$lib/engine";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { visibleSanctions } from "$lib/utils";
-  import { showToast } from "$lib/stores/toast.svelte";
   import SanctionBadge from "./SanctionBadge.svelte";
   import { Pencil, TriangleAlert, CircleCheck, Trash2, RefreshCw } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
@@ -128,7 +127,6 @@
         expires_at: sanctionExpiresAt || null,
       });
       userSanctions = [...userSanctions, sanction];
-      showToast({ type: "success", message: m.sanction_mgr_issued_success() });
       showSanctionModal = false;
       sanctionTargetUser = null;
       sanctionLevel = "probation";
@@ -192,7 +190,6 @@
     try {
       const updated = await updateSanction(sanctionUid, { lifted: true });
       userSanctions = userSanctions.map((s) => (s.uid === sanctionUid ? updated : s));
-      showToast({ type: "success", message: m.sanction_mgr_lifted_success() });
       closeEditSanctionModal();
     } catch {
       // Error toast shown by apiRequest
@@ -208,7 +205,6 @@
     try {
       userSanctions = userSanctions.filter((s) => s.uid !== sanctionUid);
       await deleteSanctionApi(sanctionUid);
-      showToast({ type: "success", message: m.sanction_mgr_deleted() });
       closeEditSanctionModal();
     } catch {
       if (user) {

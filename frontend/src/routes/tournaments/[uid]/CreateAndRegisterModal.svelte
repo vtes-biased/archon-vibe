@@ -80,7 +80,6 @@
     sponsorLoading = true;
     try {
       const result = await sponsorVeknMember(sponsorTarget.uid);
-      showToast({ type: "success", message: result.message });
       // doAction reports rather than throws: closing here would claim a success
       // the organizer didn't get, after a VEKN ID has already been allocated.
       const err = await doAction("AddPlayer", { user_uid: sponsorTarget.uid, vekn_id: result.user.vekn_id });

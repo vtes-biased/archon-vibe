@@ -38,7 +38,6 @@
     loading = true;
     try {
       await onadd(user.uid);
-      showToast({ type: "success", message: m.organizers_added() });
     } catch {
       // Error already shown by apiRequest
     } finally {

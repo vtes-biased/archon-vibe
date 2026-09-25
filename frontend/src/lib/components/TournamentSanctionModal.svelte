@@ -3,7 +3,6 @@
   import { getSanctionReference } from "$lib/engine";
   import { issueTournamentSanction } from "$lib/sanction-actions";
   import { getPlayerSanctionsInTournament } from "$lib/db";
-  import { showToast } from "$lib/stores/toast.svelte";
   import { TriangleAlert, CircleArrowDown } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
@@ -188,7 +187,6 @@
         description: description.trim(),
         tournament_uid: tournament.uid,
       });
-      showToast({ type: "success", message: m.sanction_mgr_issued_success() });
       onClose();
     } catch {
       // Error toast shown by apiRequest

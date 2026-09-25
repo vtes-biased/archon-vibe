@@ -61,11 +61,8 @@
       return;
     }
     const ok = await enablePush();
-    showToast({
-      type: ok ? "success" : "error",
-      message: ok ? m.notifications_enabled_toast() : m.notifications_denied_toast(),
-    });
     if (ok) dismiss();
+    else showToast({ type: "error", message: m.notifications_denied_toast() });
   }
 </script>
 

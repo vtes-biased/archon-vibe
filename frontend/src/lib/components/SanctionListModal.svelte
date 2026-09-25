@@ -4,7 +4,6 @@
   import { getTournamentListItems, type TournamentListItem } from "$lib/db";
   import { canViewSanctionReason } from "$lib/engine";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { showToast } from "$lib/stores/toast.svelte";
   import SanctionBadge from "./SanctionBadge.svelte";
   import Button from '$lib/components/Button.svelte';
   import { Trash2 } from "@lucide/svelte";
@@ -50,7 +49,6 @@
     deleting = true;
     try {
       await removeTournamentSanction(tournamentUid, uid);
-      showToast({ type: "success", message: m.sanction_mgr_deleted() });
       // The list refreshes via the SSE sanction event -> sanctions prop
     } catch {
       // Error toast shown by apiRequest

@@ -23,10 +23,7 @@
       await disablePush();
     } else {
       const ok = await enablePush();
-      showToast({
-        type: ok ? "success" : "error",
-        message: ok ? m.notifications_enabled_toast() : m.notifications_denied_toast(),
-      });
+      if (!ok) showToast({ type: "error", message: m.notifications_denied_toast() });
     }
   }
 

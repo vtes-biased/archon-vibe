@@ -2,7 +2,6 @@
   import type { User } from "$lib/types";
   import type { NdaStatus } from "$lib/api";
   import { requestNdaSignature, uploadNdaScan, downloadNdaPdf } from "$lib/api";
-  import { showToast } from "$lib/stores/toast.svelte";
   import Button from "$lib/components/Button.svelte";
   import Badge from "$lib/components/Badge.svelte";
   import InlineNotice from "$lib/components/InlineNotice.svelte";
@@ -35,7 +34,6 @@
     requesting = true;
     try {
       await requestNdaSignature(user.uid);
-      showToast({ type: "success", message: m.nda_requested_toast() });
       onchanged();
     } catch {
       // Error toast is shown by apiRequest
@@ -49,7 +47,6 @@
     uploading = true;
     try {
       await uploadNdaScan(user.uid, file);
-      showToast({ type: "success", message: m.nda_uploaded_toast() });
       onchanged();
     } catch {
       // Error toast is shown by apiRequest

@@ -400,7 +400,6 @@ export async function uploadAvatar(userUid: string, blob: Blob): Promise<{ succe
     `/api/users/${userUid}/avatar`,
     { method: 'POST', body: formData }
   );
-  showToast({ type: 'success', message: m.profile_avatar_updated() });
   return result;
 }
 
@@ -663,7 +662,6 @@ export async function uploadTournamentBanner(
     `/api/tournaments/${tournamentUid}/banner`,
     { method: 'POST', body: formData }
   );
-  showToast({ type: 'success', message: m.tournament_banner_updated() });
   return result;
 }
 
@@ -674,7 +672,6 @@ export async function deleteTournamentBanner(
     `/api/tournaments/${tournamentUid}/banner`,
     { method: 'DELETE' }
   );
-  showToast({ type: 'success', message: m.tournament_banner_removed() });
   return result;
 }
 

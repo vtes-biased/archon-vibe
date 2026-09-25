@@ -2,7 +2,6 @@
   import type { User } from "$lib/types";
   import type { UserListItem } from "$lib/db";
   import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased, setMemberSponsor, deleteMember, anonymizeMember } from "$lib/api";
-  import { showToast } from "$lib/stores/toast.svelte";
   import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2, Trash2, TriangleAlert, ArrowLeftRight, EyeOff, Handshake } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import UserPicker from '$lib/components/UserPicker.svelte';
@@ -71,7 +70,6 @@
     processingAction = true;
     try {
       const result = await sponsorVeknMember(user.uid);
-      showToast({ type: "success", message: result.message });
       showSponsorConfirm = false;
       onaction(result.user);
     } catch {
@@ -86,7 +84,6 @@
     processingAction = true;
     try {
       const result = await linkVeknId(linkVeknIdInput.trim(), user.uid);
-      showToast({ type: "success", message: result.message });
       showLinkModal = false;
       linkVeknIdInput = "";
       onaction(result.user);
@@ -101,7 +98,6 @@
     processingAction = true;
     try {
       const result = await forceAbandonVeknId(user.uid);
-      showToast({ type: "success", message: result.message });
       showForceAbandonConfirm = false;
     } catch {
       // Error toast shown by apiRequest
@@ -115,10 +111,6 @@
     processingAction = true;
     try {
       const updated = await setMemberDeceased(user.uid, !isDeceased);
-      showToast({
-        type: "success",
-        message: isDeceased ? m.deceased_cleared_toast() : m.deceased_marked_toast(),
-      });
       onaction(updated);
     } catch {
       // Error toast shown by apiRequest
@@ -131,10 +123,6 @@
     processingAction = true;
     try {
       const updated = await setMemberSponsor(user.uid, sponsorUid);
-      showToast({
-        type: "success",
-        message: sponsorUid ? m.sponsor_edit_saved_toast() : m.sponsor_edit_cleared_toast(),
-      });
       showSponsorEdit = false;
       onaction(updated);
     } catch {
@@ -148,7 +136,6 @@
     processingAction = true;
     try {
       await deleteMember(user.uid);
-      showToast({ type: "success", message: m.member_deleted_toast() });
       showDeleteConfirm = false;
       ondelete?.();
     } catch {
@@ -162,7 +149,6 @@
     processingAction = true;
     try {
       const updated = await anonymizeMember(user.uid);
-      showToast({ type: "success", message: m.member_anonymized_toast() });
       showAnonymizeConfirm = false;
       onaction(updated);
     } catch {
@@ -179,7 +165,6 @@
     processingAction = true;
     try {
       const result = await mergeUsers(mergeKeep.uid, mergeDrop.uid);
-      showToast({ type: "success", message: result.message });
       showMergeModal = false;
       mergeTarget = null;
       // A swapped merge soft-deletes the profile we are standing on.

@@ -1,7 +1,6 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
   import { importArchonFile, type ArchonImportResult } from "$lib/api";
-  import { showToast } from "$lib/stores/toast.svelte";
   import { Upload, Download, X } from "@lucide/svelte";
   import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -46,7 +45,6 @@
       const result = await importArchonFile(tournamentUid, archonFile);
       archonResult = result;
       if (result.success) {
-        showToast({ type: "success", message: m.archon_import_success() });
         archonFile = null;
         const input = document.getElementById("archon-file-input") as HTMLInputElement;
         if (input) input.value = "";
