@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.2.2 — 2026-09-25
 
 - Winning decks sent to the TWDA are cleaner and follow the archive's own format.
 - A pasted decklist that starts with its name, like "Vote Lock", now keeps that name.
