@@ -1123,6 +1123,7 @@
   "archival_add_player": "Añadir un jugador",
   "archival_remove_player": "Quitar jugador",
   "archival_set_winner": "Marcar como ganador",
+  "archival_saved": "Resultados de archivo guardados",
   "archival_error_save": "No se han podido guardar los resultados de archivo",
   "vekn_add_to_calendar": "Añadir al calendario VEKN",
   "vekn_report_results": "Enviar resultados a VEKN",

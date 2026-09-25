@@ -2,6 +2,7 @@
   import type { User } from "$lib/types";
   import type { UserListItem } from "$lib/db";
   import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased, setMemberSponsor, deleteMember, anonymizeMember } from "$lib/api";
+  import { showToast } from "$lib/stores/toast.svelte";
   import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2, Trash2, TriangleAlert, ArrowLeftRight, EyeOff, Handshake } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import UserPicker from '$lib/components/UserPicker.svelte';
@@ -98,6 +99,7 @@
     processingAction = true;
     try {
       const result = await forceAbandonVeknId(user.uid);
+      showToast({ type: "success", message: result.message });
       showForceAbandonConfirm = false;
     } catch {
       // Error toast shown by apiRequest

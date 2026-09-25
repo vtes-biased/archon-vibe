@@ -1123,6 +1123,7 @@
   "archival_add_player": "Add a player",
   "archival_remove_player": "Remove player",
   "archival_set_winner": "Mark as winner",
+  "archival_saved": "Archival results saved",
   "archival_error_save": "Could not save the archival results",
   "vekn_add_to_calendar": "Add to the VEKN calendar",
   "vekn_report_results": "Report results to VEKN",

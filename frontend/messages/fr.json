@@ -1123,6 +1123,7 @@
   "archival_add_player": "Ajouter un joueur",
   "archival_remove_player": "Retirer le joueur",
   "archival_set_winner": "Désigner comme vainqueur",
+  "archival_saved": "Résultats d'archive enregistrés",
   "archival_error_save": "Impossible d'enregistrer les résultats d'archive",
   "vekn_add_to_calendar": "Ajouter au calendrier VEKN",
   "vekn_report_results": "Envoyer les résultats à VEKN",

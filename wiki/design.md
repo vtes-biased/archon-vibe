@@ -326,12 +326,13 @@ an exclusive accordion, which would take away the feedback that is the edit's on
 confirmation. Only genuinely irreversible or externally visible actions gate behind
 a confirm step.
 
-**Success toasts** — none when the surface that fired the action renders the
-outcome: the rendered change is the confirmation, and a toast restating it is
-noise. A success toast earns its place only where nothing on screen changes — a
-clipboard copy, a manual resync, a push to the VEKN calendar, a check-in fired by a
-QR redirect — or where it carries what the screen does not, like the go-online
-summary's counts. Error toasts are unaffected.
+**Success toasts** — none when the surface that fired the action, or the one it
+lands on, renders the outcome: the rendered change is the confirmation, and a toast
+restating it is noise. A success toast earns its place only where nothing on screen
+changes — a clipboard copy, a manual resync, a push to the VEKN calendar, a
+check-in fired by a QR redirect, a saved archival form — or where it carries what
+the screen does not, like the go-online summary's counts or where a force-abandoned
+member went.
 
 **Unactionable match** — a member the organizer cannot act on is listed disabled
 with its reason, never filtered out of the results: an empty dropdown reads as "no
