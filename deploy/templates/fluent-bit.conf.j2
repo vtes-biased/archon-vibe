@@ -1,0 +1,32 @@
+[SERVICE]
+    flush     5
+    log_level warn
+
+# read_from_tail applies only without a cursor: a first start ships no backlog
+[INPUT]
+    name           systemd
+    tag            journal
+    db             /var/lib/fluent-bit/journal.db
+    read_from_tail on
+    max_entries    1000
+    mem_buf_limit  5MB
+
+[FILTER]
+    name   lua
+    match  journal
+    script /etc/fluent-bit/journal.lua
+    call   journal
+
+[OUTPUT]
+    name            loki
+    match           journal
+    host            {{ loki_host }}
+    port            443
+    tls             on
+    tls.verify      on
+    http_user       {{ loki_user }}
+    http_passwd     ${GC_LOKI_PASSWORD}
+    labels          job=integrations/node_exporter, cluster=archon, host={{ host_name }}
+    label_keys      $unit,$tag,$level
+    remove_keys     unit,tag,level
+    drop_single_key raw
