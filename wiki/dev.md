@@ -158,6 +158,13 @@ production corpus size (36.7k objects): imports 103 MB, the rating recompute
 +44 MB, the TWDA fetch +22 MB. `MALLOC_ARENA_MAX=2` changes nothing — measured
 under concurrent load, the event loop allocates from one thread.
 
+**Production's memory, settled** (v1.2.3, a full member and tournament sync run):
+the backend holds ~200 MB with ~6 MB swapped, where the job peaks used to leave
+~300 MB resident and ~120 MB swapped. Beside it PostgreSQL holds ~350 MB — the
+96 MB of `shared_buffers` plus file cache the kernel reclaims — nginx ~60 MB, the
+bot ~35 MB and Fluent Bit ~25 MB, leaving ~420 MB available and ~75 MB of swap in
+use. The memory-stall alert is what watches for a regression.
+
 Because the backend ships as an installed wheel, **bundled data files must load
 through `importlib.resources`**, never `Path(__file__)`
 ([dogmas](dogmas.md#dependencies-and-data)).
