@@ -678,15 +678,15 @@ missing/problems filters count submitted decks either way — the chase asks who
 still owes a decklist, which is a question about check-in, not about contents.
 
 **Until the event finishes, an organizer opens another player's played deck
-deliberately.** The roster, and a seat in the Rounds tab for that round's deck,
-show its name behind "View decklist", which fires `ViewDeck`: the engine emits a
-`log_view` op naming the organizer and the round in progress — `len(rounds)` once
-the finals are seated — and does nothing on the organizer's own deck or once
-`Finished`. The processor keeps one entry per organizer per deck and drops a
-repeat, so re-opening adds nothing and an offline replay converges. The log shows
-on the deck row to the event's organizers and on the owner's own deck. It deters
-casual peeking and enforces nothing: the deck is already on the organizer's
-device.
+deliberately.** The roster, and a seat of a managed table in the Rounds tab for
+that round's deck, show its name behind "View decklist", which fires `ViewDeck`:
+the engine emits a `log_view` op naming the organizer and the round in progress —
+`len(rounds)` once the finals are seated — and does nothing on the organizer's own
+deck or once `Finished`. The processor keeps one entry per organizer per deck and
+drops a repeat, so re-opening adds nothing and an offline replay converges. The
+log shows on the deck row to the event's organizers and on the owner's own deck.
+It deters casual peeking and enforces nothing: the deck is already on the
+organizer's device.
 
 **A profile lists a decklist only once its event published it.** The player
 record on `/profile` and `/users/[uid]` gates on the tournament being held

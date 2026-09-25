@@ -3,7 +3,7 @@
   import { vpIssueText } from "$lib/vpIssue";
   import { toUserMessage } from '$lib/errors';
   import type { Tournament, Sanction } from "$lib/types";
-  import { formatScore } from "$lib/utils";
+  import { formatScore, formatGwTp } from "$lib/utils";
   import { tournamentAction } from "$lib/tournament-actions";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
@@ -162,7 +162,7 @@
                 <div class="text-xs text-ink-faint">{m.finals_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
               </div>
               <div class="flex items-center gap-2 shrink-0">
-                <span class="text-ink-faint text-xs">{tGws[j]}GW {tTps[j]}TP</span>
+                <span class="text-ink-faint text-xs">{formatGwTp(tGws[j] ?? 0, tTps[j] ?? 0)}</span>
                 {#if isOrganizer}
                   <button
                     onclick={() => sanctionTarget = { uid: seat.player_uid, name: seatDisplay(seat.player_uid) }}

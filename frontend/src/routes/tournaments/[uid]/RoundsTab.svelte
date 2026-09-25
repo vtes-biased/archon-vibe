@@ -11,14 +11,14 @@
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
   import Button from '$lib/components/Button.svelte';
-  import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users, Settings2, Search } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users, Settings2, Search, Eye } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import SeatDeckModal from "./SeatDeckModal.svelte";
   import VpInput from "$lib/components/VpInput.svelte";
   import { seatDisplay as seatDisplayUtil, seatDisplayParts, vpOptions, translateTableState, translatePlayerState, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
   import { showToast } from "$lib/stores/toast.svelte";
-  import { searchTokens, matchesAllTerms } from "$lib/utils";
+  import { searchTokens, matchesAllTerms, formatScore, formatGwTp } from "$lib/utils";
 
   let {
     tournament = $bindable(),
@@ -875,16 +875,7 @@
                     <div data-seat="{r}:{i}:{j}" class="py-2.5 transition-colors {foundSeat === `${r}:${i}:${j}` ? 'bg-select-soft/40 -mx-2 px-2 rounded' : ''}">
                       <div class="flex items-center justify-between gap-2 text-sm">
                         <span class="text-ink inline-flex items-center gap-1 min-w-0">
-                          {#if deck}
-                            <button
-                              onclick={() => deckTarget = { uid: seat.player_uid, round: r, name: seatDisplay(seat.player_uid) }}
-                              class="text-left text-link hover:underline py-3 -my-3"
-                              title={m.decks_view_decklist()}
-                              aria-label="{seatDisplay(seat.player_uid)}: {m.decks_view_decklist()}"
-                            >{seatDisplay(seat.player_uid)}</button>
-                          {:else}
-                            {seatDisplay(seat.player_uid)}
-                          {/if}
+                          {seatDisplay(seat.player_uid)}
                           {#if nonCompetingUids.has(seat.player_uid)}
                             <span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-active text-ink-muted shrink-0" title={m.proxy_hint()}>{m.proxy_label()}</span>
                           {/if}
@@ -896,7 +887,7 @@
                           {/if}
                         </span>
                         <div class="flex items-center gap-2 shrink-0">
-                          <span class="text-ink-faint text-xs whitespace-nowrap">{#if !isScoring}<span class="text-ink-strong font-medium tabular-nums">{seat.result.vp}VP</span> {/if}{tGws[j]}GW {tTps[j]}TP</span>
+                          <span class="text-ink-faint text-xs whitespace-nowrap">{#if !isScoring}<span class="text-ink-strong font-medium tabular-nums">{formatScore(tGws[j] ?? 0, seat.result.vp)}</span>{:else}{formatGwTp(tGws[j] ?? 0, tTps[j] ?? 0)}{/if}</span>
                           {#if isEditable && (isLast || isRoundLive)}
                             <!-- p-3 + 20px icon = 44px touch floor on the on-the-floor issuance path -->
                             <button
@@ -934,6 +925,11 @@
                               saving={scoreSavingSeat === seat.player_uid && scoreSaving === i}
                               onchange={(v) => setVp(r, i, seat.player_uid, v, table.seating)}
                             />
+                          {/if}
+                          {#if deck}
+                            <Button variant="ghost" size="sm" class="min-h-[44px] mt-1" aria-label="{seatDisplay(seat.player_uid)}: {m.decks_view_decklist()}" onclick={() => deckTarget = { uid: seat.player_uid, round: r, name: seatDisplay(seat.player_uid) }}>
+                              <Eye class="w-3.5 h-3.5" aria-hidden="true" />{m.decks_view_decklist()}
+                            </Button>
                           {/if}
                         </div>
                       {/if}

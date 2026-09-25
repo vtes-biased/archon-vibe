@@ -492,6 +492,11 @@ endpoint that already speaks it.
 Shared helpers live in `tournament-utils.ts`; don't re-duplicate score helpers per
 file.
 
+**Scores** read in the VTES notation, `2GW7` or `7VP` (`formatScore`). The folded
+Rounds seat row drops TP, being the densest row an organizer works from on a phone;
+every row with room keeps it — beside a VP picker, in a round's results, in
+standings.
+
 ## Landing
 
 `/` is the signed-out front door and the PWA's `start_url`. A visitor with no

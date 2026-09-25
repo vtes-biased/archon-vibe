@@ -3,7 +3,7 @@
   import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
   import { seatDisplay as seatDisplayUtil, vpOptions, translatePlayerState, translateTableState, translateStandingsMode, roundsPlayed, getRatingPts, ratingContext } from "$lib/tournament-utils";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { formatScore } from "$lib/utils";
+  import { formatScore, formatGwTp } from "$lib/utils";
   import { previewScoresSync, tableLabel, type ValidationError, type TournamentEventType } from "$lib/engine";
   import { TriangleAlert, QrCode, Gavel, Ban, Trash2, ExternalLink, Users, Lock, ShieldCheck, Undo2 } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
@@ -509,7 +509,7 @@
                     {:else if isPrey}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_prey()}</span>
                     {:else if isPredator}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_predator()}</span>{/if}
                   </span>
-                  <div class="text-xs text-ink-faint">{m.tournament_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if} · {tGws[j]}GW {tTps[j]}TP</div>
+                  <div class="text-xs text-ink-faint">{m.tournament_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if} · {formatGwTp(tGws[j] ?? 0, tTps[j] ?? 0)}</div>
                 </div>
               </div>
               {#if finalsSeatIdx >= 0}
@@ -593,7 +593,7 @@
                       {:else if isPrey}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_prey()}</span>
                       {:else if isPredator}<span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_predator()}</span>{/if}
                     </span>
-                    <span class="text-ink-faint text-xs shrink-0">{tGws[j]}GW {tTps[j]}TP</span>
+                    <span class="text-ink-faint text-xs shrink-0">{formatGwTp(tGws[j] ?? 0, tTps[j] ?? 0)}</span>
                   </div>
                   {#if tableLocked}
                     <span class="inline-flex items-center gap-1 text-xs text-ink-muted">
@@ -693,7 +693,7 @@
                 {@const tTps = preview ? preview.tp : prev.table.seating.map(s => s.result.tp)}
                 <div class="py-1 flex items-center justify-between text-sm {seat.player_uid === userUid ? 'text-ink-strong' : 'text-ink-muted'}">
                   <span>{seatDisplay(seat.player_uid)}</span>
-                  <span class="text-xs">{seat.result.vp}VP {tGws[j]}GW {tTps[j]}TP</span>
+                  <span class="text-xs">{formatScore(tGws[j] ?? 0, seat.result.vp, tTps[j] ?? 0)}</span>
                 </div>
               {/each}
             </div>
@@ -845,7 +845,7 @@
                 <span class="text-ink">{seatDisplay(seat.player_uid)}</span>
                 <div class="text-xs text-ink-faint">{m.tournament_seed({ n: String(seedIdx) })}{#if seedStanding} · {formatScore(seedStanding.gw, seedStanding.vp, seedStanding.tp)}{/if}</div>
               </div>
-              <span class="text-ink-faint text-xs">{seat.result.vp}VP {tGws[j]}GW {tTps[j]}TP</span>
+              <span class="text-ink-faint text-xs">{formatScore(tGws[j] ?? 0, seat.result.vp, tTps[j] ?? 0)}</span>
             </div>
           {/each}
         </div>

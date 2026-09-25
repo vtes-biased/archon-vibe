@@ -17,9 +17,13 @@ export function matchesAllTerms(tokens: string[], terms: string[]): boolean {
   return terms.every((term) => tokens.some((tok) => tok.startsWith(term)));
 }
 
-export function formatScore(gw: number, vp: number, tp: number): string {
+export function formatScore(gw: number, vp: number, tp?: number): string {
   const s = gw > 0 ? `${gw}GW${vp}` : `${vp}VP`;
-  return `${s} ${tp}TP`;
+  return tp === undefined ? s : `${s} ${tp}TP`;
+}
+
+export function formatGwTp(gw: number, tp: number): string {
+  return gw > 0 ? `${gw}GW ${tp}TP` : `${tp}TP`;
 }
 
 /** Offset (ms) of an IANA timezone at a given instant. */
