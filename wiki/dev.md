@@ -194,8 +194,8 @@ developer. A new recipient is added to `.sops.yaml` by someone who already
 decrypts, who then runs `sops updatekeys` on every production file.
 
 **Production's logs are in the VEKN Grafana Cloud stack** (vtesbiased), shipped
-from the journal by Fluent Bit rather than Alloy: measured at 4.4 MB against
-Alloy's ~73 MB, under a 40 MB systemd cap. It sends logs with
+from the journal by Fluent Bit rather than Alloy: ~23 MB with logs and metrics
+against Alloy's ~73 MB, under a 40 MB systemd cap. It sends logs with
 the labels beta's Alloy sends to the personal stack (`unit`, `tag`, `level`,
 `host`), so a query carries over: `{host="archon.vekn.net", unit="archon-backend.service"}`
 in Explore on the Loki datasource. A first start ships no backlog, and a cursor in
@@ -214,8 +214,7 @@ textfile every 15 s with the host's CPU, memory and I/O pressure and, per unit, 
 cgroup memory, swap, CPU and memory stall as `archon_unit_*{unit=…}` — per unit
 rather than per process, since the backend and the public API are both `uvicorn`
 and every PostgreSQL connection is a new pid. PostgreSQL's internals are not
-reported: Fluent Bit cannot query it. With metrics on, Fluent Bit holds ~23 MB
-under its cap, and the loop is capped at 10 MB.
+reported: Fluent Bit cannot query it. The loop is capped at 10 MB.
 
 **`deploy/grafana.py` owns production's Grafana side**, applied with a
 service-account token (Editor) as `GRAFANA_TOKEN`, and `DISCORD_WEBHOOK` only to

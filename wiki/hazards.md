@@ -212,6 +212,15 @@ the organizer's promote-from-the-waitlist decision both read it. There is no
 timestamp to fall back on: any path that rebuilds the array rather than mutating it
 in place silently reorders the queue, and nothing fails.
 
+**Production's alerts and dashboards read names Fluent Bit mints.** The rules and
+panels in `deploy/grafana.py` match the `instance` and systemd `name` labels, the
+`archon_unit_*` metrics of the `fluent-bit-units` loop and the Loki `host`, `unit`
+and `level` labels, all set in the Fluent Bit config and the loop. Five of the six
+rules treat no data as fine, so a rename on the Fluent Bit side silences them
+rather than firing — only the silent-host rule notices, and only a change to
+`instance`. A rename there lands with the same rename in `deploy/grafana.py`,
+re-applied.
+
 **Proxy players are excluded-but-not-zeroed**, the inverse of DQ. Consumers
 iterating standings unfiltered — league scoring and the VEKN push among them —
 leak proxy scores. Filter on `disqualified || non_competing`.

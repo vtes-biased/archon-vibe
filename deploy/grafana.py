@@ -1,9 +1,3 @@
-"""Production's dashboards, alert rules and Discord contact point on the VEKN Grafana stack.
-
-GRAFANA_TOKEN: a service-account token (Editor) on vtesbiased.grafana.net.
-DISCORD_WEBHOOK: only to create or change the contact point; rules alone without it.
-"""
-
 import json
 import os
 import urllib.error
@@ -637,8 +631,6 @@ def main() -> None:
     if status >= 300:
         raise SystemExit(f"node exporter full: {status} {text}")
     print(f"dashboard {json.loads(text).get('uid')} (Node Exporter Full)")
-    for spec in RULES:
-        upsert("/api/v1/provisioning/alert-rules", spec[0], rule(*spec))
     status, text = call(
         "PUT",
         f"/api/v1/provisioning/folder/{FOLDER}/rule-groups/{GROUP}",
