@@ -6,8 +6,7 @@ import { goto } from "$app/navigation";
 const STORAGE_KEY = "archon:last-view";
 const TTL_MS = 30 * 60 * 1000;
 
-/** Dropped from the remembered view — a position or an arrival intent, not a view preference. Back still restores them via the URL. */
-const TRANSIENT = ["page", "q", "sponsor"];
+const TRANSIENT = ["page", "sponsor"];
 
 interface Entry {
     search: string;

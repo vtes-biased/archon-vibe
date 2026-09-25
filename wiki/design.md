@@ -357,8 +357,10 @@ three layers:
   remembered (`/users?sponsor`).
 - **Nav-menu memory** — a bare link back into a list resolves, on click, to the
   view it was left in. sessionStorage, 30-minute inactivity window, so a new or
-  stale tab starts clean. The page number and free-text query are deliberately
-  dropped: those are a position and an intent, not a view preference.
+  stale tab starts clean. The free-text query is kept with the filters: a viewer
+  who searched and stepped to another tab is coming back to what they were looking
+  for, not starting over. Only the page number is dropped: it is a position in the
+  results, not part of the view.
 - **localStorage** only for true display preferences outliving the tab — the
   agenda/all toggle, the theme.
 
