@@ -468,25 +468,26 @@ service(
 
 files.directory(name="Frontend root", path=www, user=name, group=name, mode="755")
 tarball = frontend_bundle(build)
+bundle = digest(tarball)
 files.put(
     name="Frontend bundle",
     src=str(tarball),
-    dest=f"{www}/frontend-dist.tar.gz",
+    dest=f"{www}/frontend-{bundle}.tar.gz",
     user=name,
     group=name,
 )
-bundle = digest(tarball)
 if deployed(f"{www}/.bundle") != bundle:
     server.shell(
         name="Swap in the frontend",
         commands=[
             f"rm -rf {www}/dist.new {www}/dist.old",
             f"mkdir {www}/dist.new",
-            f"tar -xzf {www}/frontend-dist.tar.gz -C {www}/dist.new",
+            f"tar -xzf {www}/frontend-{bundle}.tar.gz -C {www}/dist.new",
             f"chown -R {name}:{name} {www}/dist.new",
             f"if [ -d {www}/dist ]; then mv {www}/dist {www}/dist.old; fi",
             f"mv {www}/dist.new {www}/dist",
             f"rm -rf {www}/dist.old",
+            f"find {www} -maxdepth 1 -name 'frontend-*.tar.gz' ! -name frontend-{bundle}.tar.gz -delete",
             f"echo {bundle} > {www}/.bundle",
         ],
     )
