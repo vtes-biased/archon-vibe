@@ -10,6 +10,10 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- Tournaments created with the old Archon since 2025 no longer show up as held in Palma de Mallorca, Spain.
+
 ## v1.2.2 — 2026-09-25
 
 - Winning decks sent to the TWDA are cleaner and follow the archive's own format.
