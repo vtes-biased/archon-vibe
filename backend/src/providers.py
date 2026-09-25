@@ -1,7 +1,4 @@
-"""Deck URL providers: fetch + resolve deck data from VDB, VTESDecks, Amaranth.
-VDB and VTESDecks already speak VEKN ids, checked against our ``cards.json``;
-Amaranth's own ids are mapped through krcg's card DB, loaded once to build the
-map and then dropped."""
+"""Deck URL providers: fetch + resolve deck data from VDB, VTESDecks, Amaranth."""
 
 import asyncio
 import itertools
@@ -32,8 +29,7 @@ _known_ids: frozenset[int] | None = None
 _amaranth_ids: dict[str, int] | None = None
 _amaranth_lock = asyncio.Lock()
 
-# Legacy/alternate hostnames. Only the netloc is remapped for routing; the
-# fetchers key off path/query/fragment, not netloc.
+# Legacy/alternate hostnames. Only the netloc is remapped for routing.
 _NETLOC_ALIASES = {
     "vdb.smeea.casa": "vdb.im",
     "api.vtesdecks.com": "vtesdecks.com",
@@ -43,10 +39,10 @@ _NETLOC_ALIASES = {
 def _card_ids() -> frozenset[int]:
     global _known_ids
     if _known_ids is None:
-        raw = msgspec.json.decode(
-            cards_json_bytes() or b"{}", type=dict[int, msgspec.Raw]
-        )
-        _known_ids = frozenset(raw)
+        data = cards_json_bytes()
+        if data is None:
+            raise RuntimeError("card database unavailable")
+        _known_ids = frozenset(msgspec.json.decode(data, type=dict[int, msgspec.Raw]))
     return _known_ids
 
 
@@ -55,7 +51,6 @@ async def _amaranth_map(session: aiohttp.ClientSession) -> dict[str, int]:
     if _amaranth_ids is None:
         async with _amaranth_lock:
             if _amaranth_ids is None:
-                # ~75 MB of card objects, only to read one id off each
                 cards = await asyncio.to_thread(loader.load)
                 by_card = await providers.get_amaranth_cards_map(session, cards)
                 _amaranth_ids = {aid: card.id for aid, card in by_card.items()}
@@ -92,7 +87,6 @@ async def _fetch_vdb(
     if "id" in params:
         uid = params["id"][0]
     elif url.path == "/decks/deck":
-        # the deck-in-URL form carries the deck itself: decoded without calling VDB
         if not url.fragment:
             raise ValueError("Empty VDB deck in URL")
         deck = {

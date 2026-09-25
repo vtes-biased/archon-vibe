@@ -1124,9 +1124,9 @@ an interval job of a day or more can never fire here
 ([hazards](hazards.md#deploy)). The VEKN chain is one too: its hours are spelled
 out from 04:00 UTC every `VEKN_SYNC_INTERVAL_HOURS` — 04:00 alone at the 24 both
 deployed environments set, clear of the 03:00 backup and ahead of the 05:00 TWDA
-sync. It used to run on a startup kick instead, which made every daily restart
-pay the chain's whole memory peak; a fresh install waits for the hour or for the
-admin page's *Run now*.
+sync. Not a startup kick: a kick makes every daily restart pay the chain's whole
+memory peak, so a fresh install waits for the hour or for the admin page's *Run
+now*.
 
 The tournament sync and the TWDA sync hold one lock between them, so neither
 reads the corpus as lacking an event the other is halfway through creating. That

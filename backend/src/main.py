@@ -97,7 +97,6 @@ except (OSError, AttributeError):
 
 
 def _release_heap(_event: object) -> None:
-    # glibc keeps freed heap: without this a job's peak stays resident until restart
     if _malloc_trim:
         _malloc_trim(0)
 
