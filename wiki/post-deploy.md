@@ -88,3 +88,20 @@ sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
 Rerun with `--apply` once every before/after pair reads as noise only. It worked
 when a third run reports `0 of N`. Delete this section and
 `backend/scripts/strip_deck_comment_noise.py` together.
+
+## Production's env files load silently in bash
+
+Gated by `d15b90f9`, which single-quotes every value `deploy/deploy.py` writes.
+The deploy runs from the checkout, not the release, so it takes the next
+`just deploy-prod` from a tree containing that commit to rewrite the backend and
+bot env files (production runs no public API) and restart both units; a check
+before that reads the unquoted files. Proof, on the box — no output from either
+load, two `active`, and `0` per unit:
+
+```sh
+for f in backend bot; do sudo -u archon bash -c "set -a; . /etc/archon/archon-$f.env; set +a"; done
+systemctl is-active archon-backend archon-bot
+for u in backend bot; do sudo cat /proc/$(systemctl show -p MainPID --value archon-$u)/environ | tr '\0' '\n' | grep -c "='"; done
+```
+
+Nothing is owed afterwards.
