@@ -11,6 +11,21 @@
     max_entries    1000
     mem_buf_limit  5MB
 
+[INPUT]
+    name                            node_exporter_metrics
+    tag                             metrics.node
+    scrape_interval                 60
+    metrics                         cpu,meminfo,diskstats,filesystem,loadavg,vmstat,netdev,stat,time,uname,systemd,textfile
+    collector.textfile.path         /var/lib/fluent-bit/textfile
+    systemd_include_pattern         ^(archon-.*|nginx|postgresql@.*|fluent-bit|fluent-bit-units)\.service$
+    systemd_service_restart_metrics on
+    systemd_unit_start_time_metrics on
+
+[INPUT]
+    name            fluentbit_metrics
+    tag             metrics.fluentbit
+    scrape_interval 60
+
 [FILTER]
     name   lua
     match  journal
@@ -30,3 +45,17 @@
     label_keys      $unit,$tag,$level
     remove_keys     unit,tag,level
     drop_single_key raw
+
+[OUTPUT]
+    name        prometheus_remote_write
+    match       metrics.*
+    host        {{ prometheus_host }}
+    port        443
+    uri         /api/prom/push
+    tls         on
+    tls.verify  on
+    http_user   {{ prometheus_user }}
+    http_passwd ${GC_LOKI_PASSWORD}
+    add_label   job integrations/node_exporter
+    add_label   cluster archon
+    add_label   instance {{ host_name }}

@@ -64,20 +64,16 @@ each developer's `archon.vekn.net` alias, and the journal of system units needs
 
 1. **Deploy** a release carrying `19413c3b` and `f0fd0ca7` to prod (owner's call
    on timing).
-2. **Start the sampler** right after, into `/var/tmp` so a reboot keeps the log
-   (the sampler itself stops at a reboot):
+2. **Read the stalls from Grafana** once the metrics line's `just setup-prod` has
+   run — no sampler: `rate(node_pressure_memory_stalled_seconds_total{instance="archon.vekn.net"}[5m])`
+   on the `grafanacloud-prom` datasource, beside `archon_unit_memory_bytes` per unit.
+3. **List the job runs** over the same day:
 
    ```
-   ssh archon.vekn.net 'nohup sh -c "while :; do echo \$(date -u +%FT%TZ) \$(grep full /proc/pressure/memory | cut -d\" \" -f5) \$(free -m | awk \"/Mem/{print \\\$7}\"); sleep 60; done" > /var/tmp/psi.log 2>&1 &'
+   ssh archon.vekn.net 'sudo journalctl -u archon-backend --since "-25h" --no-pager | grep -E "Running job|starting|complete" | cut -c1-160'
    ```
 
-3. **Collect a day later** — prints the log, stops the sampler, lists the job runs:
-
-   ```
-   ssh archon.vekn.net 'cat /var/tmp/psi.log; pkill -f "psi.log"; sudo journalctl -u archon-backend --since "-25h" --no-pager | grep -E "Running job|starting|complete" | cut -c1-160'
-   ```
-
-4. **Attribute.** Per-minute deltas of `total`; match each jump against: 01:00
+4. **Attribute.** Match each stall burst against: 01:00
    sanction cleanup, 01:30 purge, 02:00 promo stock, 02:30 rating recompute,
    03:00 backup, 04:00 VEKN chain, 05:00 TWDA sync, Wednesday 06:00
    restore-verify, the hourly VEKN push, and the backend's daily `RuntimeMaxSec`

@@ -41,7 +41,7 @@ s.postgres_backups(
     bucket="archon-db-backups",
 )
 
-# --- Logs: the journal to the VEKN Grafana Cloud stack, with Alloy's labels
+# --- Logs and metrics to the VEKN Grafana Cloud stack, with Alloy's labels
 
 key = files.download(
     name="Fluent Bit apt key",
@@ -62,6 +62,9 @@ repo = files.put(
 apt.update(name="Refresh apt for Fluent Bit", _if=any_changed(key, repo))
 apt.packages(name="Fluent Bit", packages=["fluent-bit"])
 files.directory(name="Fluent Bit state", path="/var/lib/fluent-bit", mode="700")
+files.directory(
+    name="Fluent Bit textfile metrics", path="/var/lib/fluent-bit/textfile", mode="700"
+)
 fluent_bit = [
     files.template(
         name="Fluent Bit config",
@@ -70,6 +73,8 @@ fluent_bit = [
         mode="644",
         loki_host="logs-prod-012.grafana.net",
         loki_user="1798381",
+        prometheus_host="prometheus-prod-65-prod-eu-west-2.grafana.net",
+        prometheus_user="3605422",
         host_name=host.name,
     ),
     files.put(
@@ -99,6 +104,39 @@ systemd.service(
     service="fluent-bit",
     restarted=True,
     _if=any_changed(unit_override, *fluent_bit),
+)
+
+units_metrics = [
+    files.put(
+        name="Unit metrics script",
+        src=str(HERE / "templates/unit-metrics.sh"),
+        dest="/usr/local/lib/fluent-bit-units.sh",
+        mode="755",
+    ),
+    files.put(
+        name="Unit metrics service",
+        src=StringIO(
+            "[Unit]\nDescription=Host pressure and per-unit resources for Fluent Bit\n\n"
+            "[Service]\nExecStart=/usr/local/lib/fluent-bit-units.sh\nRestart=always\n"
+            "MemoryMax=10M\nNoNewPrivileges=true\nProtectSystem=strict\n"
+            "ProtectHome=true\nReadWritePaths=/var/lib/fluent-bit/textfile\n\n"
+            "[Install]\nWantedBy=multi-user.target\n"
+        ),
+        dest="/etc/systemd/system/fluent-bit-units.service",
+        mode="644",
+    ),
+]
+systemd.daemon_reload(
+    name="Reload units for unit metrics", _if=units_metrics[1].did_change
+)
+systemd.service(
+    name="fluent-bit-units", service="fluent-bit-units", running=True, enabled=True
+)
+systemd.service(
+    name="Restart fluent-bit-units",
+    service="fluent-bit-units",
+    restarted=True,
+    _if=any_changed(*units_metrics),
 )
 
 if host.get_fact(File, path="/var/run/reboot-required"):

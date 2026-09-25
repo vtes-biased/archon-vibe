@@ -195,12 +195,26 @@ decrypts, who then runs `sops updatekeys` on every production file.
 
 **Production's logs are in the VEKN Grafana Cloud stack** (vtesbiased), shipped
 from the journal by Fluent Bit rather than Alloy: measured at 4.4 MB against
-Alloy's ~73 MB, under a 40 MB systemd cap. It sends logs only — no metrics — with
+Alloy's ~73 MB, under a 40 MB systemd cap. It sends logs with
 the labels beta's Alloy sends to the personal stack (`unit`, `tag`, `level`,
 `host`), so a query carries over: `{host="archon.vekn.net", unit="archon-backend.service"}`
 in Explore on the Loki datasource. A first start ships no backlog, and a cursor in
 `/var/lib/fluent-bit` keeps a restart from sending anything twice. On the box,
 `journalctl -t archon` still reads the same lines.
+
+**Production reports its health to the same stack as metrics**, through the same
+Fluent Bit and the same token, which carries metrics write. Everything is scraped
+every 60 s and labelled like beta's Alloy (`job="integrations/node_exporter"`,
+`cluster="archon"`, `instance="archon.vekn.net"`), so Grafana's stock Linux node
+dashboards render the host: CPU, memory, swap, disk, network and load under
+node_exporter's names; the systemd state, restarts and start time of the archon
+units, nginx, PostgreSQL and Fluent Bit; and Fluent Bit's own record and error
+counters, where a failing log shipment shows. A `fluent-bit-units` loop writes a
+textfile every 15 s with the host's CPU, memory and I/O pressure and, per unit, its
+cgroup memory, swap, CPU and memory stall as `archon_unit_*{unit=…}` — per unit
+rather than per process, since the backend and the public API are both `uvicorn`
+and every PostgreSQL connection is a new pid. PostgreSQL's internals are not
+reported: Fluent Bit cannot query it.
 
 **Production access is per developer.** Each has their own sudo account
 (`just add-admin-prod <name> <pubkey> <an existing admin>`) and a
