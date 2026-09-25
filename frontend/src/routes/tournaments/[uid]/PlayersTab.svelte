@@ -5,18 +5,17 @@
   type DeckMap = Record<string, DeckObject[]>;
   import { formatScore } from "$lib/utils";
   import AddPlayerForm from "$lib/components/AddPlayerForm.svelte";
-  import DeckDisplay from "$lib/components/DeckDisplay.svelte";
   import DeckUpload from "$lib/components/DeckUpload.svelte";
-  import DeckViews from "$lib/components/DeckViews.svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
   import ConfirmActionModal from "$lib/components/ConfirmActionModal.svelte";
-  import { UserPlus, Dice3, CircleCheck, CircleHelp, TriangleAlert, CircleX, FileX, X, Eye, EyeOff, Trash2, Ellipsis, Dices, Printer, SlidersHorizontal, ChevronDown, ChevronRight, Banknote } from "@lucide/svelte";
+  import { UserPlus, Dice3, CircleCheck, CircleHelp, TriangleAlert, CircleX, FileX, X, EyeOff, Trash2, Ellipsis, Dices, Printer, SlidersHorizontal, ChevronDown, ChevronRight, Banknote } from "@lucide/svelte";
   import ActionMenu from "$lib/components/ActionMenu.svelte";
   import FoldableSection from "$lib/components/FoldableSection.svelte";
   import CreateAndRegisterModal from "./CreateAndRegisterModal.svelte";
+  import OrganizerDeck, { isDeckBehindViewLog } from "./OrganizerDeck.svelte";
   import Button from "$lib/components/Button.svelte";
   import Badge from "$lib/components/Badge.svelte";
   import { validateDeck, finalsQualification, type ValidationError, type TournamentEventType } from "$lib/engine";
@@ -185,18 +184,6 @@
   function isDeckHiddenFromOrganizer(round: number | null): boolean {
     if (!isOrganizer) return false;
     return isMultideck ? round === null : roundCount === 0;
-  }
-
-  const myUid = $derived(getAuthState().user?.uid ?? "");
-  let revealedDecks = $state<Set<string>>(new Set());
-  function isDeckBehindViewLog(deck: DeckObject): boolean {
-    return isOrganizer && deck.user_uid !== myUid && tournament.state !== "Finished" && !revealedDecks.has(deck.uid);
-  }
-  function viewDeck(deck: DeckObject) {
-    revealedDecks = new Set([...revealedDecks, deck.uid]);
-    if (!deck.views?.some(v => v.user_uid === myUid)) {
-      doAction("ViewDeck", { player_uid: deck.user_uid, round: deck.round });
-    }
   }
 
   type RoundSlot = { round: number | null; deck: DeckObject | null };
@@ -598,29 +585,6 @@
     {/if}
   {/snippet}
 
-  {#snippet organizerDeck(deck: DeckObject, onreplace: (() => void) | undefined)}
-    {#if isDeckBehindViewLog(deck)}
-      <div class="space-y-2">
-        <p class="text-sm text-ink-strong">{deck.name || m.decks_unnamed()}</p>
-        <div class="flex flex-wrap gap-2">
-          <Button variant="secondary" size="lg" onclick={() => viewDeck(deck)}>
-            <Eye class="w-4 h-4" />
-            {m.decks_view_decklist()}
-          </Button>
-          {#if onreplace}
-            <Button variant="secondary" size="lg" onclick={onreplace}>{m.decks_replace()}</Button>
-          {/if}
-        </div>
-        <p class="text-xs text-ink-faint">{m.decks_view_logged_hint()}</p>
-      </div>
-    {:else}
-      <DeckDisplay {deck} editable={!!onreplace} tournamentUid={tournament.uid} organizer={isOrganizer} multideck={isMultideck} {onreplace} />
-    {/if}
-    {#if isOrganizer}
-      <DeckViews views={deck.views ?? []} {roundCount} />
-    {/if}
-  {/snippet}
-
   <!-- Per-player expanded deck panel (upload / accordion / validation errors).
        Shared by the mobile card and the desktop expand row. -->
   {#snippet deckPanel(puid: string)}
@@ -657,7 +621,7 @@
                 >{m.decks_replace()}</Button>
               {/if}
             {:else if slot.deck}
-              {@render organizerDeck(slot.deck, canEditDecks ? () => { uploadingFor = puid; uploadingRound = slot.round ?? undefined; } : undefined)}
+              <OrganizerDeck deck={slot.deck} {tournament} organizer={isOrganizer} {doAction} onreplace={canEditDecks ? () => { uploadingFor = puid; uploadingRound = slot.round ?? undefined; } : undefined} />
             {:else if canEditDecks}
               <DeckUpload tournamentUid={tournament.uid} playerUid={puid} playerName={playerInfo[puid]?.name} round={slot.round ?? undefined} multideck onuploaded={onUploaded} />
             {:else}
@@ -679,10 +643,10 @@
             >{m.decks_replace()}</Button>
           {/if}
         {:else}
-          {@render organizerDeck(playerDecks[0], canEditDecks ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined)}
+          <OrganizerDeck deck={playerDecks[0]} {tournament} organizer={isOrganizer} {doAction} onreplace={canEditDecks ? () => { uploadingFor = puid; uploadingRound = undefined; } : undefined} />
         {/if}
       {/if}
-      {#if errors.length > 0 && playerDecks.some(d => !isDeckHiddenFromOrganizer(d.round) && !isDeckBehindViewLog(d))}
+      {#if errors.length > 0 && playerDecks.some(d => !isDeckHiddenFromOrganizer(d.round) && !isDeckBehindViewLog(d, tournament, isOrganizer))}
         <div class="space-y-1">
           {#each errors as err}
             <p class="text-sm {err.severity === 'error' ? 'text-link' : 'text-warn'}">

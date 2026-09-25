@@ -1034,6 +1034,7 @@ import TournamentModals from "./TournamentModals.svelte";
                 {setVp}
                 {scoreSaving}
                 {scoreSavingSeat}
+                {decksByUser}
               />
             {:else if activeTab === 'finals'}
               <FinalsTab

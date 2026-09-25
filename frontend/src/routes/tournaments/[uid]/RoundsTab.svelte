@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from "svelte";
   import { toUserMessage } from '$lib/errors';
-  import type { Tournament, Table, Sanction } from "$lib/types";
+  import type { Tournament, Table, Sanction, DeckObject } from "$lib/types";
   import { tournamentAction } from "$lib/tournament-actions";
   import { timerAddTime } from "$lib/api";
   import { scoreSeatingSync, computePlayerIssuesSync, previewScoresSync, checkTableVpsSync, tableLabel, type TournamentEventType } from "$lib/engine";
@@ -11,8 +11,9 @@
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
   import Button from '$lib/components/Button.svelte';
-  import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users, Settings2, Search } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users, Settings2, Search, Eye } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
+  import SeatDeckModal from "./SeatDeckModal.svelte";
   import VpInput from "$lib/components/VpInput.svelte";
   import { seatDisplay as seatDisplayUtil, seatDisplayParts, vpOptions, translateTableState, translatePlayerState, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
@@ -30,6 +31,7 @@
     setVp,
     scoreSaving,
     scoreSavingSeat,
+    decksByUser,
   }: {
     tournament: Tournament;
     playerInfo: PlayerInfoMap;
@@ -41,10 +43,17 @@
     setVp: (roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>, opts?: { silent?: boolean }) => Promise<string | null>;
     scoreSaving: number | null;
     scoreSavingSeat: string | null;
+    decksByUser: Record<string, DeckObject[]>;
   } = $props();
 
   let sanctionTarget = $state<{ uid: string; name: string; round: number } | null>(null);
   let sanctionListTarget = $state<{ uid: string; name: string } | null>(null);
+  let deckTarget = $state<{ uid: string; round: number; name: string } | null>(null);
+
+  function seatDeck(uid: string, round: number): DeckObject | undefined {
+    const decks = decksByUser[uid] ?? [];
+    return tournament.multideck ? decks.find(d => d.round === round) : decks[0];
+  }
 
   const playerSanctionsMap = $derived.by(() => {
     const map: Record<string, Sanction[]> = {};
@@ -862,10 +871,15 @@
                     {@const preview = previewScoresSync(tournament, tournamentSanctions, r, i, tVps)}
                     {@const tGws = preview ? preview.gw : table.seating.map(s => s.result.gw)}
                     {@const tTps = preview ? preview.tp : table.seating.map(s => s.result.tp)}
+                    {@const deck = isOrganizer && !isCancelled ? seatDeck(seat.player_uid, r) : undefined}
                     <div data-seat="{r}:{i}:{j}" class="py-2.5 transition-colors {foundSeat === `${r}:${i}:${j}` ? 'bg-select-soft/40 -mx-2 px-2 rounded' : ''}">
                       <div class="flex items-center justify-between gap-2 text-sm">
                         <span class="text-ink inline-flex items-center gap-1 min-w-0">
-                          {seatDisplay(seat.player_uid)}
+                          {#if deck}
+                            <span class="truncate" title={seatDisplay(seat.player_uid)}>{seatDisplay(seat.player_uid)}</span>
+                          {:else}
+                            {seatDisplay(seat.player_uid)}
+                          {/if}
                           {#if nonCompetingUids.has(seat.player_uid)}
                             <span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-active text-ink-muted shrink-0" title={m.proxy_hint()}>{m.proxy_label()}</span>
                           {/if}
@@ -877,7 +891,17 @@
                           {/if}
                         </span>
                         <div class="flex items-center gap-2 shrink-0">
-                          <span class="text-ink-faint text-xs">{#if !isScoring}<span class="text-ink-strong font-medium tabular-nums">{seat.result.vp}VP</span> {/if}{tGws[j]}GW {tTps[j]}TP</span>
+                          <span class="text-ink-faint text-xs whitespace-nowrap">{#if !isScoring}<span class="text-ink-strong font-medium tabular-nums">{seat.result.vp}VP</span> {/if}{tGws[j]}GW {tTps[j]}TP</span>
+                          {#if deck}
+                            <button
+                              onclick={() => deckTarget = { uid: seat.player_uid, round: r, name: seatDisplay(seat.player_uid) }}
+                              class="p-3 sm:p-0.5 -m-1 sm:m-0 text-ink-faint hover:text-select transition-colors"
+                              title={m.decks_view_decklist()}
+                              aria-label={m.decks_view_decklist()}
+                            >
+                              <Eye class="w-5 h-5 sm:w-3.5 sm:h-3.5" />
+                            </button>
+                          {/if}
                           {#if isEditable && (isLast || isRoundLive)}
                             <!-- p-3 + 20px icon = 44px touch floor on the on-the-floor issuance path -->
                             <button
@@ -1037,6 +1061,19 @@
     currentRound={sanctionTarget.round}
     onClose={() => sanctionTarget = null}
   />
+{/if}
+
+{#if deckTarget}
+  {@const deck = seatDeck(deckTarget.uid, deckTarget.round)}
+  {#if deck}
+    <SeatDeckModal
+      {deck}
+      {tournament}
+      playerName={deckTarget.name}
+      {doAction}
+      onClose={() => deckTarget = null}
+    />
+  {/if}
 {/if}
 
 {#if sanctionListTarget}
