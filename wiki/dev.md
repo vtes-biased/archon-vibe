@@ -138,7 +138,7 @@ Production's system is `deploy/setup.py` (`just setup-prod`), which calls
 the box's own parameters: PostgreSQL 17 from PGDG, the journal capped at 256 MB
 and **one month**, the privacy policy's promise that server logs are kept only
 briefly, and **no fail2ban** — it holds ~70 MB, and sshd refuses passwords
-anyway. No Alloy either, for the same memory. Every uv call runs `--no-cache`,
+anyway. Every uv call runs `--no-cache`,
 so a deploy leaves no build cache behind. PostgreSQL is sized to the pools that actually connect — 20 slots against
 the app's 8 and the public API's 4, leaving the superuser reserve of 3 and
 headroom for pg_dump and ad-hoc psql — not to a client count the box never sees.
@@ -192,6 +192,15 @@ with. Edit with `sops secrets/prod.sops.yaml` from `deploy/`; a key other than
 owner's and the fleet's `deploy` key; production's add `id_archon` and each BCP
 developer. A new recipient is added to `.sops.yaml` by someone who already
 decrypts, who then runs `sops updatekeys` on every production file.
+
+**Production's logs are in the VEKN Grafana Cloud stack** (vtesbiased), shipped
+from the journal by Fluent Bit rather than Alloy: measured at 4.4 MB against
+Alloy's ~73 MB, under a 40 MB systemd cap. It sends logs only — no metrics — with
+the labels beta's Alloy sends to the personal stack (`unit`, `tag`, `level`,
+`host`), so a query carries over: `{host="archon.vekn.net", unit="archon-backend.service"}`
+in Explore on the Loki datasource. A first start ships no backlog, and a cursor in
+`/var/lib/fluent-bit` keeps a restart from sending anything twice. On the box,
+`journalctl -t archon` still reads the same lines.
 
 **Production access is per developer.** Each has their own sudo account
 (`just add-admin-prod <name> <pubkey> <an existing admin>`) and a
