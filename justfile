@@ -317,6 +317,10 @@ deploy-prod *flags:
 setup-prod *flags:
     cd deploy && uv run --group deploy pyinfra inventory.py setup.py --limit prod --diff {{ flags }}
 
+# Reboot production if an update needs it (FORCE=1 reboots anyway), then check every unit came back
+reboot-prod:
+    cd deploy && uv run --group deploy pyinfra inventory.py reboot.py --limit prod -y
+
 # Give a developer a sudo account on production, logged in as an existing admin
 add-admin-prod name pubkey as_user:
     cd deploy && ADMIN={{ name }} ADMIN_KEY={{ pubkey }} uv run --group deploy pyinfra inventory.py add_admin.py --limit prod --ssh-user {{ as_user }} -y

@@ -401,7 +401,8 @@ API process must see the same `SNAPSHOT_DIR`.
 
 - **Prod rollout** — beta is live and verified; prod repeats the same three
   steps with `api.archon.vekn.net`, port 7007, unit `archon-public-api`: the A
-  record, a full (not quick-lane) deploy, then a registered `api:read` client
+  record, `public_api = True` in `deploy/group_data/prod.py` and `just
+  deploy-prod`, then a registered `api:read` client
   exercising a daemon token, the throttle and the app's rejection of that token.
   Trigger: the owner's next prod window.
 - **TWD opt-out for a winner** — a member asking to keep their name or their

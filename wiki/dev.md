@@ -194,7 +194,7 @@ decrypts, who then runs `sops updatekeys` on every production file.
 `~/.ssh/config`, which pyinfra reads — the inventory names no user. `ubuntu`,
 the image's account, is kept for `id_archon`. Kernel reboots are never
 automatic: tournaments run in every timezone, so `setup-prod` warns when one is
-pending and a person picks the moment.
+pending and a person picks the moment to run `just reboot-prod`.
 
 Three units and three vhosts per environment: the app, the Discord bot, and the
 **public read API**, which installs nothing of its own — it runs a second uvicorn

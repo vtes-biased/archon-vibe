@@ -616,16 +616,17 @@ created in the wrong cluster. The play that rebooted the box reported `failed=0`
 Two rules follow: **`pg_dropcluster` a superseded cluster** rather than trusting it
 to stay stopped, since only removal survives a reboot; and never read a 200 from
 `/` as proof the database is up — nginx serves the SPA shell without touching it.
-The `system_upgrade` role now asserts the critical units after a reboot, which is
-what turns this shape into a red play.
+`just reboot-prod` waits for `systemctl is-system-running` after the reboot and
+fails listing the units that did not come back, which is what turns this shape
+into a red run.
 
-**An apt upgrade can install a *new* PostgreSQL major beside the pinned one.** The
-default lane runs `apt upgrade --with-new-pkgs`, needed so kernel metapackages can
-pull a new `linux-image-*`, and the same mechanism lets the unversioned
+**An apt upgrade can install a *new* PostgreSQL major beside the pinned one.**
+`setup-prod` runs `apt dist-upgrade`, which kernel metapackages need to pull a new
+`linux-image-*`, and the same mechanism lets the unversioned
 `postgresql` metapackage — which always depends on PGDG's newest — drag in the
 next major, whose postinst then wants a cluster of its own. Installing only
 versioned `postgresql-<N>` packages is not enough; the metapackage must be absent,
-which the `postgresql` role now enforces.
+which `deploy/setup.py` enforces.
 
 **A `ClientTimeout` breach raises `asyncio.TimeoutError`, not an
 `aiohttp.ClientError`**, so `except aiohttp.ClientError` misses timeouts on every

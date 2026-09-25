@@ -3,6 +3,7 @@ from pathlib import Path
 import server_setup as s
 from pyinfra import host, logger
 from pyinfra.facts.files import File
+from pyinfra.operations import apt
 from server_setup.secrets import load
 
 # prod only: beta's box belongs to the server-setup fleet
@@ -11,7 +12,12 @@ secrets = load(
 )
 
 s.packages(postgres_version="17")
-# the privacy policy promises server logs are kept only briefly
+# they depend on PGDG's newest major: an upgrade would install it beside 17
+apt.packages(
+    name="No unversioned postgresql",
+    packages=["postgresql", "postgresql-client"],
+    present=False,
+)
 s.services(journal_max_use="256M", journal_max_age="1month", fail2ban=False)
 s.nginx()
 s.ssh()
