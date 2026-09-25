@@ -10,6 +10,10 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- The tournament page is tidier: its details fold into one panel, and organizers edit them from a Setup tab.
+
 ## v1.2.4 — 2026-09-25
 
 - The tournament list can now be filtered by a date range and by several countries at once.
