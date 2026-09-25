@@ -71,7 +71,12 @@ def render(template: str, **values) -> str:
 
 
 def env_file(values: dict) -> str:
-    return "".join(f"{key}={value}\n" for key, value in values.items())
+    for key, value in values.items():
+        if "'" in str(value):
+            raise ValueError(
+                f"{key} holds a single quote, which the env file cannot carry"
+            )
+    return "".join(f"{key}='{value}'\n" for key, value in values.items())
 
 
 def put(template: str, dest: str, **values):

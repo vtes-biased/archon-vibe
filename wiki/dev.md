@@ -181,7 +181,10 @@ derives every path, unit and database from the environment's `name` in
 `deploy/group_data/`, which holds what differs between environments. A service
 restarts only when its wheel, requirements, env file or unit changed; the venv
 install and the frontend swap compare a marker on the box with the hash of what
-is deployed, so re-running a deploy that failed halfway finishes it. Every release
+is deployed, so re-running a deploy that failed halfway finishes it. The backend,
+public-API and bot env files single-quote every value, so they load cleanly in bash
+(`set -a; . <file>`) as well as in systemd; the deploy refuses a value holding a
+single quote, which neither can escape inside one. Every release
 wheel carries the release tag as its version — hatch-vcs for the backend and the bot,
 CI stamping `engine/Cargo.toml` for the engine. The wheels and the frontend
 tarball are replaced in place through `put_binary`, which keeps them out of

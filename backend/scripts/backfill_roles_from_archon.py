@@ -37,12 +37,12 @@ leave you connected to the wrong database). Extract each var whole:
         /opt/archon/backend/scripts/backfill_roles_from_archon.py --apply'
 
 The Discord push additionally needs DISCORD_CLIENTID / DISCORD_SECRET, which live
-in the BACKEND env file — add them the same way when using `--apply` or
+in the BACKEND env file, whose values are single-quoted — add them when using `--apply` or
 `--push-discord`, or the metadata push silently no-ops:
 
       B=/etc/archon/archon-backend.env
-      export DISCORD_CLIENTID="$(sed -n "s/^DISCORD_CLIENTID=//p" $B)"
-      export DISCORD_SECRET="$(sed -n "s/^DISCORD_SECRET=//p" $B)"
+      export DISCORD_CLIENTID="$(sed -n "s/^DISCORD_CLIENTID='\\(.*\\)'$/\\1/p" $B)"
+      export DISCORD_SECRET="$(sed -n "s/^DISCORD_SECRET='\\(.*\\)'$/\\1/p" $B)"
 """
 
 import argparse

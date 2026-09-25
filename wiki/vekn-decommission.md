@@ -150,12 +150,10 @@ ssh ubuntu@46.226.104.123 "sudo -u archon bash -c 'set -a; . /etc/archon/archon-
   /opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/dedup_tournaments.py --probe-vekn'"
 ```
 
-Sourcing the whole env file trips bash on an unquoted value at line 14
-(`zyve: command not found`) — harmless noise, but for anything that does not need
-the VEKN creds prefer exporting just what you need:
+For anything that does not need the VEKN creds, export just what you need:
 
 ```sh
-export DATABASE_URL=$(grep -m1 ^DATABASE_URL= /etc/archon/archon-backend.env | cut -d= -f2-)
+export DATABASE_URL=$(grep -m1 ^DATABASE_URL= /etc/archon/archon-backend.env | cut -d= -f2- | tr -d "'")
 ```
 
 Ratings need no manual step after any cleanup here: `run_rating_recompute` is on
