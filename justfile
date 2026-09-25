@@ -232,7 +232,6 @@ help-mockups:
 lint:
     uv run ruff check --fix . && uv run ruff format .
     (cd engine && cargo fmt && cargo clippy --all-targets --all-features -- -D warnings)
-    @just _backup-drift
     just permission-drift
     just comment-blocks
     just dark-variant
@@ -243,21 +242,6 @@ lint:
     just model-drift
     just migration-pairing
     just help-mockups
-
-# Warn (never fail) when the hand-synced backup scripts drift from server-setup's
-# copies (script headers document the contract). Comment wording and the
-# documented createdb encoding divergence are sanctioned; anything else warns.
-# The upstream checkout lands via the ansible justfile's `galaxy` recipe.
-_backup-drift:
-    #!/usr/bin/env bash
-    up=ansible/galaxy_collections/server-setup/files
-    ours=ansible/roles/db_backup/files
-    [ -d "$up" ] || { echo "backup-drift: no server-setup checkout (cd ansible && just galaxy) — check skipped"; exit 0; }
-    for s in pg-backup.sh pg-backup-check.sh; do
-        if diff <(grep -vE '^[[:space:]]*(#|$)' "$up/$s") <(grep -vE '^[[:space:]]*(#|$)' "$ours/$s") | grep '^[<>]' | grep -vq createdb; then
-            echo "⚠️  WARNING: $s drifted from server-setup files/$s — resync or document the divergence in its header"
-        fi
-    done
 
 # Install git hooks (pre-commit: ruff auto-format of staged Python)
 hooks:
@@ -276,13 +260,13 @@ cards:
 build-geonames:
     uv run python backend/scripts/build_geonames.py
 
-# Generate a VAPID keypair for Web Push (#314). One per env; store the private key in
-# ansible-vault, never commit it. Rotating invalidates all existing subscriptions.
+# Generate a VAPID keypair for Web Push (#314). One per env; the private key goes in
+# deploy/secrets/<env>.sops.yaml. Rotating invalidates all existing subscriptions.
 vapid-keys:
     uv run python backend/scripts/gen_vapid_keys.py
 
 # Generate the Ed25519 JWT signing keypair. One per env; the private key is the app's
-# alone (ansible-vault), the public key goes to every verifier.
+# alone (sops), the public key goes to every verifier.
 jwt-keys:
     uv run python backend/scripts/gen_jwt_keys.py
 

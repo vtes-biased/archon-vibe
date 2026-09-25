@@ -23,7 +23,7 @@ from .vekn_api import VEKNAPIClient, VEKNAPIError
 logger = logging.getLogger(__name__)
 
 
-# Personal data, delivered out of band (ansible-vault at deploy, untracked dev
+# Personal data, delivered out of band (a sops secret at deploy, untracked dev
 # copy otherwise); a missing/unreadable file skips injection silently.
 def _officials_contacts_path() -> Path:
     env = os.environ.get("OFFICIALS_CONTACTS_FILE")

@@ -567,7 +567,7 @@ a 200-client cold connect through the proxy measured **2.5GB** of nginx
 cgroup memory on beta, every proxy temp file page-cached and the disk I/O per
 snapshot multiplied; on production's few hundred spare MB that surge evicts
 the database's working set at the exact moment a room cold-connects. The
-`static_site` role renders `proxy_buffering off` into the `/snapshot`
+app vhost template renders `proxy_buffering off` into the `/snapshot`
 location — a new nginx location that proxies a streamed file must do the
 same.
 

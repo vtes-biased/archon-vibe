@@ -2,7 +2,7 @@
 
 Emits two single-line, env-var-friendly base64url values:
   VAPID_PRIVATE_KEY  — raw 32-octet private scalar (loaded by push_service via
-                       Vapid01.from_raw); SECRET, store in ansible-vault, never commit.
+                       Vapid01.from_raw); SECRET, store in sops, never commit in clear.
   VAPID_PUBLIC_KEY   — raw 65-octet uncompressed public point; this IS the browser's
                        applicationServerKey, served per-env by GET /api/push/vapid-key.
 

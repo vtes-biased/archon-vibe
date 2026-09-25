@@ -1,6 +1,0 @@
----
-# r.server_name     required  - FQDN to request a cert for
-# r.contact_email   required  - email registered with Let's Encrypt
-# r.acme_webroot    optional  - ACME webroot (default below)
-r: {}
-nginx_acme_webroot_default: /var/www/acme

@@ -24,7 +24,7 @@ class InstallationTokenError(ValueError):
 
 def load_private_key(key: str) -> str:
     """Resolve a GitHub App private key from an env value: inline PEM, or a path
-    to a .pem file (the multi-line secret is vault-delivered to a runtime path).
+    to a .pem file (the deploy writes the multi-line secret to a runtime path).
 
     A non-PEM value MUST be a readable file: falling through with the path string
     would surface later as PyJWT's cryptic InvalidKeyError instead of naming the

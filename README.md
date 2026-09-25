@@ -129,7 +129,7 @@ just dev-reset    # Reset dev database
 
 ### Deployment
 
-In dev, only the **database** runs in Docker (`localhost:5433`); the backend and frontend run natively (`just dev`). Real deployment is wheels + systemd: beta with pyinfra under `deploy/`, production with Ansible under `ansible/` until it moves over — there is no Docker production path. The compose backend image self-builds the engine (`backend/Dockerfile` runs `maturin build --release`); the `test` profile services back `just test-e2e`.
+In dev, only the **database** runs in Docker (`localhost:5433`); the backend and frontend run natively (`just dev`). Real deployment is wheels + systemd: beta and production with pyinfra under `deploy/` — there is no Docker production path. The compose backend image self-builds the engine (`backend/Dockerfile` runs `maturin build --release`); the `test` profile services back `just test-e2e`.
 
 | Service | Host port | |
 |---|---|---|

@@ -91,30 +91,8 @@ INCOMING/
 # local settings out of the tree:
 /*/.claude/settings.local.json
 
-# Ansible
-ansible/build/
+# pyinfra deploy: downloaded release assets
 deploy/build/
-ansible/.ansible_facts/
-ansible/.ansible/
-
-# Ansible vault — decrypted vault passwords, never commit (CI writes .vault_pass in
-# the runner; admins decrypt secrets/<env>.vault-pass.age into the per-env files).
-ansible/.vault_pass
-ansible/.beta.vault_pass
-ansible/.prod.vault_pass
-
-# ansible/secrets/ — commit ONLY the public recipients list + age-encrypted password
-# files; everything else (e.g. a decrypted plaintext password) stays ignored.
-ansible/secrets/*
-!ansible/secrets/age-recipients.txt
-!ansible/secrets/*.vault-pass.age
-
-# Role secret files — commit only the ansible-vault (.vault) variants, never plaintext.
-ansible/roles/fastapi_backend/files/officials_contacts.json
-ansible/roles/fastapi_backend/files/twda_github_app.pem
-ansible/roles/fastapi_backend/files/feedback_github_app.pem
-ansible/*.retry
-ansible/galaxy_collections/
 
 # Local prod DB dumps / restore staging (never commit)
 archondb.dump.gz
@@ -123,7 +101,7 @@ archondb.dump.gz
 archon-restore/
 
 # Personal data (scraped NC/Prince contacts) — never commit plaintext.
-# Dev keeps an untracked copy here; prod gets it via ansible-vault at deploy.
+# Dev keeps an untracked copy here; the deploys get it from deploy/secrets/.
 backend/src/data/officials_contacts.json
 
 # Signed NDA agreement PDF — keep out of the public repo.

@@ -197,25 +197,8 @@ if not any(
 
 postgres_db(database=name, owner=name)
 
-# --- Certificates: the Ansible port-80 vhosts answered ACME from /var/www/acme,
-# and a name a site claims never reaches the default server's /var/www/certbot
+# --- Certificates
 
-legacy_http = [
-    files.file(
-        name=f"Retire {conf}", path=f"/etc/nginx/sites-enabled/{conf}", present=False
-    )
-    for conf in (
-        f"{domain}.http.conf",
-        f"{api_domain}.http.conf",
-        f"{bot_domain}.http.conf",
-    )
-]
-server.shell(
-    name="Validate nginx config", commands=["nginx -t"], _if=any_changed(*legacy_http)
-)
-systemd.service(
-    name="Reload nginx", service="nginx", reloaded=True, _if=any_changed(*legacy_http)
-)
 certificate(domain)
 if d.public_api:
     certificate(api_domain)
@@ -485,8 +468,7 @@ if deployed(f"{www}/.bundle") != bundle:
         ],
     )
 
-# --- Vhosts, swapped in one reload: a leftover Ansible vhost sorts first in
-# sites-enabled, and nginx serves the first server_name it loads
+# --- Vhosts
 
 http2 = modern_http2(host.get_fact(Command, "nginx -v 2>&1"))
 available = "/etc/nginx/sites-available"
@@ -530,23 +512,6 @@ if d.public_api:
             target=f"{available}/{name}_api.conf",
         ),
     ]
-vhosts += [
-    files.file(
-        name=f"Retire {conf}", path=f"/etc/nginx/sites-enabled/{conf}", present=False
-    )
-    for conf in (
-        f"{domain}.https.conf",
-        f"{api_domain}.https.conf",
-        f"{bot_domain}.https.conf",
-    )
-]
-vhosts.append(
-    files.file(
-        name="Retire the old limits",
-        path=f"/etc/nginx/conf.d/{unit}-public-api-limits.conf",
-        present=False,
-    )
-)
 server.shell(
     name="Validate nginx config", commands=["nginx -t"], _if=any_changed(*vhosts)
 )

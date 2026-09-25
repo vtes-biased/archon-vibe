@@ -128,18 +128,18 @@ Its `test` profile backs `just test-e2e` ([testing](testing.md)).
 
 ## Deployment
 
-Real deployment is **wheels plus systemd**. Beta deploys with **pyinfra** from
-`deploy/`; production still deploys with Ansible from `ansible/` until it moves
-over. There is no Docker production path. Production runs on a 945 MB single-core VPS with a
+Real deployment is **wheels plus systemd**, both environments deployed with
+**pyinfra** from `deploy/`. There is no Docker production path. Production runs on a 945 MB single-core VPS with a
 24 GB disk, which is why the connection pool is small and bulk table loads are
 forbidden ([architecture](architecture.md#database-access)).
 
-On production, the Ansible `common` role guarantees the box's baseline beyond what it installs: the
-daemons a single-disk VM never uses (multipath, fwupd, ModemManager, udisks2,
-VMware guest tools) and rsyslog — a second copy of what the journal already
-keeps — are purged, the journal is capped at 256 MB, apt keeps no downloaded
-packages, and every uv call runs `--no-cache`, so a deploy leaves no build cache
-behind. PostgreSQL is sized to the pools that actually connect — 20 slots against
+Production's system is `deploy/setup.py` (`just setup-prod`), which calls
+[server-setup](https://github.com/lionel-panhaleux/server-setup)'s library with
+the box's own parameters: PostgreSQL 17 from PGDG, the journal capped at 256 MB
+and **one month**, the privacy policy's promise that server logs are kept only
+briefly, and **no fail2ban** — it holds ~70 MB, and sshd refuses passwords
+anyway. No Alloy either, for the same memory. Every uv call runs `--no-cache`,
+so a deploy leaves no build cache behind. PostgreSQL is sized to the pools that actually connect — 20 slots against
 the app's 8 and the public API's 4, leaving the superuser reserve of 3 and
 headroom for pg_dump and ad-hoc psql — not to a client count the box never sees.
 
@@ -157,11 +157,12 @@ Because the backend ships as an installed wheel, **bundled data files must load
 through `importlib.resources`**, never `Path(__file__)`
 ([dogmas](dogmas.md#dependencies-and-data)).
 
-**Beta runs on frankfurt, a [server-setup](https://github.com/lionel-panhaleux/server-setup)
-box**: that repo owns the system (packages, postgres cluster, backups, Alloy,
-nginx's default server), and `deploy/` only deploys the app, importing
-`server_setup` (the `deploy` dependency group, pinned to a commit). `just
-deploy-beta` shows every change, then asks; `--dry` only shows, `RELEASE_TAG`
+**Beta runs on frankfurt, a server-setup box**: that repo's inventory owns
+its system (packages, postgres cluster, backups, Alloy, nginx's default
+server). Production stays out of that inventory — it is commissioned work for
+BCP, with its own keys, backup bucket and healthchecks. `deploy/` imports
+`server_setup` (the `deploy` dependency group, pinned to a tag). `just
+deploy-beta` and `just deploy-prod` show every change, then ask; `--dry` only shows, `RELEASE_TAG`
 pins a release and `BUILD_DIR` deploys a local build (a `frontend-dist/`
 directory there is packed in place of the release tarball). `deploy/deploy.py`
 derives every path, unit and database from the environment's `name` in
@@ -170,29 +171,30 @@ restarts only when its wheel, requirements, env file or unit changed; the venv
 install and the frontend swap compare a marker on the box with the hash of what
 is deployed, so re-running a deploy that failed halfway finishes it. A
 certificate renews through `/var/www/certbot`. The backend's ops scripts are
-copied from the working tree, not from the release being deployed. Beta's app,
+copied from the working tree, not from the release being deployed. The app,
 public API and bot connect to the database by peer auth over the socket, as
 the OS user that owns it: the role has no password.
 
-Beta's vhosts send `Strict-Transport-Security: max-age=31536000` (this host only,
+The vhosts send `Strict-Transport-Security: max-age=31536000` (this host only,
 no `includeSubDomains`), a year-long promise every browser keeps, and pass the
-client address as `X-Forwarded-For`. Production's Ansible vhosts do neither
-until production moves to `deploy/`.
+client address as `X-Forwarded-For`.
 
-Beta's secrets are `deploy/secrets/beta.sops.yaml` and the files under
-`deploy/secrets/beta/`, encrypted with sops to the keys `deploy/.sops.yaml`
-names; identifiers stay readable beside the secret they pair with. Edit with
-`sops secrets/beta.sops.yaml` from `deploy/`. Production's are still ansible-vault
-files, edited with `just vault-edit-prod` from `ansible/`; their password files
-are gitignored, and an admin decrypts them from
-`ansible/secrets/prod.vault-pass.age`.
+Each environment's secrets are `deploy/secrets/<env>.sops.yaml` and the files
+under `deploy/secrets/<env>/`, encrypted with sops to the SSH keys
+`deploy/.sops.yaml` names; identifiers stay readable beside the secret they pair
+with. Edit with `sops secrets/prod.sops.yaml` from `deploy/`; a key other than
+`~/.ssh/id_ed25519` goes in `SOPS_AGE_SSH_PRIVATE_KEY_FILE`. Beta's are the
+owner's and the fleet's `deploy` key; production's add `id_archon` and each BCP
+developer. A new recipient is added to `.sops.yaml` by someone who already
+decrypts, who then runs `sops updatekeys` on every production file.
 
-**An Ansible role's `defaults/main.yml` is its parameter contract.** Every `r.*` key the
-role reads is listed there, and is either required — asserted in the role, so
-omission fails the play — or carries a `*_default` that makes omission correct.
-A role resolves its defaults into `_`-prefixed facts, and
-those are host-scoped: they outlive the role that set them, so each role must set
-every `_` fact it reads rather than inherit a same-named one from an earlier role.
+**Production access is per developer.** Each has their own sudo account
+(`just add-admin-prod <name> <pubkey> <an existing admin>`) and a
+`Host archon.vekn.net` block with their `User` and `IdentityFile` in
+`~/.ssh/config`, which pyinfra reads — the inventory names no user. `ubuntu`,
+the image's account, is kept for `id_archon`. Kernel reboots are never
+automatic: tournaments run in every timezone, so `setup-prod` warns when one is
+pending and a person picks the moment.
 
 Three units and three vhosts per environment: the app, the Discord bot, and the
 **public read API**, which installs nothing of its own — it runs a second uvicorn
@@ -236,9 +238,9 @@ because the backend's own `/` is the health check.
 
 ### Backups
 
-Production only — `ansible/roles/db_backup`, gated on `db_backup_enabled`.
-Beta's database is excluded from server-setup's cluster backup: beta is reseeded
-at will. Daily at 03:00 UTC a systemd timer dumps every
+server-setup's `postgres_backups`, to the `archon-db-backups` bucket on
+production. Beta's database is excluded from its box's cluster backup: beta is
+reseeded at will. Daily a systemd timer dumps every
 non-template database in the cluster except `postgres` itself (`pg_dump -F c`,
 one file per DB) plus the cluster globals — login roles and password hashes,
 without which a full-cluster restore has no roles to connect as — into
@@ -247,7 +249,7 @@ off-box with restic to S3, one repository per database plus one for globals;
 remote retention is 7 daily, 4 weekly and 12 monthly snapshots, applied with
 `restic forget --group-by host` — the default `host,paths` grouping would put
 each timestamp-named dump in a group of its own and keep everything forever.
-Weekly (Wednesday 06:00 on prod) a second timer proves the per-database backups
+Weekly a second timer proves the per-database backups
 restorable: `restic check` decodes a 10% sample of each database's repo, then
 the latest snapshot is restored round-trip into a throwaway database that must
 come back with user tables — the globals repo gets no such check. Both timers
@@ -324,7 +326,7 @@ fork needs Contents, but an installation holds only what its owner approved: the
 archive's approved Pull requests alone, which is exactly why the old
 both-at-once token request was refused. The per-request `permissions` narrowing is
 what keeps us from ever asking it for more. No webhook on either. The private key and client
-id are shared; only the two installation ids differ, and both are vault secrets.
+id are shared; only the two installation ids differ, and both are sops secrets.
 **The fork must stay public** — the archive's token has no access to it and can
 only reference a public head. **The PR request must decline maintainer
 modification** (`maintainer_can_modify: false`): GitHub turns it on by default for
@@ -362,8 +364,7 @@ engine/     Rust core — the single source of business logic
 backend/    FastAPI service
 frontend/   Svelte PWA
 bot/        Discord tournament bot (separate process)
-deploy/     pyinfra deploy (beta)
-ansible/    Ansible deploy (production, until it moves to deploy/)
+deploy/     pyinfra deploy (beta and production)
 reference/  official VEKN and VTES documents (external, not ours to edit)
 scripts/    build and data tooling
 wiki/       this wiki

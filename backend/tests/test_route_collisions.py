@@ -8,8 +8,6 @@ source nginx renders from, so the check can't drift from the deployed config.
 import importlib.util
 from pathlib import Path
 
-import yaml
-
 _REPO = Path(__file__).resolve().parents[2]
 _ROUTES = _REPO / "frontend" / "src" / "routes"
 
@@ -48,14 +46,6 @@ def test_no_frontend_route_shadowed_by_backend_prefix() -> None:
         for prefix in prefixes
         if _shadowed_by(route, prefix)
     }
-    # production renders from the Ansible role until it moves to deploy/
-    ansible = _REPO / "ansible" / "roles" / "static_site" / "defaults" / "main.yml"
-    if ansible.exists():
-        data = yaml.safe_load(ansible.read_text())
-        assert [
-            *data["static_site_backend_paths_default"],
-            data["static_site_sse_path_default"],
-        ] == prefixes, "deploy/routes.py and the static_site role disagree"
     assert not offenders, (
         "Frontend page routes shadowed by a backend nginx prefix — these would "
         f"404 against the API instead of booting the SPA: {offenders}. Move the "

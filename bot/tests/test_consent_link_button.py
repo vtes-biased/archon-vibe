@@ -1,6 +1,6 @@
 """The consent link ships as a Discord link button, whose URL Discord caps at
-512 characters. The values below mirror the production inventory
-(`ansible/inventories/prod`), so a domain change updates this test too."""
+512 characters. The values below mirror the production deploy
+(`deploy/group_data/prod.py`), so a domain change updates this test too."""
 
 from __future__ import annotations
 
