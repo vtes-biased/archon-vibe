@@ -558,6 +558,14 @@ with the finals seat's VP beside it — never the aggregated `result`, which alr
 folds the final in and would read to the archive as a double count. It is the
 archive's most common wording.
 
+**The header is only as good as krcg's reading of it.** The archive is consumed
+through krcg's TWDA parser, and ours through it again on the next archive read, so
+a header krcg cannot read is a header lost: it reads the date **only** in the US
+form, and an ISO date — the bot's first `2026-06-21 09:00:00`, or a hand
+normalisation to `2026-06-21` — leaves the event, its date, place, player count
+and link unread, the winner falling into the comment. The header test parses our
+export back through krcg rather than matching strings.
+
 **Comments**: the deck's comment sits verbatim under the name and credit, ahead of
 the crypt. What a deckbuilder
 leaves behind when a text list is imported into it — the lines it could not parse

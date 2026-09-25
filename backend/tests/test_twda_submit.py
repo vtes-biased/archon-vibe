@@ -6,11 +6,14 @@ Real DB, real engine, real (pinned) card data: every assertion below reads the
 TWDA text that would be published, not an intermediate the code hands a stub.
 """
 
+import io
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from uuid import uuid7
 
 import pytest
+from krcg import loader as krcg_loader
+from krcg import parser as krcg_parser
 from src import db
 from src.db import TWDA_MIN_PLAYERS
 from src.models import (
@@ -125,9 +128,20 @@ async def test_header_follows_the_archive_convention(test_db):
     ):
         lines = twda.splitlines()
         assert lines[2] == "June 1st 2025"
-        assert lines[3] == "1R+F"
-        assert lines[6].startswith("http") and lines[6].endswith("/t/12345")
         assert lines[7:10] == ["", "-- 1GW4.5 + 3vp in final", ""]
+        parsed = krcg_parser.deck_from_txt(
+            io.StringIO(twda), krcg_loader.load(), id="12345", twda=True
+        )
+        assert parsed.event.date == date(2025, 6, 1)
+        assert (parsed.event.rounds, parsed.event.finals) == (1, True)
+        assert parsed.event.country.code == "FR"
+        assert parsed.event.url.endswith("/t/12345")
+        assert parsed.player == "Winner Wendy"
+        assert (
+            parsed.score.round_gw,
+            parsed.score.round_vp,
+            parsed.score.finals_vp,
+        ) == (1, 4.5, 3)
 
 
 @pytest.mark.asyncio
