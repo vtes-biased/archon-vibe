@@ -102,9 +102,7 @@ test.describe('Tournament lifecycle', () => {
       await expect(searchInput).toHaveValue('');
     }
 
-    // exact: true — a substring match also hits a player row whose uuid7 ends in
-    // "8" ("…a48 Registered" contains "8 registered" case-insensitively).
-    await expect(page.getByText('8 registered', { exact: true })).toBeVisible({ timeout: 2_000 });
+    await expect(page.getByText('8 players registered.')).toBeVisible({ timeout: 2_000 });
 
     await cta(page, 'Start Check-in').click();
     // Bulk check-in lives in the toolbar's "More" overflow (per-player rows have
