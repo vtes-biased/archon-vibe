@@ -26,7 +26,7 @@ Up since 2026-08-24 16:54 (29.5 days): `full total` 13,614 s ≈ 7.7 min/day on
 average, possibly bursty. 210 MB available, 326 MB swap. `archon-backend` last
 entered active 2026-09-22 09:35 UTC, so its daily restart falls near 09:35-09:40
 UTC — clear of the 03:00 backup and 05:00 TWDA sync. Next: a day of per-minute
-`/tmp/psi.log` samples before the deploy, a day after.
+samples before the deploy, a day after.
 
 ## Beta attribution (2026-09-23, same 36,683-object corpus)
 
@@ -56,33 +56,36 @@ Current tuning (keep or change explicitly): `postgresql_shared_buffers: 96MB`,
 
 ## Resume here (owner executes every prod command)
 
-A per-minute sampler has run on prod since **2026-09-23 05:49 UTC**, writing
-`/tmp/psi.log` lines of `<UTC time> total=<cumulative full-stall µs> <MB available>`.
+The pre-deploy sampler log was lost: it wrote to `/tmp`, which the 2026-09-25
+reboot wiped. The "before" is therefore the 29.5-day average above (≈7.7 min/day
+of full stalls); no second pre-deploy day is being collected. Commands go through
+each developer's `archon.vekn.net` alias, and the journal of system units needs
+`sudo`.
 
-1. **Collect the pre-deploy day** (any time after 2026-09-24 ~06:00 UTC). This
-   prints the log, stops the sampler, and lists the backend's job runs:
+1. **Deploy** a release carrying `19413c3b` and `f0fd0ca7` to prod (owner's call
+   on timing).
+2. **Start the sampler** right after, into `/var/tmp` so a reboot keeps the log
+   (the sampler itself stops at a reboot):
 
    ```
-   ssh ubuntu@46.226.104.123 'cat /tmp/psi.log; pkill -f "psi.log"; journalctl -u archon-backend --since "-25h" --no-pager | grep -E "Running job|Starting|complete" | cut -c1-160'
+   ssh archon.vekn.net 'nohup sh -c "while :; do echo \$(date -u +%FT%TZ) \$(grep full /proc/pressure/memory | cut -d\" \" -f5) \$(free -m | awk \"/Mem/{print \\\$7}\"); sleep 60; done" > /var/tmp/psi.log 2>&1 &'
    ```
 
-2. **Attribute.** Per-minute deltas of `total`; match each jump against: 01:00
+3. **Collect a day later** — prints the log, stops the sampler, lists the job runs:
+
+   ```
+   ssh archon.vekn.net 'cat /var/tmp/psi.log; pkill -f "psi.log"; sudo journalctl -u archon-backend --since "-25h" --no-pager | grep -E "Running job|starting|complete" | cut -c1-160'
+   ```
+
+4. **Attribute.** Per-minute deltas of `total`; match each jump against: 01:00
    sanction cleanup, 01:30 purge, 02:00 promo stock, 02:30 rating recompute,
-   03:00 backup, 05:00 TWDA sync, Wednesday 06:00 restore-verify, the hourly
-   VEKN push, and the backend's daily `RuntimeMaxSec` restart (~09:35-09:40 UTC,
-   drifting) with its boot VEKN chain.
-3. **Deploy** a release carrying `19413c3b` to prod (owner's call on timing).
-4. **Restart the sampler** (same command as its first launch):
+   03:00 backup, 04:00 VEKN chain, 05:00 TWDA sync, Wednesday 06:00
+   restore-verify, the hourly VEKN push, and the backend's daily `RuntimeMaxSec`
+   restart (drifting; it no longer runs the VEKN chain).
+5. **Backend settled size and peak**, once the 04:00 UTC chain has run:
 
    ```
-   ssh ubuntu@46.226.104.123 'nohup sh -c "while :; do echo \$(date -u +%FT%TZ) \$(grep full /proc/pressure/memory | cut -d\" \" -f5) \$(free -m | awk \"/Mem/{print \\\$7}\"); sleep 60; done" > /tmp/psi.log 2>&1 &'
-   ```
-
-   and a day later collect it with step 1's command.
-5. **Backend settled size and peak** after that day, once the 04:00 UTC chain has run:
-
-   ```
-   ssh ubuntu@46.226.104.123 'grep -E "VmRSS|VmHWM" /proc/$(systemctl show archon-backend -p MainPID --value)/status; free -m'
+   ssh archon.vekn.net 'grep -E "VmRSS|VmHWM" /proc/$(systemctl show archon-backend -p MainPID --value)/status; free -m'
    ```
 
 6. **Close the line**: the Deployment section of `wiki/dev.md` gets the
