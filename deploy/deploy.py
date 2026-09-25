@@ -314,16 +314,9 @@ backend_env = {
     "VAPID_SUBJECT": "mailto:lionel.panhaleux@gmail.com",
     "SNAPSHOT_DIR": snapshot_dir,
     "SNAPSHOT_ACCEL_PREFIX": SNAPSHOTS_PREFIX,
-    "TWDA_GITHUB_CLIENT_ID": secrets["twda_github_client_id"],
-    "TWDA_GITHUB_INSTALLATION_ID": secrets["twda_github_installation_id"],
-    "TWDA_GITHUB_FORK_INSTALLATION_ID": secrets.get(
-        "twda_github_fork_installation_id", ""
-    ),
-    "TWDA_GITHUB_FORK_OWNER": "vtes-biased",
-    # a path: systemd's EnvironmentFile cannot carry a multi-line PEM
-    "TWDA_GITHUB_PRIVATE_KEY": f"{env_dir}/twda_github_app.pem",
     "FEEDBACK_GITHUB_CLIENT_ID": secrets["feedback_github_client_id"],
     "FEEDBACK_GITHUB_INSTALLATION_ID": secrets["feedback_github_installation_id"],
+    # a path: systemd's EnvironmentFile cannot carry a multi-line PEM
     "FEEDBACK_GITHUB_PRIVATE_KEY": f"{env_dir}/feedback_github_app.pem",
     "GITHUB_OAUTH_CLIENT_ID": secrets["github_oauth_client_id"],
     "GITHUB_OAUTH_SECRET": secrets["github_oauth_secret"],
@@ -331,6 +324,15 @@ backend_env = {
     "OFFICIALS_CONTACTS_FILE": f"{env_dir}/officials_contacts.json",
     **d.backend_env_extra,
 }
+# only production writes to the public archive: without these, every submission skips
+if d.twda_push:
+    backend_env |= {
+        "TWDA_GITHUB_CLIENT_ID": secrets["twda_github_client_id"],
+        "TWDA_GITHUB_INSTALLATION_ID": secrets["twda_github_installation_id"],
+        "TWDA_GITHUB_FORK_INSTALLATION_ID": secrets["twda_github_fork_installation_id"],
+        "TWDA_GITHUB_FORK_OWNER": "vtes-biased",
+        "TWDA_GITHUB_PRIVATE_KEY": f"{env_dir}/twda_github_app.pem",
+    }
 backend.append(
     put_secret(
         f"{unit}-backend env",
@@ -340,11 +342,12 @@ backend.append(
         mode="640",
     )
 )
-for filename in (
-    "officials_contacts.json",
-    "twda_github_app.pem",
-    "feedback_github_app.pem",
-):
+secret_files = ["officials_contacts.json", "feedback_github_app.pem"]
+if d.twda_push:
+    secret_files.append("twda_github_app.pem")
+else:
+    files.file(name="No TWDA key", path=f"{env_dir}/twda_github_app.pem", present=False)
+for filename in secret_files:
     backend.append(
         put_secret(
             filename,
