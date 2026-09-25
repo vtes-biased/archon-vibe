@@ -1,4 +1,4 @@
-"""Clear the Antarctica location the placeholder venue wrote onto app-created events.
+"""Clear the location a placeholder venue wrote onto events.
 
 vekn.net's venue resource rejects POST, so an in-person event the app files gets
 the generic placeholder venue, which reads back as "Check on Archon" in AQ. The
@@ -7,6 +7,10 @@ address and map url within the hour, undoing every hand re-entry on the next run
 The sync now drops the placeholder and keeps what the app holds — but the rows
 already flipped hold Antarctica as their own value, and the sync preserving them
 is exactly what stops them healing. This script is that one-off.
+
+Legacy archon did the same with a real venue, GoblinTrader Mallorca, and every
+event it filed from 2025 on reads Spain. Those rows keep their timezone, which the
+sync never wrote.
 
     # report what would change (safe, read-only)
     /opt/archon/backend/.venv/bin/python \\
@@ -41,13 +45,19 @@ if not _have_backend:
 
 from backend.src import db  # noqa: E402
 from backend.src.models import Tournament  # noqa: E402
-from backend.src.vekn_api import PLACEHOLDER_VENUE_NAME  # noqa: E402
+from backend.src.vekn_api import (  # noqa: E402
+    LEGACY_PLACEHOLDER_SINCE,
+    PLACEHOLDER_VENUE_NAME,
+)
+
+LEGACY_PLACEHOLDER_VENUE_NAME = "GoblinTrader Mallorca"
 
 PLACEHOLDER_VENUE_QUERY = """
     SELECT "full" FROM objects
     WHERE type = 'tournament'
       AND deleted_at IS NULL
-      AND "full"->>'venue' = %s
+      AND ("full"->>'venue' = %s
+           OR ("full"->>'venue' = %s AND "full"->>'start' >= %s))
     ORDER BY "full"->>'start'
 """
 
@@ -59,7 +69,12 @@ async def run(args: argparse.Namespace) -> int:
     try:
         async with db.get_connection() as conn:
             result = await conn.execute(
-                PLACEHOLDER_VENUE_QUERY, (PLACEHOLDER_VENUE_NAME,)
+                PLACEHOLDER_VENUE_QUERY,
+                (
+                    PLACEHOLDER_VENUE_NAME,
+                    LEGACY_PLACEHOLDER_VENUE_NAME,
+                    LEGACY_PLACEHOLDER_SINCE,
+                ),
             )
             rows = await result.fetchall()
         found = [db.decode_json(row[0], Tournament) for row in rows]
@@ -78,8 +93,9 @@ async def run(args: argparse.Namespace) -> int:
             )
             if not args.apply:
                 continue
+            if t.venue == PLACEHOLDER_VENUE_NAME:
+                t.timezone = "UTC"
             t.country = None
-            t.timezone = "UTC"
             t.venue = ""
             t.venue_url = ""
             t.address = ""

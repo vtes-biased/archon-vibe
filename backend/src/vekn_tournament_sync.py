@@ -38,7 +38,12 @@ from .models import (
     TournamentState,
 )
 from .twda_import import TWDA_URL
-from .vekn_api import PLACEHOLDER_VENUE_ID, VEKNAPIClient
+from .vekn_api import (
+    LEGACY_PLACEHOLDER_SINCE,
+    LEGACY_PLACEHOLDER_VENUE_ID,
+    PLACEHOLDER_VENUE_ID,
+    VEKNAPIClient,
+)
 
 logger = logging.getLogger(__name__)
 _engine = PyEngine()
@@ -525,7 +530,11 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
             venue_id = str(event_data.get("venue_id") or "")
             # An event we filed ourselves carries the placeholder venue, which
             # answers for no place: drop it so the app's own location stands.
-            placeholder_venue = venue_id == str(PLACEHOLDER_VENUE_ID)
+            placeholder_venue = venue_id == str(PLACEHOLDER_VENUE_ID) or (
+                venue_id == str(LEGACY_PLACEHOLDER_VENUE_ID)
+                and (event_data.get("event_startdate") or "")
+                >= LEGACY_PLACEHOLDER_SINCE
+            )
             if placeholder_venue:
                 venue_id = ""
                 event_data = {

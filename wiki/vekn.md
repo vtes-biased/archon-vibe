@@ -360,7 +360,11 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   app holds for country, venue, venue url, address and map url — `timezone` needs
   no entry here, being app-owned on every linked event. Taking it at face value
   moved a Budapest national qualifier to Antarctica/UTC within the hour and undid
-  the organizer's re-entry on every run (gh-9).
+  the organizer's re-entry on every run (gh-9). **Venue 3800, GoblinTrader Mallorca,
+  is the same stand-in from 2025 on**: legacy archon filed its events against that
+  real Palma shop, so Budapest, Seville, Osnabrück and Itaocara all read back as
+  Spain. It is a placeholder only by date — the events held there before 2025 were
+  held there — so the rule keys on venue *and* start date.
 - Carries `proxies_allowed` onto `proxies`, **except under a championship rank,
   which forbids proxies by rule**. A few vekn.net championships do set the flag,
   and importing that combination would block every later config edit on engine

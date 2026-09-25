@@ -53,6 +53,9 @@ VEKN_MESSAGES = {
 # against this generic stand-in — a venue in AQ that describes no real place.
 PLACEHOLDER_VENUE_ID = 9999
 PLACEHOLDER_VENUE_NAME = "Check on Archon"
+# A real venue, legacy archon's stand-in only from this date: earlier events were held there.
+LEGACY_PLACEHOLDER_VENUE_ID = 3800
+LEGACY_PLACEHOLDER_SINCE = "2025-01-01"
 
 
 class VEKNAPIError(Exception):
