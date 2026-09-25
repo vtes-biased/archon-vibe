@@ -36,6 +36,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # the tag is the version, as hatch-vcs makes it for the backend wheel
+      - name: Stamp the engine version from the tag
+        if: inputs.tag != ''
+        env:
+          TAG: ${{ inputs.tag }}
+        run: sed -i -E "0,/^version = \".*\"/s//version = \"${TAG#v}\"/" engine/Cargo.toml
+
       - name: Build engine wheel
         uses: PyO3/maturin-action@v1
         with:

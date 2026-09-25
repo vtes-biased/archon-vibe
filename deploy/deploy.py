@@ -89,6 +89,11 @@ def digest(*paths: Path) -> str:
     return sha.hexdigest()[:16]
 
 
+def wheel_dir(root: str, wheels: list[Path]) -> str:
+    # never overwrite a wheel in place: --diff would read the binary as text and crash
+    return f"{root}/wheels/{digest(*wheels)}"
+
+
 def deployed(marker: str) -> str:
     return host.get_fact(Command, f"cat {marker} 2>/dev/null || true") or ""
 
@@ -118,8 +123,9 @@ def venv(
                 *(rebuild if python != PYTHON else []),
                 f"{pip} --requirement {root}/requirements.txt",
                 f"{pip} {' '.join(f'--reinstall-package {p}' for p in reinstall)} "
-                + " ".join(f"{root}/wheels/{w.name}" for w in wheels),
+                + " ".join(f"{wheel_dir(root, wheels)}/{w.name}" for w in wheels),
                 f"echo {expected} > {root}/.venv/.deployed",
+                f"find {root}/wheels -mindepth 1 -maxdepth 1 ! -name {digest(*wheels)} -exec rm -rf {{}} +",
             ],
             _sudo_user=name,
             _env=UV_ENV,
@@ -208,13 +214,6 @@ if d.public_api:
 files.directory(
     name="Backend root", path=backend_root, user=name, group=name, mode="755"
 )
-files.directory(
-    name="Backend wheels",
-    path=f"{backend_root}/wheels",
-    user=name,
-    group=name,
-    mode="755",
-)
 # operator tooling run by hand with the deployed venv, never imported by the service
 files.sync(
     name="Backend ops scripts",
@@ -230,11 +229,18 @@ backend_wheels = [
     artifact(build, "archon-*.whl"),
 ]
 backend_requirements = artifact(build, "backend-requirements.txt")
+files.directory(
+    name="Backend wheels",
+    path=wheel_dir(backend_root, backend_wheels),
+    user=name,
+    group=name,
+    mode="755",
+)
 backend = [
     files.put(
         name=f"Upload {w.name}",
         src=str(w),
-        dest=f"{backend_root}/wheels/{w.name}",
+        dest=f"{wheel_dir(backend_root, backend_wheels)}/{w.name}",
         user=name,
         group=name,
     )
@@ -387,16 +393,20 @@ if d.public_api:
 
 files.directory(name="Bot root", path=bot_root, user=name, group=name, mode="755")
 files.directory(name="Bot state", path=bot_state_dir, user=name, group=name, mode="750")
-files.directory(
-    name="Bot wheels", path=f"{bot_root}/wheels", user=name, group=name, mode="755"
-)
 bot_wheel = artifact(build, "archon_discord_bot-*.whl")
+files.directory(
+    name="Bot wheels",
+    path=wheel_dir(bot_root, [bot_wheel]),
+    user=name,
+    group=name,
+    mode="755",
+)
 bot_requirements = artifact(build, "bot-requirements.txt")
 bot = [
     files.put(
         name=f"Upload {bot_wheel.name}",
         src=str(bot_wheel),
-        dest=f"{bot_root}/wheels/{bot_wheel.name}",
+        dest=f"{wheel_dir(bot_root, [bot_wheel])}/{bot_wheel.name}",
         user=name,
         group=name,
     ),

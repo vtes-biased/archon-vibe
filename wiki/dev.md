@@ -174,7 +174,11 @@ derives every path, unit and database from the environment's `name` in
 `deploy/group_data/`, which holds what differs between environments. A service
 restarts only when its wheel, requirements, env file or unit changed; the venv
 install and the frontend swap compare a marker on the box with the hash of what
-is deployed, so re-running a deploy that failed halfway finishes it. A
+is deployed, so re-running a deploy that failed halfway finishes it. Every wheel
+carries the release tag as its version — hatch-vcs for the backend and the bot,
+CI stamping `engine/Cargo.toml` for the engine — and a build's wheels upload into
+a directory named by their digest, because `--diff` crashes reading a binary it
+would overwrite in place. A
 certificate renews through `/var/www/certbot`. The backend's ops scripts are
 copied from the working tree, not from the release being deployed. The app,
 public API and bot connect to the database by peer auth over the socket, as
