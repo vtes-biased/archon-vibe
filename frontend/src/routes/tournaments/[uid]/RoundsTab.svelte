@@ -11,7 +11,7 @@
   import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "$lib/components/SanctionListModal.svelte";
   import Button from '$lib/components/Button.svelte';
-  import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users, Settings2, Search, Eye } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users, Settings2, Search } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import SeatDeckModal from "./SeatDeckModal.svelte";
   import VpInput from "$lib/components/VpInput.svelte";
@@ -876,7 +876,12 @@
                       <div class="flex items-center justify-between gap-2 text-sm">
                         <span class="text-ink inline-flex items-center gap-1 min-w-0">
                           {#if deck}
-                            <span class="truncate" title={seatDisplay(seat.player_uid)}>{seatDisplay(seat.player_uid)}</span>
+                            <button
+                              onclick={() => deckTarget = { uid: seat.player_uid, round: r, name: seatDisplay(seat.player_uid) }}
+                              class="text-left text-link hover:underline py-3 -my-3"
+                              title={m.decks_view_decklist()}
+                              aria-label="{seatDisplay(seat.player_uid)}: {m.decks_view_decklist()}"
+                            >{seatDisplay(seat.player_uid)}</button>
                           {:else}
                             {seatDisplay(seat.player_uid)}
                           {/if}
@@ -892,16 +897,6 @@
                         </span>
                         <div class="flex items-center gap-2 shrink-0">
                           <span class="text-ink-faint text-xs whitespace-nowrap">{#if !isScoring}<span class="text-ink-strong font-medium tabular-nums">{seat.result.vp}VP</span> {/if}{tGws[j]}GW {tTps[j]}TP</span>
-                          {#if deck}
-                            <button
-                              onclick={() => deckTarget = { uid: seat.player_uid, round: r, name: seatDisplay(seat.player_uid) }}
-                              class="p-3 sm:p-0.5 -m-1 sm:m-0 text-ink-faint hover:text-select transition-colors"
-                              title={m.decks_view_decklist()}
-                              aria-label={m.decks_view_decklist()}
-                            >
-                              <Eye class="w-5 h-5 sm:w-3.5 sm:h-3.5" />
-                            </button>
-                          {/if}
                           {#if isEditable && (isLast || isRoundLive)}
                             <!-- p-3 + 20px icon = 44px touch floor on the on-the-floor issuance path -->
                             <button
