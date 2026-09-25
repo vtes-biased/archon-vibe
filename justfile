@@ -325,6 +325,18 @@ test-smoke:
 deploy-beta *flags:
     cd deploy && uv run --group deploy pyinfra inventory.py deploy.py --limit beta --diff {{ flags }}
 
+# Deploy production with pyinfra: shows every change, then asks (same flags as deploy-beta)
+deploy-prod *flags:
+    cd deploy && uv run --group deploy pyinfra inventory.py deploy.py --limit prod --diff {{ flags }}
+
+# System setup of the production box (packages, nginx, ssh, firewall, postgres, backups): shows, then asks
+setup-prod *flags:
+    cd deploy && uv run --group deploy pyinfra inventory.py setup.py --limit prod --diff {{ flags }}
+
+# Give a developer a sudo account on production, logged in as an existing admin
+add-admin-prod name pubkey as_user:
+    cd deploy && ADMIN={{ name }} ADMIN_KEY={{ pubkey }} uv run --group deploy pyinfra inventory.py add_admin.py --limit prod --ssh-user {{ as_user }} -y
+
 # release.yml runs e2e on the pushed tag and, only if green, creates the GitHub
 # Release, then builds + attaches the artifacts in the same run. Examples:
 #   just release patch   # v0.1.10 -> v0.1.11

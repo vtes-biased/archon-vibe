@@ -14,7 +14,7 @@ creation_rules:
   - path_regex: secrets/beta/
     age: *beta
   - path_regex: secrets/prod\.sops\.yaml$
-    unencrypted_regex: _(client_id|installation_id|public_keys?|username)$
+    unencrypted_regex: _(client_id|installation_id|public_keys?|username|access_key)$
     age: *prod
   - path_regex: secrets/prod/
     age: *prod
