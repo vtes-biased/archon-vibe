@@ -8,8 +8,11 @@ description: Triage user-feedback GitHub issues on vtes-biased/archon-vibe — v
 In-app feedback (`backend/src/routes/feedback.py`) files GitHub issues on
 `vtes-biased/archon-vibe`, labeled `feedback` plus one of `bug` / `enhancement` /
 `question`. Every body ends with a `---` metadata block: submitter VEKN id + roles,
-app version, page route, locale, user agent. The owner also files issues by hand
-under the same `feedback` label, usually with their own analysis appended.
+app version, page route, locale, user agent. Beta files into the same repository
+through the same App: its issues also carry the `beta` label and an `Environment:
+beta` line — a tester's report against the beta build, not production. The owner
+also files issues by hand under the same `feedback` label, usually with their own
+analysis appended.
 
 **`Page:` is always `/help`** — that's the only screen the feedback form lives on,
 so the route says nothing about where the problem was. Ignore it; never treat it

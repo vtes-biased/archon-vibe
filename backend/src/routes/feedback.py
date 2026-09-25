@@ -25,6 +25,9 @@ FEEDBACK_GITHUB_CLIENT_ID = os.environ.get("FEEDBACK_GITHUB_CLIENT_ID", "")
 FEEDBACK_GITHUB_PRIVATE_KEY = os.environ.get("FEEDBACK_GITHUB_PRIVATE_KEY", "")
 FEEDBACK_GITHUB_INSTALLATION_ID = os.environ.get("FEEDBACK_GITHUB_INSTALLATION_ID", "")
 FEEDBACK_TARGET_REPO = "vtes-biased/archon-vibe"
+# beta and production share the repo and the App
+FROM_BETA = os.environ.get("ENVIRONMENT") == "beta"
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
 
 
 def _is_configured() -> bool:
@@ -136,6 +139,7 @@ async def submit_feedback(body: FeedbackRequest, current_user: CurrentUser) -> R
         who = f"@{mention} ({vekn})" if mention else vekn
         meta = [
             f"- **Submitted by:** {who} — role: {roles}",
+            *(["- **Environment:** beta"] if FROM_BETA else []),
             f"- **App version:** {body.app_version or 'unknown'}",
         ]
         if body.route:
@@ -144,12 +148,16 @@ async def submit_feedback(body: FeedbackRequest, current_user: CurrentUser) -> R
             meta.append(f"- **Locale:** {body.locale}")
         if body.user_agent:
             meta.append(f"- **User agent:** {body.user_agent}")
+        labels = ["feedback", category_label]
+        if ENVIRONMENT == "beta":
+            meta.append("- **Environment:** beta")
+            labels.append("beta")
         issue_body = body.description.strip() + "\n\n---\n" + "\n".join(meta)
 
         issue: dict = {
             "title": f"[{prefix}] {body.title}",
             "body": issue_body,
-            "labels": ["feedback", category_label],
+            "labels": labels,
         }
         # Non-collaborator assignees are silently dropped by the API; the
         # body @-mention still notifies them.
