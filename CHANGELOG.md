@@ -12,6 +12,11 @@ these are player-facing lines, not developer notes.
 
 ## Unreleased
 
+- The tournament list can now be filtered by a date range and by several countries at once.
+- Your search text on the tournament and member lists is kept when you come back through the menu.
+- A seated player's deck now opens from their seat in the Rounds tab.
+- Your profile's tournament list shows your place out of the number of players.
+- The IC and a member's NC can now correct or clear that member's sponsor.
 - Tournaments created with the old Archon since 2025 no longer show up as held in Palma de Mallorca, Spain.
 
 ## v1.2.2 — 2026-09-25
