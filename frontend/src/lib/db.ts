@@ -883,6 +883,13 @@ function matchesState(t: TournamentListItem, state: TournamentStateFilter, cutof
   }
 }
 
+function inDateWindow(t: TournamentListItem, from?: string, to?: string): boolean {
+  if (!from && !to) return true;
+  if (!t.start) return false;
+  const day = t.start.slice(0, 10);
+  return (!from || day >= from) && (!to || day <= to);
+}
+
 /** Sorts upcoming/current ascending then past descending, returning the upcoming cluster size for an
  * Upcoming/Past divider. Filtering to Finished needs no separate sort flip — with no upcoming events left, the whole list is the past cluster already in recency order. */
 export function sortUpcomingFirst(items: TournamentListItem[]): number {
@@ -906,11 +913,13 @@ export async function getFilteredTournaments(
   filters: {
     state?: TournamentStateFilter;
     includeOnline?: boolean;
-    country?: string;
+    countries?: string[];
     format?: string;
     rank?: string;
     search?: string;
     excludePast?: boolean;
+    dateFrom?: string;
+    dateTo?: string;
   },
   page = 0,
   pageSize = 50,
@@ -924,7 +933,8 @@ export async function getFilteredTournaments(
     if (filters.state && filters.state !== 'all' && !matchesState(t, filters.state, cutoff)) continue;
     // Logged-out viewers see current + upcoming only (no finished/past events).
     if (filters.excludePast && t.state === 'Finished') continue;
-    if (filters.country && filters.country !== 'all' && t.country !== filters.country) continue;
+    if (filters.countries?.length && !filters.countries.includes(t.country ?? '')) continue;
+    if (!inDateWindow(t, filters.dateFrom, filters.dateTo)) continue;
     if (filters.includeOnline === false && t.online) continue;
     if (filters.format && filters.format !== 'all' && t.format !== filters.format) continue;
     if (filters.rank && filters.rank !== 'all' && t.rank !== filters.rank) continue;
@@ -941,7 +951,7 @@ export async function getFilteredTournaments(
 
 export async function getAgendaTournaments(
   viewer: AgendaViewer,
-  filters: { state?: TournamentStateFilter; includeOnline?: boolean; format?: string; rank?: string; search?: string },
+  filters: { state?: TournamentStateFilter; includeOnline?: boolean; format?: string; rank?: string; search?: string; dateFrom?: string; dateTo?: string },
   page = 0,
   pageSize = 50,
 ): Promise<FilteredTournamentsResult> {
@@ -954,6 +964,7 @@ export async function getAgendaTournaments(
     if (filters.state && filters.state !== 'all' && !matchesState(t, filters.state, cutoff)) continue;
     if (filters.format && filters.format !== 'all' && t.format !== filters.format) continue;
     if (filters.rank && filters.rank !== 'all' && t.rank !== filters.rank) continue;
+    if (!inDateWindow(t, filters.dateFrom, filters.dateTo)) continue;
     if (q && !normalizeSearch(t.name).includes(q)) continue;
     candidates.push(t);
   }

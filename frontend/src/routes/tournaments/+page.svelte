@@ -91,7 +91,9 @@
   let selectedState = $state<TournamentStateFilter>(
     STATE_FILTERS.includes(urlState as TournamentStateFilter) ? (urlState as TournamentStateFilter) : "all",
   );
-  let selectedCountry = $state<string>(urlParams.get("country") ?? "all");
+  let selectedCountries = $state<string[]>((urlParams.get("country") ?? "").split(",").filter(Boolean));
+  let dateFrom = $state(urlParams.get("from") ?? "");
+  let dateTo = $state(urlParams.get("to") ?? "");
   let selectedFormat = $state<string>(urlParams.get("format") ?? "all");
   const RANK_FILTERS: TournamentRank[] = ["National Championship", "Continental Championship"];
   const urlRank = urlParams.get("rank");
@@ -152,7 +154,7 @@
       if (viewMode === "agenda" && viewer) {
         const result = await getAgendaTournaments(
           viewer,
-          { state: selectedState, includeOnline, format: selectedFormat, rank: selectedRank, search: debouncedSearch },
+          { state: selectedState, includeOnline, format: selectedFormat, rank: selectedRank, search: debouncedSearch, dateFrom, dateTo },
           page,
           PAGE_SIZE,
         );
@@ -164,7 +166,9 @@
           {
             state: selectedState,
             includeOnline,
-            country: selectedCountry,
+            countries: selectedCountries,
+            dateFrom,
+            dateTo,
             format: selectedFormat,
             rank: selectedRank,
             search: debouncedSearch,
@@ -211,7 +215,9 @@
   $effect(() => {
     const _s = debouncedSearch;
     const _o = selectedState;
-    const _c = selectedCountry;
+    const _c = selectedCountries.join(",");
+    const _df = dateFrom;
+    const _dt = dateTo;
     const _f = selectedFormat;
     const _r = selectedRank;
     const _io = includeOnline;
@@ -223,14 +229,15 @@
   });
 
   const filterKey = $derived(
-    [debouncedSearch, selectedState, selectedCountry, selectedFormat, selectedRank, includeOnline, viewMode].join("|"),
+    [debouncedSearch, selectedState, selectedCountries.join(","), dateFrom, dateTo, selectedFormat, selectedRank, includeOnline, viewMode].join("|"),
   );
 
   // The badge counts what the sheet holds: search sits outside it, and the
   // country select is absent in agenda mode.
   const activeFilterCount = $derived(
     (selectedState !== "all" ? 1 : 0)
-      + (viewMode !== "agenda" && selectedCountry !== "all" ? 1 : 0)
+      + (viewMode !== "agenda" && selectedCountries.length > 0 ? 1 : 0)
+      + (dateFrom || dateTo ? 1 : 0)
       + (selectedFormat !== "all" ? 1 : 0)
       + (selectedRank !== "all" ? 1 : 0)
       + (includeOnline ? 0 : 1),
@@ -239,14 +246,16 @@
   // includeOnline counts: it hides data like any other filter, so an empty list
   // under it must read as filtered, not as "no tournaments yet".
   const hasFilters = $derived(
-    !!searchQuery.trim() || selectedState !== "all" || selectedCountry !== "all"
+    !!searchQuery.trim() || selectedState !== "all" || selectedCountries.length > 0 || !!dateFrom || !!dateTo
       || selectedFormat !== "all" || selectedRank !== "all" || !includeOnline,
   );
 
   function clearFilters() {
     searchQuery = "";
     selectedState = "all";
-    selectedCountry = "all";
+    selectedCountries = [];
+    dateFrom = "";
+    dateTo = "";
     selectedFormat = "all";
     selectedRank = "all";
     includeOnline = true;
@@ -278,7 +287,9 @@
     syncQueryParams({
       q: debouncedSearch,
       state: selectedState === "all" ? null : selectedState,
-      country: selectedCountry === "all" ? null : selectedCountry,
+      country: selectedCountries.join(",") || null,
+      from: dateFrom || null,
+      to: dateTo || null,
       format: selectedFormat === "all" ? null : selectedFormat,
       rank: selectedRank === "all" ? null : selectedRank,
       online: includeOnline ? null : "false",
@@ -313,8 +324,8 @@
       return `${CALENDAR_BASE}/api/calendar/tournaments.ics?${params}`;
     }
     const params = new URLSearchParams();
-    if (selectedCountry && selectedCountry !== "all") {
-      params.set("country", selectedCountry);
+    if (selectedCountries.length > 0) {
+      params.set("country", selectedCountries.join(","));
     }
     if (selectedFormat && selectedFormat !== "all") {
       params.set("format", selectedFormat);
@@ -335,7 +346,9 @@
       return m.tournaments_calendar_scope_agenda();
     }
     const parts: string[] = [];
-    parts.push(selectedCountry !== "all" ? (countries[selectedCountry]?.name ?? selectedCountry) : m.rankings_all_countries());
+    parts.push(selectedCountries.length > 0
+      ? selectedCountries.map(c => countries[c]?.name ?? c).join(", ")
+      : m.rankings_all_countries());
     if (selectedFormat !== "all") parts.push(selectedFormat);
     if (includeOnline) parts.push(m.tournaments_calendar_scope_online());
     return parts.join(" · ");
@@ -674,18 +687,60 @@
         {#if viewMode !== "agenda"}
           <div>
             <label for="country-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.common_country()}</label>
+            {#if selectedCountries.length > 0}
+              <div class="flex flex-wrap gap-1.5 mb-2">
+                {#each selectedCountries as code (code)}
+                  {@const name = countries[code]?.name ?? code}
+                  <Badge
+                    kind="control"
+                    onclick={() => (selectedCountries = selectedCountries.filter(c => c !== code))}
+                    title={m.tournaments_filter_remove_country({ country: name })}
+                  >
+                    {getCountryFlag(code)} {name}
+                    <X class="w-3 h-3" aria-hidden="true" />
+                  </Badge>
+                {/each}
+              </div>
+            {/if}
             <select
               id="country-filter"
-              bind:value={selectedCountry}
+              value=""
+              onchange={(e) => {
+                const code = e.currentTarget.value;
+                if (code && !selectedCountries.includes(code)) selectedCountries = [...selectedCountries, code];
+                e.currentTarget.value = "";
+              }}
               class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
             >
-              <option value="all">{m.tournaments_all_countries()}</option>
+              <option value="">{selectedCountries.length > 0 ? m.tournaments_filter_add_country() : m.tournaments_all_countries()}</option>
               {#each sortedCountries as country}
-                <option value={country.iso_code}>{country.name} {getCountryFlag(country.iso_code)}</option>
+                {#if !selectedCountries.includes(country.iso_code)}
+                  <option value={country.iso_code}>{country.name} {getCountryFlag(country.iso_code)}</option>
+                {/if}
               {/each}
             </select>
           </div>
         {/if}
+
+        <fieldset>
+          <legend class="block text-sm font-medium text-ink-muted mb-1">{m.tournaments_filter_dates()}</legend>
+          <div class="grid grid-cols-2 gap-2">
+            <input
+              type="date"
+              bind:value={dateFrom}
+              max={dateTo || undefined}
+              aria-label={m.tournaments_filter_from()}
+              class="w-full min-w-0 px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
+            />
+            <input
+              type="date"
+              bind:value={dateTo}
+              min={dateFrom || undefined}
+              aria-label={m.tournaments_filter_to()}
+              class="w-full min-w-0 px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
+            />
+          </div>
+        </fieldset>
 
         <div>
           <label for="state-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.tournaments_col_state()}</label>

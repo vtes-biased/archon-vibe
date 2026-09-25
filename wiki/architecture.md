@@ -923,8 +923,9 @@ member typed, and `link_preview.py` holds the guards
 
 `GET /api/calendar/tournaments.ics` serves iCal for client subscriptions. Feeds:
 **personal** (`?token=<calendar_token>`, agenda-matched), **country**
-(`?country=XX`) and **global** (no params); `?online=false` excludes online events
-from any feed.
+(`?country=XX`, or `XX,YY` for several) and **global** (no params);
+`?online=false` excludes online events from any feed. The list's date window never
+rides into a feed: a subscription is open-ended.
 
 `calendar_token` is nullable on User, generated on demand, stripped from SSE, only
 visible via `/auth/me`, and backed by a partial index.

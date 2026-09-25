@@ -179,7 +179,9 @@ async def tournament_event_ics(uid: str) -> Response:
 @router.get("/tournaments.ics")
 async def tournament_calendar(
     token: str | None = Query(None, description="Personal calendar token"),
-    country: str | None = Query(None, description="Filter by country ISO code"),
+    country: str | None = Query(
+        None, description="Filter by comma-separated country ISO codes"
+    ),
     online: bool = Query(True, description="Include online events"),
     format: str | None = Query(None, description="Filter by format"),
     league: str | None = Query(None, description="Only events of this league uid"),
@@ -189,6 +191,7 @@ async def tournament_calendar(
     FINISHED_WINDOW_DAYS), else a public feed filtered by country/online/format."""
     from ..db import decode_json, get_connection
 
+    countries = {c.strip().upper() for c in (country or "").split(",") if c.strip()}
     now = datetime.now(UTC)
     now_str = now.strftime("%Y%m%dT%H%M%SZ")
     cutoff = (now - timedelta(days=7)).isoformat()
@@ -244,7 +247,7 @@ async def tournament_calendar(
         # Public filtering
         filtered = []
         for t in tournaments:
-            if country and t.country != country.upper() and not t.online:
+            if countries and t.country not in countries and not t.online:
                 continue
             if not online and t.online:
                 continue
@@ -268,8 +271,8 @@ async def tournament_calendar(
         cal_name = f"VEKN League — {league_obj.name}" if league_obj else "VEKN League"
     elif user:
         cal_name = "My VEKN Tournaments"
-    elif country:
-        cal_name = f"VEKN Tournaments ({country.upper()})"
+    elif countries:
+        cal_name = f"VEKN Tournaments ({', '.join(sorted(countries))})"
 
     ical_lines = [
         "BEGIN:VCALENDAR",
