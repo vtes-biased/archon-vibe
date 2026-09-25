@@ -16,7 +16,7 @@ from .db import (
     get_users_without_coopted_by,
     save_user,
 )
-from .geonames import match_city
+from .geonames import CityIndex, city_index, match_city
 from .models import ObjectType, Role, User
 from .vekn_api import VEKNAPIClient, VEKNAPIError
 
@@ -520,7 +520,9 @@ class VEKNSyncService:
     def __init__(self) -> None:
         self.client = VEKNAPIClient()
 
-    def _map_vekn_to_user(self, vekn_player: dict[str, Any]) -> dict[str, Any]:
+    def _map_vekn_to_user(
+        self, vekn_player: dict[str, Any], cities: CityIndex
+    ) -> dict[str, Any]:
         name = f"{vekn_player.get('firstname', '')} {vekn_player.get('lastname', '')}".strip()
         vekn_id = str(vekn_player.get("veknid", ""))
 
@@ -531,7 +533,7 @@ class VEKNSyncService:
             city = FIX_CITIES[country_name].get(city, city)
         city_geoname_id = None
         if city and country_code:
-            matched = match_city(city, country_code)
+            matched = match_city(cities, city, country_code)
             if matched:
                 city = matched["name"]
                 city_geoname_id = matched["geoname_id"]
@@ -621,9 +623,11 @@ class VEKNSyncService:
 
         return existing_user, True
 
-    async def sync_player(self, vekn_player: dict[str, Any]) -> tuple[User, str]:
+    async def sync_player(
+        self, vekn_player: dict[str, Any], cities: CityIndex
+    ) -> tuple[User, str]:
         """Returns (User, action) where action is "created", "updated" or "unchanged"."""
-        vekn_data = self._map_vekn_to_user(vekn_player)
+        vekn_data = self._map_vekn_to_user(vekn_player, cities)
         vekn_id = vekn_data.get("vekn_id")
 
         if not vekn_id:
@@ -641,12 +645,13 @@ class VEKNSyncService:
     async def sync_all_members(self) -> dict[str, int]:
         logger.info("Starting VEKN member sync")
         stats = {"created": 0, "updated": 0, "unchanged": 0, "errors": 0, "total": 0}
+        cities = city_index()
 
         try:
             async for player in self.client.fetch_all_members():
                 stats["total"] += 1
                 try:
-                    _, action = await self.sync_player(player)
+                    _, action = await self.sync_player(player, cities)
                     stats[action] += 1
                 except Exception as e:
                     logger.error(f"Error syncing player {player}: {e}")

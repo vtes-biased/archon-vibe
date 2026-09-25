@@ -144,14 +144,19 @@ the app's 8 and the public API's 4, leaving the superuser reserve of 3 and
 headroom for pg_dump and ad-hoc psql — not to a client count the box never sees.
 
 **The backend's resident size is its jobs' peak, not its idle footprint.** glibc
-keeps freed heap, so whatever a job materializes stays resident until the daily
-`RuntimeMaxSec` restart — and that restart re-runs the VEKN chain at boot. Every
-scheduled job therefore streams or holds a narrow projection: a `vekn_id → uid`
-map rather than 19k decoded users, the archive decoded into only the fields the
-TWDA sync reads, rating tournaments by cursor and users in batches. Measured on
-beta at production corpus size (36.7k objects): imports 103 MB, the rating
-recompute +44 MB, the TWDA fetch +22 MB. fpdf is imported on the first NDA
-render for the same reason — idle, it is 34 MB.
+keeps freed heap, so whatever a job materializes would stay resident until the
+daily `RuntimeMaxSec` restart. Two defences: a scheduler listener calls
+`malloc_trim(0)` after every job — the 15-minute snapshot check makes that at most
+a quarter-hour's lag for a peak outside the scheduler, such as a deck import — and
+every scheduled job streams or holds a narrow projection: a `vekn_id → uid` map
+rather than 19k decoded users, the archive decoded into only the fields the TWDA
+sync reads, rating tournaments by cursor and users in batches. Nothing large stays
+cached between passes either: the member sync builds the ~45 MB city index per
+run, krcg's ~75 MB card DB is dropped once the Amaranth id map is read off it, and
+fpdf is imported on the first NDA render (idle, 34 MB). Measured on beta at
+production corpus size (36.7k objects): imports 103 MB, the rating recompute
++44 MB, the TWDA fetch +22 MB. `MALLOC_ARENA_MAX=2` changes nothing — measured
+under concurrent load, the event loop allocates from one thread.
 
 Because the backend ships as an installed wheel, **bundled data files must load
 through `importlib.resources`**, never `Path(__file__)`

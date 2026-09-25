@@ -12,7 +12,7 @@ retiring these syncs means is [below](#decommission); the work waiting on it is
 | `VEKN_PUSH` | backend env | enables all outbound push |
 | `VITE_VEKN_PUSH` | frontend env | restricts the `max_rounds` UI to 2–4, shows the VEKN link badge and the amber pending-sync badges |
 | `VEKN_SYNC_ENABLED` | backend env | enables periodic inbound member and tournament sync |
-| `VEKN_SYNC_INTERVAL_HOURS` | backend env | inbound period, default 6h |
+| `VEKN_SYNC_INTERVAL_HOURS` | backend env | inbound period from 04:00 UTC, default 6h |
 | `TWDA_SYNC_ENABLED` | backend env | enables the archive sync — separate from `VEKN_SYNC_ENABLED`, because it must outlive the VEKN API |
 | `VEKN_PUSH_INTERVAL_HOURS` | backend env | outbound push period, default 1h |
 

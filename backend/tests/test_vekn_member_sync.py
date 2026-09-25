@@ -6,6 +6,7 @@ against the real DB, no mocks.
 
 import pytest
 from src.data.vekn_roster import ADMINS
+from src.geonames import city_index
 from src.models import Role
 from src.vekn_sync import VEKNSyncService
 
@@ -24,7 +25,8 @@ async def test_create_seeds_derived_roles(test_db):
             "lastname": "Member",
             "princeid": "PR1",
             "coordinatorid": "CO1",
-        }
+        },
+        city_index(),
     )
 
     assert action == "created"
@@ -35,7 +37,7 @@ async def test_create_seeds_derived_roles(test_db):
 async def test_update_never_writes_roles(test_db):
     # Seed a user the way the app would: a single app-granted role, no Prince/NC.
     created, action = await VEKNSyncService().sync_player(
-        {"veknid": 1000777, "firstname": "App", "lastname": "User"}
+        {"veknid": 1000777, "firstname": "App", "lastname": "User"}, city_index()
     )
     assert action == "created"
     assert created.roles == []
@@ -53,7 +55,8 @@ async def test_update_never_writes_roles(test_db):
             "lastname": "User",
             "princeid": "PR9",
             "coordinatorid": "CO9",
-        }
+        },
+        city_index(),
     )
     assert action == "updated"  # identity-adjacent field (vekn_prefix) changed
 

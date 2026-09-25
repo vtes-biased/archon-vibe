@@ -1,6 +1,7 @@
 """FastAPI application entry point."""
 
 import asyncio
+import ctypes
 import gzip
 import logging
 import os
@@ -13,6 +14,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 import msgspec
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -87,6 +89,17 @@ _sync_service: VEKNSyncService | None = None
 _corpus_write_lock = asyncio.Lock()
 
 _shutdown_event: asyncio.Event | None = None
+
+try:
+    _malloc_trim = ctypes.CDLL("libc.so.6").malloc_trim
+except (OSError, AttributeError):
+    _malloc_trim = None
+
+
+def _release_heap(_event: object) -> None:
+    # glibc keeps freed heap: without this a job's peak stays resident until restart
+    if _malloc_trim:
+        _malloc_trim(0)
 
 
 def _install_fast_shutdown_signals() -> None:
@@ -368,6 +381,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     asyncio.create_task(register_metadata())
 
     _scheduler = AsyncIOScheduler()
+    _scheduler.add_listener(_release_heap, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
 
     sync_enabled = os.getenv("VEKN_SYNC_ENABLED", "false").lower() == "true"
     if sync_enabled:
@@ -383,15 +397,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         sync_interval_hours = int(os.getenv("VEKN_SYNC_INTERVAL_HOURS", "6"))
         _scheduler.add_job(
             run_vekn_sync,
-            trigger=IntervalTrigger(hours=sync_interval_hours),
+            trigger=CronTrigger(
+                hour=",".join(
+                    str((4 + h) % 24) for h in range(0, 24, sync_interval_hours)
+                ),
+                timezone="UTC",
+            ),
             id="vekn_sync",
             name="VEKN Member Sync",
             replace_existing=True,
         )
-        logger.info(f"VEKN sync scheduled every {sync_interval_hours} hours")
-
-        asyncio.create_task(run_vekn_sync())
-        logger.info("Initial VEKN sync scheduled in background")
+        logger.info(
+            f"VEKN sync scheduled every {sync_interval_hours} hours from 04:00 UTC"
+        )
     else:
         logger.info("VEKN sync is disabled")
 

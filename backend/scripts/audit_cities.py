@@ -18,7 +18,7 @@ from collections import Counter, defaultdict
 sys.path.insert(0, ".")
 
 from src import http_client  # noqa: E402
-from src.geonames import load_countries, match_city  # noqa: E402
+from src.geonames import city_index, load_countries, match_city  # noqa: E402
 from src.vekn_api import VEKNAPIClient  # noqa: E402
 from src.vekn_sync import FIX_CITIES  # noqa: E402
 
@@ -30,6 +30,7 @@ def _country_name_to_code() -> dict[str, str]:
 
 async def main() -> None:
     name_to_code = _country_name_to_code()
+    index = city_index()
 
     print("Fetching all VEKN members...")
     client = VEKNAPIClient()
@@ -67,7 +68,7 @@ async def main() -> None:
                 city = fixed
                 was_fixed = True
 
-        result = match_city(city, country_code)
+        result = match_city(index, city, country_code)
         if result:
             if was_fixed:
                 matched_after_fix += 1
@@ -91,7 +92,7 @@ async def main() -> None:
             stale_fixes.append((country_name, "*", f"unknown country: {country_name}"))
             continue
         for src, target in fixes.items():
-            if not match_city(target, cc):
+            if not match_city(index, target, cc):
                 stale_fixes.append((country_name, src, target))
 
     print("=" * 70)

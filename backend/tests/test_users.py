@@ -365,6 +365,7 @@ async def test_anonymize_member(test_db, test_client: AsyncClient):
     """The wipe must reach every copy of the name, end the sign-in, and survive
     the next VEKN member sync — the record keeps its uid and VEKN id."""
     from src.accounts import ANONYMIZED_NAME
+    from src.geonames import city_index
     from src.models import Announcement, AuthMethod, AuthMethodType, Player, Tournament
     from src.routes.auth import create_refresh_token
     from src.vekn_sync import VEKNSyncService
@@ -445,7 +446,8 @@ async def test_anonymize_member(test_db, test_client: AsyncClient):
                 "firstname": "Real",
                 "lastname": "Name",
                 "city": "Paris",
-            }
+            },
+            city_index(),
         )
         resynced = await db.get_user_by_uid(member.uid)
         assert (resynced.name, resynced.city) == (ANONYMIZED_NAME, None)

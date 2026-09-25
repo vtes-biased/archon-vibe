@@ -1,17 +1,20 @@
 """Deck URL providers: fetch + resolve deck data from VDB, VTESDecks, Amaranth.
-krcg maps each provider's native card ids to VEKN ids (notably Amaranth's own),
-using its bundled card DB, independent of our generated ``cards.json``."""
+VDB and VTESDecks already speak VEKN ids, checked against our ``cards.json``;
+Amaranth's own ids are mapped through krcg's card DB, loaded once to build the
+map and then dropped."""
 
 import asyncio
+import itertools
 import logging
 import urllib.parse
+from typing import Any
 
 import aiohttp
+import msgspec
 from krcg import loader, providers
-from krcg.collections import CardDict
-from krcg.models import Card, Deck
 
 from . import http_client
+from .card_data import cards_json_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -23,45 +26,127 @@ class DeckFetchError(Exception):
         self.params = params or {}
 
 
-# krcg's card DB, loaded once (offline pickle/local) and reused across requests.
-_cards: CardDict | None = None
-# Amaranth's amaranth_id -> Card map. Its /api/cards catalog is ~4k rows, so fetch it
-# once and reuse; the lock keeps concurrent imports from double-fetching.
-_amaranth_map: dict[str, Card] | None = None
+_known_ids: frozenset[int] | None = None
+# amaranth_id -> VEKN id. Its /api/cards catalog is ~4k rows, so fetch it once and
+# reuse; the lock keeps concurrent imports from double-fetching.
+_amaranth_ids: dict[str, int] | None = None
 _amaranth_lock = asyncio.Lock()
 
-# Legacy/alternate hostnames krcg's own dispatcher doesn't recognize. Only the netloc
-# is remapped for routing; the krcg fetchers key off path/query/fragment, not netloc.
+# Legacy/alternate hostnames. Only the netloc is remapped for routing; the
+# fetchers key off path/query/fragment, not netloc.
 _NETLOC_ALIASES = {
     "vdb.smeea.casa": "vdb.im",
     "api.vtesdecks.com": "vtesdecks.com",
 }
 
 
-def _cards_dict() -> CardDict:
-    global _cards
-    if _cards is None:
-        _cards = loader.load()
-    return _cards
+def _card_ids() -> frozenset[int]:
+    global _known_ids
+    if _known_ids is None:
+        raw = msgspec.json.decode(
+            cards_json_bytes() or b"{}", type=dict[int, msgspec.Raw]
+        )
+        _known_ids = frozenset(raw)
+    return _known_ids
 
 
-async def _amaranth_cards_map(session: aiohttp.ClientSession) -> dict[str, Card]:
-    global _amaranth_map
-    if _amaranth_map is None:
+async def _amaranth_map(session: aiohttp.ClientSession) -> dict[str, int]:
+    global _amaranth_ids
+    if _amaranth_ids is None:
         async with _amaranth_lock:
-            if _amaranth_map is None:
-                _amaranth_map = await providers.get_amaranth_cards_map(
-                    session, _cards_dict()
-                )
-    return _amaranth_map
+            if _amaranth_ids is None:
+                # ~75 MB of card objects, only to read one id off each
+                cards = await asyncio.to_thread(loader.load)
+                by_card = await providers.get_amaranth_cards_map(session, cards)
+                _amaranth_ids = {aid: card.id for aid, card in by_card.items()}
+    return _amaranth_ids
 
 
-def _deck_to_dict(deck: Deck) -> dict:
+def _deck(data: dict[str, Any], name_key: str) -> dict:
     return {
-        "name": deck.name or "",
-        "comments": deck.comment or "",
-        "cards": {str(c.id): c.count for c in deck.cards if c.count > 0},
+        "name": data.get(name_key) or "",
+        "comments": data.get("description") or "",
+        "cards": {},
     }
+
+
+def _add(deck: dict, vekn_id: int, count: Any) -> None:
+    count = int(count)
+    if count <= 0:
+        return
+    if vekn_id not in _card_ids():
+        raise KeyError(vekn_id)
+    deck["cards"][str(vekn_id)] = count
+
+
+async def _get_json(session: aiohttp.ClientSession, url: str) -> Any:
+    async with session.get(url) as response:
+        response.raise_for_status()
+        return await response.json()
+
+
+async def _fetch_vdb(
+    session: aiohttp.ClientSession, url: urllib.parse.ParseResult
+) -> dict:
+    params = urllib.parse.parse_qs(url.query)
+    if "id" in params:
+        uid = params["id"][0]
+    elif url.path == "/decks/deck":
+        # the deck-in-URL form carries the deck itself: decoded without calling VDB
+        if not url.fragment:
+            raise ValueError("Empty VDB deck in URL")
+        deck = {
+            "name": params.get("name", [""])[0],
+            "comments": params.get("description", [""])[0],
+            "cards": {},
+        }
+        for item in url.fragment.split(";"):
+            cid, count = item.split("=", 1)
+            _add(deck, int(cid), count)
+        return deck
+    elif url.path.startswith("/decks/"):
+        uid = url.path[7:]
+    else:
+        raise ValueError("Unknown VDB URL path")
+    data = await _get_json(session, "https://vdb.im/api/deck/" + uid)
+    deck = _deck(data, "name")
+    for cid, count in data["cards"].items():
+        _add(deck, int(cid), count)
+    return deck
+
+
+async def _fetch_vtesdecks(
+    session: aiohttp.ClientSession, url: urllib.parse.ParseResult
+) -> dict:
+    if not url.path.startswith("/deck/"):
+        raise ValueError("Invalid URL")
+    data = await _get_json(
+        session, "https://api.vtesdecks.com/1.0/decks/" + url.path[6:]
+    )
+    deck = _deck(data, "name")
+    for card in itertools.chain(data["crypt"], data["library"]):
+        _add(deck, int(card["id"]), card["number"])
+    return deck
+
+
+async def _fetch_amaranth(
+    session: aiohttp.ClientSession, url: urllib.parse.ParseResult
+) -> dict:
+    # a hash-routed SPA: share URLs carry the deck in the fragment (#deck/<uid>)
+    path = "/" + url.fragment if url.fragment.startswith("deck/") else url.path
+    if not path.startswith("/deck/"):
+        raise ValueError("Invalid URL")
+    ids = await _amaranth_map(session)
+    data = await _get_json(
+        session, "https://amaranth.vtes.co.nz/api/deck?id=" + path[6:]
+    )
+    if not data.get("success"):
+        raise ValueError(f"Amaranth: {data.get('error', {}).get('message')}")
+    result = data["result"]
+    deck = _deck(result, "title")
+    for cid, count in result["cards"].items():
+        _add(deck, ids[cid], count)
+    return deck
 
 
 async def fetch_deck_from_url(url: str) -> dict:
@@ -72,18 +157,14 @@ async def fetch_deck_from_url(url: str) -> dict:
     """
     parsed = urllib.parse.urlparse(url)
     netloc = _NETLOC_ALIASES.get(parsed.netloc, parsed.netloc)
-    cards = _cards_dict()
     session = http_client.session()
     try:
         if netloc == "amaranth.vtes.co.nz":
-            amap = await _amaranth_cards_map(session)
-            deck = await providers.fetch_amaranth(
-                session, parsed, cards, amaranth_map=amap
-            )
+            return await _fetch_amaranth(session, parsed)
         elif netloc == "vdb.im":
-            deck = await providers.fetch_vdb(session, parsed, cards)
+            return await _fetch_vdb(session, parsed)
         elif netloc == "vtesdecks.com":
-            deck = await providers.fetch_vtesdecks(session, parsed, cards)
+            return await _fetch_vtesdecks(session, parsed)
         else:
             raise DeckFetchError(
                 f"Unsupported deck URL provider: {parsed.netloc}",
@@ -92,7 +173,7 @@ async def fetch_deck_from_url(url: str) -> dict:
     except DeckFetchError:
         raise
     except KeyError as e:
-        # A referenced card id isn't in krcg's DB (unknown/storyline/counter card).
+        # A referenced card id isn't in the card DB (unknown/storyline/counter card).
         raise DeckFetchError(
             f"Deck references an unknown card ({e})", "deck_fetch.bad_link"
         ) from e
@@ -111,4 +192,3 @@ async def fetch_deck_from_url(url: str) -> dict:
             "deck_fetch.provider_unavailable",
             {"provider": netloc},
         ) from e
-    return _deck_to_dict(deck)

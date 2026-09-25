@@ -48,7 +48,6 @@ def load_countries() -> dict[str, Country]:
     return json.loads(data_file.read_text(encoding="utf-8"))
 
 
-@lru_cache(maxsize=1)
 def load_cities() -> list[City]:
     """Cities are sorted by population descending."""
     data_file = files(__package__).joinpath("data", "geonames", "cities.json")
@@ -134,15 +133,18 @@ def get_countries_on_continent(country_code: str) -> list[str]:
 _PAREN_RE = re.compile(r"\s*\(.*\)\s*$")
 
 
-@lru_cache(maxsize=1)
-def _build_city_index() -> tuple[
+type CityIndex = tuple[
     dict[tuple[str, str], City],
     dict[tuple[str, str], City],
     dict[tuple[str, str], City],
-]:
-    """Build (by_name, by_ascii, by_base) lookup dicts keyed by (country_code,
+]
+
+
+def city_index() -> CityIndex:
+    """(by_name, by_ascii, by_base) lookup dicts keyed by (country_code,
     name.lower()). Cities are sorted by population desc, so setdefault keeps
-    the largest city per key."""
+    the largest city per key. Never cached: it holds ~45 MB, so a caller
+    builds it for one pass and lets it go."""
     by_name: dict[tuple[str, str], City] = {}
     by_ascii: dict[tuple[str, str], City] = {}
     by_base: dict[tuple[str, str], City] = {}
@@ -162,14 +164,14 @@ def _build_city_index() -> tuple[
     return by_name, by_ascii, by_base
 
 
-def match_city(name: str, country_code: str) -> City | None:
+def match_city(index: CityIndex, name: str, country_code: str) -> City | None:
     """Tries exact name, ASCII name, ASCII-folded, then base name (no parens),
     in that order."""
     name = name.strip()
     if not name:
         return None
     cc = country_code.upper()
-    by_name, by_ascii, by_base = _build_city_index()
+    by_name, by_ascii, by_base = index
 
     if city := by_name.get((cc, name.lower())):
         return city

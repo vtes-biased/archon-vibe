@@ -42,7 +42,11 @@ changed, so the rewrite is equivalent).
 ## Landed
 
 `4e76ad6f` (the streaming cuts, `wiki/dev.md` rule) and `19413c3b` (review
-fixes) are on main, **not yet deployed to prod**. Prod units: `archon-backend`,
+fixes) are on main, **not yet deployed to prod**, and so is the follow-up that
+trims the heap after every job, builds the city index per member sync, drops
+krcg's card DB from the deck proxy and **moves the VEKN chain off boot to 04:00
+UTC** — so a restart no longer pays the chain's peak, and step 5 reads after
+04:00. Prod units: `archon-backend`,
 `archon-bot`, `archon-public-api`; no systemd memory accounting, so read RSS
 from `/proc`.
 
@@ -75,7 +79,7 @@ A per-minute sampler has run on prod since **2026-09-23 05:49 UTC**, writing
    ```
 
    and a day later collect it with step 1's command.
-5. **Backend settled size and peak** after that day, once its boot chain has run:
+5. **Backend settled size and peak** after that day, once the 04:00 UTC chain has run:
 
    ```
    ssh ubuntu@46.226.104.123 'grep -E "VmRSS|VmHWM" /proc/$(systemctl show archon-backend -p MainPID --value)/status; free -m'

@@ -195,8 +195,7 @@ worst on the login path a tournament morning hammers. Its default timeout is
 `proxy_read_timeout` because the manual push-vekn route runs its VEKN calls
 inline on the request; a caller needing longer passes `timeout=` per request, as
 the TWDA archive fetch (120s) and the TWDA PR flow (30s) do. The deck providers
-cannot: krcg owns those `session.get` calls and passes no timeout, so for
-Amaranth, VDB and VTESDecks the session default is a hard ceiling.
+take the session default.
 
 It carries a `DummyCookieJar`, so it stores nothing a host sets. Every caller
 authenticates by header or query parameter — VEKN by `Authorization: Bearer` or
@@ -514,11 +513,12 @@ both sides of the stack — except where the owner is withheld, and a deck with 
 
 **Import** — raw-text paste parses locally through the WASM engine
 (offline-capable). URL import (VDB / VTESDecks / Amaranth) and QR go through the
-backend `GET /fetch-deck` proxy, which uses krcg providers to fetch and resolve
-provider-native card ids — notably Amaranth's own — to VEKN ids against krcg's own
-bundled card DB, independent of our `cards.json`. VDB's deck-in-URL form
-(`/decks/deck?name=…#id=count;…`) carries the deck itself and krcg decodes it
-without calling VDB. URL and QR import are disabled offline; text import is not.
+backend `GET /fetch-deck` proxy (`providers.py`). VDB and VTESDecks answer in
+VEKN ids, checked against our `cards.json`; Amaranth's own ids go through a map
+built once per process from krcg's bundled card DB, which is loaded in a thread,
+read for that map and dropped — resident, it is ~75 MB. VDB's deck-in-URL form
+(`/decks/deck?name=…#id=count;…`) carries the deck itself and is decoded without
+calling VDB. URL and QR import are disabled offline; text import is not.
 Both ride `apiRequest`, so they inherit the refresh-and-retry every other
 authenticated call has, and the proxy codes its refusals so a dead session, an
 unreadable link and a provider outage each read differently: a 4xx answer from
@@ -1103,7 +1103,7 @@ rounds, tables, seating, scores and players, matching players by VEKN ID.
 | Job | Schedule | Module |
 |---|---|---|
 | Event-code sweep, Discord Linked Roles registration | once, at startup | `main.py`, `roles_hook` |
-| VEKN sync (members, tournaments) | at startup, then every `VEKN_SYNC_INTERVAL_HOURS` | `vekn_sync.py`, `vekn_tournament_sync.py` |
+| VEKN sync (members, tournaments) | every `VEKN_SYNC_INTERVAL_HOURS` from 04:00 UTC | `vekn_sync.py`, `vekn_tournament_sync.py` |
 | Snapshot rebuild, only if the corpus moved | at startup, then checked every 15 min | `snapshots.py` |
 | OAuth cleanup | hourly | `db_oauth.py` |
 | VEKN push batch | hourly, configurable | `vekn_push.py` |
@@ -1121,10 +1121,12 @@ guard fails them on a cold cache.
 
 **Every daily job is a `CronTrigger` at a pinned UTC hour, never an interval** —
 an interval job of a day or more can never fire here
-([hazards](hazards.md#deploy)). Both deployed environments set
-`VEKN_SYNC_INTERVAL_HOURS` to 24, so the VEKN chain's own timer is likewise
-unreachable and its daily cadence is really its startup kick; the kick is the
-mechanism, the interval is the ceiling.
+([hazards](hazards.md#deploy)). The VEKN chain is one too: its hours are spelled
+out from 04:00 UTC every `VEKN_SYNC_INTERVAL_HOURS` — 04:00 alone at the 24 both
+deployed environments set, clear of the 03:00 backup and ahead of the 05:00 TWDA
+sync. It used to run on a startup kick instead, which made every daily restart
+pay the chain's whole memory peak; a fresh install waits for the hour or for the
+admin page's *Run now*.
 
 The tournament sync and the TWDA sync hold one lock between them, so neither
 reads the corpus as lacking an event the other is halfway through creating. That
