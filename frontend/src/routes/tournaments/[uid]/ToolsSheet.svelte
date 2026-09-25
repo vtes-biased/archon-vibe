@@ -4,9 +4,6 @@
   // group starts open follows tournament state.
   import type { Component } from "svelte";
   import type { Sanction, Tournament } from "$lib/types";
-  import { addTournamentOrganizer, removeTournamentOrganizer } from "$lib/api";
-  import TournamentDetailsForm from "./TournamentDetailsForm.svelte";
-  import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import PromosDistributedEditor from "./PromosDistributedEditor.svelte";
   import ArchivalResultsEditor from "./ArchivalResultsEditor.svelte";
   import QrCheckinDisplay from "$lib/components/QrCheckinDisplay.svelte";
@@ -20,16 +17,14 @@
   import { canSetArchivalResults } from "$lib/engine";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import type { TournamentEventType } from "$lib/engine";
-  import { ChevronDown, ChevronRight, X, Settings2, Users, Upload, CloudUpload, QrCode, Gift, Ticket, ClipboardCopy, Download, Undo2, Trash2, Image, TriangleAlert, ScrollText } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight, X, Upload, CloudUpload, QrCode, Gift, Ticket, ClipboardCopy, Download, Undo2, Trash2, Image, TriangleAlert, ScrollText } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   type ActionItem = { label: string; icon?: Component<any>; onclick: () => void; disabled?: boolean };
   type GroupId = "setup" | "door" | "wrapup";
-  // Table rooms live at the foot of Details > Venue, not as a peer row here —
-  // they're part of the venue.
-  type PanelId = "details" | "organizers" | "qr" | "promos" | "raffle" | "archival";
+  type PanelId = "qr" | "promos" | "raffle" | "archival";
   const PANEL_GROUP: Record<PanelId, GroupId> = {
-    details: "setup", organizers: "setup", qr: "door",
+    qr: "door",
     promos: "wrapup", raffle: "wrapup", archival: "wrapup",
   };
 
@@ -37,7 +32,6 @@
     open = $bindable(false),
     requestPanel = $bindable(null),
     tournament = $bindable(),
-    isOrganizer,
     playerInfo,
     standings,
     sanctions,
@@ -55,7 +49,6 @@
     /** Open the sheet straight onto one panel (deep links from the console). */
     requestPanel?: PanelId | null;
     tournament: Tournament;
-    isOrganizer: boolean;
     playerInfo: PlayerInfoMap;
     standings: StandingEntry[];
     sanctions: Sanction[];
@@ -221,8 +214,6 @@
       <div class="min-h-0 flex-1 overflow-y-auto">
         {@render groupHeader("setup", m.tools_group_setup())}
         {#if openGroup === "setup"}
-          {@render panelRow("details", m.tools_details(), Settings2, detailsPanel)}
-          {@render panelRow("organizers", m.organizers_title(), Users, organizersPanel)}
           {@render actionRow(bannerItem, Image)}
           {@render actionRow(csvImportItem, Upload)}
           {@render actionRow(archonImportItem, Upload)}
@@ -275,19 +266,6 @@
     </div>
   </div>
 {/if}
-
-{#snippet detailsPanel()}
-  <TournamentDetailsForm bind:tournament {isOrganizer} inSheet />
-{/snippet}
-
-{#snippet organizersPanel()}
-  <OrganizerManager
-    organizerUids={tournament.organizers_uids ?? []}
-    onadd={async (userUid) => { await addTournamentOrganizer(tournament.uid, userUid); }}
-    onremove={async (userUid) => { await removeTournamentOrganizer(tournament.uid, userUid); }}
-  />
-{/snippet}
-
 
 {#snippet qrPanel()}
   {#if tournament.checkin_code}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import type { Tournament, TournamentState, DeckObject } from "$lib/types";
   import { finalsQualification, type TournamentEventType } from "$lib/engine";
   import Button from "$lib/components/Button.svelte";
@@ -6,7 +7,8 @@
   import QrCheckinDisplay from "$lib/components/QrCheckinDisplay.svelte";
   import FinishedResults from "./FinishedResults.svelte";
   import InlineNotice from "$lib/components/InlineNotice.svelte";
-  import { Undo2, CheckCheck, Banknote, RotateCcw, Upload, TriangleAlert } from "@lucide/svelte";
+  import Badge from "$lib/components/Badge.svelte";
+  import { Undo2, CheckCheck, Banknote, RotateCcw, Upload, TriangleAlert, CloudOff, CloudAlert } from "@lucide/svelte";
   import { translateTournamentState, seatDisplay, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -23,6 +25,7 @@
     onAddBanner,
     onRecordPromos,
     onFinishTournament,
+    children,
   }: {
     tournament: Tournament;
     standings: StandingEntry[];
@@ -35,7 +38,15 @@
     onAddBanner: () => void;
     onRecordPromos: () => void;
     onFinishTournament: () => void;
+    children?: Snippet;
   } = $props();
+
+  // Strict null: undefined means the viewer's projection omits the field.
+  // rounds>0 mirrors batch_push's guard — VEKN imports/migrated history are never "pending".
+  const veknResultsPending = $derived(
+    import.meta.env.VITE_VEKN_PUSH === "true" && tournament.state === "Finished"
+      && tournament.vekn_pushed_at === null && (tournament.rounds?.length ?? 0) > 0
+  );
 
   let showQrCode = $state(false);
 
@@ -232,6 +243,29 @@
     {/if}
   </p>
 
+  {#if veknResultsPending || tournament.vekn_results_stale || tournament.vekn_event_absent_at}
+    <div class="flex flex-wrap items-center gap-2">
+      {#if veknResultsPending}
+        <Badge kind="status" tone="pending" title={m.vekn_sync_pending_hint()}>
+          <CloudOff class="w-3 h-3" aria-hidden="true" />
+          {m.vekn_sync_pending_results()}
+        </Badge>
+      {/if}
+      {#if tournament.vekn_results_stale}
+        <Badge kind="status" tone="pending" title={m.vekn_out_of_sync_hint()}>
+          <CloudAlert class="w-3 h-3" aria-hidden="true" />
+          {m.vekn_out_of_sync()}
+        </Badge>
+      {/if}
+      {#if tournament.vekn_event_absent_at}
+        <Badge kind="status" tone="pending" title={m.vekn_event_absent_hint()}>
+          <CloudOff class="w-3 h-3" aria-hidden="true" />
+          {m.vekn_event_absent()}
+        </Badge>
+      {/if}
+    </div>
+  {/if}
+
   <div class="flex flex-wrap items-center gap-2">
     {#if primary}
       <Button variant="primary" size="lg" loading={actionLoading} disabled={primary.disabled} onclick={primary.onclick}>{primary.label}</Button>
@@ -334,6 +368,8 @@
       <QrCheckinDisplay code={tournament.checkin_code} tournamentUid={tournament.uid} tournamentName={tournament.name} />
     </div>
   {/if}
+
+  {@render children?.()}
 </div>
 
 <!-- Sits flush on the mobile nav (bottom-navbar, its total footprint) and

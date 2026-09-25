@@ -264,26 +264,23 @@
 {/snippet}
 
 <!-- Online has no on-site QR: check-in happens server-side (Discord bot
-     self-serve or organizer). Point at the join link instead; mirrors Button's
-     primary/lg/block styling since this is an <a>, not a button. -->
+     self-serve or organizer). Point at the join link instead. -->
 {#snippet onlineJoin()}
   {#if tournament.venue_url}
-    <a href={tournament.venue_url} target="_blank" rel="noopener"
-       class="inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium min-h-[44px] bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">
+    <Button variant="primary" size="lg" block href={tournament.venue_url} target="_blank" rel="noopener">
       <ExternalLink class="w-4 h-4" aria-hidden="true" />
       {m.tournament_join_online_btn({ venue: tournament.venue ?? "" })}
-    </a>
+    </Button>
   {/if}
 {/snippet}
 
 {#snippet externalRegistration()}
   <div class="space-y-2">
     <p class="text-sm text-ink-muted">{m.tournament_external_registration_notice()}</p>
-    <a href={tournament.registration_url} target="_blank" rel="noopener"
-       class="inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium min-h-[44px] bg-accent-strong hover:bg-accent-strong-hover text-white transition-colors">
+    <Button variant="primary" size="lg" href={tournament.registration_url} target="_blank" rel="noopener">
+      {m.tournament_register_btn()}
       <ExternalLink class="w-4 h-4" aria-hidden="true" />
-      {m.tournament_external_registration_btn()}
-    </a>
+    </Button>
   </div>
 {/snippet}
 

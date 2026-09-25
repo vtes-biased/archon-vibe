@@ -201,6 +201,11 @@ promo entry and the member each open a dialog.
 collapse together even under colourblindness, so destructive actions get their own
 hue. Meaning must not rest on hue alone: pair `danger` with an icon and a verb.
 
+**Register is one button wherever the sign-up happens.** An event taking its
+sign-ups on an external page (`registration_url`) shows the same primary Register
+as an in-app one, an `href` Button that only adds a trailing outbound icon: the
+destination changes, the player's action does not.
+
 Props: `size`, `block`, `loading` (spinner, `aria-busy`, auto-disables),
 `disabled`, `href` (renders an `<a>`, which takes neither state); extra layout
 classes via `class`. Focus comes from the global `:focus-visible` ring — never add
@@ -339,9 +344,8 @@ without scrolling on a 393×852 phone: the search field and the view toggle stay
 the open, and every select folds behind a single control naming how many filters
 are active. This is the console's own first-viewport rule ([the
 workbench](#the-workbench)) generalized — apparatus is what moves, never the content
-it filters. `/tournaments` is the only surface that follows it: `/leagues`, the
-`/users` member list and the public tournament masthead each still open on a filter
-card with every select showing.
+it filters. `/tournaments` is the only list that follows it: `/leagues` and the
+`/users` member list each still open on a filter card with every select showing.
 
 **List view state** — filters belong to the list, not the component instance, in
 three layers:
@@ -378,7 +382,8 @@ one, and the row scrolls rather than wraps. The active-only label is what makes
 three or four tabs survive five locales at 360px; a text-shrinking fix is fragile
 there, where the overflow is worse than English suggests. The strip carries the
 tournament console, the member profile, the public member page and the league
-page.
+page. The console is the four-tab case — Players, Rounds, Finals, and Setup, always
+last.
 
 **One fold grammar.** `FoldableSection` is the app's single disclosure shell —
 muted box, chevron right closed and down open, the whole header a 44px target, a
@@ -388,7 +393,13 @@ owns the state (an exclusive accordion, a body that loads on first open), a
 `disabled` for a body that cannot be fetched, and a `level` where the header is a
 heading — only the caller knows how deep it sits, so the shell renders one only
 when asked. It takes no styling props: a fold that wants its own box is a fold
-that has drifted. A chevron points **right closed
+that has drifted. The player-facing tournament page's details are one such
+section: folded, its header names the country (or Online), the state unless
+Finished, and the start; open, it holds every badge and link, venue, dates,
+organizers, event code and the description. It starts open only while the event is
+Planned or in Registration with no round or final ever played — reopening
+registration between rounds does not reopen it, except for an anonymous visitor,
+whose projection carries no rounds to tell a reopened registration from a fresh one. A chevron points **right closed
 and down open** everywhere — a rotating one is not an alternative and has no
 exception. `just fold-grammar` ([dev](dev.md#lint-gates)) holds both halves.
 
@@ -634,7 +645,7 @@ policy for *future* features, not the cleanup backlog that was worked off.
 
 The shape it settled on: the working surface starts inside the first viewport, the
 action bar sits **above** the tabs so its guidance line is visible on every tab,
-reference material leaves the masthead once the event is under way, and everything
+nothing but the title and a short action row stands above the bar, and everything
 rarer than the current moment sits one tap deep in a Tools sheet opened from the
 masthead — grouped and ordered **like the event runs** (set up · at the door · wrap
 up), because an event's chronology is fixed and muscle memory holds. Only which
@@ -647,9 +658,18 @@ Standing decisions:
 - **Share Image is deleted, not moved** — `backend/src/og.py` server-renders a
   per-tournament `og:image` from the banner, so pasting the link already yields a
   cover. The banner therefore matters *more*, and needs a real home.
-- **Go Offline stays in the masthead button row** (owner, 2026-08-08: "always
+- **The masthead is the title and one action row** — agenda, share, the view
+  toggle, and the organizer's Go Offline and Tools. The live notices (errors, judge
+  calls, the push opt-in, the announcement composer) and the VEKN sync warnings sit
+  in the action bar instead.
+- **Go Offline stays in the masthead action row** (owner, 2026-08-08: "always
   accessible and obvious") — state-dependent and time-critical, and the masthead is
   the one surface present on every tab.
+- **The console shows no event details, in any state.** The organizer wrote them;
+  the view toggle is the preview, showing the player's folded panel.
+- **Setup is a permanent tab, standing last**, the default only while Planned. The
+  details and organizers editors live there and nowhere else, so Tools holds actions
+  and state-bound panels only; table rooms sit at the foot of the venue section.
 - **No Start Finals CTA in an empty Finals tab.** Finishing without a final is
   legitimate ([rules §3.1.6](domain/tournament-rules.md)), so a CTA there would
   frame finals as the expected path; the action lives in the action bar, where
@@ -665,8 +685,6 @@ Standing decisions:
   among two rather than the only one. Same shape as the CSV import and the
   Finished promo CTA: Tools keeps the any-state path, the bar names the moment,
   and one confirmation modal lives on the page so both open it.
-- **The description drops out of the organizer view only** — organizers wrote it,
-  players still need it.
 - **The Rounds tab finds a player through a search icon**, not a standing field:
   each match reads its table and seat in the latest round it sits in, and tapping
   it opens that round on the highlighted seat without collapsing any other.

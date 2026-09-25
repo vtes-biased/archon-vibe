@@ -17,7 +17,7 @@ server (PyO3) behave identically.
 | Multideck | yes/no | Standard rank only; frozen once a round exists, since the flag re-keys every deck read |
 | Decklist required | yes/no | organizer choice |
 | Online | yes/no | the venue URL is the meeting place |
-| `registration_url` | URL, empty = none | the external page taking the sign-ups; setting it closes Archon's own sign-up — the engine refuses `Register` and self-`Unregister`, below — and surfaces the paid-registrations CSV import in the action bar |
+| `registration_url` | URL, empty = none | the external page taking the sign-ups; setting it closes Archon's own sign-up — the engine refuses `Register` and self-`Unregister`, below — points the player's Register button at that page, and surfaces the paid-registrations CSV import in the action bar |
 | `max_rounds` | int, 0 = uncapped | per-player round cap |
 | `max_players` | int, 0 = none | venue capacity: the engine never blocks a registration, it waitlists it — below |
 | `open_rounds` | bool | the non-VEKN house format, below |

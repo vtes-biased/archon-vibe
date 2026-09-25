@@ -17,8 +17,9 @@
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime, OfflineLockLostError } from "$lib/stores/offline.svelte";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
   import { openLastView } from "$lib/last-view";
-  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Wrench, Settings2, ExternalLink, MapPin, CloudOff, CloudAlert, Upload, CloudUpload, Share2, CalendarPlus, BookmarkPlus, BookmarkMinus } from "@lucide/svelte";
-  import FoldableDescription from "$lib/components/FoldableDescription.svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Wrench, Settings2, ExternalLink, MapPin, Upload, CloudUpload, Share2, CalendarPlus, BookmarkPlus, BookmarkMinus } from "@lucide/svelte";
+  import FoldableSection from "$lib/components/FoldableSection.svelte";
+  import { renderMarkdown, stripLeadingTitle } from "$lib/markdown";
   import Button from "$lib/components/Button.svelte";
   import TournamentBanner from "$lib/components/TournamentBanner.svelte";
   import Badge from "$lib/components/Badge.svelte";
@@ -70,12 +71,6 @@ import TournamentModals from "./TournamentModals.svelte";
     tournament ? engineIsOrganizer(auth.user, tournament) : false
   );
   const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
-  // Strict null: undefined means the viewer's projection omits the field.
-  // rounds>0 mirrors batch_push's guard — VEKN imports/migrated history are never "pending".
-  const veknResultsPending = $derived(
-    veknPush && tournament?.state === "Finished" && tournament?.vekn_pushed_at === null
-      && (tournament?.rounds?.length ?? 0) > 0
-  );
   // Once external_ids.vekn or vekn_pushed_at exist, deleting here would orphan
   // the vekn.net record — unless the scan confirmed that record is gone.
   // Mirrors the server gate in tournaments.py.
@@ -186,10 +181,9 @@ import TournamentModals from "./TournamentModals.svelte";
   });
 
   type TabId = 'players' | 'setup' | 'rounds' | 'finals';
-  const preEvent = $derived(tournament?.state === "Planned" || tournament?.state === "Registration");
   let activeTab = $state<TabId>('players');
   let showTools = $state(false);
-  let toolsPanel = $state<'details' | 'organizers' | 'qr' | 'promos' | null>(null);
+  let toolsPanel = $state<'qr' | 'promos' | null>(null);
   function openTools(panel: typeof toolsPanel = null) {
     toolsPanel = panel;
     showTools = true;
@@ -202,9 +196,6 @@ import TournamentModals from "./TournamentModals.svelte";
     const t: { id: TabId; label: string; icon: typeof Users }[] = [
       { id: 'players', label: m.tournament_tab_players(), icon: Users },
     ];
-    if (showOrganizerView && preEvent) {
-      t.push({ id: 'setup', label: m.tools_group_setup(), icon: Settings2 });
-    }
     if ((tournament?.rounds?.length ?? 0) > 0) {
       t.push({ id: 'rounds', label: m.tournament_tab_rounds(), icon: Swords });
     }
@@ -213,6 +204,9 @@ import TournamentModals from "./TournamentModals.svelte";
     const finishedWithoutFinals = tournament?.state === "Finished" && !tournament?.finals;
     if (!finishedWithoutFinals && (finalsQual.enough_rounds || tournament?.finals)) {
       t.push({ id: 'finals', label: m.tournament_tab_finals(), icon: Trophy });
+    }
+    if (showOrganizerView) {
+      t.push({ id: 'setup', label: m.tools_group_setup(), icon: Settings2 });
     }
     return t;
   });
@@ -228,6 +222,15 @@ import TournamentModals from "./TournamentModals.svelte";
     landed = true;
     viewAsPlayer = !!currentPlayerEntry && !(tournament.organizers_uids ?? []).includes(auth.user.uid);
     if (showOrganizerView && tournament.state === "Planned") activeTab = 'setup';
+  });
+
+  let detailsOpen = $state(false);
+  let detailsSeeded = false;
+  $effect(() => {
+    if (detailsSeeded || !tournament) return;
+    detailsSeeded = true;
+    detailsOpen = (tournament.state === "Planned" || tournament.state === "Registration")
+      && !tournament.rounds?.length && !tournament.finals;
   });
 
   let playerInfo = $state<PlayerInfoMap>({});
@@ -317,12 +320,6 @@ import TournamentModals from "./TournamentModals.svelte";
 
 
   const hasRounds = $derived((tournament?.rounds?.length ?? 0) > 0);
-
-  // From check-in on the organizer is in the venue: the info card answers
-  // "should I attend", not "what now". Player view keeps it at every state.
-  const eventUnderWay = $derived(
-    tournament?.state === "Waiting" || tournament?.state === "Playing" || tournament?.state === "Finished"
-  );
 
   // The banner is the per-tournament og:image (sharing the link IS the share
   // path), but it's a setup job, not something the masthead holds a dropzone
@@ -586,6 +583,16 @@ import TournamentModals from "./TournamentModals.svelte";
     } catch { return iso; }
   }
 
+  function formatStart(iso: string): string {
+    if (!tournament) return iso;
+    try {
+      return zonedDate(iso, tournament.timezone || "UTC").toLocaleString(getLocale(), {
+        dateStyle: "medium", timeStyle: "short",
+        ...(tournament.online ? {} : { timeZone: tournament.timezone || "UTC" }),
+      });
+    } catch { return iso; }
+  }
+
   function formatDateLocal(iso: string | null): string | null {
     if (!iso || !tournament || tournament.online) return null;
     const tournamentTz = tournament.timezone || "UTC";
@@ -748,214 +755,174 @@ import TournamentModals from "./TournamentModals.svelte";
         </div>
       {/if}
 
-      <!-- The title owns its full width — sharing a row with the buttons
-           wrapped long names to three lines on a phone and wrapped the
-           buttons' own labels too. -->
-      <div class="mb-6">
-        <div>
-          <h1 class="text-3xl font-semibold text-accent">{tournament.name}</h1>
-          <div class="flex flex-wrap items-center gap-3 mt-2">
-            <!-- State is the only meaning-bearing colour here; the league links
-                 keep their hues because there the hue is the label. -->
-            <Badge kind="status" tone={getStateTone(tournament.state)}>
-              {translateTournamentState(tournament.state)}
-            </Badge>
-            <Badge>{tournament.format}</Badge>
-            {#if tournament.rank}
-              <!-- One word, not the full "Continental Championship", which
-                   wrapped the row on a phone; the full name is the tooltip. -->
-              <Badge title={tournament.rank}>{rankBadgeLabel(tournament.rank)}</Badge>
-            {/if}
-            <RankedBadge {tournament} />
-            <!-- No default either way: an absent boolean is falsy, and the
-                 ternary would assert "not allowed" on a payload that never
-                 carried the field. -->
-            {#if tournament.proxies != null}
-              <Badge>{tournament.proxies ? m.tournament_proxies_allowed() : m.tournament_proxies_not_allowed()}</Badge>
-            {/if}
-            {#if archival}
-              <Badge title={m.tournament_archival_hint()}>{m.tournament_archival()}</Badge>
-            {/if}
-            {#if tournament.external_ids?.vekn}
-              <Badge kind="link" external
-                     href="https://www.vekn.net/event-calendar/event/{tournament.external_ids.vekn}"
-                     title={m.tournament_vekn_link_title()}>
-                VEKN <ExternalLink class="w-3 h-3" aria-hidden="true" />
-              </Badge>
-            {/if}
-            {#if isOrganizer && veknResultsPending}
-              <Badge kind="status" tone="pending" title={m.vekn_sync_pending_hint()}>
-                <CloudOff class="w-3 h-3" aria-hidden="true" />
-                {m.vekn_sync_pending_results()}
-              </Badge>
-            {/if}
-            {#if isOrganizer && tournament.vekn_results_stale}
-              <Badge kind="status" tone="pending" title={m.vekn_out_of_sync_hint()}>
-                <CloudAlert class="w-3 h-3" aria-hidden="true" />
-                {m.vekn_out_of_sync()}
-              </Badge>
-            {/if}
-            {#if isOrganizer && tournament.vekn_event_absent_at}
-              <Badge kind="status" tone="pending" title={m.vekn_event_absent_hint()}>
-                <CloudOff class="w-3 h-3" aria-hidden="true" />
-                {m.vekn_event_absent()}
-              </Badge>
-            {/if}
-            {#if tournament.league_uid && leagueName}
-              <Badge kind="link" tone="blue" truncate href="/leagues/{tournament.league_uid}">
-                {leagueName}
-              </Badge>
-            {/if}
-            {#if metaLeague}
-              <Badge kind="link" tone="amethyst" truncate href="/leagues/{metaLeague.uid}" title={m.league_kind_meta()}>
-                {metaLeague.name}
-              </Badge>
-            {/if}
-            <!-- The view toggle is a control, and looks like one: it is the only
-                 chip in the row you can press. -->
-            {#if isOrganizer}
-              <Badge kind="control" onclick={() => viewAsPlayer = !viewAsPlayer}>
-                {#if viewAsPlayer}<Shield class="w-3 h-3" aria-hidden="true" />{:else}<UserIcon class="w-3 h-3" aria-hidden="true" />{/if}
-                {viewAsPlayer ? m.tournament_view_organizer() : m.tournament_view_player()}
-              </Badge>
-            {/if}
-          </div>
-        </div>
-
-        <!-- Own row, not beside the title: Go Offline is state-dependent and
-             time-critical, so it stays out of the Tools drawer. -->
-        <div class="flex flex-wrap items-center gap-2 mt-3">
-          <Button variant="ghost" size="md" onclick={shareEvent} title={m.tournament_share()}>
-            <Share2 class="w-4 h-4" aria-hidden="true" />
-            {m.tournament_share()}
+      <h1 class="text-3xl font-semibold text-accent">{tournament.name}</h1>
+      <div class="flex flex-wrap items-center gap-2 mt-3 mb-6">
+        {#if agenda}
+          {@const agendaLabel = onMyAgenda ? m.tournaments_agenda_remove() : m.tournaments_agenda_add()}
+          <Button variant="ghost" size="md" onclick={toggleAgenda} disabled={!isBrowserOnline()} aria-label={agendaLabel} title={agendaLabel} aria-pressed={onMyAgenda}>
+            {#if onMyAgenda}<BookmarkMinus class="w-4 h-4" aria-hidden="true" />{:else}<BookmarkPlus class="w-4 h-4" aria-hidden="true" />{/if}
+            {m.tournament_agenda()}
           </Button>
-          {#if agenda}
-            <Button variant="ghost" size="md" onclick={toggleAgenda} disabled={!isBrowserOnline()}>
-              {#if onMyAgenda}<BookmarkMinus class="w-4 h-4" aria-hidden="true" />{:else}<BookmarkPlus class="w-4 h-4" aria-hidden="true" />{/if}
-              {onMyAgenda ? m.tournaments_agenda_remove() : m.tournaments_agenda_add()}
-            </Button>
-          {/if}
-          {#if showOrganizerView && !tournament.offline_mode && canGoOffline}
-            <Button variant="ghost" size="md" onclick={() => showGoOfflineConfirm = true}>
-              <WifiOff class="w-4 h-4" />
-              {m.offline_go_offline()}
-            </Button>
-          {/if}
-          {#if showOrganizerView}
-            <Button variant="ghost" size="md" onclick={() => openTools()} title={m.tools_title()}>
-              <Wrench class="w-4 h-4" aria-hidden="true" />
-              {m.tools_title()}
-            </Button>
-          {/if}
-        </div>
+        {/if}
+        <Button variant="ghost" size="md" onclick={shareEvent} title={m.tournament_share()}>
+          <Share2 class="w-4 h-4" aria-hidden="true" />
+          {m.tournament_share()}
+        </Button>
+        {#if isOrganizer}
+          <Badge kind="control" onclick={() => viewAsPlayer = !viewAsPlayer}>
+            {#if viewAsPlayer}<Shield class="w-3 h-3" aria-hidden="true" />{:else}<UserIcon class="w-3 h-3" aria-hidden="true" />{/if}
+            {viewAsPlayer ? m.tournament_view_organizer() : m.tournament_view_player()}
+          </Badge>
+        {/if}
+        {#if showOrganizerView && !tournament.offline_mode && canGoOffline}
+          <Button variant="ghost" size="md" onclick={() => showGoOfflineConfirm = true}>
+            <WifiOff class="w-4 h-4" />
+            {m.offline_go_offline()}
+          </Button>
+        {/if}
+        {#if showOrganizerView}
+          <Button variant="ghost" size="md" onclick={() => openTools()} title={m.tools_title()}>
+            <Wrench class="w-4 h-4" aria-hidden="true" />
+            {m.tools_title()}
+          </Button>
+        {/if}
       </div>
 
-      {#if error}
-        <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3 mb-4">
-          <p class="text-link-soft text-sm">{error}</p>
-        </div>
-      {/if}
+      {#snippet errorNotice()}
+        {#if error}
+          <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3 mb-4">
+            <p class="text-link-soft text-sm">{error}</p>
+          </div>
+        {/if}
+      {/snippet}
 
-      {#if !(showOrganizerView && eventUnderWay)}
-      <div class="bg-surface-card rounded-lg shadow p-6 border border-line mb-6">
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-          <div>
-            <div class="text-ink-faint">{m.tournament_info_date()}</div>
-            <div class="text-ink-bright">{formatDate(tournament.start)}</div>
-            {#if formatDateLocal(tournament.start)}
-              <div class="text-xs text-ink-faint">{formatDateLocal(tournament.start)} {m.tournament_in_timezone()}</div>
-            {/if}
-            {#if tournament.finish}
-              <div class="text-ink-bright">– {formatDate(tournament.finish)}</div>
-            {/if}
-            <!-- Server-generated download — hidden offline (dead link otherwise) -->
-            {#if tournament.start && tournament.state !== "Finished" && isBrowserOnline()}
-              <a href="{API_BASE}/api/calendar/tournaments/{uid}.ics" download
-                 class="text-xs text-link hover:text-link-soft inline-flex items-center gap-1 mt-1">
-                <CalendarPlus class="w-3 h-3" aria-hidden="true" />
-                {m.tournament_add_to_calendar()}
-              </a>
-            {/if}
-          </div>
-          <div>
-            <div class="text-ink-faint">{m.tournament_info_code()}</div>
-            {#if tournament.event_code}
-              <div class="text-ink-bright font-mono">{tournament.event_code}</div>
-            {:else}
-              <!-- Assigned once the VEKN push resolves, so this can linger for a
-                   minute when vekn.net is slow. Nothing waits on it. -->
-              <div class="text-ink-faint italic">{m.tournament_info_code_pending()}</div>
-            {/if}
-          </div>
-          <div>
-            <div class="text-ink-faint">{m.tournament_info_location()}</div>
-            <div class="text-ink-bright">
-              {#if tournament.online}
-                {m.tournaments_online()}
-                {#if tournament.venue}
-                  <br />
-                  {#if tournament.venue_url}
-                    <a href={tournament.venue_url} target="_blank" rel="noopener" class="text-link hover:text-link-soft inline-flex items-center gap-1">{tournament.venue} <ExternalLink class="w-3 h-3" aria-hidden="true" /></a>
-                  {:else}
-                    <span class="text-ink-muted">{tournament.venue}</span>
-                  {/if}
-                {/if}
-              {:else if tournament.country}
-                {getCountryFlag(tournament.country)} {countries[tournament.country]?.name ?? tournament.country}
-                {#if tournament.venue}
-                  <br />
-                  {#if tournament.venue_url}
-                    <a href={tournament.venue_url} target="_blank" rel="noopener" class="text-link hover:text-link-soft inline-flex items-center gap-1">{tournament.venue} <ExternalLink class="w-3 h-3" aria-hidden="true" /></a>
-                  {:else}
-                    <span class="text-ink-muted">{tournament.venue}</span>
-                  {/if}
-                {/if}
-                {#if tournament.address}
-                  <br />
-                  {#if tournament.map_url}
-                    <a href={tournament.map_url} target="_blank" rel="noopener" class="text-ink-faint hover:text-link-soft text-xs inline-flex items-center gap-1"><MapPin class="w-3 h-3" aria-hidden="true" /> {tournament.address}</a>
-                  {:else}
-                    <span class="text-ink-faint text-xs"><MapPin class="w-3 h-3 inline" aria-hidden="true" /> {tournament.address}</span>
-                  {/if}
-                {/if}
-              {:else}
-                —
+      {#if !showOrganizerView}
+        <div class="mb-6">
+          <FoldableSection title={tournament.online ? m.tournaments_online() : tournament.country ? `${getCountryFlag(tournament.country)} ${countries[tournament.country]?.name ?? tournament.country}` : m.tournament_info_location()} level={2} bind:open={detailsOpen}>
+            {#snippet header()}
+              {#if tournament && tournament.state !== "Finished"}
+                <Badge kind="status" tone={getStateTone(tournament.state)}>{translateTournamentState(tournament.state)}</Badge>
+              {/if}
+              {#if tournament?.start}
+                <span class="ml-auto text-xs text-ink-muted text-right">{formatStart(tournament.start)}</span>
+              {/if}
+            {/snippet}
+            <div class="flex flex-wrap items-center gap-2">
+              <Badge>{tournament.format}</Badge>
+              {#if tournament.rank}
+                <Badge title={tournament.rank}>{rankBadgeLabel(tournament.rank)}</Badge>
+              {/if}
+              <RankedBadge {tournament} />
+              <!-- No default either way: an absent boolean is falsy, and the
+                   ternary would assert "not allowed" on a payload that never
+                   carried the field. -->
+              {#if tournament.proxies != null}
+                <Badge>{tournament.proxies ? m.tournament_proxies_allowed() : m.tournament_proxies_not_allowed()}</Badge>
+              {/if}
+              {#if archival}
+                <Badge title={m.tournament_archival_hint()}>{m.tournament_archival()}</Badge>
+              {/if}
+              {#if tournament.external_ids?.vekn}
+                <Badge kind="link" external
+                       href="https://www.vekn.net/event-calendar/event/{tournament.external_ids.vekn}"
+                       title={m.tournament_vekn_link_title()}>
+                  VEKN <ExternalLink class="w-3 h-3" aria-hidden="true" />
+                </Badge>
+              {/if}
+              {#if tournament.league_uid && leagueName}
+                <Badge kind="link" tone="blue" truncate href="/leagues/{tournament.league_uid}">
+                  {leagueName}
+                </Badge>
+              {/if}
+              {#if metaLeague}
+                <Badge kind="link" tone="amethyst" truncate href="/leagues/{metaLeague.uid}" title={m.league_kind_meta()}>
+                  {metaLeague.name}
+                </Badge>
               {/if}
             </div>
-          </div>
-          {#if tournament.players || standings.length}
-          {@const attested = noPlayData && tournament.reported_player_count ? attestedPlayerCount(tournament) : 0}
-          <!-- An archival row with nothing attested says nothing: ~100 archive
-               entries carry no player count, and the engine then falls through to
-               the winner's lone standing, which is not the size of the field. -->
-          {#if attested || !archival}
-          <div>
-            <div class="text-ink-faint">{m.tournament_info_players()}</div>
-            {#if attested}
-              <div class="text-ink-bright">{m.tournament_reported_count({ count: String(attested) })}</div>
-            {:else}
-              <!-- Imported records: standings may exceed a partial/absent roster. -->
-              <div class="text-ink-bright">{m.tournament_registered_count({ count: String(Math.max(tournament.players?.filter(p => !p.waitlisted).length ?? 0, standings.length)) })}</div>
-            {/if}
-          </div>
-          {/if}
-          {/if}
-          {#if tournament.organizers_uids?.length}
-          <div>
-            <div class="text-ink-faint">{m.tournament_info_organizers()}</div>
-            <div class="text-ink-bright">
-              {#each tournament.organizers_uids as ouid, i}{#if i > 0}{", "}{/if}<a href="/users/{ouid}" class="text-link hover:text-link-soft">{organizerNames[ouid] || "…"}</a>{/each}
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+              <div>
+                <div class="text-ink-faint">{m.tournament_info_date()}</div>
+                <div class="text-ink-bright">{formatDate(tournament.start)}</div>
+                {#if formatDateLocal(tournament.start)}
+                  <div class="text-xs text-ink-faint">{formatDateLocal(tournament.start)} {m.tournament_in_timezone()}</div>
+                {/if}
+                {#if tournament.finish}
+                  <div class="text-ink-bright">– {formatDate(tournament.finish)}</div>
+                {/if}
+                <!-- Server-generated download — hidden offline (dead link otherwise) -->
+                {#if tournament.start && tournament.state !== "Finished" && isBrowserOnline()}
+                  <a href="{API_BASE}/api/calendar/tournaments/{uid}.ics" download
+                     class="text-xs text-link hover:text-link-soft inline-flex items-center gap-1 mt-1">
+                    <CalendarPlus class="w-3 h-3" aria-hidden="true" />
+                    {m.tournament_add_to_calendar()}
+                  </a>
+                {/if}
+              </div>
+              <div>
+                <div class="text-ink-faint">{m.tournament_info_code()}</div>
+                {#if tournament.event_code}
+                  <div class="text-ink-bright font-mono">{tournament.event_code}</div>
+                {:else}
+                  <!-- Assigned once the VEKN push resolves, so this can linger for a
+                       minute when vekn.net is slow. Nothing waits on it. -->
+                  <div class="text-ink-faint italic">{m.tournament_info_code_pending()}</div>
+                {/if}
+              </div>
+              {#if tournament.venue || tournament.address}
+              <div>
+                <div class="text-ink-faint">{m.tournament_info_location()}</div>
+                <div class="text-ink-bright">
+                  {#if tournament.venue}
+                    {#if tournament.venue_url}
+                      <a href={tournament.venue_url} target="_blank" rel="noopener" class="text-link hover:text-link-soft inline-flex items-center gap-1">{tournament.venue} <ExternalLink class="w-3 h-3" aria-hidden="true" /></a>
+                    {:else}
+                      <span class="text-ink-muted">{tournament.venue}</span>
+                    {/if}
+                  {/if}
+                  {#if tournament.address && !tournament.online}
+                    <br />
+                    {#if tournament.map_url}
+                      <a href={tournament.map_url} target="_blank" rel="noopener" class="text-ink-faint hover:text-link-soft text-xs inline-flex items-center gap-1"><MapPin class="w-3 h-3" aria-hidden="true" /> {tournament.address}</a>
+                    {:else}
+                      <span class="text-ink-faint text-xs"><MapPin class="w-3 h-3 inline" aria-hidden="true" /> {tournament.address}</span>
+                    {/if}
+                  {/if}
+                </div>
+              </div>
+              {/if}
+              {#if tournament.players || standings.length}
+              {@const attested = noPlayData && tournament.reported_player_count ? attestedPlayerCount(tournament) : 0}
+              <!-- An archival row with nothing attested says nothing: ~100 archive
+                   entries carry no player count, and the engine then falls through to
+                   the winner's lone standing, which is not the size of the field. -->
+              {#if attested || !archival}
+              <div>
+                <div class="text-ink-faint">{m.tournament_info_players()}</div>
+                {#if attested}
+                  <div class="text-ink-bright">{m.tournament_reported_count({ count: String(attested) })}</div>
+                {:else}
+                  <!-- Imported records: standings may exceed a partial/absent roster. -->
+                  <div class="text-ink-bright">{m.tournament_registered_count({ count: String(Math.max(tournament.players?.filter(p => !p.waitlisted).length ?? 0, standings.length)) })}</div>
+                {/if}
+              </div>
+              {/if}
+              {/if}
+              {#if tournament.organizers_uids?.length}
+              <div>
+                <div class="text-ink-faint">{m.tournament_info_organizers()}</div>
+                <div class="text-ink-bright">
+                  {#each tournament.organizers_uids as ouid, i}{#if i > 0}{", "}{/if}<a href="/users/{ouid}" class="text-link hover:text-link-soft">{organizerNames[ouid] || "…"}</a>{/each}
+                </div>
+              </div>
+              {/if}
             </div>
-          </div>
-          {/if}
+            {#if tournament.description}
+              <div class="doc-prose prose prose-sm max-w-none">{@html renderMarkdown(stripLeadingTitle(tournament.description, tournament.name))}</div>
+            {/if}
+          </FoldableSection>
         </div>
-      </div>
-      {/if}
-
-      <!-- Description is for people deciding whether to attend. The organizer
-           wrote it; showing it back to them costs a screen of console. -->
-      {#if tournament.description && !showOrganizerView}
-        <FoldableDescription description={tournament.description} title={tournament.name} />
+        {@render errorNotice()}
       {/if}
 
       {#if isMinimalView}
@@ -969,26 +936,15 @@ import TournamentModals from "./TournamentModals.svelte";
           {/if}
         </div>
       {:else}
-      {#if tournament.state === "Playing"}
-        <JudgeCallBanner bind:this={judgeCallBanner} tournamentUid={uid} />
-      {/if}
-
-      <!-- Organizers compose & manage; everyone else sees the banner. Hidden
-           while offline-locked (announcements are online-only and would just
-           fail), consistent with the timer/call-judge affordances. -->
-      <PushOptIn tournamentUid={uid} eligible={pushEligible} {isOrganizer} />
-      {#if showOrganizerView && !tournament.offline_mode && tournament.state !== "Planned" && tournament.state !== "Registration"}
-        <!-- Nobody is at the venue yet while planning, so there is no one to
-             broadcast to — the composer only earns its space from check-in on. -->
-        <AnnouncementComposer {tournament} />
-      {:else if !showOrganizerView}
-        <AnnouncementBanner announcements={tournament.announcements ?? []} tournamentUid={uid} tournamentState={tournament.state} />
-      {/if}
+      {#snippet liveNotices()}
+        {#if tournament?.state === "Playing"}
+          <JudgeCallBanner bind:this={judgeCallBanner} tournamentUid={uid} />
+        {/if}
+        <PushOptIn tournamentUid={uid} eligible={pushEligible} {isOrganizer} />
+      {/snippet}
 
       {#if showOrganizerView}
         <div class="bg-surface-card rounded-lg shadow border border-line mb-6">
-          <!-- The action bar leads: it is tournament-level and identical on every
-               tab, so it reads as the console header and the tabs as the workspace. -->
           <ActionBar
             {tournament}
             {standings}
@@ -1001,7 +957,15 @@ import TournamentModals from "./TournamentModals.svelte";
             onAddBanner={() => bannerComp?.openCropper()}
             onRecordPromos={() => openTools('promos')}
             onFinishTournament={() => (showFinishConfirm = true)}
-          />
+          >
+            {@render errorNotice()}
+            {@render liveNotices()}
+            <!-- Hidden while offline-locked: announcements are online-only and
+                 would just fail. Nobody is at the venue before check-in. -->
+            {#if !tournament.offline_mode && tournament.state !== "Planned" && tournament.state !== "Registration"}
+              <AnnouncementComposer {tournament} />
+            {/if}
+          </ActionBar>
 
           <TabStrip {tabs} bind:active={activeTab} />
 
@@ -1021,7 +985,7 @@ import TournamentModals from "./TournamentModals.svelte";
                 {decksByUser}
               />
             {:else if activeTab === 'setup'}
-              <SetupTab bind:tournament={tournament} isOrganizer={true} />
+              <SetupTab bind:tournament={tournament} />
             {:else if activeTab === 'rounds'}
               <RoundsTab
                 bind:tournament={tournament}
@@ -1053,6 +1017,9 @@ import TournamentModals from "./TournamentModals.svelte";
             {/if}
           </div>
         </div>
+      {:else}
+        {@render liveNotices()}
+        <AnnouncementBanner announcements={tournament.announcements ?? []} tournamentUid={uid} tournamentState={tournament.state} />
       {/if}
 
       {#if !showOrganizerView && auth.isAuthenticated}
@@ -1111,7 +1078,6 @@ import TournamentModals from "./TournamentModals.svelte";
     bind:open={showTools}
     bind:requestPanel={toolsPanel}
     bind:tournament={tournament}
-    isOrganizer={true}
     {playerInfo}
     {standings}
     sanctions={tournamentSanctions}

@@ -10,14 +10,8 @@
 
   let {
     tournament = $bindable(),
-    isOrganizer,
-    inSheet = false,
   }: {
     tournament: Tournament;
-    isOrganizer: boolean;
-    // Set when rendered inside a scrolling sheet: the sheet already covers the
-    // bottom nav, so the save chip must not reserve clearance for it.
-    inSheet?: boolean;
   } = $props();
 
   let saving = $state(false);
@@ -102,7 +96,6 @@
   });
 
   async function save(field: string, value: any) {
-    if (!isOrganizer) return;
     saving = true;
     error = null;
     try {
@@ -116,7 +109,6 @@
   }
 
   async function saveMultiple(fields: Record<string, any>) {
-    if (!isOrganizer) return;
     saving = true;
     error = null;
     try {
@@ -239,9 +231,6 @@
     </div>
   {/if}
 
-  {#if !isOrganizer}
-    <p class="text-ink-muted">{m.config_no_permission()}</p>
-  {:else}
     <div class="space-y-4">
       <TournamentFields
         bind:values={fieldValues}
@@ -253,11 +242,10 @@
       />
     </div>
 
-    <!-- Sticky resolves against the scrollport, not the shell's padding box: on
-         the page it must clear the bottom nav (z-40) or the nav paints over it,
-         while in a sheet the same clearance strands the chip. -->
+    <!-- Sticky resolves against the scrollport, not the shell's padding box: it
+         must clear the bottom nav (z-40) or the nav paints over it. -->
     {#if saving || savedFlash}
-      <div class="sticky {inSheet ? 'bottom-4' : 'bottom-[calc(1rem+var(--spacing-navbar))] sm:bottom-[calc(1rem+var(--spacing-safe-b))]'} flex justify-end pointer-events-none">
+      <div class="sticky bottom-[calc(1rem+var(--spacing-navbar))] sm:bottom-[calc(1rem+var(--spacing-safe-b))] flex justify-end pointer-events-none">
         <div class="bg-surface-card border border-line rounded-full shadow px-3 py-1.5 text-xs text-ink-muted flex items-center gap-1.5">
           {#if saving}
             <RefreshCw class="w-3 h-3 animate-spin" aria-hidden="true" />
@@ -269,5 +257,4 @@
         </div>
       </div>
     {/if}
-  {/if}
 </div>

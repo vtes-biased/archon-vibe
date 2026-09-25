@@ -11,7 +11,7 @@
     QrCode, WifiOff, Wifi, Share2, ClipboardCopy, Download, Dices, Dice3, Ticket, Gift, Undo2, Trash2,
     Pause, RotateCcw, ChevronDown, ChevronRight, Plus, SquarePlus, ArrowRightLeft,
     ShieldCheck, TriangleAlert, Gavel, X, Ban, Wrench, Users, Swords, Upload, Settings2,
-    CheckCheck, MoreHorizontal, Ellipsis, Banknote, FileX, UserMinus, Printer, Image,
+    CheckCheck, MoreHorizontal, Ellipsis, Banknote, FileX, UserMinus, Printer, Image, BookmarkMinus, User as UserIcon,
   } from "@lucide/svelte";
 
   let openFaq = $state<number | null>(null);
@@ -69,13 +69,10 @@
   <div class="space-y-4 max-w-sm">
     <div class="space-y-2">
       <h3 class="text-lg font-semibold text-accent leading-tight">Alicante por la tarde</h3>
-      <div class="flex flex-wrap items-center gap-1.5">
-        <Badge kind="status" tone="pending">{m.state_checkin()}</Badge>
-        <Badge>Standard</Badge>
-        <Badge>{m.tournament_proxies_allowed()}</Badge>
-      </div>
       <div class="flex flex-wrap items-center gap-2 pt-0.5">
+        <Button variant="ghost" size="md"><BookmarkMinus class="w-4 h-4" /> {m.tournament_agenda()}</Button>
         <Button variant="ghost" size="md"><Share2 class="w-4 h-4" /> {m.tournament_share()}</Button>
+        <Badge kind="control"><UserIcon class="w-3 h-3" /> {m.tournament_view_player()}</Badge>
         <Button variant="ghost" size="md"><WifiOff class="w-4 h-4" /> {m.offline_go_offline()}</Button>
         <Button variant="ghost" size="md"><Wrench class="w-4 h-4" /> {m.tools_title()}</Button>
       </div>
@@ -104,6 +101,7 @@
       <div class="flex">
         <span class="flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 border-accent text-ink-strong"><Users class="w-4 h-4" /> {m.tournament_tab_players()}</span>
         <span class="flex items-center px-4 py-3 border-b-2 border-transparent text-ink-muted"><Swords class="w-4 h-4" /></span>
+        <span class="flex items-center px-4 py-3 border-b-2 border-transparent text-ink-muted"><Settings2 class="w-4 h-4" /></span>
       </div>
     </div>
 
