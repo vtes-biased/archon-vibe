@@ -25,8 +25,6 @@ FEEDBACK_GITHUB_CLIENT_ID = os.environ.get("FEEDBACK_GITHUB_CLIENT_ID", "")
 FEEDBACK_GITHUB_PRIVATE_KEY = os.environ.get("FEEDBACK_GITHUB_PRIVATE_KEY", "")
 FEEDBACK_GITHUB_INSTALLATION_ID = os.environ.get("FEEDBACK_GITHUB_INSTALLATION_ID", "")
 FEEDBACK_TARGET_REPO = "vtes-biased/archon-vibe"
-# beta and production share the repo and the App
-FROM_BETA = os.environ.get("ENVIRONMENT") == "beta"
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
 
 
@@ -139,7 +137,6 @@ async def submit_feedback(body: FeedbackRequest, current_user: CurrentUser) -> R
         who = f"@{mention} ({vekn})" if mention else vekn
         meta = [
             f"- **Submitted by:** {who} — role: {roles}",
-            *(["- **Environment:** beta"] if FROM_BETA else []),
             f"- **App version:** {body.app_version or 'unknown'}",
         ]
         if body.route:

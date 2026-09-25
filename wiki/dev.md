@@ -276,7 +276,9 @@ that each need it independently, because none can read another's answer: the
 read at install time, and publishes the answer as `documentElement.dataset.env`
 for the app to read), `service-worker.ts` off `self.location.hostname`, and
 `og.py` off the host the crawler reached. Anywhere else, read `dataset.env`
-rather than re-deriving. What each surface then shows is
+rather than re-deriving. The backend is the exception: the deploy sets its
+`ENVIRONMENT` per host, and feedback reads it to mark a beta issue with an
+`Environment: beta` line and the `beta` label. What each surface then shows is
 [design](design.md#beta-identity).
 
 Beta's identity assets ship in the same artifact under `-beta` names —
@@ -345,7 +347,7 @@ variable has a sensible default. Production requires explicit configuration.
 **Core** — `DATABASE_URL`; `JWT_PRIVATE_KEY` and `JWT_PUBLIC_KEYS` (`just
 jwt-keys`, one pair per environment, both deploy secrets —
 [access](access.md#authentication)); `ENVIRONMENT`, which anything but
-`development` makes those two mandatory;
+`development` makes those two mandatory, and whose `beta` marks feedback issues;
 `FRONTEND_URL`, the public frontend origin used for OAuth redirects, calendar links
 and error pages; `API_BASE_URL`, the backend's view of its *own* public address for
 URLs it generates; `VITE_API_URL`, the frontend's view of where to reach the
