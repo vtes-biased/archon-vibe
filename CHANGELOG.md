@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.2.5 — 2026-09-25
 
 - The tournament page is tidier: its details fold into one panel, and organizers edit them from a Setup tab.
 
