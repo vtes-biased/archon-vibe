@@ -42,18 +42,23 @@ contributor.
 
 ### How long it is
 
-**Ten to fifteen lines, whatever the span.** Two months and a hundred commits is
-still ten to fifteen lines. Thirty means one line per commit — go back and
-collapse.
+**As short as possible — shorter is always better.** There is no target count and
+no floor: five lines is better than eight when five say it, and a span of a
+hundred commits can still be five lines. Length is never a reason to keep a line.
 
-Collapse by **surface, not by commit**. A page reworked is one line however many
-commits and however many separate improvements went into it: "The Community page
-has been reworked: easier to curate, clearer display for all links" is the whole
-of a five-commit restructure.
+**One scope, one line.** Every change to the same surface or flow collapses into a
+single line, however many commits and however many separate improvements went
+into it: "Winning decks sent to the TWDA are cleaner and follow the archive's own
+format" is the whole of five commits on import cleanup, the header, the comment
+and the place gate. "The Community page has been reworked: easier to curate,
+clearer display for all links" is the whole of a five-commit restructure.
 
-Draft **short**. Every pass over this file has ended in a cut, never an addition.
-A line the owner misses costs one message; twelve lines they have to delete is
-the work done twice.
+**A line another line covers is dropped.** "Historic results have been reconciled"
+already says what the fix to old vekn.net sheets did — the narrower line goes.
+
+Every pass over this file has ended in a cut, never an addition. Before showing
+the draft, make that cut yourself: a line the owner misses costs one message; lines
+they have to merge or delete are the work done twice.
 
 ### How a line reads
 
@@ -90,7 +95,7 @@ One sentence, around twenty words, one clause of substance. Then stop.
 
 ### Shape
 
-**A flat list. No headings, no sections.** Twelve lines need no signposting, and a
+**A flat list. No headings, no sections.** A short list needs no signposting, and a
 heading invites padding the thin section out to earn itself.
 
 Order so related lines sit together, and put the corpus last: what changed about
