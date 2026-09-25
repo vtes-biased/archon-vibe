@@ -176,9 +176,9 @@ restarts only when its wheel, requirements, env file or unit changed; the venv
 install and the frontend swap compare a marker on the box with the hash of what
 is deployed, so re-running a deploy that failed halfway finishes it. Every release
 wheel carries the release tag as its version — hatch-vcs for the backend and the bot,
-CI stamping `engine/Cargo.toml` for the engine — and every binary upload, the
-wheels and the frontend tarball, lands on a path named by its digest, because
-`--diff` crashes reading a binary it would overwrite in place. A
+CI stamping `engine/Cargo.toml` for the engine. The wheels and the frontend
+tarball are replaced in place through `put_binary`, which keeps them out of
+`--diff`; rolling back is redeploying an earlier `RELEASE_TAG`. A
 certificate renews through `/var/www/certbot`. The backend's ops scripts are
 copied from the working tree, not from the release being deployed. The app,
 public API and bot connect to the database by peer auth over the socket, as

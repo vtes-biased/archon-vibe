@@ -6,6 +6,7 @@ from pathlib import Path
 
 import jinja2
 from pyinfra import host
+from pyinfra.facts.files import Sha256File
 from pyinfra.facts.server import Command
 from pyinfra.operations import files, server, systemd
 from pyinfra.operations.util import any_changed
@@ -89,8 +90,12 @@ def digest(*paths: Path) -> str:
     return sha.hexdigest()[:16]
 
 
-def wheel_dir(root: str, wheels: list[Path]) -> str:
-    return f"{root}/wheels/{digest(*wheels)}"
+def put_binary(name: str, src: Path, dest: str, **kwargs):
+    # --diff reads a replaced binary as text and crashes; force takes put's create path, which skips it
+    remote = host.get_fact(Sha256File, path=dest)
+    local = hashlib.sha256(src.read_bytes()).hexdigest()
+    force = remote is not None and remote != local
+    return files.put(name=name, src=str(src), dest=dest, force=force, **kwargs)
 
 
 def deployed(marker: str) -> str:
@@ -122,8 +127,10 @@ def venv(
                 *(rebuild if python != PYTHON else []),
                 f"{pip} --requirement {root}/requirements.txt",
                 f"{pip} {' '.join(f'--reinstall-package {p}' for p in reinstall)} "
-                + " ".join(f"{wheel_dir(root, wheels)}/{w.name}" for w in wheels),
-                f"find {root}/wheels -mindepth 1 -maxdepth 1 ! -name {digest(*wheels)} -exec rm -rf {{}} +",
+                + " ".join(f"{root}/wheels/{w.name}" for w in wheels),
+                f"find {root}/wheels -mindepth 1 -maxdepth 1 "
+                + " ".join(f"! -name {w.name}" for w in wheels)
+                + " -exec rm -rf {} +",
                 f"echo {expected} > {root}/.venv/.deployed",
             ],
             _sudo_user=name,
@@ -229,24 +236,17 @@ backend_wheels = [
 ]
 backend_requirements = artifact(build, "backend-requirements.txt")
 files.directory(
-    name="Backend wheels root",
+    name="Backend wheels",
     path=f"{backend_root}/wheels",
     user=name,
     group=name,
     mode="755",
 )
-files.directory(
-    name="Backend wheels",
-    path=wheel_dir(backend_root, backend_wheels),
-    user=name,
-    group=name,
-    mode="755",
-)
 backend = [
-    files.put(
+    put_binary(
         name=f"Upload {w.name}",
-        src=str(w),
-        dest=f"{wheel_dir(backend_root, backend_wheels)}/{w.name}",
+        src=w,
+        dest=f"{backend_root}/wheels/{w.name}",
         user=name,
         group=name,
     )
@@ -401,25 +401,18 @@ files.directory(name="Bot root", path=bot_root, user=name, group=name, mode="755
 files.directory(name="Bot state", path=bot_state_dir, user=name, group=name, mode="750")
 bot_wheel = artifact(build, "archon_discord_bot-*.whl")
 files.directory(
-    name="Bot wheels root",
-    path=f"{bot_root}/wheels",
-    user=name,
-    group=name,
-    mode="755",
-)
-files.directory(
     name="Bot wheels",
-    path=wheel_dir(bot_root, [bot_wheel]),
+    path=f"{bot_root}/wheels",
     user=name,
     group=name,
     mode="755",
 )
 bot_requirements = artifact(build, "bot-requirements.txt")
 bot = [
-    files.put(
+    put_binary(
         name=f"Upload {bot_wheel.name}",
-        src=str(bot_wheel),
-        dest=f"{wheel_dir(bot_root, [bot_wheel])}/{bot_wheel.name}",
+        src=bot_wheel,
+        dest=f"{bot_root}/wheels/{bot_wheel.name}",
         user=name,
         group=name,
     ),
@@ -469,10 +462,10 @@ service(
 files.directory(name="Frontend root", path=www, user=name, group=name, mode="755")
 tarball = frontend_bundle(build)
 bundle = digest(tarball)
-files.put(
+put_binary(
     name="Frontend bundle",
-    src=str(tarball),
-    dest=f"{www}/frontend-{bundle}.tar.gz",
+    src=tarball,
+    dest=f"{www}/frontend-dist.tar.gz",
     user=name,
     group=name,
 )
@@ -482,12 +475,11 @@ if deployed(f"{www}/.bundle") != bundle:
         commands=[
             f"rm -rf {www}/dist.new {www}/dist.old",
             f"mkdir {www}/dist.new",
-            f"tar -xzf {www}/frontend-{bundle}.tar.gz -C {www}/dist.new",
+            f"tar -xzf {www}/frontend-dist.tar.gz -C {www}/dist.new",
             f"chown -R {name}:{name} {www}/dist.new",
             f"if [ -d {www}/dist ]; then mv {www}/dist {www}/dist.old; fi",
             f"mv {www}/dist.new {www}/dist",
             f"rm -rf {www}/dist.old",
-            f"find {www} -maxdepth 1 -name 'frontend-*.tar.gz' ! -name frontend-{bundle}.tar.gz -delete",
             f"echo {bundle} > {www}/.bundle",
         ],
     )
