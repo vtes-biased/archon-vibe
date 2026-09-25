@@ -276,9 +276,9 @@ that each need it independently, because none can read another's answer: the
 read at install time, and publishes the answer as `documentElement.dataset.env`
 for the app to read), `service-worker.ts` off `self.location.hostname`, and
 `og.py` off the host the crawler reached. Anywhere else, read `dataset.env`
-rather than re-deriving. The backend is the exception: the deploy sets its
-`ENVIRONMENT` per host, and feedback reads it to mark a beta issue with an
-`Environment: beta` line and the `beta` label. What each surface then shows is
+rather than re-deriving. The feedback route is the exception: it reads the
+backend's `ENVIRONMENT`, which the deploy sets per host, to mark a beta issue with
+an `Environment: beta` line and the `beta` label. What each surface then shows is
 [design](design.md#beta-identity).
 
 Beta's identity assets ship in the same artifact under `-beta` names —
