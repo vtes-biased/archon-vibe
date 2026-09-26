@@ -2479,7 +2479,10 @@ fn apply_event(
             let has_deck = decks
                 .members()
                 .any(|d| d[deck_object::USER_UID].as_str() == Some(player_uid.as_str()));
-            if !actor.is_organizer && state == TournamentState::Playing && !*multideck && has_deck {
+            let single_deck_locked = state == TournamentState::Playing
+                || (state != TournamentState::Finished
+                    && !tournament[tournament::ROUNDS].is_empty());
+            if !actor.is_organizer && single_deck_locked && !*multideck && has_deck {
                 return Err(EngineError::DeckLockedPlaying);
             }
             let mut deck_data = deck.clone();
@@ -2528,7 +2531,10 @@ fn apply_event(
                 if *multideck && deck_index.is_some() {
                     return Err(EngineError::DeckLockedRound);
                 }
-                if state == TournamentState::Playing && !*multideck {
+                if !*multideck
+                    && (state == TournamentState::Playing
+                        || !tournament[tournament::ROUNDS].is_empty())
+                {
                     return Err(EngineError::DeckLockedPlaying);
                 }
             }

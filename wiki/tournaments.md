@@ -666,9 +666,11 @@ name one.
 **Stamped is locked during play.** A stamped deck was played, so until the event
 finishes a player may neither replace nor delete it — the engine drops any round
 a player names on an upload, leaving them one editable deck at a time, and only
-an organizer names a round. **Once Finished the owner corrects.** A player may
-add, replace, edit or delete any of their own decks, naming the round it was
-played in.
+an organizer names a round. A single-deck event's deck, never stamped, locks for
+its player once the first round exists (§3.1.5 bars changing decks between rounds
+outside multideck); only a first upload stays open. **Once Finished the owner
+corrects.** A player may add, replace, edit or delete any of their own decks,
+naming the round it was played in.
 `DeleteDeck` carries the same Storyline refusal as the upload.
 
 **An organizer sees a deck once it has been played**, never before: organizer
@@ -835,7 +837,7 @@ naturally:
   prelims. `CheckIn` is refused; `CheckInAll` skips them.
 - Deck locking is per deck, not tournament-wide: seating stamps a player's pending
   deck with its round and a stamped deck is immutable, so between rounds every
-  player has exactly one editable deck.
+  multideck player has exactly one editable deck.
 - Standings are cumulative GW > VP > TP across all rounds played, as usual.
 
 ### Self-organized rounds

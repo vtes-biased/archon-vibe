@@ -3687,6 +3687,30 @@ fn test_delete_deck_playing_blocked() {
 }
 
 #[test]
+fn test_single_deck_locked_between_rounds() {
+    let mut tournament = multideck_tournament("Waiting", 1);
+    tournament["multideck"] = false.into();
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1"}]"#;
+    let actor = make_player("player-1");
+    let upsert = json::object! {
+        type: "UpsertDeck",
+        player_uid: "player-1",
+        deck: { name: "New", author: "", comments: "", cards: {} },
+        multideck: false,
+    };
+    let delete = json::object! {
+        type: "DeleteDeck",
+        player_uid: "player-1",
+        deck_index: json::Null,
+        multideck: false,
+    };
+    for event in [&upsert, &delete] {
+        let result = run_event_with_decks(&tournament, event, &actor, decks);
+        assert!(result.unwrap_err().to_string().contains("in progress"));
+    }
+}
+
+#[test]
 fn test_owner_deletes_a_played_deck_after_finish() {
     let mut tournament = tournament_with_player("Finished");
     tournament["multideck"] = true.into();

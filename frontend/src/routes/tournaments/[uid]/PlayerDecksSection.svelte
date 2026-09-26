@@ -117,7 +117,8 @@
   const isStoryline = $derived(tournament.format === 'Storyline');
   const isFinished = $derived(tournament.state === 'Finished');
   const canModifyPending = $derived(!isStoryline);
-  const singleDeckEditable = $derived(!isStoryline && tournament.state !== 'Playing');
+  const singleDeckUploadable = $derived(!isStoryline && tournament.state !== 'Playing');
+  const singleDeckEditable = $derived(singleDeckUploadable && (isFinished || roundCount === 0));
 
   function roundLabel(round: number | null): string {
     if (round === null) return m.decks_next_round();
@@ -292,7 +293,7 @@
               {/if}
             </div>
           </FoldableSection>
-        {:else if singleDeckEditable}
+        {:else if singleDeckUploadable}
           <!-- The uploader is a screenful, so it waits behind its own button. -->
           {@const uploading = uploadingFor === myUid}
           <div class="bg-surface-muted/50 rounded-lg p-3 sm:p-4 space-y-3">
