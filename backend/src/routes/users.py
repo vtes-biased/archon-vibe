@@ -1,11 +1,14 @@
 import logging
 from datetime import UTC, datetime
+from typing import Annotated
 from uuid import uuid7
 
 import msgspec
-from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from litestar import Request, Response, Router, delete, get, patch, post, put
+from litestar.datastructures import UploadFile
+from litestar.enums import RequestEncodingType
+from litestar.exceptions import HTTPException
+from litestar.params import Body, FromPath
 
 from .. import accounts, community_links, permissions
 from ..broadcast import broadcast_precomputed, broadcast_resync
@@ -21,16 +24,15 @@ from ..db import save_user as db_save_user
 from ..db import upsert_avatar as db_upsert_avatar
 from ..db import user_has_nda as db_user_has_nda
 from ..geonames import stored_country
-from ..middleware.auth import CurrentUser, OptionalUser
+from ..middleware.auth import get_current_user, get_optional_user
 from ..models import Role, User
 from .auth import send_invite_email
 
-router = APIRouter(prefix="/api/users", tags=["users"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 
 
-class CreateUserRequest(BaseModel):
+class CreateUserRequest(msgspec.Struct):
     """JSON body for POST /api/users/."""
 
     name: str
@@ -43,7 +45,7 @@ class CreateUserRequest(BaseModel):
     roles: list[str] | None = None
 
 
-class UpdateUserRequest(BaseModel):
+class UpdateUserRequest(msgspec.Struct):
     """JSON body for PUT /api/users/{uid}. All fields optional (omit = leave unchanged)."""
 
     name: str | None = None
@@ -55,18 +57,17 @@ class UpdateUserRequest(BaseModel):
     roles: list[str] | None = None
 
 
-@router.post("/", status_code=201)
-async def create_user(
-    body: CreateUserRequest, current_user: OptionalUser = None
-) -> Response:
+@post("/")
+async def create_user(request: Request, data: CreateUserRequest) -> Response:
     """Auto-allocates a VEKN ID. If email is provided, sends an invite email so
     the new member can log in."""
-    name = body.name
-    country = stored_country(body.country)
-    if body.country and country is None:
-        raise HTTPException(status_code=422, detail=f"Invalid country: {body.country}")
-    city, city_geoname_id = body.city, body.city_geoname_id
-    state, nickname, email, roles = body.state, body.nickname, body.email, body.roles
+    current_user = await get_optional_user(request)
+    name = data.name
+    country = stored_country(data.country)
+    if data.country and country is None:
+        raise HTTPException(status_code=422, detail=f"Invalid country: {data.country}")
+    city, city_geoname_id = data.city, data.city_geoname_id
+    state, nickname, email, roles = data.state, data.nickname, data.email, data.roles
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -94,13 +95,13 @@ async def create_user(
     if email:
         existing = await get_user_by_email(email)
         if existing:
-            return JSONResponse(
-                status_code=409,
-                content={
+            return Response(
+                {
                     "detail": "A member with this email already exists",
                     "code": "user.email_exists",
                     "params": {"uid": existing.uid},
                 },
+                status_code=409,
             )
 
     vekn_id = await allocate_next_vekn_id()
@@ -150,20 +151,20 @@ async def create_user(
     return Response(
         content=encoder.encode(user),
         media_type="application/json",
-        status_code=201,
     )
 
 
-@router.put("/{uid}")
+@put("/{uid:str}")
 async def update_user(
-    uid: str, body: UpdateUserRequest, current_user: OptionalUser = None
+    request: Request, uid: FromPath[str], data: UpdateUserRequest
 ) -> Response:
-    name = body.name
-    country = stored_country(body.country)
-    if body.country and country is None:
-        raise HTTPException(status_code=422, detail=f"Invalid country: {body.country}")
-    city, city_geoname_id = body.city, body.city_geoname_id
-    state, nickname, roles = body.state, body.nickname, body.roles
+    current_user = await get_optional_user(request)
+    name = data.name
+    country = stored_country(data.country)
+    if data.country and country is None:
+        raise HTTPException(status_code=422, detail=f"Invalid country: {data.country}")
+    city, city_geoname_id = data.city, data.city_geoname_id
+    state, nickname, roles = data.state, data.nickname, data.roles
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -313,32 +314,33 @@ async def update_user(
 MAX_AVATAR_SIZE = 1024 * 1024
 
 
-@router.post("/{uid}/avatar")
+@post("/{uid:str}/avatar")
 async def upload_avatar(
-    uid: str,
-    file: UploadFile,
-    current_user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
+    data: Annotated[UploadFile, Body(media_type=RequestEncodingType.MULTI_PART)],
 ) -> Response:
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
     if current_user.uid != uid:
         raise HTTPException(status_code=403, detail="Can only upload your own avatar")
 
-    if file.content_type not in ("image/webp", "image/png", "image/jpeg"):
+    if data.content_type not in ("image/webp", "image/png", "image/jpeg"):
         raise HTTPException(
             status_code=400,
             detail="Avatar must be webp, png, or jpeg",
         )
 
-    data = await file.read()
-    if len(data) > MAX_AVATAR_SIZE:
+    payload = await data.read()
+    if len(payload) > MAX_AVATAR_SIZE:
         raise HTTPException(
             status_code=400,
             detail=f"Avatar too large. Max size: {MAX_AVATAR_SIZE // 1024}KB",
         )
 
-    await db_upsert_avatar(uid, data, file.content_type or "image/webp")
+    await db_upsert_avatar(uid, payload, data.content_type or "image/webp")
 
     # Versioned avatar_path: a re-upload gets a new URL so SSE propagates the change
     # and clients refetch, while each version stays long-cacheable (see get_avatar).
@@ -361,8 +363,8 @@ async def upload_avatar(
     )
 
 
-@router.get("/{uid}/avatar")
-async def get_avatar(uid: str, request: Request) -> Response:
+@get("/{uid:str}/avatar")
+async def get_avatar(request: Request, uid: FromPath[str]) -> Response:
     """A versioned (?v=) URL is immutable content, cached for a year; a legacy
     unversioned request gets a short TTL and revalidates hourly."""
     result = await db_get_avatar(uid)
@@ -382,11 +384,9 @@ async def get_avatar(uid: str, request: Request) -> Response:
     )
 
 
-@router.delete("/{uid}/avatar")
-async def delete_avatar(
-    uid: str,
-    current_user: OptionalUser = None,
-) -> Response:
+@delete("/{uid:str}/avatar", status_code=200)
+async def delete_avatar(request: Request, uid: FromPath[str]) -> Response:
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -414,7 +414,7 @@ async def delete_avatar(
     )
 
 
-class LinkEditRequest(BaseModel):
+class LinkEditRequest(msgspec.Struct):
     """Curate a link on another member's profile, addressed by its URL.
 
     The URL is the identity moderation is keyed on and is never rewritten.
@@ -428,18 +428,17 @@ class LinkEditRequest(BaseModel):
     state: str | None = None
 
 
-@router.patch("/{user_uid}/community-link-moderation")
+@patch("/{user_uid:str}/community-link-moderation")
 async def edit_community_link(
-    user_uid: str,
-    request: LinkEditRequest,
-    current_user: CurrentUser,
+    request: Request, user_uid: FromPath[str], data: LinkEditRequest
 ) -> Response:
     """Curate a link on another member's profile."""
+    current_user = await get_current_user(request)
     target = await get_user_by_uid(user_uid)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
 
-    prior = next((el for el in target.community_links if el.url == request.url), None)
+    prior = next((el for el in target.community_links if el.url == data.url), None)
     if prior is None:
         raise HTTPException(status_code=404, detail="Link not found on target user")
 
@@ -449,7 +448,7 @@ async def edit_community_link(
             status_code=403, detail="Can only moderate links in your country"
         )
     country = community_links.validated_country(
-        request.country, prior.country or target.country
+        data.country, prior.country or target.country
     )
     if country != prior.country and not permissions.can_moderate_link(
         current_user, country
@@ -458,30 +457,28 @@ async def edit_community_link(
             status_code=403, detail="Can only move a link into your own country"
         )
 
-    link_type = (
-        community_links.validated_type(request.type) if request.type else prior.type
-    )
+    link_type = community_links.validated_type(data.type) if data.type else prior.type
     languages = community_links.validated_languages(
-        prior.languages if request.languages is None else request.languages,
+        prior.languages if data.languages is None else data.languages,
         link_type,
         prior,
     )
     mod = prior.moderation
-    if request.state is not None:
+    if data.state is not None:
         mod = community_links.moderation_for(
-            current_user, request.state, country, mod, target.uid, request.url
+            current_user, data.state, country, mod, target.uid, data.url
         )
 
     edited = msgspec.structs.replace(
         prior,
         type=link_type,
-        label=prior.label if request.label is None else request.label,
+        label=prior.label if data.label is None else data.label,
         languages=languages,
         country=country,
         moderation=mod,
     )
     target.community_links = [
-        edited if link.url == request.url else link for link in target.community_links
+        edited if link.url == data.url else link for link in target.community_links
     ]
     target.modified = datetime.now(UTC)
     bd = await db_save_user(target)
@@ -490,18 +487,19 @@ async def edit_community_link(
     return Response(content=b'{"success": true}', media_type="application/json")
 
 
-class DeceasedRequest(BaseModel):
+class DeceasedRequest(msgspec.Struct):
     """JSON body for PATCH /api/users/{uid}/deceased."""
 
     deceased: bool
 
 
-@router.patch("/{uid}/deceased")
+@patch("/{uid:str}/deceased")
 async def set_deceased(
-    uid: str, body: DeceasedRequest, current_user: CurrentUser
+    request: Request, uid: FromPath[str], data: DeceasedRequest
 ) -> Response:
     """Mark or clear a member's deceased status. Not a soft-delete: history
     and ratings are preserved. Reversible."""
+    current_user = await get_current_user(request)
     if current_user.uid == uid:
         raise HTTPException(
             status_code=403, detail="You cannot change your own deceased status"
@@ -519,7 +517,7 @@ async def set_deceased(
 
     # Block only SETTING on a VEKN-less member (delete instead) — clearing a
     # legacy mis-mark stays allowed so it can't get stuck.
-    if body.deceased and not target.vekn_id:
+    if data.deceased and not target.vekn_id:
         raise HTTPException(
             status_code=400,
             detail="VEKN-less members cannot be marked deceased; delete them instead",
@@ -532,8 +530,8 @@ async def set_deceased(
     target = msgspec.structs.replace(
         target,
         modified=datetime.now(UTC),
-        deceased_at=datetime.now(UTC) if body.deceased else None,
-        deceased_by_uid=current_user.uid if body.deceased else None,
+        deceased_at=datetime.now(UTC) if data.deceased else None,
+        deceased_by_uid=current_user.uid if data.deceased else None,
         local_modifications=local_mods,
     )
 
@@ -542,17 +540,18 @@ async def set_deceased(
     return Response(content=encoder.encode(target), media_type="application/json")
 
 
-class SponsorEditRequest(BaseModel):
+class SponsorEditRequest(msgspec.Struct):
     """JSON body for PATCH /api/users/{uid}/sponsor. None clears the sponsor."""
 
     sponsor_uid: str | None
 
 
-@router.patch("/{uid}/sponsor")
+@patch("/{uid:str}/sponsor")
 async def set_sponsor(
-    uid: str, body: SponsorEditRequest, current_user: CurrentUser
+    request: Request, uid: FromPath[str], data: SponsorEditRequest
 ) -> Response:
     """Correct or clear who sponsored a member."""
+    current_user = await get_current_user(request)
     if current_user.uid == uid:
         raise HTTPException(
             status_code=403, detail="You cannot change your own sponsor"
@@ -573,12 +572,12 @@ async def set_sponsor(
             status_code=400, detail="Only a VEKN member's sponsor can be changed"
         )
 
-    if body.sponsor_uid is not None:
-        if body.sponsor_uid == uid:
+    if data.sponsor_uid is not None:
+        if data.sponsor_uid == uid:
             raise HTTPException(
                 status_code=400, detail="A member cannot sponsor themselves"
             )
-        sponsor = await get_user_by_uid(body.sponsor_uid)
+        sponsor = await get_user_by_uid(data.sponsor_uid)
         if not sponsor or sponsor.deleted_at or not sponsor.vekn_id:
             raise HTTPException(
                 status_code=400, detail="The sponsor must be a VEKN member"
@@ -589,8 +588,8 @@ async def set_sponsor(
     target = msgspec.structs.replace(
         target,
         modified=datetime.now(UTC),
-        coopted_by=body.sponsor_uid,
-        coopted_at=target.coopted_at if body.sponsor_uid else None,
+        coopted_by=data.sponsor_uid,
+        coopted_at=target.coopted_at if data.sponsor_uid else None,
         local_modifications=local_mods,
     )
 
@@ -599,8 +598,9 @@ async def set_sponsor(
     return Response(content=encoder.encode(target), media_type="application/json")
 
 
-@router.post("/{uid}/anonymize")
-async def anonymize_member(uid: str, current_user: CurrentUser) -> Response:
+@post("/{uid:str}/anonymize")
+async def anonymize_member(request: Request, uid: FromPath[str]) -> Response:
+    current_user = await get_current_user(request)
     if current_user.uid == uid:
         raise HTTPException(
             status_code=403, detail="You cannot anonymize your own account"
@@ -627,10 +627,11 @@ async def anonymize_member(uid: str, current_user: CurrentUser) -> Response:
     return Response(content=encoder.encode(user), media_type="application/json")
 
 
-@router.delete("/{uid}")
-async def delete_member(uid: str, current_user: CurrentUser) -> Response:
+@delete("/{uid:str}", status_code=200)
+async def delete_member(request: Request, uid: FromPath[str]) -> Response:
     """Soft-delete a VEKN-less member (IC only). A VEKN-bearing member is
     refused: the next VEKN sync would just recreate a tombstoned one."""
+    current_user = await get_current_user(request)
     if current_user.uid == uid:
         raise HTTPException(
             status_code=403, detail="You cannot delete your own account"
@@ -655,3 +656,20 @@ async def delete_member(uid: str, current_user: CurrentUser) -> Response:
     user, bd = result
     broadcast_precomputed(bd)
     return Response(content=encoder.encode(user), media_type="application/json")
+
+
+router = Router(
+    "/api/users",
+    route_handlers=[
+        create_user,
+        update_user,
+        upload_avatar,
+        get_avatar,
+        delete_avatar,
+        edit_community_link,
+        set_deceased,
+        set_sponsor,
+        anonymize_member,
+        delete_member,
+    ],
+)

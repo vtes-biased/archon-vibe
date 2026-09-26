@@ -341,10 +341,10 @@ async def test_personal_feed_keeps_recently_finished_own_events(test_db):
             await db.save_tournament(t, conn=conn)
 
     async def feed(token):
-        resp = await tournament_calendar(
+        resp = await tournament_calendar.fn(
             token=token, country=None, online=True, format=None, league=None
         )
-        return resp.body.decode()
+        return resp.content
 
     personal = await feed("feed-window")
     assert recent_own.uid in personal
@@ -387,9 +387,9 @@ async def test_agenda_overrides_reach_the_owner_and_their_feed_only(test_client)
         assert "agenda_hidden" not in projection
         assert "agenda_added" not in projection
 
-    resp = await tournament_calendar(
+    resp = await tournament_calendar.fn(
         token="agenda-feed", country=None, online=True, format=None, league=None
     )
-    feed = resp.body.decode()
+    feed = resp.content
     assert far.uid in feed
     assert own.uid not in feed

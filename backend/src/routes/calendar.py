@@ -6,13 +6,13 @@ from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from archon_engine import PyEngine
-from fastapi import APIRouter, HTTPException, Query, Response
+from litestar import Response, Router, get
+from litestar.exceptions import HTTPException
+from litestar.params import FromPath, FromQuery
 
 from ..db import get_user_by_calendar_token
 from ..geonames import get_countries_on_continent
 from ..models import Tournament
-
-router = APIRouter(prefix="/api/calendar", tags=["calendar"])
 
 _engine = PyEngine()
 
@@ -139,8 +139,8 @@ def _agenda_filter(
     return [t for t, keep in zip(tournaments, on, strict=True) if keep]
 
 
-@router.get("/tournaments/{uid}.ics")
-async def tournament_event_ics(uid: str) -> Response:
+@get("/tournaments/{uid:str}.ics")
+async def tournament_event_ics(uid: FromPath[str]) -> Response:
     """Public like the feeds: the same venue/address projection exception applies."""
     from ..db import get_tournament_by_uid
 
@@ -176,15 +176,13 @@ async def tournament_event_ics(uid: str) -> Response:
     )
 
 
-@router.get("/tournaments.ics")
+@get("/tournaments.ics")
 async def tournament_calendar(
-    token: str | None = Query(None, description="Personal calendar token"),
-    country: str | None = Query(
-        None, description="Filter by comma-separated country ISO codes"
-    ),
-    online: bool = Query(True, description="Include online events"),
-    format: str | None = Query(None, description="Filter by format"),
-    league: str | None = Query(None, description="Only events of this league uid"),
+    token: FromQuery[str | None] = None,
+    country: FromQuery[str | None] = None,
+    online: FromQuery[bool] = True,
+    format: FromQuery[str | None] = None,
+    league: FromQuery[str | None] = None,
 ) -> Response:
     """iCal feed: league's events if `league`, else a personal agenda if `token`
     (own events always included, recently-finished ones stay for
@@ -296,3 +294,9 @@ async def tournament_calendar(
             "Cache-Control": "public, max-age=3600",
         },
     )
+
+
+router = Router(
+    "/api/calendar",
+    route_handlers=[tournament_event_ics, tournament_calendar],
+)

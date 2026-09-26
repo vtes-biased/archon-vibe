@@ -3,12 +3,14 @@
 import os
 import secrets
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 from uuid import uuid7
 
 import msgspec
 from argon2 import PasswordHasher
-from fastapi import APIRouter, Header, HTTPException, Response
-from pydantic import BaseModel, EmailStr
+from litestar import Response, post
+from litestar.exceptions import HTTPException
+from litestar.params import FromHeader
 
 from ...db import (
     delete_transient_token,
@@ -29,8 +31,8 @@ from ._tokens import (
     create_refresh_token,
     verify_token,
 )
+from .email_password import EMAIL_PATTERN
 
-router = APIRouter()
 encoder = msgspec.json.Encoder()
 ph = PasswordHasher()
 
@@ -39,16 +41,16 @@ INVITE_LIFETIME = timedelta(days=7)
 SET_PASSWORD_EXPIRE_MINUTES = 10
 
 
-class MagicLinkRequest(BaseModel):
-    email: EmailStr
+class MagicLinkRequest(msgspec.Struct):
+    email: Annotated[str, msgspec.Meta(pattern=EMAIL_PATTERN)]
     purpose: str = "signup"  # "signup" or "reset"
 
 
-class MagicLinkVerifyRequest(BaseModel):
+class MagicLinkVerifyRequest(msgspec.Struct):
     token: str
 
 
-class SetPasswordRequest(BaseModel):
+class SetPasswordRequest(msgspec.Struct):
     token: str
     password: str
 
@@ -84,15 +86,15 @@ async def send_invite_email(email: str, user_uid: str, user_name: str) -> bool:
     return True
 
 
-@router.post("/email/request")
+@post("/email/request")
 async def request_magic_link(
-    request: MagicLinkRequest,
-    authorization: str | None = Header(default=None),
+    data: MagicLinkRequest,
+    authorization: FromHeader[str | None] = None,
 ) -> Response:
     """Purpose "signup" creates or links an account; "reset" requires an
     existing one. An authenticated Bearer token links the email to that user."""
-    email = request.email.lower()
-    purpose = request.purpose
+    email = data.email.lower()
+    purpose = data.purpose
 
     if purpose not in ("signup", "reset"):
         raise HTTPException(status_code=400, detail="Invalid purpose")
@@ -158,10 +160,10 @@ async def request_magic_link(
     )
 
 
-@router.post("/email/verify")
-async def verify_magic_link(request: MagicLinkVerifyRequest) -> Response:
+@post("/email/verify")
+async def verify_magic_link(data: MagicLinkVerifyRequest) -> Response:
     """Returns a short-lived set-password token; does not log in directly."""
-    stored = await get_transient_token(f"magic:{request.token}")
+    stored = await get_transient_token(f"magic:{data.token}")
     if not stored:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
@@ -174,7 +176,7 @@ async def verify_magic_link(request: MagicLinkVerifyRequest) -> Response:
             "purpose": stored["purpose"],
             "discord_user_uid": stored.get("discord_user_uid"),
             "user_uid": stored.get("user_uid"),
-            "magic_token": request.token,
+            "magic_token": data.token,
         },
         expires_at,
     )
@@ -192,15 +194,15 @@ async def verify_magic_link(request: MagicLinkVerifyRequest) -> Response:
     )
 
 
-@router.post("/email/set-password")
-async def set_password(request: SetPasswordRequest) -> Response:
+@post("/email/set-password")
+async def set_password(data: SetPasswordRequest) -> Response:
     """Creates or updates the EMAIL auth method depending on purpose
     (signup/reset/invite) and returns authentication tokens."""
-    stored = await get_transient_token(f"setpwd:{request.token}")
+    stored = await get_transient_token(f"setpwd:{data.token}")
     if not stored:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
-    await delete_transient_token(f"setpwd:{request.token}")
+    await delete_transient_token(f"setpwd:{data.token}")
     if magic_token := stored.get("magic_token"):
         await delete_transient_token(f"magic:{magic_token}")
 
@@ -209,7 +211,7 @@ async def set_password(request: SetPasswordRequest) -> Response:
     record_user_uid = stored.get("discord_user_uid")
     now = datetime.now(UTC)
 
-    password_hash = ph.hash(request.password)
+    password_hash = ph.hash(data.password)
 
     existing_email_auth = await get_auth_method_by_identifier("email", email)
 
@@ -319,6 +321,9 @@ async def set_password(request: SetPasswordRequest) -> Response:
         expires_in=expires_in,
     )
     return Response(
-        content=response.model_dump_json(),
+        content=encoder.encode(response),
         media_type="application/json",
     )
+
+
+handlers = [request_magic_link, verify_magic_link, set_password]

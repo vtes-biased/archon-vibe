@@ -123,15 +123,16 @@ def venv(
     )
     if python == PYTHON and deployed(f"{root}/.venv/.deployed") == expected:
         return
-    pip = f"{UV} pip install --no-cache --python {root}/.venv/bin/python"
+    target = f"--no-cache --python {root}/.venv/bin/python"
     rebuild = [f"rm -rf {root}/.venv", f"{UV} venv --python {PYTHON} {root}/.venv"]
     changes.append(
         server.shell(
             name=f"Install {root}",
             commands=[
                 *(rebuild if python != PYTHON else []),
-                f"{pip} --requirement {root}/requirements.txt",
-                f"{pip} {' '.join(f'--reinstall-package {p}' for p in reinstall)} "
+                f"{UV} pip sync {target} {root}/requirements.txt",
+                f"{UV} pip install {target} "
+                + f"{' '.join(f'--reinstall-package {p}' for p in reinstall)} "
                 + " ".join(f"{root}/wheels/{w.name}" for w in wheels),
                 f"find {root}/wheels -mindepth 1 -maxdepth 1 "
                 + " ".join(f"! -name {w.name}" for w in wheels)

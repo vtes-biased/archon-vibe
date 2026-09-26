@@ -4,12 +4,13 @@ import os
 import secrets
 import time
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 import msgspec
 from argon2 import PasswordHasher
-from fastapi import APIRouter, HTTPException, Response
-from pydantic import BaseModel, Field
+from litestar import Request, Response, get, patch, post, put
+from litestar.exceptions import HTTPException
+from litestar.params import FromPath, FromQuery
 
 from ... import permissions
 from ...broadcast import broadcast_precomputed
@@ -30,15 +31,14 @@ from ...db import (
 )
 from ...geonames import stored_country
 from ...link_preview import LinkPreviewError, fetch_link_title
-from ...middleware.auth import CurrentUser
+from ...middleware.auth import get_current_user
 from ...models import AuthMethodType, CommunityLink
 
-router = APIRouter()
 encoder = msgspec.json.Encoder()
 ph = PasswordHasher()
 
 
-class CommunityLinkInput(BaseModel):
+class CommunityLinkInput(msgspec.Struct):
     type: str
     url: str
     label: str = ""
@@ -47,7 +47,7 @@ class CommunityLinkInput(BaseModel):
     state: str | None = None
 
 
-class ProfileUpdateRequest(BaseModel):
+class ProfileUpdateRequest(msgspec.Struct):
     name: str | None = None
     nickname: str | None = None
     country: str | None = None
@@ -59,12 +59,13 @@ class ProfileUpdateRequest(BaseModel):
     community_links: list[CommunityLinkInput] | None = None
 
 
-class PasswordChangeRequest(BaseModel):
-    password: str = Field(min_length=8)
+class PasswordChangeRequest(msgspec.Struct):
+    password: Annotated[str, msgspec.Meta(min_length=8)]
 
 
-@router.get("/me")
-async def get_me(current_user: CurrentUser) -> Response:
+@get("/me")
+async def get_me(request: Request) -> Response:
+    current_user = await get_current_user(request)
     user = current_user
 
     user.calendar_token = await get_calendar_token(user.uid)
@@ -90,28 +91,29 @@ async def get_me(current_user: CurrentUser) -> Response:
     )
 
 
-@router.patch("/me")
+@patch("/me")
 async def update_current_user(
-    request: ProfileUpdateRequest,
-    current_user: CurrentUser,
+    request: Request,
+    data: ProfileUpdateRequest,
 ) -> Response:
+    current_user = await get_current_user(request)
     user = current_user
 
     # Self-edits must land in local_modifications, or the VEKN sync and the
     # legacy-archon merge — both skip locally-modified fields — silently revert them.
     local_mods = set(user.local_modifications)
 
-    if request.name is not None:
-        user.name = request.name
+    if data.name is not None:
+        user.name = data.name
         local_mods.add("name")
-    if request.nickname is not None:
-        user.nickname = request.nickname if request.nickname else None
+    if data.nickname is not None:
+        user.nickname = data.nickname if data.nickname else None
         local_mods.add("nickname")
-    if request.country is not None:
-        new_country = stored_country(request.country)
-        if request.country and new_country is None:
+    if data.country is not None:
+        new_country = stored_country(data.country)
+        if data.country and new_country is None:
             raise HTTPException(
-                status_code=422, detail=f"Invalid country: {request.country}"
+                status_code=422, detail=f"Invalid country: {data.country}"
             )
         # An NC/Prince can't change their own country: it scopes their FULL-data
         # overlay, so a self-edit would be an unauthorized scope change.
@@ -125,27 +127,25 @@ async def update_current_user(
             )
         user.country = new_country
         local_mods.add("country")
-    if request.city is not None:
-        user.city = request.city if request.city else None
+    if data.city is not None:
+        user.city = data.city if data.city else None
         local_mods.add("city")
-        if not request.city:
+        if not data.city:
             user.city_geoname_id = None
             local_mods.add("city_geoname_id")
-    if request.city_geoname_id is not None:
-        user.city_geoname_id = (
-            request.city_geoname_id if request.city_geoname_id else None
-        )
+    if data.city_geoname_id is not None:
+        user.city_geoname_id = data.city_geoname_id if data.city_geoname_id else None
         local_mods.add("city_geoname_id")
-    if request.contact_email is not None:
-        user.contact_email = request.contact_email if request.contact_email else None
+    if data.contact_email is not None:
+        user.contact_email = data.contact_email if data.contact_email else None
         local_mods.add("contact_email")
-    if request.contact_phone is not None:
-        user.contact_phone = request.contact_phone if request.contact_phone else None
+    if data.contact_phone is not None:
+        user.contact_phone = data.contact_phone if data.contact_phone else None
         local_mods.add("contact_phone")
-    if request.phone_is_whatsapp is not None:
-        user.phone_is_whatsapp = request.phone_is_whatsapp
+    if data.phone_is_whatsapp is not None:
+        user.phone_is_whatsapp = data.phone_is_whatsapp
         local_mods.add("phone_is_whatsapp")
-    if request.community_links is not None:
+    if data.community_links is not None:
         if not user.vekn_id:
             raise HTTPException(
                 status_code=403,
@@ -153,14 +153,14 @@ async def update_current_user(
             )
         is_official = permissions.is_official(user)
         max_links = 10 if is_official else 5
-        if len(request.community_links) > max_links:
+        if len(data.community_links) > max_links:
             raise HTTPException(
                 status_code=422,
                 detail=f"Maximum {max_links} community links allowed",
             )
         links = []
         existing_by_url = {existing.url: existing for existing in user.community_links}
-        for link in request.community_links:
+        for link in data.community_links:
             link_type = validated_type(link.type)
             if not link.url.startswith(("http://", "https://")):
                 raise HTTPException(status_code=422, detail=f"Invalid URL: {link.url}")
@@ -211,11 +211,12 @@ async def update_current_user(
     )
 
 
-@router.post("/me/password", status_code=204)
+@post("/me/password", status_code=204)
 async def change_password(
-    request: PasswordChangeRequest,
-    current_user: CurrentUser,
-) -> Response:
+    request: Request,
+    data: PasswordChangeRequest,
+) -> None:
+    current_user = await get_current_user(request)
     auth_methods = await get_auth_methods_for_user(current_user.uid)
     # An account merge carries every absorbed login over, so a member can hold
     # more than one email credential — all of them are theirs to sign in with.
@@ -227,15 +228,13 @@ async def change_password(
         )
 
     now = datetime.now(UTC)
-    password_hash = ph.hash(request.password)
+    password_hash = ph.hash(data.password)
     for email_auth in email_auths:
         await update_auth_method(
             msgspec.structs.replace(
                 email_auth, modified=now, credential_hash=password_hash
             )
         )
-
-    return Response(status_code=204)
 
 
 # In-process (per-worker) quota on the one route that fetches an address a
@@ -258,9 +257,10 @@ def _title_quota_exceeded(user_uid: str) -> bool:
     return exceeded
 
 
-@router.get("/me/link-title")
-async def read_link_title(url: str, current_user: CurrentUser) -> Response:
+@get("/me/link-title")
+async def read_link_title(url: FromQuery[str], request: Request) -> Response:
     """Suggest a label for a community link from the target's own title."""
+    current_user = await get_current_user(request)
     if not current_user.vekn_id:
         raise HTTPException(
             status_code=403, detail="VEKN membership required to add community links"
@@ -278,23 +278,22 @@ async def read_link_title(url: str, current_user: CurrentUser) -> Response:
     )
 
 
-class AgendaEntryRequest(BaseModel):
+class AgendaEntryRequest(msgspec.Struct):
     entry: Literal["hidden", "added"] | None = None
 
 
-@router.put("/me/agenda/{tournament_uid}")
+@put("/me/agenda/{tournament_uid:str}")
 async def set_agenda(
-    tournament_uid: str, request: AgendaEntryRequest, current_user: CurrentUser
+    tournament_uid: FromPath[str], request: Request, data: AgendaEntryRequest
 ) -> Response:
+    current_user = await get_current_user(request)
     if not current_user.vekn_id:
         raise HTTPException(status_code=403, detail="VEKN membership required")
-    if request.entry is not None:
+    if data.entry is not None:
         tournament = await get_tournament_by_uid(tournament_uid)
         if tournament is None or tournament.deleted_at is not None:
             raise HTTPException(status_code=404, detail="Tournament not found")
-    hidden, added = await set_agenda_entry(
-        current_user.uid, tournament_uid, request.entry
-    )
+    hidden, added = await set_agenda_entry(current_user.uid, tournament_uid, data.entry)
     user = current_user
     user.modified = datetime.now(UTC)
     broadcast_precomputed(await save_user(user))
@@ -304,8 +303,9 @@ async def set_agenda(
     )
 
 
-@router.post("/me/calendar-token")
-async def generate_calendar_token(current_user: CurrentUser) -> Response:
+@post("/me/calendar-token")
+async def generate_calendar_token(request: Request) -> Response:
+    current_user = await get_current_user(request)
     user = current_user
 
     cal_token = secrets.token_urlsafe(32)
@@ -325,3 +325,13 @@ async def generate_calendar_token(current_user: CurrentUser) -> Response:
         ),
         media_type="application/json",
     )
+
+
+handlers = [
+    get_me,
+    update_current_user,
+    change_password,
+    read_link_title,
+    set_agenda,
+    generate_calendar_token,
+]

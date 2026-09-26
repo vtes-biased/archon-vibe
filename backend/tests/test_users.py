@@ -424,7 +424,7 @@ async def test_anonymize_member(test_db, test_client: AsyncClient):
         resp = await test_client.post(
             f"/api/users/{member.uid}/anonymize", headers=make_auth_header(ic.uid)
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
 
         stored = await db.get_user_by_uid(member.uid)
         assert stored.name == ANONYMIZED_NAME

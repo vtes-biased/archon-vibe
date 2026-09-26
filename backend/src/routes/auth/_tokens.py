@@ -4,28 +4,27 @@ from datetime import UTC, datetime, timedelta
 
 import jwt
 import msgspec
-from fastapi import APIRouter, HTTPException, Response
-from pydantic import BaseModel
+from litestar import Response, post
+from litestar.exceptions import HTTPException
 
 from ...db import get_user_by_uid
 from ...jwt_config import AUDIENCE_APP, decode, sign
 from ...models import is_active_account
 
-router = APIRouter()
 encoder = msgspec.json.Encoder()
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 
-class TokenResponse(BaseModel):
+class TokenResponse(msgspec.Struct, kw_only=True):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int
 
 
-class RefreshRequest(BaseModel):
+class RefreshRequest(msgspec.Struct):
     refresh_token: str
 
 
@@ -76,9 +75,9 @@ async def assert_account_active(user_uid: str) -> None:
         raise HTTPException(status_code=403, detail="This account is no longer active")
 
 
-@router.post("/refresh")
-async def refresh_token_endpoint(request: RefreshRequest) -> Response:
-    user_uid = verify_token(request.refresh_token, expected_type="refresh")
+@post("/refresh")
+async def refresh_token_endpoint(data: RefreshRequest) -> Response:
+    user_uid = verify_token(data.refresh_token, expected_type="refresh")
 
     # Refresh mints a fresh 7d token pair, so an inactive account must not renew here.
     user = await get_user_by_uid(user_uid)
@@ -94,6 +93,9 @@ async def refresh_token_endpoint(request: RefreshRequest) -> Response:
         expires_in=expires_in,
     )
     return Response(
-        content=response.model_dump_json(),
+        content=encoder.encode(response),
         media_type="application/json",
     )
+
+
+handlers = [refresh_token_endpoint]

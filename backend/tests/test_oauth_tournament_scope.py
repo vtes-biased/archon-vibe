@@ -137,7 +137,7 @@ async def test_scoped_token_reaches_its_event_and_nothing_else(
             resp = await test_client.request(method, path, headers=auth, json=body)
             assert resp.status_code in (401, 403), f"{method} {path}"
 
-        # Sent with a real body: a missing file 422s before auth resolves, which
+        # Sent with a real body: a missing file 400s before auth resolves, which
         # would pass this assertion without exercising the bar.
         resp = await test_client.post(
             f"/api/tournaments/{GRANTED}/archon-import",

@@ -1,4 +1,4 @@
-"""FastAPI application entry point."""
+"""Litestar application entry point."""
 
 import asyncio
 import ctypes
@@ -11,7 +11,6 @@ import zipfile
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Annotated
 
 import msgspec
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
@@ -19,8 +18,12 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, Request, Response
-from fastapi.responses import JSONResponse, StreamingResponse
+from litestar import Litestar, Request, Response, get
+from litestar.config.cors import CORSConfig
+from litestar.exceptions import HTTPException, NotFoundException
+from litestar.params import FromPath, FromQuery
+from litestar.response import Redirect, Stream
+from litestar.status_codes import HTTP_500_INTERNAL_SERVER_ERROR
 
 from . import http_client
 from .broadcast import (
@@ -55,7 +58,7 @@ from .models import (
     User,
     is_active_account,
 )
-from .request_log import RequestIdMiddleware, configure_logging
+from .request_log import RequestIdMiddleware, configure_logging, internal_error_handler
 from .roles_hook import register_metadata
 from .routes import (
     admin,
@@ -118,7 +121,7 @@ def _install_fast_shutdown_signals() -> None:
         try:
             signal.signal(sig, _make_handler(signal.getsignal(sig)))
         except ValueError:
-            # Not in the main thread (e.g. Starlette TestClient) — uvicorn didn't
+            # Not in the main thread (e.g. a test client) — uvicorn didn't
             # install its handlers here either, so there is nothing to accelerate.
             pass
 
@@ -352,7 +355,7 @@ async def _stamp_missing_event_codes(booted_at: datetime) -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: Litestar) -> AsyncIterator[None]:
     global _scheduler, _sync_service, _shutdown_event
 
     logger.info(f"Archon backend starting (version {__version__})")
@@ -513,83 +516,22 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await close_db()
 
 
-app = FastAPI(title="Archon", version="0.1.0", lifespan=lifespan)
-
-
-@app.exception_handler(EngineRejection)
-async def engine_rejection_handler(request, exc: EngineRejection) -> JSONResponse:
+def engine_rejection_handler(_: Request, exc: EngineRejection) -> Response:
     """Engine domain rejection: detail stays a human string (bot/legacy clients),
     code+params are additive for frontend i18n."""
-    return JSONResponse(
+    return Response(
+        {"detail": exc.message, "code": exc.code, "params": exc.params},
         status_code=400,
-        content={"detail": exc.message, "code": exc.code, "params": exc.params},
     )
 
 
-# CORS: only needed in development (nginx handles it in production)
-if os.getenv("ENVIRONMENT", "development") == "development":
-    from fastapi.middleware.cors import CORSMiddleware
-
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        # Neither is CORS-safelisted, so a cross-origin dev frontend reads them only if
-        # exposed — without this the catalog's conditional request is dead in dev and
-        # live in production, which is same-origin.
-        expose_headers=["X-Access-Version", "ETag"],
-    )
-
-    @app.exception_handler(Exception)
-    async def cors_aware_500_handler(request: Request, exc: Exception) -> JSONResponse:
-        """Dev-only: ServerErrorMiddleware wraps outside CORSMiddleware, so an
-        unhandled 500 ships with no CORS headers and the cross-origin dev frontend
-        sees a blocked response. Re-attach them; ServerErrorMiddleware still
-        re-raises after, preserving uvicorn's traceback logging."""
-        origin = request.headers.get("origin")
-        headers = (
-            {
-                "Access-Control-Allow-Origin": origin,
-                "Access-Control-Allow-Credentials": "true",
-                "Vary": "Origin",
-            }
-            if origin
-            else {}
-        )
-        return JSONResponse(
-            status_code=500,
-            content={"detail": "Internal Server Error"},
-            headers=headers,
-        )
-
-
-app.add_middleware(RequestIdMiddleware)
-
-app.include_router(auth.router)
-app.include_router(users.router)
-app.include_router(nda.router)
-app.include_router(admin.router)
-app.include_router(vekn.router)
-app.include_router(sanctions.router)
-app.include_router(tournaments.router)
-app.include_router(oauth.router)
-app.include_router(cards.router)
-app.include_router(leagues.router)
-app.include_router(promos.router)
-app.include_router(calendar.router)
-app.include_router(push.router)
-app.include_router(feedback.router)
-
-
-@app.get("/")
+@get("/")
 async def root() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "ok", "version": __version__}
 
 
-@app.get("/api/time")
+@get("/api/time")
 async def server_time() -> Response:
     """Microsecond server clock for the frontend's mini-NTP offset sync.
 
@@ -605,8 +547,8 @@ async def server_time() -> Response:
     )
 
 
-@app.get("/tournaments/{uid}")
-async def tournament_og_stub(uid: str, request: Request) -> Response:
+@get("/tournaments/{uid:str}")
+async def tournament_og_stub(uid: FromPath[str], request: Request) -> Response:
     """Open Graph stub for a tournament share link — reached ONLY by social
     crawlers (nginx UA-splits /tournaments/{uid}; humans get the static SPA).
 
@@ -622,8 +564,8 @@ async def tournament_og_stub(uid: str, request: Request) -> Response:
     return Response(content=html, media_type="text/html")
 
 
-@app.get("/t/{code}")
-async def tournament_code_og_stub(code: str, request: Request) -> Response:
+@get("/t/{code:str}")
+async def tournament_code_og_stub(code: FromPath[str], request: Request) -> Response:
     """Same crawler-only UA-split as the uid stub, for the short link — which is
     the form actually pasted into chat, so it is the one that needs the card."""
     from .db import get_tournament_by_event_code
@@ -639,18 +581,18 @@ async def tournament_code_og_stub(code: str, request: Request) -> Response:
     return Response(content=html, media_type="text/html")
 
 
-@app.get("/tournament/{archon_uid}/display.html")
-async def legacy_tournament_redirect(archon_uid: str) -> Response:
+@get("/tournament/{archon_uid:str}/display.html")
+async def legacy_tournament_redirect(archon_uid: FromPath[str]) -> Redirect:
     from .db import get_tournament_uid_by_archon_uid
 
     uid = await get_tournament_uid_by_archon_uid(archon_uid)
     if uid is None:
-        raise HTTPException(status_code=404)
-    return Response(status_code=301, headers={"Location": f"/tournaments/{uid}"})
+        raise NotFoundException()
+    return Redirect(f"/tournaments/{uid}", status_code=301)
 
 
-@app.get("/leagues/{uid}")
-async def league_og_stub(uid: str, request: Request) -> Response:
+@get("/leagues/{uid:str}")
+async def league_og_stub(uid: FromPath[str], request: Request) -> Response:
     """Open Graph stub for a league share link — same crawler-only UA-split
     as the tournament stub above; unknown/deleted uid → site-wide card."""
     from .og import render_league_og_html
@@ -663,8 +605,8 @@ async def league_og_stub(uid: str, request: Request) -> Response:
     return Response(content=html, media_type="text/html")
 
 
-@app.get("/help/{slug}")
-async def help_og_stub(slug: str, request: Request) -> Response:
+@get("/help/{slug:str}")
+async def help_og_stub(slug: FromPath[str], request: Request) -> Response:
     """Open Graph stub for a help-page share link — same crawler-only UA-split.
 
     Static content, so no projection lookup; an unknown slug falls back to the
@@ -680,7 +622,7 @@ async def help_og_stub(slug: str, request: Request) -> Response:
     )
 
 
-@app.get("/og/site")
+@get("/og/site")
 async def site_og_stub(request: Request) -> Response:
     """Open Graph stub for the bare app link — same crawler-only UA-split as the
     object stubs, on a path of its own because `/` is the health check."""
@@ -726,16 +668,14 @@ async def _resolve_user_from_token(token: str | None) -> User | None:
         return None
 
 
-async def _resolve_viewer(
-    request: Request, token: str | None, authorization: str | None
-) -> User | None:
+async def _resolve_viewer(request: Request, token: str | None) -> User | None:
     """Resolve the SSE/snapshot viewer. The bot sends an `Authorization` header
     (revocation-aware, oauth-aware via get_current_user); the browser EventSource
     can't set headers and passes a `token` query param. A supplied-but-invalid
     credential raises 401; only a wholly absent one yields None (anonymous public).
     """
-    if authorization and authorization.startswith("Bearer "):
-        return await get_current_user(request, authorization)
+    if request.headers.get("authorization", "").startswith("Bearer "):
+        return await get_current_user(request)
     if token:
         viewer = await _resolve_user_from_token(token)
         if viewer is None:
@@ -753,7 +693,7 @@ def _iter_file_chunks(f, chunk_size: int = 64 * 1024) -> Iterator[bytes]:
     response.
 
     The held fd pins the inode, so an atomic os.rename mid-stream (snapshot
-    regen) is safe. Sync generator → Starlette iterates it in a threadpool,
+    regen) is safe. Sync generator → Litestar's `Stream` iterates it in a threadpool,
     keeping the blocking reads off the event loop.
     """
     with f:
@@ -819,13 +759,12 @@ def _iter_snapshot_zip(
     yield sink.take()
 
 
-@app.get("/snapshot")
+@get("/snapshot")
 async def get_snapshot(
     request: Request,
-    token: str | None = None,
-    download: bool = False,
-    authorization: Annotated[str | None, Header()] = None,
-) -> Response:
+    token: FromQuery[str | None] = None,
+    download: FromQuery[bool] = False,
+) -> Response | Stream:
     """Serve the pre-computed gzip snapshot for the viewer's access level.
 
     Behind nginx (SNAPSHOT_ACCEL_PREFIX set) the app answers headers-only and
@@ -837,7 +776,7 @@ async def get_snapshot(
     from .snapshots import get_snapshot_path
 
     # Shielded: a reader hanging up mid-query costs the pool the connection.
-    viewer = await asyncio.shield(_resolve_viewer(request, token, authorization))
+    viewer = await asyncio.shield(_resolve_viewer(request, token))
     level = _viewer_level(viewer)
 
     snapshot_path = get_snapshot_path(level.value)
@@ -864,7 +803,7 @@ async def get_snapshot(
             "%Y-%m-%d", time.localtime(mtime)
         )
         headers["Content-Disposition"] = f'attachment; filename="{stem}.zip"'
-        return StreamingResponse(
+        return Stream(
             _iter_snapshot_zip(snapshot_path, f"{stem}.jsonl", mtime),
             media_type="application/zip",
             headers=headers,
@@ -875,14 +814,14 @@ async def get_snapshot(
         # nginx drops custom upstream headers on the internal redirect; the
         # accel location re-emits X-Access-Version from $upstream_http_*.
         headers["X-Accel-Redirect"] = f"{accel_prefix}/{level.value}.jsonl.gz"
-        return Response(headers=headers)
+        return Response(b"", headers=headers, media_type="application/x-ndjson")
 
     f = open(snapshot_path, "rb")
     headers["Content-Encoding"] = "gzip"
     # Sized from the SAME fd being served: a separate stat would race the
     # regen's atomic rename and declare another inode's length for this body.
     headers["Content-Length"] = str(os.fstat(f.fileno()).st_size)
-    return StreamingResponse(
+    return Stream(
         _iter_file_chunks(f),
         media_type="application/x-ndjson",
         headers=headers,
@@ -1129,17 +1068,16 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
     return frames, count
 
 
-@app.get("/stream")
+@get("/stream")
 async def stream_updates(
     request: Request,
-    since: str | None = None,
-    generated_at: str | None = None,
-    av: str | None = None,
-    token: str | None = None,
-    tournament: str | None = None,
-    device_id: str | None = None,
-    authorization: Annotated[str | None, Header()] = None,
-) -> StreamingResponse:
+    since: FromQuery[str | None] = None,
+    generated_at: FromQuery[str | None] = None,
+    av: FromQuery[str | None] = None,
+    token: FromQuery[str | None] = None,
+    tournament: FromQuery[str | None] = None,
+    device_id: FromQuery[str | None] = None,
+) -> Stream:
     """Stream object updates via SSE, reading pre-computed access columns — no
     per-item filtering. `tournament=<uid>` opens a bot-scoped stream: catch-up and
     live events restricted to that tournament + its sanctions, same access rule."""
@@ -1148,7 +1086,7 @@ async def stream_updates(
 
     # Shielded, here and on every pooled read below: a client hanging up
     # cancels the awaiting task mid-query and costs the pool the connection.
-    stream_user = await asyncio.shield(_resolve_viewer(request, token, authorization))
+    stream_user = await asyncio.shield(_resolve_viewer(request, token))
     # One label per connection in every log line: who + scope — makes
     # open/close/overflow/sync-complete attributable when tracing an SSE issue.
     _who = stream_user.uid if stream_user else "anon"
@@ -1352,7 +1290,7 @@ async def stream_updates(
             _sse_connections.discard(conn)
             logger.info(f"SSE connection closed ({conn_label})")
 
-    return StreamingResponse(
+    return Stream(
         event_generator(),
         media_type="text/event-stream",
         headers={
@@ -1361,3 +1299,46 @@ async def stream_updates(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+app = Litestar(
+    route_handlers=[
+        root,
+        server_time,
+        tournament_og_stub,
+        tournament_code_og_stub,
+        legacy_tournament_redirect,
+        league_og_stub,
+        help_og_stub,
+        site_og_stub,
+        get_snapshot,
+        stream_updates,
+        auth.router,
+        users.router,
+        nda.router,
+        admin.router,
+        vekn.router,
+        sanctions.router,
+        tournaments.router,
+        oauth.router,
+        cards.router,
+        leagues.router,
+        promos.router,
+        calendar.router,
+        push.router,
+        feedback.router,
+    ],
+    lifespan=[lifespan],
+    middleware=[RequestIdMiddleware],
+    exception_handlers={
+        EngineRejection: engine_rejection_handler,
+        HTTP_500_INTERNAL_SERVER_ERROR: internal_error_handler,
+    },
+    # Dev only: nginx serves production same-origin. Neither header is
+    # CORS-safelisted, so the cross-origin dev frontend reads them only if exposed.
+    cors_config=CORSConfig(expose_headers=["X-Access-Version", "ETag"])
+    if os.getenv("ENVIRONMENT", "development") == "development"
+    else None,
+    openapi_config=None,
+    logging_config=None,
+)

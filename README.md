@@ -64,7 +64,7 @@ Archon is designed to work seamlessly online or offline, crucial for tournament 
 
 ### Stack
 - **Frontend**: Svelte + TypeScript + Vite + Tailwind CSS
-- **Backend**: FastAPI + Python + PostgreSQL
+- **Backend**: Litestar + Python + PostgreSQL
 - **Shared Core**: Rust (compiled to WASM for frontend, PyO3 for backend)
 - **Offline Storage**: IndexedDB
 - **Real-time Sync**: Server-Sent Events (SSE)
@@ -133,7 +133,7 @@ In dev, only the **database** runs in Docker (`localhost:5433`); the backend and
 
 | Service | Host port | |
 |---|---|---|
-| backend | 8000 | FastAPI (`DATABASE_URL` → `db:5432`) |
+| backend | 8000 | Litestar (`DATABASE_URL` → `db:5432`) |
 | db | 5433 → 5432 | PostgreSQL 17, volume `postgres_data` |
 
 This compose file is **not** production-hardened (uvicorn reload, default DB password). If a container port (8000/5433) is already in use, change the mapping in `docker-compose.yml`.

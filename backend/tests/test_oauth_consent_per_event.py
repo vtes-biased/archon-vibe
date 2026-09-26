@@ -64,7 +64,7 @@ async def test_a_member_grants_one_client_two_events(test_client: AsyncClient, t
                     "approved": True,
                 },
             )
-            assert response.status_code == 200, response.text
+            assert response.status_code == 201, response.text
             assert "code=" in response.json()["redirect_url"]
 
         consents = (await test_client.get("/oauth/consents", headers=auth)).json()

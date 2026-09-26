@@ -8,7 +8,7 @@ business logic on the frontend (WASM) and backend (PyO3). Works online or offlin
 - **Frontend** — Svelte 5 (runes) + SvelteKit with `adapter-static` (SPA), Vite,
   TypeScript, Tailwind v4, IndexedDB, PWA service workers. `idb`,
   `lucide-svelte`, `marked` + `dompurify`, Paraglide for i18n.
-- **Backend** — FastAPI on Python 3.11+, PostgreSQL 17 with JSONB, psycopg3 async
+- **Backend** — Litestar on uvicorn, Python 3.14, PostgreSQL 17 with JSONB, psycopg3 async
   and no ORM, msgspec JSON. Tooling `uv` / `ruff` / `ty`.
 - **Discord bot** — a separate process (`bot/`): hikari + lightbulb + miru +
   Pillow, SQLite for tokens and state, a pure OAuth client with no DB access and
@@ -444,14 +444,25 @@ condition localizes identically on every path.
 
 ## API conventions
 
-- **Request bodies** are Pydantic `BaseModel` — FastAPI parses them
-  automatically. Not `msgspec.Struct` over raw `bytes`: an unbound `body: bytes`
-  won't read the request body.
-- **Responses** use msgspec (`msgspec.json.Encoder`), faster than Pydantic. Python
-  models are `msgspec.Struct`, mirrored by TypeScript interfaces.
-- **Date-only fields** (expiry, event dates) accept `YYYY-MM-DD` and store UTC
-  midnight. Full tz-aware datetimes are reserved for precise timestamps
-  (`issued_at`, `modified`).
+- **Request bodies** are `msgspec.Struct`s taken as Litestar's `data` parameter —
+  the only name Litestar binds a body to. A partial update that must tell a field
+  left out from one sent as `null` defaults it to `msgspec.UNSET`.
+- **Responses** use msgspec (`msgspec.json.Encoder`). Python models are
+  `msgspec.Struct`, mirrored by TypeScript interfaces.
+- **Status codes are Litestar's defaults** — `POST` 201, `DELETE` 204, a body that
+  fails validation 400 — unless the handler pins one: a `POST` that returns nothing
+  answers 204, a `DELETE` that returns a body 200.
+  `/oauth/token` and `/oauth/revoke` answer 200 because their RFCs say so. A raised
+  `HTTPException` answers `{"status_code", "detail"}`; an engine rejection answers
+  `{"detail", "code", "params"}`.
+- **The signed-in member is resolved in the handler**, `await
+  get_current_user(request)` or `get_optional_user`, not injected: Litestar injects
+  a dependency by parameter name only, and runs one only when a handler names it.
+- **Date-only fields** accept `YYYY-MM-DD`. A sanction's expiry stores UTC
+  midnight; a league's dates and a promo's release date store **naive** midnight,
+  because the frontend renders them with `new Date(…)` in local time, where UTC
+  midnight is the day before west of Greenwich. Full tz-aware datetimes are
+  reserved for precise timestamps (`issued_at`, `modified`).
 - **Scheduled times** (`Tournament.start`/`finish`) are stored **naive**, paired
   with the separate `Tournament.timezone` — never tz-aware. Readers anchor the
   wall clock in that zone, so a stored instant would get shifted by the venue's
@@ -1017,7 +1028,7 @@ push notification targets — stay on the uid the router already navigates.
 **Open Graph stubs.** Social link-preview crawlers don't run JavaScript, so they
 would always see the static SPA shell with the site-wide `og:image`. nginx
 UA-splits `/tournaments/{uid}`: humans get the static SPA (SW-cacheable,
-offline-first unaffected), social bots are proxied to a FastAPI route that renders
+offline-first unaffected), social bots are proxied to a backend route that renders
 a minimal HTML stub from the public projection. With a `banner_path` the stub uses
 `twitter:card=summary_large_image` (1200×630), otherwise the 512×512 site icon
 with `summary`. Unknown or deleted uids fall back gracefully — crawlers never get
@@ -1028,7 +1039,7 @@ should index the real SPA route. The UA list lives in the nginx template that be
 and prod both render. An unlisted crawler gets the generic site-wide card.
 
 `/tournaments/{uid}` is **not** in the proxied-prefix allowlist — it is served
-statically for humans and reaches FastAPI only through the named-location bot
+statically for humans and reaches the backend only through the named-location bot
 proxy. `/t/{code}` works the same way, and both stubs canonicalise on the short
 form where the event has one, so the two URLs do not read as two pages.
 

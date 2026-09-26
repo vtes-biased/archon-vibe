@@ -1,15 +1,17 @@
+import copy
 import os
 import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.utils import get_openapi
-from scalar_fastapi import get_scalar_api_reference
+from litestar import Litestar, Request
+from litestar.config.cors import CORSConfig
+from litestar.openapi import OpenAPIConfig
+from litestar.openapi.plugins import JsonRenderPlugin, ScalarRenderPlugin
+from litestar.status_codes import HTTP_500_INTERNAL_SERVER_ERROR
 
 from ..jwt_config import assert_production_keys
-from ..request_log import RequestIdMiddleware, configure_logging
+from ..request_log import RequestIdMiddleware, configure_logging, internal_error_handler
 from .db import close_pool, open_pool
 from .examples import (
     MEMBER_TOURNAMENT,
@@ -409,7 +411,7 @@ the index one past the last preliminary round.
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+async def lifespan(_: Litestar) -> AsyncIterator[None]:
     assert_production_keys(signing=False)
     await open_pool()
     try:
@@ -449,7 +451,7 @@ _EVENT_RUN_ROUTES: list[tuple[str, str, str, str, str, str]] = [
         "post",
         f"{_EVENT}/action",
         "Run the event",
-        "200",
+        "201",
         "The updated tournament.",
         "Every state change of a tournament — registration, check-in, rounds, scores,"
         " finals — is one `type` sent here, and each type is its own model below."
@@ -459,7 +461,7 @@ _EVENT_RUN_ROUTES: list[tuple[str, str, str, str, str, str]] = [
         "post",
         f"{_EVENT}/announce",
         "Post an announcement",
-        "200",
+        "201",
         "The updated tournament.",
         "Puts a message in front of everyone watching the event.",
     ),
@@ -475,7 +477,7 @@ _EVENT_RUN_ROUTES: list[tuple[str, str, str, str, str, str]] = [
         "post",
         f"{_EVENT}/bulk-register",
         "Register a roster",
-        "200",
+        "201",
         "The updated tournament.",
         "Registers many players in one call, for a roster you already hold.",
     ),
@@ -501,7 +503,7 @@ _EVENT_RUN_ROUTES: list[tuple[str, str, str, str, str, str]] = [
         "post",
         f"{_EVENT}/timer/start",
         "Start the round timer",
-        "200",
+        "201",
         "The updated tournament.",
         "Starts the clock on the round in play.",
     ),
@@ -509,7 +511,7 @@ _EVENT_RUN_ROUTES: list[tuple[str, str, str, str, str, str]] = [
         "post",
         f"{_EVENT}/timer/pause",
         "Pause the round timer",
-        "200",
+        "201",
         "The updated tournament.",
         "Holds the clock where it is.",
     ),
@@ -517,7 +519,7 @@ _EVENT_RUN_ROUTES: list[tuple[str, str, str, str, str, str]] = [
         "post",
         f"{_EVENT}/timer/add-time",
         "Add time to the round",
-        "200",
+        "201",
         "The updated tournament.",
         "Extends the round.",
     ),
@@ -525,7 +527,7 @@ _EVENT_RUN_ROUTES: list[tuple[str, str, str, str, str, str]] = [
         "post",
         f"{_EVENT}/timer/reset",
         "Reset the round timer",
-        "200",
+        "201",
         "The updated tournament.",
         "Puts the clock back to the round's full length.",
     ),
@@ -533,7 +535,7 @@ _EVENT_RUN_ROUTES: list[tuple[str, str, str, str, str, str]] = [
         "post",
         f"{_EVENT}/banner",
         "Upload the event banner",
-        "200",
+        "201",
         '`{"success": true}`.',
         "Replaces the event's banner image.",
     ),
@@ -559,11 +561,11 @@ _EVENT_RUN_ROUTES: list[tuple[str, str, str, str, str, str]] = [
         "Sanction categories and levels",
         "200",
         "The categories, subcategories and levels a sanction may carry.",
-        "The vocabulary `/sanctions/` accepts.",
+        "The vocabulary `/sanctions` accepts.",
     ),
     (
         "post",
-        "/sanctions/",
+        "/sanctions",
         "File a sanction",
         "201",
         "The created sanction.",
@@ -870,7 +872,7 @@ def _action_schemas() -> dict[str, dict]:
     return schemas
 
 
-# Hand-written: the app's Pydantic models are on the far side of the isolation
+# Hand-written: the app's request Structs are on the far side of the isolation
 # line. `check_event_run_coverage.py` pairs each with the model it names.
 _EVENT_RUN_SCHEMAS: dict[str, dict] = {
     "AnnounceRequest": {
@@ -952,7 +954,7 @@ _RESPONSE_EXAMPLES: dict[tuple[str, str], object] = {
     ("post", f"{_EVENT}/banner"): {"success": True},
     ("delete", f"{_EVENT}/banner"): {"success": True},
     ("get", "/stream"): STREAM,
-    ("post", "/sanctions/"): SANCTION,
+    ("post", "/sanctions"): SANCTION,
     ("get", "/oauth/userinfo"): USERINFO,
     ("get", "/sanctions/reference"): SANCTION_REFERENCE,
 }
@@ -964,7 +966,7 @@ _EVENT_RUN_BODIES: dict[str, str] = {
     f"{_EVENT}/bulk-register": "BulkRegisterRequest",
     f"{_EVENT}/call-judge": "JudgeCallRequest",
     f"{_EVENT}/timer/add-time": "AddTimeRequest",
-    "/sanctions/": "CreateSanctionRequest",
+    "/sanctions": "CreateSanctionRequest",
 }
 
 
@@ -1046,34 +1048,19 @@ def _event_run_paths() -> dict:
     return paths
 
 
-app = FastAPI(
-    title="Archon Public API",
-    version="1",
-    description=DESCRIPTION,
-    lifespan=lifespan,
-    docs_url=None,
-    redoc_url=None,
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["GET"],
-    allow_headers=["Authorization"],
-)
-app.add_middleware(RequestIdMiddleware)
-
-app.include_router(router)
+_DOCUMENT: dict | None = None
 
 
-def _openapi() -> dict:
-    if app.openapi_schema is None:
-        schema = get_openapi(
-            title=app.title,
-            version=app.version,
-            description=app.description,
-            routes=app.routes,
-        )
+def _document(generated: dict, app: Litestar) -> dict:
+    global _DOCUMENT
+    if _DOCUMENT is None:
+        schema = copy.deepcopy(generated)
+        for route in app.routes:
+            for handler in getattr(route, "route_handlers", ()):
+                if "responses" in handler.opt:
+                    for method in handler.http_methods:
+                        operation = schema["paths"][route.path_format][method.lower()]
+                        operation["responses"] = handler.opt["responses"]
         components = schema.setdefault("components", {})
         components.setdefault("schemas", {}).update(
             COMPONENTS | _EVENT_RUN_SCHEMAS | _action_schemas()
@@ -1082,14 +1069,6 @@ def _openapi() -> dict:
             "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
         }
         schema["security"] = [{"bearerAuth": []}]
-        # FastAPI adds an `application/json` 200 of its own and `openapi_extra`
-        # merges beside it rather than replacing it, so a stream would advertise
-        # a JSON body it never returns — and Scalar would preview that one.
-        for methods in schema["paths"].values():
-            for operation in methods.values():
-                content = operation["responses"]["200"]["content"]
-                if len(content) > 1:
-                    content.pop("application/json", None)
         schema["tags"] = [
             {"name": "Public API", "description": PUBLIC_API_TAG},
             {"name": "Member API", "description": MEMBER_API_TAG},
@@ -1098,16 +1077,37 @@ def _openapi() -> dict:
             {"name": "Public API", "tags": ["Public API"]},
             {"name": "Member API", "tags": ["Member API"]},
         ]
-        # After the pruning loop above: these carry no `content` for it to prune.
         for path, operations in _event_run_paths().items():
             schema["paths"].setdefault(path, {}).update(operations)
-        app.openapi_schema = schema
-    return app.openapi_schema
+        _DOCUMENT = schema
+    return _DOCUMENT
 
 
-app.openapi = _openapi
+class _Reference(JsonRenderPlugin):
+    def render(self, request: Request, openapi_schema: dict) -> bytes:
+        return super().render(request, _document(openapi_schema, request.app))
 
 
-@app.get("/docs", include_in_schema=False)
-async def docs():
-    return get_scalar_api_reference(openapi_url=app.openapi_url, title=app.title)
+app = Litestar(
+    route_handlers=[router],
+    lifespan=[lifespan],
+    middleware=[RequestIdMiddleware],
+    exception_handlers={HTTP_500_INTERNAL_SERVER_ERROR: internal_error_handler},
+    cors_config=CORSConfig(allow_methods=["GET"], allow_headers=["Authorization"]),
+    openapi_config=OpenAPIConfig(
+        title="Archon Public API",
+        version="1",
+        description=DESCRIPTION,
+        path="/",
+        use_handler_docstrings=True,
+        render_plugins=[
+            ScalarRenderPlugin(
+                path="/docs",
+                css_url="https://cdn.jsdelivr.net/npm/@scalar/api-reference@latest/dist/style.css",
+                favicon="",
+            ),
+            _Reference(path="/openapi.json"),
+        ],
+    ),
+    logging_config=None,
+)

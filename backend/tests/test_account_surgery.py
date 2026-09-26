@@ -471,7 +471,7 @@ async def test_abandon_allowed_without_active_suspension(test_client):
         resp = await test_client.post(
             "/vekn/abandon", headers=make_auth_header(user.uid)
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         body = resp.json()
         # detach issued a fresh uid for the new personal account.
         assert body["user"]["uid"] != user.uid

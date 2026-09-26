@@ -93,7 +93,7 @@ async def test_bulk_register_matches_and_reports(test_client):
             },
             headers=make_auth_header(org.uid),
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         body = resp.json()
         assert sorted(body["registered"]) == ["Email Match", "Vekn Match"]
         reasons = {u["name"]: u["reason"] for u in body["unmatched"]}

@@ -4,6 +4,10 @@ import uuid
 from contextvars import ContextVar
 
 import psycopg
+from litestar import Request, Response
+from litestar.exceptions import HTTPException
+
+logger = logging.getLogger(__name__)
 
 request_id: ContextVar[str | None] = ContextVar("request_id", default=None)
 
@@ -24,7 +28,7 @@ class RequestIdMiddleware:
             await self.app(scope, receive, send)
             return
         sent = dict(scope["headers"]).get(b"x-request-id", b"").decode("latin-1")
-        # Never reset: the 500 and uvicorn's traceback are logged after this
+        # Never reset: the 500 handler and uvicorn's access line log after this
         # returns, still inside uvicorn's per-request task.
         request_id.set(sent if _REQUEST_ID.fullmatch(sent) else uuid.uuid4().hex)
         await self.app(scope, receive, send)
@@ -59,3 +63,12 @@ async def tag_connection(conn: psycopg.AsyncConnection, app: str) -> None:
     name = f"{app}/{rid}" if rid else app
     if conn.info.parameter_status("application_name") != name:
         await conn.execute("SELECT set_config('application_name', %s, false)", (name,))
+
+
+def internal_error_handler(request: Request, exc: Exception) -> Response:
+    if isinstance(exc, HTTPException):
+        return Response({"status_code": 500, "detail": exc.detail}, status_code=500)
+    logger.error(f"{request.method} {request.url.path} failed", exc_info=exc)
+    return Response(
+        {"status_code": 500, "detail": "Internal Server Error"}, status_code=500
+    )

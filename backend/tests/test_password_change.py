@@ -36,7 +36,7 @@ async def test_changed_password_is_what_login_reads(test_client: AsyncClient, te
         "/auth/login",
         json={"email": "rotate@example.com", "password": "rotated-secret"},
     )
-    assert accepted.status_code == 200
+    assert accepted.status_code == 201
 
     refused = await test_client.post(
         "/auth/login",
@@ -87,4 +87,4 @@ async def test_every_email_login_a_merge_left_behind_is_rewritten(
         accepted = await test_client.post(
             "/auth/login", json={"email": email, "password": "merged-secret"}
         )
-        assert accepted.status_code == 200, email
+        assert accepted.status_code == 201, email

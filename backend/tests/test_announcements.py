@@ -35,7 +35,7 @@ async def test_announcements_capped_keeping_newest(test_client: AsyncClient, tes
                 json={"body": f"msg-{i}"},
                 headers=make_auth_header("org-ann"),
             )
-            assert resp.status_code == 200
+            assert resp.status_code == 201
 
         stored = await db.get_tournament_by_uid("trn-ann")
         bodies = [a.body for a in stored.announcements]

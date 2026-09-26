@@ -1,12 +1,14 @@
 """Email/password register and login endpoints."""
 
 from datetime import UTC, datetime
+from typing import Annotated
 from uuid import uuid7
 
+import msgspec
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from fastapi import APIRouter, HTTPException, Response
-from pydantic import BaseModel, EmailStr
+from litestar import Response, post
+from litestar.exceptions import HTTPException
 
 from ...db import (
     get_auth_method_by_identifier,
@@ -22,24 +24,26 @@ from ._tokens import (
     create_refresh_token,
 )
 
-router = APIRouter()
+encoder = msgspec.json.Encoder()
 ph = PasswordHasher()
 
+EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
 
-class RegisterRequest(BaseModel):
-    email: EmailStr
+
+class RegisterRequest(msgspec.Struct):
+    email: Annotated[str, msgspec.Meta(pattern=EMAIL_PATTERN)]
     password: str
     name: str
 
 
-class LoginRequest(BaseModel):
-    email: EmailStr
+class LoginRequest(msgspec.Struct):
+    email: Annotated[str, msgspec.Meta(pattern=EMAIL_PATTERN)]
     password: str
 
 
-@router.post("/register", status_code=201)
-async def register(request: RegisterRequest) -> Response:
-    existing = await get_auth_method_by_identifier("email", request.email.lower())
+@post("/register")
+async def register(data: RegisterRequest) -> Response:
+    existing = await get_auth_method_by_identifier("email", data.email.lower())
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
@@ -47,17 +51,17 @@ async def register(request: RegisterRequest) -> Response:
     user = User(
         uid=str(uuid7()),
         modified=now,
-        name=request.name,
+        name=data.name,
     )
     await save_user(user)
 
-    password_hash = ph.hash(request.password)
+    password_hash = ph.hash(data.password)
     auth_method = AuthMethod(
         uid=str(uuid7()),
         modified=now,
         user_uid=user.uid,
         method_type=AuthMethodType.EMAIL,
-        identifier=request.email.lower(),
+        identifier=data.email.lower(),
         credential_hash=password_hash,
         verified=False,
         created_at=now,
@@ -74,20 +78,19 @@ async def register(request: RegisterRequest) -> Response:
         expires_in=expires_in,
     )
     return Response(
-        content=response.model_dump_json(),
+        content=encoder.encode(response),
         media_type="application/json",
-        status_code=201,
     )
 
 
-@router.post("/login")
-async def login(request: LoginRequest) -> Response:
-    auth_method = await get_auth_method_by_identifier("email", request.email.lower())
+@post("/login")
+async def login(data: LoginRequest) -> Response:
+    auth_method = await get_auth_method_by_identifier("email", data.email.lower())
     if not auth_method:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     try:
-        ph.verify(auth_method.credential_hash, request.password)  # ty: ignore[invalid-argument-type]
+        ph.verify(auth_method.credential_hash, data.password)  # ty: ignore[invalid-argument-type]
     except VerifyMismatchError as err:
         raise HTTPException(
             status_code=401, detail="Invalid email or password"
@@ -100,7 +103,7 @@ async def login(request: LoginRequest) -> Response:
             user_uid=auth_method.user_uid,
             method_type=auth_method.method_type,
             identifier=auth_method.identifier,
-            credential_hash=ph.hash(request.password),
+            credential_hash=ph.hash(data.password),
             verified=auth_method.verified,
             created_at=auth_method.created_at,
             last_used_at=datetime.now(UTC),
@@ -132,6 +135,9 @@ async def login(request: LoginRequest) -> Response:
         expires_in=expires_in,
     )
     return Response(
-        content=response.model_dump_json(),
+        content=encoder.encode(response),
         media_type="application/json",
     )
+
+
+handlers = [register, login]

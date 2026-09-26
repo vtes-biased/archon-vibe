@@ -4,11 +4,14 @@ import logging
 import os
 import secrets
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 from urllib.parse import urlencode
 from uuid import uuid7
 
-from fastapi import APIRouter, Header, HTTPException, Query
-from fastapi.responses import RedirectResponse
+from litestar import get
+from litestar.exceptions import HTTPException
+from litestar.params import FromHeader, FromQuery, QueryParameter
+from litestar.response import Redirect
 
 from ... import http_client
 from ...accounts import merge_users
@@ -28,7 +31,6 @@ from ...models import AuthMethod, AuthMethodType, User, is_active_account
 from ...roles_hook import discord_api_base, push_role_metadata
 from ._tokens import create_access_token, create_refresh_token, verify_token
 
-router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
@@ -44,21 +46,13 @@ def _get_discord_config() -> tuple[str, str, str, str]:
     )
 
 
-@router.get("/discord/authorize")
+@get("/discord/authorize")
 async def discord_authorize(
-    link: bool = Query(
-        False, description="Set to true to link Discord to existing account"
-    ),
-    redirect: str | None = Query(
-        None,
-        description="Frontend path to redirect after OAuth (same-origin path only)",
-    ),
-    token: str | None = Query(
-        None,
-        description="Access token for link mode (since headers can't be sent during redirect)",
-    ),
-    authorization: str | None = Header(default=None),
-) -> RedirectResponse:
+    link: FromQuery[bool] = False,
+    redirect: FromQuery[str | None] = None,
+    token: FromQuery[str | None] = None,
+    authorization: FromHeader[str | None] = None,
+) -> Redirect:
     client_id, client_secret, redirect_uri, frontend_url = _get_discord_config()
 
     if not client_id:
@@ -100,23 +94,21 @@ async def discord_authorize(
     }
     discord_auth_url = f"{discord_api_base()}/oauth2/authorize?{urlencode(params)}"
 
-    return RedirectResponse(url=discord_auth_url, status_code=302)
+    return Redirect(discord_auth_url, status_code=302)
 
 
-@router.get("/discord/callback")
+@get("/discord/callback")
 async def discord_callback(
-    code: str = Query(..., description="Authorization code from Discord"),
-    state: str = Query(..., description="CSRF state token"),
-) -> RedirectResponse:
+    code: FromQuery[str],
+    oauth_state: Annotated[str, QueryParameter(name="state")],
+) -> Redirect:
     client_id, client_secret, redirect_uri, frontend_url = _get_discord_config()
 
-    stored = await get_transient_token(f"discord:{state}")
+    stored = await get_transient_token(f"discord:{oauth_state}")
     if not stored:
-        return RedirectResponse(
-            url=f"{frontend_url}/login?error=invalid_state", status_code=302
-        )
+        return Redirect(f"{frontend_url}/login?error=invalid_state", status_code=302)
 
-    await delete_transient_token(f"discord:{state}")
+    await delete_transient_token(f"discord:{oauth_state}")
 
     link_mode = stored.get("link_mode", False)
     user_uid_from_state = stored.get("user_uid")
@@ -136,16 +128,14 @@ async def discord_callback(
             if token_response.status != 200:
                 error_text = await token_response.text()
                 logger.error(f"Discord token exchange failed: {error_text}")
-                return RedirectResponse(
-                    url=f"{frontend_url}/login?error=discord_token_failed",
+                return Redirect(
+                    f"{frontend_url}/login?error=discord_token_failed",
                     status_code=302,
                 )
             discord_tokens = await token_response.json()
     except Exception as e:
         logger.error(f"Discord token exchange error: {e}")
-        return RedirectResponse(
-            url=f"{frontend_url}/login?error=discord_error", status_code=302
-        )
+        return Redirect(f"{frontend_url}/login?error=discord_error", status_code=302)
 
     try:
         async with session.get(
@@ -155,16 +145,14 @@ async def discord_callback(
             if user_response.status != 200:
                 error_text = await user_response.text()
                 logger.error(f"Discord user fetch failed: {error_text}")
-                return RedirectResponse(
-                    url=f"{frontend_url}/login?error=discord_user_failed",
+                return Redirect(
+                    f"{frontend_url}/login?error=discord_user_failed",
                     status_code=302,
                 )
             discord_user = await user_response.json()
     except Exception as e:
         logger.error(f"Discord user fetch error: {e}")
-        return RedirectResponse(
-            url=f"{frontend_url}/login?error=discord_error", status_code=302
-        )
+        return Redirect(f"{frontend_url}/login?error=discord_error", status_code=302)
 
     discord_id = discord_user["id"]
     discord_username = discord_user.get("username", "")
@@ -178,13 +166,13 @@ async def discord_callback(
     if link_mode and user_uid_from_state:
         redirect_path = stored.get("redirect") or "/profile"
         if not is_active_account(await get_user_by_uid(user_uid_from_state)):
-            return RedirectResponse(
-                url=f"{frontend_url}/login?error=account_deleted", status_code=302
+            return Redirect(
+                f"{frontend_url}/login?error=account_deleted", status_code=302
             )
         if existing_auth:
             if existing_auth.user_uid == user_uid_from_state:
-                return RedirectResponse(
-                    url=f"{frontend_url}{redirect_path}?discord_linked=already",
+                return Redirect(
+                    f"{frontend_url}{redirect_path}?discord_linked=already",
                     status_code=302,
                 )
             else:
@@ -197,8 +185,8 @@ async def discord_callback(
                 except ValueError:
                     merge_result = None
                 if not merge_result:
-                    return RedirectResponse(
-                        url=f"{frontend_url}{redirect_path}?error=merge_failed",
+                    return Redirect(
+                        f"{frontend_url}{redirect_path}?error=merge_failed",
                         status_code=302,
                     )
                 # Push the merge to other clients' caches live; the
@@ -248,8 +236,8 @@ async def discord_callback(
 
         await _store_and_push_discord_roles(user_uid_from_state, discord_tokens)
 
-        return RedirectResponse(
-            url=f"{frontend_url}{redirect_path}?discord_linked=success",
+        return Redirect(
+            f"{frontend_url}{redirect_path}?discord_linked=success",
             status_code=302,
         )
 
@@ -355,8 +343,8 @@ async def discord_callback(
         # fresh login from re-minting for it (a new signup has a live uid, passes).
         login_user = await get_user_by_uid(user_uid)
         if not is_active_account(login_user):
-            return RedirectResponse(
-                url=f"{frontend_url}/login?error=account_deleted", status_code=302
+            return Redirect(
+                f"{frontend_url}/login?error=account_deleted", status_code=302
             )
 
         access_token, _ = create_access_token(user_uid)
@@ -366,8 +354,8 @@ async def discord_callback(
         if stored.get("redirect"):
             token_params["redirect"] = stored["redirect"]
         params = urlencode(token_params)
-        return RedirectResponse(
-            url=f"{frontend_url}/login?{params}",
+        return Redirect(
+            f"{frontend_url}/login?{params}",
             status_code=302,
         )
 
@@ -390,3 +378,6 @@ async def _store_and_push_discord_roles(user_uid: str, discord_tokens: dict) -> 
         logger.warning(
             f"Failed to push Discord Linked Roles for {user_uid}", exc_info=True
         )
+
+
+handlers = [discord_authorize, discord_callback]

@@ -5,7 +5,6 @@ description = "VEKN community and tournament management system"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
     "msgspec>=0.19.0",
     "psycopg[binary]>=3.2.3",
@@ -15,15 +14,13 @@ dependencies = [
     "apscheduler>=3.10.0",
     "pyjwt[crypto]>=2.9.0",  # crypto extra: EdDSA signing, and the keypair handling in jwt_config
     "argon2-cffi>=23.1.0",
-    "email-validator>=2.2.0",
     "webauthn>=2.0.0",
     "aiosmtplib>=3.0.0",
-    "python-multipart>=0.0.9",
     "openpyxl>=3.1.0",
     "pywebpush>=2.0.0",
     "krcg>=5.12",
-    "scalar-fastapi>=1.8.2",
     "fpdf2>=2.8.8",
+    "litestar>=2.18",
 ]
 
 [build-system]
@@ -72,7 +69,6 @@ select = [
 ]
 ignore = [
     "E501", # line too long, handled by formatter
-    "B008", # Depends() in default args is standard FastAPI
 ]
 
 [tool.ruff.lint.per-file-ignores]

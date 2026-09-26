@@ -6,8 +6,9 @@ from uuid import uuid7
 
 import msgspec
 from archon_engine import PyEngine
-from fastapi import APIRouter, HTTPException, Request, Response
-from pydantic import BaseModel
+from litestar import Request, Response, Router, delete, get, post, put
+from litestar.exceptions import HTTPException
+from litestar.params import FromPath
 
 from .. import permissions
 from ..broadcast import broadcast_precomputed
@@ -20,7 +21,7 @@ from ..db import (
     save_tournament,
     tournament_transaction,
 )
-from ..middleware.auth import OptionalUser
+from ..middleware.auth import get_optional_user
 from ..models import (
     SUBCATEGORIES_BY_CATEGORY,
     PlayerState,
@@ -33,7 +34,6 @@ from ..models import (
     TournamentState,
 )
 
-router = APIRouter(prefix="/sanctions", tags=["sanctions"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 _engine = PyEngine()
@@ -46,7 +46,7 @@ TOURNAMENT_LEVELS = frozenset(
 )
 
 
-@router.get("/reference")
+@get("/reference")
 async def get_sanction_reference() -> Response:
     """Public sanction reference owned by the Rust engine; the Discord bot
     builds its sanction UI from this."""
@@ -247,7 +247,7 @@ async def _apply_sanction_to_tournament(
             )
 
 
-class CreateSanctionRequest(BaseModel):
+class CreateSanctionRequest(msgspec.Struct, kw_only=True):
     user_uid: str
     level: str
     category: str
@@ -258,7 +258,7 @@ class CreateSanctionRequest(BaseModel):
     tournament_uid: str | None = None
 
 
-class UpdateSanctionRequest(BaseModel):
+class UpdateSanctionRequest(msgspec.Struct):
     level: str | None = None
     category: str | None = None
     subcategory: str | None = None
@@ -268,49 +268,46 @@ class UpdateSanctionRequest(BaseModel):
     lifted: bool | None = None
 
 
-@router.post("/", status_code=201)
-async def create_sanction(
-    request: CreateSanctionRequest,
-    http_request: Request,
-    current_user: OptionalUser = None,
-) -> Response:
+@post("/")
+async def create_sanction(data: CreateSanctionRequest, request: Request) -> Response:
     """Only IC and Ethics can issue SUSPENSION and PROBATION outside tournaments."""
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    oauth_tournament = getattr(http_request.state, "oauth_tournament", None)
-    if oauth_tournament and request.tournament_uid != oauth_tournament:
+    oauth_tournament = getattr(request.state, "oauth_tournament", None)
+    if oauth_tournament and data.tournament_uid != oauth_tournament:
         raise HTTPException(
             status_code=403,
             detail="This token acts only on the tournament it was granted for",
         )
 
     try:
-        level = SanctionLevel(request.level)
+        level = SanctionLevel(data.level)
     except ValueError as e:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid level: {request.level}. Valid: {[lv.value for lv in SanctionLevel]}",
+            detail=f"Invalid level: {data.level}. Valid: {[lv.value for lv in SanctionLevel]}",
         ) from e
 
-    _validate_binding(level, request.tournament_uid)
+    _validate_binding(level, data.tournament_uid)
 
     try:
-        category = SanctionCategory(request.category)
+        category = SanctionCategory(data.category)
     except ValueError as e:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid category: {request.category}. Valid: {[c.value for c in SanctionCategory]}",
+            detail=f"Invalid category: {data.category}. Valid: {[c.value for c in SanctionCategory]}",
         ) from e
 
     subcategory = None
-    if request.subcategory is not None:
+    if data.subcategory is not None:
         try:
-            subcategory = SanctionSubcategory(request.subcategory)
+            subcategory = SanctionSubcategory(data.subcategory)
         except ValueError as e:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid subcategory: {request.subcategory}",
+                detail=f"Invalid subcategory: {data.subcategory}",
             ) from e
         valid_subs = SUBCATEGORIES_BY_CATEGORY.get(category, [])
         if subcategory not in valid_subs:
@@ -319,14 +316,14 @@ async def create_sanction(
                 detail=f"Subcategory '{subcategory.value}' not valid for category '{category.value}'",
             )
 
-    round_number = request.round_number
+    round_number = data.round_number
     if level == SanctionLevel.STANDINGS_ADJUSTMENT and round_number is None:
         raise HTTPException(
             status_code=400,
             detail="round_number is required for standings_adjustment sanctions",
         )
-    if round_number is not None and request.tournament_uid:
-        tournament = await get_tournament_by_uid(request.tournament_uid)
+    if round_number is not None and data.tournament_uid:
+        tournament = await get_tournament_by_uid(data.tournament_uid)
         # len(rounds) is the finals sentinel (same as setTableScore), valid
         # only once a finals table exists.
         if tournament and (
@@ -338,21 +335,21 @@ async def create_sanction(
                 detail=f"round_number {round_number} exceeds tournament rounds ({len(tournament.rounds)})",
             )
 
-    if not await _can_issue_sanction(current_user, level, request.tournament_uid):
+    if not await _can_issue_sanction(current_user, level, data.tournament_uid):
         raise HTTPException(
             status_code=403,
             detail="You don't have permission to issue this type of sanction",
         )
 
-    target_user = await get_user_by_uid(request.user_uid)
+    target_user = await get_user_by_uid(data.user_uid)
     if not target_user:
         raise HTTPException(status_code=404, detail="Target user not found")
 
     issued_at = datetime.now(UTC)
     expires_at = None
-    if request.expires_at:
+    if data.expires_at:
         try:
-            d = date.fromisoformat(request.expires_at)
+            d = date.fromisoformat(data.expires_at)
             expires_at = datetime(d.year, d.month, d.day, tzinfo=UTC)
         except ValueError as e:
             raise HTTPException(
@@ -365,7 +362,7 @@ async def create_sanction(
     # One active DQ per player per tournament: a second is meaningless and, once one
     # is lifted, would strand the player zeroed. Re-DQ after a lift is still allowed.
     if level == SanctionLevel.DISQUALIFICATION and await _has_active_dq(
-        request.tournament_uid, request.user_uid
+        data.tournament_uid, data.user_uid
     ):
         raise HTTPException(
             status_code=409,
@@ -375,49 +372,47 @@ async def create_sanction(
     sanction = Sanction(
         uid=str(uuid7()),
         modified=issued_at,
-        user_uid=request.user_uid,
+        user_uid=data.user_uid,
         issued_by_uid=current_user.uid,
-        tournament_uid=request.tournament_uid,
+        tournament_uid=data.tournament_uid,
         level=level,
         category=category,
         subcategory=subcategory,
         round_number=round_number,
-        description=request.description,
+        description=data.description,
         issued_at=issued_at,
         expires_at=expires_at,
     )
 
     bd = await save_sanction(sanction)
     logger.info(
-        f"Sanction {sanction.uid} ({level.value}) created for user {request.user_uid} "
+        f"Sanction {sanction.uid} ({level.value}) created for user {data.user_uid} "
         f"by {current_user.uid}"
     )
 
     # A sanction is not a TournamentEvent, so it needs its own recompute call.
     if level == SanctionLevel.DISQUALIFICATION:
         await _apply_sanction_to_tournament(
-            request.tournament_uid,
-            dq_user_uid=request.user_uid,
+            data.tournament_uid,
+            dq_user_uid=data.user_uid,
             dq_state=PlayerState.DISQUALIFIED,
         )
     elif level == SanctionLevel.STANDINGS_ADJUSTMENT:
-        await _apply_sanction_to_tournament(request.tournament_uid)
+        await _apply_sanction_to_tournament(data.tournament_uid)
 
     broadcast_precomputed(bd)
 
     return Response(
         content=encoder.encode(sanction),
         media_type="application/json",
-        status_code=201,
     )
 
 
-@router.put("/{uid}")
+@put("/{uid:str}")
 async def update_sanction_endpoint(
-    uid: str,
-    request: UpdateSanctionRequest,
-    current_user: OptionalUser = None,
+    request: Request, uid: FromPath[str], data: UpdateSanctionRequest
 ) -> Response:
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -425,7 +420,7 @@ async def update_sanction_endpoint(
     if not sanction:
         raise HTTPException(status_code=404, detail="Sanction not found")
 
-    if request.lifted is True and sanction.lifted_at is None:
+    if data.lifted is True and sanction.lifted_at is None:
         if not await _can_lift_sanction(current_user, sanction):
             raise HTTPException(
                 status_code=403,
@@ -434,12 +429,12 @@ async def update_sanction_endpoint(
 
     has_modify_fields = any(
         [
-            request.level is not None,
-            request.category is not None,
-            request.subcategory is not None,
-            request.round_number is not None,
-            request.description is not None,
-            request.expires_at is not None,
+            data.level is not None,
+            data.category is not None,
+            data.subcategory is not None,
+            data.round_number is not None,
+            data.description is not None,
+            data.expires_at is not None,
         ]
     )
     if has_modify_fields:
@@ -458,32 +453,32 @@ async def update_sanction_endpoint(
     lifted_at = sanction.lifted_at
     lifted_by_uid = sanction.lifted_by_uid
 
-    if request.level is not None:
+    if data.level is not None:
         try:
-            level = SanctionLevel(request.level)
+            level = SanctionLevel(data.level)
         except ValueError as e:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid level: {request.level}",
+                detail=f"Invalid level: {data.level}",
             ) from e
         _validate_binding(level, sanction.tournament_uid)
 
-    if request.category is not None:
+    if data.category is not None:
         try:
-            category = SanctionCategory(request.category)
+            category = SanctionCategory(data.category)
         except ValueError as e:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid category: {request.category}",
+                detail=f"Invalid category: {data.category}",
             ) from e
 
-    if request.subcategory is not None:
+    if data.subcategory is not None:
         try:
-            subcategory = SanctionSubcategory(request.subcategory)
+            subcategory = SanctionSubcategory(data.subcategory)
         except ValueError as e:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid subcategory: {request.subcategory}",
+                detail=f"Invalid subcategory: {data.subcategory}",
             ) from e
         valid_subs = SUBCATEGORIES_BY_CATEGORY.get(category, [])
         if subcategory not in valid_subs:
@@ -493,8 +488,8 @@ async def update_sanction_endpoint(
             )
 
     # Mirrors create's sentinel check: else an SA silently no-ops in the engine.
-    if request.round_number is not None:
-        round_number = request.round_number
+    if data.round_number is not None:
+        round_number = data.round_number
         if sanction.tournament_uid is not None:
             tournament = await get_tournament_by_uid(sanction.tournament_uid)
             if tournament and (
@@ -515,14 +510,14 @@ async def update_sanction_endpoint(
             detail="round_number is required for standings_adjustment sanctions",
         )
 
-    if request.description is not None:
-        description = request.description.strip()
+    if data.description is not None:
+        description = data.description.strip()
         if not description:
             raise HTTPException(status_code=400, detail="Description cannot be empty")
 
-    if request.expires_at is not None:
+    if data.expires_at is not None:
         try:
-            d = date.fromisoformat(request.expires_at)
+            d = date.fromisoformat(data.expires_at)
             expires_at = datetime(d.year, d.month, d.day, tzinfo=UTC)
         except ValueError as e:
             raise HTTPException(
@@ -534,7 +529,7 @@ async def update_sanction_endpoint(
     # persist PROBATION with expires_at=None.
     _validate_expiry(level, expires_at, sanction.issued_at)
 
-    if request.lifted is True and sanction.lifted_at is None:
+    if data.lifted is True and sanction.lifted_at is None:
         lifted_at = now
         lifted_by_uid = current_user.uid
 
@@ -599,12 +594,10 @@ async def update_sanction_endpoint(
     )
 
 
-@router.delete("/{uid}")
-async def delete_sanction_endpoint(
-    uid: str,
-    current_user: OptionalUser = None,
-) -> Response:
+@delete("/{uid:str}", status_code=200)
+async def delete_sanction_endpoint(request: Request, uid: FromPath[str]) -> Response:
     """Soft-delete a sanction."""
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -655,3 +648,14 @@ async def delete_sanction_endpoint(
         content=encoder.encode({"message": "Sanction deleted"}),
         media_type="application/json",
     )
+
+
+router = Router(
+    "/sanctions",
+    route_handlers=[
+        get_sanction_reference,
+        create_sanction,
+        update_sanction_endpoint,
+        delete_sanction_endpoint,
+    ],
+)

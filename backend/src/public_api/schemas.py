@@ -151,16 +151,14 @@ def ref(name: str) -> dict:
 
 def responds(name: str) -> dict:
     return {
-        "responses": {
-            "200": {
-                "description": "The stored object",
-                "content": {
-                    "application/json": {
-                        "schema": ref(name),
-                        "example": EXAMPLES[name],
-                    }
-                },
-            }
+        "200": {
+            "description": "The stored object",
+            "content": {
+                "application/json": {
+                    "schema": ref(name),
+                    "example": EXAMPLES[name],
+                }
+            },
         }
     }
 
@@ -174,27 +172,25 @@ def streams(name: str, line_type: str) -> dict:
         '{"type":"eof","count":1}',
     ]
     return {
-        "responses": {
-            "200": {
-                "description": "One JSON object per line",
-                "content": {
-                    NDJSON: {
-                        "schema": {
-                            "type": "string",
-                            "contentMediaType": NDJSON,
-                            "description": (
-                                "Newline-delimited, not a JSON array. Each line "
-                                f"is a {name}Line."
-                            ),
-                        },
-                        "examples": {
-                            "stream": {
-                                "summary": f"A {line_type} stream",
-                                "value": "\n".join(rows),
-                            }
-                        },
-                    }
-                },
-            }
+        "200": {
+            "description": "One JSON object per line",
+            "content": {
+                NDJSON: {
+                    "schema": {
+                        "type": "string",
+                        "contentMediaType": NDJSON,
+                        "description": (
+                            "Newline-delimited, not a JSON array. Each line "
+                            f"is a {name}Line."
+                        ),
+                    },
+                    "examples": {
+                        "stream": {
+                            "summary": f"A {line_type} stream",
+                            "value": "\n".join(rows),
+                        }
+                    },
+                }
+            },
         }
     }

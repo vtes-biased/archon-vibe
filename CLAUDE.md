@@ -1,7 +1,7 @@
 # Archon
 
 Offline-first PWA for running VTES tournaments and managing VEKN membership.
-Svelte + FastAPI + PostgreSQL, with a shared Rust core compiled to WASM and PyO3.
+Svelte + Litestar + PostgreSQL, with a shared Rust core compiled to WASM and PyO3.
 
 ## Three lifespans
 

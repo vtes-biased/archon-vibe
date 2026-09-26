@@ -3,8 +3,10 @@ import json
 from collections.abc import AsyncIterator, Sequence
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Response
-from fastapi.responses import FileResponse, StreamingResponse
+from litestar import Response, Router, get
+from litestar.exceptions import HTTPException
+from litestar.params import FromPath, FromQuery
+from litestar.response import File, Stream
 
 from ..models import ObjectType, RatingCategory
 from ..snapshots import get_snapshot_path
@@ -12,32 +14,24 @@ from .auth import lookup_budget, stream_budget
 from .db import get_connection
 from .schemas import NDJSON, responds, streams
 
-router = APIRouter(
-    prefix="/v1",
-    tags=["Public API"],
-    dependencies=[Depends(lookup_budget)],
-)
-
-_STREAM = [Depends(stream_budget)]
-
 _BATCH = 250
 _VISIBLE = '"api" IS NOT NULL AND deleted_at IS NULL'
 _BY_UID = "uid < %s"
 
 
 def _json(body: str) -> Response:
-    return Response(content=body, media_type="application/json")
+    return Response(body, media_type="application/json")
 
 
-def _ndjson(lines: AsyncIterator[str]) -> StreamingResponse:
-    return StreamingResponse(lines, media_type=NDJSON)
+def _ndjson(lines: AsyncIterator[str]) -> Stream:
+    return Stream(lines, media_type=NDJSON)
 
 
 def _timestamp(value: str, label: str) -> str:
     try:
         datetime.fromisoformat(value)
     except ValueError as err:
-        raise HTTPException(400, f"Invalid {label}") from err
+        raise HTTPException(status_code=400, detail=f"Invalid {label}") from err
     return value
 
 
@@ -110,16 +104,17 @@ def _object_batches(
     )
 
 
-@router.get(
+@get(
     "/tournaments",
-    openapi_extra=streams("Tournament", "tournament"),
-    dependencies=_STREAM,
+    summary="Tournaments",
+    guards=[stream_budget],
+    opt={"responses": streams("Tournament", "tournament")},
 )
 async def list_tournaments(
-    country: str | None = None,
-    start_after: str | None = None,
-    start_before: str | None = None,
-) -> StreamingResponse:
+    country: FromQuery[str | None] = None,
+    start_after: FromQuery[str | None] = None,
+    start_before: FromQuery[str | None] = None,
+) -> Stream:
     """Every tournament, newest first.
 
     `country` is an ISO 3166-1 alpha-2 code.
@@ -149,8 +144,13 @@ async def list_tournaments(
     )
 
 
-@router.get("/tournaments/{code_or_uid}", openapi_extra=responds("Tournament"))
-async def get_tournament(code_or_uid: str) -> Response:
+@get(
+    "/tournaments/{code_or_uid:str}",
+    guards=[lookup_budget],
+    summary="A tournament",
+    opt={"responses": responds("Tournament")},
+)
+async def get_tournament(code_or_uid: FromPath[str]) -> Response:
     """A tournament by its short event code (case-insensitive) or its uid."""
     row = await _one(
         f"SELECT \"api\"::text FROM objects WHERE type = 'tournament' AND {_VISIBLE} "
@@ -159,12 +159,17 @@ async def get_tournament(code_or_uid: str) -> Response:
         (code_or_uid, code_or_uid),
     )
     if not row:
-        raise HTTPException(404, "Tournament not found")
+        raise HTTPException(status_code=404, detail="Tournament not found")
     return _json(row[0])
 
 
-@router.get("/leagues", openapi_extra=streams("League", "league"), dependencies=_STREAM)
-async def list_leagues() -> StreamingResponse:
+@get(
+    "/leagues",
+    summary="Leagues",
+    guards=[stream_budget],
+    opt={"responses": streams("League", "league")},
+)
+async def list_leagues() -> Stream:
     """Every league, newest first."""
     return _ndjson(
         _data_lines(
@@ -175,23 +180,33 @@ async def list_leagues() -> StreamingResponse:
     )
 
 
-@router.get("/leagues/{uid}", openapi_extra=responds("League"))
-async def get_league(uid: str) -> Response:
+@get(
+    "/leagues/{uid:str}",
+    guards=[lookup_budget],
+    summary="A league",
+    opt={"responses": responds("League")},
+)
+async def get_league(uid: FromPath[str]) -> Response:
     row = await _one(
         f'SELECT "api"::text FROM objects WHERE uid = %s AND type = %s AND {_VISIBLE}',
         (uid, ObjectType.LEAGUE),
     )
     if not row:
-        raise HTTPException(404, "League not found")
+        raise HTTPException(status_code=404, detail="League not found")
     return _json(row[0])
 
 
-@router.get("/users", openapi_extra=streams("User", "user"), dependencies=_STREAM)
+@get(
+    "/users",
+    summary="Members",
+    guards=[stream_budget],
+    opt={"responses": streams("User", "user")},
+)
 async def list_users(
-    country: str | None = None,
-    category: RatingCategory | None = None,
-    tournament: str | None = None,
-) -> StreamingResponse:
+    country: FromQuery[str | None] = None,
+    category: FromQuery[RatingCategory | None] = None,
+    tournament: FromQuery[str | None] = None,
+) -> Stream:
     """Every member, newest first.
 
     Each line carries the member's rating in all four categories, so a ranking
@@ -222,8 +237,13 @@ async def list_users(
     )
 
 
-@router.get("/users/{uid_or_vekn_id}", openapi_extra=responds("User"))
-async def get_user(uid_or_vekn_id: str) -> Response:
+@get(
+    "/users/{uid_or_vekn_id:str}",
+    guards=[lookup_budget],
+    summary="A member",
+    opt={"responses": responds("User")},
+)
+async def get_user(uid_or_vekn_id: FromPath[str]) -> Response:
     """A member by uid or VEKN ID.
 
     A tournament's players, standings and winner carry uids, so this is how a
@@ -235,12 +255,17 @@ async def get_user(uid_or_vekn_id: str) -> Response:
         (uid_or_vekn_id, uid_or_vekn_id),
     )
     if not row:
-        raise HTTPException(404, "User not found")
+        raise HTTPException(status_code=404, detail="User not found")
     return _json(row[0])
 
 
-@router.get("/decks", openapi_extra=streams("DeckObject", "deck"), dependencies=_STREAM)
-async def list_decks(tournament: str | None = None) -> StreamingResponse:
+@get(
+    "/decks",
+    summary="Decks",
+    guards=[stream_budget],
+    opt={"responses": streams("DeckObject", "deck")},
+)
+async def list_decks(tournament: FromQuery[str | None] = None) -> Stream:
     """Every published deck, newest first. `tournament` is a tournament uid."""
     filters: list[str] = []
     values: list[str] = []
@@ -256,12 +281,13 @@ async def list_decks(tournament: str | None = None) -> StreamingResponse:
     )
 
 
-@router.get(
+@get(
     "/community-links",
-    openapi_extra=streams("CommunityLinkEntry", "community_link"),
-    dependencies=_STREAM,
+    summary="Community links",
+    guards=[stream_budget],
+    opt={"responses": streams("CommunityLinkEntry", "community_link")},
 )
-async def list_community_links() -> StreamingResponse:
+async def list_community_links() -> Stream:
     """Every member's community links, one line per link.
 
     Lines for one member arrive together; their order within a member carries no
@@ -290,10 +316,11 @@ async def list_community_links() -> StreamingResponse:
     )
 
 
-@router.get(
+@get(
     "/export",
-    dependencies=_STREAM,
-    openapi_extra={
+    summary="The whole corpus",
+    guards=[stream_budget],
+    opt={
         "responses": {
             "200": {
                 "description": "The same JSON Lines, gzipped, whole corpus",
@@ -306,12 +333,27 @@ async def list_community_links() -> StreamingResponse:
         }
     },
 )
-async def export() -> FileResponse:
+async def export() -> File:
     """The whole corpus as one gzipped JSON Lines file, rebuilt within 15 minutes of
     any change. One request instead of five, and the cheapest way to take everything."""
     path = get_snapshot_path("api")
     if path is None:
-        raise HTTPException(503, "Export not generated yet")
-    return FileResponse(
-        path, media_type="application/gzip", filename="archon-api.jsonl.gz"
-    )
+        raise HTTPException(status_code=503, detail="Export not generated yet")
+    return File(path, media_type="application/gzip", filename="archon-api.jsonl.gz")
+
+
+router = Router(
+    "/v1",
+    tags=["Public API"],
+    route_handlers=[
+        list_tournaments,
+        get_tournament,
+        list_leagues,
+        get_league,
+        list_users,
+        get_user,
+        list_decks,
+        list_community_links,
+        export,
+    ],
+)

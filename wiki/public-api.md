@@ -1,7 +1,7 @@
 # Public API
 
 A read-only HTTP API over Archon's organizational data, for third parties. It is
-a **separate FastAPI app in the same wheel**
+a **separate Litestar app in the same wheel**
 (`backend/src/public_api/`, `uvicorn backend.src.public_api.main:app`), running as
 its own process on its own subdomain, serving the `api` projection
 ([sync](sync.md#access-levels)) and nothing else.
@@ -186,7 +186,7 @@ authorization-code flow. Only those two endpoints are proxied here, so
 member's browser has to reach the consent screen there in any case, which makes
 the app's hostname the one a login client already has. So is everything a
 `event:run` token writes: the tournament routes, its scoped stream and
-`/sanctions/` are not proxied here at all. An app that signs members in *and*
+`/sanctions` are not proxied here at all. An app that signs members in *and*
 reads `/v1` legitimately types both.
 
 `/docs` and `/openapi.json` are open. The owner's "no anonymous" decision was
@@ -196,9 +196,10 @@ to the consumers the API exists for.
 ## Documentation
 
 `/docs` is a [Scalar](https://scalar.com) reference over the app's own OpenAPI
-document. Pass-through handlers return a raw `Response`, so FastAPI derives no
-response schema of its own: each route names its schema in `openapi_extra`, and
-`schemas.py` builds the components with `msgspec.json.schema_components()` over
+document. Litestar generates the paths, parameters and docstrings from the routes;
+pass-through handlers return a raw `Response`, so it derives no response schema
+worth publishing, and each route carries its own in `opt["responses"]`, which
+**replaces** the generated responses when `/openapi.json` renders. `schemas.py` builds the components with `msgspec.json.schema_components()` over
 the **real Structs**, pruned by the very field sets `access_levels` projects with
 (`USER_API_FIELDS`, `TOURNAMENT_API_EXCLUDE`, …). There is no second model of the
 payload. Pruning a field can orphan the struct it referenced, so the components
@@ -224,10 +225,9 @@ import**, not a stale sentence.
 
 A stream's body is not one JSON document, so its response schema is a string with
 a worked example, and the line union lives beside it as a `{Name}Line` component.
-**Every route ends up declaring exactly one media type**, which takes a pruning
-pass: FastAPI adds an `application/json` 200 of its own and `openapi_extra` merges
-beside it rather than replacing it, so a stream would advertise a JSON body it
-never returns — and a reader, a generator or Scalar's preview would believe it.
+**Every route declares exactly one media type**: the replacement is whole, so a
+stream never also advertises a JSON body it does not return — which a reader, a
+generator or Scalar's preview would believe.
 The line shape is spelled out in the page's own introduction as well, because it
 is the first thing a consumer needs and the last place they should have to look
 for it is a response schema.

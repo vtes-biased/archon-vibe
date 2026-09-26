@@ -68,7 +68,7 @@ def test_python_config_model_matches_engine(config_fields):
 
 
 def test_create_request_matches_engine(config_fields):
-    assert set(CreateTournamentRequest.model_fields) == config_fields
+    assert set(CreateTournamentRequest.__struct_fields__) == config_fields
 
 
 def test_sample_covers_every_config_field(config_fields):
@@ -117,5 +117,5 @@ _ACTION_ANY_VALUE = {
 def test_every_action_field_is_classified():
     assert not (_ACTION_TRUTHY_ONLY & _ACTION_ANY_VALUE)
     assert _ACTION_TRUTHY_ONLY | _ACTION_ANY_VALUE == set(
-        TournamentActionRequest.model_fields
+        TournamentActionRequest.__struct_fields__
     ) - {"type"}

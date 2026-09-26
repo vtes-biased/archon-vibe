@@ -6,18 +6,17 @@ import json
 import logging
 import os
 import time
-from typing import Literal
+from typing import Annotated, Literal
 
 import aiohttp
 import jwt
 import msgspec
-from fastapi import APIRouter, HTTPException, Response
-from pydantic import BaseModel, Field
+from litestar import Request, Response, Router, post
+from litestar.exceptions import HTTPException
 
 from .. import github_app, http_client
-from ..middleware.auth import CurrentUser
+from ..middleware.auth import get_current_user
 
-router = APIRouter(prefix="/api/feedback", tags=["feedback"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 
@@ -80,23 +79,24 @@ async def _resolve_login(
         return fallback
 
 
-class FeedbackRequest(BaseModel):
+class FeedbackRequest(msgspec.Struct):
     """JSON body for POST /api/feedback/. Length caps mirror the frontend maxlength
     and keep us well under GitHub's 65k issue-body limit."""
 
     category: Literal["bug", "feature", "question"]
-    title: str = Field(min_length=1, max_length=120)
-    description: str = Field(min_length=1, max_length=4000)
+    title: Annotated[str, msgspec.Meta(min_length=1, max_length=120)]
+    description: Annotated[str, msgspec.Meta(min_length=1, max_length=4000)]
     # Client-supplied context appended to the issue body (best-effort, optional).
-    app_version: str | None = Field(default=None, max_length=50)
-    route: str | None = Field(default=None, max_length=200)
-    locale: str | None = Field(default=None, max_length=10)
-    user_agent: str | None = Field(default=None, max_length=400)
+    app_version: Annotated[str, msgspec.Meta(max_length=50)] | None = None
+    route: Annotated[str, msgspec.Meta(max_length=200)] | None = None
+    locale: Annotated[str, msgspec.Meta(max_length=10)] | None = None
+    user_agent: Annotated[str, msgspec.Meta(max_length=400)] | None = None
 
 
-@router.post("/", status_code=201)
-async def submit_feedback(body: FeedbackRequest, current_user: CurrentUser) -> Response:
+@post("/")
+async def submit_feedback(request: Request, data: FeedbackRequest) -> Response:
     """File the submission as a GitHub issue; returns the created issue URL + number."""
+    current_user = await get_current_user(request)
     if not _is_configured():
         raise HTTPException(
             status_code=503, detail="Feedback channel is not configured"
@@ -113,7 +113,7 @@ async def submit_feedback(body: FeedbackRequest, current_user: CurrentUser) -> R
             detail="Too many feedback submissions; please wait a moment",
         )
 
-    prefix, category_label = _CATEGORIES[body.category]
+    prefix, category_label = _CATEGORIES[data.category]
     roles = ", ".join(r.value for r in current_user.roles) or "player"
     vekn = f"VEKN {current_user.vekn_id}"
 
@@ -137,22 +137,22 @@ async def submit_feedback(body: FeedbackRequest, current_user: CurrentUser) -> R
         who = f"@{mention} ({vekn})" if mention else vekn
         meta = [
             f"- **Submitted by:** {who} — role: {roles}",
-            f"- **App version:** {body.app_version or 'unknown'}",
+            f"- **App version:** {data.app_version or 'unknown'}",
         ]
-        if body.route:
-            meta.append(f"- **Page:** `{body.route}`")
-        if body.locale:
-            meta.append(f"- **Locale:** {body.locale}")
-        if body.user_agent:
-            meta.append(f"- **User agent:** {body.user_agent}")
+        if data.route:
+            meta.append(f"- **Page:** `{data.route}`")
+        if data.locale:
+            meta.append(f"- **Locale:** {data.locale}")
+        if data.user_agent:
+            meta.append(f"- **User agent:** {data.user_agent}")
         labels = ["feedback", category_label]
         if ENVIRONMENT == "beta":
             meta.append("- **Environment:** beta")
             labels.append("beta")
-        issue_body = body.description.strip() + "\n\n---\n" + "\n".join(meta)
+        issue_body = data.description.strip() + "\n\n---\n" + "\n".join(meta)
 
         issue: dict = {
-            "title": f"[{prefix}] {body.title}",
+            "title": f"[{prefix}] {data.title}",
             "body": issue_body,
             "labels": labels,
         }
@@ -174,7 +174,7 @@ async def submit_feedback(body: FeedbackRequest, current_user: CurrentUser) -> R
                     status_code=502,
                     detail="Could not file feedback right now; please try again later",
                 )
-            data = json.loads(text)
+            payload = json.loads(text)
     # ValueError = non-201 token fetch; OSError = unreadable key file; PyJWTError =
     # bad key content — all degrade to a clean 502 instead of a raw 500.
     except (aiohttp.ClientError, TimeoutError, ValueError, OSError, jwt.PyJWTError):
@@ -186,8 +186,11 @@ async def submit_feedback(body: FeedbackRequest, current_user: CurrentUser) -> R
 
     return Response(
         content=encoder.encode(
-            {"issue_url": data["html_url"], "issue_number": data["number"]}
+            {"issue_url": payload["html_url"], "issue_number": payload["number"]}
         ),
         media_type="application/json",
         status_code=201,
     )
+
+
+router = Router("/api/feedback", route_handlers=[submit_feedback])

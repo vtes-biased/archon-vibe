@@ -53,7 +53,7 @@ async def test_qr_checkin_checks_in_the_scanning_player(test_client):
             json={"code": "door"},
             headers=make_auth_header("qr-user-2"),
         )
-        assert resp.status_code == 200, resp.text
+        assert resp.status_code == 201, resp.text
         assert resp.json()["players"][0]["state"] == PlayerState.CHECKED_IN
     finally:
         async with db.get_connection() as conn:

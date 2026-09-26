@@ -102,7 +102,7 @@ async def test_dq_does_not_bar_check_in_at_a_league_sibling(test_client):
             json={"type": "CheckIn", "player_uid": target.uid},
             headers=make_auth_header(ic.uid),
         )
-        assert resp.status_code == 200, resp.text
+        assert resp.status_code == 201, resp.text
 
         updated = await db.get_tournament_by_uid(sibling.uid)
         entry = next(p for p in updated.players if p.user_uid == target.uid)

@@ -27,8 +27,8 @@ tournament must be scrubbed there too, or the next go-online republishes it.
 
 **`vekn_id` is deliberately absent from `TournamentActionRequest`.** `/action`
 derives `event_data` from that model, so a key reaches the Rust `TournamentEvent`
-exactly when it is declared there — Pydantic's `extra="ignore"` drops anything
-else a client sends, with no error. The server injects `vekn_id` from the
+exactly when it is declared there — a `msgspec.Struct` drops any other key a
+client sends, with no error. The server injects `vekn_id` from the
 resolved user *after* the copy; declaring it would reopen the fabricated-id hole.
 
 **The engine round-trips the whole tournament document**, so do not give it owned
@@ -647,8 +647,8 @@ loop tick already holds nginx's unread request, so the close sends a reset —
 measured on beta at about one request every few restarts under 25 req/s. The
 socket unit cannot help: the connection has left its queue. Draining accepted
 connections first means overriding uvicorn's `Server.shutdown`, a non-public
-method, so it was left open: re-explore it when switching from FastAPI to
-Litestar changes the server underneath.
+method, so it is left open until uvicorn grows a public drain hook or the app
+leaves uvicorn.
 
 **Production nginx proxies only an allowlist of top-level prefixes.** A new route
 under an existing prefix is fine; a new top-level segment 404s in production while

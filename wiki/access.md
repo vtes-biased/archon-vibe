@@ -301,7 +301,7 @@ else in the app is refused until it is named here.
 |---|---|
 | `/oauth/*` | the grant's own lifecycle |
 | `/api/tournaments/<the token's uid>/…` | minus the barred sub-routes below |
-| `POST /sanctions/` | body `tournament_uid` must equal the token's — a path gate cannot see a body, so the match is in the handler |
+| `POST /sanctions` | body `tournament_uid` must equal the token's — a path gate cannot see a body, so the match is in the handler |
 | `GET /sanctions/reference` | engine-owned, public anyway |
 | `/stream?tournament=<the token's uid>` | the scoped stream, [sync](sync.md#the-sse-endpoint) |
 
@@ -369,7 +369,7 @@ insert can therefore crash on a reserved number.
 
 ## Deployment gate
 
-Production nginx proxies **only an allowlist of path prefixes** to FastAPI:
+Production nginx proxies **only an allowlist of path prefixes** to the backend:
 `/api`, `/auth`, `/oauth`, `/vekn`, `/sanctions`, `/admin`, `/snapshot`, `/stream`,
 plus the legacy `/tournament/<uid>/display.html` redirect.
 A new route under an existing prefix is fine; **a new top-level segment 404s in

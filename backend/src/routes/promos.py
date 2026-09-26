@@ -1,12 +1,16 @@
 """Promo catalog API endpoints (IC-only writes; reads sync via SSE)."""
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from typing import Annotated
 from uuid import uuid7
 
 import msgspec
-from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
-from pydantic import BaseModel
+from litestar import Request, Response, Router, delete, get, post, put
+from litestar.datastructures import UploadFile
+from litestar.enums import RequestEncodingType
+from litestar.exceptions import HTTPException
+from litestar.params import Body, FromPath
 
 from .. import permissions
 from ..broadcast import broadcast_precomputed
@@ -23,101 +27,107 @@ from ..db import (
     save_promo,
     upsert_promo_image,
 )
-from ..middleware.auth import OptionalUser
+from ..middleware.auth import get_optional_user
 from ..models import (
     Promo,
     PromoKind,
     PromoLedgerEntry,
     PromoLedgerKind,
     TournamentRank,
+    User,
 )
 from ..promo_stock import schedule_recompute
 
-router = APIRouter(prefix="/api/promos", tags=["promos"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 
 
-class PromoCreate(BaseModel):
+class PromoCreate(msgspec.Struct):
     name: str
     kind: PromoKind = PromoKind.CARD
     description: str = ""
-    release_date: datetime | None = None
+    release_date: date | None = None
     active: bool = True
     allowed_ranks: list[TournamentRank] = []
     league_uids: list[str] = []
 
 
-class PromoUpdate(BaseModel):
+class PromoUpdate(msgspec.Struct):
     # Catalog fields only: `holdings` is server-written (ledger recompute) and
     # `image_path` is set by the image upload endpoint.
-    name: str | None = None
-    kind: PromoKind | None = None
-    description: str | None = None
-    release_date: datetime | None = None
-    active: bool | None = None
-    allowed_ranks: list[TournamentRank] | None = None
-    league_uids: list[str] | None = None
+    name: str | msgspec.UnsetType = msgspec.UNSET
+    kind: PromoKind | msgspec.UnsetType = msgspec.UNSET
+    description: str | msgspec.UnsetType = msgspec.UNSET
+    release_date: date | None | msgspec.UnsetType = msgspec.UNSET
+    active: bool | msgspec.UnsetType = msgspec.UNSET
+    allowed_ranks: list[TournamentRank] | msgspec.UnsetType = msgspec.UNSET
+    league_uids: list[str] | msgspec.UnsetType = msgspec.UNSET
 
 
-def _require_ic(user: OptionalUser) -> None:
+def _require_ic(user: User | None) -> None:
     if not user:
-        raise HTTPException(401, "Authentication required")
+        raise HTTPException(status_code=401, detail="Authentication required")
     if not permissions.can_manage_promos(user):
-        raise HTTPException(403, "Only IC can manage promos")
+        raise HTTPException(status_code=403, detail="Only IC can manage promos")
 
 
 async def _validate_league_uids(league_uids: list[str]) -> None:
     for league_uid in league_uids:
         if not await get_league_by_uid(league_uid):
-            raise HTTPException(400, f"League not found: {league_uid}")
+            raise HTTPException(
+                status_code=400, detail=f"League not found: {league_uid}"
+            )
 
 
-@router.post("/")
-async def create_promo(
-    body: PromoCreate,
-    user: OptionalUser = None,
-) -> Response:
+@post("/")
+async def create_promo(request: Request, data: PromoCreate) -> Response:
     """Create a new promo item. IC only."""
+    user = await get_optional_user(request)
     _require_ic(user)
-    await _validate_league_uids(body.league_uids)
+    await _validate_league_uids(data.league_uids)
 
     promo = Promo(
         uid=str(uuid7()),
         modified=datetime.now(UTC),
-        name=body.name,
-        kind=body.kind,
-        description=body.description,
-        release_date=body.release_date,
-        active=body.active,
-        allowed_ranks=body.allowed_ranks,
-        league_uids=body.league_uids,
+        name=data.name,
+        kind=data.kind,
+        description=data.description,
+        release_date=datetime(d.year, d.month, d.day)
+        if (d := data.release_date)
+        else None,
+        active=data.active,
+        allowed_ranks=data.allowed_ranks,
+        league_uids=data.league_uids,
     )
     bd = await save_promo(promo)
     broadcast_precomputed(bd)
     return Response(
         content=encoder.encode(msgspec.to_builtins(promo)),
         media_type="application/json",
-        status_code=201,
     )
 
 
-@router.put("/{uid}")
+@put("/{uid:str}")
 async def update_promo(
-    uid: str,
-    body: PromoUpdate,
-    user: OptionalUser = None,
+    request: Request, uid: FromPath[str], data: PromoUpdate
 ) -> Response:
     """Update a promo's catalog fields. IC only."""
+    user = await get_optional_user(request)
     _require_ic(user)
     promo = await get_promo_by_uid(uid)
     if not promo:
-        raise HTTPException(404, "Promo not found")
+        raise HTTPException(status_code=404, detail="Promo not found")
 
-    updates = body.model_dump(exclude_unset=True)
+    updates = {
+        f: v
+        for f in data.__struct_fields__
+        if (v := getattr(data, f)) is not msgspec.UNSET
+    }
     if "league_uids" in updates and updates["league_uids"]:
         await _validate_league_uids(updates["league_uids"])
     for field, value in updates.items():
+        if isinstance(value, date):
+            value = datetime(value.year, value.month, value.day)
         setattr(promo, field, value)
 
     promo.modified = datetime.now(UTC)
@@ -132,43 +142,41 @@ async def update_promo(
     )
 
 
-@router.delete("/{uid}")
-async def delete_promo(
-    uid: str,
-    user: OptionalUser = None,
-) -> Response:
+@delete("/{uid:str}")
+async def delete_promo(request: Request, uid: FromPath[str]) -> None:
     """Soft-delete an unreferenced promo. IC only.
 
     A referenced promo must be retired (active=false) instead: the universal
     soft-delete tombstone hard-deletes it client-side, which would dangle the
     historical distribution rows and raffle prizes pointing at it.
     """
+    user = await get_optional_user(request)
     _require_ic(user)
     promo = await get_promo_by_uid(uid)
     if not promo:
-        raise HTTPException(404, "Promo not found")
+        raise HTTPException(status_code=404, detail="Promo not found")
     if await count_promo_references(uid):
         raise HTTPException(
-            409, "Promo is referenced by tournament reports — retire it instead"
+            status_code=409,
+            detail="Promo is referenced by tournament reports — retire it instead",
         )
 
     promo.deleted_at = datetime.now(UTC)
     promo.modified = datetime.now(UTC)
     bd = await save_promo(promo)
     broadcast_precomputed(bd)
-    return Response(status_code=204)
 
 
 # Ledger movements (promo_ledger, not synced) are officials-only back office.
 # Stock is recomputed server-side and streamed via Promo/User, never derived client-side.
 
 
-class LedgerLine(BaseModel):
+class LedgerLine(msgspec.Struct):
     promo_uid: str
     qty: int
 
 
-class LedgerEntryCreate(BaseModel):
+class LedgerEntryCreate(msgspec.Struct):
     kind: PromoLedgerKind
     lines: list[LedgerLine]
     to_uid: str | None = None
@@ -177,85 +185,90 @@ class LedgerEntryCreate(BaseModel):
     happened_at: datetime | None = None
 
 
-@router.post("/ledger")
-async def create_ledger_entries(
-    body: LedgerEntryCreate,
-    user: OptionalUser = None,
-) -> Response:
+@post("/ledger")
+async def create_ledger_entries(request: Request, data: LedgerEntryCreate) -> Response:
     """Record one inventory movement across several promos — one row per line,
     written all-or-nothing. Self-sourced (own stock) for anyone; IC may record
     for another holder (unrecorded supply needs no prior stock). Intake (batch
     received from BCP, from_uid = the receiving holder) is officials-only: NC
     for their own pool, IC for anyone."""
+    user = await get_optional_user(request)
     if not user:
-        raise HTTPException(401, "Authentication required")
+        raise HTTPException(status_code=401, detail="Authentication required")
     # Membership floor: every real holder has a VEKN ID — keeps drive-by accounts
     # from writing rows (movements stay auditable, correctable via compensating rows).
     if not user.vekn_id:
-        raise HTTPException(403, "VEKN membership required")
-    from_uid = body.from_uid or user.uid
+        raise HTTPException(status_code=403, detail="VEKN membership required")
+    from_uid = data.from_uid or user.uid
     if from_uid != user.uid and not permissions.can_manage_promos(user):
-        raise HTTPException(403, "Only IC can record movements for another holder")
+        raise HTTPException(
+            status_code=403, detail="Only IC can record movements for another holder"
+        )
     # Intake creates stock from nothing: officials only (self check above
     # already restricts NC to their own pool).
-    if body.kind == PromoLedgerKind.INTAKE and not permissions.can_record_promo_intake(
+    if data.kind == PromoLedgerKind.INTAKE and not permissions.can_record_promo_intake(
         user
     ):
-        raise HTTPException(403, "Only IC or NC can record an intake")
-    if not body.lines:
-        raise HTTPException(400, "At least one line is required")
-    if any(line.qty == 0 for line in body.lines):
-        raise HTTPException(400, "qty must be non-zero")
-    promo_uids = [line.promo_uid for line in body.lines]
+        raise HTTPException(
+            status_code=403, detail="Only IC or NC can record an intake"
+        )
+    if not data.lines:
+        raise HTTPException(status_code=400, detail="At least one line is required")
+    if any(line.qty == 0 for line in data.lines):
+        raise HTTPException(status_code=400, detail="qty must be non-zero")
+    promo_uids = [line.promo_uid for line in data.lines]
     if len(set(promo_uids)) != len(promo_uids):
-        raise HTTPException(400, "A promo may appear only once per submission")
+        raise HTTPException(
+            status_code=400, detail="A promo may appear only once per submission"
+        )
     known = {promo.uid for promo in await get_all_promos()}
     if not set(promo_uids) <= known:
-        raise HTTPException(404, "Promo not found")
-    if body.kind == PromoLedgerKind.ASSIGNMENT:
-        if not body.to_uid:
-            raise HTTPException(400, "Assignment requires to_uid")
+        raise HTTPException(status_code=404, detail="Promo not found")
+    if data.kind == PromoLedgerKind.ASSIGNMENT:
+        if not data.to_uid:
+            raise HTTPException(status_code=400, detail="Assignment requires to_uid")
         # Credits and debits the same holder — nets to zero in the recompute.
-        if body.to_uid == from_uid:
+        if data.to_uid == from_uid:
             raise HTTPException(
-                400, "Self-assignment is a no-op — record an intake instead"
+                status_code=400,
+                detail="Self-assignment is a no-op — record an intake instead",
             )
-        if not await get_user_by_uid(body.to_uid):
-            raise HTTPException(400, "Assignee not found")
-    elif body.to_uid:
-        raise HTTPException(400, "Only assignments have to_uid")
+        if not await get_user_by_uid(data.to_uid):
+            raise HTTPException(status_code=400, detail="Assignee not found")
+    elif data.to_uid:
+        raise HTTPException(status_code=400, detail="Only assignments have to_uid")
 
     now = datetime.now(UTC)
     entries = [
         PromoLedgerEntry(
             uid=str(uuid7()),
-            kind=body.kind,
+            kind=data.kind,
             promo_uid=line.promo_uid,
             qty=line.qty,
             from_uid=from_uid,
-            to_uid=body.to_uid,
-            note=body.note,
-            happened_at=body.happened_at or now,
+            to_uid=data.to_uid,
+            note=data.note,
+            happened_at=data.happened_at or now,
             created_by=user.uid,
             created_at=now,
         )
-        for line in body.lines
+        for line in data.lines
     ]
     await insert_promo_ledger_entries(entries)
     schedule_recompute(promo_uids)
     return Response(
         content=encoder.encode(msgspec.to_builtins(entries)),
         media_type="application/json",
-        status_code=201,
     )
 
 
-@router.get("/ledger")
-async def list_ledger_entries(user: OptionalUser = None) -> Response:
+@get("/ledger")
+async def list_ledger_entries(request: Request) -> Response:
     """The whole role-scoped ledger, oldest first — no pagination by design
     (small dataset; filtering/aggregation happen client-side)."""
+    user = await get_optional_user(request)
     if not user:
-        raise HTTPException(401, "Authentication required")
+        raise HTTPException(status_code=401, detail="Authentication required")
     whole_ledger = permissions.can_view_full_promo_ledger(user)
     entries = await get_promo_ledger_entries(None if whole_ledger else user.uid)
     return Response(
@@ -269,28 +282,30 @@ async def list_ledger_entries(user: OptionalUser = None) -> Response:
 MAX_PROMO_IMAGE_SIZE = 1024 * 1024
 
 
-@router.post("/{uid}/image")
+@post("/{uid:str}/image")
 async def upload_promo_image(
-    uid: str,
-    file: UploadFile,
-    user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
+    data: Annotated[UploadFile, Body(media_type=RequestEncodingType.MULTI_PART)],
 ) -> Response:
     """Upload or replace a promo image. IC only. Max 1MB webp/png/jpeg."""
+    user = await get_optional_user(request)
     _require_ic(user)
     promo = await get_promo_by_uid(uid)
     if not promo:
-        raise HTTPException(404, "Promo not found")
+        raise HTTPException(status_code=404, detail="Promo not found")
 
-    if file.content_type not in ("image/webp", "image/png", "image/jpeg"):
-        raise HTTPException(400, "Image must be webp, png, or jpeg")
+    if data.content_type not in ("image/webp", "image/png", "image/jpeg"):
+        raise HTTPException(status_code=400, detail="Image must be webp, png, or jpeg")
 
-    data = await file.read()
-    if len(data) > MAX_PROMO_IMAGE_SIZE:
+    image_bytes = await data.read()
+    if len(image_bytes) > MAX_PROMO_IMAGE_SIZE:
         raise HTTPException(
-            400, f"Image too large. Max size: {MAX_PROMO_IMAGE_SIZE // 1024}KB"
+            status_code=400,
+            detail=f"Image too large. Max size: {MAX_PROMO_IMAGE_SIZE // 1024}KB",
         )
 
-    await upsert_promo_image(uid, data, file.content_type or "image/webp")
+    await upsert_promo_image(uid, image_bytes, data.content_type or "image/webp")
 
     now = datetime.now(UTC)
     version = int(now.timestamp() * 1000)  # cache-busting token baked into the URL
@@ -302,13 +317,13 @@ async def upload_promo_image(
     return Response(content=b'{"success": true}', media_type="application/json")
 
 
-@router.get("/{uid}/image")
-async def get_promo_image_endpoint(uid: str, request: Request) -> Response:
+@get("/{uid:str}/image")
+async def get_promo_image_endpoint(uid: FromPath[str], request: Request) -> Response:
     """Serve a promo image. A versioned (?v=) URL is immutable, so it can be
     cached aggressively; an unversioned request gets a short TTL."""
     result = await get_promo_image(uid)
     if not result:
-        raise HTTPException(404, "Promo image not found")
+        raise HTTPException(status_code=404, detail="Promo image not found")
 
     data, content_type = result
     cache = (
@@ -323,20 +338,32 @@ async def get_promo_image_endpoint(uid: str, request: Request) -> Response:
     )
 
 
-@router.delete("/{uid}/image")
-async def delete_promo_image_endpoint(
-    uid: str,
-    user: OptionalUser = None,
-) -> Response:
+@delete("/{uid:str}/image")
+async def delete_promo_image_endpoint(request: Request, uid: FromPath[str]) -> None:
     """Delete a promo image. IC only."""
+    user = await get_optional_user(request)
     _require_ic(user)
     promo = await get_promo_by_uid(uid)
     if not promo:
-        raise HTTPException(404, "Promo not found")
+        raise HTTPException(status_code=404, detail="Promo not found")
 
     await delete_promo_image(uid)
     promo.image_path = None
     promo.modified = datetime.now(UTC)
     bd = await save_promo(promo)
     broadcast_precomputed(bd)
-    return Response(status_code=204)
+
+
+router = Router(
+    "/api/promos",
+    route_handlers=[
+        create_promo,
+        update_promo,
+        delete_promo,
+        create_ledger_entries,
+        list_ledger_entries,
+        upload_promo_image,
+        get_promo_image_endpoint,
+        delete_promo_image_endpoint,
+    ],
+)

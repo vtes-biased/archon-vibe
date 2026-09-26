@@ -1,5 +1,5 @@
 [Unit]
-Description={{ unit }}-backend (archon FastAPI backend)
+Description={{ unit }}-backend (archon Litestar backend)
 After=network-online.target {{ postgres_unit }} {{ unit }}-backend.socket
 Requires={{ unit }}-backend.socket
 Wants=network-online.target

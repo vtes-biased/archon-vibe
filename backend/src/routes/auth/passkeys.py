@@ -7,8 +7,8 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid7
 
 import msgspec
-from fastapi import APIRouter, HTTPException, Response
-from pydantic import BaseModel
+from litestar import Request, Response, post
+from litestar.exceptions import HTTPException
 from webauthn import (
     generate_authentication_options,
     generate_registration_options,
@@ -33,7 +33,7 @@ from ...db import (
     store_transient_token,
     update_auth_method,
 )
-from ...middleware.auth import CurrentUser
+from ...middleware.auth import get_current_user
 from ...models import AuthMethod, AuthMethodType, User
 from ._tokens import (
     TokenResponse,
@@ -42,7 +42,6 @@ from ._tokens import (
     create_refresh_token,
 )
 
-router = APIRouter()
 encoder = msgspec.json.Encoder()
 
 WEBAUTHN_RP_ID = os.getenv("WEBAUTHN_RP_ID", "localhost")
@@ -50,16 +49,17 @@ WEBAUTHN_RP_NAME = os.getenv("WEBAUTHN_RP_NAME", "Archon")
 WEBAUTHN_ORIGIN = os.getenv("WEBAUTHN_ORIGIN", "http://localhost:5173")
 
 
-class PasskeyRegisterVerifyRequest(BaseModel):
+class PasskeyRegisterVerifyRequest(msgspec.Struct):
     credential: dict  # Raw credential from navigator.credentials.create()
 
 
-class PasskeyLoginVerifyRequest(BaseModel):
+class PasskeyLoginVerifyRequest(msgspec.Struct):
     credential: dict  # Raw credential from navigator.credentials.get()
 
 
-@router.post("/passkey/register/options")
-async def passkey_register_options(current_user: CurrentUser) -> Response:
+@post("/passkey/register/options")
+async def passkey_register_options(request: Request) -> Response:
+    current_user = await get_current_user(request)
     user = current_user
     user_uid = user.uid
 
@@ -102,15 +102,16 @@ async def passkey_register_options(current_user: CurrentUser) -> Response:
     )
 
 
-@router.post("/passkey/register/verify")
+@post("/passkey/register/verify")
 async def passkey_register_verify(
-    request: PasskeyRegisterVerifyRequest,
-    current_user: CurrentUser,
+    request: Request,
+    data: PasskeyRegisterVerifyRequest,
 ) -> Response:
+    current_user = await get_current_user(request)
     user_uid = current_user.uid
 
     client_data_json = base64.urlsafe_b64decode(
-        request.credential["response"]["clientDataJSON"] + "=="
+        data.credential["response"]["clientDataJSON"] + "=="
     )
     client_data = json.loads(client_data_json)
     challenge_b64 = client_data["challenge"]
@@ -125,7 +126,7 @@ async def passkey_register_verify(
 
     try:
         verification = verify_registration_response(
-            credential=request.credential,
+            credential=data.credential,
             expected_challenge=base64.urlsafe_b64decode(challenge_b64 + "=="),
             expected_rp_id=WEBAUTHN_RP_ID,
             expected_origin=WEBAUTHN_ORIGIN,
@@ -164,7 +165,7 @@ async def passkey_register_verify(
     )
 
 
-@router.post("/passkey/create/options")
+@post("/passkey/create/options")
 async def passkey_create_options() -> Response:
     """No auth required; creates a new account with a placeholder name
     completed later via profile."""
@@ -203,10 +204,10 @@ async def passkey_create_options() -> Response:
     )
 
 
-@router.post("/passkey/create/verify")
-async def passkey_create_verify(request: PasskeyRegisterVerifyRequest) -> Response:
+@post("/passkey/create/verify")
+async def passkey_create_verify(data: PasskeyRegisterVerifyRequest) -> Response:
     client_data_json = base64.urlsafe_b64decode(
-        request.credential["response"]["clientDataJSON"] + "=="
+        data.credential["response"]["clientDataJSON"] + "=="
     )
     client_data = json.loads(client_data_json)
     challenge_b64 = client_data["challenge"]
@@ -219,7 +220,7 @@ async def passkey_create_verify(request: PasskeyRegisterVerifyRequest) -> Respon
 
     try:
         verification = verify_registration_response(
-            credential=request.credential,
+            credential=data.credential,
             expected_challenge=base64.urlsafe_b64decode(challenge_b64 + "=="),
             expected_rp_id=WEBAUTHN_RP_ID,
             expected_origin=WEBAUTHN_ORIGIN,
@@ -268,13 +269,12 @@ async def passkey_create_verify(request: PasskeyRegisterVerifyRequest) -> Respon
         expires_in=expires_in,
     )
     return Response(
-        content=response.model_dump_json(),
+        content=encoder.encode(response),
         media_type="application/json",
-        status_code=201,
     )
 
 
-@router.post("/passkey/login/options")
+@post("/passkey/login/options")
 async def passkey_login_options() -> Response:
     """Uses discoverable credentials (resident keys): no user identification is
     passed, so the credential itself resolves the user."""
@@ -301,9 +301,9 @@ async def passkey_login_options() -> Response:
     )
 
 
-@router.post("/passkey/login/verify")
-async def passkey_login_verify(request: PasskeyLoginVerifyRequest) -> Response:
-    credential_id_raw = request.credential.get("id", "")
+@post("/passkey/login/verify")
+async def passkey_login_verify(data: PasskeyLoginVerifyRequest) -> Response:
+    credential_id_raw = data.credential.get("id", "")
     # id is already base64url-encoded by the browser.
     credential_id_b64 = credential_id_raw.rstrip("=")
 
@@ -312,7 +312,7 @@ async def passkey_login_verify(request: PasskeyLoginVerifyRequest) -> Response:
         raise HTTPException(status_code=401, detail="Passkey not found")
 
     client_data_json = base64.urlsafe_b64decode(
-        request.credential["response"]["clientDataJSON"] + "=="
+        data.credential["response"]["clientDataJSON"] + "=="
     )
     client_data = json.loads(client_data_json)
     challenge_b64 = client_data["challenge"]
@@ -327,7 +327,7 @@ async def passkey_login_verify(request: PasskeyLoginVerifyRequest) -> Response:
     try:
         public_key = base64.urlsafe_b64decode(auth_method.credential_hash + "==")
         verification = verify_authentication_response(
-            credential=request.credential,
+            credential=data.credential,
             expected_challenge=base64.urlsafe_b64decode(challenge_b64 + "=="),
             expected_rp_id=WEBAUTHN_RP_ID,
             expected_origin=WEBAUTHN_ORIGIN,
@@ -368,6 +368,16 @@ async def passkey_login_verify(request: PasskeyLoginVerifyRequest) -> Response:
         expires_in=expires_in,
     )
     return Response(
-        content=response.model_dump_json(),
+        content=encoder.encode(response),
         media_type="application/json",
     )
+
+
+handlers = [
+    passkey_register_options,
+    passkey_register_verify,
+    passkey_create_options,
+    passkey_create_verify,
+    passkey_login_options,
+    passkey_login_verify,
+]

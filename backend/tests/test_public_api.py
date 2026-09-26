@@ -40,12 +40,8 @@ _UNDOCUMENTED = ("/docs", "/openapi.json")
 
 
 def _paths() -> list[str]:
-    # The document also carries the app's Member API endpoints, which this
-    # app does not serve — asserting on those would only exercise its 404 handler.
     documented = [
-        re.sub(r"\{[^}]+\}", "x", path)
-        for path, operations in app.openapi()["paths"].items()
-        if any("Public API" in op.get("tags", []) for op in operations.values())
+        re.sub(r"\{[^}]+\}", "x", path) for path in app.openapi_schema.paths or {}
     ]
     assert documented
     return [*documented, *_UNDOCUMENTED]

@@ -182,7 +182,9 @@ derives every path, unit and database from the environment's `name` in
 restarts only when its wheel, requirements, env file or units changed — the public
 API runs from the backend's venv, so it restarts with the backend's; the venv
 install and the frontend swap compare a marker on the box with the hash of what
-is deployed, so re-running a deploy that failed halfway finishes it. The backend,
+is deployed, so re-running a deploy that failed halfway finishes it. A venv is
+`uv pip sync`ed to its requirements, never merely installed over, so a dependency
+the lock drops leaves the box. The backend,
 public-API and bot env files single-quote every value, so they load cleanly in bash
 (`set -a; . <file>`) as well as in systemd; the deploy refuses a value holding a
 single quote, which neither can escape inside one. Every release
@@ -396,7 +398,7 @@ issue, the commit whose `Reported in #N.` names it and `git tag --contains` are
 enough to say whether a fix is live, while a script run leaves nothing behind to
 derive from and so has to be written down when it is written.
 
-Production nginx proxies only an allowlist of top-level path prefixes to FastAPI
+Production nginx proxies only an allowlist of top-level path prefixes to the backend
 ([access](access.md#deployment-gate)), and its templates own the Open Graph
 crawler UA list ([architecture](architecture.md#reports-and-social-sharing)).
 
@@ -467,7 +469,7 @@ memory. Chosen for the best combination of snippet count and benchmark score:
 | TypeScript | `/websites/typescriptlang` |
 | Tailwind CSS v4 | `/websites/tailwindcss` |
 | Playwright | `/websites/devdocs_io_playwright` |
-| FastAPI | `/websites/fastapi_tiangolo` |
+| Litestar | `/websites/litestar_dev` |
 | msgspec | `/jcrist/msgspec` |
 | psycopg 3 | `/websites/psycopg_psycopg3` |
 | pytest | `/pytest-dev/pytest` |
@@ -479,7 +481,7 @@ memory. Chosen for the best combination of snippet count and benchmark score:
 
 ```
 engine/     Rust core — the single source of business logic
-backend/    FastAPI service
+backend/    Litestar service
 frontend/   Svelte PWA
 bot/        Discord tournament bot (separate process)
 deploy/     pyinfra deploy (beta and production)

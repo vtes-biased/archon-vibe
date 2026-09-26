@@ -3,11 +3,15 @@ sealed-PDF evidence."""
 
 import logging
 from datetime import UTC, datetime
+from typing import Annotated
 from uuid import uuid7
 
 import msgspec
-from fastapi import APIRouter, HTTPException, Response, UploadFile
-from pydantic import BaseModel
+from litestar import Request, Response, Router, get, post
+from litestar.datastructures import UploadFile
+from litestar.enums import RequestEncodingType
+from litestar.exceptions import HTTPException
+from litestar.params import Body, FromPath
 
 from .. import nda, permissions
 from ..db import (
@@ -20,9 +24,8 @@ from ..db import (
     seal_nda_signature,
 )
 from ..email_service import send_nda_copy_email
-from ..middleware.auth import CurrentUser
+from ..middleware.auth import get_current_user
 
-router = APIRouter(prefix="/api/users", tags=["nda"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 
@@ -37,8 +40,9 @@ def _require_manage_or_self(current_user, uid: str) -> None:
         )
 
 
-@router.get("/{uid}/nda")
-async def get_nda_status(uid: str, current_user: CurrentUser) -> Response:
+@get("/{uid:str}/nda")
+async def get_nda_status(request: Request, uid: FromPath[str]) -> Response:
+    current_user = await get_current_user(request)
     _require_manage_or_self(current_user, uid)
     records = await get_nda_records(uid)
     return Response(
@@ -54,8 +58,9 @@ async def get_nda_status(uid: str, current_user: CurrentUser) -> Response:
     )
 
 
-@router.post("/{uid}/nda/request", status_code=201)
-async def request_nda_signature(uid: str, current_user: CurrentUser) -> Response:
+@post("/{uid:str}/nda/request")
+async def request_nda_signature(request: Request, uid: FromPath[str]) -> Response:
+    current_user = await get_current_user(request)
     if not permissions.can_manage_nda(current_user):
         raise HTTPException(
             status_code=403, detail="Only IC or PTC can request an NDA signature"
@@ -70,8 +75,9 @@ async def request_nda_signature(uid: str, current_user: CurrentUser) -> Response
     return Response(content=b'{"success": true}', media_type="application/json")
 
 
-@router.get("/{uid}/nda/document")
-async def get_nda_document(uid: str, current_user: CurrentUser) -> Response:
+@get("/{uid:str}/nda/document")
+async def get_nda_document(request: Request, uid: FromPath[str]) -> Response:
+    current_user = await get_current_user(request)
     _require_manage_or_self(current_user, uid)
     target = await get_user_by_uid(uid)
     if not target or target.deleted_at:
@@ -88,7 +94,7 @@ async def get_nda_document(uid: str, current_user: CurrentUser) -> Response:
     )
 
 
-class SignNdaRequest(BaseModel):
+class SignNdaRequest(msgspec.Struct):
     """JSON body for POST /api/users/{uid}/nda/sign. The typed name is the
     signature and becomes the document's Recipient."""
 
@@ -98,13 +104,14 @@ class SignNdaRequest(BaseModel):
     phone: str = ""
 
 
-@router.post("/{uid}/nda/sign")
+@post("/{uid:str}/nda/sign")
 async def sign_nda(
-    uid: str, body: SignNdaRequest, current_user: CurrentUser
+    request: Request, uid: FromPath[str], data: SignNdaRequest
 ) -> Response:
+    current_user = await get_current_user(request)
     if current_user.uid != uid:
         raise HTTPException(status_code=403, detail="Only the member can sign")
-    name = body.name.strip()
+    name = data.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="A typed name is required to sign")
     pending = await get_nda_pending(uid)
@@ -116,9 +123,9 @@ async def sign_nda(
     signed_at = datetime.now(UTC)
     pdf = nda.build_sealed_pdf(
         recipient_name=name,
-        signer_email=body.email.strip(),
-        signer_address=body.address.strip(),
-        signer_phone=body.phone.strip(),
+        signer_email=data.email.strip(),
+        signer_address=data.address.strip(),
+        signer_phone=data.phone.strip(),
         member_uid=uid,
         vekn_id=current_user.vekn_id or "-",
         requested_by=requester.name if requester else pending["requested_by"],
@@ -131,9 +138,9 @@ async def sign_nda(
         document_version=nda.NDA_VERSION,
         document_sha256=nda.nda_sha256(),
         signer_name=name,
-        signer_email=body.email.strip(),
-        signer_address=body.address.strip(),
-        signer_phone=body.phone.strip(),
+        signer_email=data.email.strip(),
+        signer_address=data.address.strip(),
+        signer_phone=data.phone.strip(),
         signed_at=signed_at,
         pdf=pdf,
     )
@@ -141,18 +148,21 @@ async def sign_nda(
         raise HTTPException(
             status_code=409, detail="No pending NDA request for this member"
         )
-    if body.email.strip():
-        await send_nda_copy_email(body.email.strip(), name, pdf)
+    if data.email.strip():
+        await send_nda_copy_email(data.email.strip(), name, pdf)
     return Response(
         content=encoder.encode({"success": True, "record_uid": pending["uid"]}),
         media_type="application/json",
     )
 
 
-@router.post("/{uid}/nda/upload", status_code=201)
+@post("/{uid:str}/nda/upload")
 async def upload_nda_scan(
-    uid: str, file: UploadFile, current_user: CurrentUser
+    request: Request,
+    uid: FromPath[str],
+    data: Annotated[UploadFile, Body(media_type=RequestEncodingType.MULTI_PART)],
 ) -> Response:
+    current_user = await get_current_user(request)
     if not permissions.can_manage_nda(current_user):
         raise HTTPException(
             status_code=403, detail="Only IC or PTC can upload an NDA scan"
@@ -160,26 +170,27 @@ async def upload_nda_scan(
     target = await get_user_by_uid(uid)
     if not target or target.deleted_at:
         raise HTTPException(status_code=404, detail="User not found")
-    if file.content_type not in UPLOAD_CONTENT_TYPES:
+    if data.content_type not in UPLOAD_CONTENT_TYPES:
         raise HTTPException(
             status_code=400, detail="NDA scan must be a PDF or an image"
         )
-    data = await file.read()
-    if len(data) > MAX_NDA_UPLOAD_SIZE:
+    payload = await data.read()
+    if len(payload) > MAX_NDA_UPLOAD_SIZE:
         raise HTTPException(
             status_code=400,
             detail=f"Scan too large. Max size: {MAX_NDA_UPLOAD_SIZE // (1024 * 1024)}MB",
         )
     await insert_nda_upload(
-        str(uuid7()), uid, current_user.uid, data, file.content_type
+        str(uuid7()), uid, current_user.uid, payload, data.content_type
     )
     return Response(content=b'{"success": true}', media_type="application/json")
 
 
-@router.get("/{uid}/nda/{record_uid}/pdf")
+@get("/{uid:str}/nda/{record_uid:str}/pdf")
 async def download_nda(
-    uid: str, record_uid: str, current_user: CurrentUser
+    request: Request, uid: FromPath[str], record_uid: FromPath[str]
 ) -> Response:
+    current_user = await get_current_user(request)
     _require_manage_or_self(current_user, uid)
     result = await get_nda_pdf(uid, record_uid)
     if not result:
@@ -196,3 +207,16 @@ async def download_nda(
             "Content-Length": str(len(data)),
         },
     )
+
+
+router = Router(
+    "/api/users",
+    route_handlers=[
+        get_nda_status,
+        request_nda_signature,
+        get_nda_document,
+        sign_nda,
+        upload_nda_scan,
+        download_nda,
+    ],
+)

@@ -158,7 +158,7 @@ async def test_offline_created_insert_works_for_official(test_client, test_db):
         json=body,
         headers=make_auth_header(prince.uid),
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     created = await db.get_tournament_by_uid(uid)
     assert created is not None
     assert created.offline_mode is False
@@ -224,7 +224,7 @@ async def test_organizer_resolves_players_and_goes_online(test_client, test_db):
         json=body,
         headers=make_auth_header(org.uid),
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     body_json = resp.json()
     assert body_json["tournament"]["offline_mode"] is False
     # Outcome summary: the one temp player was a brand-new account.
@@ -298,7 +298,7 @@ async def test_nested_uids_and_deck_attribution_remapped(test_client, test_db):
         json=body,
         headers=make_auth_header(org.uid),
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
 
     saved = await db.get_tournament_by_uid(base_uid)
     real_uid = saved.players[0].user_uid
@@ -400,7 +400,7 @@ async def test_finished_go_online_recomputes_ratings(test_client, test_db):
         json={"device_id": "devA", "tournament": json.loads(msgspec.json.encode(t))},
         headers=make_auth_header(org.uid),
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
 
     # The participant's rating was recomputed on go-online (None by default → set).
     updated = await db.get_user_by_uid(player.uid)
@@ -452,7 +452,7 @@ async def test_sync_offline_inserts_offline_created_backup(test_client, test_db)
         },
         headers=make_auth_header(prince.uid),
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     saved = await db.get_tournament_by_uid(uid)
     assert saved is not None
     assert saved.offline_mode is True  # a backup, not a go-online

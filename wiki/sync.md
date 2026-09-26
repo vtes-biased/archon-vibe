@@ -1,6 +1,6 @@
 # Sync
 
-PostgreSQL → FastAPI → SSE → browser → IndexedDB. Every UI read comes from
+PostgreSQL → Litestar → SSE → browser → IndexedDB. Every UI read comes from
 IndexedDB; the stream is how it gets there.
 
 ## Access levels

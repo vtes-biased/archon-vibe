@@ -5,9 +5,8 @@ import logging
 from datetime import UTC, datetime
 
 import msgspec
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
-from pydantic import BaseModel
+from litestar import Request, Response, Router, post
+from litestar.exceptions import HTTPException
 
 from .. import permissions
 from ..accounts import (
@@ -24,12 +23,11 @@ from ..db import (
     is_vekn_id_claimed,
     save_user,
 )
-from ..middleware.auth import CurrentUser
+from ..middleware.auth import get_current_user
 from ..models import User
 from ..roles_hook import sync_user_discord_roles
 from .auth import create_access_token, create_refresh_token
 
-router = APIRouter(prefix="/vekn", tags=["vekn"])
 encoder = msgspec.json.Encoder()
 logger = logging.getLogger(__name__)
 
@@ -43,34 +41,32 @@ def _require_manager_for_user(manager: User, target: User) -> None:
         )
 
 
-class ClaimRequest(BaseModel):
+class ClaimRequest(msgspec.Struct):
     vekn_id: str
 
 
-class LinkRequest(BaseModel):
+class LinkRequest(msgspec.Struct):
     vekn_id: str
     user_uid: str
 
 
-class SponsorRequest(BaseModel):
+class SponsorRequest(msgspec.Struct):
     user_uid: str
 
 
-class ForceAbandonRequest(BaseModel):
+class ForceAbandonRequest(msgspec.Struct):
     user_uid: str
 
 
-@router.post("/claim")
-async def claim_vekn_id(
-    request: ClaimRequest,
-    current_user: CurrentUser,
-) -> Response:
+@post("/claim")
+async def claim_vekn_id(request: Request, data: ClaimRequest) -> Response:
     """User claims an unclaimed VEKN ID, merging it into their own account."""
+    current_user = await get_current_user(request)
 
     if current_user.vekn_id:
         raise HTTPException(status_code=400, detail="You already have a VEKN ID")
 
-    vekn_user = await get_user_by_vekn_id(request.vekn_id)
+    vekn_user = await get_user_by_vekn_id(data.vekn_id)
     if not vekn_user:
         raise HTTPException(status_code=404, detail="VEKN ID not found")
     # An anonymized record has no auth methods, so it reads as unclaimed here —
@@ -80,7 +76,7 @@ async def claim_vekn_id(
             status_code=400, detail="This VEKN ID belongs to an anonymized member"
         )
 
-    if await is_vekn_id_claimed(request.vekn_id):
+    if await is_vekn_id_claimed(data.vekn_id):
         raise HTTPException(
             status_code=400, detail="This VEKN ID is already claimed by another user"
         )
@@ -95,7 +91,7 @@ async def claim_vekn_id(
     # owner (their data level changed — they gained a vekn_id).
     for bd in merge_bds:
         broadcast_precomputed(bd)
-    logger.info(f"User claimed VEKN ID {request.vekn_id}: {merged.uid}")
+    logger.info(f"User claimed VEKN ID {data.vekn_id}: {merged.uid}")
     await broadcast_resync(merged.uid)
 
     # Update Discord Linked Roles (vekn_id changes org level)
@@ -110,7 +106,7 @@ async def claim_vekn_id(
         content=encoder.encode(
             {
                 "user": msgspec.to_builtins(merged),
-                "message": f"Successfully claimed VEKN ID {request.vekn_id}",
+                "message": f"Successfully claimed VEKN ID {data.vekn_id}",
                 "access_token": access_token,
                 "refresh_token": refresh_token,
                 "expires_in": expires_in,
@@ -120,12 +116,11 @@ async def claim_vekn_id(
     )
 
 
-@router.post("/abandon")
-async def abandon_vekn_id(
-    current_user: CurrentUser,
-) -> Response:
+@post("/abandon")
+async def abandon_vekn_id(request: Request) -> Response:
     """User voluntarily abandons their VEKN ID, splitting off a fresh account
     with their auth methods and personal data."""
+    current_user = await get_current_user(request)
 
     if not current_user.vekn_id:
         raise HTTPException(
@@ -173,20 +168,18 @@ async def abandon_vekn_id(
     )
 
 
-@router.post("/sponsor")
-async def sponsor_new_member(
-    request: SponsorRequest,
-    manager: CurrentUser,
-) -> Response:
+@post("/sponsor")
+async def sponsor_new_member(request: Request, data: SponsorRequest) -> Response:
     """Sponsor a new VEKN member: allocates a sequential VEKN ID to the target
     user. A visiting official can sponsor abroad, but won't be able to edit
     that member's profile afterwards — profile edits stay country-scoped."""
+    manager = await get_current_user(request)
     if not permissions.can_sponsor_member(manager):
         raise HTTPException(
             status_code=403, detail="Only IC, NC, or Prince can sponsor new members"
         )
 
-    target = await get_user_by_uid(request.user_uid)
+    target = await get_user_by_uid(data.user_uid)
     if not target:
         raise HTTPException(status_code=404, detail="Target user not found")
 
@@ -233,25 +226,23 @@ async def sponsor_new_member(
     )
 
 
-@router.post("/link")
-async def link_vekn_to_user(
-    request: LinkRequest,
-    manager: CurrentUser,
-) -> Response:
+@post("/link")
+async def link_vekn_to_user(request: Request, data: LinkRequest) -> Response:
     """Link a VEKN ID to a user account: merges directly if unclaimed, else
     displaces the current holder first."""
-    target = await get_user_by_uid(request.user_uid)
+    manager = await get_current_user(request)
+    target = await get_user_by_uid(data.user_uid)
     if not target:
         raise HTTPException(status_code=404, detail="Target user not found")
 
     _require_manager_for_user(manager, target)
 
-    if target.vekn_id and target.vekn_id != request.vekn_id:
+    if target.vekn_id and target.vekn_id != data.vekn_id:
         raise HTTPException(
             status_code=400, detail="User already has a different VEKN ID"
         )
 
-    vekn_user = await get_user_by_vekn_id(request.vekn_id)
+    vekn_user = await get_user_by_vekn_id(data.vekn_id)
     if not vekn_user:
         raise HTTPException(status_code=404, detail="VEKN ID not found")
     # An anonymized record has no auth methods, so it reads as unclaimed here —
@@ -264,9 +255,9 @@ async def link_vekn_to_user(
     _require_manager_for_user(manager, vekn_user)
 
     displaced_user = None
-    message = f"Linked VEKN ID {request.vekn_id}"
+    message = f"Linked VEKN ID {data.vekn_id}"
 
-    if await is_vekn_id_claimed(request.vekn_id):
+    if await is_vekn_id_claimed(data.vekn_id):
         result = await detach_user_from_vekn(vekn_user.uid)
         if result:
             displaced_user, _vekn_record, displace_bds = result
@@ -275,11 +266,9 @@ async def link_vekn_to_user(
             for bd in displace_bds:
                 broadcast_precomputed(bd)
             message = (
-                f"Displaced from {vekn_user.name} and linked VEKN ID {request.vekn_id}"
+                f"Displaced from {vekn_user.name} and linked VEKN ID {data.vekn_id}"
             )
-            logger.info(
-                f"Displaced user {vekn_user.uid} from VEKN ID {request.vekn_id}"
-            )
+            logger.info(f"Displaced user {vekn_user.uid} from VEKN ID {data.vekn_id}")
 
     result = await merge_users(vekn_user.uid, target.uid)
     if not result:
@@ -288,9 +277,7 @@ async def link_vekn_to_user(
     for bd in merge_bds:
         broadcast_precomputed(bd)
 
-    logger.info(
-        f"Linked VEKN ID {request.vekn_id} to user {merged.uid} by {manager.uid}"
-    )
+    logger.info(f"Linked VEKN ID {data.vekn_id} to user {merged.uid} by {manager.uid}")
 
     await broadcast_resync(merged.uid)
     asyncio.create_task(sync_user_discord_roles(merged.uid))
@@ -311,13 +298,13 @@ async def link_vekn_to_user(
     )
 
 
-@router.post("/force-abandon")
+@post("/force-abandon")
 async def force_abandon_vekn_id(
-    request: ForceAbandonRequest,
-    manager: CurrentUser,
+    request: Request, data: ForceAbandonRequest
 ) -> Response:
     """Force-abandon a user's VEKN ID (same effect as self-abandon)."""
-    target = await get_user_by_uid(request.user_uid)
+    manager = await get_current_user(request)
+    target = await get_user_by_uid(data.user_uid)
     if not target:
         raise HTTPException(status_code=404, detail="Target user not found")
 
@@ -364,3 +351,15 @@ async def force_abandon_vekn_id(
         ),
         media_type="application/json",
     )
+
+
+router = Router(
+    "/vekn",
+    route_handlers=[
+        claim_vekn_id,
+        abandon_vekn_id,
+        sponsor_new_member,
+        link_vekn_to_user,
+        force_abandon_vekn_id,
+    ],
+)

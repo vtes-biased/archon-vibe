@@ -5,20 +5,18 @@ import logging
 from collections.abc import Awaitable, Callable
 
 import msgspec
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
-from pydantic import BaseModel
+from litestar import Request, Response, Router, get, post
+from litestar.exceptions import HTTPException
 
 from .. import permissions
 from ..accounts import merge_users
 from ..broadcast import broadcast_precomputed
 from ..db import get_user_by_uid, remap_promo_ledger_user
-from ..middleware.auth import CurrentUser
+from ..middleware.auth import get_current_user
 from ..promo_stock import schedule_recompute
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/admin", tags=["admin"])
 encoder = msgspec.json.Encoder()
 
 # Will be set by main.py
@@ -50,18 +48,17 @@ def _dispatch(job: str, make_coro: Callable[[], Awaitable[None]]) -> dict:
     return {"status": "started"}
 
 
-class MergeRequest(BaseModel):
+class MergeRequest(msgspec.Struct):
     keep_uid: str
     delete_uid: str
 
 
-@router.post("/sync-vekn")
-async def trigger_vekn_sync(
-    manager: CurrentUser,
-) -> dict:
+@post("/sync-vekn")
+async def trigger_vekn_sync(request: Request) -> dict:
     """Returns immediately ({"status": "started"} or "already_running"); the
     outcome lands in /admin/vekn-status under member_sync.
     """
+    manager = await get_current_user(request)
     if not permissions.can_run_admin_sync(manager):
         raise HTTPException(status_code=403, detail="Only IC can trigger sync")
 
@@ -75,13 +72,12 @@ async def trigger_vekn_sync(
     return _dispatch("member_sync", runner)
 
 
-@router.post("/sync-vekn-tournaments")
-async def trigger_vekn_tournament_sync(
-    manager: CurrentUser,
-) -> dict:
+@post("/sync-vekn-tournaments")
+async def trigger_vekn_tournament_sync(request: Request) -> dict:
     """Returns immediately; the outcome lands in /admin/vekn-status under
     tournament_sync.
     """
+    manager = await get_current_user(request)
     if not permissions.can_run_admin_sync(manager):
         raise HTTPException(status_code=403, detail="Only IC can trigger sync")
 
@@ -95,13 +91,12 @@ async def trigger_vekn_tournament_sync(
     return _dispatch("tournament_sync", runner)
 
 
-@router.get("/vekn-status")
-async def vekn_status(
-    manager: CurrentUser,
-) -> dict:
+@get("/vekn-status")
+async def vekn_status(request: Request) -> dict:
     """State is in-process (resets on restart); keys: member_sync,
     tournament_sync, twda_sync, batch_push.
     """
+    manager = await get_current_user(request)
     if not permissions.can_run_admin_sync(manager):
         raise HTTPException(status_code=403, detail="Only IC can view VEKN status")
 
@@ -110,13 +105,12 @@ async def vekn_status(
     return {"jobs": get_status()}
 
 
-@router.post("/sync-twda-decks")
-async def trigger_twda_deck_import(
-    manager: CurrentUser,
-) -> dict:
+@post("/sync-twda-decks")
+async def trigger_twda_deck_import(request: Request) -> dict:
     """Returns immediately; the outcome lands on the vekn-status panel as
     `twda_sync`, same as the two VEKN syncs.
     """
+    manager = await get_current_user(request)
     if not permissions.can_run_admin_sync(manager):
         raise HTTPException(status_code=403, detail="Only IC can trigger sync")
 
@@ -128,16 +122,14 @@ async def trigger_twda_deck_import(
     return _dispatch("twda_sync", runner)
 
 
-@router.post("/users/merge")
-async def merge_user_accounts(
-    request: MergeRequest,
-    manager: CurrentUser,
-) -> Response:
+@post("/users/merge")
+async def merge_user_accounts(request: Request, data: MergeRequest) -> Response:
+    manager = await get_current_user(request)
     if not permissions.can_merge_accounts(manager):
         raise HTTPException(status_code=403, detail="Only IC can merge users")
 
-    keep_user = await get_user_by_uid(request.keep_uid)
-    delete_user = await get_user_by_uid(request.delete_uid)
+    keep_user = await get_user_by_uid(data.keep_uid)
+    delete_user = await get_user_by_uid(data.delete_uid)
 
     if not keep_user:
         raise HTTPException(status_code=404, detail="Keep user not found")
@@ -147,7 +139,7 @@ async def merge_user_accounts(
     # merge_users refuses to absorb a VEKN-bearing account; surface that as a
     # 400 rather than a generic 500.
     try:
-        result = await merge_users(request.keep_uid, request.delete_uid)
+        result = await merge_users(data.keep_uid, data.delete_uid)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
     if not result:
@@ -158,12 +150,10 @@ async def merge_user_accounts(
 
     # The absorbed account's tombstone keeps stale promo_stock keys after the
     # recompute — moot, since tombstones are client-evicted.
-    await remap_promo_ledger_user(request.delete_uid, request.keep_uid)
+    await remap_promo_ledger_user(data.delete_uid, data.keep_uid)
     schedule_recompute()
 
-    logger.info(
-        f"Merged users {request.delete_uid} into {request.keep_uid} by {manager.uid}"
-    )
+    logger.info(f"Merged users {data.delete_uid} into {data.keep_uid} by {manager.uid}")
 
     return Response(
         content=encoder.encode(
@@ -174,3 +164,15 @@ async def merge_user_accounts(
         ),
         media_type="application/json",
     )
+
+
+router = Router(
+    "/admin",
+    route_handlers=[
+        trigger_vekn_sync,
+        trigger_vekn_tournament_sync,
+        vekn_status,
+        trigger_twda_deck_import,
+        merge_user_accounts,
+    ],
+)

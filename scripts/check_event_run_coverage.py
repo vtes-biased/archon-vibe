@@ -53,7 +53,7 @@ _IRREGULAR_GATES = {
 # lifecycle, not the event's surface.
 _OFF_PREFIX = {
     ("get", "/stream"),
-    ("post", "/sanctions/"),
+    ("post", "/sanctions"),
     ("get", "/sanctions/reference"),
     ("get", "/oauth/userinfo"),
 }
@@ -61,21 +61,11 @@ _OFF_PREFIX = {
 _PREFIX = "/api/tournaments/{uid}"
 
 
-def _walk(router) -> list:
-    """Every route, including `include_in_schema=False` ones the OpenAPI document
-    omits — the middleware admits a route whether or not it is published."""
-    routes = []
-    for route in router.routes:
-        inner = getattr(route, "original_router", None)
-        routes.extend(_walk(inner) if inner is not None else [route])
-    return routes
-
-
 def reachable() -> set[tuple[str, str]]:
     found = set()
-    routes = _walk(site_app)
+    routes = site_app.routes
     for route in routes:
-        path = getattr(route, "path", "")
+        path = route.path_format
         for method in {m.lower() for m in getattr(route, "methods", ())}:
             if method not in {"get", "post", "put", "patch", "delete"}:
                 continue
@@ -92,8 +82,6 @@ def reachable() -> set[tuple[str, str]]:
             if tail.split("/")[0] in _OAUTH_BARRED_SUBPATHS:
                 continue
             found.add((method, path))
-    # FastAPI's lazy router wrappers are an internal shape; if a version change
-    # breaks the walk, fail here rather than pass on an empty set.
     if not found:
         raise SystemExit(f"route walk found nothing in {len(routes)} routes")
     return found
@@ -111,7 +99,7 @@ def schema_drift() -> list[str]:
             problems.append(f"{name}: no app model of that name")
             continue
         documented = set(schema.get("properties", {}))
-        actual = set(model.model_fields)
+        actual = set(model.__struct_fields__)
         for field in sorted(actual - documented):
             problems.append(f"{name}.{field}: on the model, not in the schema")
         for field in sorted(documented - actual):
@@ -148,7 +136,7 @@ def action_drift() -> list[str]:
     for name in sorted(documented - engine):
         problems.append(f"{name}: documented, but the engine has no such action")
 
-    carried = set(TournamentActionRequest.model_fields) - {"type"}
+    carried = set(TournamentActionRequest.__struct_fields__) - {"type"}
     for field in sorted(carried - set(_ACTION_FIELDS)):
         problems.append(f"{field}: on the request model, described by no action")
     for field in sorted(set(_ACTION_FIELDS) - carried):

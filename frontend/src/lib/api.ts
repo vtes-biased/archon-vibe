@@ -144,7 +144,7 @@ export async function submitFeedback(
   opts?: { suppressErrorToast?: boolean }
 ): Promise<{ issue_url: string; issue_number: number }> {
   return apiRequest<{ issue_url: string; issue_number: number }>(
-    '/api/feedback/',
+    '/api/feedback',
     { method: 'POST', body: JSON.stringify(data) },
     opts
   );
@@ -167,7 +167,7 @@ export async function createUser(
   if (email) body.email = email;
   if (roles !== undefined) body.roles = roles;
 
-  return apiRequest<User>('/api/users/', { method: 'POST', body: JSON.stringify(body) }, opts);
+  return apiRequest<User>('/api/users', { method: 'POST', body: JSON.stringify(body) }, opts);
 }
 
 export async function updateUser(
@@ -360,7 +360,7 @@ export interface CreateSanctionData {
 
 /** IC/Ethics only for SUSPENSION/PROBATION. */
 export async function createSanction(data: CreateSanctionData): Promise<Sanction> {
-  return apiRequest<Sanction>('/sanctions/', {
+  return apiRequest<Sanction>('/sanctions', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -464,7 +464,7 @@ export interface CreateTournamentData {
 }
 
 export async function createTournament(data: CreateTournamentData, opts?: { suppressErrorToast?: boolean }): Promise<Tournament> {
-  return apiRequest<Tournament>('/api/tournaments/', {
+  return apiRequest<Tournament>('/api/tournaments', {
     method: 'POST',
     body: JSON.stringify(data),
   }, opts);
@@ -560,7 +560,7 @@ export interface CreateLeagueData {
 }
 
 export async function createLeague(data: CreateLeagueData, opts?: { suppressErrorToast?: boolean }): Promise<League> {
-  const created = await apiRequest<League>('/api/leagues/', {
+  const created = await apiRequest<League>('/api/leagues', {
     method: 'POST',
     body: JSON.stringify(data),
   }, opts);
@@ -688,7 +688,7 @@ export interface PromoPayload {
 }
 
 export async function createPromo(payload: PromoPayload): Promise<Promo> {
-  return apiRequest<Promo>('/api/promos/', {
+  return apiRequest<Promo>('/api/promos', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

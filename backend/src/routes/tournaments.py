@@ -4,14 +4,18 @@ import logging
 import os
 from datetime import UTC, datetime
 from importlib.resources import files
+from typing import Annotated
 from uuid import uuid7
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import msgspec
 from archon_engine import PyEngine
-from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel, Field
+from litestar import Request, Response, Router, delete, get, post
+from litestar.datastructures import UploadFile
+from litestar.enums import RequestEncodingType
+from litestar.exceptions import HTTPException
+from litestar.params import Body, FromPath, FromQuery
+from litestar.response import File
 
 from .. import permissions
 from ..accounts import scrub_anonymized_copies
@@ -53,7 +57,7 @@ from ..db import (
 )
 from ..engine_errors import EngineRejection
 from ..geonames import get_country, normalize_country, stored_country
-from ..middleware.auth import OptionalUser
+from ..middleware.auth import get_optional_user
 from ..models import (
     Announcement,
     AttributionKind,
@@ -78,7 +82,6 @@ from ..models import (
 from ..promo_stock import schedule_recompute
 from .auth import send_invite_email
 
-router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
 
@@ -650,7 +653,7 @@ async def _check_player_barred(player_uid: str, conn=None) -> None:
                 )
 
 
-class OrganizerAction(BaseModel):
+class OrganizerAction(msgspec.Struct):
     user_uid: str
 
 
@@ -724,12 +727,13 @@ async def _withdraw_private_decks(tournament: Tournament) -> None:
     _push_decks(tournament, tournament.organizers_uids, decks)
 
 
-@router.post("/{uid}/organizers")
+@post("/{uid:str}/organizers")
 async def add_organizer(
-    uid: str,
-    body: OrganizerAction,
-    current_user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
+    data: OrganizerAction,
 ) -> Response:
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -743,13 +747,13 @@ async def add_organizer(
             )
         # A non-member sits at public level, which carries no organizer view of
         # the event — same rule as league organizers.
-        organizer = await get_user_by_uid(body.user_uid, conn=tx_conn)
+        organizer = await get_user_by_uid(data.user_uid, conn=tx_conn)
         if not organizer or not organizer.vekn_id:
             raise HTTPException(
                 status_code=400, detail="Organizer must be a VEKN member"
             )
-        if body.user_uid not in tournament.organizers_uids:
-            tournament.organizers_uids.append(body.user_uid)
+        if data.user_uid not in tournament.organizers_uids:
+            tournament.organizers_uids.append(data.user_uid)
             tournament.modified = datetime.now(UTC)
             bd = await save_tournament(tournament, conn=tx_conn)
 
@@ -757,7 +761,7 @@ async def add_organizer(
         broadcast_precomputed(bd)
         # broadcast_precomputed never delivers decks — push the new organizer
         # the non-public ones they are now entitled to separately.
-        await _invalidate_organizer_view(tournament, body.user_uid, bd.modified_at)
+        await _invalidate_organizer_view(tournament, data.user_uid, bd.modified_at)
 
     return Response(
         content=encoder.encode(tournament),
@@ -765,14 +769,15 @@ async def add_organizer(
     )
 
 
-@router.post("/{uid}/push-vekn")
+@post("/{uid:str}/push-vekn")
 async def push_vekn(
-    uid: str,
-    current_user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
 ) -> Response:
     """Registers the calendar event if missing; for a FINISHED tournament also
     pushes results (once) and submits the TWDA deck, mirroring the hourly
     batch_push immediately."""
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -844,12 +849,13 @@ async def push_vekn(
     return Response(content=encoder.encode(updated), media_type="application/json")
 
 
-@router.delete("/{uid}/organizers/{organizer_uid}")
+@delete("/{uid:str}/organizers/{organizer_uid:str}", status_code=200)
 async def remove_organizer(
-    uid: str,
-    organizer_uid: str,
-    current_user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
+    organizer_uid: FromPath[str],
 ) -> Response:
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -887,13 +893,14 @@ async def remove_organizer(
 MAX_BANNER_SIZE = 1024 * 1024
 
 
-@router.post("/{uid}/banner")
+@post("/{uid:str}/banner")
 async def upload_banner(
-    uid: str,
-    file: UploadFile,
-    current_user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
+    data: Annotated[UploadFile, Body(media_type=RequestEncodingType.MULTI_PART)],
 ) -> Response:
     """Expects a 1.91:1 (1200×630) image, max 1MB; client crops before upload."""
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -909,19 +916,19 @@ async def upload_banner(
         if tournament.offline_mode:
             raise HTTPException(status_code=423, detail="Tournament is in offline mode")
 
-        if file.content_type not in ("image/webp", "image/png", "image/jpeg"):
+        if data.content_type not in ("image/webp", "image/png", "image/jpeg"):
             raise HTTPException(
                 status_code=400, detail="Banner must be webp, png, or jpeg"
             )
 
-        data = await file.read()
-        if len(data) > MAX_BANNER_SIZE:
+        payload = await data.read()
+        if len(payload) > MAX_BANNER_SIZE:
             raise HTTPException(
                 status_code=400,
                 detail=f"Banner too large. Max size: {MAX_BANNER_SIZE // 1024}KB",
             )
 
-        await upsert_banner(uid, data, file.content_type or "image/webp")
+        await upsert_banner(uid, payload, data.content_type or "image/webp")
 
         now = datetime.now(UTC)
         version = int(now.timestamp() * 1000)  # cache-busting token baked into the URL
@@ -933,8 +940,8 @@ async def upload_banner(
     return Response(content=b'{"success": true}', media_type="application/json")
 
 
-@router.get("/{uid}/banner")
-async def get_banner_image(uid: str, request: Request) -> Response:
+@get("/{uid:str}/banner")
+async def get_banner_image(uid: FromPath[str], request: Request) -> Response:
     """Serve a tournament banner. A versioned (?v=) URL is immutable, so it can
     be cached aggressively; an unversioned request gets a short TTL."""
     result = await get_banner(uid)
@@ -954,11 +961,12 @@ async def get_banner_image(uid: str, request: Request) -> Response:
     )
 
 
-@router.delete("/{uid}/banner")
+@delete("/{uid:str}/banner", status_code=200)
 async def delete_banner_image(
-    uid: str,
-    current_user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
 ) -> Response:
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -987,7 +995,7 @@ async def delete_banner_image(
     return Response(content=b'{"success": true}', media_type="application/json")
 
 
-class CreateTournamentRequest(BaseModel):
+class CreateTournamentRequest(msgspec.Struct):
     name: str
     format: str = "Standard"
     rank: str = ""
@@ -1011,7 +1019,7 @@ class CreateTournamentRequest(BaseModel):
     max_players: int = 0
     open_rounds: bool = False
     self_organized_rounds: bool = False
-    table_rooms: list[dict] = Field(default_factory=list)
+    table_rooms: list[dict] = msgspec.field(default_factory=list)
     first_table_number: int = 1
     continue_room_numbering: bool = True
     league_uid: str | None = None
@@ -1019,10 +1027,10 @@ class CreateTournamentRequest(BaseModel):
     finals_time: int = 0
 
 
-@router.get("/{uid}/decks")
+@get("/{uid:str}/decks")
 async def get_round_decks(
-    uid: str,
-    current_user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
 ) -> Response:
     """Every seated player's deck, per ongoing round. The delegated read an
     online-play platform makes once a round starts; the scoped stream cannot
@@ -1033,6 +1041,7 @@ async def get_round_decks(
     `tournament.rounds`, with `len(rounds)` the finals, exactly as
     `DeckObject.round` and `Sanction.round_number` use it.
     """
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -1130,11 +1139,12 @@ def _engine_create_tournament(config: dict, actor: User) -> str:
         raise EngineRejection.from_engine(e) from e
 
 
-@router.post("/", status_code=201)
+@post("/")
 async def create_tournament(
-    request: CreateTournamentRequest,
-    current_user: OptionalUser = None,
+    request: Request,
+    data: CreateTournamentRequest,
 ) -> Response:
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -1146,23 +1156,21 @@ async def create_tournament(
     # VEKN_PUSH: standard tournaments need max_rounds 2-4. Open-rounds events are
     # non-VEKN (not pushed), so max_rounds there is a free per-player cap (0 = no limit).
     vekn_push = os.getenv("VEKN_PUSH", "").lower() == "true"
-    if vekn_push and not request.open_rounds:
-        if request.max_rounds < 2 or request.max_rounds > 4:
+    if vekn_push and not data.open_rounds:
+        if data.max_rounds < 2 or data.max_rounds > 4:
             raise HTTPException(
                 status_code=400,
                 detail="max_rounds must be 2, 3, or 4 when VEKN push is enabled",
             )
 
-    country = stored_country(request.country)
-    if request.country and country is None:
-        raise HTTPException(
-            status_code=422, detail=f"Invalid country: {request.country}"
-        )
+    country = stored_country(data.country)
+    if data.country and country is None:
+        raise HTTPException(status_code=422, detail=f"Invalid country: {data.country}")
 
     # Validate league_uid: league editors, or same-country Princes when the
     # league is open to them (rule single-sourced in the engine).
-    if request.league_uid:
-        league = await get_league_by_uid(request.league_uid)
+    if data.league_uid:
+        league = await get_league_by_uid(data.league_uid)
         if not league:
             raise HTTPException(status_code=400, detail="League not found")
         if not permissions.can_link_tournament_to_league(current_user, league):
@@ -1171,15 +1179,15 @@ async def create_tournament(
                 detail="You don't have permission to attach tournaments to this league",
             )
 
-    start = _wall_clock(_parse_datetime(request.start), request.timezone)
-    finish = _wall_clock(_parse_datetime(request.finish), request.timezone)
-    config = request.model_dump() | {
+    start = _wall_clock(_parse_datetime(data.start), data.timezone)
+    finish = _wall_clock(_parse_datetime(data.finish), data.timezone)
+    config = msgspec.structs.asdict(data) | {
         "uid": str(uuid7()),
         "now": datetime.now(UTC).isoformat(),
         "country": country,
         "start": start.isoformat() if start else None,
         "finish": finish.isoformat() if finish else None,
-        "league_uid": request.league_uid or None,
+        "league_uid": data.league_uid or None,
     }
     tournament = msgspec.json.decode(
         _engine_create_tournament(config, current_user), type=Tournament
@@ -1203,30 +1211,28 @@ async def create_tournament(
     )
 
 
-# Must precede /{uid}: route match order, or the path param captures these.
-
-
-@router.get("/archon-template")
-async def download_archon_template() -> FileResponse:
+@get("/archon-template")
+async def download_archon_template() -> File:
     """Serve blank Archon v1.5l spreadsheet template. Public access."""
     # must live under backend/src/data to ship inside the installed wheel
     path = files("backend.src").joinpath("data", "thearchon1.5l.xlsx")
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Template file not found")
-    return FileResponse(
+    return File(
         path,
         filename="thearchon1.5l.xlsx",
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
 
-@router.get("/fetch-deck")
+@get("/fetch-deck")
 async def fetch_deck_proxy(
-    url: str,
-    current_user: OptionalUser = None,
+    request: Request,
+    url: FromQuery[str],
 ) -> Response:
     """Proxies deck fetch from VDB/VTESDecks/Amaranth — works around CORS and
     maps provider-native card ids to VEKN ids via krcg."""
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -1235,9 +1241,9 @@ async def fetch_deck_proxy(
     try:
         result = await fetch_deck_from_url(url)
     except DeckFetchError as e:
-        return JSONResponse(
+        return Response(
+            {"detail": str(e), "code": e.code, "params": e.params},
             status_code=400,
-            content={"detail": str(e), "code": e.code, "params": e.params},
         )
     except Exception as e:
         logger.exception("Failed to fetch deck from URL")
@@ -1250,11 +1256,12 @@ async def fetch_deck_proxy(
     )
 
 
-@router.delete("/{uid}")
+@delete("/{uid:str}", status_code=200)
 async def delete_tournament_endpoint(
-    uid: str,
-    current_user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
 ) -> Response:
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -1324,12 +1331,13 @@ async def delete_tournament_endpoint(
     )
 
 
-@router.post("/{uid}/archon-import")
+@post("/{uid:str}/archon-import")
 async def archon_import(
-    uid: str,
-    file: UploadFile,
-    current_user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
+    data: Annotated[UploadFile, Body(media_type=RequestEncodingType.MULTI_PART)],
 ) -> Response:
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -1343,10 +1351,10 @@ async def archon_import(
             detail="Only organizers can import",
         )
 
-    if not file.filename or not file.filename.endswith(".xlsx"):
+    if not data.filename or not data.filename.endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="File must be an .xlsx spreadsheet")
 
-    file_bytes = await file.read()
+    file_bytes = await data.read()
     if len(file_bytes) > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large (max 5MB)")
 
@@ -1357,14 +1365,14 @@ async def archon_import(
     )
 
     try:
-        data = parse_archon_file(file_bytes)
+        parsed = parse_archon_file(file_bytes)
     except Exception as e:
         raise HTTPException(
             status_code=400, detail=f"Failed to parse spreadsheet: {e}"
         ) from e
 
     engine = _engine
-    errors = validate_archon_import(data, engine)
+    errors = validate_archon_import(parsed, engine)
     if errors:
         return Response(
             content=msgspec.json.encode(
@@ -1383,7 +1391,7 @@ async def archon_import(
 
     result = await apply_archon_import(
         tournament_uid=uid,
-        data=data,
+        data=parsed,
         actor_uid=current_user.uid,
         engine=engine,
         broadcast_tournament_event=broadcast_precomputed,
@@ -1407,29 +1415,30 @@ async def archon_import(
     )
 
 
-class BulkRegisterRow(BaseModel):
+class BulkRegisterRow(msgspec.Struct):
     vekn_id: str | None = None
     email: str | None = None
     name: str | None = None  # display only (unmatched-row reporting)
     paid: bool | None = None  # None → request default
 
 
-class BulkRegisterRequest(BaseModel):
+class BulkRegisterRequest(msgspec.Struct):
     rows: list[BulkRegisterRow]
     default_paid: bool = True  # they paid at the ticketing source
 
 
-@router.post("/{uid}/bulk-register")
+@post("/{uid:str}/bulk-register")
 async def bulk_register(
-    uid: str,
-    request: BulkRegisterRequest,
-    current_user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
+    data: BulkRegisterRequest,
 ) -> Response:
     """Bulk-register externally-ticketed players by VEKN ID then email match.
     Unmatched rows are RETURNED for manual resolution — never silently created."""
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
-    if len(request.rows) > 500:
+    if len(data.rows) > 500:
         raise HTTPException(status_code=400, detail="Too many rows (max 500)")
 
     existing = await get_tournament_by_uid(uid)
@@ -1448,7 +1457,7 @@ async def bulk_register(
     matched: list[tuple[User, bool | None]] = []
     unmatched: list[dict] = []
     seen_uids: set[str] = set()
-    for i, row in enumerate(request.rows):
+    for i, row in enumerate(data.rows):
         label = row.name or row.email or row.vekn_id or f"row {i + 1}"
         user = None
         if row.vekn_id and row.vekn_id.strip():
@@ -1507,7 +1516,7 @@ async def bulk_register(
                     "waitlist_past_cap": True,
                 }
             ]
-            effective_paid = request.default_paid if paid is None else paid
+            effective_paid = data.default_paid if paid is None else paid
             if effective_paid:
                 events.append(
                     {
@@ -1560,13 +1569,13 @@ async def bulk_register(
     )
 
 
-class TournamentActionRequest(BaseModel):
+class TournamentActionRequest(msgspec.Struct):
     type: str  # Event type: OpenRegistration, Register, CheckIn, StartRound, etc.
     user_uid: str | None = None  # For Register, AddPlayer, RemovePlayer
     player_uid: str | None = None  # For CheckIn
     # Discord guild nickname, display-only, never identity — vekn_id comes only
     # from the resolved user. max_length=32 mirrors Discord's own ceiling.
-    display_name: str | None = Field(default=None, max_length=32)
+    display_name: Annotated[str, msgspec.Meta(max_length=32)] | None = None
     round: int | None = None  # For SetScore, SwapSeats
     table: int | None = None  # For SetScore
     table1: int | None = None  # For SwapSeats
@@ -1615,31 +1624,31 @@ _ACTION_TRUTHY_ONLY = frozenset(
 )
 
 
-@router.post("/{uid}/action")
+@post("/{uid:str}/action")
 async def tournament_action(
-    uid: str,
-    request: TournamentActionRequest,
-    http_request: Request,
-    current_user: OptionalUser = None,
+    uid: FromPath[str],
+    data: TournamentActionRequest,
+    request: Request,
 ) -> Response:
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
     if (
-        request.type == "ReopenTournament"
-        and getattr(http_request.state, "oauth_tournament", None) is not None
+        data.type == "ReopenTournament"
+        and getattr(request.state, "oauth_tournament", None) is not None
     ):
         raise HTTPException(
             status_code=403,
             detail="A third-party token cannot reopen a finished tournament",
         )
 
-    event_data = {"type": request.type} | {
+    event_data = {"type": data.type} | {
         name: value
-        for name, value in request.model_dump(
-            exclude_none=True, exclude={"type"}
-        ).items()
-        if value or name not in _ACTION_TRUTHY_ONLY
+        for name in data.__struct_fields__
+        if name != "type"
+        and (value := getattr(data, name)) is not None
+        and (value or name not in _ACTION_TRUTHY_ONLY)
     }
     if "config" in event_data and "country" in event_data["config"]:
         country = stored_country(event_data["config"]["country"])
@@ -1656,13 +1665,9 @@ async def tournament_action(
             raise HTTPException(status_code=404, detail="Tournament not found")
 
         # VEKN_PUSH: max_rounds immutable once pushed to VEKN
-        if (
-            request.type == "UpdateConfig"
-            and request.config
-            and "max_rounds" in request.config
-        ):
+        if data.type == "UpdateConfig" and data.config and "max_rounds" in data.config:
             if tournament.external_ids.get("vekn"):
-                if request.config["max_rounds"] != tournament.max_rounds:
+                if data.config["max_rounds"] != tournament.max_rounds:
                     raise HTTPException(
                         status_code=409,
                         detail="max_rounds cannot be changed after tournament is pushed to VEKN",
@@ -1670,13 +1675,9 @@ async def tournament_action(
             vekn_push = os.getenv("VEKN_PUSH", "").lower() == "true"
             # 2-4 max_rounds applies only to standard (non-open-rounds) tournaments;
             # open_rounds is the request's value if present, else the stored one.
-            open_rounds = request.config.get("open_rounds", tournament.open_rounds)
-            if (
-                vekn_push
-                and not open_rounds
-                and request.config["max_rounds"] is not None
-            ):
-                mr = request.config["max_rounds"]
+            open_rounds = data.config.get("open_rounds", tournament.open_rounds)
+            if vekn_push and not open_rounds and data.config["max_rounds"] is not None:
+                mr = data.config["max_rounds"]
                 if mr != 0 and (mr < 2 or mr > 4):
                     raise HTTPException(
                         status_code=400,
@@ -1692,7 +1693,7 @@ async def tournament_action(
         # Reads below reuse tx_conn instead of a fresh pooled connection while
         # holding FOR UPDATE, so one action never pins more than one pool slot.
         can_organize = None
-        if request.type == "UpdateConfig" and request.config:
+        if data.type == "UpdateConfig" and data.config:
             can_organize = await _get_user_organizable_league_uids(
                 current_user, conn=tx_conn
             )
@@ -1701,10 +1702,10 @@ async def tournament_action(
         # vekn_id comes only from the resolved user — the request model has no
         # vekn_id field, so a fabricated id can never reach the engine.
         target_uid = None
-        if request.type in ("Register", "AddPlayer"):
-            target_uid = request.user_uid
-        elif request.type == "CheckIn":
-            target_uid = request.player_uid
+        if data.type in ("Register", "AddPlayer"):
+            target_uid = data.user_uid
+        elif data.type == "CheckIn":
+            target_uid = data.player_uid
         if target_uid:
             target_user = await get_user_by_uid(target_uid, conn=tx_conn)
             if not target_user:
@@ -1720,8 +1721,8 @@ async def tournament_action(
         sanctions_json = await _build_sanctions_json(uid, player_uids, conn=tx_conn)
         decks_json = await _build_decks_json(uid, conn=tx_conn)
 
-        if request.type in ("CheckIn", "Register", "AddPlayer"):
-            player_uid = request.player_uid or request.user_uid
+        if data.type in ("CheckIn", "Register", "AddPlayer"):
+            player_uid = data.player_uid or data.user_uid
             if player_uid:
                 await _check_player_barred(player_uid, conn=tx_conn)
 
@@ -1771,7 +1772,7 @@ async def tournament_action(
             "FinishTournament",
             "CancelFinals",
         )
-        if request.type in TIMER_EVENTS:
+        if data.type in TIMER_EVENTS:
             updated.timer = TimerState()
             updated.table_extra_time = {}
 
@@ -1796,7 +1797,7 @@ async def tournament_action(
         pre_state = tournament.state
 
     # Below runs unlocked — the tournament row's FOR UPDATE lock was released.
-    logger.info(f"Tournament {uid} action {request.type} by {current_user.uid}")
+    logger.info(f"Tournament {uid} action {data.type} by {current_user.uid}")
 
     deck_bds = await _process_deck_ops(deck_ops, uid, updated)
     for bd in deck_bds:
@@ -1817,14 +1818,14 @@ async def tournament_action(
 
     broadcast_precomputed(tournament_bd)
 
-    if request.type == "ReportPromos":
+    if data.type == "ReportPromos":
         _promo_recompute_diff(tournament, updated)
 
     # Fire-and-forget, post-commit (a DB-touching task must not run inside
     # tournament_transaction). RestoreRound re-seats no one, so it's excluded.
-    if request.type in ("StartRound", "SelfOrganizeRound", "StartFinals"):
-        asyncio.create_task(_maybe_push_seating(updated, request.type))
-    elif request.type in ("AlterSeating", "SwapSeats", "SeatPlayer", "UnseatPlayer"):
+    if data.type in ("StartRound", "SelfOrganizeRound", "StartFinals"):
+        asyncio.create_task(_maybe_push_seating(updated, data.type))
+    elif data.type in ("AlterSeating", "SwapSeats", "SeatPlayer", "UnseatPlayer"):
         # Only players whose table/seat actually changed are pushed — the
         # stale seating notification they may act on gets replaced.
         asyncio.create_task(_maybe_push_reseat(tournament, updated))
@@ -1832,7 +1833,7 @@ async def tournament_action(
     # Recompute on entering/leaving Finished, or on a result-affecting action on
     # an already-finished tournament (see _RATING_IRRELEVANT_ACTIONS for the skip list).
     state_changed = was_finished != is_finished
-    results_may_change = is_finished and request.type not in _RATING_IRRELEVANT_ACTIONS
+    results_may_change = is_finished and data.type not in _RATING_IRRELEVANT_ACTIONS
     if state_changed or results_may_change:
         try:
             from ..ratings import (
@@ -1891,18 +1892,18 @@ async def tournament_action(
     )
 
 
-class QrCheckinRequest(BaseModel):
+class QrCheckinRequest(msgspec.Struct):
     code: str
 
 
-@router.post("/{uid}/qr-checkin")
+@post("/{uid:str}/qr-checkin")
 async def qr_checkin(
-    uid: str,
-    request: QrCheckinRequest,
-    http_request: Request,
-    current_user: OptionalUser = None,
+    uid: FromPath[str],
+    data: QrCheckinRequest,
+    request: Request,
 ) -> Response:
     """Self check-in via QR code scanned at the venue."""
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
     tournament = await get_tournament_by_uid(uid)
@@ -1910,13 +1911,12 @@ async def qr_checkin(
         raise HTTPException(status_code=404, detail="Tournament not found")
     # Defense-in-depth: an empty stored code must never authorize check-in (a
     # legacy event with checkin_code='' would otherwise accept code='').
-    if not tournament.checkin_code or request.code != tournament.checkin_code:
+    if not tournament.checkin_code or data.code != tournament.checkin_code:
         raise HTTPException(status_code=403, detail="Invalid check-in code")
-    return await tournament_action(
+    return await tournament_action.fn(
         uid,
         TournamentActionRequest(type="CheckIn", player_uid=current_user.uid),
-        http_request=http_request,
-        current_user=current_user,
+        request=request,
     )
 
 
@@ -1957,11 +1957,12 @@ async def _save_timer_tx(tournament: Tournament, tx_conn) -> BroadcastData:
     )
 
 
-@router.post("/{uid}/timer/start")
+@post("/{uid:str}/timer/start")
 async def timer_start(
-    uid: str,
-    user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
 ) -> Response:
+    user = await get_optional_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     async with tournament_transaction(uid) as (tournament, tx_conn):
@@ -1979,11 +1980,12 @@ async def timer_start(
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
-@router.post("/{uid}/timer/pause")
+@post("/{uid:str}/timer/pause")
 async def timer_pause(
-    uid: str,
-    user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
 ) -> Response:
+    user = await get_optional_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     async with tournament_transaction(uid) as (tournament, tx_conn):
@@ -2003,12 +2005,13 @@ async def timer_pause(
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
-@router.post("/{uid}/timer/reset")
+@post("/{uid:str}/timer/reset")
 async def timer_reset(
-    uid: str,
-    user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
 ) -> Response:
     """Reset the global timer to fresh paused state."""
+    user = await get_optional_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     async with tournament_transaction(uid) as (tournament, tx_conn):
@@ -2021,32 +2024,33 @@ async def timer_reset(
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
-class AddTimeRequest(BaseModel):
+class AddTimeRequest(msgspec.Struct):
     table: str  # table index as string key
     seconds: int
 
 
-@router.post("/{uid}/timer/add-time")
+@post("/{uid:str}/timer/add-time")
 async def timer_add_time(
-    uid: str,
-    request: AddTimeRequest,
-    user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
+    data: AddTimeRequest,
 ) -> Response:
     """Add extra time to a specific table."""
+    user = await get_optional_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     async with tournament_transaction(uid) as (tournament, tx_conn):
         _validate_timer_tournament(user, tournament)
         assert tournament is not None
-        if request.seconds <= 0:
+        if data.seconds <= 0:
             raise HTTPException(status_code=400, detail="Seconds must be positive")
-        current = tournament.table_extra_time.get(request.table, 0)
+        current = tournament.table_extra_time.get(data.table, 0)
         # Sanity bound, not a VEKN rule (judges may grant generous extensions).
-        if current + request.seconds > 1800:
+        if current + data.seconds > 1800:
             raise HTTPException(
                 status_code=400, detail="Max 1800s (30 min) extra time per table"
             )
-        tournament.table_extra_time[request.table] = current + request.seconds
+        tournament.table_extra_time[data.table] = current + data.seconds
         bd = await _save_timer_tx(tournament, tx_conn)
     broadcast_precomputed(bd)
     return Response(content=encoder.encode(tournament), media_type="application/json")
@@ -2066,20 +2070,21 @@ def _validate_announce_tournament(user, tournament: Tournament | None):
         raise HTTPException(status_code=423, detail="Tournament is in offline mode")
 
 
-class AnnounceRequest(BaseModel):
+class AnnounceRequest(msgspec.Struct):
     body: str
 
 
-@router.post("/{uid}/announce")
+@post("/{uid:str}/announce")
 async def post_announcement(
-    uid: str,
-    request: AnnounceRequest,
-    user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
+    data: AnnounceRequest,
 ) -> Response:
     """Post a live announcement to all tournament participants."""
+    user = await get_optional_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
-    body = request.body.strip()
+    body = data.body.strip()
     if not body:
         raise HTTPException(status_code=400, detail="Announcement is empty")
     if len(body) > MAX_ANNOUNCEMENT_LEN:
@@ -2114,13 +2119,14 @@ async def post_announcement(
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
-@router.delete("/{uid}/announce/{announcement_id}")
+@delete("/{uid:str}/announce/{announcement_id:str}", status_code=200)
 async def delete_announcement(
-    uid: str,
-    announcement_id: str,
-    user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
+    announcement_id: FromPath[str],
 ) -> Response:
     """Remove an announcement (wrong-room, typo, superseded)."""
+    user = await get_optional_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     async with tournament_transaction(uid) as (tournament, tx_conn):
@@ -2141,17 +2147,18 @@ async def delete_announcement(
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
-class JudgeCallRequest(BaseModel):
+class JudgeCallRequest(msgspec.Struct):
     table: int
 
 
-@router.post("/{uid}/call-judge", status_code=204)
+@post("/{uid:str}/call-judge", status_code=204)
 async def call_judge(
-    uid: str,
-    request: JudgeCallRequest,
-    user: OptionalUser = None,
-) -> Response:
+    request: Request,
+    uid: FromPath[str],
+    data: JudgeCallRequest,
+) -> None:
     """Player calls for judge assistance at their table."""
+    user = await get_optional_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     tournament = await get_tournament_by_uid(uid)
@@ -2164,9 +2171,9 @@ async def call_judge(
     if not tournament.rounds:
         raise HTTPException(status_code=400, detail="No active round")
     current_round = tournament.rounds[-1]
-    if request.table < 0 or request.table >= len(current_round):
+    if data.table < 0 or data.table >= len(current_round):
         raise HTTPException(status_code=400, detail="Invalid table index")
-    table = current_round[request.table]
+    table = current_round[data.table]
     if not any(s.player_uid == user.uid for s in table.seating):
         raise HTTPException(status_code=403, detail="You are not seated at this table")
     numbering = {
@@ -2175,12 +2182,12 @@ async def call_judge(
         "continue_room_numbering": tournament.continue_room_numbering,
     }
     sign = json.loads(
-        _engine.table_label(msgspec.json.encode(numbering).decode(), request.table)
+        _engine.table_label(msgspec.json.encode(numbering).decode(), data.table)
     )
     table_label, table_number = sign["label"], sign["number"]
     await broadcast_judge_call(
         tournament_uid=tournament.uid,
-        table=request.table,
+        table=data.table,
         table_label=table_label,
         table_number=table_number,
         player_name=user.name,
@@ -2188,23 +2195,23 @@ async def call_judge(
     )
     asyncio.create_task(
         _maybe_push_judge_call(
-            tournament, request.table, table_label, table_number, user.name, user.uid
+            tournament, data.table, table_label, table_number, user.name, user.uid
         )
     )
-    return Response(status_code=204)
 
 
-class GoOfflineRequest(BaseModel):
+class GoOfflineRequest(msgspec.Struct):
     device_id: str
 
 
-@router.post("/{uid}/go-offline")
+@post("/{uid:str}/go-offline")
 async def go_offline(
-    uid: str,
-    request: GoOfflineRequest,
-    current_user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
+    data: GoOfflineRequest,
 ) -> Response:
     """Lock a tournament for offline use on a specific device."""
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -2227,7 +2234,7 @@ async def go_offline(
             )
 
         tournament.offline_mode = True
-        tournament.offline_device_id = request.device_id
+        tournament.offline_device_id = data.device_id
         tournament.offline_user_uid = current_user.uid
         tournament.offline_since = datetime.now(UTC)
         tournament.modified = datetime.now(UTC)
@@ -2240,7 +2247,7 @@ async def go_offline(
         )
 
     logger.info(
-        f"Tournament {uid} went offline (device={request.device_id}, user={current_user.uid})"
+        f"Tournament {uid} went offline (device={data.device_id}, user={current_user.uid})"
     )
 
     broadcast_precomputed(bd)
@@ -2248,14 +2255,14 @@ async def go_offline(
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
-class OfflinePlayerData(BaseModel):
+class OfflinePlayerData(msgspec.Struct):
     temp_uid: str
     name: str
     vekn_id: str | None = None
     email: str | None = None
 
 
-class GoOnlineRequest(BaseModel):
+class GoOnlineRequest(msgspec.Struct):
     device_id: str
     tournament: dict  # Full tournament data from the offline device
     offline_players: list[OfflinePlayerData] = []
@@ -2358,23 +2365,24 @@ async def _gate_offline_created_insert(
     _engine_create_tournament(tournament_data, current_user)
 
 
-@router.post("/{uid}/go-online")
+@post("/{uid:str}/go-online")
 async def go_online(
-    uid: str,
-    request: GoOnlineRequest,
-    current_user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
+    data: GoOnlineRequest,
 ) -> Response:
     """Bring a tournament back online with full reconciliation."""
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
     # Cheap, request-only check before any side effects.
-    if request.tournament.get("uid") and request.tournament["uid"] != uid:
+    if data.tournament.get("uid") and data.tournament["uid"] != uid:
         raise HTTPException(status_code=400, detail="Tournament UID mismatch")
-    request.tournament["uid"] = uid
+    data.tournament["uid"] = uid
     # Before the player loop below, not at the convert: a minted account copies
     # this value into its own permission-bearing country field.
-    request.tournament["country"] = stored_country(request.tournament.get("country"))
+    data.tournament["country"] = stored_country(data.tournament.get("country"))
 
     # Pre-lock gate: authorize before creating any users (save_user/allocate_next_vekn_id).
     # Re-checked authoritatively under the lock below; this unlocked read only fails fast.
@@ -2395,8 +2403,8 @@ async def go_online(
             )
         if (
             existing.offline_mode
-            and existing.offline_device_id != request.device_id
-            and not request.force
+            and existing.offline_device_id != data.device_id
+            and not data.force
         ):
             raise HTTPException(
                 status_code=409,
@@ -2405,7 +2413,7 @@ async def go_online(
     else:
         # Offline-CREATED tournament — the server first learns of it here, so
         # this insert is a creation.
-        await _gate_offline_created_insert(current_user, request.tournament)
+        await _gate_offline_created_insert(current_user, data.tournament)
 
     # Resolved OUTSIDE the lock: each resolution may allocate a VEKN ID via its
     # own transaction. A rights-revoke race here only orphans an account (harmless).
@@ -2414,9 +2422,9 @@ async def go_online(
         str, str
     ] = {}  # offline TEMP- vekn → resolved real vekn (a member deck credit)
     accounts_created = 0
-    for player_data in request.offline_players:
+    for player_data in data.offline_players:
         temp_uid, real_user, created = await _resolve_or_create_offline_player(
-            player_data, request.tournament.get("country"), current_user.uid
+            player_data, data.tournament.get("country"), current_user.uid
         )
         uid_map[temp_uid] = real_user.uid
         accounts_created += created
@@ -2427,7 +2435,7 @@ async def go_online(
     # duplicate a participant — fail early rather than auto-merge them.
     final_player_uids = [
         uid_map.get(p.get("user_uid"), p.get("user_uid"))
-        for p in request.tournament.get("players", [])
+        for p in data.tournament.get("players", [])
     ]
     dupes = {u for u in final_player_uids if u and final_player_uids.count(u) > 1}
     if dupes:
@@ -2460,7 +2468,7 @@ async def go_online(
                 ),
             )
         if tournament and tournament.offline_mode:
-            if tournament.offline_device_id != request.device_id and not request.force:
+            if tournament.offline_device_id != data.device_id and not data.force:
                 raise HTTPException(
                     status_code=409,
                     detail="Tournament owned by another device. Use force to override.",
@@ -2469,16 +2477,14 @@ async def go_online(
         # Preserve original organizers (prevent client from removing them)
         if tournament:
             original_organizers = tournament.organizers_uids or []
-            client_organizers = request.tournament.get("organizers_uids", [])
+            client_organizers = data.tournament.get("organizers_uids", [])
             merged = list(dict.fromkeys(original_organizers + client_organizers))
-            request.tournament["organizers_uids"] = merged
+            data.tournament["organizers_uids"] = merged
 
             for name in SERVER_OWNED_TOURNAMENT_FIELDS:
-                request.tournament[name] = msgspec.to_builtins(
-                    getattr(tournament, name)
-                )
+                data.tournament[name] = msgspec.to_builtins(getattr(tournament, name))
 
-        tournament_data = request.tournament
+        tournament_data = data.tournament
         if uid_map:
             tournament_data = _remap_uids_in_tournament(tournament_data, uid_map)
 
@@ -2495,7 +2501,7 @@ async def go_online(
         # — the offline client mirrors the flip, but state gates check-in/StartFinals.
         active_dq_uids = {
             uid_map.get(s.get("user_uid"), s.get("user_uid"))
-            for s in request.offline_sanctions
+            for s in data.offline_sanctions
             if s.get("level") == "disqualification"
             and not s.get("lifted_at")
             and not s.get("deleted_at")
@@ -2538,7 +2544,7 @@ async def go_online(
         # Saved INSIDE the same transaction as the snapshot: a mid-push connection
         # drop must leave it still offline and retryable, never partially committed.
         pending_bds: list = []
-        for sanction_data in request.offline_sanctions:
+        for sanction_data in data.offline_sanctions:
             sanction = msgspec.convert(sanction_data, Sanction)
             sanction.user_uid = uid_map.get(sanction.user_uid, sanction.user_uid)
             pending_bds.append(
@@ -2548,7 +2554,7 @@ async def go_online(
             )
         # A member credit earned offline names a TEMP- vekn; repoint it to the
         # resolved one, and withhold the credit where nothing resolves it.
-        for deck_data in request.offline_decks:
+        for deck_data in data.offline_decks:
             deck_obj = msgspec.convert(deck_data, DeckObject)
             deck_obj.tournament_uid = uid
             deck_obj.user_uid = uid_map.get(deck_obj.user_uid, deck_obj.user_uid)
@@ -2578,7 +2584,7 @@ async def go_online(
     if updated.state == TournamentState.FINISHED:
         await _withdraw_private_decks(updated)
 
-    if request.offline_sanctions:
+    if data.offline_sanctions:
         # One authoritative recompute over the now-saved sanctions, server-side
         # under the row lock (the offline client already recomputed via WASM).
         from .sanctions import _apply_sanction_to_tournament
@@ -2592,7 +2598,7 @@ async def go_online(
 
     # Excludes the initiating device: it gets the reconciled tournament in the HTTP
     # response, and an echoed offline_mode=false would race ahead and trip its lost-lock warning.
-    broadcast_precomputed(tournament_bd, exclude_device_id=request.device_id)
+    broadcast_precomputed(tournament_bd, exclude_device_id=data.device_id)
 
     _promo_recompute_diff(tournament, updated)
 
@@ -2619,10 +2625,10 @@ async def go_online(
     # Outcome summary closes the loop the go-offline modal opens: each created
     # account is a real coopted VEKN member the organizer should know about.
     summary = {
-        "players_matched": len(request.offline_players) - accounts_created,
+        "players_matched": len(data.offline_players) - accounts_created,
         "accounts_created": accounts_created,
-        "decks_synced": len(request.offline_decks),
-        "sanctions_synced": len(request.offline_sanctions),
+        "decks_synced": len(data.offline_decks),
+        "sanctions_synced": len(data.offline_sanctions),
     }
     return Response(
         content=encoder.encode({"tournament": updated, "summary": summary}),
@@ -2630,17 +2636,18 @@ async def go_online(
     )
 
 
-class ForceTakeoverRequest(BaseModel):
+class ForceTakeoverRequest(msgspec.Struct):
     device_id: str
 
 
-@router.post("/{uid}/force-takeover")
+@post("/{uid:str}/force-takeover")
 async def force_takeover(
-    uid: str,
-    request: ForceTakeoverRequest,
-    current_user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
+    data: ForceTakeoverRequest,
 ) -> Response:
     """Transfer offline lock to a new device (any organizer of this tournament)."""
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -2663,7 +2670,7 @@ async def force_takeover(
             )
 
         old_device = tournament.offline_device_id
-        tournament.offline_device_id = request.device_id
+        tournament.offline_device_id = data.device_id
         tournament.offline_user_uid = current_user.uid
         tournament.modified = datetime.now(UTC)
 
@@ -2675,7 +2682,7 @@ async def force_takeover(
         )
 
     logger.info(
-        f"Tournament {uid} force-takeover: {old_device} → {request.device_id} by {current_user.uid}"
+        f"Tournament {uid} force-takeover: {old_device} → {data.device_id} by {current_user.uid}"
     )
 
     broadcast_precomputed(bd)
@@ -2683,18 +2690,19 @@ async def force_takeover(
     return Response(content=encoder.encode(tournament), media_type="application/json")
 
 
-class SyncOfflineRequest(BaseModel):
+class SyncOfflineRequest(msgspec.Struct):
     device_id: str
     tournament: dict
 
 
-@router.post("/{uid}/sync-offline")
+@post("/{uid:str}/sync-offline")
 async def sync_offline(
-    uid: str,
-    request: SyncOfflineRequest,
-    current_user: OptionalUser = None,
+    request: Request,
+    uid: FromPath[str],
+    data: SyncOfflineRequest,
 ) -> Response:
     """Background data backup for offline tournament. Saves snapshot without unlocking."""
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -2714,22 +2722,22 @@ async def sync_offline(
                     detail="Only organizers can sync an offline tournament",
                 )
 
-            if tournament.offline_device_id != request.device_id:
+            if tournament.offline_device_id != data.device_id:
                 raise HTTPException(
                     status_code=409, detail="Device does not hold the offline lock"
                 )
         else:
             # Offline-CREATED tournament: insert rather than 404 — this backup
             # snapshot IS the crash insurance offline creation exists for.
-            await _gate_offline_created_insert(current_user, request.tournament)
+            await _gate_offline_created_insert(current_user, data.tournament)
 
         # Pin the write to the locked row: the FOR UPDATE lock and device-lock
         # check are keyed on the URL uid, so the snapshot must save there too.
-        if request.tournament.get("uid") and request.tournament["uid"] != uid:
+        if data.tournament.get("uid") and data.tournament["uid"] != uid:
             raise HTTPException(status_code=400, detail="Tournament UID mismatch")
-        request.tournament["uid"] = uid
+        data.tournament["uid"] = uid
 
-        tournament_data = request.tournament
+        tournament_data = data.tournament
         tournament_data["country"] = stored_country(tournament_data.get("country"))
         tournament_data["offline_mode"] = True
         if tournament:
@@ -2747,7 +2755,7 @@ async def sync_offline(
         else:
             # Insert: no server-side lock fields to preserve — the snapshot stays
             # locked to the device that created it offline.
-            tournament_data["offline_device_id"] = request.device_id
+            tournament_data["offline_device_id"] = data.device_id
             tournament_data["offline_user_uid"] = current_user.uid
             if not tournament_data.get("offline_since"):
                 tournament_data["offline_since"] = datetime.now(UTC).isoformat()
@@ -2765,7 +2773,7 @@ async def sync_offline(
         )
 
     now = datetime.now(UTC)
-    logger.info(f"Tournament {uid} offline sync from device {request.device_id}")
+    logger.info(f"Tournament {uid} offline sync from device {data.device_id}")
 
     _promo_recompute_diff(tournament, updated)
 
@@ -2775,13 +2783,13 @@ async def sync_offline(
     )
 
 
-@router.post("/{uid}/force-unlock")
+@post("/{uid:str}/force-unlock")
 async def force_unlock(
-    uid: str,
+    uid: FromPath[str],
     request: Request,
-    current_user: OptionalUser = None,
 ) -> Response:
     """IC-only emergency unlock. Clears offline mode entirely."""
+    current_user = await get_optional_user(request)
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
@@ -2825,3 +2833,37 @@ async def force_unlock(
     broadcast_precomputed(bd)
 
     return Response(content=encoder.encode(tournament), media_type="application/json")
+
+
+router = Router(
+    "/api/tournaments",
+    route_handlers=[
+        add_organizer,
+        push_vekn,
+        remove_organizer,
+        upload_banner,
+        get_banner_image,
+        delete_banner_image,
+        get_round_decks,
+        create_tournament,
+        download_archon_template,
+        fetch_deck_proxy,
+        delete_tournament_endpoint,
+        archon_import,
+        bulk_register,
+        tournament_action,
+        qr_checkin,
+        timer_start,
+        timer_pause,
+        timer_reset,
+        timer_add_time,
+        post_announcement,
+        delete_announcement,
+        call_judge,
+        go_offline,
+        go_online,
+        force_takeover,
+        sync_offline,
+        force_unlock,
+    ],
+)

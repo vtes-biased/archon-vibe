@@ -1,19 +1,23 @@
 """Authentication API endpoints package."""
 
-from fastapi import APIRouter
+from litestar import Router
 
 from . import _tokens, discord, email_password, github, magic_link, passkeys, profile
 from ._tokens import create_access_token, create_refresh_token, verify_token
 from .magic_link import send_invite_email
 
-router = APIRouter(prefix="/auth", tags=["auth"])
-router.include_router(_tokens.router)
-router.include_router(email_password.router)
-router.include_router(magic_link.router)
-router.include_router(profile.router)
-router.include_router(passkeys.router)
-router.include_router(discord.router)
-router.include_router(github.router)
+router = Router(
+    "/auth",
+    route_handlers=[
+        *_tokens.handlers,
+        *email_password.handlers,
+        *magic_link.handlers,
+        *profile.handlers,
+        *passkeys.handlers,
+        *discord.handlers,
+        *github.handlers,
+    ],
+)
 
 __all__ = [
     "create_access_token",

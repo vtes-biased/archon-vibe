@@ -2,11 +2,9 @@
 
 import hashlib
 
-from fastapi import APIRouter, Request, Response
+from litestar import Request, Response, Router, get
 
 from ..card_data import cards_json_bytes
-
-router = APIRouter(prefix="/api", tags=["cards"])
 
 _cards_etag: str | None = None
 
@@ -21,7 +19,7 @@ def _load_cards():
     return data, _cards_etag
 
 
-@router.get("/cards")
+@get("/cards")
 async def get_cards(request: Request) -> Response:
     data, etag = _load_cards()
     if data is None:
@@ -36,3 +34,6 @@ async def get_cards(request: Request) -> Response:
         media_type="application/json",
         headers={"ETag": f'"{etag}"', "Cache-Control": "public, max-age=3600"},
     )
+
+
+router = Router("/api", route_handlers=[get_cards])

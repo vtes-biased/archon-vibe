@@ -8,10 +8,13 @@ import logging
 import os
 import secrets
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Header, HTTPException, Query, Response
-from fastapi.responses import RedirectResponse
+from litestar import Request, get, post
+from litestar.exceptions import HTTPException
+from litestar.params import FromHeader, FromQuery, QueryParameter
+from litestar.response import Redirect
 
 from ... import http_client
 from ...broadcast import broadcast_precomputed
@@ -22,11 +25,10 @@ from ...db import (
     save_user,
     store_transient_token,
 )
-from ...middleware.auth import CurrentUser
+from ...middleware.auth import get_current_user
 from ...models import is_active_account
 from ._tokens import verify_token
 
-router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
@@ -42,21 +44,17 @@ def _get_github_config() -> tuple[str, str, str, str]:
     )
 
 
-@router.get("/github/authorize")
+@get("/github/authorize")
 async def github_authorize(
-    redirect: str = Query(
-        "/profile", description="Frontend path to redirect after OAuth"
-    ),
-    token: str | None = Query(
-        None, description="Access token (headers are lost across the redirect)"
-    ),
-    authorization: str | None = Header(default=None),
-) -> RedirectResponse:
+    redirect: FromQuery[str] = "/profile",
+    token: FromQuery[str | None] = None,
+    authorization: FromHeader[str | None] = None,
+) -> Redirect:
     client_id, _secret, redirect_uri, frontend_url = _get_github_config()
     if not client_id:
         # Toast, not a 500: /authorize is a top-level navigation.
-        return RedirectResponse(
-            url=f"{frontend_url}/profile?github_error=not_configured", status_code=302
+        return Redirect(
+            f"{frontend_url}/profile?github_error=not_configured", status_code=302
         )
 
     auth_token = token
@@ -81,32 +79,32 @@ async def github_authorize(
         "scope": "read:user",
         "state": state,
     }
-    return RedirectResponse(
-        url=f"https://github.com/login/oauth/authorize?{urlencode(params)}",
+    return Redirect(
+        f"https://github.com/login/oauth/authorize?{urlencode(params)}",
         status_code=302,
     )
 
 
-@router.get("/github/callback")
+@get("/github/callback")
 async def github_callback(
-    code: str = Query(..., description="Authorization code from GitHub"),
-    state: str = Query(..., description="CSRF state token"),
-) -> RedirectResponse:
+    code: FromQuery[str],
+    oauth_state: Annotated[str, QueryParameter(name="state")],
+) -> Redirect:
     client_id, client_secret, redirect_uri, frontend_url = _get_github_config()
 
-    stored = await get_transient_token(f"github:{state}")
+    stored = await get_transient_token(f"github:{oauth_state}")
     if not stored:
-        return RedirectResponse(
-            url=f"{frontend_url}/profile?github_error=invalid_state", status_code=302
+        return Redirect(
+            f"{frontend_url}/profile?github_error=invalid_state", status_code=302
         )
-    await delete_transient_token(f"github:{state}")
+    await delete_transient_token(f"github:{oauth_state}")
 
     user_uid = stored.get("user_uid")
     redirect_path = stored.get("redirect", "/profile")
 
-    def fail(err: str) -> RedirectResponse:
-        return RedirectResponse(
-            url=f"{frontend_url}{redirect_path}?github_error={err}", status_code=302
+    def fail(err: str) -> Redirect:
+        return Redirect(
+            f"{frontend_url}{redirect_path}?github_error={err}", status_code=302
         )
 
     session = http_client.session()
@@ -165,17 +163,20 @@ async def github_callback(
         user.modified = datetime.now(UTC)
         broadcast_precomputed(await save_user(user))
 
-    return RedirectResponse(
-        url=f"{frontend_url}{redirect_path}?github_linked=success", status_code=302
+    return Redirect(
+        f"{frontend_url}{redirect_path}?github_linked=success", status_code=302
     )
 
 
-@router.post("/github/unlink")
-async def github_unlink(current_user: CurrentUser) -> Response:
+@post("/github/unlink", status_code=204)
+async def github_unlink(request: Request) -> None:
+    current_user = await get_current_user(request)
     user = current_user
     if user.github_id or user.github_login:
         user.github_id = None
         user.github_login = None
         user.modified = datetime.now(UTC)
         broadcast_precomputed(await save_user(user))
-    return Response(status_code=204)
+
+
+handlers = [github_authorize, github_callback, github_unlink]

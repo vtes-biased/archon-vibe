@@ -1,9 +1,8 @@
 """Authentication middleware and dependencies."""
 
-from typing import Annotated
-
 import jwt
-from fastapi import Depends, Header, HTTPException, Request
+from litestar import Request
+from litestar.exceptions import HTTPException
 
 from ..db import get_user_by_uid
 from ..db_oauth import get_oauth_token_by_jti
@@ -32,7 +31,7 @@ def _oauth_allows(request: Request, tournament_uid: str) -> bool:
     path = request.url.path
     if path.startswith("/oauth/"):
         return True
-    if path == "/sanctions/":
+    if path == "/sanctions":
         return request.method == "POST"
     if path == "/sanctions/reference":
         return request.method == "GET"
@@ -47,13 +46,11 @@ def _oauth_allows(request: Request, tournament_uid: str) -> bool:
     return len(segments) < 4 or segments[3] not in _OAUTH_BARRED_SUBPATHS
 
 
-async def get_current_user(
-    request: Request,
-    authorization: Annotated[str | None, Header()] = None,
-) -> User:
+async def get_current_user(request: Request) -> User:
     """Resolves both regular access tokens and OAuth access tokens. A token that
     names no event reaches /oauth/* only, whatever its scopes; an event:run token
     that names one reaches that tournament through the allowlist above."""
+    authorization = request.headers.get("authorization")
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=401,
@@ -129,18 +126,11 @@ async def get_current_user(
     return user
 
 
-async def get_optional_user(
-    request: Request,
-    authorization: Annotated[str | None, Header()] = None,
-) -> User | None:
-    if not authorization or not authorization.startswith("Bearer "):
+async def get_optional_user(request: Request) -> User | None:
+    if not request.headers.get("authorization", "").startswith("Bearer "):
         return None
 
     try:
-        return await get_current_user(request, authorization)
+        return await get_current_user(request)
     except HTTPException:
         return None
-
-
-CurrentUser = Annotated[User, Depends(get_current_user)]
-OptionalUser = Annotated[User | None, Depends(get_optional_user)]

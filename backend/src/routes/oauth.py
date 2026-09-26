@@ -5,6 +5,7 @@ import json
 import logging
 import secrets
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 from urllib.parse import parse_qsl, urlencode
 from uuid import uuid7
 
@@ -12,8 +13,9 @@ import jwt
 import msgspec
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from litestar import Request, Router, delete, get, post
+from litestar.exceptions import HTTPException
+from litestar.params import FromPath, FromQuery, QueryParameter
 
 from .. import permissions
 from ..db import get_auth_methods_for_user, get_tournament_by_uid
@@ -36,7 +38,7 @@ from ..db_oauth import (
     upsert_oauth_consent,
 )
 from ..jwt_config import AUDIENCE_API, AUDIENCE_APP, decode, sign
-from ..middleware.auth import CurrentUser
+from ..middleware.auth import get_current_user
 from ..models import (
     AuthMethodType,
     OAuthAuthorizationCode,
@@ -49,8 +51,6 @@ from ..models import (
 )
 
 logger = logging.getLogger(__name__)
-
-router = APIRouter(prefix="/oauth", tags=["oauth"])
 
 ph = PasswordHasher()
 
@@ -115,7 +115,7 @@ def _parse_scopes(scope_str: str) -> list[OAuthScope]:
         try:
             scopes.append(OAuthScope(s))
         except ValueError:
-            raise HTTPException(400, f"Invalid scope: {s}") from None
+            raise HTTPException(status_code=400, detail=f"Invalid scope: {s}") from None
     return scopes
 
 
@@ -124,54 +124,62 @@ async def _grant_tournament(scopes: list[OAuthScope], tournament_uid: str):
     one. Returns None for a grant that names no event: identity only, whatever
     scopes it carries."""
     if OAuthScope.EVENT_RUN not in scopes and tournament_uid:
-        raise HTTPException(400, "tournament requires the event:run scope")
+        raise HTTPException(
+            status_code=400, detail="tournament requires the event:run scope"
+        )
     if not tournament_uid:
         return None
     tournament = await get_tournament_by_uid(tournament_uid)
     if not tournament:
-        raise HTTPException(400, "Unknown tournament")
+        raise HTTPException(status_code=400, detail="Unknown tournament")
     if tournament.state == TournamentState.FINISHED:
-        raise HTTPException(400, "Tournament is finished")
+        raise HTTPException(status_code=400, detail="Tournament is finished")
     return tournament
 
 
-@router.get("/authorize")
+@get("/authorize")
 async def authorize_get(
     request: Request,
-    user: CurrentUser,
-    response_type: str,
-    client_id: str,
-    redirect_uri: str,
-    scope: str,
-    state: str = "",
-    code_challenge: str = "",
-    code_challenge_method: str = "",
-    tournament: str = "",
-):
+    response_type: FromQuery[str],
+    client_id: FromQuery[str],
+    redirect_uri: FromQuery[str],
+    oauth_scope: Annotated[str, QueryParameter(name="scope")],
+    oauth_state: Annotated[str, QueryParameter(name="state")] = "",
+    code_challenge: FromQuery[str] = "",
+    code_challenge_method: FromQuery[str] = "",
+    tournament: FromQuery[str] = "",
+) -> dict:
     """Validate OAuth authorization request parameters. Returns JSON with authorization details
     or redirects with code if consent already exists."""
+    user = await get_current_user(request)
     _require_first_party(request, "Consent management requires a first-party session")
 
     if response_type != "code":
-        raise HTTPException(400, "Only response_type=code is supported")
+        raise HTTPException(
+            status_code=400, detail="Only response_type=code is supported"
+        )
 
     if not code_challenge or code_challenge_method != "S256":
-        raise HTTPException(400, "PKCE with S256 is required")
+        raise HTTPException(status_code=400, detail="PKCE with S256 is required")
 
     client = await get_oauth_client_by_client_id(client_id)
     if not client or not client.active:
-        raise HTTPException(400, "Invalid client_id")
+        raise HTTPException(status_code=400, detail="Invalid client_id")
 
     # Exact match required — a prefix/substring match would allow open redirects.
     if redirect_uri not in client.redirect_uris:
-        raise HTTPException(400, "Invalid redirect_uri")
+        raise HTTPException(status_code=400, detail="Invalid redirect_uri")
 
-    requested_scopes = _parse_scopes(scope)
+    requested_scopes = _parse_scopes(oauth_scope)
     for s in requested_scopes:
         if s not in client.scopes:
-            raise HTTPException(400, f"Scope {s} not allowed for this client")
+            raise HTTPException(
+                status_code=400, detail=f"Scope {s} not allowed for this client"
+            )
     if OAuthScope.API_READ in requested_scopes:
-        raise HTTPException(400, "api:read is a client_credentials scope")
+        raise HTTPException(
+            status_code=400, detail="api:read is a client_credentials scope"
+        )
 
     event = await _grant_tournament(requested_scopes, tournament)
     tournament_uid = event.uid if event else None
@@ -195,8 +203,8 @@ async def authorize_get(
         await insert_oauth_code(auth_code)
 
         params = {"code": code_value}
-        if state:
-            params["state"] = state
+        if oauth_state:
+            params["state"] = oauth_state
         # Never a 302: the caller is a fetch, which cannot read Location.
         return {"redirect_url": f"{redirect_uri}?{urlencode(params)}"}
 
@@ -215,7 +223,7 @@ async def authorize_get(
             ),
         },
         "redirect_uri": redirect_uri,
-        "state": state,
+        "state": oauth_state,
         "client_id": client_id,
         "code_challenge": code_challenge,
         "tournament": tournament_uid,
@@ -226,7 +234,7 @@ async def authorize_get(
     }
 
 
-class AuthorizeApprovalRequest(BaseModel):
+class AuthorizeApprovalRequest(msgspec.Struct):
     """POST /authorize body (first-party consent screen). Fields default empty
     so missing values fail the endpoint's own 400s, not as a 422."""
 
@@ -239,32 +247,35 @@ class AuthorizeApprovalRequest(BaseModel):
     approved: bool = True
 
 
-@router.post("/authorize")
-async def authorize_post(
-    user: CurrentUser, body: AuthorizeApprovalRequest, request: Request
-):
+@post("/authorize")
+async def authorize_post(request: Request, data: AuthorizeApprovalRequest) -> dict:
+    user = await get_current_user(request)
     _require_first_party(request, "Consent management requires a first-party session")
 
-    client_id = body.client_id
-    redirect_uri = body.redirect_uri
-    scope = body.scope
-    state = body.state
-    code_challenge = body.code_challenge
-    approved = body.approved
+    client_id = data.client_id
+    redirect_uri = data.redirect_uri
+    scope = data.scope
+    state = data.state
+    code_challenge = data.code_challenge
+    approved = data.approved
 
     client = await get_oauth_client_by_client_id(client_id)
     if not client or not client.active:
-        raise HTTPException(400, "Invalid client_id")
+        raise HTTPException(status_code=400, detail="Invalid client_id")
 
     if redirect_uri not in client.redirect_uris:
-        raise HTTPException(400, "Invalid redirect_uri")
+        raise HTTPException(status_code=400, detail="Invalid redirect_uri")
 
     requested_scopes = _parse_scopes(scope)
     for s in requested_scopes:
         if s not in client.scopes:
-            raise HTTPException(400, f"Scope {s} not allowed for this client")
+            raise HTTPException(
+                status_code=400, detail=f"Scope {s} not allowed for this client"
+            )
     if OAuthScope.API_READ in requested_scopes:
-        raise HTTPException(400, "api:read is a client_credentials scope")
+        raise HTTPException(
+            status_code=400, detail="api:read is a client_credentials scope"
+        )
 
     if not approved:
         params = {"error": "access_denied"}
@@ -273,9 +284,9 @@ async def authorize_post(
         return {"redirect_url": f"{redirect_uri}?{urlencode(params)}"}
 
     if not code_challenge:
-        raise HTTPException(400, "PKCE code_challenge is required")
+        raise HTTPException(status_code=400, detail="PKCE code_challenge is required")
 
-    event = await _grant_tournament(requested_scopes, body.tournament)
+    event = await _grant_tournament(requested_scopes, data.tournament)
     tournament_uid = event.uid if event else None
 
     now = datetime.now(UTC)
@@ -310,7 +321,7 @@ async def authorize_post(
     return {"redirect_url": f"{redirect_uri}?{urlencode(params)}"}
 
 
-class TokenRequest(BaseModel):
+class TokenRequest(msgspec.Struct):
     """POST /token body. Fields default empty so a missing value fails the
     endpoint's own 400/401s, not a 422."""
 
@@ -324,7 +335,7 @@ class TokenRequest(BaseModel):
     scope: str = ""
 
 
-class RevokeRequest(BaseModel):
+class RevokeRequest(msgspec.Struct):
     """POST /revoke body (RFC 7009)."""
 
     client_id: str = ""
@@ -332,29 +343,7 @@ class RevokeRequest(BaseModel):
     token: str = ""
 
 
-# Both handlers take a raw Request to accept either encoding, so FastAPI derives
-# no request body of its own.
-_TOKEN_BODY = {
-    "requestBody": {
-        "required": True,
-        "content": {
-            media: {"schema": TokenRequest.model_json_schema()}
-            for media in ("application/x-www-form-urlencoded", "application/json")
-        },
-    }
-}
-_REVOKE_BODY = {
-    "requestBody": {
-        "required": True,
-        "content": {
-            media: {"schema": RevokeRequest.model_json_schema()}
-            for media in ("application/x-www-form-urlencoded", "application/json")
-        },
-    }
-}
-
-
-async def _rfc_body[T: BaseModel](request: Request, model: type[T]) -> T:
+async def _rfc_body[T: msgspec.Struct](request: Request, model: type[T]) -> T:
     """Form-encoded as the RFCs require, or JSON with the same keys."""
     raw = await request.body()
     if request.headers.get("content-type", "").startswith(
@@ -365,17 +354,23 @@ async def _rfc_body[T: BaseModel](request: Request, model: type[T]) -> T:
         try:
             fields = json.loads(raw or b"{}")
         except ValueError:
-            raise HTTPException(400, "Body must be form-encoded or JSON") from None
+            raise HTTPException(
+                status_code=400, detail="Body must be form-encoded or JSON"
+            ) from None
     if not isinstance(fields, dict):
-        raise HTTPException(400, "Body must be form-encoded or JSON")
-    known = model.model_fields
-    return model(
-        **{k: str(v) for k, v in fields.items() if k in known and v is not None}
-    )
+        raise HTTPException(status_code=400, detail="Body must be form-encoded or JSON")
+    known = model.__struct_fields__
+    try:
+        return msgspec.convert(
+            {k: str(v) for k, v in fields.items() if k in known and v is not None},
+            model,
+        )
+    except msgspec.ValidationError as err:
+        raise HTTPException(status_code=400, detail="Invalid request body") from err
 
 
-@router.post("/token", openapi_extra=_TOKEN_BODY)
-async def token_endpoint(request: Request):
+@post("/token", status_code=200)
+async def token_endpoint(request: Request) -> dict:
     """Exchange authorization code, refresh token or client credentials for tokens.
 
     The client authenticates with its client_id and client_secret in the body,
@@ -386,12 +381,14 @@ async def token_endpoint(request: Request):
 
     client = await get_oauth_client_by_client_id(body.client_id)
     if not client or not client.active:
-        raise HTTPException(401, "Invalid client credentials")
+        raise HTTPException(status_code=401, detail="Invalid client credentials")
 
     try:
         ph.verify(client.client_secret_hash, body.client_secret)
     except VerifyMismatchError:
-        raise HTTPException(401, "Invalid client credentials") from None
+        raise HTTPException(
+            status_code=401, detail="Invalid client credentials"
+        ) from None
 
     if grant_type == "authorization_code":
         return await _handle_authorization_code(body, client)
@@ -400,7 +397,7 @@ async def token_endpoint(request: Request):
     elif grant_type == "client_credentials":
         return await _handle_client_credentials(body, client)
     else:
-        raise HTTPException(400, "Unsupported grant_type")
+        raise HTTPException(status_code=400, detail="Unsupported grant_type")
 
 
 async def _handle_authorization_code(body: TokenRequest, client: OAuthClient) -> dict:
@@ -409,34 +406,34 @@ async def _handle_authorization_code(body: TokenRequest, client: OAuthClient) ->
     code_verifier = body.code_verifier
 
     if not code_value or not redirect_uri or not code_verifier:
-        raise HTTPException(400, "Missing required parameters")
+        raise HTTPException(status_code=400, detail="Missing required parameters")
 
     auth_code = await get_oauth_code(code_value)
     if not auth_code:
-        raise HTTPException(400, "Invalid authorization code")
+        raise HTTPException(status_code=400, detail="Invalid authorization code")
 
     if auth_code.used:
-        raise HTTPException(400, "Authorization code already used")
+        raise HTTPException(status_code=400, detail="Authorization code already used")
 
     if auth_code.client_id != client.client_id:
-        raise HTTPException(400, "Client mismatch")
+        raise HTTPException(status_code=400, detail="Client mismatch")
 
     if auth_code.redirect_uri != redirect_uri:
-        raise HTTPException(400, "Redirect URI mismatch")
+        raise HTTPException(status_code=400, detail="Redirect URI mismatch")
 
     now = datetime.now(UTC)
     if auth_code.expires_at < now:
-        raise HTTPException(400, "Authorization code expired")
+        raise HTTPException(status_code=400, detail="Authorization code expired")
 
     if not _verify_pkce(code_verifier, auth_code.code_challenge):
-        raise HTTPException(400, "Invalid code_verifier (PKCE)")
+        raise HTTPException(status_code=400, detail="Invalid code_verifier (PKCE)")
 
     # Consent is authoritative: a revoke between code issuance and exchange (≤60s,
     # or any auto-approve race) deletes the consent row and must block redemption.
     if not await get_oauth_consent(
         auth_code.user_uid, client.client_id, auth_code.tournament_uid
     ):
-        raise HTTPException(400, "Consent has been revoked")
+        raise HTTPException(status_code=400, detail="Consent has been revoked")
 
     used_code = OAuthAuthorizationCode(
         uid=auth_code.uid,
@@ -465,44 +462,44 @@ async def _handle_authorization_code(body: TokenRequest, client: OAuthClient) ->
 async def _handle_refresh_token(body: TokenRequest, client: OAuthClient) -> dict:
     refresh_token_str = body.refresh_token
     if not refresh_token_str:
-        raise HTTPException(400, "Missing refresh_token")
+        raise HTTPException(status_code=400, detail="Missing refresh_token")
 
     try:
         payload = decode(refresh_token_str, AUDIENCE_APP)
     except jwt.ExpiredSignatureError:
-        raise HTTPException(400, "Refresh token expired") from None
+        raise HTTPException(status_code=400, detail="Refresh token expired") from None
     except jwt.InvalidTokenError:
-        raise HTTPException(400, "Invalid refresh token") from None
+        raise HTTPException(status_code=400, detail="Invalid refresh token") from None
 
     if payload.get("type") != "oauth_refresh":
-        raise HTTPException(400, "Invalid token type")
+        raise HTTPException(status_code=400, detail="Invalid token type")
 
     if payload.get("client_id") != client.client_id:
-        raise HTTPException(400, "Client mismatch")
+        raise HTTPException(status_code=400, detail="Client mismatch")
 
     jti = payload.get("jti", "")
     token_record = await get_oauth_token_by_jti(jti)
     if not token_record:
-        raise HTTPException(400, "Unknown refresh token")
+        raise HTTPException(status_code=400, detail="Unknown refresh token")
 
     if token_record.revoked:
         # Reuse of revoked token → revoke entire chain
         if token_record.parent_token_uid:
             await revoke_oauth_token_chain(token_record.parent_token_uid)
         logger.warning(f"Revoked refresh token reuse detected: jti={jti}")
-        raise HTTPException(400, "Refresh token has been revoked")
+        raise HTTPException(status_code=400, detail="Refresh token has been revoked")
 
     # Consent is authoritative: revoking it deletes the row, so a surviving refresh
     # token (e.g. a partial revoke) still can't mint new access tokens.
     tournament_uid = payload.get("tournament")
 
     if not await get_oauth_consent(payload["sub"], client.client_id, tournament_uid):
-        raise HTTPException(400, "Consent has been revoked")
+        raise HTTPException(status_code=400, detail="Consent has been revoked")
 
     if tournament_uid:
         event = await get_tournament_by_uid(tournament_uid)
         if not event or event.state == TournamentState.FINISHED:
-            raise HTTPException(400, "Tournament is finished")
+            raise HTTPException(status_code=400, detail="Tournament is finished")
 
     now = datetime.now(UTC)
     revoked = OAuthToken(
@@ -528,7 +525,8 @@ async def _handle_refresh_token(body: TokenRequest, client: OAuthClient) -> dict
         # A token minted before a scope was renamed: 400 so a client clears the
         # pair and re-authorizes, where the raw ValueError would 500 and strand it.
         raise HTTPException(
-            400, "Token carries a scope this build no longer issues"
+            status_code=400,
+            detail="Token carries a scope this build no longer issues",
         ) from err
 
     return await _issue_token_pair(
@@ -545,9 +543,14 @@ async def _handle_client_credentials(body: TokenRequest, client: OAuthClient) ->
     a user and a daemon has none. Revocation is the client's `active` flag, which
     the public API checks for itself."""
     if OAuthScope.API_READ not in client.scopes:
-        raise HTTPException(400, "Client is not allowed the api:read scope")
+        raise HTTPException(
+            status_code=400, detail="Client is not allowed the api:read scope"
+        )
     if body.scope and _parse_scopes(body.scope) != [OAuthScope.API_READ]:
-        raise HTTPException(400, "client_credentials grants api:read and nothing else")
+        raise HTTPException(
+            status_code=400,
+            detail="client_credentials grants api:read and nothing else",
+        )
 
     now = datetime.now(UTC)
     token = sign(
@@ -634,22 +637,24 @@ async def _issue_token_pair(
     }
 
 
-@router.post("/revoke", openapi_extra=_REVOKE_BODY)
-async def revoke_token(request: Request):
+@post("/revoke", status_code=200)
+async def revoke_token(request: Request) -> dict:
     """Revoke a token and the whole rotation lineage it belongs to (RFC 7009)."""
     body = await _rfc_body(request, RevokeRequest)
 
     client = await get_oauth_client_by_client_id(body.client_id)
     if not client or not client.active:
-        raise HTTPException(401, "Invalid client credentials")
+        raise HTTPException(status_code=401, detail="Invalid client credentials")
 
     try:
         ph.verify(client.client_secret_hash, body.client_secret)
     except VerifyMismatchError:
-        raise HTTPException(401, "Invalid client credentials") from None
+        raise HTTPException(
+            status_code=401, detail="Invalid client credentials"
+        ) from None
 
     if not body.token:
-        raise HTTPException(400, "Missing token")
+        raise HTTPException(status_code=400, detail="Missing token")
 
     try:
         payload = decode(body.token, AUDIENCE_APP, verify_exp=False)
@@ -663,10 +668,11 @@ async def revoke_token(request: Request):
     return {"status": "ok"}
 
 
-@router.get("/userinfo")
-async def userinfo(user: CurrentUser, request: Request):
+@get("/userinfo")
+async def userinfo(request: Request) -> dict:
     """Middleware validates the token and sets request.state.oauth_scopes for OAuth
     tokens (None for first-party sessions, which skip the scope check below)."""
+    user = await get_current_user(request)
     oauth_scopes = getattr(request.state, "oauth_scopes", None)
     if oauth_scopes is None:
         pass
@@ -676,7 +682,8 @@ async def userinfo(user: CurrentUser, request: Request):
         OAuthScope.EVENT_RUN.value,
     } & set(oauth_scopes):
         raise HTTPException(
-            403, "Requires profile:read, profile:email or event:run scope"
+            status_code=403,
+            detail="Requires profile:read, profile:email or event:run scope",
         )
 
     info = {
@@ -712,11 +719,12 @@ def _require_first_party(request: Request, detail: str) -> None:
     """The middleware admits a scoped token to every `/oauth/*` path, so each
     self-service endpoint under the prefix re-checks that it is not a third party."""
     if getattr(request.state, "oauth_scopes", None) is not None:
-        raise HTTPException(403, detail)
+        raise HTTPException(status_code=403, detail=detail)
 
 
-@router.get("/consents")
-async def list_consents(user: CurrentUser, request: Request):
+@get("/consents")
+async def list_consents(request: Request) -> list[dict]:
+    user = await get_current_user(request)
     _require_first_party(request, "Consent management requires a first-party session")
     consents = await get_oauth_consents_by_user(user.uid)
     out = []
@@ -740,30 +748,33 @@ async def list_consents(user: CurrentUser, request: Request):
     return out
 
 
-@router.delete("/consents/{client_id}")
-async def revoke_consent(client_id: str, user: CurrentUser, request: Request):
+@delete("/consents/{client_id:str}", status_code=200)
+async def revoke_consent(request: Request, client_id: FromPath[str]) -> dict:
     """Tokens revoked first (cuts access immediately), then consent dropped — a
     failure in between leaves a re-revokable consent that can't mint new tokens."""
+    user = await get_current_user(request)
     _require_first_party(request, "Consent management requires a first-party session")
     revoked = await revoke_oauth_tokens_for_user_client(user.uid, client_id)
     deleted = await delete_oauth_consent(user.uid, client_id)
     if not deleted and not revoked:
-        raise HTTPException(404, "No authorization found for this app")
+        raise HTTPException(
+            status_code=404, detail="No authorization found for this app"
+        )
     return {"status": "revoked", "client_id": client_id, "tokens_revoked": revoked}
 
 
 # One gate, four routes.
-async def _require_oauth_admin(request: Request, user: CurrentUser) -> User:
+async def _require_oauth_admin(request: Request) -> User:
+    user = await get_current_user(request)
     _require_first_party(request, "Client management requires a first-party session")
     if not permissions.can_manage_oauth_clients(user):
-        raise HTTPException(403, "Only IC or DEV can manage OAuth clients")
+        raise HTTPException(
+            status_code=403, detail="Only IC or DEV can manage OAuth clients"
+        )
     return user
 
 
-RequireOauthAdmin = Depends(_require_oauth_admin)
-
-
-class RegisterClientRequest(BaseModel):
+class RegisterClientRequest(msgspec.Struct):
     """Fields default empty so missing values fail the endpoint's own 400s,
     not as a 422."""
 
@@ -773,35 +784,38 @@ class RegisterClientRequest(BaseModel):
     email_purpose: str = ""
 
 
-@router.post("/clients")
-async def register_client(
-    body: RegisterClientRequest,
-    user: User = RequireOauthAdmin,
-):
+@post("/clients")
+async def register_client(request: Request, data: RegisterClientRequest) -> dict:
     """Register a new OAuth client. Returns client_secret once."""
-    name = body.name.strip()
-    redirect_uris = body.redirect_uris
-    scope_strs = body.scopes
+    user = await _require_oauth_admin(request)
+    name = data.name.strip()
+    redirect_uris = data.redirect_uris
+    scope_strs = data.scopes
 
     if not name:
-        raise HTTPException(400, "Client name is required")
+        raise HTTPException(status_code=400, detail="Client name is required")
 
     scopes = []
     for scope_str in scope_strs:
         try:
             scopes.append(OAuthScope(scope_str))
         except ValueError:
-            raise HTTPException(400, f"Invalid scope: {scope_str}") from None
+            raise HTTPException(
+                status_code=400, detail=f"Invalid scope: {scope_str}"
+            ) from None
 
     if not redirect_uris and set(scopes) != {OAuthScope.API_READ}:
-        raise HTTPException(400, "At least one redirect_uri is required")
+        raise HTTPException(
+            status_code=400, detail="At least one redirect_uri is required"
+        )
 
     email_purpose = None
     if OAuthScope.PROFILE_EMAIL in scopes:
-        email_purpose = body.email_purpose.strip()
+        email_purpose = data.email_purpose.strip()
         if not email_purpose:
             raise HTTPException(
-                400, "profile:email requires a statement of what the app does with it"
+                status_code=400,
+                detail="profile:email requires a statement of what the app does with it",
             )
 
     client_id = _generate_client_id()
@@ -833,8 +847,9 @@ async def register_client(
     }
 
 
-@router.get("/clients")
-async def list_clients(user: User = RequireOauthAdmin):
+@get("/clients")
+async def list_clients(request: Request) -> list[dict]:
+    user = await _require_oauth_admin(request)
     clients = await get_oauth_clients_by_owner(user.uid)
     return [
         {
@@ -851,14 +866,12 @@ async def list_clients(user: User = RequireOauthAdmin):
     ]
 
 
-@router.post("/clients/{client_id}/regenerate-secret")
-async def regenerate_secret(
-    client_id: str,
-    user: User = RequireOauthAdmin,
-):
+@post("/clients/{client_id:str}/regenerate-secret")
+async def regenerate_secret(request: Request, client_id: FromPath[str]) -> dict:
+    user = await _require_oauth_admin(request)
     client = await get_oauth_client_by_client_id(client_id)
     if not client or client.created_by_uid != user.uid:
-        raise HTTPException(404, "Client not found")
+        raise HTTPException(status_code=404, detail="Client not found")
 
     new_secret = _generate_client_secret()
     now = datetime.now(UTC)
@@ -875,14 +888,12 @@ async def regenerate_secret(
     }
 
 
-@router.delete("/clients/{client_id}")
-async def deactivate_client(
-    client_id: str,
-    user: User = RequireOauthAdmin,
-):
+@delete("/clients/{client_id:str}", status_code=200)
+async def deactivate_client(request: Request, client_id: FromPath[str]) -> dict:
+    user = await _require_oauth_admin(request)
     client = await get_oauth_client_by_client_id(client_id)
     if not client or client.created_by_uid != user.uid:
-        raise HTTPException(404, "Client not found")
+        raise HTTPException(status_code=404, detail="Client not found")
 
     now = datetime.now(UTC)
     await update_oauth_client(
@@ -890,3 +901,21 @@ async def deactivate_client(
     )
 
     return {"status": "deactivated", "client_id": client_id}
+
+
+router = Router(
+    "/oauth",
+    route_handlers=[
+        authorize_get,
+        authorize_post,
+        token_endpoint,
+        revoke_token,
+        userinfo,
+        list_consents,
+        revoke_consent,
+        register_client,
+        list_clients,
+        regenerate_secret,
+        deactivate_client,
+    ],
+)

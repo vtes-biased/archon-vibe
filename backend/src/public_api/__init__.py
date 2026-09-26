@@ -1,1 +1,1 @@
-"""The public read-only API — a separate FastAPI app, run as its own process."""
+"""The public read-only API — a separate Litestar app, run as its own process."""

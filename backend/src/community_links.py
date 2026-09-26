@@ -2,7 +2,7 @@
 
 import logging
 
-from fastapi import HTTPException
+from litestar.exceptions import HTTPException
 
 from . import permissions
 from .models import (
