@@ -84,11 +84,15 @@ result set is one call rather than one per player.
 **Every filter is served by an index, so the API can never crowd out the app**
 that shares its database: a filter that walked the type dropping rows would let a
 third party choose that load for us, and a sparse one reads the whole type to fill
-a batch. `country` rides `(country, uid)` indexes, the `start` bounds an index on
-the start text, and each rating `category` a partial index on `uid` — filter and
-stream order at once — which `objects_api_filter_stats` lets the planner price.
-Tournament `format` and `state` were dropped rather than indexed: each splits the
-corpus into a few large classes no index reads cheaper than the stream itself.
+a batch. `country` rides `(country, uid)` indexes and each rating `category` a
+partial index on `uid`, filter and stream order at once; the `start` bounds an
+index on the start text. The planner reads no statistics off a partial index's
+expression, so `objects_api_filter_stats` measures them — without it a bound
+matching a handful of events is priced as a third of the corpus and walks it all.
+There is no `format` or `state` filter: each splits the corpus into a few large
+classes no index reads cheaper than the stream itself. An unknown query parameter
+is ignored, not refused, so a filter the API does not have returns the whole
+stream.
 `tournament` runs the cheap direction of the relation: one primary-key read of
 the event, then a primary-key read per player it names, about ninety buffers for
 a thirteen-player event. The expensive direction, every event a given member

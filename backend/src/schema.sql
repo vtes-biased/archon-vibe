@@ -290,9 +290,10 @@ WHERE type = 'user' AND "full"->'limited_offline'->>'total' IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_objects_user_community_links
 ON objects(uid)
 WHERE type = 'user' AND "full"->'community_links' <> '[]'::jsonb;
--- Lets the planner price the five indexes above: unmeasured, each predicate looks near-universal.
+-- Lets the planner price the indexes above: a partial index's expression gets no statistics.
 CREATE STATISTICS IF NOT EXISTS objects_api_filter_stats
-ON ("full"->'constructed_online'->>'total'), ("full"->'constructed_offline'->>'total'),
+ON ("full"->>'country'), ("full"->>'start'),
+("full"->'constructed_online'->>'total'), ("full"->'constructed_offline'->>'total'),
 ("full"->'limited_online'->>'total'), ("full"->'limited_offline'->>'total'),
 ("full"->'community_links') FROM objects;
 -- A merge re-pointing the members the absorbed account co-opted.
