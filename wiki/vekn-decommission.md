@@ -7,8 +7,9 @@ condition someone could observe firing. `/upkeep` re-checks the triggers each
 pass; a fired trigger sends its item back through `/intake` as an ordinary board
 line.
 
-Both triggers are the retirement stages in [vekn](vekn.md#decommission), which is
-where what retires and in what order is settled.
+The first two triggers are the retirement stages in [vekn](vekn.md#decommission),
+which is where what retires and in what order is settled. The third is a fix on
+vekn.net's own side that our push waits on.
 
 While the tournament and member syncs are upstreams, anything deleted or diverged
 locally is re-created on their next run — that is what makes each of these
@@ -543,3 +544,40 @@ _29 members._
 | 3090014 | Zsolt Varga | **Prince** | Prince |
 
 _36 members._
+
+## Trigger: vekn.net's results upload accepts the rounds actually played
+
+### Push the results stuck on the calendar's round count
+
+vekn.net refuses a results upload whose round count differs from the calendar
+event's `rounds`: *"The provided number of rounds (N) do not match the expected
+number of rounds (M) from the calendar"*. The two numbers count different things —
+the archondata header counts preliminaries plus the final, the calendar's `rounds`
+leaves the final to its own `final` flag — so every event with a final disagrees
+by one. And an event created with no round cap is filed with the VEKN minimum of 2
+(or vekn.net holds 0), so an event that then plays three rounds disagrees further.
+Only vekn.net can reconcile them: its API offers no update to a calendar event's
+`rounds`, and the upload must report the games actually played.
+
+Stuck on prod on 2026-09-26, each retried by the hourly batch:
+
+| Tournament | vekn event | our `max_rounds` | rounds played | vekn.net: provided / expected |
+|---|---|---|---|---|
+| `019f1a1a-d496-738d-886f-14fc81c59f69` Twilight Camp 4': Hyper Champion Edition Plus | 13085 | 0 | 3 + final | 4 / 0 |
+| `019ff7e8-5715-7319-bc10-5dbcb2a422d5` Bleed À gosto | 13487 | 3 | 3 + final | 4 / 3 |
+| `019ff9eb-0619-76c7-b5c8-fedbf02baa3b` Crusade: Budapest VII. Forduló | 13488 | 2 | 2 + final | 3 / 2 |
+| `01a00503-1fbb-73e6-b7ca-3d3f10006224` Army of Rats (Dunakeszi) | 13495 | 2 | 2 + final | 3 / 2 |
+| `01a04be5-f71e-713b-861d-9133647c261d` "Pangil sa Pangil" | 13517 | 3 | 3 + final | 4 / 3 |
+| `01a068f7-6659-76b0-9453-889f254c4585` TCG Webshop Vampire League 2026 Round VII. | 13544 | 3 | 3 + final | 4 / 3 |
+| `01a06971-b39a-7643-b765-c5ee02acc1ad` 1ª Jornada Liga Anarcogaditana | 13546 | 2 | 2 + final | 3 / 2 |
+| `01a08d31-8f63-74fd-b6ca-7d0481ab345b` Mensal Itaocara 09 | 13565 | 2 | 2 + final | **2 / 3** |
+| `05b849ee-e63f-444f-8951-3afcd43b3b11` Summer End 2026 | 13455 | 0 | 3 + final | 4 / 2 |
+| `725ec964-3812-4f9f-a05f-11551401abc8` Old Friends 2 | 13450 | 0 | 2 + final | 3 / 2 |
+| `cfa5205e-144f-4f71-a22a-300c016732a2` Will of the Council 2 | 13449 | 0 | 3 + final | 4 / 2 |
+
+`Mensal Itaocara 09` is the outlier: its archondata says 3, yet vekn.net reports
+2 provided against 3 expected — worth raising with the VEKN API admins separately.
+
+**Trigger:** the VEKN API admins report the round check fixed, or an update of a
+calendar event's `rounds` opened to us. **Done when** the first hourly batch after
+it pushes all eleven and none of them logs the round-count refusal again.
