@@ -167,8 +167,8 @@ hourly batch drains the backlog. On top of that:
 - **Observability** — scheduled jobs record last success and error in process, and
   `GET /admin/vekn-status` (IC-gated) exposes member sync, tournament sync and
   batch push, so a days-long outage is visible without grepping logs. It resets on
-  restart. The batch's `errors` counts every member or results push that did not
-  land, refused or skipped, so a stuck item reads as non-zero every hour. Every such
+  restart. The batch's `errors` counts every member, event or results push that did
+  not land, refused or skipped, so a stuck item reads as non-zero every hour. Every such
   failure logs one line, `VEKN push failed: tournament=<uid> vekn_event=<id|->
   reason=…` or `… member=<vekn id> reason=…`, which the production dashboard's
   **VEKN push** tables group over the last two hours: the list to hand the VEKN API

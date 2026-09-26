@@ -492,6 +492,8 @@ async def batch_push(client: VEKNAPIClient) -> dict:
                 event_id = await push_tournament_event(client, t)
                 if event_id:
                     stats["events_created"] += 1
+                else:
+                    stats["errors"] += 1
             except VEKNAPIConnectionError:
                 raise
             except Exception:
