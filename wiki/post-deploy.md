@@ -48,21 +48,3 @@ sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
 Rerun with `--apply` once every before/after pair reads as noise only. It worked
 when a third run reports `0 of N`. Delete this section and
 `backend/scripts/strip_deck_comment_noise.py` together.
-
-## Clear the Spain stamped on legacy archon's events
-
-Gated by `a847352c`. From that commit the sync reads venue 3800, GoblinTrader
-Mallorca, as a placeholder for events from 2025 on; before it, every sync re-stamps
-Spain, so run this only once the deploy is live. A dev copy reported 69 such events
-(Budapest, Seville, Osnabrück, Itaocara…) beside the Antarctica rows the script
-already covered; 9511, held there in 2020, is left alone.
-
-```sh
-sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
-  /opt/archon/backend/.venv/bin/python \
-  /opt/archon/backend/scripts/clear_placeholder_venue_location.py'
-```
-
-Rerun with `--apply` on the owner's go/no-go. It worked when a third run reports
-`0 tournament(s)`. Tell the organizers it prints to re-enter their location, then
-delete this section.

@@ -581,15 +581,28 @@ fn is_counted_section(line: &str) -> bool {
 }
 
 fn is_revision_stamp(line: &str) -> bool {
-    let b = line.as_bytes();
-    b.len() == 12
-        && b[0] == b'['
-        && b[11] == b']'
-        && b[5] == b'-'
-        && b[8] == b'-'
-        && [1, 2, 3, 4, 6, 7, 9, 10]
+    let date = line.strip_prefix('[').unwrap_or(line);
+    let date = date.strip_suffix(']').unwrap_or(date);
+    let b = date.as_bytes();
+    date.len() < line.len()
+        && b.len() == 10
+        && b[4] == b'-'
+        && b[7] == b'-'
+        && [0, 1, 2, 3, 5, 6, 8, 9]
             .iter()
             .all(|&i| b[i].is_ascii_digit())
+}
+
+fn heads_text(rest: &[&str]) -> bool {
+    rest.iter()
+        .map(|l| l.trim())
+        .find(|l| !l.is_empty())
+        .is_some_and(|next| {
+            !is_revision_stamp(next)
+                && !next.get(..12).is_some_and(is_revision_stamp)
+                && !is_score_line(next)
+                && !is_rule(next)
+        })
 }
 
 fn is_score_line(line: &str) -> bool {
@@ -614,7 +627,6 @@ pub fn strip_deckbuilder_noise(comments: &str) -> String {
     for (i, raw) in lines.iter().enumerate() {
         let line = raw.trim();
         if line.is_empty() || is_revision_stamp(line) || is_score_line(line) || is_rule(line) {
-            block_end = i + 1;
             continue;
         }
         match header_field(line) {
@@ -641,17 +653,22 @@ pub fn strip_deckbuilder_noise(comments: &str) -> String {
         &lines[..]
     };
     let mut after_drop = false;
-    for raw in body {
+    let mut body_text = false;
+    for (i, raw) in body.iter().enumerate() {
         let line = raw.trim();
         if line.is_empty() {
             if !out.is_empty() && !(after_drop && out.last() == Some(&"")) {
                 out.push("");
             }
-        } else if is_revision_stamp(line) || is_score_line(line) || is_rule(line) {
+        } else if is_score_line(line)
+            || (is_revision_stamp(line) && !heads_text(&body[i + 1..]))
+            || (is_rule(line) && !body_text)
+        {
             after_drop = true;
         } else {
             out.push(raw.trim_end());
             after_drop = false;
+            body_text = true;
         }
     }
     while out.last().is_some_and(|l| l.is_empty()) {
@@ -959,7 +976,16 @@ mod tests {
         let stamped = "[2026-08-21] \n[2025-06-07] \noriginal author Frederic Pin\n";
         assert_eq!(
             strip_deckbuilder_noise(stamped),
-            "original author Frederic Pin"
+            "[2025-06-07]\noriginal author Frederic Pin"
+        );
+        let revised = "2025-04-22]\n[2024-05-12]\n[2025-10-29]\n- Remove last stand\n\
+            +1 Dust to Dust\n\n---------\nLatest Update\n*****did not do this*****\n\
+            +4 Protection Racket\n*******\nExtra options\n[2024-03-12\n";
+        assert_eq!(
+            strip_deckbuilder_noise(revised),
+            "[2025-10-29]\n- Remove last stand\n+1 Dust to Dust\n\n---------\n\
+            Latest Update\n*****did not do this*****\n+4 Protection Racket\n*******\n\
+            Extra options"
         );
         let described = "Deck Name: Wraith wall\nAuthor: ezmariel\n\
             Description: Gangrel wall with Garou\n\n=====\n\nTech: Deflection over Wake\n\
@@ -987,6 +1013,7 @@ mod tests {
             imported,
             twda_header,
             stamped,
+            revised,
             described,
             typed,
             archived,
