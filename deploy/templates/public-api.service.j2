@@ -13,6 +13,7 @@ User={{ name }}
 Group={{ name }}
 WorkingDirectory={{ backend_root }}
 EnvironmentFile={{ env_dir }}/{{ unit }}-public-api.env
+# One worker: the per-client throttle budgets are in-process, a second doubles them.
 ExecStart={{ backend_root }}/.venv/bin/uvicorn --fd 3 --log-level info --timeout-graceful-shutdown 5 backend.src.public_api.main:app
 # The NDJSON stream and bulk export hold a socket and a file fd per reader,
 # tight against the 1024 default — running out truncates responses mid-body.

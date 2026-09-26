@@ -42,7 +42,6 @@ async def _require_active_client(payload: dict) -> None:
 
 
 async def require_api_token(request: Request) -> str:
-    """The caller's `client_id`, the key every budget below is spent against."""
     authorization = request.headers.get("authorization")
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Missing or invalid authorization header", _CHALLENGE)
@@ -65,9 +64,6 @@ async def require_api_token(request: Request) -> str:
 
 
 class _Budget:
-    """nginx's `limit_req rate=… burst=… nodelay`, keyed on the client. Process-local:
-    a second uvicorn worker would silently double every budget."""
-
     def __init__(self, per_minute: int, burst: int) -> None:
         self.rate = per_minute / 60
         self.burst = burst

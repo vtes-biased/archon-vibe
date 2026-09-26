@@ -637,6 +637,10 @@ uvicorn wraps the inherited fd as `AF_UNIX`, so asyncio never sets `TCP_NODELAY`
 on accepted connections: the socket unit's `NoDelay=true` is what keeps small SSE
 writes off Nagle's delay, and a new socket-activated unit needs it too.
 
+**The public API must run one uvicorn worker.** Its per-client throttle budgets
+are process memory, so `--workers N` in its unit silently multiplies every budget
+by N and nothing fails — [public-api](public-api.md#deployment).
+
 **A request accepted at the SIGTERM instant can still 502.** uvicorn's shutdown
 closes every connection with no request cycle yet, and one accepted in the same
 loop tick already holds nginx's unread request, so the close sends a reset —
