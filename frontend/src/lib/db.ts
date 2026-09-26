@@ -322,7 +322,7 @@ export interface UserListItem {
 /** saveUser/saveUsersBatch/deleteUser/clearAllUsers must all patch this or search goes stale. */
 interface UserIndexEntry {
   user: UserListItem;
-  /** Word-prefix haystack: name, nickname, email and Discord handle tokens. */
+  /** Word-prefix haystack: name, nickname, city, email and Discord handle tokens. */
   tokens: string[];
   /** Normalized full name — ranking key, precomputed to stay out of sort comparators. */
   nameNorm: string;
@@ -367,6 +367,7 @@ function buildEntry(user: User): UserIndexEntry {
     tokens: [
       ...searchTokens(user.name),
       ...(user.nickname ? searchTokens(user.nickname) : []),
+      ...(user.city ? searchTokens(user.city) : []),
       ...(user.contact_email ? searchTokens(user.contact_email) : []),
       ...(user.contact_discord ? searchTokens(user.contact_discord) : []),
     ],
@@ -422,7 +423,7 @@ function sortSearchResults(entries: UserIndexEntry[], terms: string[]): UserList
   return entries.map(e => e.user);
 }
 
-/** Search is uniformly word-prefix; every term must open a name/nickname/email/Discord token or
+/** Search is uniformly word-prefix; every term must open a name/nickname/city/email/Discord token or
  * prefix an id. Mid-word matches are deliberately excluded — they read as a bug (e.g. "inc" hitting an email address). */
 export async function getFilteredUsers(
   country?: string,

@@ -553,7 +553,7 @@
                       <div class="text-sm text-ink-muted">
                         {user.country
                           ? `${getCountryFlag(user.country)} ${countries[user.country]?.name || user.country}`
-                          : m.common_na()}
+                          : m.common_na()}{user.city ? ` · ${user.city}` : ""}
                       </div>
                     </div>
                   </div>
@@ -584,6 +584,9 @@
                     {user.country
                       ? `${getCountryFlag(user.country)} ${countries[user.country]?.name || user.country}`
                       : m.common_na()}
+                    {#if user.city}
+                      <div class="text-xs text-ink-faint">{user.city}</div>
+                    {/if}
                   </div>
                   <div class="col-span-5">
                     {#if user.roles.length > 0}
