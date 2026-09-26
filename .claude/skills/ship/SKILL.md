@@ -8,6 +8,28 @@ description: Take a line off BOARD.md and land it as one change — code, wiki, 
 One line in, one change out. The unit of work is the **trinity**: code changed,
 doc-impact wiki pages updated, board line deleted — in one commit.
 
+## You are not alone in the tree
+
+Other agents work this checkout at the same time, on their own lines, and nothing
+announces them. Collisions are usually harmless. Read the tree, the index and HEAD
+as state that may have moved since you last looked, never as yours alone:
+
+- **A change you did not make is a sibling's work in progress, not debris.** Never
+  revert, stash, `git checkout --`, `git restore`, `git reset` or `git clean` it,
+  and never "fix" it, even when it breaks your build.
+- **A file can change between your read and your edit.** When an edit fails because
+  the content moved, re-read and re-apply your hunk. Never rewrite the file from
+  your stale copy.
+- **A red gate on paths you did not touch is someone mid-line.** Establish whether
+  the failure is yours before acting: is it in their files, and does it pass on
+  HEAD? If not yours, leave it and name it in the report.
+- **Tree-wide mutators run on your paths only.** `just lint` reformats everything
+  (`ruff --fix .`, `ruff format .`, `cargo fmt`): use `just lint-check`, or run the
+  formatter on your own files. The same goes for `dev-reset`, `clean` and lockfile
+  refreshes, which pull shared state out from under a sibling.
+
+The commit mechanics that keep your change and theirs apart are in step 1.
+
 ## 1. Claim the line
 
 ```sh
@@ -19,9 +41,8 @@ Take the **top** line unless the owner named a different one.
 Read its `board/<slug>.md` if it has one. Read the wiki pages the line touches, and
 `wiki/hazards.md` if it names any subsystem you are about to change.
 
-**Assume a sibling agent is working the board beside you.** Nothing announces one:
-`git status` is how you find out, so read it when you claim the line and again
-before every commit — foreign paths mean someone is mid-line. Say in chat which
+**`git status` is how you find a sibling.** Read it when you claim the line and
+again before every commit. Foreign paths mean someone is mid-line. Say in chat which
 line you are taking and keep to your own commits.
 
 **Commit explicit paths — `git commit -- <paths>`**, the only form that ignores
@@ -140,7 +161,7 @@ that made it dead rather than leaving it for the reviewer to demand.
 ## 4. Land the trinity
 
 **Code.** Run the gates that cover what you touched and confirm green — there are
-no red builds. `just test`, `just lint`, or the narrower target for the stack you
+no red builds. `just test`, `just lint-check`, or the narrower target for the stack you
 changed (`wiki/testing.md`).
 
 **Wiki.** Update the pages named at ingress in the same change. Pivots are edits:
