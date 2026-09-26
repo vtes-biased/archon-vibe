@@ -303,6 +303,13 @@ Beta's identity assets ship in the same artifact under `-beta` names —
 generated from `favicon-beta.svg` onto the `#2A2520` ground; they are committed
 assets, not a build step.
 
+The paths browsers and crawlers request without being told are real files in
+`frontend/static/`, so nginx serves them instead of logging an `open() failed`
+404 or answering the SPA fallback: `favicon.ico` (16/32/48 from `favicon.svg`),
+`apple-touch-icon-precomposed.png` (a copy of `apple-touch-icon.png`),
+`robots.txt` (everything allowed) and `.well-known/assetlinks.json` (`[]`, no
+Android app claims the domain). They name production on both hosts.
+
 Social crawlers reach an og stub through the nginx UA-split, which covers the bare
 `/`, the tournament, short-link, league and help paths — and only those; every
 other route previews from `app.html`'s static tags, which name production on both
