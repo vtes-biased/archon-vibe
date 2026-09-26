@@ -15,14 +15,14 @@ announces them. Collisions are usually harmless. Read the tree, the index and HE
 as state that may have moved since you last looked, never as yours alone:
 
 - **A change you did not make is a sibling's work in progress, not debris.** Never
-  revert, stash, `git checkout --`, `git restore`, `git reset` or `git clean` it,
-  and never "fix" it, even when it breaks your build.
+  discard it: no revert, stash, `git checkout --`, `git restore`, `git reset` or
+  `git clean` over it.
 - **A file can change between your read and your edit.** When an edit fails because
   the content moved, re-read and re-apply your hunk. Never rewrite the file from
   your stale copy.
-- **A red gate on paths you did not touch is someone mid-line.** Establish whether
-  the failure is yours before acting: is it in their files, and does it pass on
-  HEAD? If not yours, leave it and name it in the report.
+- **A red gate is yours to fix, whoever broke it.** "Not my change" is never a
+  reason to leave a build, test or lint failure standing. Fix it forward, even
+  inside a sibling's files, and name the fix in the report.
 - **Tree-wide mutators run on your paths only.** `just lint` reformats everything
   (`ruff --fix .`, `ruff format .`, `cargo fmt`): use `just lint-check`, or run the
   formatter on your own files. The same goes for `dev-reset`, `clean` and lockfile
