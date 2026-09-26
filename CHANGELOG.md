@@ -10,6 +10,10 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- You can now search the member list by city, and each member shows their city.
+
 ## v1.2.7 — 2026-09-26
 
 - Dropping out of a tournament now asks you to confirm first.
