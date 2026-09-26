@@ -255,7 +255,8 @@ are not reported: Fluent Bit cannot query it.
 service-account token (Editor) as `GRAFANA_TOKEN`, and `DISCORD_WEBHOOK` only to
 change the contact point. It lays out, in the stack's Archon folder, the **Archon
 production** dashboard — health at a glance, CPU, memory, network and disk with
-throughput, operations and stall per unit, units,
+throughput, operations and stall per unit, units (Fluent Bit left out of every
+panel: only the alerts watch it),
 the tournaments and members the VEKN push currently fails on with the reason
 ([vekn](vekn.md#outage-resilience)), and the logs filtered by unit, level and free
 text, where a user's uid finds their SSE connections and any error naming them —

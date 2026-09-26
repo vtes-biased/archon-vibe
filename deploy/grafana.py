@@ -9,6 +9,8 @@ GROUP = "archon"
 RECEIVER = "archon-discord"
 HOST = 'instance="archon.vekn.net"'
 UNITS = 'name=~"archon-.*|nginx.service|postgresql@.*|fluent-bit.*"'
+SHOWN_UNITS = 'name=~"archon-.*|nginx.service|postgresql@.*"'
+SHOWN = 'unit!~"fluent-bit.*"'
 
 RULES = [
     (
@@ -197,7 +199,7 @@ UNIT_STATE = {
     "targets": [
         {
             "refId": "A",
-            "expr": f'node_systemd_unit_state{{{HOST}, {UNITS}, state="active"}}',
+            "expr": f'node_systemd_unit_state{{{HOST}, {SHOWN_UNITS}, state="active"}}',
             "legendFormat": "{{name}}",
         }
     ],
@@ -343,7 +345,10 @@ LAYOUT = [
         ts(
             "CPU per unit",
             "percentunit",
-            (f"rate(archon_unit_cpu_seconds_total{{{HOST}}}[{RATE}])", "{{unit}}"),
+            (
+                f"rate(archon_unit_cpu_seconds_total{{{HOST}, {SHOWN}}}[{RATE}])",
+                "{{unit}}",
+            ),
             stack=True,
         ),
         8,
@@ -386,7 +391,7 @@ LAYOUT = [
         ts(
             "Memory per unit",
             "bytes",
-            (f"archon_unit_memory_bytes{{{HOST}}}", "{{unit}}"),
+            (f"archon_unit_memory_bytes{{{HOST}, {SHOWN}}}", "{{unit}}"),
             stack=True,
         ),
         8,
@@ -396,7 +401,7 @@ LAYOUT = [
         ts(
             "Swap per unit",
             "bytes",
-            (f"archon_unit_swap_bytes{{{HOST}}}", "{{unit}}"),
+            (f"archon_unit_swap_bytes{{{HOST}, {SHOWN}}}", "{{unit}}"),
             stack=True,
         ),
         8,
@@ -427,7 +432,7 @@ LAYOUT = [
             "Memory stall per unit",
             "percentunit",
             (
-                f"rate(archon_unit_memory_stalled_seconds_total{{{HOST}}}[{RATE}])",
+                f"rate(archon_unit_memory_stalled_seconds_total{{{HOST}, {SHOWN}}}[{RATE}])",
                 "{{unit}}",
             ),
         ),
@@ -484,11 +489,11 @@ LAYOUT = [
             "Disk throughput per unit",
             "Bps",
             (
-                f"rate(archon_unit_io_read_bytes_total{{{HOST}}}[{RATE}])",
+                f"rate(archon_unit_io_read_bytes_total{{{HOST}, {SHOWN}}}[{RATE}])",
                 "read {{unit}}",
             ),
             (
-                f"rate(archon_unit_io_written_bytes_total{{{HOST}}}[{RATE}])",
+                f"rate(archon_unit_io_written_bytes_total{{{HOST}, {SHOWN}}}[{RATE}])",
                 "write {{unit}}",
             ),
             overrides=TX_BELOW,
@@ -500,9 +505,12 @@ LAYOUT = [
         ts(
             "Disk operations per unit",
             "iops",
-            (f"rate(archon_unit_io_reads_total{{{HOST}}}[{RATE}])", "read {{unit}}"),
             (
-                f"rate(archon_unit_io_writes_total{{{HOST}}}[{RATE}])",
+                f"rate(archon_unit_io_reads_total{{{HOST}, {SHOWN}}}[{RATE}])",
+                "read {{unit}}",
+            ),
+            (
+                f"rate(archon_unit_io_writes_total{{{HOST}, {SHOWN}}}[{RATE}])",
                 "write {{unit}}",
             ),
             overrides=TX_BELOW,
@@ -515,7 +523,7 @@ LAYOUT = [
             "I/O stall per unit",
             "percentunit",
             (
-                f"rate(archon_unit_io_stalled_seconds_total{{{HOST}}}[{RATE}])",
+                f"rate(archon_unit_io_stalled_seconds_total{{{HOST}, {SHOWN}}}[{RATE}])",
                 "{{unit}}",
             ),
         ),
@@ -529,7 +537,7 @@ LAYOUT = [
             "Restarts",
             "none",
             (
-                f"increase(node_systemd_service_restart_total{{{HOST}, {UNITS}}}[1h]) > 0",
+                f"increase(node_systemd_service_restart_total{{{HOST}, {SHOWN_UNITS}}}[1h]) > 0",
                 "{{name}}",
             ),
             bars=True,
