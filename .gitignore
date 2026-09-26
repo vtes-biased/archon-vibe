@@ -81,14 +81,9 @@ backend/data/geonames_raw/
 # Incoming notes
 INCOMING/
 
-# Claude Code (user-specific settings and private memory)
+# Claude Code (user-specific settings)
 .claude/settings.local.json
 .claude/projects/
-# `memory: project` resolves `.claude/agent-memory/` relative to cwd, so an agent
-# run from a package subdir would otherwise write strays there. Each subdir's
-# `.claude/agent-memory` is a committed symlink back to the root one (../../.claude/
-# agent-memory), so subdir-cwd writes land in the tracked root memory. Keep per-subdir
-# local settings out of the tree:
 /*/.claude/settings.local.json
 
 # pyinfra deploy: downloaded release assets

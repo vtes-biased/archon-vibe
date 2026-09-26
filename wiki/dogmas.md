@@ -80,6 +80,11 @@ behavior not evident where it lives, traps for an agent without today's context.
 Prefer the design a fresh agent understands from the files in front of it. The
 standing traps are catalogued in [hazards](hazards.md).
 
+**Guards are for external input and runtime state**, never for our own committed
+config. A typo in a value we author fails loudly at deploy; a pre-flight over it
+is machinery without safety. Assert on user input, remote responses, secrets that
+a flag requires, and resources a step consumes.
+
 **Comments are for traps only.** The wiki holds the why, the code shows the how.
 A comment is justified only by a subtle non-local constraint invisible at the
 point of reading. No narration, no changelogs, no TODOs — discovered work goes
