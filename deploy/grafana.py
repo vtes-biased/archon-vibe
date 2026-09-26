@@ -9,7 +9,7 @@ GROUP = "archon"
 RECEIVER = "archon-discord"
 HOST = 'instance="archon.vekn.net"'
 UNITS = 'name=~"archon-.*|nginx.service|postgresql@.*|fluent-bit.*"'
-SHOWN_UNITS = 'name=~"archon-.*|nginx.service|postgresql@.*"'
+SHOWN_UNITS = f'{UNITS}, name!~"fluent-bit.*"'
 SHOWN = 'unit!~"fluent-bit.*"'
 
 RULES = [
@@ -72,7 +72,7 @@ RULES = [
 
 PROM = {"type": "prometheus", "uid": "grafanacloud-prom"}
 LOKI = {"type": "loki", "uid": "grafanacloud-logs"}
-LOGS = '{host="archon.vekn.net", unit=~"$unit", level=~"$level"} |~ "(?i)$search"'
+LOGS = f'{{host="archon.vekn.net", {SHOWN}, unit=~"$unit", level=~"$level"}} |~ "(?i)$search"'
 RATE = "$__rate_interval"
 LEVEL_COLORS = {
     "error": "red",
@@ -600,7 +600,11 @@ def dashboard() -> dict:
             "label": name.capitalize(),
             "type": "query",
             "datasource": LOKI,
-            "query": {"label": name, "stream": '{host="archon.vekn.net"}', "type": 1},
+            "query": {
+                "label": name,
+                "stream": f'{{host="archon.vekn.net", {SHOWN}}}',
+                "type": 1,
+            },
             "includeAll": True,
             "multi": True,
             "allValue": ".+",
