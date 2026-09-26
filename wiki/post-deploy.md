@@ -103,3 +103,20 @@ It worked when, after a minute's rest each time: A's 11 requests split across
 this machine and the beta box itself (`ssh deploy@57.129.110.107` with the same
 loop) 429 on the twelfth overall, exactly as from one address; and A then B, both
 from one address, each get their own 11 × 200. Nothing is owed after.
+
+## Check the `profile:email` grant on beta
+
+Gated by `4ca6cdf6`, which adds the scope ([access](access.md#oauth2-provider)).
+Before `just deploy-beta` carries it, beta refuses the scope as invalid. On
+`https://archon.krcg.org`, register the vekn-forum client from Developer with
+`profile:read` and `profile:email` checked, its purpose stated, and the forum's
+callback as redirect URI. Then sign in through it three times, asking for
+`profile:email`, for `profile:read`, and for `profile:email` as a member whose
+only address is the one on their profile, and read `/oauth/userinfo` with each
+access token.
+
+It worked when the first consent page shows the purpose under `profile:email`
+and its `userinfo` carries `sub`, `roles`, `vekn_id`, `capabilities` and the
+member's verified `email`; the other two carry no `email`. Owed after: the
+vekn-forum board line naming the archon `email` scope is deleted there, with its
+`wiki/archon.md` rewritten for `profile:email`.
