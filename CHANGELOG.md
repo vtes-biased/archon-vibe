@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.2.7 — 2026-09-26
 
 - Dropping out of a tournament now asks you to confirm first.
 - Links to a tournament on the old Archon now open that tournament here.
