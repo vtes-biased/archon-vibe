@@ -598,8 +598,10 @@ fn heads_text(rest: &[&str]) -> bool {
         .map(|l| l.trim())
         .find(|l| !l.is_empty())
         .is_some_and(|next| {
-            !is_revision_stamp(next)
-                && !next.get(..12).is_some_and(is_revision_stamp)
+            !next
+                .split_whitespace()
+                .next()
+                .is_some_and(is_revision_stamp)
                 && !is_score_line(next)
                 && !is_rule(next)
         })
@@ -978,12 +980,13 @@ mod tests {
             strip_deckbuilder_noise(stamped),
             "[2025-06-07]\noriginal author Frederic Pin"
         );
-        let revised = "2025-04-22]\n[2024-05-12]\n[2025-10-29]\n- Remove last stand\n\
+        let revised =
+            "2025-04-22]\n[2024-05-12]\n2024-05-01] typo\n[2025-10-29]\n- Remove last stand\n\
             +1 Dust to Dust\n\n---------\nLatest Update\n*****did not do this*****\n\
             +4 Protection Racket\n*******\nExtra options\n[2024-03-12\n";
         assert_eq!(
             strip_deckbuilder_noise(revised),
-            "[2025-10-29]\n- Remove last stand\n+1 Dust to Dust\n\n---------\n\
+            "2024-05-01] typo\n[2025-10-29]\n- Remove last stand\n+1 Dust to Dust\n\n---------\n\
             Latest Update\n*****did not do this*****\n+4 Protection Racket\n*******\n\
             Extra options"
         );

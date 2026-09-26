@@ -594,8 +594,8 @@ touched. It matches shapes, never a language's vocabulary, and biases to keeping
   block goes, keeps its value without the label — it is the description another
   deckbuilder held;
 - anywhere, a TWDA score line (`— 2GW8 …`); a bare `[YYYY-MM-DD]` revision stamp,
-  a bracket missing on either side, unless the next line is text — then it dates a
-  note the player typed under it;
+  a bracket missing on either side, unless the next non-blank line is text not
+  opening on a stamp itself — then it dates a note the player typed under it;
 - a rule of `=`, `-`, `_`, `*`, `~` or `#` only ahead of the body's first text:
   past it, it is a player's separator or the close of a block they marked.
 
