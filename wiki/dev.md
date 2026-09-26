@@ -265,7 +265,7 @@ a systemd socket unit of the same name (`<unit>-backend.socket`,
 across a deploy, a reboot or the daily `RuntimeMaxSec` restart the kernel queues
 connections instead of refusing them: a request landing in a restart waits the
 drain and startup — a few seconds, 3 s more on an automatic restart — rather than
-502ing. Both services order themselves after the running PostgreSQL cluster unit
+being refused ([hazards](hazards.md#deploy) keeps the one reset left). Both services order themselves after the running PostgreSQL cluster unit
 (`postgresql@<version>-main.service`), which the deploy reads off the box and refuses to
 guess when there is not exactly one; `postgresql.service` is a `/bin/true`
 placeholder that orders nothing. A deploy that finds a socket inactive, or its unit
