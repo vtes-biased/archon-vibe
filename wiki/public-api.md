@@ -333,9 +333,15 @@ verifies), one `DATABASE_URL`, one `SNAPSHOT_DIR` (or `/v1/export` has no file),
 and the app's `ENVIRONMENT` — without which its key guard reads `"development"`
 ([hazards](hazards.md#two-implementations-of-one-gate)).
 
-**Throttling lives on the vhost, never in a handler.** nginx sees the client and
-the app behind a proxy does not, and pacing a stream in Python would hold server
-resources longer to achieve what the proxy does for free.
+**Reads are throttled per client, in the API process; everything else on the
+vhost.** The budgets are keyed on the `client_id` the bearer token carries, daemon
+and member tokens alike, so a consumer spreading its sync over many addresses gets
+the same budget as one, and clients behind one NAT are not throttled as one. Only
+the process that verified the token can key on it: nginx's `limit_req` runs before
+anything could verify one, and a key read off an unverified token is forgeable.
+Where there is no token — `/oauth/token`, `/oauth/revoke`, `/docs` — nginx keys on
+the address. The app refuses; it never paces a stream, which would hold server
+resources longer to achieve what refusal does for free.
 
 **What is throttled is repetition, not size.** One full corpus read runs at full
 speed — "stream it all again" *is* the refresh model, so slowing a single read
@@ -343,13 +349,21 @@ punishes exactly the usage this API is designed around. There is deliberately no
 `limit_rate`. What is limited is pulling the corpus over and over in a tight
 window.
 
-| Directive | Value | Sized by |
+| Limit | Value | Sized by |
 |---|---|---|
-| `limit_req` on the six streaming routes | `rate=20r/m burst=10 nodelay` | egress: a whole refresh is five streams and ~7 MB gzipped (tournaments 5.3, users 1.1, decks 0.6, the rest rounding error), so 20r/m is four refreshes a minute, ~28 MB/min or 3.7 Mbit/s sustained from one address. The burst must clear a whole refresh or a legitimate one breaks halfway; ten leaves room for two |
-| `limit_conn` per address | 16 | a suspended stream holds one buffered batch (~1.8 MB) and **no** connection, so concurrency queues on the pool rather than exhausting it. Sixteen is ~29 MB and an eight-deep queue |
-| `limit_req` on everything else under `/v1` and on `/docs` | a separate, far more generous zone | single-row lookups; a client resolving a page of event codes bursts legitimately |
-| `limit_req` on the proxied `/oauth/token` and `/oauth/revoke` | `rate=30r/m burst=5 nodelay` | each runs an Argon2 verify of the client secret, so the cost is CPU on the app's box rather than egress here, and a client mints one token an hour. The generous read zone would let an address spend 600 Argon2 verifies a minute guessing a secret |
-| `limit_req_status`, `limit_conn_status` | 429 | nginx defaults to 503, which reads as "outage, retry" rather than "slow down" |
+| app, per client, on the six streaming routes | `20r/m burst=10`, nginx's `nodelay` semantics | egress: a whole refresh is five streams and ~7 MB gzipped (tournaments 5.3, users 1.1, decks 0.6, the rest rounding error), so 20r/m is four refreshes a minute, ~28 MB/min or 3.7 Mbit/s sustained per client. The burst must clear a whole refresh or a legitimate one breaks halfway; ten leaves room for two |
+| app, per client, on every `/v1` route | `600r/m burst=100` | single-row lookups; a client resolving a page of event codes bursts legitimately. A stream spends from it too, which is noise at this rate |
+| nginx `limit_req` per address on `/v1/` | `rate=3000r/m burst=500 nodelay` | a ceiling on traffic that reaches no budget above — a 401 still costs an Ed25519 verify. Five clients' lookup budgets, so clients sharing an address are not throttled as one |
+| nginx `limit_req` per address on `/docs`, `/openapi.json` and the banner | `rate=600r/m burst=100 nodelay` | no token; generous because a page of banners bursts legitimately |
+| nginx `limit_conn` per address | 16 | a suspended stream holds one buffered batch (~1.8 MB) and **no** connection, so concurrency queues on the pool rather than exhausting it. Sixteen is ~29 MB and an eight-deep queue |
+| nginx `limit_req` per address on the proxied `/oauth/token` and `/oauth/revoke` | `rate=30r/m burst=5 nodelay` | each runs an Argon2 verify of the client secret, so the cost is CPU on the app's box rather than egress here, and a client mints one token an hour. The generous read zone would let an address spend 600 Argon2 verifies a minute guessing a secret |
+| status | 429, with `Retry-After` from the app | nginx defaults to 503, which reads as "outage, retry" rather than "slow down"; `limit_req_status` and `limit_conn_status` set it |
+
+The app's budgets are in-process memory, which holds because the unit runs one
+uvicorn worker: a second worker would silently double every budget, and a restart
+resets them. A streaming route is one that declares the stream budget itself —
+**a new streaming route must declare it** or it is throttled as a lookup
+([access](access.md#deployment-gate)).
 
 Three locations are proxied to the **app** rather than the API process:
 `/oauth/token` and `/oauth/revoke`, so minting, revoking and reading share a
@@ -358,20 +372,11 @@ keep the app's path verbatim; a rewrite here would be a second place to change
 when any of them moves.
 
 The zones are `limit_req_zone`/`limit_conn_zone` and so live in a `conf.d` file —
-they are http-context directives and cannot go in the server block. The streams
-are matched **exactly**, so a single-object lookup under the same prefix falls
-through to the generous zone; **a new streaming route must be added to that list**
-or it is throttled as a lookup ([access](access.md#deployment-gate)). The vhost
+they are http-context directives and cannot go in the server block. The vhost
 also sets `gzip_types application/x-ndjson` with `gzip_proxied any` — the streams
 are the bulk of the egress and nginx skips proxied responses by default — and
 `proxy_buffering off`, or a reader taking the first N lines waits for the whole
 corpus, which is the documented top-N idiom.
-
-Per-address is the wrong unit, and knowingly so: behind NAT several clients are
-throttled as one, and one client on several addresses is not throttled at all. The
-daemon grant makes a better key possible — `client_id` is in the token — but that
-is token-aware work in the app, not nginx config. Generous limits are the
-mitigation until a real consumer proves it needs more.
 
 The figures are sized against the corpus of the day they were set (8249
 tournaments at ~7 KB): substantial growth moves the egress budget, and the rate

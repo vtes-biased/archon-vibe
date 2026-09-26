@@ -1,6 +1,6 @@
 # limit_*_zone only exists in the http context, hence conf.d and not the vhost.
-limit_req_zone $binary_remote_addr zone={{ zone }}_stream:10m rate=20r/m;
-# Single-row lookups: a client resolving a page of event codes bursts legitimately.
+# Above the app's per-client budgets, so clients sharing an address are not capped.
+limit_req_zone $binary_remote_addr zone={{ zone }}_v1:10m rate=3000r/m;
 limit_req_zone $binary_remote_addr zone={{ zone }}_read:10m rate=600r/m;
 # The two proxied endpoints that run an Argon2 verify per request: a client
 # secret is not something a caller retries at read speed.

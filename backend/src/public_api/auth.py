@@ -1,5 +1,8 @@
+import math
+import time
+
 import jwt
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 
 from ..jwt_config import AUDIENCE_API, decode
 from ..models import OAuthScope
@@ -38,7 +41,8 @@ async def _require_active_client(payload: dict) -> None:
         raise HTTPException(401, "Client is no longer active", _CHALLENGE)
 
 
-async def require_api_token(request: Request) -> None:
+async def require_api_token(request: Request) -> str:
+    """The caller's `client_id`, the key every budget below is spent against."""
     authorization = request.headers.get("authorization")
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Missing or invalid authorization header", _CHALLENGE)
@@ -57,3 +61,35 @@ async def require_api_token(request: Request) -> None:
             await _require_live_token(payload)
         case _:
             raise HTTPException(401, "Invalid token type", _CHALLENGE)
+    return payload["client_id"]
+
+
+class _Budget:
+    """nginx's `limit_req rate=… burst=… nodelay`, keyed on the client. Process-local:
+    a second uvicorn worker would silently double every budget."""
+
+    def __init__(self, per_minute: int, burst: int) -> None:
+        self.rate = per_minute / 60
+        self.burst = burst
+        self.spent: dict[str, tuple[float, float]] = {}
+
+    def spend(self, client_id: str) -> None:
+        now = time.monotonic()
+        excess, then = self.spent.get(client_id, (-1.0, now))
+        excess = max(-1.0, excess - (now - then) * self.rate) + 1
+        if excess > self.burst:
+            wait = math.ceil((excess - self.burst) / self.rate)
+            raise HTTPException(429, "Too many requests", {"Retry-After": str(wait)})
+        self.spent[client_id] = (excess, now)
+
+
+_LOOKUP = _Budget(per_minute=600, burst=100)
+_STREAM = _Budget(per_minute=20, burst=10)
+
+
+async def lookup_budget(client_id: str = Depends(require_api_token)) -> None:
+    _LOOKUP.spend(client_id)
+
+
+async def stream_budget(client_id: str = Depends(require_api_token)) -> None:
+    _STREAM.spend(client_id)

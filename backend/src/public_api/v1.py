@@ -8,15 +8,17 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 from ..models import ObjectType, RatingCategory
 from ..snapshots import get_snapshot_path
-from .auth import require_api_token
+from .auth import lookup_budget, stream_budget
 from .db import get_connection
 from .schemas import NDJSON, responds, streams
 
 router = APIRouter(
     prefix="/v1",
     tags=["Public API"],
-    dependencies=[Depends(require_api_token)],
+    dependencies=[Depends(lookup_budget)],
 )
+
+_STREAM = [Depends(stream_budget)]
 
 _BATCH = 250
 _VISIBLE = '"api" IS NOT NULL AND deleted_at IS NULL'
@@ -108,7 +110,11 @@ def _object_batches(
     )
 
 
-@router.get("/tournaments", openapi_extra=streams("Tournament", "tournament"))
+@router.get(
+    "/tournaments",
+    openapi_extra=streams("Tournament", "tournament"),
+    dependencies=_STREAM,
+)
 async def list_tournaments(
     country: str | None = None,
     start_after: str | None = None,
@@ -157,7 +163,7 @@ async def get_tournament(code_or_uid: str) -> Response:
     return _json(row[0])
 
 
-@router.get("/leagues", openapi_extra=streams("League", "league"))
+@router.get("/leagues", openapi_extra=streams("League", "league"), dependencies=_STREAM)
 async def list_leagues() -> StreamingResponse:
     """Every league, newest first."""
     return _ndjson(
@@ -180,7 +186,7 @@ async def get_league(uid: str) -> Response:
     return _json(row[0])
 
 
-@router.get("/users", openapi_extra=streams("User", "user"))
+@router.get("/users", openapi_extra=streams("User", "user"), dependencies=_STREAM)
 async def list_users(
     country: str | None = None,
     category: RatingCategory | None = None,
@@ -233,7 +239,7 @@ async def get_user(uid_or_vekn_id: str) -> Response:
     return _json(row[0])
 
 
-@router.get("/decks", openapi_extra=streams("DeckObject", "deck"))
+@router.get("/decks", openapi_extra=streams("DeckObject", "deck"), dependencies=_STREAM)
 async def list_decks(tournament: str | None = None) -> StreamingResponse:
     """Every published deck, newest first. `tournament` is a tournament uid."""
     filters: list[str] = []
@@ -253,6 +259,7 @@ async def list_decks(tournament: str | None = None) -> StreamingResponse:
 @router.get(
     "/community-links",
     openapi_extra=streams("CommunityLinkEntry", "community_link"),
+    dependencies=_STREAM,
 )
 async def list_community_links() -> StreamingResponse:
     """Every member's community links, one line per link.
@@ -285,6 +292,7 @@ async def list_community_links() -> StreamingResponse:
 
 @router.get(
     "/export",
+    dependencies=_STREAM,
     openapi_extra={
         "responses": {
             "200": {

@@ -361,6 +361,6 @@ plus the legacy `/tournament/<uid>/display.html` redirect.
 A new route under an existing prefix is fine; **a new top-level segment 404s in
 production while passing dev CORS and tests**.
 
-The public API's vhost is a second, tighter allowlist of the same kind, and a new
-streaming route must be named in it or it is throttled as a single-row lookup —
-[public-api](public-api.md#deployment).
+The public API's vhost is a second, tighter allowlist of the same kind. A new
+streaming route passes it under `/v1/`, but must declare the stream budget or it is
+throttled as a single-row lookup — [public-api](public-api.md#deployment).
