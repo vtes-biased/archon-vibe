@@ -30,46 +30,6 @@ answers whether a given deploy has made it actionable — the same check
 gates it and why, what to run, what proves it worked, and what it owes afterwards:
 people to tell, and the wiki text that dies with it.
 
-## Audit results across vekn.net, the TWDA and Archon after the first tournament sync
-
-Gated by `8db70191`, which ships the script and the round-count and archive rules,
-and by `7836e944`'s legacy-sheet rules before it. The sync rewrites the stored rows
-only on the first tournament sync after the deploy (or the admin *Run now*); a
-check before that reads the old imports. The audit scans vekn.net itself (about a
-minute) and peaks around 150 MB, so run it with the box quiet.
-
-```sh
-sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
-  /opt/archon/backend/.venv/bin/python \
-  /opt/archon/backend/scripts/audit_results.py' > /tmp/audit-results.txt
-head -20 /tmp/audit-results.txt
-```
-
-Then the two checks the legacy-sheet rules owe, nothing to run but the queries:
-
-```sql
-SELECT "full"->'external_ids'->>'vekn' AS vekn
-FROM objects
-WHERE type = 'tournament' AND "full"->'external_ids' ? 'vekn'
-  AND jsonb_array_length("full"->'standings')
-      <> (SELECT count(DISTINCT s->>'user_uid')
-          FROM jsonb_array_elements("full"->'standings') s);
-
-SELECT count(*) FILTER (WHERE (s->>'gw')::float = 0) AS winners_at_zero,
-       count(*) AS winners
-FROM objects t, jsonb_array_elements(t."full"->'standings') s
-WHERE t.type = 'tournament' AND t."full"->'external_ids' ? 'vekn'
-  AND t."full"->>'start' < '2011' AND s->>'user_uid' = t."full"->>'winner';
-```
-
-It worked when the summary holds no `ours prelim-gw` line — the six rows over their
-round count on 2026-09-23 (7300, 7396, 8450, 9474, 9667, 11962) are gone after the
-re-sync — the first query returns no rows (vekn events 9915, 7713, 8754, 5793, 6580,
-9166 and 2804 among them), and the second reads about 520 winners at 0 prelim GW
-out of about 2,980, against about 65 before. Report all three to the owner, put the
-audit's counts in the table in [vekn](vekn.md#results-across-the-three-sources) in
-place of its pre-sync row, and delete this section.
-
 ## Strip deckbuilder noise from the deck comments stored before it
 
 Gated by `d24e5f4d`. A deck-link import strips the deckbuilder's noise from that
@@ -88,23 +48,6 @@ sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
 Rerun with `--apply` once every before/after pair reads as noise only. It worked
 when a third run reports `0 of N`. Delete this section and
 `backend/scripts/strip_deck_comment_noise.py` together.
-
-## Production's env files load silently in bash
-
-Gated by `d15b90f9`, which single-quotes every value `deploy/deploy.py` writes.
-The deploy runs from the checkout, not the release, so it takes the next
-`just deploy-prod` from a tree containing that commit to rewrite the backend, bot
-and public API env files and restart the three units; a check before that reads
-the unquoted files. Proof, on the box — no output from any load, three `active`,
-and `0` per unit:
-
-```sh
-for f in backend bot public-api; do sudo -u archon bash -c "set -a; . /etc/archon/archon-$f.env; set +a"; done
-systemctl is-active archon-backend archon-bot archon-public-api
-for u in backend bot public-api; do sudo cat /proc/$(systemctl show -p MainPID --value archon-$u)/environ | tr '\0' '\n' | grep -c "='"; done
-```
-
-Nothing is owed afterwards.
 
 ## Clear the Spain stamped on legacy archon's events
 

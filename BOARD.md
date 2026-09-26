@@ -25,3 +25,5 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 
 Board changes ride the commit that earns them.
 
+
+- Classify the audit drift since the 2026-09-23 table in [vekn](wiki/vekn.md#results-across-the-three-sources) and refresh it from a fresh prod `audit_results.py` run: the 2026-09-26 run read vekn/twda winner 77 (table: 28), archon/vekn field 29 and archon/twda field 5 (no row), archon/vekn prelim 8 (table: 2), winner 7 + finalists 13 (table: 15), rounds 7 (table: 6) — likely the 76 merged reconstructions now compared, unverified.

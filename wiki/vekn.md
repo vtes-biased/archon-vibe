@@ -400,8 +400,8 @@ each disagreement under its class. It reads a vekn.net sheet through the importe
 so what the rules already correct does not show.
 
 *(Measured 2026-09-23 on production, 9,486 finished events against a full vekn.net
-scan and the archive, before the first sync that applies the rules
-[above](#tournaments) — which only the stored-row line moves.)*
+scan and the archive. The first sync applying the rules [above](#tournaments)
+left no GW above a known round count on a stored row.)*
 
 | Class | Found | What stands |
 |---|---|---|
@@ -413,8 +413,7 @@ scan and the archive, before the first sync that applies the rules
 | vekn.net vs archive: round count, field size, winner's score line | 36, 173, 92 | vekn.net |
 | vekn.net vs archive: the winner's name | 28 | vekn.net's winner, under the name Archon holds |
 | An archive reconstruction of an event vekn.net holds | 79 | merged into the vekn.net copy, three excepted |
-| A GW above a known round count, once imported | 0 | — |
-| A GW above a known round count, as stored before that sync | 6 | corrected by that sync |
+| A GW above a known round count | 0 | — |
 
 **The winner's name is Archon's.** A member may change their name here, so an
 archive entry naming the winner differently is no disagreement about who won.
