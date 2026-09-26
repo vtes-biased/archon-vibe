@@ -356,7 +356,8 @@ insert can therefore crash on a reserved number.
 ## Deployment gate
 
 Production nginx proxies **only an allowlist of path prefixes** to FastAPI:
-`/api`, `/auth`, `/oauth`, `/vekn`, `/sanctions`, `/admin`, `/snapshot`, `/stream`.
+`/api`, `/auth`, `/oauth`, `/vekn`, `/sanctions`, `/admin`, `/snapshot`, `/stream`,
+plus the legacy `/tournament/<uid>/display.html` redirect.
 A new route under an existing prefix is fine; **a new top-level segment 404s in
 production while passing dev CORS and tests**.
 

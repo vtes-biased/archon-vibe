@@ -8,6 +8,7 @@ import { build, files, version } from '$service-worker';
 const sw = globalThis.self as unknown as ServiceWorkerGlobalScope;
 const CACHE = `cache-${version}`;
 const ASSETS = [...build, ...files];
+const LEGACY_DISPLAY = /^\/tournament\/[^/]+\/display\.html$/;
 
 sw.addEventListener('install', (event) => {
   event.waitUntil(
@@ -42,6 +43,7 @@ sw.addEventListener('fetch', (event) => {
     // Allow-list: only precached assets and SPA navigations use Cache Storage;
     // every other same-origin GET passes through untouched, so authenticated
     // responses never get cached.
+    if (event.request.mode === 'navigate' && LEGACY_DISPLAY.test(url.pathname)) return;
     if (ASSETS.includes(url.pathname) || event.request.mode === 'navigate') {
       event.respondWith(respondFromCache(event.request, url));
     }

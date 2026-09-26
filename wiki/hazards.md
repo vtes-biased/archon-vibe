@@ -650,6 +650,12 @@ Litestar changes the server underneath.
 under an existing prefix is fine; a new top-level segment 404s in production while
 passing dev CORS and the test suite ([access](access.md#deployment-gate)).
 
+**The service worker answers every same-origin navigation with the SPA shell.**
+A path a user navigates to that nginx or the backend answers, rather than the SPA,
+must be excluded in `service-worker.ts`, or every device that has opened the app
+before gets the in-app 404 while `curl` shows the route working. The legacy
+`/tournament/<uid>/display.html` redirect is excluded there.
+
 **A superseded PostgreSQL cluster left enabled steals 5432 at the next boot**, and
 nothing in the stack can tell you it happened. Both clusters are configured for
 5432; whichever systemd starts first wins and the other dies on *could not create
