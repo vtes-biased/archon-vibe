@@ -83,3 +83,23 @@ just setup-prod
 
 It worked when, in the vtesbiased Loki, `{host="archon.vekn.net", unit="nginx.service"} |= "request: " |~ "[?&](token|code)=[^*&]"`
 returns nothing from after the run. Nothing is owed after.
+
+## Check the per-client API throttle on beta
+
+Gated by `17a036ac`, which moves the public API's stream and lookup budgets from
+nginx's per-address zones into the API process, keyed on the token's `client_id`
+([public-api](public-api.md#deployment)). Before that deploy beta still throttles
+per address, so the counts below prove nothing. Run on `https://api.archon.krcg.org`
+after `just deploy-beta`, with two `api:read` clients registered there (A, B), each
+minting a daemon token through `/oauth/token` into `$TOKEN_A` / `$TOKEN_B`:
+
+```sh
+burst() { for i in $(seq 1 15); do curl -s -o /dev/null -w '%{http_code} ' \
+  -H "Authorization: Bearer $1" https://api.archon.krcg.org/v1/leagues; done; echo; }
+burst "$TOKEN_A"                       # from here: 11 × 200, then 429
+```
+
+It worked when, after a minute's rest each time: A's 11 requests split across
+this machine and the beta box itself (`ssh deploy@57.129.110.107` with the same
+loop) 429 on the twelfth overall, exactly as from one address; and A then B, both
+from one address, each get their own 11 × 200. Nothing is owed after.
