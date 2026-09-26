@@ -10,6 +10,12 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- Dropping out of a tournament now asks you to confirm first.
+- Links to a tournament on the old Archon now open that tournament here.
+- A tab left open while Archon is updated no longer breaks.
+
 ## v1.2.5 — 2026-09-25
 
 - The tournament page is tidier: its details fold into one panel, and organizers edit them from a Setup tab.
