@@ -625,6 +625,25 @@ drifting restart happens to land on loses that day's run; every one of these job
 is idempotent, which is why that is tolerable rather than something to build
 around.
 
+**An HTTP unit behind nginx takes its port from a socket unit, not from
+uvicorn.** The app's and the public API's ports belong to `<unit>-backend.socket`
+and `<unit>-public-api.socket`; the services only inherit them. Three things
+follow. `systemctl stop` on the service no longer takes it down — the next
+connection starts it again — so stopping for real means stopping the `.socket`
+too. Restarting the `.socket` is the one operation that refuses connections. And
+uvicorn wraps the inherited fd as `AF_UNIX`, so asyncio never sets `TCP_NODELAY`
+on accepted connections: the socket unit's `NoDelay=true` is what keeps small SSE
+writes off Nagle's delay, and a new socket-activated unit needs it too.
+
+**A request accepted at the SIGTERM instant can still 502.** uvicorn's shutdown
+closes every connection with no request cycle yet, and one accepted in the same
+loop tick already holds nginx's unread request, so the close sends a reset —
+measured on beta at about one request every few restarts under 25 req/s. The
+socket unit cannot help: the connection has left its queue. Draining accepted
+connections first means overriding uvicorn's `Server.shutdown`, a non-public
+method, so it was left open: re-explore it when switching from FastAPI to
+Litestar changes the server underneath.
+
 **Production nginx proxies only an allowlist of top-level prefixes.** A new route
 under an existing prefix is fine; a new top-level segment 404s in production while
 passing dev CORS and the test suite ([access](access.md#deployment-gate)).

@@ -325,7 +325,9 @@ without a token.
 A second systemd unit off the **backend's own wheel and venv** — nothing is
 installed for it — on its own vhost at `api.<domain>`. The unit is `PartOf` the
 backend's, so the deploy that restarts the app for a new wheel restarts this
-process too; without that it would serve yesterday's code. Its environment is
+process too; without that it would serve yesterday's code. Its port is held by
+its own socket unit, like the app's, so that restart queues requests rather than
+refusing them ([dev](dev.md#deployment)). Its environment is
 derived from the app's rather than repeated: `JWT_PUBLIC_KEYS` off the app's (or no token it is handed ever
 verifies), one `DATABASE_URL`, one `SNAPSHOT_DIR` (or `/v1/export` has no file),
 and the app's `ENVIRONMENT` — without which its key guard reads `"development"`

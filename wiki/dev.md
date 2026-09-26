@@ -179,7 +179,7 @@ pins a release and `BUILD_DIR` deploys a local build (a `frontend-dist/`
 directory there is packed in place of the release tarball). `deploy/deploy.py`
 derives every path, unit and database from the environment's `name` in
 `deploy/group_data/`, which holds what differs between environments. A service
-restarts only when its wheel, requirements, env file or unit changed; the venv
+restarts only when its wheel, requirements, env file or units changed; the venv
 install and the frontend swap compare a marker on the box with the hash of what
 is deployed, so re-running a deploy that failed halfway finishes it. The backend,
 public-API and bot env files single-quote every value, so they load cleanly in bash
@@ -253,11 +253,23 @@ the image's account, is kept for `id_archon`. Kernel reboots are never
 automatic: tournaments run in every timezone, so `setup-prod` warns when one is
 pending and a person picks the moment to run `just reboot-prod`.
 
-Three units and three vhosts per environment: the app, the Discord bot, and the
+Three services and three vhosts per environment: the app, the Discord bot, and the
 **public read API**, which installs nothing of its own — it runs a second uvicorn
 off the backend's wheel and venv, is `PartOf` the backend unit so a wheel restart
 reaches it, and owns the only vhost carrying rate limits
 ([public-api](public-api.md#deployment)).
+
+**Backend restarts are gapless.** The app and the public API take their port from
+a systemd socket unit of the same name (`<unit>-backend.socket`,
+`<unit>-public-api.socket`) and uvicorn serves the inherited fd (`--fd 3`), so
+across a deploy, a reboot or the daily `RuntimeMaxSec` restart the kernel queues
+connections instead of refusing them: a request landing in a restart waits the
+drain and startup — a few seconds, 3 s more on an automatic restart — rather than
+502ing. Both services order themselves after the running PostgreSQL cluster unit
+(`postgresql@17-main.service`), which the deploy reads off the box and refuses to
+guess when there is not exactly one; `postgresql.service` is a `/bin/true`
+placeholder that orders nothing. A deploy that finds a socket inactive hands the
+port over itself — stop the service, enable the socket, start the service.
 
 Nothing auto-deploys, and there is no public version endpoint — never sniff the app
 for a version.

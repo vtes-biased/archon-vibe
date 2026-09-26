@@ -146,18 +146,51 @@ def venv(
     )
 
 
-def service(service_name: str, template: str, changes: list, **values):
-    unit_file = put(template, f"/etc/systemd/system/{service_name}.service", **values)
+def service(
+    service_name: str, template: str, changes: list, port: int | None = None, **values
+):
+    units = [put(template, f"/etc/systemd/system/{service_name}.service", **values)]
+    if port is not None:
+        units.append(
+            put(
+                "listen.socket.j2",
+                f"/etc/systemd/system/{service_name}.socket",
+                service_name=service_name,
+                port=port,
+            )
+        )
     systemd.daemon_reload(
-        name=f"Reload units for {service_name}", _if=unit_file.did_change
+        name=f"Reload units for {service_name}", _if=any_changed(*units)
     )
+    handover = port is not None and (
+        host.get_fact(Command, f"systemctl is-active {service_name}.socket || true")
+        != "active"
+    )
+    if handover:
+        # facts predate every op: a running=True after this stop would read "running" and skip
+        server.shell(
+            name=f"Hand {service_name}'s port to its socket",
+            commands=[
+                f"systemctl stop {service_name}.service",
+                f"systemctl enable --now {service_name}.socket",
+                f"systemctl start {service_name}.service",
+            ],
+        )
+    elif port is not None:
+        systemd.service(
+            name=f"{service_name} socket",
+            service=f"{service_name}.socket",
+            running=True,
+            enabled=True,
+        )
     systemd.service(name=service_name, service=service_name, running=True, enabled=True)
-    systemd.service(
-        name=f"Restart {service_name}",
-        service=service_name,
-        restarted=True,
-        _if=any_changed(unit_file, *changes),
-    )
+    if not handover:
+        systemd.service(
+            name=f"Restart {service_name}",
+            service=service_name,
+            restarted=True,
+            _if=any_changed(*units, *changes),
+        )
 
 
 # --- Runtime user and directories
@@ -213,6 +246,18 @@ if not any(
     )
 
 postgres_db(database=name, owner=name)
+postgres_units = (
+    host.get_fact(
+        Command,
+        "systemctl list-units --plain --no-legend --state=active 'postgresql@*.service' | awk '{print $1}'",
+    )
+    or ""
+).split()
+if len(postgres_units) != 1:
+    raise RuntimeError(
+        f"expected one running PostgreSQL cluster, found {postgres_units}"
+    )
+postgres_unit = postgres_units[0]
 
 # --- Certificates
 
@@ -364,9 +409,10 @@ service(
     name=name,
     unit=unit,
     backend_root=backend_root,
+    port=d.backend_port,
     env_dir=env_dir,
-    backend_port=d.backend_port,
     lib_dir=lib_dir,
+    postgres_unit=postgres_unit,
 )
 
 # --- Public read API: a second unit off the backend's venv
@@ -396,8 +442,9 @@ if d.public_api:
         name=name,
         unit=unit,
         backend_root=backend_root,
+        port=d.api_port,
         env_dir=env_dir,
-        api_port=d.api_port,
+        postgres_unit=postgres_unit,
     )
 
 # --- Discord bot

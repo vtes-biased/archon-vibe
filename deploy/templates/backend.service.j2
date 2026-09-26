@@ -1,6 +1,7 @@
 [Unit]
 Description={{ unit }}-backend (archon FastAPI backend)
-After=network-online.target postgresql.service
+After=network-online.target {{ postgres_unit }} {{ unit }}-backend.socket
+Requires={{ unit }}-backend.socket
 Wants=network-online.target
 
 [Service]
@@ -9,7 +10,7 @@ User={{ name }}
 Group={{ name }}
 WorkingDirectory={{ backend_root }}
 EnvironmentFile={{ env_dir }}/{{ unit }}-backend.env
-ExecStart={{ backend_root }}/.venv/bin/uvicorn --host 127.0.0.1 --port {{ backend_port }} --log-level info --timeout-graceful-shutdown 5 backend.src.main:app
+ExecStart={{ backend_root }}/.venv/bin/uvicorn --fd 3 --log-level info --timeout-graceful-shutdown 5 backend.src.main:app
 # A 200-client burst costs a socket plus a snapshot fd per client, under 2x
 # headroom at the 1024 default — running out truncates responses mid-body.
 LimitNOFILE=65536
