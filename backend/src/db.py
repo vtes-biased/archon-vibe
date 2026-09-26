@@ -90,7 +90,7 @@ async def init_db() -> None:
         min_size=2,
         max_size=POOL_MAX_SIZE,
         open=False,
-        kwargs={"autocommit": True},
+        kwargs={"autocommit": True, "application_name": "archon-backend"},
     )
     await _pool.open()
 

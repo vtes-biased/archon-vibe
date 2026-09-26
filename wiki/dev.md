@@ -227,13 +227,32 @@ counters, where a failing log shipment shows. A `fluent-bit-units` loop writes a
 textfile every 15 s with the host's CPU, memory and I/O pressure and, per unit, its
 cgroup memory, swap, CPU and memory stall as `archon_unit_*{unit=…}` — per unit
 rather than per process, since the backend and the public API are both `uvicorn`
-and every PostgreSQL connection is a new pid. PostgreSQL's internals are not
-reported: Fluent Bit cannot query it. The loop is capped at 10 MB.
+and every PostgreSQL connection is a new pid. Beside them go each unit's disk I/O:
+`archon_unit_io_read_bytes_total`, `…_written_bytes_total`, `…_reads_total`,
+`…_writes_total` and `…_io_stalled_seconds_total` (full stall). They need the
+cgroup `io` controller, which `setup.py` turns on with `DefaultIOAccounting=yes`
+and a `daemon-reexec` — a plain reload reads the setting but leaves running units
+without it. Page-cache writeback is charged to the unit that dirtied the page, so
+PostgreSQL's checkpoints land on PostgreSQL. The nightly `postgres-backup.service`
+is tracked while it runs, but Fluent Bit scrapes every 60 s: a run under two
+minutes leaves at most one point and no rate. The loop is capped at 10 MB.
+
+**PostgreSQL logs to the journal through syslog** (`log_destination`, set in
+`setup.py`: Debian's cluster wrapper otherwise sends it to a file under
+`/var/log/postgresql` Fluent Bit never reads), so its lines reach Loki as
+`unit="postgresql@17-main.service"`. server-setup's conf.d logs statements over a
+second, lock waits, autovacuum runs over a second, checkpoints, DDL and temp files
+over 10 MB; the prefix `[%p] %q%a %u@%d ` names the connection's application —
+`archon-backend` or `archon-public-api`, set on each pool, and `pg_dump` for the
+backup. Syslog shifts PostgreSQL's severities down one step, so its `ERROR` lines
+carry `level="warning"` and a plain `LOG` line `info`. Its internal statistics
+are not reported: Fluent Bit cannot query it.
 
 **`deploy/grafana.py` owns production's Grafana side**, applied with a
 service-account token (Editor) as `GRAFANA_TOKEN`, and `DISCORD_WEBHOOK` only to
 change the contact point. It lays out, in the stack's Archon folder, the **Archon
-production** dashboard — health at a glance, CPU, memory, network and disk, units,
+production** dashboard — health at a glance, CPU, memory, network and disk with
+throughput, operations and stall per unit, units,
 the tournaments and members the VEKN push currently fails on with the reason
 ([vekn](vekn.md#outage-resilience)), and the logs filtered by unit, level and free
 text, where a user's uid finds their SSE connections and any error naming them —

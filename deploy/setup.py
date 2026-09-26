@@ -5,7 +5,7 @@ import server_setup as s
 from pyinfra import host, logger
 from pyinfra.facts.files import File
 from pyinfra.facts.server import LinuxDistribution
-from pyinfra.operations import apt, files, systemd
+from pyinfra.operations import apt, files, server, systemd
 from pyinfra.operations.util import any_changed
 from server_setup.secrets import load, put_secret
 
@@ -25,11 +25,24 @@ s.nginx()
 s.ssh()
 s.firewall()
 s.swap()
+io_accounting = files.put(
+    name="Per-unit I/O accounting",
+    src=StringIO("[Manager]\nDefaultIOAccounting=yes\n"),
+    dest="/etc/systemd/system.conf.d/io-accounting.conf",
+    mode="644",
+)
+server.shell(
+    name="Re-execute systemd for I/O accounting",
+    commands=["systemctl daemon-reexec"],
+    _if=io_accounting.did_change,
+)
 s.postgres_config(
     settings={
         "shared_buffers": "96MB",
         "max_connections": "20",
         "effective_cache_size": "384MB",
+        "log_destination": "syslog",
+        "log_line_prefix": "[%p] %q%a %u@%d ",
     }
 )
 s.postgres_backups(

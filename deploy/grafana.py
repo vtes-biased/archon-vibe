@@ -479,6 +479,49 @@ LAYOUT = [
         8,
         8,
     ),
+    (
+        ts(
+            "Disk throughput per unit",
+            "Bps",
+            (
+                f"rate(archon_unit_io_read_bytes_total{{{HOST}}}[{RATE}])",
+                "read {{unit}}",
+            ),
+            (
+                f"rate(archon_unit_io_written_bytes_total{{{HOST}}}[{RATE}])",
+                "write {{unit}}",
+            ),
+            overrides=TX_BELOW,
+        ),
+        8,
+        8,
+    ),
+    (
+        ts(
+            "Disk operations per unit",
+            "iops",
+            (f"rate(archon_unit_io_reads_total{{{HOST}}}[{RATE}])", "read {{unit}}"),
+            (
+                f"rate(archon_unit_io_writes_total{{{HOST}}}[{RATE}])",
+                "write {{unit}}",
+            ),
+            overrides=TX_BELOW,
+        ),
+        8,
+        8,
+    ),
+    (
+        ts(
+            "I/O stall per unit",
+            "percentunit",
+            (
+                f"rate(archon_unit_io_stalled_seconds_total{{{HOST}}}[{RATE}])",
+                "{{unit}}",
+            ),
+        ),
+        8,
+        8,
+    ),
     (row("Services"), 24, 1),
     (UNIT_STATE, 16, 7),
     (

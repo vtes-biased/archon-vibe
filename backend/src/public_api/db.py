@@ -28,6 +28,7 @@ async def open_pool() -> None:
         open=False,
         kwargs={
             "autocommit": True,
+            "application_name": "archon-public-api",
             "options": f"-c statement_timeout={STATEMENT_TIMEOUT_MS}",
         },
     )

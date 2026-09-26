@@ -68,3 +68,25 @@ sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
 It worked when `EXPLAIN` of `/v1/tournaments?start_after=<last month>` names
 `idx_objects_tournament_start` in its `Index Cond`
 ([architecture](architecture.md#indexes) has the recipe). Nothing is owed after.
+
+## Apply per-unit I/O accounting and PostgreSQL's journal logging
+
+Gated by the commit that added `DefaultIOAccounting` to `deploy/setup.py`
+(`git log -1 --format=%h -S DefaultIOAccounting -- deploy/setup.py`): `setup-prod`
+applies the working tree, so it needs that commit checked out, and the
+`archon-backend` and `archon-public-api` application names show once a release
+carrying it is deployed. The setup restarts PostgreSQL for its new settings, so
+pick a quiet moment. A `log_destination` set by hand with `ALTER SYSTEM` would win
+over the setup's conf.d, hence the reset.
+
+```sh
+just setup-prod
+sudo -u postgres psql -Atc "SHOW log_destination"   # on the box
+```
+
+If it does not answer `syslog`, run `sudo -u postgres psql -c "ALTER SYSTEM RESET
+log_destination" -c "SELECT pg_reload_conf()"`. It worked when Grafana's
+**Archon production** dashboard, re-applied with `deploy/grafana.py`, shows disk
+throughput for `postgresql@17-main.service` and `archon-backend.service`, and
+`{host="archon.vekn.net", unit="postgresql@17-main.service"} |= "checkpoint"`
+returns a line in Loki. Nothing is owed after.
