@@ -52,8 +52,8 @@ when a third run reports `0 of N`. Delete this section and
 
 ## Measure the public API's filter expressions
 
-Gated by `8cfc1d3b` and the commit extending its `objects_api_filter_stats` to
-`country` and `start`. The schema creates the statistics object at startup but
+Gated by `7fb74416`, which gives `objects_api_filter_stats` its final shape. The
+schema creates the statistics object at startup but
 nothing fills it until autovacuum next analyzes `objects`, and until then the
 planner prices a one-sided `start` bound, a country or a sparse rating category as
 a third of the corpus and walks the whole type. Running it before the deploy
