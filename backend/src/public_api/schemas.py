@@ -15,6 +15,7 @@ from .examples import COMMUNITY_LINK_ENTRY, DECK, LEAGUE, TOURNAMENT, USER
 EXAMPLES = {
     "Tournament": TOURNAMENT,
     "User": USER,
+    "UserLookup": {**USER, "sanctions": []},
     "League": LEAGUE,
     "DeckObject": DECK,
     "CommunityLinkEntry": COMMUNITY_LINK_ENTRY,
@@ -122,6 +123,36 @@ def _build() -> dict[str, dict]:
         },
         "required": ["vekn_id", "link"],
     }
+    components["MemberSanction"] = {
+        "type": "object",
+        "description": "A suspension or probation in force: not lifted, not expired.",
+        "properties": {
+            "level": {"enum": ["suspension", "probation"]},
+            "expires_at": {
+                "type": ["string", "null"],
+                "format": "date-time",
+                "description": "UTC. Null is a ban: a suspension with no end.",
+            },
+        },
+        "required": ["level", "expires_at"],
+        "example": {"level": "suspension", "expires_at": None},
+    }
+    components["UserLookup"] = {
+        "allOf": [
+            {"$ref": _REF.format(name="User")},
+            {
+                "type": "object",
+                "properties": {
+                    "sanctions": {
+                        "type": "array",
+                        "items": {"$ref": _REF.format(name="MemberSanction")},
+                        "description": "Present for an app token only, never "
+                        "for a member's.",
+                    }
+                },
+            },
+        ]
+    }
     for name, fields in _API_NOTES.items():
         properties = components[name]["properties"]
         for field, note in fields.items():
@@ -132,7 +163,7 @@ def _build() -> dict[str, dict]:
     roots = {"Tournament", "User", "League", "DeckObject", "CommunityLinkEntry"}
     for name in list(roots):
         components[f"{name}Line"] = _line(name)
-    roots |= {f"{name}Line" for name in roots}
+    roots |= {f"{name}Line" for name in roots} | {"UserLookup"}
     reachable = set(roots)
     for name in roots:
         _referenced(components[name], components, reachable)

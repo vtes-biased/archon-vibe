@@ -7,9 +7,17 @@ its own process on its own subdomain, serving the `api` projection
 ([sync](sync.md#access-levels)) and nothing else.
 
 It publishes **VEKN IDs, never names** — the projection carries no member name,
-contact, city or avatar, a player without a VEKN ID has no row at all, and
-sanctions never appear. That is a property of the column, not a filter this app
-applies ([dogmas](dogmas.md#product)). Card data stays krcg's.
+contact, city or avatar, and a player without a VEKN ID has no row at all. That
+is a property of the column, not a filter this app applies
+([dogmas](dogmas.md#product)). Card data stays krcg's.
+
+**Sanctions are absent from the column, with one exception outside it**: the
+member lookup answers an app token a member's suspensions and probations in
+force, so a site signing members in through the VEKN forum's login bridge can
+suspend a banned member everywhere without waiting for that member's next login.
+Only the level and end date go out — no reason, no issuer, no other level — read
+from `"full"` and spliced onto the member's `"api"` row in SQL; the sanction's own
+`api` column stays NULL, so no stream or export ever carries one.
 
 ## Endpoints
 
@@ -25,7 +33,7 @@ reaches consumers with no code change here.
 | `/v1/tournaments/{code_or_uid}` | one tournament, by short event code (case-insensitive) or uid |
 | `/v1/leagues` | stream |
 | `/v1/leagues/{uid}` | one league |
-| `/v1/users/{uid_or_vekn_id}` | one member, by either identifier |
+| `/v1/users/{uid_or_vekn_id}` | one member, by either identifier; to an app token, plus `sanctions` |
 | `/v1/decks` | stream of published decks; `tournament` |
 | `/v1/users` | stream of members, each carrying all four ratings; `country`, `category`, `tournament` |
 | `/v1/community-links` | stream, one line per link |
@@ -139,20 +147,22 @@ tournament is bounded in its own local time and a bare date bounds at midnight.
 full read costs one pass and arrives gzipped — the same file the app's own
 `/snapshot` serves at its levels.
 
-Two places the response is not the column verbatim, both deliberate:
+Three places the response is not the column verbatim, all deliberate:
 **`community-links` resolves each link's `country`** to the link's own where it
 has one and the member's otherwise, so a consumer never has to know the fallback
 rule, and **withholds a link a moderator hid** — the app's own clients
-filter those client-side and a third party has no way to know it should — and
+filter those client-side and a third party has no way to know it should — the
+member lookup **splices `sanctions` onto the row** for an app token, and
 lookups and filters **match on the indexed `"full"` expressions** (event code,
 VEKN id, a deck's tournament, country, start, rating category) with `type` written
 as a literal, because that is where the partial indexes are. Only `"api"` is ever
-returned.
+returned, save that splice.
 
 ## Auth
 
 **Bearer token required; there is no anonymous read.** Two token types are
-accepted and answered identically. A third party's **daemon token** — the
+accepted and answered identically, save a member's `sanctions`, which only the
+daemon token reads. A third party's **daemon token** — the
 `client_credentials` grant's `oauth_client` JWT
 ([access](access.md#the-daemon-grant)) — is the intended one: it carries a
 `client_id` and `api:read`, has no row anywhere, and is checked against the

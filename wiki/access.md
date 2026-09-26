@@ -244,7 +244,9 @@ Scopes: `profile:read` (limited to `/oauth/*`), `profile:email` (the same
 plus the member's verified address) and `event:run` (one named tournament, or
 identity only when it names none — below) delegate a *user's* authority;
 `api:read` delegates nobody's and is refused at `/authorize` for that reason — it
-is the daemon grant's scope and only that. What a client learns about the member
+is the daemon grant's scope and only that, and the only audience for a member's
+standing suspensions and probations outside the app
+([public-api](public-api.md)). What a client learns about the member
 and what it may do as them are separate axes, so `profile:email` includes
 `profile:read` but sits under no `event:run`: an app that runs events gets no
 address unless it also asks for one. Both `/authorize` verbs refuse a scope the

@@ -26,4 +26,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 Board changes ride the commit that earns them.
 
 
-- Give a registered `api:read` client a member's active suspensions and probations on the public API's user lookup, so the VEKN forum's login bridge can suspend a banned member on every site without waiting for a login: each with its level and end date (none for a ban), no other sanction level, and nothing to a user's token or an anonymous caller. Done when `/v1/users/{uid}` answers them to a client token only — lifted, expired and deleted ones absent — a test at the endpoint pins both audiences, and [public-api](wiki/public-api.md) (the one exception to "sanctions never appear"), [sync](wiki/sync.md) (the sanction row) and [access](wiki/access.md) are updated.

@@ -3,12 +3,12 @@ import json
 from collections.abc import AsyncIterator, Sequence
 from datetime import datetime
 
-from litestar import Response, Router, get
+from litestar import Request, Response, Router, get
 from litestar.exceptions import HTTPException
 from litestar.params import FromPath, FromQuery
 from litestar.response import File, Stream
 
-from ..models import ObjectType, RatingCategory
+from ..models import ObjectType, RatingCategory, SanctionLevel
 from ..snapshots import get_snapshot_path
 from .auth import lookup_budget, stream_budget
 from .db import get_connection
@@ -237,20 +237,39 @@ async def list_users(
     )
 
 
+_WITH_SANCTIONS = (
+    "\"api\" || jsonb_build_object('sanctions', coalesce(("
+    "SELECT jsonb_agg(jsonb_build_object("
+    "'level', s.\"full\"->'level', 'expires_at', s.\"full\"->'expires_at'"
+    ") ORDER BY s.uid) FROM objects s "
+    "WHERE s.type = 'sanction' AND s.\"full\"->>'user_uid' = objects.uid "
+    "AND s.deleted_at IS NULL AND s.\"full\"->>'lifted_at' IS NULL "
+    f"AND s.\"full\"->>'level' IN ('{SanctionLevel.SUSPENSION}', "
+    f"'{SanctionLevel.PROBATION}') "
+    "AND (s.\"full\"->>'expires_at' IS NULL "
+    "OR (s.\"full\"->>'expires_at')::timestamptz > now())"
+    "), '[]'::jsonb))"
+)
+
+
 @get(
     "/users/{uid_or_vekn_id:str}",
     guards=[lookup_budget],
     summary="A member",
-    opt={"responses": responds("User")},
+    opt={"responses": responds("UserLookup")},
 )
-async def get_user(uid_or_vekn_id: FromPath[str]) -> Response:
+async def get_user(uid_or_vekn_id: FromPath[str], request: Request) -> Response:
     """A member by uid or VEKN ID.
 
     A tournament's players, standings and winner carry uids, so this is how a
     result becomes a member.
+
+    `sanctions` is answered to an app token only, never to a member's: the
+    member's standing suspensions and probations, empty when there are none.
     """
+    body = _WITH_SANCTIONS if request.state.app_token else '"api"'
     row = await _one(
-        f"SELECT \"api\"::text FROM objects WHERE type = 'user' AND {_VISIBLE} "
+        f"SELECT ({body})::text FROM objects WHERE type = 'user' AND {_VISIBLE} "
         "AND (uid = %s OR (\"full\"->>'vekn_id' = %s AND \"full\"->>'vekn_id' != ''))",
         (uid_or_vekn_id, uid_or_vekn_id),
     )

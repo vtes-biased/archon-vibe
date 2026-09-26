@@ -80,6 +80,7 @@ async def require_api_token(connection: ASGIConnection) -> str:
             raise HTTPException(
                 status_code=401, detail="Invalid token type", headers=_CHALLENGE
             )
+    connection.state.app_token = payload["type"] == "oauth_client"
     return payload["client_id"]
 
 

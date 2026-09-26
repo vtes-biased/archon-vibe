@@ -4,17 +4,19 @@ the projection it actually serves, and a daemon identity opens it while the app
 stays shut to that same token."""
 
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid7
 
 import msgspec
 import pytest
 import pytest_asyncio
+import src.db as db
 from httpx import ASGITransport, AsyncClient
 from src.access_levels import compute_api
 from src.db_oauth import (
     get_oauth_client_by_client_id,
     insert_oauth_client,
+    insert_oauth_token,
     update_oauth_client,
 )
 from src.models import (
@@ -23,17 +25,23 @@ from src.models import (
     League,
     OAuthClient,
     OAuthScope,
+    OAuthToken,
     ObjectType,
     Player,
     Sanction,
+    SanctionCategory,
+    SanctionLevel,
     Tournament,
+    TournamentState,
     User,
 )
 from src.public_api import db as public_db
 from src.public_api.examples import MEMBER_TOURNAMENT, ROUND_DECKS, SANCTION
 from src.public_api.main import app
 from src.public_api.schemas import COMPONENTS
-from src.routes.oauth import ph
+from src.routes.oauth import ACCESS_TOKEN_LIFETIME, _create_oauth_jwt, ph
+
+from tests.conftest import seed_tournament
 
 _WRITES = ("POST", "PUT", "PATCH", "DELETE")
 _UNDOCUMENTED = ("/docs", "/openapi.json")
@@ -230,3 +238,101 @@ class TestDaemonIdentity:
     async def test_a_client_without_the_scope_cannot_mint(self, test_client):
         client_id, secret = await _register("no-scope", [OAuthScope.PROFILE_READ])
         assert (await _mint(test_client, client_id, secret)).status_code == 400
+
+
+class TestMemberSanctions:
+    @pytest.mark.asyncio
+    async def test_only_an_app_token_reads_standing_suspensions_and_probations(
+        self, test_client, live_api
+    ):
+        now = datetime.now(UTC)
+        member = User(uid=str(uuid7()), modified=now, name="Banned", vekn_id="7654321")
+        await db.save_user(member)
+        event = Tournament(
+            uid=str(uuid7()),
+            modified=now,
+            name="Where it happened",
+            state=TournamentState.FINISHED,
+        )
+        await seed_tournament(event)
+
+        def sanction(level, expires_at=None, **fields) -> Sanction:
+            return Sanction(
+                uid=str(uuid7()),
+                modified=now,
+                user_uid=member.uid,
+                issued_by_uid="tests",
+                level=level,
+                category=SanctionCategory.UNSPORTSMANLIKE_CONDUCT,
+                description="test",
+                issued_at=now - timedelta(days=60),
+                expires_at=expires_at,
+                **fields,
+            )
+
+        standing = [
+            sanction(SanctionLevel.SUSPENSION),
+            sanction(SanctionLevel.PROBATION, now + timedelta(days=30)),
+        ]
+        for s in [
+            *standing,
+            sanction(SanctionLevel.SUSPENSION, lifted_at=now, lifted_by_uid="tests"),
+            sanction(SanctionLevel.PROBATION, now - timedelta(days=1)),
+            sanction(SanctionLevel.SUSPENSION, deleted_at=now),
+            sanction(SanctionLevel.WARNING, tournament_uid=event.uid),
+        ]:
+            await db.save_sanction(s)
+
+        try:
+            client_id, secret = await _register("bridge", [OAuthScope.API_READ])
+            app_token = (await _mint(test_client, client_id, secret)).json()[
+                "access_token"
+            ]
+            jti = str(uuid7())
+            await insert_oauth_token(
+                OAuthToken(
+                    uid=str(uuid7()),
+                    modified=now,
+                    token_jti=jti,
+                    client_id=client_id,
+                    user_uid=member.uid,
+                    scopes=[OAuthScope.PROFILE_READ],
+                    token_type="access",
+                    expires_at=now + ACCESS_TOKEN_LIFETIME,
+                )
+            )
+            member_token = _create_oauth_jwt(
+                member.uid,
+                "access",
+                [OAuthScope.PROFILE_READ],
+                client_id,
+                jti,
+                ACCESS_TOKEN_LIFETIME,
+            )
+
+            as_app = await live_api.get(
+                f"/v1/users/{member.vekn_id}",
+                headers={"Authorization": f"Bearer {app_token}"},
+            )
+            assert as_app.status_code == 200, as_app.text
+            assert as_app.json()["sanctions"] == [
+                {
+                    "level": s.level.value,
+                    "expires_at": msgspec.to_builtins(s.expires_at),
+                }
+                for s in standing
+            ]
+
+            as_member = await live_api.get(
+                f"/v1/users/{member.uid}",
+                headers={"Authorization": f"Bearer {member_token}"},
+            )
+            assert as_member.status_code == 200, as_member.text
+            assert "sanctions" not in as_member.json()
+        finally:
+            async with db.get_connection() as conn:
+                await conn.execute(
+                    "DELETE FROM objects WHERE uid = %s OR "
+                    "(type = 'sanction' AND \"full\"->>'user_uid' = %s)",
+                    (event.uid, member.uid),
+                )
