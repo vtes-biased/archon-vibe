@@ -32,12 +32,13 @@ people to tell, and the wiki text that dies with it.
 
 ## Strip deckbuilder noise from the deck comments stored before it
 
-Gated by `d24e5f4d`. A deck-link import strips the deckbuilder's noise from that
-commit on, and the TWDA export publishes the stored comment verbatim, so a comment
-imported earlier keeps its restated header until this runs. Events the TWDA sync
-created are left out — their comments are the archive's own text. The go/no-go is
-the owner's, on the production report's count and pairs; a dev copy holding 930
-archive comments reported 1, a stray score line.
+Gated by `3f6ce3c1`, which keeps a stamp heading a typed note and a rule past the
+body's first text: the 2026-09-26 production dry run under `d24e5f4d` (271 of 2,783)
+dropped both. A deck-link import strips the deckbuilder's noise, and the TWDA
+export publishes the stored comment verbatim, so a comment imported earlier keeps
+its restated header until this runs. Events the TWDA sync created are left out —
+their comments are the archive's own text. The go/no-go is the owner's, on the
+production report's count and pairs.
 
 ```sh
 sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
