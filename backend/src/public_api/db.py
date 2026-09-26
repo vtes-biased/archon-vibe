@@ -3,9 +3,12 @@
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from functools import partial
 
 import psycopg
 from psycopg_pool import AsyncConnectionPool
+
+from ..request_log import tag_connection
 
 DB_URL = os.getenv(
     "DATABASE_URL",
@@ -31,6 +34,7 @@ async def open_pool() -> None:
             "application_name": "archon-public-api",
             "options": f"-c statement_timeout={STATEMENT_TIMEOUT_MS}",
         },
+        check=partial(tag_connection, app="archon-public-api"),
     )
     await _pool.open()
 

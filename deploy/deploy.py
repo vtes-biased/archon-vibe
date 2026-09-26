@@ -434,7 +434,7 @@ if d.public_api:
     service(
         f"{unit}-public-api",
         "public-api.service.j2",
-        [api_env],
+        [*backend, api_env],
         name=name,
         unit=unit,
         backend_root=backend_root,
@@ -535,11 +535,18 @@ if deployed(f"{www}/.bundle") != bundle:
 
 http2 = modern_http2(host.get_fact(Command, "nginx -v 2>&1"))
 available = "/etc/nginx/sites-available"
+log_format = f"{name}_masked"
 vhosts = [
+    put(
+        "request-log.conf.j2",
+        f"/etc/nginx/conf.d/{name}_request_log.conf",
+        log_format=log_format,
+    ),
     put(
         "app.conf.j2",
         f"{available}/{name}_app.conf",
         domain=domain,
+        log_format=log_format,
         modern_http2=http2,
         dist=f"{www}/dist",
         previous_dist=f"{www}/dist.prev",
@@ -566,6 +573,7 @@ if d.public_api:
             f"{available}/{name}_api.conf",
             domain=api_domain,
             modern_http2=http2,
+            log_format=log_format,
             zone=zone,
             backend_port=d.backend_port,
             api_port=d.api_port,

@@ -19,5 +19,5 @@
   ssl_session_timeout 1d;
   ssl_session_tickets off;
 
-  access_log syslog:server=unix:/dev/log,nohostname;
+  access_log syslog:server=unix:/dev/log,nohostname {{ log_format }};
   error_log syslog:server=unix:/dev/log,nohostname;

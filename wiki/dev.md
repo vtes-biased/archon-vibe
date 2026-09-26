@@ -179,7 +179,8 @@ pins a release and `BUILD_DIR` deploys a local build (a `frontend-dist/`
 directory there is packed in place of the release tarball). `deploy/deploy.py`
 derives every path, unit and database from the environment's `name` in
 `deploy/group_data/`, which holds what differs between environments. A service
-restarts only when its wheel, requirements, env file or units changed; the venv
+restarts only when its wheel, requirements, env file or units changed — the public
+API runs from the backend's venv, so it restarts with the backend's; the venv
 install and the frontend swap compare a marker on the box with the hash of what
 is deployed, so re-running a deploy that failed halfway finishes it. The backend,
 public-API and bot env files single-quote every value, so they load cleanly in bash
@@ -246,10 +247,23 @@ takes long lines, and a slow statement over ~900 bytes would otherwise arrive as
 several. server-setup's conf.d logs statements over a
 second, lock waits, autovacuum runs over a second, checkpoints, DDL and temp files
 over 10 MB; the prefix `[%p] %q%a %u@%d ` names the connection's application —
-`archon-backend` or `archon-public-api`, set on each pool, and `pg_dump` for the
-backup. Syslog shifts PostgreSQL's severities down one step, so its `ERROR` lines
+`archon-backend` or `archon-public-api`, set on each pool and suffixed with
+`/<request id>` while a request holds the connection, and `pg_dump` for the
+backup. Beta's cluster is server-setup's and its prefix carries no `%a`. Syslog shifts PostgreSQL's severities down one step, so its `ERROR` lines
 carry `level="warning"` and a plain `LOG` line `info`. Its internal statistics
 are not reported: Fluent Bit cannot query it.
+
+**Every request carries nginx's `$request_id`** — 32 hex characters, last on
+nginx's access line, passed upstream as `X-Request-ID`. The backend and the public
+API prefix every log line a request produces with `[<id>]` (minting one when the
+header is missing or malformed, as in dev), and the pool tags the connection with
+it on checkout, so one Loki query for the ID returns the nginx line, the app's
+lines and any slow statement or error PostgreSQL logged for it. **Credentials in a
+URL are masked to `***`**: the `token`, `code` and `state` query values, in nginx's
+request and referer (the `<env>_masked` log format, `conf.d`) and in every backend
+log line. nginx's error log has no format and quotes the raw request and upstream
+URL, so on production Fluent Bit's `journal.lua` masks the same values before
+shipping; the journal on the box keeps them.
 
 **`deploy/grafana.py` owns production's Grafana side**, applied with a
 service-account token (Editor) as `GRAFANA_TOKEN`, and `DISCORD_WEBHOOK` only to

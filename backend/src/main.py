@@ -55,6 +55,7 @@ from .models import (
     User,
     is_active_account,
 )
+from .request_log import RequestIdMiddleware, configure_logging
 from .roles_hook import register_metadata
 from .routes import (
     admin,
@@ -77,10 +78,7 @@ from .version import __version__
 
 load_dotenv()
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+configure_logging()
 logger = logging.getLogger(__name__)
 
 _scheduler: AsyncIOScheduler | None = None
@@ -566,6 +564,8 @@ if os.getenv("ENVIRONMENT", "development") == "development":
             headers=headers,
         )
 
+
+app.add_middleware(RequestIdMiddleware)
 
 app.include_router(auth.router)
 app.include_router(users.router)

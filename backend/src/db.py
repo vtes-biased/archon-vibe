@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from functools import cache
+from functools import cache, partial
 from importlib import resources
 from typing import NamedTuple
 
@@ -32,6 +32,7 @@ from .models import (
     Tournament,
     User,
 )
+from .request_log import tag_connection
 
 _engine = PyEngine()
 
@@ -91,6 +92,7 @@ async def init_db() -> None:
         max_size=POOL_MAX_SIZE,
         open=False,
         kwargs={"autocommit": True, "application_name": "archon-backend"},
+        check=partial(tag_connection, app="archon-backend"),
     )
     await _pool.open()
 

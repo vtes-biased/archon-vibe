@@ -391,8 +391,8 @@ The app never calls the API, and the API never runs the app. Three layers:
 2. **`scripts/check_public_api_isolation.py`**, wired into `just lint`,
    `just lint-check` **and** `ci.yml` — nothing under `frontend/` may name the API,
    nothing under `backend/src/` outside the package may import it, and the package
-   may import only `models`, `access_levels`, `jwt_config` and `snapshots` from the
-   app. `..db` is excluded on purpose: its pool is a global the app's `init_db()`
+   may import only `models`, `access_levels`, `jwt_config`, `snapshots` and
+   `request_log` (log masking and the request ID) from the app. `..db` is excluded on purpose: its pool is a global the app's `init_db()`
    fills, so reaching for it here would hand third-party reads the app's write
    helpers over a pool nothing in this process opens.
 3. **The route-table test** above, so the surface cannot grow a write.

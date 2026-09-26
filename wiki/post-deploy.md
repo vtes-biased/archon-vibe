@@ -68,3 +68,18 @@ sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
 It worked when `EXPLAIN` of `/v1/tournaments?start_after=<last month>` names
 `idx_objects_tournament_start` in its `Index Cond`
 ([architecture](architecture.md#indexes) has the recipe). Nothing is owed after.
+
+## Mask credentials in production's shipped nginx error lines
+
+Gated by `d57073ac`, whose deploy masks the `token`, `code` and `state` query
+values in nginx's access lines and the backend's, but not in nginx's error log,
+which has no format ([dev](dev.md#deployment)). Fluent Bit's
+`journal.lua` masks them before shipping, and `setup.py` installs it rather than
+the deploy, so the error lines keep shipping raw until this runs.
+
+```sh
+just setup-prod
+```
+
+It worked when, in the vtesbiased Loki, `{host="archon.vekn.net", unit="nginx.service"} |= "request: " |~ "[?&](token|code)=[^*&]"`
+returns nothing from after the run. Nothing is owed after.

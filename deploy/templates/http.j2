@@ -3,7 +3,7 @@ server {
   listen [::]:80;
   server_name {{ domain }};
 
-  access_log syslog:server=unix:/dev/log,nohostname;
+  access_log syslog:server=unix:/dev/log,nohostname {{ log_format }};
   error_log syslog:server=unix:/dev/log,nohostname;
 
   location /.well-known/acme-challenge/ {

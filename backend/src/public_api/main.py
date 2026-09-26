@@ -9,6 +9,7 @@ from fastapi.openapi.utils import get_openapi
 from scalar_fastapi import get_scalar_api_reference
 
 from ..jwt_config import assert_production_keys
+from ..request_log import RequestIdMiddleware, configure_logging
 from .db import close_pool, open_pool
 from .examples import (
     MEMBER_TOURNAMENT,
@@ -20,6 +21,8 @@ from .examples import (
 )
 from .schemas import COMPONENTS
 from .v1 import router
+
+configure_logging()
 
 SITE_URL = os.getenv("SITE_URL_BASE", "http://localhost:8000")
 API_URL = os.getenv("PUBLIC_API_URL_BASE", "http://localhost:8001")
@@ -1054,6 +1057,7 @@ app.add_middleware(
     allow_methods=["GET"],
     allow_headers=["Authorization"],
 )
+app.add_middleware(RequestIdMiddleware)
 
 app.include_router(router)
 
