@@ -246,10 +246,11 @@ minutes leaves at most one point and no rate. The loop is capped at 10 MB.
 takes long lines, and a slow statement over ~900 bytes would otherwise arrive as
 several. server-setup's conf.d logs statements over a
 second, lock waits, autovacuum runs over a second, checkpoints, DDL and temp files
-over 10 MB; the prefix `[%p] %q%a %u@%d ` names the connection's application —
-`archon-backend` or `archon-public-api`, set on each pool and suffixed with
-`/<request id>` while a request holds the connection, and `pg_dump` for the
-backup. Beta's cluster is server-setup's and its prefix carries no `%a`. Syslog shifts PostgreSQL's severities down one step, so its `ERROR` lines
+over 10 MB. `setup.py` sets the prefix `[%p] %q%a %u@%d `, which names the
+connection's application — `archon-backend` or `archon-public-api`, set on each
+pool and suffixed with `/<request id>` while a request holds the connection, and
+`pg_dump` for the backup. Beta's cluster is server-setup's, whose prefix
+`[%p] %q@%d ` carries no application. Syslog shifts PostgreSQL's severities down one step, so its `ERROR` lines
 carry `level="warning"` and a plain `LOG` line `info`. Its internal statistics
 are not reported: Fluent Bit cannot query it.
 
@@ -263,7 +264,8 @@ URL are masked to `***`**: the `token`, `code` and `state` query values, in ngin
 request and referer (the `<env>_masked` log format, `conf.d`) and in every backend
 log line. nginx's error log has no format and quotes the raw request and upstream
 URL, so on production Fluent Bit's `journal.lua` masks the same values before
-shipping; the journal on the box keeps them.
+shipping; the journal on the box keeps them. Beta's Alloy, server-setup's, ships
+those error lines unmasked.
 
 **`deploy/grafana.py` owns production's Grafana side**, applied with a
 service-account token (Editor) as `GRAFANA_TOKEN`, and `DISCORD_WEBHOOK` only to
