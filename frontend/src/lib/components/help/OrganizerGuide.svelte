@@ -7,11 +7,12 @@
   import InlineNotice from "$lib/components/InlineNotice.svelte";
   import VpInput from "$lib/components/VpInput.svelte";
   import FoldableSection from "$lib/components/FoldableSection.svelte";
+  import { formatScore, formatGwTp } from "$lib/utils";
   import {
     QrCode, WifiOff, Wifi, Share2, ClipboardCopy, Download, Dices, Dice3, Ticket, Gift, Undo2, Trash2,
     Pause, RotateCcw, ChevronDown, ChevronRight, Plus, SquarePlus, ArrowRightLeft,
     ShieldCheck, TriangleAlert, Gavel, X, Ban, Wrench, Users, Swords, Upload, Settings2,
-    CheckCheck, MoreHorizontal, Ellipsis, Banknote, FileX, UserMinus, Printer, Image, BookmarkMinus, User as UserIcon,
+    CheckCheck, Eye, Send, MoreHorizontal, Ellipsis, Banknote, FileX, UserMinus, Printer, Image, BookmarkMinus, User as UserIcon,
   } from "@lucide/svelte";
 
   let openFaq = $state<number | null>(null);
@@ -219,7 +220,7 @@
         {#each ["Alice", "Bob", "Charlie"] as name}
           <div class="py-2.5 flex items-center justify-between">
             <span class="text-ink">{name}</span>
-            <span class="text-ink-faint text-xs">0GW 0TP</span>
+            <span class="text-ink-faint text-xs"><span class="text-ink-strong font-medium tabular-nums">{formatScore(0, 0)}</span></span>
           </div>
         {/each}
       </div>
@@ -256,13 +257,16 @@
           <div class="flex items-center justify-between gap-2 text-sm">
             <span class="text-ink min-w-0 truncate">{name}</span>
             <div class="flex items-center gap-2 shrink-0">
-              <span class="text-ink-faint text-xs">0GW 0TP</span>
+              <span class="text-ink-faint text-xs">{formatGwTp(0, 0)}</span>
               <UserMinus class="w-3.5 h-3.5 text-ink-faint" />
               <TriangleAlert class="w-3.5 h-3.5 text-ink-faint" />
             </div>
           </div>
           <div class="mt-1.5">
             <VpInput value={0} options={[0, 0.5, 1, 1.5, 2, 3, 4]} label={name} onchange={() => {}} />
+            {#if name === "Alice"}
+              <Button variant="ghost" size="sm" class="min-h-[44px] mt-1"><Eye class="w-3.5 h-3.5" />{m.decks_view_decklist()}</Button>
+            {/if}
           </div>
         </div>
       {/each}
@@ -574,10 +578,17 @@
 {@html renderGuideSection(m.og_announcements())}
 
 <ExampleBox>
-  <div class="flex gap-2 items-start max-w-sm">
-    <textarea tabindex="-1" rows="2" placeholder={m.announcement_composer_placeholder()}
-      class="flex-1 bg-surface-hover text-ink-strong text-sm rounded-lg px-3 py-2 border border-line-strong resize-none"></textarea>
-    <Button variant="primary" size="md">{m.announcement_post()}</Button>
+  <div class="max-w-sm">
+    <FoldableSection title={m.announcement_section_title()} open={true}>
+      <div>
+        <textarea tabindex="-1" rows="2" placeholder={m.announcement_composer_placeholder()}
+          class="w-full px-3 py-2 text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright resize-none"></textarea>
+        <div class="flex items-center justify-between mt-2">
+          <span class="text-xs text-ink-faint">280</span>
+          <Button variant="primary" size="sm"><Send class="w-4 h-4 inline mr-1" />{m.announcement_post()}</Button>
+        </div>
+      </div>
+    </FoldableSection>
   </div>
 </ExampleBox>
 
@@ -603,7 +614,7 @@
 
 {@html renderGuideSection(m.og_configuration())}
 
-<!-- One card per section of the real settings form (Tools > Settings), in the same order, so the
+<!-- One card per section of the real settings form (the Set up tab), in the same order, so the
      reference reads as a map of the screen rather than a second taxonomy to translate. -->
 <div class="not-prose my-4 grid gap-3 sm:grid-cols-2">
   <div class="rounded-lg border border-line-strong bg-surface-muted/40 p-4">
@@ -650,6 +661,7 @@
   <div class="rounded-lg border border-line-strong bg-surface-muted/40 p-4 sm:col-span-2">
     <h4 class="text-sm font-semibold text-ink-strong mb-2">{m.og_cfg_venue()}</h4>
     <dl class="space-y-1.5 text-sm">
+      <div><dt class="text-ink inline font-medium">{m.tfield_registration_url()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_registration_url_desc()}</dd></div>
       <div><dt class="text-ink inline font-medium">{m.og_cfg_table_rooms()}</dt> <dd class="text-ink-muted inline">— {m.og_cfg_table_rooms_desc()}</dd></div>
     </dl>
   </div>

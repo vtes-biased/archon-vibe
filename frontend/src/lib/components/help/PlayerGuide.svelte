@@ -1,7 +1,7 @@
 <script lang="ts">
   import { renderGuideSection } from "$lib/markdown";
   import * as m from "$lib/paraglide/messages.js";
-  import { formatScore } from "$lib/utils";
+  import { formatScore, formatGwTp } from "$lib/utils";
   import { getRoleTone } from "$lib/roles";
   import ExampleBox from "./ExampleBox.svelte";
   import Button from "$lib/components/Button.svelte";
@@ -465,7 +465,7 @@
             <span class="text-ink truncate min-w-0">Alice</span>
             <span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_predator()}</span>
           </span>
-          <span class="text-ink-faint text-xs shrink-0">0GW 42TP</span>
+          <span class="text-ink-faint text-xs shrink-0">{formatGwTp(0, 42)}</span>
         </div>
         {@render vpChips(1)}
       </div>
@@ -476,7 +476,7 @@
             <span class="text-ink truncate min-w-0">Bob</span>
             <span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_you()}</span>
           </span>
-          <span class="text-ink-faint text-xs shrink-0">1GW 60TP</span>
+          <span class="text-ink-faint text-xs shrink-0">{formatGwTp(1, 60)}</span>
         </div>
         {@render vpChips(2)}
       </div>
@@ -487,7 +487,7 @@
             <span class="text-ink truncate min-w-0">Charlie</span>
             <span class="shrink-0 px-1.5 py-0.5 rounded text-xs badge-slate">{m.tournament_seat_prey()}</span>
           </span>
-          <span class="text-ink-faint text-xs shrink-0">0GW 24TP</span>
+          <span class="text-ink-faint text-xs shrink-0">{formatGwTp(0, 24)}</span>
         </div>
         {@render vpChips(0)}
       </div>
@@ -497,7 +497,7 @@
             <span class="text-ink-faint text-xs tabular-nums shrink-0">{m.tournament_seat_n({ n: "4" })}</span>
             <span class="text-ink truncate min-w-0">Diana</span>
           </span>
-          <span class="text-ink-faint text-xs shrink-0">0GW 42TP</span>
+          <span class="text-ink-faint text-xs shrink-0">{formatGwTp(0, 42)}</span>
         </div>
         {@render vpChips(1)}
       </div>
