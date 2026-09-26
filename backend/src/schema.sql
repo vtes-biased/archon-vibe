@@ -260,13 +260,41 @@ WHERE type = 'tournament';
 CREATE INDEX IF NOT EXISTS idx_objects_tournament_league
 ON objects(("full"->>'league_uid'))
 WHERE type = 'tournament';
--- The NC overlay on every reconnect: the country's members and events.
-CREATE INDEX IF NOT EXISTS idx_objects_user_country
-ON objects(("full"->>'country'))
+-- The NC overlay on every reconnect, and the public API's country streams in uid order.
+DROP INDEX IF EXISTS idx_objects_user_country;
+DROP INDEX IF EXISTS idx_objects_tournament_country;
+CREATE INDEX IF NOT EXISTS idx_objects_user_country_uid
+ON objects(("full"->>'country'), uid)
 WHERE type = 'user';
-CREATE INDEX IF NOT EXISTS idx_objects_tournament_country
-ON objects(("full"->>'country'))
+CREATE INDEX IF NOT EXISTS idx_objects_tournament_country_uid
+ON objects(("full"->>'country'), uid)
 WHERE type = 'tournament';
+-- The public API's tournament date window.
+CREATE INDEX IF NOT EXISTS idx_objects_tournament_start
+ON objects(("full"->>'start'))
+WHERE type = 'tournament';
+-- The public API's rating-category streams, each category carried by a fraction of members.
+CREATE INDEX IF NOT EXISTS idx_objects_user_constructed_online
+ON objects(uid)
+WHERE type = 'user' AND "full"->'constructed_online'->>'total' IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_objects_user_constructed_offline
+ON objects(uid)
+WHERE type = 'user' AND "full"->'constructed_offline'->>'total' IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_objects_user_limited_online
+ON objects(uid)
+WHERE type = 'user' AND "full"->'limited_online'->>'total' IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_objects_user_limited_offline
+ON objects(uid)
+WHERE type = 'user' AND "full"->'limited_offline'->>'total' IS NOT NULL;
+-- The public API's community-links stream: a handful of members carry any.
+CREATE INDEX IF NOT EXISTS idx_objects_user_community_links
+ON objects(uid)
+WHERE type = 'user' AND "full"->'community_links' <> '[]'::jsonb;
+-- Lets the planner price the five indexes above: unmeasured, each predicate looks near-universal.
+CREATE STATISTICS IF NOT EXISTS objects_api_filter_stats
+ON ("full"->'constructed_online'->>'total'), ("full"->'constructed_offline'->>'total'),
+("full"->'limited_online'->>'total'), ("full"->'limited_offline'->>'total'),
+("full"->'community_links') FROM objects;
 -- A merge re-pointing the members the absorbed account co-opted.
 CREATE INDEX IF NOT EXISTS idx_objects_user_coopted_by
 ON objects(("full"->>'coopted_by'))

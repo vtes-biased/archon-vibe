@@ -21,7 +21,7 @@ reaches consumers with no code change here.
 
 | Route | Returns |
 |---|---|
-| `/v1/tournaments` | stream; filters `country`, `format`, `state`, `start_after`, `start_before` |
+| `/v1/tournaments` | stream; filters `country`, `start_after`, `start_before` |
 | `/v1/tournaments/{code_or_uid}` | one tournament, by short event code (case-insensitive) or uid |
 | `/v1/leagues` | stream |
 | `/v1/leagues/{uid}` | one league |
@@ -53,7 +53,7 @@ it wants and closes the connection. That is the whole answer to "give me the ten
 most recent" — every stream is ordered, so read ten lines and hang up. Handlers
 batch
 internally on a keyset and release the pooled connection between batches, so a
-slow reader never pins one of four; that keyset never reaches the client. Each
+slow reader never pins one of two; that keyset never reaches the client. Each
 batch query is `asyncio.shield`ed, because a reader hanging up mid-stream — the
 documented way to take a top-N — otherwise cancels a query in flight and the pool
 discards a connection it cannot roll back.
@@ -78,12 +78,17 @@ only thing that actually discourages it.
 
 `/v1/users` therefore serves the whole membership, and its filters exist so that
 the targeted read is always the easy one. `category` narrows to the members
-carrying a rating in it, a few percent of the whole; `tournament` narrows to the
-roster of one event, so a result set is one call rather than one per player.
+carrying a rating in it; `tournament` narrows to the roster of one event, so a
+result set is one call rather than one per player.
 
-Neither needed an index. Ordering by `uid` lets the `(type, uid)` index scan
-backwards and drop unrated rows as it goes, where the old rating-ordered endpoint
-had to sort the whole table on an unindexed expression once per batch. And
+**Every filter is served by an index, so the API can never crowd out the app**
+that shares its database: a filter that walked the type dropping rows would let a
+third party choose that load for us, and a sparse one reads the whole type to fill
+a batch. `country` rides `(country, uid)` indexes, the `start` bounds an index on
+the start text, and each rating `category` a partial index on `uid` — filter and
+stream order at once — which `objects_api_filter_stats` lets the planner price.
+Tournament `format` and `state` were dropped rather than indexed: each splits the
+corpus into a few large classes no index reads cheaper than the stream itself.
 `tournament` runs the cheap direction of the relation: one primary-key read of
 the event, then a primary-key read per player it names, about ninety buffers for
 a thirteen-player event. The expensive direction, every event a given member
@@ -120,7 +125,7 @@ they answer a question rather than resume a sync.
 go wrong: no row is ever duplicated. A row written between two batches is served
 in whichever version the batch that reaches it finds, and a row *created* mid-read
 sorts above the cursor and is simply not in this read. Holding one transaction
-open for the length of a client read is the actual hazard on a four-connection
+open for the length of a client read is the actual hazard on a two-connection
 pool: do not "fix" this with a held transaction.
 
 `start_after`/`start_before` compare ISO-8601 text carrying no offset, so each
@@ -135,8 +140,9 @@ Two places the response is not the column verbatim, both deliberate:
 has one and the member's otherwise, so a consumer never has to know the fallback
 rule, and **withholds a link a moderator hid** — the app's own clients
 filter those client-side and a third party has no way to know it should — and
-lookups **match on the indexed `"full"` expressions** (event code, VEKN id, a
-deck's tournament) because that is where the indexes are. Only `"api"` is ever
+lookups and filters **match on the indexed `"full"` expressions** (event code,
+VEKN id, a deck's tournament, country, start, rating category) with `type` written
+as a literal, because that is where the partial indexes are. Only `"api"` is ever
 returned.
 
 ## Auth
@@ -334,7 +340,7 @@ window.
 | Directive | Value | Sized by |
 |---|---|---|
 | `limit_req` on the six streaming routes | `rate=20r/m burst=10 nodelay` | egress: a whole refresh is five streams and ~7 MB gzipped (tournaments 5.3, users 1.1, decks 0.6, the rest rounding error), so 20r/m is four refreshes a minute, ~28 MB/min or 3.7 Mbit/s sustained from one address. The burst must clear a whole refresh or a legitimate one breaks halfway; ten leaves room for two |
-| `limit_conn` per address | 16 | a suspended stream holds one buffered batch (~1.8 MB) and **no** connection, so concurrency queues on the pool rather than exhausting it. Sixteen is ~29 MB and a four-deep queue |
+| `limit_conn` per address | 16 | a suspended stream holds one buffered batch (~1.8 MB) and **no** connection, so concurrency queues on the pool rather than exhausting it. Sixteen is ~29 MB and an eight-deep queue |
 | `limit_req` on everything else under `/v1` and on `/docs` | a separate, far more generous zone | single-row lookups; a client resolving a page of event codes bursts legitimately |
 | `limit_req` on the proxied `/oauth/token` and `/oauth/revoke` | `rate=30r/m burst=5 nodelay` | each runs an Argon2 verify of the client secret, so the cost is CPU on the app's box rather than egress here, and a client mints one token an hour. The generous read zone would let an address spend 600 Argon2 verifies a minute guessing a secret |
 | `limit_req_status`, `limit_conn_status` | 429 | nginx defaults to 503, which reads as "outage, retry" rather than "slow down" |
@@ -370,9 +376,11 @@ should be re-derived rather than inherited.
 The app never calls the API, and the API never runs the app. Three layers:
 
 1. **Structural** — its own subdomain, its own process, its own small pool
-   (`PUBLIC_API_DB_POOL_MAX_SIZE`, default 4) sized so it cannot starve the app's,
-   under a `statement_timeout` of its own so a query nobody waits for cannot hold
-   a slot of four.
+   (`PUBLIC_API_DB_POOL_MAX_SIZE`, default 2) sized so it cannot starve the app's,
+   under a 2-second `statement_timeout` of its own
+   (`PUBLIC_API_STATEMENT_TIMEOUT_MS`) so a query nobody waits for cannot hold a
+   slot of two. Every query is index-backed and answers in tens of milliseconds, so
+   the timeout only ever cuts off a regression.
    The frontend has no environment variable pointing at it.
 2. **`scripts/check_public_api_isolation.py`**, wired into `just lint`,
    `just lint-check` **and** `ci.yml` — nothing under `frontend/` may name the API,

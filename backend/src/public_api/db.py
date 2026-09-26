@@ -12,9 +12,9 @@ DB_URL = os.getenv(
     "postgresql://archon:archon_dev_password@localhost:5433/archon",
 )
 
-POOL_MAX_SIZE = int(os.getenv("PUBLIC_API_DB_POOL_MAX_SIZE", "4"))
+POOL_MAX_SIZE = int(os.getenv("PUBLIC_API_DB_POOL_MAX_SIZE", "2"))
 
-STATEMENT_TIMEOUT_MS = int(os.getenv("PUBLIC_API_STATEMENT_TIMEOUT_MS", "15000"))
+STATEMENT_TIMEOUT_MS = int(os.getenv("PUBLIC_API_STATEMENT_TIMEOUT_MS", "2000"))
 
 _pool: AsyncConnectionPool | None = None
 

@@ -126,9 +126,6 @@ The scans that stay, each deliberate:
 - **Rare official actions**: `count_promo_references` on an IC deleting a promo,
   and the anonymize sweep for tournaments naming the member as player or
   announcement author.
-- **Public API list filters** and `/v1/community-links`: they walk the `(type,
-  uid)` stream order and stop at the page size, so only a filter matching almost
-  nothing reads the whole type.
 
 Every other table is bounded — tens of rows, or per-user side rows read by key —
 and ops scripts under `backend/scripts/` run once with the owner watching; neither

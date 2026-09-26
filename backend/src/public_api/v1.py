@@ -100,9 +100,9 @@ def _object_batches(
     match = " AND ".join([_VISIBLE, *filters])
     return _batches(
         f'SELECT uid, "api"::text FROM objects '
-        f"WHERE type = %s AND {match} AND ({{keyset}}) "
+        f"WHERE type = '{obj_type}' AND {match} AND ({{keyset}}) "
         "ORDER BY uid DESC LIMIT %s",
-        (obj_type, *values),
+        tuple(values),
         _BY_UID,
         1,
     )
@@ -111,16 +111,12 @@ def _object_batches(
 @router.get("/tournaments", openapi_extra=streams("Tournament", "tournament"))
 async def list_tournaments(
     country: str | None = None,
-    format: str | None = None,
-    state: str | None = None,
     start_after: str | None = None,
     start_before: str | None = None,
 ) -> StreamingResponse:
     """Every tournament, newest first.
 
-    `country` is an ISO 3166-1 alpha-2 code. `format` is `Standard`, `Limited`,
-    `V5` or `Storyline`. `state` is `Planned`, `Registration`, `Waiting`,
-    `Playing` or `Finished`.
+    `country` is an ISO 3166-1 alpha-2 code.
 
     `start_after` and `start_before` are ISO-8601 dates or datetimes carrying no
     timezone. Each tournament is compared in its own local time, so
@@ -129,15 +125,14 @@ async def list_tournaments(
     """
     filters: list[str] = []
     values: list[str] = []
-    for field, value in (("country", country), ("format", format), ("state", state)):
-        if value:
-            filters.append(f"\"api\"->>'{field}' = %s")
-            values.append(value)
+    if country:
+        filters.append("\"full\"->>'country' = %s")
+        values.append(country)
     if start_after:
-        filters.append("\"api\"->>'start' >= %s")
+        filters.append("\"full\"->>'start' >= %s")
         values.append(_timestamp(start_after, "start_after"))
     if start_before:
-        filters.append("\"api\"->>'start' <= %s")
+        filters.append("\"full\"->>'start' <= %s")
         values.append(_timestamp(start_before, "start_before"))
     return _ndjson(
         _data_lines(
@@ -195,17 +190,17 @@ async def list_users(
 
     Each line carries the member's rating in all four categories, so a ranking
     is a sort away. `country` is an ISO 3166-1 alpha-2 code. `category` narrows
-    to members carrying a rating in it, which is a small fraction of the whole.
+    to members carrying a rating in it.
     `tournament` is a tournament uid and narrows to the members who played in
     it, so a result set costs one call rather than one call per player.
     """
     filters: list[str] = []
     values: list[str] = []
     if country:
-        filters.append("\"api\"->>'country' = %s")
+        filters.append("\"full\"->>'country' = %s")
         values.append(country)
     if category:
-        filters.append(f"\"api\"->'{category.value}'->>'total' IS NOT NULL")
+        filters.append(f"\"full\"->'{category.value}'->>'total' IS NOT NULL")
     if tournament:
         filters.append(
             "uid IN (SELECT jsonb_array_elements(t.\"api\"->'players')->>'user_uid' "
@@ -273,7 +268,9 @@ async def list_community_links() -> StreamingResponse:
         "FROM objects o CROSS JOIN LATERAL jsonb_array_elements("
         "coalesce(o.\"api\"->'community_links', '[]'::jsonb)) "
         "WITH ORDINALITY AS link(value, idx) "
-        'WHERE o.type = %s AND o."api" IS NOT NULL AND o.deleted_at IS NULL '
+        f"WHERE o.type = '{ObjectType.USER}' "
+        "AND o.\"full\"->'community_links' <> '[]'::jsonb "
+        'AND o."api" IS NOT NULL AND o.deleted_at IS NULL '
         "AND coalesce(link.value->>'moderation', '') <> 'hidden' "
         "AND ({keyset}) ORDER BY o.uid DESC, link.idx DESC LIMIT %s"
     )
@@ -281,7 +278,7 @@ async def list_community_links() -> StreamingResponse:
         _data_lines(
             "community_link",
             await _read_at(),
-            _batches(sql, (ObjectType.USER,), "(o.uid, link.idx) < (%s, %s)", 2),
+            _batches(sql, (), "(o.uid, link.idx) < (%s, %s)", 2),
         )
     )
 
