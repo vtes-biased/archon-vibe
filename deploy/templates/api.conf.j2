@@ -16,7 +16,7 @@ server {
   gzip_vary on;
   gzip_proxied any;
   gzip_min_length 1024;
-  gzip_types application/json application/x-ndjson;
+  gzip_types application/json application/x-ndjson application/vnd.oai.openapi+json;
 
   limit_conn {{ zone }}_conn 16;
   # nginx defaults both to 503, which tells a client "outage, retry" rather than

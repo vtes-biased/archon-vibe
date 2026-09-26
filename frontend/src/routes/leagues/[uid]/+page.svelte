@@ -297,7 +297,7 @@
     if (!league) return;
     error = null;
     try {
-      await updateLeague(league.uid, { finish: new Date().toISOString() }, { suppressErrorToast: true });
+      await updateLeague(league.uid, { finish: new Date().toISOString().slice(0, 10) }, { suppressErrorToast: true });
       await loadLeague();
     } catch (e) {
       error = toUserMessage(e, m.league_error_update());

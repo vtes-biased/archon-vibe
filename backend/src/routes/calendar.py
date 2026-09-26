@@ -139,12 +139,14 @@ def _agenda_filter(
     return [t for t, keep in zip(tournaments, on, strict=True) if keep]
 
 
-@get("/tournaments/{uid:str}.ics")
-async def tournament_event_ics(uid: FromPath[str]) -> Response:
+# Litestar only matches whole-segment path params: `{uid}.ics` would never match.
+@get("/tournaments/{filename:str}")
+async def tournament_event_ics(filename: FromPath[str]) -> Response:
     """Public like the feeds: the same venue/address projection exception applies."""
     from ..db import get_tournament_by_uid
 
-    t = await get_tournament_by_uid(uid)
+    uid = filename.removesuffix(".ics")
+    t = None if uid == filename else await get_tournament_by_uid(uid)
     if t is None or t.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Tournament not found")
     now_str = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")

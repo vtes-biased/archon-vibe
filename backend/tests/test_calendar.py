@@ -393,3 +393,17 @@ async def test_agenda_overrides_reach_the_owner_and_their_feed_only(test_client)
     feed = resp.content
     assert far.uid in feed
     assert own.uid not in feed
+
+
+@pytest.mark.asyncio
+async def test_single_event_ics_is_routed(test_client):
+    t = _make_tournament(uid=str(uuid7()), start=JUNE_15_10AM)
+    async with db.get_connection() as conn:
+        await db.save_tournament(t, conn=conn)
+
+    resp = await test_client.get(f"/api/calendar/tournaments/{t.uid}.ics")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/calendar")
+    assert f"UID:{t.uid}@archon.vekn.net" in resp.text
+    no_suffix = await test_client.get(f"/api/calendar/tournaments/{t.uid}")
+    assert no_suffix.status_code == 404

@@ -384,7 +384,8 @@ when any of them moves.
 The zones are `limit_req_zone`/`limit_conn_zone` and so live in a `conf.d` file —
 they are http-context directives and cannot go in the server block. The vhost
 also sets `gzip_types application/x-ndjson` with `gzip_proxied any` — the streams
-are the bulk of the egress and nginx skips proxied responses by default — and
+are the bulk of the egress and nginx skips proxied responses by default; the list
+carries `application/vnd.oai.openapi+json`, Litestar's type for `/openapi.json` — and
 `proxy_buffering off`, or a reader taking the first N lines waits for the whole
 corpus, which is the documented top-N idiom.
 

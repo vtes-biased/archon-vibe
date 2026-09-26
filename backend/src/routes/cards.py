@@ -27,7 +27,7 @@ async def get_cards(request: Request) -> Response:
 
     if_none_match = request.headers.get("if-none-match")
     if if_none_match and if_none_match.strip('"') == etag:
-        return Response(status_code=304)
+        return Response(content=b"", status_code=304)
 
     return Response(
         content=data,
