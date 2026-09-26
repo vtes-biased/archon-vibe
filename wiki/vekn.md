@@ -414,26 +414,30 @@ describes — winner, finalists, prelim GW/VP, round count, field size — and p
 each disagreement under its class. It reads a vekn.net sheet through the importer,
 so what the rules already correct does not show.
 
-*(Measured 2026-09-23 on production, 9,486 finished events against a full vekn.net
-scan and the archive. The first sync applying the rules [above](#tournaments)
-left no GW above a known round count on a stored row.)*
+*(Measured 2026-09-26 on production, 9,411 finished events against a full vekn.net
+scan of 8,304 and the archive's 4,538. The first sync applying the rules
+[above](#tournaments) left no GW above a known round count on a stored row.)*
 
 | Class | Found | What stands |
 |---|---|---|
 | Archon vs vekn.net: the sheet's prelim holds the final | 178 events | Archon — legacy archon's upload, frozen upstream |
-| Archon vs vekn.net: winner or finalists | 15 | Archon — the list [with the maintainers](#placements-handed-to-the-vekn-api-maintainers), plus 13388 |
+| Archon vs vekn.net: winner or finalists | 16 | Archon — the 15 [with the maintainers](#placements-handed-to-the-vekn-api-maintainers), plus 13388 |
 | Archon vs vekn.net: a no-final event's rows 1–5 (12642, 13471) | 2 | Archon — our own push numbers them by prelim standing |
-| Archon vs vekn.net: fewer rounds played than the calendar declares | 6 | Archon |
+| Archon vs vekn.net: a prelim score the final does not explain | 8 | Archon |
+| Archon vs vekn.net: fewer rounds played than the calendar declares | 7 | Archon |
+| Archon vs vekn.net: field size | 29 | Archon — 27 sheets lack a player or two we hold, 12505 and 13529 carry rows we count as not played |
 | Archon vs archive: the winner's score line | 33 | Archon — archon's submissions wrote totals |
-| vekn.net vs archive: round count, field size, winner's score line | 36, 173, 92 | vekn.net |
-| vekn.net vs archive: the winner's name | 28 | vekn.net's winner, under the name Archon holds |
-| An archive reconstruction of an event vekn.net holds | 79 | merged into the vekn.net copy, three excepted |
+| Archon vs archive: field size | 5 | Archon |
+| vekn.net vs archive: round count, field size, winner's score line | 36, 179, 94 | vekn.net |
+| vekn.net vs archive: the winner's name | 77 | vekn.net's winner, under the name Archon holds |
+| An archive reconstruction of an event vekn.net holds | 3 | two events each, below |
 | A GW above a known round count | 0 | — |
 
 **The winner's name is Archon's.** A member may change their name here, so an
 archive entry naming the winner differently is no disagreement about who won.
-Eleven of the 28 are spellings of one person; the other 17 name someone else,
-four of them Vivica for Alexander Båskman (1776, 4126, 7343, 13120), and the
+Sixty of the 77 are spellings of one person, all but one on a merged event, which
+the audit compares through its transplanted archive key; the other 17 name someone
+else, four of them Vivica for Alexander Båskman (1776, 4126, 7343, 13120), and the
 archive's deck stays with vekn.net's winner there too.
 
 **A reconstruction of an event vekn.net holds was merged** on 2026-09-23, keeping
