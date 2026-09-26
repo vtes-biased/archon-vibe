@@ -228,8 +228,9 @@ textfile every 15 s with the host's CPU, memory and I/O pressure and, per unit, 
 cgroup memory, swap, CPU and memory stall as `archon_unit_*{unit=…}` — per unit
 rather than per process, since the backend and the public API are both `uvicorn`
 and every PostgreSQL connection is a new pid. Beside them go each unit's disk I/O:
-`archon_unit_io_read_bytes_total`, `…_written_bytes_total`, `…_reads_total`,
-`…_writes_total` and `…_io_stalled_seconds_total` (full stall). They need the
+`archon_unit_io_read_bytes_total`, `archon_unit_io_written_bytes_total`,
+`archon_unit_io_reads_total`, `archon_unit_io_writes_total` and
+`archon_unit_io_stalled_seconds_total` (full stall). They need the
 cgroup `io` controller, which `setup.py` turns on with `DefaultIOAccounting=yes`
 and a `daemon-reexec` — a plain reload reads the setting but leaves running units
 without it. Page-cache writeback is charged to the unit that dirtied the page, so
@@ -240,7 +241,9 @@ minutes leaves at most one point and no rate. The loop is capped at 10 MB.
 **PostgreSQL logs to the journal through syslog** (`log_destination`, set in
 `setup.py`: Debian's cluster wrapper otherwise sends it to a file under
 `/var/log/postgresql` Fluent Bit never reads), so its lines reach Loki as
-`unit="postgresql@17-main.service"`. server-setup's conf.d logs statements over a
+`unit="postgresql@17-main.service"`. `syslog_split_messages` is off: journald
+takes long lines, and a slow statement over ~900 bytes would otherwise arrive as
+several. server-setup's conf.d logs statements over a
 second, lock waits, autovacuum runs over a second, checkpoints, DDL and temp files
 over 10 MB; the prefix `[%p] %q%a %u@%d ` names the connection's application —
 `archon-backend` or `archon-public-api`, set on each pool, and `pg_dump` for the

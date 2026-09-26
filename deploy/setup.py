@@ -42,6 +42,7 @@ s.postgres_config(
         "max_connections": "20",
         "effective_cache_size": "384MB",
         "log_destination": "syslog",
+        "syslog_split_messages": "off",
         "log_line_prefix": "[%p] %q%a %u@%d ",
     }
 )
