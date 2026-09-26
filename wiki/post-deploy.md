@@ -71,7 +71,7 @@ It worked when `EXPLAIN` of `/v1/tournaments?start_after=<last month>` names
 
 ## Mask credentials in production's shipped nginx error lines
 
-Gated by `d57073ac`, whose deploy masks the `token`, `code` and `state` query
+Gated by `3fa28ae5`, whose deploy masks the `token`, `code` and `state` query
 values in nginx's access lines and the backend's, but not in nginx's error log,
 which has no format ([dev](dev.md#deployment)). Fluent Bit's
 `journal.lua` masks them before shipping, and `setup.py` installs it rather than
