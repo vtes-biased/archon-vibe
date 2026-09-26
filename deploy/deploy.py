@@ -149,48 +149,44 @@ def venv(
 def service(
     service_name: str, template: str, changes: list, port: int | None = None, **values
 ):
-    units = [put(template, f"/etc/systemd/system/{service_name}.service", **values)]
+    unit_file = put(template, f"/etc/systemd/system/{service_name}.service", **values)
+    units = [unit_file]
+    rebind = None
     if port is not None:
-        units.append(
-            put(
-                "listen.socket.j2",
-                f"/etc/systemd/system/{service_name}.socket",
-                service_name=service_name,
-                port=port,
-            )
+        socket_file = put(
+            "listen.socket.j2",
+            f"/etc/systemd/system/{service_name}.socket",
+            service_name=service_name,
+            port=port,
         )
+        units.append(socket_file)
     systemd.daemon_reload(
         name=f"Reload units for {service_name}", _if=any_changed(*units)
     )
-    handover = port is not None and (
-        host.get_fact(Command, f"systemctl is-active {service_name}.socket || true")
-        != "active"
-    )
-    if handover:
-        # facts predate every op: a running=True after this stop would read "running" and skip
-        server.shell(
-            name=f"Hand {service_name}'s port to its socket",
+    if port is not None:
+        inactive = (
+            host.get_fact(Command, f"systemctl is-active {service_name}.socket || true")
+            != "active"
+        )
+        rebind = server.shell(
+            name=f"Rebind {service_name}'s port to its socket",
             commands=[
                 f"systemctl stop {service_name}.service",
-                f"systemctl enable --now {service_name}.socket",
+                f"systemctl enable {service_name}.socket",
+                f"systemctl restart {service_name}.socket",
                 f"systemctl start {service_name}.service",
             ],
-        )
-    elif port is not None:
-        systemd.service(
-            name=f"{service_name} socket",
-            service=f"{service_name}.socket",
-            running=True,
-            enabled=True,
+            _if=(lambda: True) if inactive else socket_file.did_change,
         )
     systemd.service(name=service_name, service=service_name, running=True, enabled=True)
-    if not handover:
-        systemd.service(
-            name=f"Restart {service_name}",
-            service=service_name,
-            restarted=True,
-            _if=any_changed(*units, *changes),
-        )
+    systemd.service(
+        name=f"Restart {service_name}",
+        service=service_name,
+        restarted=True,
+        _if=lambda: (
+            any_changed(*units, *changes)() and not (rebind and rebind.did_change())
+        ),
+    )
 
 
 # --- Runtime user and directories

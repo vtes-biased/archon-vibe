@@ -630,7 +630,9 @@ uvicorn.** The app's and the public API's ports belong to `<unit>-backend.socket
 and `<unit>-public-api.socket`; the services only inherit them. Three things
 follow. `systemctl stop` on the service no longer takes it down — the next
 connection starts it again — so stopping for real means stopping the `.socket`
-too. Restarting the `.socket` is the one operation that refuses connections. And
+too. Restarting the `.socket` is the one operation that refuses connections, and a
+running socket keeps the fd it bound, so the deploy restarts it only when its unit
+changed. And
 uvicorn wraps the inherited fd as `AF_UNIX`, so asyncio never sets `TCP_NODELAY`
 on accepted connections: the socket unit's `NoDelay=true` is what keeps small SSE
 writes off Nagle's delay, and a new socket-activated unit needs it too.
