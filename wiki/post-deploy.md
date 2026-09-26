@@ -117,6 +117,6 @@ access token.
 
 It worked when the first consent page shows the purpose under `profile:email`
 and its `userinfo` carries `sub`, `roles`, `vekn_id`, `capabilities` and the
-member's verified `email`; the other two carry no `email`. Owed after: the
-vekn-forum board line naming the archon `email` scope is deleted there, with its
-`wiki/archon.md` rewritten for `profile:email`.
+member's verified `email`; the other two carry no `email`. Nothing is owed after:
+vekn-forum's `wiki/archon.md` already describes the scope, and a failure goes back
+through `/intake` here.
