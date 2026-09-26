@@ -25,6 +25,8 @@ VEKN_MESSAGES = {
     "PLG_API_VEKN_LOGIN_INVALID_PASSWORD_MESSAGE": "Invalid password",
     "PLG_API_VEKN_REGISTRY_NOT_AUTHORIZED_MESSAGE": "Not authorized",
     "PLG_API_VEKN_REGISTRY_INVALID_VEKNID_MESSAGE": "Invalid VEKN Id",
+    "PLG_API_VEKN_REGISTRY_VEKNID_ALREADY_ASSIGNED_MESSAGE": "VEKN Id already assigned",
+    "PLG_API_VEKN_REGISTRY_PLAYER_ALREADY_EXISTS_MESSAGE": "A player with the same name or email already exists",
     "PLG_API_VEKN_ARCHON_INVALID_PARAMETER_MESSAGE": "Invalid parameter",
     "PLG_API_VEKN_ARCHON_EVENT_NOT_FOUND_MESSAGE": "Event not found",
     "PLG_API_VEKN_ARCHON_WRONG_USER_MESSAGE": "The connected user does not match the event creator.",
@@ -326,7 +328,13 @@ class VEKNAPIClient:
                 response.raise_for_status()
                 data = await response.json()
                 inner = data.get("data", {})
-                self._check_vekn_error(inner, "Create member failed")
+                duplicate = inner.get("veknid")
+                self._check_vekn_error(
+                    inner,
+                    f"Create member failed (duplicate of {duplicate} on vekn.net)"
+                    if duplicate
+                    else "Create member failed",
+                )
                 logger.info(f"Created VEKN member {veknid}: {firstname} {lastname}")
         except (aiohttp.ClientError, TimeoutError) as e:
             raise VEKNAPIConnectionError(f"HTTP error creating member: {e}") from e

@@ -34,6 +34,24 @@ from .vekn_api import (
 logger = logging.getLogger(__name__)
 
 
+# deploy/grafana.py parses these two line shapes into its failing-push tables.
+def _tournament_failed(
+    tournament: Tournament, reason: str, *, exc_info: bool = False
+) -> None:
+    vekn_event = tournament.external_ids.get("vekn") or "-"
+    logger.error(
+        f"VEKN push failed: tournament={tournament.uid} vekn_event={vekn_event} "
+        f"reason={reason}",
+        exc_info=exc_info,
+    )
+
+
+def _member_failed(user: User, reason: str, *, exc_info: bool = False) -> None:
+    logger.error(
+        f"VEKN push failed: member={user.vekn_id} reason={reason}", exc_info=exc_info
+    )
+
+
 def vekn_push_client() -> VEKNAPIClient | None:
     """A VEKNAPIClient when VEKN_PUSH is enabled, else None."""
     if os.getenv("VEKN_PUSH", "").lower() != "true":
@@ -161,22 +179,22 @@ async def push_tournament_event(
         return None
 
     if not tournament.name or len(tournament.name) < 3:
-        logger.warning(f"Tournament {tournament.uid}: name too short for VEKN")
+        _tournament_failed(tournament, "name too short for VEKN")
         return None
     if not tournament.organizers_uids:
-        logger.warning(f"Tournament {tournament.uid}: no organizers")
+        _tournament_failed(tournament, "no organizers")
         return None
 
     organizer = await get_user_by_uid(tournament.organizers_uids[0])
     if not organizer or not organizer.vekn_id:
-        logger.warning(f"Tournament {tournament.uid}: organizer has no VEKN ID")
+        _tournament_failed(tournament, "organizer has no VEKN ID")
         return None
 
     event_type = tournament_to_vekn_type(tournament.format, tournament.rank)
     if event_type is None:
-        logger.warning(
-            f"Tournament {tournament.uid}: no VEKN event type for "
-            f"{tournament.format.value}/{tournament.rank.value}"
+        _tournament_failed(
+            tournament,
+            f"no VEKN event type for {tournament.format.value}/{tournament.rank.value}",
         )
         return None
 
@@ -206,7 +224,7 @@ async def push_tournament_event(
         end_time = dt.strftime("%H:%M")
 
     if not start_date:
-        logger.warning(f"Tournament {tournament.uid}: no start date")
+        _tournament_failed(tournament, "no start date")
         return None
     if not end_date:
         end_date = start_date
@@ -239,7 +257,7 @@ async def push_tournament_event(
     except VEKNAPIError as e:
         if raise_api_errors:
             raise
-        logger.error(f"Failed to create VEKN event for {tournament.uid}: {e}")
+        _tournament_failed(tournament, str(e))
         return None
 
     # Re-fetch under the row lock — batch_push loads rows minutes before saving,
@@ -269,19 +287,17 @@ async def push_tournament_results(
         return False
 
     if tournament.state != TournamentState.FINISHED:
-        logger.warning(f"Tournament {tournament.uid}: not finished")
+        _tournament_failed(tournament, "not finished")
         return False
     if not tournament.standings:
-        logger.warning(f"Tournament {tournament.uid}: no standings")
+        _tournament_failed(tournament, "no standings")
         return False
 
     users_by_uid: dict[str, User] = {}
     for standing in tournament.standings:
         user = await get_user_by_uid(standing.user_uid)
         if not user or not user.vekn_id:
-            logger.warning(
-                f"Tournament {tournament.uid}: player {standing.user_uid} has no VEKN ID, skipping push"
-            )
+            _tournament_failed(tournament, f"player {standing.user_uid} has no VEKN ID")
             return False
         users_by_uid[standing.user_uid] = user
 
@@ -291,7 +307,6 @@ async def push_tournament_results(
             client, tournament, raise_api_errors=raise_api_errors
         )
         if not vekn_event_id:
-            logger.error(f"Tournament {tournament.uid}: cannot create VEKN event")
             return False
 
     # sanctions feed the SA-adjusted rating points in the archondata
@@ -305,7 +320,7 @@ async def push_tournament_results(
     except VEKNAPIError as e:
         if raise_api_errors:
             raise
-        logger.error(f"Failed to upload results for {tournament.uid}: {e}")
+        _tournament_failed(tournament, str(e))
         return False
 
     # Re-fetch under the row lock — the archondata snapshot may be minutes
@@ -357,7 +372,7 @@ async def push_member(
     except VEKNAPIConnectionError:
         raise  # batch-fatal: let batch_push abort and retry next cycle
     except VEKNAPIError as e:
-        logger.error(f"Failed to push member {user.vekn_id}: {e}")
+        _member_failed(user, str(e))
         return False
 
     # Re-fetch — batch_push may have loaded this user minutes ago; write only
@@ -455,10 +470,12 @@ async def batch_push(client: VEKNAPIClient) -> dict:
             try:
                 if await push_member(client, u):
                     stats["members_pushed"] += 1
+                else:
+                    stats["errors"] += 1
             except VEKNAPIConnectionError:
                 raise
             except Exception:
-                logger.exception(f"Error pushing member {u.vekn_id}")
+                _member_failed(u, "crash", exc_info=True)
                 stats["errors"] += 1
 
         # 2. Push calendar events for tournaments without external_ids.vekn
@@ -478,7 +495,7 @@ async def batch_push(client: VEKNAPIClient) -> dict:
             except VEKNAPIConnectionError:
                 raise
             except Exception:
-                logger.exception(f"Error pushing event for {t.uid}")
+                _tournament_failed(t, "crash", exc_info=True)
                 stats["errors"] += 1
 
         # 3. Push results for finished tournaments without vekn_pushed_at.
@@ -502,10 +519,12 @@ async def batch_push(client: VEKNAPIClient) -> dict:
                     fresh = await get_tournament_by_uid(t.uid)
                     if fresh:
                         await maybe_submit_twda(fresh)
+                else:
+                    stats["errors"] += 1
             except VEKNAPIConnectionError:
                 raise
             except Exception:
-                logger.exception(f"Error pushing results for {t.uid}")
+                _tournament_failed(t, "crash", exc_info=True)
                 stats["errors"] += 1
     except VEKNAPIConnectionError as e:
         logger.warning(

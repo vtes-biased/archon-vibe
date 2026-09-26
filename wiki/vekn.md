@@ -135,6 +135,16 @@ Standard/CC 6, Limited/Basic 3, V5/Basic 16, Storyline/Basic 9.
   sync writes that city back on its next pull, so the local row ends up holding
   it too. A member with no country cannot be pushed at all and keeps its amber
   pending-sync badge.
+- **A member the registry already knows under another id is never pushed.**
+  `createPlayer` refuses a create whose email, or whose full name as a substring,
+  matches an existing player, and names that player's `veknid`, always a different
+  id from ours, since a taken id is refused first. It means we minted an id for
+  someone vekn.net already registered, and inbound sync has usually brought their
+  registry record in as a second local account. vekn.net is the source of truth,
+  but the push does not heal it: the unique `vekn_id` index refuses moving the
+  registry id onto our member, keeping our id under the registry's name is a false
+  sync, and a substring match can name a different person. The failure line carries
+  the registry's id, and an IC reconciles the two accounts by hand.
 - Open-rounds events are never pushed.
 
 ### Outage resilience
@@ -157,7 +167,12 @@ hourly batch drains the backlog. On top of that:
 - **Observability** — scheduled jobs record last success and error in process, and
   `GET /admin/vekn-status` (IC-gated) exposes member sync, tournament sync and
   batch push, so a days-long outage is visible without grepping logs. It resets on
-  restart.
+  restart. The batch's `errors` counts every member or results push that did not
+  land, refused or skipped, so a stuck item reads as non-zero every hour. Every such
+  failure logs one line, `VEKN push failed: tournament=<uid> vekn_event=<id|->
+  reason=…` or `… member=<vekn id> reason=…`, which the production dashboard's
+  **VEKN push** tables group over the last two hours: the list to hand the VEKN API
+  admins when the refusal is theirs.
 
 ### Post-push divergence
 

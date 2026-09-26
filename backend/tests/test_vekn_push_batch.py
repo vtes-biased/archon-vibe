@@ -142,10 +142,11 @@ async def test_batch_push_skips_data_error_and_continues(test_db, monkeypatch):
     client = _FakeClient(VEKNAPIError("bad VEKN number"))
     stats = await batch_push(client)
 
-    # Data error skips just that member (push_member swallows it → not counted
-    # in members_pushed); the batch does NOT abort and the other member pushes.
+    # Data error skips just that member; the batch does NOT abort, the other
+    # member pushes, and the summary counts the failure.
     assert stats["aborted"] is False
     assert stats["members_pushed"] == 1
+    assert stats["errors"] == 1
     assert client.calls == 2
 
 
