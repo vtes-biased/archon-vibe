@@ -9,13 +9,14 @@ from urllib.parse import parse_qsl, urlencode
 from uuid import uuid7
 
 import jwt
+import msgspec
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from .. import permissions
-from ..db import get_tournament_by_uid
+from ..db import get_auth_methods_for_user, get_tournament_by_uid
 from ..db_oauth import (
     delete_oauth_consent,
     get_oauth_client_by_client_id,
@@ -37,6 +38,7 @@ from ..db_oauth import (
 from ..jwt_config import AUDIENCE_API, AUDIENCE_APP, decode, sign
 from ..middleware.auth import CurrentUser
 from ..models import (
+    AuthMethodType,
     OAuthAuthorizationCode,
     OAuthClient,
     OAuthConsent,
@@ -203,6 +205,9 @@ async def authorize_get(
         "scopes": [s.value for s in requested_scopes],
         "scope_descriptions": {
             OAuthScope.PROFILE_READ.value: "Read your basic profile (roles, VEKN ID)",
+            OAuthScope.PROFILE_EMAIL.value: (
+                "Read your basic profile (roles, VEKN ID) and your verified email address"
+            ),
             OAuthScope.EVENT_RUN.value: (
                 "Act on your behalf on this event"
                 if tournament_uid
@@ -215,6 +220,9 @@ async def authorize_get(
         "code_challenge": code_challenge,
         "tournament": tournament_uid,
         "tournament_name": event.name if event else None,
+        "email_purpose": client.email_purpose
+        if OAuthScope.PROFILE_EMAIL in requested_scopes
+        else None,
     }
 
 
@@ -252,6 +260,9 @@ async def authorize_post(
         raise HTTPException(400, "Invalid redirect_uri")
 
     requested_scopes = _parse_scopes(scope)
+    for s in requested_scopes:
+        if s not in client.scopes:
+            raise HTTPException(400, f"Scope {s} not allowed for this client")
     if OAuthScope.API_READ in requested_scopes:
         raise HTTPException(400, "api:read is a client_credentials scope")
 
@@ -659,18 +670,42 @@ async def userinfo(user: CurrentUser, request: Request):
     oauth_scopes = getattr(request.state, "oauth_scopes", None)
     if oauth_scopes is None:
         pass
-    elif not {OAuthScope.PROFILE_READ.value, OAuthScope.EVENT_RUN.value} & set(
-        oauth_scopes
-    ):
-        raise HTTPException(403, "Requires profile:read or event:run scope")
+    elif not {
+        OAuthScope.PROFILE_READ.value,
+        OAuthScope.PROFILE_EMAIL.value,
+        OAuthScope.EVENT_RUN.value,
+    } & set(oauth_scopes):
+        raise HTTPException(
+            403, "Requires profile:read, profile:email or event:run scope"
+        )
 
-    return {
+    info = {
         "sub": user.uid,
         "roles": [r.value for r in user.roles],
         "vekn_id": user.vekn_id,
         # What the holder may do, so a client need not match role strings.
         "capabilities": permissions.unconditional_capabilities(user),
     }
+    if oauth_scopes and OAuthScope.PROFILE_EMAIL.value in oauth_scopes:
+        email = await _verified_email(user.uid)
+        if email:
+            info["email"] = email
+    return info
+
+
+async def _verified_email(user_uid: str) -> str | None:
+    methods = sorted(
+        await get_auth_methods_for_user(user_uid),
+        key=lambda a: a.last_used_at or a.modified,
+        reverse=True,
+    )
+    for a in methods:
+        if a.method_type == AuthMethodType.EMAIL and a.verified:
+            return a.identifier
+    for a in methods:
+        if a.method_type == AuthMethodType.DISCORD and a.email:
+            return a.email
+    return None
 
 
 def _require_first_party(request: Request, detail: str) -> None:
@@ -735,6 +770,7 @@ class RegisterClientRequest(BaseModel):
     name: str = ""
     redirect_uris: list[str] = []
     scopes: list[str] = []
+    email_purpose: str = ""
 
 
 @router.post("/clients")
@@ -760,6 +796,14 @@ async def register_client(
     if not redirect_uris and set(scopes) != {OAuthScope.API_READ}:
         raise HTTPException(400, "At least one redirect_uri is required")
 
+    email_purpose = None
+    if OAuthScope.PROFILE_EMAIL in scopes:
+        email_purpose = body.email_purpose.strip()
+        if not email_purpose:
+            raise HTTPException(
+                400, "profile:email requires a statement of what the app does with it"
+            )
+
     client_id = _generate_client_id()
     client_secret = _generate_client_secret()
     secret_hash = ph.hash(client_secret)
@@ -774,6 +818,7 @@ async def register_client(
         redirect_uris=redirect_uris,
         scopes=scopes,
         created_by_uid=user.uid,
+        email_purpose=email_purpose,
     )
     await insert_oauth_client(client)
 
@@ -783,6 +828,7 @@ async def register_client(
         "name": name,
         "redirect_uris": redirect_uris,
         "scopes": [s.value for s in scopes],
+        "email_purpose": email_purpose,
         "warning": "Save the client_secret now. It will not be shown again.",
     }
 
@@ -797,6 +843,7 @@ async def list_clients(user: User = RequireOauthAdmin):
             "client_id": c.client_id,
             "redirect_uris": c.redirect_uris,
             "scopes": [s.value for s in c.scopes],
+            "email_purpose": c.email_purpose,
             "active": c.active,
             "modified": c.modified.isoformat(),
         }
@@ -815,18 +862,11 @@ async def regenerate_secret(
 
     new_secret = _generate_client_secret()
     now = datetime.now(UTC)
-    updated = OAuthClient(
-        uid=client.uid,
-        modified=now,
-        name=client.name,
-        client_id=client.client_id,
-        client_secret_hash=ph.hash(new_secret),
-        redirect_uris=client.redirect_uris,
-        scopes=client.scopes,
-        created_by_uid=client.created_by_uid,
-        active=client.active,
+    await update_oauth_client(
+        msgspec.structs.replace(
+            client, modified=now, client_secret_hash=ph.hash(new_secret)
+        )
     )
-    await update_oauth_client(updated)
 
     return {
         "client_id": client_id,
@@ -845,17 +885,8 @@ async def deactivate_client(
         raise HTTPException(404, "Client not found")
 
     now = datetime.now(UTC)
-    updated = OAuthClient(
-        uid=client.uid,
-        modified=now,
-        name=client.name,
-        client_id=client.client_id,
-        client_secret_hash=client.client_secret_hash,
-        redirect_uris=client.redirect_uris,
-        scopes=client.scopes,
-        created_by_uid=client.created_by_uid,
-        active=False,
+    await update_oauth_client(
+        msgspec.structs.replace(client, modified=now, active=False)
     )
-    await update_oauth_client(updated)
 
     return {"status": "deactivated", "client_id": client_id}

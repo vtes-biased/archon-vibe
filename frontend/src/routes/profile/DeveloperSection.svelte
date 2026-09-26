@@ -30,6 +30,7 @@
   let newName = $state("");
   let newRedirectUris = $state("");
   let newScopes = $state<string[]>(["profile:read"]);
+  let newEmailPurpose = $state("");
   let registering = $state(false);
 
   let displayedSecret = $state<string | null>(null);
@@ -38,6 +39,7 @@
   let confirmAction = $state<{ clientId: string; action: string } | null>(null);
 
   const daemonOnly = $derived(newScopes.length === 1 && newScopes[0] === "api:read");
+  const purposeMissing = $derived(newScopes.includes("profile:email") && !newEmailPurpose.trim());
 
   async function loadClients() {
     loading = true;
@@ -66,7 +68,12 @@
         name: string;
       }>("/oauth/clients", {
         method: "POST",
-        body: JSON.stringify({ name: newName.trim(), redirect_uris: uris, scopes: newScopes }),
+        body: JSON.stringify({
+          name: newName.trim(),
+          redirect_uris: uris,
+          scopes: newScopes,
+          email_purpose: newEmailPurpose.trim(),
+        }),
       });
       displayedSecret = result.client_secret;
       displayedClientId = result.client_id;
@@ -74,6 +81,7 @@
       newName = "";
       newRedirectUris = "";
       newScopes = ["profile:read"];
+      newEmailPurpose = "";
       await loadClients();
     } catch {
       // handled by apiRequest
@@ -183,6 +191,19 @@
                 </div>
               </label>
               <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={newScopes.includes("profile:email")} onchange={() => toggleScope("profile:email")}
+                  class="w-3.5 h-3.5 rounded border-line-strong bg-surface-muted text-accent focus:ring-accent-strong-hover" />
+                <div>
+                  <span class="text-ink-strong text-xs">profile:email</span>
+                  <span class="text-ink-faint text-xs ml-1">— {m.developer_scope_profile_email_desc()}</span>
+                </div>
+              </label>
+              {#if newScopes.includes("profile:email")}
+                <textarea bind:value={newEmailPurpose} rows="2" aria-label={m.developer_email_purpose()}
+                  placeholder={m.developer_email_purpose()}
+                  class="w-full px-3 py-2 bg-surface-card border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint focus:outline-none focus:border-accent-strong-hover"></textarea>
+              {/if}
+              <label class="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={newScopes.includes("event:run")} onchange={() => toggleScope("event:run")}
                   class="w-3.5 h-3.5 rounded border-line-strong bg-surface-muted text-accent focus:ring-accent-strong-hover" />
                 <div>
@@ -202,7 +223,7 @@
           </div>
           <div class="flex gap-2">
             <Button type="button" variant="secondary" size="lg" class="flex-1" onclick={() => (showRegister = false)}>{m.common_cancel()}</Button>
-            <Button type="submit" variant="primary" size="lg" class="flex-1" loading={registering} disabled={!newName.trim() || (!daemonOnly && !newRedirectUris.trim()) || newScopes.length === 0}>
+            <Button type="submit" variant="primary" size="lg" class="flex-1" loading={registering} disabled={!newName.trim() || (!daemonOnly && !newRedirectUris.trim()) || newScopes.length === 0 || purposeMissing}>
               {m.developer_register_submit()}
             </Button>
           </div>

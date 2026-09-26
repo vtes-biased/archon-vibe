@@ -1016,6 +1016,7 @@ class Promo(BaseObject, kw_only=True):
 
 class OAuthScope(StrEnum):
     PROFILE_READ = "profile:read"
+    PROFILE_EMAIL = "profile:email"
     EVENT_RUN = "event:run"
     API_READ = "api:read"
 
@@ -1030,6 +1031,13 @@ class OAuthClient(BaseObject, kw_only=True):
         str, msgspec.Meta(description="Uid of the member who registered the client.")
     ]
     active: bool = True
+    email_purpose: Annotated[
+        str | None,
+        msgspec.Meta(
+            description="What the client does with a member's email, shown on "
+            "consent. Set exactly when scopes include profile:email."
+        ),
+    ] = None
 
 
 class OAuthAuthorizationCode(BaseObject, kw_only=True):

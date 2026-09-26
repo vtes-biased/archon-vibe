@@ -21,6 +21,7 @@
   let codeChallenge = $state("");
   let tournament = $state<string | null>(null);
   let tournamentName = $state<string | null>(null);
+  let emailPurpose = $state<string | null>(null);
   let loading = $state(true);
   let submitting = $state(false);
   let error = $state<string | null>(null);
@@ -71,6 +72,7 @@
       codeChallenge = data.code_challenge;
       tournament = data.tournament;
       tournamentName = data.tournament_name;
+      emailPurpose = data.email_purpose;
     } catch (e) {
       error = toUserMessage(e, m.oauth_error_load_failed());
     }
@@ -203,6 +205,9 @@
                   <p class="text-ink-strong text-sm">{scope}</p>
                   {#if scopeDescriptions[scope]}
                     <p class="text-ink-muted text-xs mt-0.5">{scopeDescriptions[scope]}</p>
+                  {/if}
+                  {#if scope === "profile:email" && emailPurpose}
+                    <p class="text-ink text-xs mt-1">{m.oauth_email_purpose({ app: clientName, purpose: emailPurpose })}</p>
                   {/if}
                 </div>
               </div>

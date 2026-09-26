@@ -48,11 +48,13 @@ Select the grants your app needs:
 
 - `api:read`: lets your app use the Public API. Does not require a callback URL.
 - `profile:read`: lets you identify the member (`/oauth/userinfo`)
+- `profile:email`: everything `profile:read` gives, plus the member's verified email address.
+  Registering it asks what your app does with the address; the member reads that before consenting.
 - `event:run`: gives you access on the member's behalf
 
 **Note** `event:run` needs consent for each tournament you want to run on behalf of the member.
 
-**Configuration: Register a callback URL** for `profile:read` and `event:run`.
+**Configuration: Register a callback URL** for `profile:read`, `profile:email` and `event:run`.
 The match is exact, so `https://example.com/callback` will not accept a trailing slash.
 
 ## Public API App token
@@ -358,7 +360,7 @@ def _state_machine() -> str:
 
 MEMBER_API_TAG = (
     r"""
-Separate API on `{site}`. `/oauth/userinfo` needs only `profile:read` and gives the user's identity.
+Separate API on `{site}`. `/oauth/userinfo` needs only `profile:read` (or `profile:email`) and gives the user's identity.
 The rest is the event itself, and needs `event:run` and a token with specific consent for each event.
 A public API token has no access to this API, on the other hand a Member token has access to the public API.
 
@@ -428,8 +430,10 @@ _EVENT_RUN_ROUTES: list[tuple[str, str, str, str, str, str]] = [
         "`sub` is the member's uid — what `/v1/users/{uid}` takes on the Public API,"
         " and what a tournament's `players`, `standings` and `winner` carry."
         " `capabilities` is what the member may do anywhere, so your app need not"
-        " carry its own copy of the role matrix. Answers a `profile:read` or an"
-        " `event:run` token, whether or not it names an event.",
+        " carry its own copy of the role matrix. Answers a `profile:read`, a"
+        " `profile:email` or an `event:run` token, whether or not it names an event."
+        " A `profile:email` token also gets `email`: the member's verified address,"
+        " absent when they have none.",
     ),
     (
         "get",

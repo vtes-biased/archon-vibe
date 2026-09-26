@@ -157,7 +157,12 @@ read-only, versioned and token-gated, it streams rather than paginates, it runs 
 its own process on its own subdomain, and the app never calls it
 ([public-api](public-api.md)). It
 publishes VEKN IDs rather than names: the `api` projection carries no member's
-name, contact or city ([sync](sync.md#access-levels)).
+name, contact or city ([sync](sync.md#access-levels)). **A member's email goes
+only where the member sends it**: to an OAuth client they consent to under
+`profile:email`, after reading what it does with the address
+([access](access.md#oauth2-provider)). Archon publishes no address; the member does, to a
+client they chose — a forum or mailing list keyed on archon login needs one to
+link existing accounts and to send mail.
 
 **IC holds every capability, everywhere.** Wherever a rule names Prince or NC, IC
 has the same or more.

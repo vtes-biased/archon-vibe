@@ -176,7 +176,9 @@ registry push submits, falling back to
 address for exactly two roles: an NC's or Prince's row carries it into the member
 projection in plaintext and into the public one base64-cloaked, a harvester
 speed-bump rather than access control. Every other member's reaches only the
-holder and full-access readers, and no `api` projection carries it at all.
+holder and full-access readers, and no `api` projection carries it at all. It is
+not what `profile:email` hands a client either: that is a *verified* address,
+because the client keys accounts on it.
 
 **Case is folded at the lookup, not at the row, and the sources differ on
 which.** `contact_email` and the stored Discord email are compared `LOWER()` on
@@ -238,11 +240,23 @@ exist; only a bad client secret (401) and a missing `token` (400) fail. Consent
 survives: revoking tokens is not revoking the grant, which is
 `DELETE /oauth/consents/{client_id}`.
 
-Scopes: `profile:read` (limited to `/oauth/*`) and `event:run` (one named
-tournament, or identity only when it names none — below) delegate a *user's*
-authority; `api:read` delegates nobody's
-and is refused at `/authorize` for that reason — it is the daemon grant's scope
-and only that.
+Scopes: `profile:read` (limited to `/oauth/*`), `profile:email` (the same
+plus the member's verified address) and `event:run` (one named tournament, or
+identity only when it names none — below) delegate a *user's* authority;
+`api:read` delegates nobody's and is refused at `/authorize` for that reason — it
+is the daemon grant's scope and only that. What a client learns about the member
+and what it may do as them are separate axes, so `profile:email` includes
+`profile:read` but sits under no `event:run`: an app that runs events gets no
+address unless it also asks for one. Both `/authorize` verbs refuse a scope the
+client was not registered with — the consent page is not a way around
+registration.
+
+**`profile:email` is registered with a purpose.** Registering it requires a
+statement of what the client does with the address, and the consent page shows it
+under the scope. `/oauth/userinfo` then adds `email`: the address of a verified
+email login, else the verified address Discord last reported for a linked Discord
+login, and absent when there is neither — never [the address of
+record](#the-email-of-record).
 
 ### Event access is per event
 

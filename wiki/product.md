@@ -10,7 +10,8 @@ internet, and results sync when connectivity returns.
 **Out of scope by choice**: card rulings, a rules engine for the card game
 itself, replacing the rulebook, and money handling beyond a payment status — see
 [dogmas](dogmas.md#product). Organizational data is published to third parties,
-read-only and under VEKN IDs rather than names.
+read-only and under VEKN IDs rather than names; a member's verified email reaches
+only an OAuth client the member consents to give it to.
 
 ## Who uses it
 
