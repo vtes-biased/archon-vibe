@@ -383,8 +383,8 @@ The app never calls the API, and the API never runs the app. Three layers:
    (`PUBLIC_API_DB_POOL_MAX_SIZE`, default 2) sized so it cannot starve the app's,
    under a 2-second `statement_timeout` of its own
    (`PUBLIC_API_STATEMENT_TIMEOUT_MS`) so a query nobody waits for cannot hold a
-   slot of two. Every query is index-backed and answers in tens of milliseconds, so
-   the timeout only ever cuts off a regression.
+   slot of two. Every query is index-backed, and even a broad date bound answers a
+   batch in about 100 ms, so the timeout only ever cuts off a regression.
    The frontend has no environment variable pointing at it.
 2. **`scripts/check_public_api_isolation.py`**, wired into `just lint`,
    `just lint-check` **and** `ci.yml` — nothing under `frontend/` may name the API,
