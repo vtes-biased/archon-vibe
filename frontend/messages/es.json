@@ -762,6 +762,8 @@
   "tournament_proxies_allowed": "Proxies permitidos",
   "tournament_proxies_not_allowed": "Proxies no permitidos",
   "tournament_drop_out_btn": "Retirarse",
+  "tournament_drop_out_confirm_title": "¿Retirarse del torneo?",
+  "tournament_drop_out_confirm_body": "No se le sentará en las rondas siguientes. Sus resultados se conservan. Puede volver a hacer el check-in para deshacerlo.",
   "tournament_upload_valid_deck": "Cargue un deck válido para hacer check-in",
   "tournament_fix_deck_btn": "Corrija su deck",
   "tournament_checkin_call_player": "Debe hacer check-in para participar.",

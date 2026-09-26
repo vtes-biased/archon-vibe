@@ -363,8 +363,6 @@
     await doAction("AddPlayer", { user_uid: user.uid, vekn_id: user.vekn_id });
   }
 
-  // Both are one tap from an expanded card and neither is undoable in place, so
-  // they confirm. The modal closes on success — the row changing is the receipt.
   let removalTarget = $state<{ kind: "drop" | "remove"; uid: string; name: string } | null>(null);
 
   async function runRemoval() {

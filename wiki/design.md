@@ -324,7 +324,8 @@ pending debounce is **flushed** on close, never dropped. Nor does such a form cl
 a section on the reader: its folds open **independently** and stay open, never as
 an exclusive accordion, which would take away the feedback that is the edit's only
 confirmation. Only genuinely irreversible or externally visible actions gate behind
-a confirm step.
+a confirm step — plus Drop Out, reversible but silently costly when mistapped
+([tournaments](tournaments.md)); its dialog names the undo.
 
 **Success toasts** — none when the surface that fired the action, or the one it
 lands on, renders the outcome: the rendered change is the confirmation, and a toast

@@ -762,6 +762,8 @@
   "tournament_proxies_allowed": "Proxy consentiti",
   "tournament_proxies_not_allowed": "Proxy non consentiti",
   "tournament_drop_out_btn": "Abbandona",
+  "tournament_drop_out_confirm_title": "Abbandonare il torneo?",
+  "tournament_drop_out_confirm_body": "Non sarai più messo a sedere nei round successivi. I tuoi punteggi restano. Puoi rifare il check-in per annullare.",
   "tournament_upload_valid_deck": "Carica un deck valido per fare check in",
   "tournament_fix_deck_btn": "Correggi il tuo deck",
   "tournament_checkin_call_player": "È necessario fare il check-in per partecipare.",

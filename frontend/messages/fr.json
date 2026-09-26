@@ -762,6 +762,8 @@
   "tournament_proxies_allowed": "Proxies autorisés",
   "tournament_proxies_not_allowed": "Proxies non autorisés",
   "tournament_drop_out_btn": "Abandonner",
+  "tournament_drop_out_confirm_title": "Abandonner le tournoi ?",
+  "tournament_drop_out_confirm_body": "Vous ne serez plus placé aux rondes suivantes. Vos scores sont conservés. Vous pouvez pointer à nouveau pour annuler.",
   "tournament_upload_valid_deck": "Téléchargez un deck valide pour pointer",
   "tournament_fix_deck_btn": "Corriger votre deck",
   "tournament_checkin_call_player": "Vous devez pointer pour participer.",

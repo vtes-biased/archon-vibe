@@ -601,10 +601,6 @@ import TournamentModals from "./TournamentModals.svelte";
     } catch { return null; }
   }
 
-  async function dropPlayer(playerUid: string): Promise<string | null> {
-    return doAction("DropOut", { player_uid: playerUid }, { silent: true });
-  }
-
   // QR self-check-in (?checkin=CODE): strip the code from the address bar and
   // history at once, or copy-link, the share sheet and back-history leak it. An
   // anonymous visitor's stash is consumed on login-return.
@@ -1033,7 +1029,6 @@ import TournamentModals from "./TournamentModals.svelte";
           {scoreSaving}
           {scoreSavingSeat}
           {doAction}
-          {dropPlayer}
           {setVp}
           {setFinalsVp}
           {tournamentSanctions}

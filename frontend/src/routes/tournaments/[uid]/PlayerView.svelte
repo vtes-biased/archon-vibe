@@ -14,6 +14,7 @@
   import CopyResultsButton from "./CopyResultsButton.svelte";
   import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
   import Button from '$lib/components/Button.svelte';
+  import ConfirmActionModal from "$lib/components/ConfirmActionModal.svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import VpInput from "$lib/components/VpInput.svelte";
   import FoldableSection from "$lib/components/FoldableSection.svelte";
@@ -38,7 +39,6 @@
     scoreSaving,
     scoreSavingSeat,
     doAction,
-    dropPlayer,
     setVp,
     setFinalsVp,
     tournamentSanctions,
@@ -57,7 +57,6 @@
     scoreSaving: number | null;
     scoreSavingSeat: string | null;
     doAction: (action: TournamentEventType, body?: any, opts?: { silent?: boolean }) => Promise<string | null>;
-    dropPlayer: (uid: string) => Promise<string | null>;
     setVp: (roundIndex: number, tableIndex: number, playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>, opts?: { silent?: boolean }) => Promise<string | null>;
     setFinalsVp: (playerUid: string, vp: number, seating: Array<{ player_uid: string; result: { vp: number } }>, opts?: { silent?: boolean }) => Promise<string | null>;
     tournamentSanctions: Sanction[];
@@ -144,6 +143,8 @@
   async function playerAction(action: TournamentEventType, body?: Record<string, unknown>) {
     actionError = await doAction(action, body, { silent: true });
   }
+
+  let showDropConfirm = $state(false);
 
   let selfOrganizeError = $state<string | null>(null);
   async function submitSelfOrganize(picked: string[]) {
@@ -426,7 +427,7 @@
       {:else if currentPlayerEntry.state !== "Finished" && (tournament.state === "Waiting" || tournament.state === "Playing")}
         <Button
           variant="danger"
-          onclick={async () => { actionError = await dropPlayer(userUid); }}
+          onclick={() => showDropConfirm = true}
           disabled={actionLoading}
         ><Trash2 class="w-4 h-4" aria-hidden="true" />{m.tournament_drop_out_btn()}</Button>
       {/if}
@@ -717,6 +718,17 @@
       error={selfOrganizeError}
       onSubmit={submitSelfOrganize}
       onClose={() => { showSelfOrganize = false; selfOrganizeError = null; }}
+    />
+  {/if}
+
+  {#if showDropConfirm}
+    <ConfirmActionModal
+      title={m.tournament_drop_out_confirm_title()}
+      body={m.tournament_drop_out_confirm_body()}
+      confirmLabel={m.tournament_drop_out_btn()}
+      action={() => playerAction("DropOut", { player_uid: userUid })}
+      reportResult={false}
+      onClose={() => showDropConfirm = false}
     />
   {/if}
 

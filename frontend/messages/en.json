@@ -762,6 +762,8 @@
   "tournament_proxies_allowed": "Proxies allowed",
   "tournament_proxies_not_allowed": "Proxies not allowed",
   "tournament_drop_out_btn": "Drop Out",
+  "tournament_drop_out_confirm_title": "Drop out of the tournament?",
+  "tournament_drop_out_confirm_body": "You won't be seated in later rounds. Your scores so far are kept. You can check back in to undo it.",
   "tournament_upload_valid_deck": "Upload a valid deck to check in",
   "tournament_fix_deck_btn": "Fix your deck",
   "tournament_checkin_call_player": "You need to check in to participate.",

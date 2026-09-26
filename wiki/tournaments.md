@@ -253,8 +253,10 @@ app has no default and must not decide.** A round turns `Playing` the moment it
 is seated, while players are still finding seats, so an arrival in that gap can
 often still be seated; once play has begun they usually wait. The same path
 reverses a drop-out, who returns to `Playing` if their seat is still live —
-dropping out never vacates a seat, which is why Drop Out carries no
-confirmation. Only `Planned` and `Registration` refuse a check-in; a `Finished`
+dropping out never vacates a seat. Drop Out still confirms, for the organizer and
+for a player dropping themselves alike: it is one tap from the card, and a mistap
+left unnoticed keeps the player out of the next seating, so the dialog names check-in
+as the undo. Only `Planned` and `Registration` refuse a check-in; a `Finished`
 tournament accepts one only for post-hoc correction.
 
 **There is no "Loss".** Tournament rules §3.3 and §3.1.4 assign one for the round
