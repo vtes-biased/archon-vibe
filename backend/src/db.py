@@ -1156,6 +1156,18 @@ async def get_tournament_by_vekn_event_id(event_id: str) -> Tournament | None:
         return None
 
 
+async def get_tournament_uid_by_archon_uid(archon_uid: str) -> str | None:
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT uid FROM objects
+            WHERE type = 'tournament' AND "full"->'external_ids'->>'archon' = %s
+              AND deleted_at IS NULL LIMIT 1""",
+            (archon_uid,),
+        )
+        row = await result.fetchone()
+        return row[0] if row else None
+
+
 # Crockford base32: no I/L/O/U, so nothing decodes two ways when read aloud.
 _EVENT_CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 

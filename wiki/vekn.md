@@ -779,11 +779,13 @@ entries disagree that way harmlessly — only a rival event on the same date won
 the same player does.
 
 **The two `event_link` url forms quote uids from two different id spaces.** The
-live `/tournaments/<uid>` form quotes ours; the dead legacy
+live `/tournaments/<uid>` form quotes ours; the legacy
 `/tournament/<uid>/display.html` form quotes the uid legacy archon minted, which
 the import kept in `external_ids['archon']` on 255 rows. Resolving a legacy link
 against our own uid space alone reports it dead, and the entry then falls to a
-reconstruction it does not need.
+reconstruction it does not need. The app redirects the legacy form:
+nginx proxies it to the backend, which 301s to the live event holding that uid and
+404s any other.
 
 **One winning deck per event means two entries cannot share a tournament.** Each
 tier judges a single entry, so a collision between two of them is invisible until a

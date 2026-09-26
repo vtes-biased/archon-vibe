@@ -639,6 +639,16 @@ async def tournament_code_og_stub(code: str, request: Request) -> Response:
     return Response(content=html, media_type="text/html")
 
 
+@app.get("/tournament/{archon_uid}/display.html")
+async def legacy_tournament_redirect(archon_uid: str) -> Response:
+    from .db import get_tournament_uid_by_archon_uid
+
+    uid = await get_tournament_uid_by_archon_uid(archon_uid)
+    if uid is None:
+        raise HTTPException(status_code=404)
+    return Response(status_code=301, headers={"Location": f"/tournaments/{uid}"})
+
+
 @app.get("/leagues/{uid}")
 async def league_og_stub(uid: str, request: Request) -> Response:
     """Open Graph stub for a league share link — same crawler-only UA-split

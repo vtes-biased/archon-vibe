@@ -91,6 +91,10 @@ server {
 {{ headers() }}
   }
 {% endfor %}
+  location ~ ^/tournament/[^/]+/display\.html$ {
+{{ proxy_headers() }}
+    proxy_pass http://127.0.0.1:{{ backend_port }};
+  }
   # Its own named location: preserving the URI would reach the backend's `/`
   # health check.
   location = / {

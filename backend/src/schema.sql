@@ -234,6 +234,10 @@ WHERE type = 'user' AND calendar_token IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_objects_tournament_vekn
 ON objects(("full"->'external_ids'->>'vekn'))
 WHERE type = 'tournament' AND "full"->'external_ids'->>'vekn' IS NOT NULL;
+-- The legacy /tournament/<uid>/display.html redirect.
+CREATE INDEX IF NOT EXISTS idx_objects_tournament_archon
+ON objects(("full"->'external_ids'->>'archon'))
+WHERE type = 'tournament' AND "full"->'external_ids'->>'archon' IS NOT NULL;
 -- The short event code, resolved case-insensitively (archive slugs are lower,
 -- minted codes upper). Spans soft-deleted rows: a code is never reissued.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_objects_tournament_event_code
