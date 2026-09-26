@@ -462,7 +462,7 @@ service(
     bot_state_dir=bot_state_dir,
 )
 
-# --- Frontend: unpacked beside the live dist and swapped in, so no stale file survives
+# --- Frontend
 
 files.directory(name="Frontend root", path=www, user=name, group=name, mode="755")
 tarball = frontend_bundle(build)
@@ -478,13 +478,12 @@ if deployed(f"{www}/.bundle") != bundle:
     server.shell(
         name="Swap in the frontend",
         commands=[
-            f"rm -rf {www}/dist.new {www}/dist.old",
+            f"rm -rf {www}/dist.new",
             f"mkdir {www}/dist.new",
             f"tar -xzf {www}/frontend-dist.tar.gz -C {www}/dist.new",
             f"chown -R {name}:{name} {www}/dist.new",
-            f"if [ -d {www}/dist ]; then mv {www}/dist {www}/dist.old; fi",
+            f"if [ -d {www}/dist ]; then rm -rf {www}/dist.prev && mv {www}/dist {www}/dist.prev; fi",
             f"mv {www}/dist.new {www}/dist",
-            f"rm -rf {www}/dist.old",
             f"echo {bundle} > {www}/.bundle",
         ],
     )
@@ -500,6 +499,7 @@ vhosts = [
         domain=domain,
         modern_http2=http2,
         dist=f"{www}/dist",
+        previous_dist=f"{www}/dist.prev",
         backend_paths=BACKEND_PATHS,
         sse_path=SSE_PATH,
         backend_port=d.backend_port,

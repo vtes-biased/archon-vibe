@@ -554,6 +554,20 @@ returned and coming back to "Link invalid" with no password form. Anything a
 page needs across an unannounced reload must survive in the URL or in storage
 until it is actually spent.
 
+**A deploy keeps exactly one previous build's chunks.** A tab still running the
+old build lazy-loads content-hashed `_app/immutable` files the new dist does not
+have, and once any tab applies the new service worker, the old precache is gone
+for every tab. So the swap keeps the replaced dist as `dist.prev`, and the vhost
+falls back to it for an `/_app/immutable/` miss. A tab two deploys behind still
+gets a 404. For a route node SvelteKit recovers on its own: its version check turns
+the failed navigation into a full-page load of the target, and a failed hover
+preload is dropped. So `reloadOnStaleChunk` stands down for route nodes and their
+CSS, which no other lazy import carries, and covers every other lazy import,
+reloading once onto the current build on `vite:preloadError`, at most once a
+minute and never while offline. Safari's error names no URL, so a stale hover
+preload there reloads the current page instead. Unlike `maybeAutoApply`, it
+ignores the offline lock: a missing chunk has already broken the page.
+
 **Running out of file descriptors truncates responses mid-body — it does not
 refuse connects.** Measured in the local EC rehearsal at macOS's 256-fd
 default: 26 of 200 snapshot downloads cut mid-body (`TransferEncodingError` on

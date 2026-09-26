@@ -116,6 +116,16 @@ server {
 {{ headers() }}
   }
 
+  location ^~ /_app/immutable/ {
+    try_files $uri @previous_build;
+    add_header Cache-Control "public, max-age=31536000, immutable";
+{{ headers() }}
+  }
+  location @previous_build {
+    root {{ previous_dist }};
+    add_header Cache-Control "public, max-age=31536000, immutable";
+{{ headers() }}
+  }
   location ^~ /_app/ {
     add_header Cache-Control "public, max-age=31536000, immutable";
 {{ headers() }}

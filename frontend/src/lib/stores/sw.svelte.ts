@@ -1,4 +1,5 @@
 import { dev } from '$app/environment';
+import { navigating } from '$app/state';
 import { getMetadataByPrefix } from '$lib/db';
 
 let updateAvailable = $state(false);
@@ -38,6 +39,21 @@ async function maybeAutoApply(registration: ServiceWorkerRegistration): Promise<
   sessionStorage.setItem(AUTO_APPLIED_KEY, '1');
   waitingWorker = registration.waiting;
   applyUpdate();
+}
+
+const CHUNK_RELOAD_KEY = 'stale_chunk_reload';
+const CHUNK_RELOAD_WINDOW_MS = 60_000;
+
+export function reloadOnStaleChunk(): void {
+  window.addEventListener('vite:preloadError', (event) => {
+    const failed = String(event.payload);
+    if (navigating.to || failed.includes('/_app/immutable/nodes/') || failed.includes('/_app/immutable/assets/')) return;
+    if (!navigator.onLine) return;
+    const last = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) ?? 0);
+    if (Date.now() - last < CHUNK_RELOAD_WINDOW_MS) return;
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+    window.location.reload();
+  });
 }
 
 export function initServiceWorker(): void {

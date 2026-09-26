@@ -5,7 +5,7 @@
   import { syncManager } from '$lib/sync';
   import { initAuth } from '$lib/stores/auth.svelte';
   import { initEngine } from '$lib/engine-instance';
-  import { initServiceWorker, getUpdateAvailable, applyUpdate } from '$lib/stores/sw.svelte';
+  import { initServiceWorker, getUpdateAvailable, applyUpdate, reloadOnStaleChunk } from '$lib/stores/sw.svelte';
   import { initOfflineState, getOfflineTournamentUids } from '$lib/stores/offline.svelte';
   import { reconcilePush } from '$lib/stores/push.svelte';
   import { onMount } from 'svelte';
@@ -54,6 +54,7 @@
   onMount(() => {
     isBeta = document.documentElement.dataset.env === 'beta';
     initTheme();
+    reloadOnStaleChunk();
     initServiceWorker();
 
     initAuth().then(() => {
