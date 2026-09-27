@@ -365,6 +365,7 @@
       {@render sheetGroup(m.tools_group_wrapup(), true)}
       {@render sheetRow(m.tools_copy_results(), ClipboardCopy)}
       {@render sheetRow(m.tools_download_event(), Download)}
+      {@render sheetRow(m.tools_download_sanctions(), Download)}
     </div>
   </div>
 </ExampleBox>
