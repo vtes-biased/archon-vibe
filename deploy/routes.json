@@ -1,0 +1,5 @@
+{
+  "backend_paths": ["/api", "/auth", "/oauth", "/vekn", "/sanctions", "/admin", "/snapshot"],
+  "sse_path": "/stream",
+  "backend_patterns": ["^/tournament/[^/]+/display\\.html$"]
+}

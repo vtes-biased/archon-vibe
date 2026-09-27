@@ -1,11 +1,11 @@
 """Guardrail: no frontend SPA page route may be shadowed by a backend-proxied
 nginx prefix — a page under a backend prefix 404s against the API instead of
 booting the SPA (bit us twice: /oauth/consent, /auth/email/verify, since
-relocated). Reads the proxied-prefix list from `deploy/routes.py`, the same
+relocated). Reads the proxied-prefix list from `deploy/routes.json`, the same
 source nginx renders from, so the check can't drift from the deployed config.
 """
 
-import importlib.util
+import json
 from pathlib import Path
 
 _REPO = Path(__file__).resolve().parents[2]
@@ -13,12 +13,8 @@ _ROUTES = _REPO / "frontend" / "src" / "routes"
 
 
 def _backend_prefixes() -> list[str]:
-    spec = importlib.util.spec_from_file_location(
-        "routes", _REPO / "deploy" / "routes.py"
-    )
-    routes = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(routes)
-    return [*routes.BACKEND_PATHS, routes.SSE_PATH]
+    routes = json.loads((_REPO / "deploy" / "routes.json").read_text())
+    return [*routes["backend_paths"], routes["sse_path"]]
 
 
 def _page_routes() -> list[str]:

@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import subprocess
 from io import StringIO
@@ -11,13 +12,13 @@ from pyinfra.facts.server import Command
 from pyinfra.operations import files, server, systemd
 from pyinfra.operations.util import any_changed
 from release import artifact, fetch, frontend_bundle
-from routes import BACKEND_PATHS, SSE_PATH
 from server_setup import certificate, nginx_site, postgres_db
 from server_setup.nginx_site import modern_http2
 from server_setup.secrets import load, put_secret
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
+ROUTES = json.loads((HERE / "routes.json").read_text())
 UV = "/usr/local/bin/uv"
 UV_ENV = {"UV_PYTHON_INSTALL_DIR": "/opt/uv/python"}
 PYTHON = (REPO / ".python-version").read_text().strip()
@@ -551,8 +552,9 @@ vhosts = [
         modern_http2=http2,
         dist=f"{www}/dist",
         previous_dist=f"{www}/dist.prev",
-        backend_paths=BACKEND_PATHS,
-        sse_path=SSE_PATH,
+        backend_paths=ROUTES["backend_paths"],
+        backend_patterns=ROUTES["backend_patterns"],
+        sse_path=ROUTES["sse_path"],
         backend_port=d.backend_port,
         snapshot_accel_prefix=SNAPSHOTS_PREFIX,
         snapshot_dir=snapshot_dir,

@@ -785,11 +785,14 @@ over 300ms were reported before it. The map is in uid order, so
 `getUserListItems` sorts by name before returning — the community directory renders
 its link lists straight off that order and the rankings tie-break on it.
 
-**Cache Storage is allowlist-only.** The service worker writes exactly two things
-to Cache Storage: precached build assets and SPA navigations. Every other
-same-origin GET — `/api`, `/stream`, `/snapshot?token=`, `/auth`, `/admin` —
-passes through untouched, so a JWT-bearing response can never be served from
-cache. Widening the cache rule is a security change, not a performance tweak.
+**Cache Storage is allowlist-only.** The service worker writes exactly three
+things to Cache Storage: the precache (build assets, static files and the SPA
+shell), promo images (unauthenticated, versioned, cache-first) and cross-origin
+card images. No navigation response is ever cached — an offline reload of any
+route is answered by the shell. Every other same-origin GET — `/api`, `/stream`,
+`/snapshot?token=`, `/auth`, `/admin` — passes through untouched, so a
+JWT-bearing response can never be served from cache. Widening the cache rule is a
+security change, not a performance tweak.
 
 **Universal soft-delete**: on a tombstone the client **hard-deletes** the row from
 its store, otherwise it saves. No type is exempt, **users included** — every

@@ -92,10 +92,12 @@ server {
 {{ headers() }}
   }
 {% endfor %}
-  location ~ ^/tournament/[^/]+/display\.html$ {
+{% for pattern in backend_patterns %}
+  location ~ {{ pattern }} {
 {{ proxy_headers() }}
     proxy_pass http://127.0.0.1:{{ backend_port }};
   }
+{% endfor %}
   # Its own named location: preserving the URI would reach the backend's `/`
   # health check.
   location = / {

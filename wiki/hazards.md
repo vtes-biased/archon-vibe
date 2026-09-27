@@ -645,11 +645,13 @@ leaves uvicorn.
 under an existing prefix is fine; a new top-level segment 404s in production while
 passing dev CORS and the test suite ([access](access.md#deployment-gate)).
 
-**The service worker answers every same-origin navigation with the SPA shell.**
-A path a user navigates to that nginx or the backend answers, rather than the SPA,
-must be excluded in `service-worker.ts`, or every device that has opened the app
-before gets the in-app 404 while `curl` shows the route working. The legacy
-`/tournament/<uid>/display.html` redirect is excluded there.
+**The service worker answers every same-origin navigation with the precached SPA
+shell**, except a path nginx proxies to the backend: the OAuth authorize and
+callback flows, the `.ics` calendar feeds, the legacy display redirect. It reads
+those from `deploy/routes.json`, the file nginx is rendered from, so a new
+backend prefix or proxied regex goes there and nowhere else. A backend path
+hardcoded outside it gets the in-app 404 on every device that has opened the app
+before — Discord login included — while `curl` shows the route working.
 
 **A superseded PostgreSQL cluster left enabled steals 5432 at the next boot**, and
 nothing in the stack can tell you it happened. Both clusters are configured for

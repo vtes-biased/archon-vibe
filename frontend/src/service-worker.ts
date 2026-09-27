@@ -4,15 +4,23 @@
 /// <reference types="@sveltejs/kit" />
 
 import { build, files, version } from '$service-worker';
+import routes from '../../deploy/routes.json';
 
 const sw = globalThis.self as unknown as ServiceWorkerGlobalScope;
 const CACHE = `cache-${version}`;
 const ASSETS = [...build, ...files];
-const LEGACY_DISPLAY = /^\/tournament\/[^/]+\/display\.html$/;
+// adapter-static writes the fallback after the build, so `build` never lists it;
+// vite dev serves no such file, and one 404 fails the whole install.
+const SHELL = '/200.html';
+const BACKEND_PREFIXES = [...routes.backend_paths, routes.sse_path];
+const BACKEND_PATTERNS = routes.backend_patterns.map((p) => new RegExp(p));
 
 sw.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(ASSETS))
+    caches.open(CACHE).then(async (cache) => {
+      await cache.addAll(ASSETS);
+      if (!import.meta.env.DEV) await cache.add(new Request(SHELL, { cache: 'reload' }));
+    })
   );
 });
 
@@ -40,12 +48,12 @@ sw.addEventListener('fetch', (event) => {
       event.respondWith(cacheFirst(event.request));
       return;
     }
-    // Allow-list: only precached assets and SPA navigations use Cache Storage;
-    // every other same-origin GET passes through untouched, so authenticated
-    // responses never get cached.
-    if (event.request.mode === 'navigate' && LEGACY_DISPLAY.test(url.pathname)) return;
-    if (ASSETS.includes(url.pathname) || event.request.mode === 'navigate') {
-      event.respondWith(respondFromCache(event.request, url));
+    if (ASSETS.includes(url.pathname)) {
+      event.respondWith(fromPrecache(event.request, url));
+      return;
+    }
+    if (event.request.mode === 'navigate' && !isBackend(url.pathname)) {
+      event.respondWith(shell(event.request));
     }
     return;
   }
@@ -53,6 +61,13 @@ sw.addEventListener('fetch', (event) => {
   // Cross-origin (card images): network-first, cache fallback.
   event.respondWith(networkFirst(event.request));
 });
+
+function isBackend(pathname: string): boolean {
+  return (
+    BACKEND_PREFIXES.some((p) => pathname.startsWith(p)) ||
+    BACKEND_PATTERNS.some((re) => re.test(pathname))
+  );
+}
 
 // Versioned promo-image URLs are immutable content: a cache hit is always
 // correct, and a re-upload changes the URL (new ?v=) so staleness can't occur.
@@ -65,20 +80,19 @@ async function cacheFirst(request: Request): Promise<Response> {
   return response;
 }
 
-async function respondFromCache(request: Request, url: URL): Promise<Response> {
-  const cache = await caches.open(CACHE);
+async function fromPrecache(request: Request, url: URL): Promise<Response> {
+  const cached = await (await caches.open(CACHE)).match(url.pathname);
+  return cached ?? fetch(request);
+}
 
-  if (ASSETS.includes(url.pathname)) {
-    const cached = await cache.match(url.pathname);
-    if (cached) return cached;
+async function shell(request: Request): Promise<Response> {
+  const cached = await (await caches.open(CACHE)).match(SHELL);
+  if (cached) return cached;
+  try {
+    return await fetch(request);
+  } catch {
+    return new Response('Offline', { status: 503 });
   }
-
-  if (request.mode === 'navigate') {
-    const fallback = await cache.match('/200.html');
-    if (fallback) return fallback;
-  }
-
-  return networkFirst(request);
 }
 
 async function networkFirst(request: Request): Promise<Response> {
