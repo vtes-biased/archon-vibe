@@ -338,8 +338,9 @@ async def test_member_level_deck_keeps_its_privacy_and_view_log(test_client, tes
     logged offline joins the stored log rather than replacing it."""
     org = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Org")
     owner = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Owner")
-    await db.save_user(org)
-    await db.save_user(owner)
+    co_org = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Co-organizer")
+    for u in (org, owner, co_org):
+        await db.save_user(u)
     base_uid = await _seed(org.uid)
     deck = DeckObject(
         uid=str(uuid7()),
@@ -350,14 +351,14 @@ async def test_member_level_deck_keeps_its_privacy_and_view_log(test_client, tes
         public=True,
         winner=True,
         private=True,
-        views=[DeckView(user_uid=org.uid, round=0)],
+        views=[DeckView(user_uid=co_org.uid, round=0)],
     )
     await db.save_object_from_model(ObjectType.DECK, deck)
     offline_copy = compute_deck_member(msgspec.to_builtins(deck))
     assert "private" not in offline_copy and "views" not in offline_copy
     offline_copy["winner"] = False
     offline_copy["public"] = False
-    offline_copy["views"] = [{"user_uid": owner.uid, "round": 1}]
+    offline_copy["views"] = [{"user_uid": org.uid, "round": 1}]
 
     body = {
         "device_id": "devA",
@@ -374,7 +375,7 @@ async def test_member_level_deck_keeps_its_privacy_and_view_log(test_client, tes
 
     [saved] = await db.get_decks_for_tournament(base_uid)
     assert (saved.public, saved.winner, saved.private) == (False, False, True)
-    assert saved.views == [*deck.views, DeckView(user_uid=owner.uid, round=1)]
+    assert saved.views == [*deck.views, DeckView(user_uid=org.uid, round=1)]
 
 
 @pytest.mark.asyncio

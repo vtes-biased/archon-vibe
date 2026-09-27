@@ -2177,8 +2177,6 @@ async def go_online(
             d.uid: msgspec.to_builtins(d)
             for d in await get_decks_for_tournament(uid, conn=tx_conn)
         }
-        # A member credit earned offline names a TEMP- vekn; repoint it to the
-        # resolved one, and withhold the credit where nothing resolves it.
         for deck_data in data.offline_decks:
             stored = stored_decks.get(deck_data.get("uid"), {})
             views = stored.get("views", [])
@@ -2191,6 +2189,8 @@ async def go_online(
             )
             deck_obj.tournament_uid = uid
             deck_obj.user_uid = uid_map.get(deck_obj.user_uid, deck_obj.user_uid)
+            # A member credit earned offline names a TEMP- vekn; repoint it to the
+            # resolved one, and withhold the credit where nothing resolves it.
             credit = deck_obj.attribution
             if credit.kind == AttributionKind.MEMBER and credit.vekn_id.startswith(
                 "TEMP-"
