@@ -1,4 +1,8 @@
+use json::JsonValue;
+
+use super::sanctions::table_sa_adjustments;
 use super::types::VpError;
+use crate::model::seat;
 
 /// VPs must be in seating (predator-prey) order around the table.
 pub fn check_table_vps(vps: &[f64]) -> Option<VpError> {
@@ -244,4 +248,32 @@ pub fn compute_tp(table_size: usize, vps: &[f64], adjustments: &[f64]) -> Vec<f6
         i = j;
     }
     result
+}
+
+/// GW/TP for one table from VPs in seating order, with the round's SAs applied.
+/// `finals_seed_order` marks a finals table: seed tiebreak, winner always awarded.
+pub(super) fn score_table(
+    seating: &JsonValue,
+    vps: &[f64],
+    round_index: usize,
+    effective_sas: &[(String, usize)],
+    finals_seed_order: Option<&JsonValue>,
+) -> (Vec<f64>, Vec<f64>) {
+    let adjustments = table_sa_adjustments(seating, round_index, effective_sas);
+    let gws = match finals_seed_order {
+        Some(seed_order) => {
+            let seating_uids: Vec<&str> = seating
+                .members()
+                .map(|s| s[seat::PLAYER_UID].as_str().unwrap_or(""))
+                .collect();
+            let seed_order: Vec<String> = seed_order
+                .members()
+                .filter_map(|s| s.as_str().map(String::from))
+                .collect();
+            compute_gw_finals(vps, &adjustments, &seating_uids, &seed_order)
+        }
+        None => compute_gw(vps, &adjustments),
+    };
+    let tps = compute_tp(seating.len(), vps, &adjustments);
+    (gws, tps)
 }

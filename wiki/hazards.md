@@ -157,12 +157,6 @@ in.
 
 **The engine's decks payload is built twice** — `build_decks_json` and `buildDecksPayload` — and the engine refuses an entry missing `public`, `winner` or `private`; the frontend fills a withheld `private` from `winner`, which holds only while the member projection publishes no private deck but the winner's ([sync](sync.md#access-levels)).
 
-**`preview_scores_json` deliberately duplicates the `SetScore` GW/TP cascade** —
-the preview runs on not-yet-persisted scores, so the two paths cannot share state.
-A cascade change must land on both sides; the single equality test
-`test_preview_scores_match_setscore_including_sa_cascade` pins them together, and
-one is enough — don't add a second.
-
 ## Renames and references
 
 **Reassigning object references** — sanctions, decks, cooptation on merge or detach

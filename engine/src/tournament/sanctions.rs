@@ -63,8 +63,7 @@ pub(super) fn resolve_sa_effective_rounds(
 }
 
 /// -1.0 per resolved SA whose effective round is `round_index`. Length matches
-/// `seating`. Shared by SetScore and the standings/rating recompute, so every
-/// path applies SA to GW/TP identically.
+/// `seating`.
 pub(super) fn table_sa_adjustments(
     seating: &JsonValue,
     round_index: usize,

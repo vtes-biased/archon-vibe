@@ -33,7 +33,8 @@ use helpers::{
     recompute_deck_publication, release_stamped_decks, require_can_edit_results, require_organizer,
     require_state, require_state_or_finished, stamp_round_decks, validate_enum,
 };
-use sanctions::{has_active_suspension, has_dq_sanction, table_sa_adjustments};
+use sanctions::{has_active_suspension, has_dq_sanction};
+use scoring::score_table;
 use standings::{
     compute_preliminary_standings, finals_candidates, top5_has_ties, toss_groups, tosses_are_total,
     update_standings,
@@ -380,8 +381,7 @@ pub fn update_standings_json(
     Ok(result.dump())
 }
 
-/// Mirrors SetScore's SA cascade exactly, so live UI previews never drift from
-/// persisted results. `round == rounds.len()` is the finals sentinel (`table` ignored).
+/// `round == rounds.len()` is the finals sentinel (`table` ignored).
 pub fn preview_scores_json(config_json: &str) -> Result<String, EngineError> {
     let config = json::parse(config_json)?;
     let tournament = &config[arg::TOURNAMENT];
@@ -408,21 +408,13 @@ pub fn preview_scores_json(config_json: &str) -> Result<String, EngineError> {
         return Err(EngineError::internal("vps/seating length mismatch"));
     }
     let effective_sas = sanctions::resolve_sa_effective_rounds(tournament, sanctions);
-    let adjustments = table_sa_adjustments(seating, round, &effective_sas);
-    let gws = if is_finals {
-        let seating_uids: Vec<&str> = seating
-            .members()
-            .map(|s| s[seat::PLAYER_UID].as_str().unwrap_or(""))
-            .collect();
-        let seed_order: Vec<String> = table[finals_table::SEED_ORDER]
-            .members()
-            .filter_map(|s| s.as_str().map(|v| v.to_string()))
-            .collect();
-        compute_gw_finals(&vps, &adjustments, &seating_uids, &seed_order)
-    } else {
-        compute_gw(&vps, &adjustments)
-    };
-    let tps = compute_tp(seating.len(), &vps, &adjustments);
+    let (gws, tps) = score_table(
+        seating,
+        &vps,
+        round,
+        &effective_sas,
+        is_finals.then(|| &table[finals_table::SEED_ORDER]),
+    );
     Ok(json::object! {
         score::GW => JsonValue::Array(gws.into_iter().map(Into::into).collect()),
         score::TP => JsonValue::Array(tps.into_iter().map(Into::into).collect()),
@@ -2084,29 +2076,14 @@ fn apply_event(
                 vps.push(vp);
             }
 
-            // Per-seat SA adjustments (-1.0 VP per SA on this round). Same helper the
-            // standings/rating recompute uses, so GW/TP stay consistent everywhere.
             let current_round = if is_finals { rounds_len } else { *round };
-            let adjustments =
-                table_sa_adjustments(&t[table::SEATING], current_round, &effective_sas);
-
-            let gws = if is_finals {
-                let seating_uids: Vec<&str> = (0..table_size)
-                    .map(|i| {
-                        t[table::SEATING][i][seat::PLAYER_UID]
-                            .as_str()
-                            .unwrap_or("")
-                    })
-                    .collect();
-                let seed_order: Vec<String> = t[finals_table::SEED_ORDER]
-                    .members()
-                    .filter_map(|s| s.as_str().map(|v| v.to_string()))
-                    .collect();
-                compute_gw_finals(&vps, &adjustments, &seating_uids, &seed_order)
-            } else {
-                compute_gw(&vps, &adjustments)
-            };
-            let tps = compute_tp(table_size, &vps, &adjustments);
+            let (gws, tps) = score_table(
+                &t[table::SEATING],
+                &vps,
+                current_round,
+                &effective_sas,
+                is_finals.then(|| &t[finals_table::SEED_ORDER]),
+            );
 
             for i in 0..table_size {
                 let player_uid = t[table::SEATING][i][seat::PLAYER_UID]
@@ -2367,29 +2344,30 @@ fn apply_event(
                 return Err(EngineError::FinalsTableUnfinished);
             }
 
-            // compute_gw_finals is the single source of finals-winner derivation — the same
-            // call SetScore and update_standings use, so the winner can never diverge from the scored GW.
             let effective_sas = sanctions::resolve_sa_effective_rounds(tournament, sanctions);
             let finals_round = tournament[tournament::ROUNDS].len();
-            let seating = &tournament[tournament::FINALS][finals_table::SEATING];
+            let finals = &tournament[tournament::FINALS];
+            let seating = &finals[finals_table::SEATING];
             let vps: Vec<f64> = seating
                 .members()
                 .map(|s| s[seat::RESULT][score::VP].as_f64().unwrap_or(0.0))
                 .collect();
-            let seating_uids: Vec<&str> = seating
-                .members()
-                .map(|s| s[seat::PLAYER_UID].as_str().unwrap_or(""))
-                .collect();
-            let adjustments = table_sa_adjustments(seating, finals_round, &effective_sas);
-            let seed_order: Vec<String> = tournament[tournament::FINALS][finals_table::SEED_ORDER]
-                .members()
-                .filter_map(|s| s.as_str().map(|v| v.to_string()))
-                .collect();
-            let gws = compute_gw_finals(&vps, &adjustments, &seating_uids, &seed_order);
+            let (gws, _) = score_table(
+                seating,
+                &vps,
+                finals_round,
+                &effective_sas,
+                Some(&finals[finals_table::SEED_ORDER]),
+            );
             let winner = gws
                 .iter()
                 .position(|&g| g == 1.0)
-                .map(|i| seating_uids[i].to_string())
+                .map(|i| {
+                    seating[i][seat::PLAYER_UID]
+                        .as_str()
+                        .unwrap_or("")
+                        .to_string()
+                })
                 .unwrap_or_default();
 
             tournament[tournament::WINNER] = winner.as_str().into();

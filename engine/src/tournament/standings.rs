@@ -4,10 +4,8 @@ use crate::model::{
 use json::JsonValue;
 
 use super::helpers::count_played_rounds;
-use super::sanctions::{
-    has_dq_sanction, resolve_sa_effective_rounds, sa_vp_penalty, table_sa_adjustments,
-};
-use super::scoring::{compute_gw, compute_gw_finals, compute_tp};
+use super::sanctions::{has_dq_sanction, resolve_sa_effective_rounds, sa_vp_penalty};
+use super::scoring::score_table;
 
 pub(super) struct Standing {
     pub user_uid: String,
@@ -44,9 +42,7 @@ pub(super) fn compute_preliminary_standings(
                 .members()
                 .map(|s| s[seat::RESULT][score::VP].as_f64().unwrap_or(0.0))
                 .collect();
-            let adjustments = table_sa_adjustments(seating, round_index, &effective_sas);
-            let gws = compute_gw(&vps, &adjustments);
-            let tps = compute_tp(vps.len(), &vps, &adjustments);
+            let (gws, tps) = score_table(seating, &vps, round_index, &effective_sas, None);
             for (i, seat) in seating.members().enumerate() {
                 let uid = seat[seat::PLAYER_UID].as_str().unwrap_or("").to_string();
                 if uid.is_empty() {
@@ -180,9 +176,7 @@ fn refresh_round_scoring(tournament: &mut JsonValue, sanctions: &JsonValue) {
                 .members()
                 .map(|s| s[seat::RESULT][score::VP].as_f64().unwrap_or(0.0))
                 .collect();
-            let adjustments = table_sa_adjustments(seating, r, &effective_sas);
-            let gws = compute_gw(&vps, &adjustments);
-            let tps = compute_tp(vps.len(), &vps, &adjustments);
+            let (gws, tps) = score_table(seating, &vps, r, &effective_sas, None);
             let table = &mut tournament[tournament::ROUNDS][r][t];
             for i in 0..vps.len() {
                 table[table::SEATING][i][seat::RESULT][score::GW] =
@@ -221,14 +215,15 @@ pub(super) fn update_standings(tournament: &mut JsonValue, sanctions: &JsonValue
 }
 
 /// Re-score a Finished finals table from raw VPs + current sanctions and re-derive
-/// `winner` when already set, using the same [`compute_gw_finals`] call SetScore/FinishFinals use.
+/// `winner` when already set.
 fn refresh_finals_scoring(tournament: &mut JsonValue, sanctions: &JsonValue) {
     if tournament[tournament::FINALS][finals_table::STATE].as_str() != Some("Finished") {
         return;
     }
     let finals_round = tournament[tournament::ROUNDS].len();
     let effective_sas = resolve_sa_effective_rounds(tournament, sanctions);
-    let seating = &tournament[tournament::FINALS][finals_table::SEATING];
+    let finals = &tournament[tournament::FINALS];
+    let seating = &finals[finals_table::SEATING];
     let vps: Vec<f64> = seating
         .members()
         .map(|s| s[seat::RESULT][score::VP].as_f64().unwrap_or(0.0))
@@ -237,14 +232,13 @@ fn refresh_finals_scoring(tournament: &mut JsonValue, sanctions: &JsonValue) {
         .members()
         .map(|s| s[seat::PLAYER_UID].as_str().unwrap_or("").to_string())
         .collect();
-    let uid_refs: Vec<&str> = seating_uids.iter().map(String::as_str).collect();
-    let adjustments = table_sa_adjustments(seating, finals_round, &effective_sas);
-    let seed_order: Vec<String> = tournament[tournament::FINALS][finals_table::SEED_ORDER]
-        .members()
-        .filter_map(|s| s.as_str().map(String::from))
-        .collect();
-    let gws = compute_gw_finals(&vps, &adjustments, &uid_refs, &seed_order);
-    let tps = compute_tp(vps.len(), &vps, &adjustments);
+    let (gws, tps) = score_table(
+        seating,
+        &vps,
+        finals_round,
+        &effective_sas,
+        Some(&finals[finals_table::SEED_ORDER]),
+    );
     for i in 0..vps.len() {
         tournament[tournament::FINALS][finals_table::SEATING][i][seat::RESULT][score::GW] =
             gws[i].into();
@@ -259,7 +253,7 @@ fn refresh_finals_scoring(tournament: &mut JsonValue, sanctions: &JsonValue) {
         .is_empty()
     {
         if let Some(w) = gws.iter().position(|&g| g == 1.0) {
-            tournament[tournament::WINNER] = uid_refs[w].into();
+            tournament[tournament::WINNER] = seating_uids[w].as_str().into();
         }
     }
 }
@@ -586,9 +580,8 @@ pub fn compute_rating_vp_gw(
                     .members()
                     .map(|s| s[seat::RESULT][score::VP].as_f64().unwrap_or(0.0))
                     .collect();
-                let adjustments = table_sa_adjustments(seating, round_index, &effective_sas);
                 vp += vps[i];
-                gw += compute_gw(&vps, &adjustments)[i];
+                gw += score_table(seating, &vps, round_index, &effective_sas, None).0[i];
             }
         }
         vp -= sa_vp_penalty(&effective_sas, user_uid);
