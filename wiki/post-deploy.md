@@ -30,60 +30,6 @@ answers whether a given deploy has made it actionable — the same check
 gates it and why, what to run, what proves it worked, and what it owes afterwards:
 people to tell, and the wiki text that dies with it.
 
-## Strip deckbuilder noise from the deck comments stored before it
-
-Gated by `3f6ce3c1`, which keeps a stamp heading a typed note and a rule past the
-body's first text: the 2026-09-26 production dry run under `d24e5f4d` (271 of 2,783)
-dropped both. A deck-link import strips the deckbuilder's noise, and the TWDA
-export publishes the stored comment verbatim, so a comment imported earlier keeps
-its restated header until this runs. Events the TWDA sync created are left out —
-their comments are the archive's own text. The go/no-go is the owner's, on the
-production report's count and pairs.
-
-```sh
-sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
-  /opt/archon/backend/.venv/bin/python \
-  /opt/archon/backend/scripts/strip_deck_comment_noise.py'
-```
-
-Rerun with `--apply` once every before/after pair reads as noise only. It worked
-when a third run reports `0 of N`. Delete this section and
-`backend/scripts/strip_deck_comment_noise.py` together.
-
-## Measure the public API's filter expressions
-
-Gated by `7fb74416`, which gives `objects_api_filter_stats` its final shape. The
-schema creates the statistics object at startup but
-nothing fills it until autovacuum next analyzes `objects`, and until then the
-planner prices a one-sided `start` bound, a country or a sparse rating category as
-a third of the corpus and walks the whole type. Running it before the deploy
-measures an object that does not exist yet. The app role's statement timeout
-cancels a plain `ANALYZE`, hence the override.
-
-```sh
-sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
-  psql "$DATABASE_URL" -c "SET statement_timeout = 0" -c "ANALYZE objects"'
-```
-
-It worked when `EXPLAIN` of `/v1/tournaments?start_after=<last month>` names
-`idx_objects_tournament_start` in its `Index Cond`
-([architecture](architecture.md#indexes) has the recipe). Nothing is owed after.
-
-## Mask credentials in production's shipped nginx error lines
-
-Gated by `3fa28ae5`, whose deploy masks the `token`, `code` and `state` query
-values in nginx's access lines and the backend's, but not in nginx's error log,
-which has no format ([dev](dev.md#deployment)). Fluent Bit's
-`journal.lua` masks them before shipping, and `setup.py` installs it rather than
-the deploy, so the error lines keep shipping raw until this runs.
-
-```sh
-just setup-prod
-```
-
-It worked when, in the vtesbiased Loki, `{host="archon.vekn.net", unit="nginx.service"} |= "request: " |~ "[?&](token|code)=[^*&]"`
-returns nothing from after the run. Nothing is owed after.
-
 ## Check the per-client API throttle on beta
 
 Gated by `17a036ac`, which moves the public API's stream and lookup budgets from
