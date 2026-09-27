@@ -70,12 +70,13 @@ through `/intake` here.
 ## Resubmit the TWDA entries sent with the roster count
 
 Gated by `c30f107b`, which makes the TWDA header publish `attested_player_count`
-instead of the registered roster, and `8de46917`, which keeps the maintainer's
-header lines on an update and turns the old ISO dates into the US form
-([vekn](vekn.md#outbound)). Run before both, the resubmission would publish the
-same wrong count again, or revert every city the maintainer added. Tell the TWDA admin a batch of `Update TWD` pull requests is
-coming: they keep the name and place lines the maintainer wrote, and turn a date
-still in the old ISO form into the US one ([vekn](vekn.md#outbound)). Then list:
+instead of the registered roster, and `93ce3934`, the last of the commits that keep
+the maintainer's header lines on an update, turn the old ISO dates into the US
+form and hold what the script cannot compare. Run before both, the resubmission
+would publish the same wrong count again, or revert every city the maintainer
+added. Tell the TWDA admin a batch of `Update TWD` pull requests is coming: they
+keep the name and place lines the maintainer wrote, and turn a date still in the
+old ISO form into the US one ([vekn](vekn.md#outbound)). Then list:
 
 ```sh
 sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
@@ -86,13 +87,14 @@ sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
 The listing reads each submission's count from GitHub — the open pull request's
 branch, else the archive's file — since the maintainer corrects counts by hand, and
 lists it where that differs from `attested_player_count`; it also lists events the
-old seats-only floor skipped that now clear it. Four kinds are held out of
+old seats-only floor skipped that now clear it. Five kinds are held out of
 `--apply` for the TWDA admin: `below floor`, an archived event whose field was
 under 10, where a resubmission would only record a skip; `not in the archive`, an
 entry the maintainer removed or refused, which a resubmission would add back;
 `hand-corrected`, an archived count that differs from the one our branch last
-sent, so the maintainer set it; and `no count line`, a file whose header carries
-none. Rerun with
+sent, so the maintainer set it; `no branch to compare`, where our branch is gone
+and a hand correction cannot be ruled out; and `no count line`, a file whose
+header carries none. Rerun with
 `--apply`: every other listed event opens or moves a pull request on the archive
 repo. It worked when a second report-only run lists only held rows. Delete this
 section and
