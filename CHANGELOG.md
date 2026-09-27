@@ -10,6 +10,10 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- Organizers can now download a tournament's sanctions from its Tools panel.
+
 ## v1.2.9 — 2026-09-26
 
 - You can now search the member list by city, and each member shows their city.
