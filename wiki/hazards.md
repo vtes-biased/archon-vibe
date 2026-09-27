@@ -368,11 +368,9 @@ go-online call `withdraw_private_decks` or `push_decks`, and so does the archon
 import, which finishes an event outside the engine; a new
 writer of either fact has to as well ([sync](sync.md#targeted-overlay-invalidation-no-resync)).
 
-**A deck frame that reaches `broadcast_precomputed` without its `org_uids` stamp
-now deletes the organizer's copy**, where it used to merely withhold an update: a
-deck losing its `public` flag retracts at member level, and the organizer's
-connection resolves to member without that stamp. Every path that writes a deck
-stamps it after the save ([sync](sync.md#broadcast-and-backpressure)).
+**Every broadcast deck write goes through `save_deck`**, which stamps the frame's `org_uids`.
+A deck saved any other way and broadcast deletes the organizer's copy
+([sync](sync.md#broadcast-and-backpressure)).
 
 **Adding a precomputed access column** is warranted only when projection *content*
 must vary by **consumer class**. A new viewer level inside the app does not

@@ -31,6 +31,7 @@ from .db import (
     save_tournament,
     tournament_transaction,
 )
+from .decks import save_deck
 from .geonames import City, CityIndex, city_index, match_city_in, normalize_country
 from .models import (
     AttributionKind,
@@ -313,21 +314,25 @@ async def _settle_attachment(
     return True
 
 
-async def _winners_by_tournament_uid(uids: list[str]) -> dict[str, tuple[str, list]]:
-    """uid -> (winner uid, organizer uids) for the tournaments a deck may attach to."""
+async def _winners_by_tournament_uid(
+    uids: list[str],
+) -> dict[str, tuple[str, list, str | None]]:
+    """uid -> (winner uid, organizer uids, state) for the tournaments a deck may
+    attach to."""
     if not uids:
         return {}
     async with get_connection() as conn:
         rows = await (
             await conn.execute(
                 """SELECT uid, "full"->>'winner',
-                          coalesce("full"->'organizers_uids', '[]'::jsonb)
+                          coalesce("full"->'organizers_uids', '[]'::jsonb),
+                          "full"->>'state'
                    FROM objects
                    WHERE type = %s AND uid = ANY(%s) AND deleted_at IS NULL""",
                 (ObjectType.TOURNAMENT, uids),
             )
         ).fetchall()
-    return {row[0]: (row[1] or "", list(row[2] or [])) for row in rows}
+    return {row[0]: (row[1] or "", list(row[2] or []), row[3]) for row in rows}
 
 
 async def run_twda_sync(
@@ -496,8 +501,7 @@ async def _import_decks(
             public=True,
             winner=True,
         )
-        bd = await save_object_from_model(ObjectType.DECK, deck)
-        bd.org_uids = row[1]
+        bd = await save_deck(deck, row[2], row[1])
         if broadcast:
             broadcast_precomputed(bd)
         created += 1

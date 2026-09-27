@@ -30,6 +30,18 @@ async def build_decks_json(tournament_uid: str, conn=None) -> str:
     ).decode()
 
 
+async def save_deck(
+    deck: DeckObject,
+    tournament_state: str | None,
+    organizers_uids: list[str],
+    *,
+    conn=None,
+) -> BroadcastData:
+    bd = await save_object_from_model(ObjectType.DECK, deck, conn=conn)
+    bd.org_uids = deck_org_uids(deck.private, tournament_state, organizers_uids)
+    return bd
+
+
 async def process_deck_ops(
     deck_ops: list,
     tournament_uid: str,
@@ -39,11 +51,8 @@ async def process_deck_ops(
         return []
     existing_decks = await get_decks_for_tournament(tournament_uid)
 
-    def stamp(bd: BroadcastData, deck: DeckObject) -> BroadcastData:
-        bd.org_uids = deck_org_uids(
-            deck.private, tournament.state, tournament.organizers_uids
-        )
-        return bd
+    def save(deck: DeckObject):
+        return save_deck(deck, tournament.state, tournament.organizers_uids)
 
     affected: list[BroadcastData] = []
     for op in deck_ops:
@@ -83,9 +92,7 @@ async def process_deck_ops(
             deck_obj.public = deck_data.get("public", False)
             deck_obj.winner = deck_data.get("winner", False)
             deck_obj.private = deck_data.get("private", False)
-            affected.append(
-                stamp(await save_object_from_model(ObjectType.DECK, deck_obj), deck_obj)
-            )
+            affected.append(await save(deck_obj))
 
         elif op_type == "delete":
             player_uid = op["player_uid"]
@@ -97,9 +104,7 @@ async def process_deck_ops(
                         continue
                     d.deleted_at = datetime.now(UTC)
                     d.modified = datetime.now(UTC)
-                    affected.append(
-                        stamp(await save_object_from_model(ObjectType.DECK, d), d)
-                    )
+                    affected.append(await save(d))
 
         elif op_type == "set_round":
             deck_uid = op.get("deck_uid")
@@ -107,9 +112,7 @@ async def process_deck_ops(
             if target:
                 target.round = op.get("round")
                 target.modified = datetime.now(UTC)
-                affected.append(
-                    stamp(await save_object_from_model(ObjectType.DECK, target), target)
-                )
+                affected.append(await save(target))
 
         elif op_type == "set_publication":
             deck_uid = op.get("deck_uid")
@@ -118,9 +121,7 @@ async def process_deck_ops(
                 target.public = op.get("public", False)
                 target.winner = op.get("winner", False)
                 target.modified = datetime.now(UTC)
-                affected.append(
-                    stamp(await save_object_from_model(ObjectType.DECK, target), target)
-                )
+                affected.append(await save(target))
 
         elif op_type == "set_attribution":
             deck_uid = op.get("deck_uid")
@@ -128,9 +129,7 @@ async def process_deck_ops(
             if target:
                 target.attribution = msgspec.convert(op["attribution"], DeckAttribution)
                 target.modified = datetime.now(UTC)
-                affected.append(
-                    stamp(await save_object_from_model(ObjectType.DECK, target), target)
-                )
+                affected.append(await save(target))
 
         elif op_type == "set_private":
             deck_uid = op.get("deck_uid")
@@ -138,9 +137,7 @@ async def process_deck_ops(
             if target:
                 target.private = op.get("private", False)
                 target.modified = datetime.now(UTC)
-                affected.append(
-                    stamp(await save_object_from_model(ObjectType.DECK, target), target)
-                )
+                affected.append(await save(target))
 
         elif op_type == "log_view":
             deck_uid = op.get("deck_uid")
@@ -155,12 +152,7 @@ async def process_deck_ops(
                         DeckView(user_uid=viewer_uid, round=op["round"])
                     )
                     target.modified = datetime.now(UTC)
-                    affected.append(
-                        stamp(
-                            await save_object_from_model(ObjectType.DECK, target),
-                            target,
-                        )
-                    )
+                    affected.append(await save(target))
 
     return affected
 
@@ -196,11 +188,9 @@ async def withdraw_private_decks(tournament: Tournament) -> None:
         decks = [d for d in await get_decks_for_tournament(tournament.uid) if d.private]
         for deck in decks:
             deck.modified = datetime.now(UTC)
-            bd = await save_object_from_model(ObjectType.DECK, deck)
-            bd.org_uids = deck_org_uids(
-                deck.private, tournament.state, tournament.organizers_uids
+            bds.append(
+                await save_deck(deck, tournament.state, tournament.organizers_uids)
             )
-            bds.append(bd)
     for bd in bds:
         broadcast_precomputed(bd)
     push_decks(tournament, tournament.organizers_uids, decks)

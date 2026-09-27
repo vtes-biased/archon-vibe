@@ -26,7 +26,6 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 Board changes ride the commit that earns them.
 
 - Tie the signed-in user's carried-forward owner-only fields to the backend's owner-only field set, so a new owner-only field cannot be wiped on sync. **Done when** the frontend list and the backend set cannot disagree without a gate failing and the carry-forward sentence in `wiki/hazards.md` is deleted.
-- Save and stamp decks through one helper so no deck frame reaches the broadcast without its organizer stamp. **Done when** every deck writer, the TWDA import included, stamps through it, the org-stamp paragraph in `wiki/hazards.md` shrinks to naming the helper and `wiki/sync.md#broadcast-and-backpressure` is updated.
 - Compute the score preview and SetScore's SA/GW/TP cascade through one engine function. **Done when** both call it, the preview/SetScore equality test is deleted and the "deliberately duplicates" paragraph in `wiki/hazards.md` is deleted.
 - Export the engine's rounds-played count to the frontend and have the roster and the tournament utilities call it. **Done when** both frontend twins are gone and the "round count computed in three places" paragraph in `wiki/hazards.md` is deleted.
 

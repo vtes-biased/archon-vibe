@@ -10,7 +10,7 @@ from uuid import uuid7
 
 import msgspec
 
-from .broadcast import broadcast_resync, deck_org_uids
+from .broadcast import broadcast_resync
 from .db import (
     BroadcastData,
     access_inputs,
@@ -28,7 +28,6 @@ from .db import (
     get_users_by_uids,
     remap_nda_user,
     save_object,
-    save_object_from_model,
     save_sanction,
     save_user,
     soft_delete_user,
@@ -40,6 +39,7 @@ from .db_oauth import (
     get_oauth_consents_by_user,
     revoke_oauth_tokens_for_user_client,
 )
+from .decks import save_deck
 from .models import (
     AuthMethod,
     DeckObject,
@@ -133,11 +133,11 @@ async def reassign_decks(from_user_uid: str, to_user_uid: str) -> list[Broadcast
     broadcasts = []
     for row in rows:
         deck = msgspec.json.decode(row[0].encode(), type=DeckObject)
-        bd = await save_object_from_model(
-            ObjectType.DECK, msgspec.structs.replace(deck, user_uid=to_user_uid)
+        broadcasts.append(
+            await save_deck(
+                msgspec.structs.replace(deck, user_uid=to_user_uid), row[2], row[1]
+            )
         )
-        bd.org_uids = deck_org_uids(deck.private, row[2], row[1])
-        broadcasts.append(bd)
     return broadcasts
 
 

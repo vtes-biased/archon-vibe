@@ -28,7 +28,6 @@ from ..broadcast import (
     broadcast_judge_call,
     broadcast_personal,
     broadcast_precomputed,
-    deck_org_uids,
     entitled_level,
 )
 from ..db import (
@@ -62,6 +61,7 @@ from ..decks import (
     build_decks_json,
     process_deck_ops,
     push_decks,
+    save_deck,
     withdraw_private_decks,
 )
 from ..engine_errors import EngineRejection
@@ -2201,11 +2201,11 @@ async def go_online(
                     if real_vekn
                     else DeckAttribution(kind=AttributionKind.ANONYMOUS)
                 )
-            bd = await save_object_from_model(ObjectType.DECK, deck_obj, conn=tx_conn)
-            bd.org_uids = deck_org_uids(
-                deck_obj.private, updated.state, updated.organizers_uids
+            pending_bds.append(
+                await save_deck(
+                    deck_obj, updated.state, updated.organizers_uids, conn=tx_conn
+                )
             )
-            pending_bds.append(bd)
 
     # --- Transaction committed, row lock released ---
     logger.info(

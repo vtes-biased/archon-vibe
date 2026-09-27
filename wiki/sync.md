@@ -327,13 +327,13 @@ One `broadcast_precomputed()` handles all object types. `BroadcastData` carries
 `tournament_uid` — the tournament a sanction or deck belongs to — so scoped
 connections can be routed without re-reading the DB. `org_uids` is **not**
 auto-populated for decks, which carry no `organizers_uids` of their own, so every
-path that writes a deck stamps it manually after the save: the deck-ops processor,
-the go-online replay, the TWDA import, and the account merge that reassigns a
-deck. The stamp comes from `deck_org_uids`, which is empty on a private deck of a
-finished event, and the personal overlay filters organizers' decks through it. An unstamped deck frame projects at member level, where a non-public deck is
-`None` — so the tournament's organizer misses the update until their next
-reconnect, and when that `None` is a **retraction** the frame *deletes* the deck
-from their IndexedDB rather than merely withholding it.
+broadcast deck write goes through `save_deck` in `decks.py`, which takes the tournament's
+state and organizers and stamps the frame from `deck_org_uids` — empty on a private
+deck of a finished event. The personal overlay filters organizers' decks through
+the same function. An unstamped deck frame projects at member level, where a
+non-public deck is `None` — so the tournament's organizer misses the update until
+their next reconnect, and when that `None` is a **retraction** the frame *deletes*
+the deck from their IndexedDB rather than merely withholding it.
 
 Each connection has a bounded `CoalescingQueue` (maxsize 30) keeping only the
 **latest frame per `(type, uid)`**, so successive whole-object snapshots of one
