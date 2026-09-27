@@ -69,6 +69,7 @@ import msgspec  # noqa: E402
 from archon_engine import PyEngine  # noqa: E402
 
 from backend.src import db, http_client  # noqa: E402
+from backend.src.decks import soft_delete_tournament  # noqa: E402
 from backend.src.models import Tournament, TournamentState  # noqa: E402
 from backend.src.vekn_api import VEKNAPIClient, VEKNAPIConnectionError  # noqa: E402
 
@@ -294,7 +295,7 @@ async def apply(path: str) -> int:
         for drop_uid in [u.strip() for u in drop_csv.split(",") if u.strip()]:
             if drop_uid == keep_uid:
                 continue
-            result = await db.soft_delete_tournament(drop_uid)
+            result = await soft_delete_tournament(drop_uid)
             if result:
                 lost = result[0].external_ids
                 archive_key = archive_key or lost.get("twda_entry") or lost.get("twda")

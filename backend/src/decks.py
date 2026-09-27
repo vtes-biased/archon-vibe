@@ -7,7 +7,9 @@ from .broadcast import broadcast_personal, broadcast_precomputed, deck_org_uids
 from .db import (
     BroadcastData,
     get_decks_for_tournament,
+    get_sanctions_for_tournament,
     save_object_from_model,
+    save_tournament,
     tournament_transaction,
 )
 from .models import DeckAttribution, DeckObject, DeckView, ObjectType, Tournament
@@ -194,3 +196,39 @@ async def withdraw_private_decks(tournament: Tournament) -> None:
     for bd in bds:
         broadcast_precomputed(bd)
     push_decks(tournament, tournament.organizers_uids, decks)
+
+
+async def soft_delete_tournament(
+    uid: str,
+) -> tuple[Tournament, list[BroadcastData]] | None:
+    """Soft-delete a tournament and cascade the tombstone to its decks and sanctions.
+
+    Returns bd for the tournament plus each dependent object, or they'd linger
+    live and orphaned in every client's IndexedDB. All writes share the
+    tournament's row-lock transaction.
+    """
+    async with tournament_transaction(uid) as (tournament, tx_conn):
+        if not tournament:
+            return None
+        now = datetime.now(UTC)
+        tournament.deleted_at = now
+        tournament.modified = now
+        bds = [await save_tournament(tournament, conn=tx_conn)]
+        for deck in await get_decks_for_tournament(uid, conn=tx_conn):
+            bds.append(
+                await save_deck(
+                    msgspec.structs.replace(deck, deleted_at=now, modified=now),
+                    tournament.state,
+                    tournament.organizers_uids,
+                    conn=tx_conn,
+                )
+            )
+        for sanction in await get_sanctions_for_tournament(uid, conn=tx_conn):
+            bds.append(
+                await save_object_from_model(
+                    ObjectType.SANCTION,
+                    msgspec.structs.replace(sanction, deleted_at=now, modified=now),
+                    conn=tx_conn,
+                )
+            )
+    return tournament, bds

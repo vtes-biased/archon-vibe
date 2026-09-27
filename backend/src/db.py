@@ -1096,36 +1096,6 @@ async def get_league_public_projection(uid: str) -> tuple[dict, int] | None:
         return pub, count
 
 
-async def soft_delete_tournament(
-    uid: str,
-) -> tuple[Tournament, list[BroadcastData]] | None:
-    """Soft-delete a tournament and cascade the tombstone to its decks and sanctions.
-
-    Returns bd for the tournament plus each dependent object, or they'd linger
-    live and orphaned in every client's IndexedDB. All writes share the
-    tournament's row-lock transaction.
-    """
-    async with tournament_transaction(uid) as (tournament, tx_conn):
-        if not tournament:
-            return None
-        now = datetime.now(UTC)
-        tournament.deleted_at = now
-        tournament.modified = now
-        bds = [await save_tournament(tournament, conn=tx_conn)]
-        decks = await get_decks_for_tournament(uid, conn=tx_conn)
-        sanctions = await get_sanctions_for_tournament(uid, conn=tx_conn)
-        for obj_type, objs in (
-            (ObjectType.DECK, decks),
-            (ObjectType.SANCTION, sanctions),
-        ):
-            for obj in objs:
-                tombstoned = msgspec.structs.replace(obj, deleted_at=now, modified=now)
-                bds.append(
-                    await save_object_from_model(obj_type, tombstoned, conn=tx_conn)
-                )
-    return tournament, bds
-
-
 async def get_tournament_by_event_code(code: str) -> Tournament | None:
     """Resolve a short code, then a vekn event id on a miss.
 

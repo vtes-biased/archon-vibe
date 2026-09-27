@@ -58,6 +58,7 @@ from psycopg.conninfo import make_conninfo
 from psycopg.rows import dict_row
 
 from backend.src import db
+from backend.src.decks import soft_delete_tournament
 from backend.src.geonames import normalize_country
 from backend.src.models import (
     AttributionKind,
@@ -1356,7 +1357,7 @@ async def process_tournament_row(
                 )
                 stats.bump("tournaments.both_rich_conflict")
             else:
-                await db.soft_delete_tournament(other.uid)
+                await soft_delete_tournament(other.uid)
                 loud(
                     f"tournament dedup: soft-deleted round-less {other.uid} "
                     f"(vekn event {t.external_ids['vekn']}); rich {target_uid} wins"

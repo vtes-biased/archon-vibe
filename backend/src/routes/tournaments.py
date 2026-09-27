@@ -53,7 +53,6 @@ from ..db import (
     save_object_from_model,
     save_tournament,
     save_user,
-    soft_delete_tournament,
     tournament_transaction,
     upsert_banner,
 )
@@ -62,6 +61,7 @@ from ..decks import (
     process_deck_ops,
     push_decks,
     save_deck,
+    soft_delete_tournament,
     withdraw_private_decks,
 )
 from ..engine_errors import EngineRejection
