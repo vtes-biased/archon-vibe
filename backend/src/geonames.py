@@ -248,9 +248,6 @@ US_STATES = {
 def match_city_in(
     index: CityIndex, name: str, country_code: str, hints: list[str]
 ) -> City | None:
-    """`match_city`, but a name GeoNames splits by region ("Springfield
-    (Illinois)") first takes the region any hint names — an address segment,
-    the archive's "(IL)" — before falling back to the most populous."""
     cc = country_code.upper()
     base = name.strip().lower()
     for hint in hints:
