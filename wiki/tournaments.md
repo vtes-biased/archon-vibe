@@ -925,6 +925,15 @@ outranking it on the escalation ladder — so a companion Warning would add a
 weaker duplicate of a record that already exists, not a missing one. Reading the
 rule literally and issuing both is the mistake to avoid.
 
+The organizer view's Tools sheet carries a **Download sanctions** row under Wrap up
+once the event has a sanction. It builds `<event-code>-sanctions.txt` on the device
+from the local store, so it works offline: a YAML file keyed by quoted VEKN ID (the
+member uid when there is none), each player carrying `name` and a `sanctions` list
+sorted by issuance. Each entry gives the raw `level`, the 1-based `round` (`finals`
+for the finals index, omitted when unset), `category`, `subcategory` and
+`description`, and `lifted: true` when lifted. Only this event's sanctions appear;
+deleted ones never do.
+
 ### Standings Adjustment mechanics
 
 The −1 VP lands on the player's standings total for one round. **Per-seat VP is

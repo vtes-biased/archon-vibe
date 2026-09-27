@@ -1120,6 +1120,7 @@
   "tools_export_players": "Export the player list (CSV)",
   "tools_copy_results": "Copy results",
   "tools_download_event": "Download a copy of the event",
+  "tools_download_sanctions": "Download the event's sanctions",
   "archival_title": "Archival results",
   "archival_hint": "No games recorded for this event. Enter the winner and the number of players from the archive.",
   "archival_player_count": "Players who took part",

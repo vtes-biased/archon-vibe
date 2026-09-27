@@ -5,7 +5,8 @@
   import { getUser } from "$lib/db";
   import { getPromoLedger } from "$lib/api";
   import { holdingRows } from "$lib/promo-utils";
-  import { buildCsv, downloadCsv } from "$lib/csv";
+  import { buildCsv } from "$lib/csv";
+  import { downloadBlob } from "$lib/utils";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
   import Button from "$lib/components/Button.svelte";
   import PromoLedgerList from "./PromoLedgerList.svelte";
@@ -89,7 +90,7 @@
           e.created_at,
         ]),
       ];
-      downloadCsv(buildCsv(rows), `promo-ledger-${new Date().toISOString().slice(0, 10)}.csv`);
+      downloadBlob(new Blob([buildCsv(rows)], { type: "text/csv;charset=utf-8" }), `promo-ledger-${new Date().toISOString().slice(0, 10)}.csv`);
     } catch {
       // Error toast shown by apiRequest
     } finally {

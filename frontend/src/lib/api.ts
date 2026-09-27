@@ -3,6 +3,7 @@ import { saveTournament, saveLeague } from './db';
 import { showToast } from '$lib/stores/toast.svelte';
 import { authorizedFetch, ensureSyncToken, getAuthState } from '$lib/stores/auth.svelte';
 import { errorCodeToMessage } from './error-codes';
+import { downloadBlob } from './utils';
 import * as m from './paraglide/messages.js';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
@@ -816,10 +817,5 @@ export async function downloadNdaPdf(userUid: string, recordUid: string): Promis
     .split('/')
     .pop()!
     .replace('jpeg', 'jpg');
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `bcp-playtest-nda.${ext}`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, `bcp-playtest-nda.${ext}`);
 }

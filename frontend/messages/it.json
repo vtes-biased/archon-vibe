@@ -1120,6 +1120,7 @@
   "tools_export_players": "Esporta l'elenco dei giocatori (CSV)",
   "tools_copy_results": "Copia i risultati",
   "tools_download_event": "Scarica una copia dell'evento",
+  "tools_download_sanctions": "Scarica le sanzioni dell'evento",
   "archival_title": "Risultati d'archivio",
   "archival_hint": "Nessuna partita registrata per questo torneo. Inserisci il vincitore e il numero di giocatori dall'archivio.",
   "archival_player_count": "Giocatori che hanno partecipato",

@@ -58,3 +58,14 @@ export function zonedDate(iso: string, timeZone: string): Date {
 export function visibleSanctions(sanctions: Sanction[]): Sanction[] {
   return sanctions.filter(s => s.level !== "caution");
 }
+
+export function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

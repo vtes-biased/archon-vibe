@@ -11,7 +11,8 @@
   import ReopenConfirmModal from "./ReopenConfirmModal.svelte";
   import Button from "$lib/components/Button.svelte";
   import { copyResults, downloadResults } from "$lib/copy-results";
-  import { buildCsv, downloadCsv } from "$lib/csv";
+  import { buildCsv } from "$lib/csv";
+  import { downloadBlob } from "$lib/utils";
   import { getCountry } from "$lib/geonames";
   import { playedPlayerUids, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import { canSetArchivalResults } from "$lib/engine";
@@ -101,7 +102,41 @@
         ];
       }),
     ];
-    downloadCsv(buildCsv(rows), `${tournament.event_code || tournament.uid}-players.csv`);
+    downloadBlob(new Blob([buildCsv(rows)], { type: "text/csv;charset=utf-8" }), `${tournament.event_code || tournament.uid}-players.csv`);
+  }
+
+  const eventSanctions = $derived(sanctions.filter((s) => s.tournament_uid === tournament.uid));
+
+  function downloadSanctions() {
+    const q = (v: string) => JSON.stringify(v);
+    const finalsRound = tournament.rounds?.length ?? 0;
+    const byPlayer = new Map<string, Sanction[]>();
+    for (const s of eventSanctions) {
+      byPlayer.set(s.user_uid, [...(byPlayer.get(s.user_uid) ?? []), s]);
+    }
+    const players = [...byPlayer].map(([uid, list]) => ({
+      key: playerInfo[uid]?.vekn || uid,
+      name: playerInfo[uid]?.name ?? uid,
+      list: list.sort((a, b) => a.issued_at.localeCompare(b.issued_at)),
+    }));
+    const lines: string[] = [];
+    for (const p of players.sort((a, b) => a.key.localeCompare(b.key))) {
+      lines.push(`${q(p.key)}:`, `  name: ${q(p.name)}`, "  sanctions:");
+      for (const s of p.list) {
+        lines.push(`    - level: ${s.level}`);
+        if (s.round_number != null) {
+          lines.push(`      round: ${s.round_number === finalsRound ? "finals" : s.round_number + 1}`);
+        }
+        lines.push(`      category: ${s.category}`);
+        if (s.subcategory) lines.push(`      subcategory: ${s.subcategory}`);
+        lines.push(`      description: ${q(s.description)}`);
+        if (s.lifted_at) lines.push("      lifted: true");
+      }
+    }
+    downloadBlob(
+      new Blob([lines.join("\n") + "\n"], { type: "text/plain;charset=utf-8" }),
+      `${tournament.event_code || tournament.uid}-sanctions.txt`,
+    );
   }
 
   // Which group the current moment belongs to. Order never changes; this only
@@ -244,6 +279,9 @@
           {#if hasStandings}
             {@render actionRow({ label: m.tools_copy_results(), onclick: () => copyResults(tournament, playerInfo, standings) }, ClipboardCopy)}
             {@render actionRow({ label: m.tools_download_event(), onclick: () => downloadResults(tournament, playerInfo, standings) }, Download)}
+          {/if}
+          {#if eventSanctions.length > 0}
+            {@render actionRow({ label: m.tools_download_sanctions(), onclick: downloadSanctions }, Download)}
           {/if}
           {#if syncVeknItem?.group === "wrapup"}{@render actionRow(syncVeknItem, CloudUpload)}{/if}
           {#if canFinishEarly}
