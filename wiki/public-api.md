@@ -369,11 +369,12 @@ window.
 | nginx `limit_req` per address on the proxied `/oauth/token` and `/oauth/revoke` | `rate=30r/m burst=5 nodelay` | each runs an Argon2 verify of the client secret, so the cost is CPU on the app's box rather than egress here, and a client mints one token an hour. The generous read zone would let an address spend 600 Argon2 verifies a minute guessing a secret |
 | status | 429, with `Retry-After` from the app | nginx defaults to 503, which reads as "outage, retry" rather than "slow down"; `limit_req_status` and `limit_conn_status` set it |
 
-The app's budgets are in-process memory, which holds because the unit runs one
-uvicorn worker: a second worker would silently double every budget, and a restart
-resets them. A streaming route is one that declares the stream budget itself —
-**a new streaming route must declare it** or it is throttled as a lookup
-([access](access.md#deployment-gate)).
+The app's budgets are in-process memory, so a restart resets them and the process
+enforces one uvicorn worker: its lifespan takes an exclusive lock on a file in the
+unit's private `/tmp`, a second worker fails startup on it, and uvicorn stops the
+whole process rather than serve on doubled budgets. A streaming route is one that
+declares the stream budget itself — **a new streaming route must declare it** or it
+is throttled as a lookup ([access](access.md#deployment-gate)).
 
 Three locations are proxied to the **app** rather than the API process:
 `/oauth/token` and `/oauth/revoke`, so minting, revoking and reading share a

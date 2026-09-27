@@ -112,13 +112,11 @@ formula ([dogmas](dogmas.md#product)).
 the schedule computation and `TimerDisplay.svelte` must stay in lockstep
 ([discord](discord.md#the-sse-listener)).
 
-**Token revocation is checked in two places.** The public API reads
-`oauth_tokens`' `token_jti` and `revoked` keys — and `oauth_clients`' `client_id`
-and `active` keys, the daemon token's only revocation — with its own SQL, because
-[public-api](public-api.md#isolation) forbids it the `db_oauth` import that would
-share one. A change to how a token or a client is stored, revoked or deactivated
-must land on `backend/src/public_api/auth.py` as well as `db_oauth.py` — nothing
-points the one editor at the other.
+**Token revocation is checked in two places.** How a token or a client is
+stored, revoked or deactivated lives in `db_oauth.py` and is re-read with its own
+SQL in `backend/src/public_api/auth.py`
+([public-api](public-api.md#isolation) forbids the import); `test_public_api.py`
+revokes and deactivates through the app and reads through the API.
 
 **The public API verifies JWTs and must never be able to sign one.** Its unit
 holds `JWT_PUBLIC_KEYS` and no private key ([access](access.md#authentication)) —
@@ -615,9 +613,9 @@ uvicorn wraps the inherited fd as `AF_UNIX`, so asyncio never sets `TCP_NODELAY`
 on accepted connections: the socket unit's `NoDelay=true` is what keeps small SSE
 writes off Nagle's delay, and a new socket-activated unit needs it too.
 
-**The public API must run one uvicorn worker.** Its per-client throttle budgets
-are process memory, so `--workers N` in its unit silently multiplies every budget
-by N and nothing fails — [public-api](public-api.md#deployment).
+**The public API runs one uvicorn worker, enforced.** Its per-client throttle
+budgets are process memory; a second worker fails its startup on a lock file and
+uvicorn stops the whole process — [public-api](public-api.md#deployment).
 
 **A request accepted at the SIGTERM instant can still 502.** uvicorn's shutdown
 closes every connection with no request cycle yet, and one accepted in the same

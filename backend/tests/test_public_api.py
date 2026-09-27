@@ -223,6 +223,43 @@ class TestDaemonIdentity:
         ).status_code == 401
 
     @pytest.mark.asyncio
+    async def test_revoking_a_member_token_kills_it(self, test_client, live_api):
+        client_id, secret = await _register("member-revoked", [OAuthScope.PROFILE_READ])
+        jti = str(uuid7())
+        await insert_oauth_token(
+            OAuthToken(
+                uid=str(uuid7()),
+                modified=datetime.now(UTC),
+                token_jti=jti,
+                client_id=client_id,
+                user_uid=str(uuid7()),
+                scopes=[OAuthScope.PROFILE_READ],
+                token_type="access",
+                expires_at=datetime.now(UTC) + ACCESS_TOKEN_LIFETIME,
+            )
+        )
+        token = _create_oauth_jwt(
+            "member",
+            "access",
+            [OAuthScope.PROFILE_READ],
+            client_id,
+            jti,
+            ACCESS_TOKEN_LIFETIME,
+        )
+        headers = {"Authorization": f"Bearer {token}"}
+        assert (
+            await live_api.get("/v1/tournaments", headers=headers)
+        ).status_code == 200
+
+        revoked = await test_client.post(
+            "/oauth/revoke", json={**_grant(client_id, secret), "token": token}
+        )
+        assert revoked.status_code == 200, revoked.text
+        assert (
+            await live_api.get("/v1/tournaments", headers=headers)
+        ).status_code == 401
+
+    @pytest.mark.asyncio
     async def test_the_rfc_form_encoding_mints_the_same_token(
         self, test_client, live_api
     ):

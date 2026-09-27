@@ -1,6 +1,8 @@
 import copy
+import fcntl
 import os
 import re
+import tempfile
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -412,12 +414,21 @@ the index one past the last preliminary round.
 
 @asynccontextmanager
 async def lifespan(_: Litestar) -> AsyncIterator[None]:
+    # The unit's PrivateTmp scopes this file to its own workers.
+    lock = open(os.path.join(tempfile.gettempdir(), "archon-public-api.lock"), "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise RuntimeError(
+            "The public API runs one worker: another process already serves it"
+        ) from None
     assert_production_keys(signing=False)
     await open_pool()
     try:
         yield
     finally:
         await close_pool()
+        lock.close()
 
 
 _EVENT = "/api/tournaments/{uid}"
