@@ -609,8 +609,7 @@ async def anonymize_member(request: Request, uid: FromPath[str]) -> Response:
 
 @delete("/{uid:str}", status_code=200)
 async def delete_member(request: Request, uid: FromPath[str]) -> Response:
-    """Soft-delete a VEKN-less member (IC only). A VEKN-bearing member is
-    refused: the next VEKN sync would just recreate a tombstoned one."""
+    """Soft-delete a VEKN-less member (IC only)."""
     current_user = await get_current_user(request)
     if current_user.uid == uid:
         raise HTTPException(
@@ -620,17 +619,10 @@ async def delete_member(request: Request, uid: FromPath[str]) -> Response:
     if not permissions.can_delete_member(current_user):
         raise HTTPException(status_code=403, detail="Only IC can delete members")
 
-    target = await get_user_by_uid(uid)
-    if not target:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if target.vekn_id:
-        raise HTTPException(
-            status_code=400,
-            detail="VEKN members cannot be deleted; mark them deceased instead",
-        )
-
-    result = await soft_delete_user(uid)
+    try:
+        result = await soft_delete_user(uid)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     if result is None:
         raise HTTPException(status_code=404, detail="User not found")
     user, bd = result

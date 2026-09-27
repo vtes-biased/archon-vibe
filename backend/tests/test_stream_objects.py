@@ -42,6 +42,8 @@ async def test_snapshot_files_are_complete_wellformed_jsonl(
     file carrying only what that projection can see."""
     # Soft-delete two users; a snapshot that leaked them fails the exclusion assert.
     for user in populated_db[:2]:
+        user.vekn_id = None
+        await db.save_user(user)
         await db.soft_delete_user(user.uid)
 
     monkeypatch.setattr(snapshots, "SNAPSHOT_DIR", tmp_path)
@@ -119,6 +121,8 @@ async def test_snapshot_rebuilt_only_when_the_corpus_moves(
 
     # Any write moves max(modified_at), so the sentinel differs and the pass runs.
     # A soft delete leaves the row in place, so the count is untouched here.
+    populated_db[1].vekn_id = None
+    await db.save_user(populated_db[1])
     await db.soft_delete_user(populated_db[1].uid)
     await db.save_user(populated_db[0])
     await snapshots.generate_snapshots()

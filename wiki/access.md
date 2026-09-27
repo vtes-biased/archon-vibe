@@ -371,12 +371,9 @@ for the `member` access level, for holding any role, and for tournament
 participation ([domain](domain/tournament-rules.md#eligibility-and-materials)).
 
 A uid carrying a `vekn_id` is **never re-keyed and never soft-deleted** — the
-immovable-uid invariant. Claim, sponsor, link, abandon, force-abandon, merge and
-detach are all [architecture](architecture.md#account-surgery).
-
-The `vekn_id` unique index has no `deleted_at` exclusion, so a soft-deleted user
-still reserves its number while `deleted_at`-filtered lookups disagree — a seed
-insert can therefore crash on a reserved number.
+immovable-uid invariant, which `soft_delete_user` enforces by refusing. Claim,
+sponsor, link, abandon, force-abandon, merge and detach are all
+[architecture](architecture.md#account-surgery).
 
 ## Deployment gate
 

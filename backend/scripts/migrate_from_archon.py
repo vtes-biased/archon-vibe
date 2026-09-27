@@ -577,11 +577,6 @@ async def merge_member(user: db.User, discord: dict, stats: Stats) -> str:
             stats.bump("members.inserted")
             return user.uid
 
-    if live.deleted_at:
-        # Deleted on the new stack — never resurrect from upstream.
-        stats.bump("members.skipped_deleted")
-        return live.uid
-
     changed = False
     for field in ARCHON_USER_FIELDS:
         if field in live.local_modifications:
@@ -714,9 +709,12 @@ async def migrate_member_deletions(
             if existing is not None:
                 if existing.deleted_at:
                     continue  # already propagated
-                existing.deleted_at = del_at
-                existing.modified = datetime.now(UTC)
-                await db.save_user(existing)
+                try:
+                    await db.soft_delete_user(uid)
+                except ValueError:
+                    loud(f"old archon deleted VEKN member {uid} — kept live")
+                    stats.bump("warn.vekn_member_deletion_refused")
+                    continue
                 loud(f"member deletion propagated from old archon: {uid}")
                 stats.bump("members.deletion_propagated")
                 continue

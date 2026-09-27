@@ -481,10 +481,10 @@ flip-flopping name or a both-null date makes the daily job re-save forever.
 VEKN-less members orphans 9 references — 4 players and 5 seats — across 3 finished
 tournaments, because legacy archon never enforced a VEKN id at registration.
 
-**The `vekn_id` unique index spans tombstones**: a soft-deleted user still reserves
-its number while `deleted_at`-filtered lookups disagree, so a seed insert can crash
-on a reserved number. Reachable on steady-state nightly merges, since an admin
-user-delete keeps the `vekn_id`.
+**The `vekn_id` unique index spans tombstones**, so a tombstone holding a number
+would crash a seed insert that `deleted_at`-filtered lookups clear. None can be
+written: `soft_delete_user` refuses a VEKN-bearing member. One written before
+that refusal lives until the 30-day purge — [post-deploy](post-deploy.md) counts them.
 
 **`authState.user` adopts its own sync frame, minus the owner-only fields.** The
 signed-in user's row arrives over SSE like anyone else's, and every other surface

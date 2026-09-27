@@ -582,8 +582,6 @@ class VEKNSyncService:
 
     async def _get_user_by_vekn_id(self, vekn_id: str) -> User | None:
         async with get_connection() as conn:
-            # Live rows only: the archon merge tombstones vekn-created duplicates,
-            # so matching a dead one here would update a dead copy, not the survivor.
             result = await conn.execute(
                 """
                 SELECT "full"

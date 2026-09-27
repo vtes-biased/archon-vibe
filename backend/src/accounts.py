@@ -174,8 +174,7 @@ async def merge_users(
         return keep_user, []
     if not delete_user_obj:
         return keep_user, []
-    # A uid holding a vekn_id is immovable and never soft-deleted — this is the one
-    # chokepoint enforcing it for callers that don't guarantee it structurally.
+    # soft_delete_user refuses this too, but only after the cascade below has run.
     if delete_user_obj.vekn_id:
         raise ValueError(
             "Cannot merge an account that holds a VEKN ID — VEKN identities are "

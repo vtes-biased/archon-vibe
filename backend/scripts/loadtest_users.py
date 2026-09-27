@@ -38,8 +38,7 @@ async def mint(count: int, ttl_minutes: int, out: str) -> None:
     now = datetime.now(UTC)
     lines = []
     # 8-digit 99xxxNNN vekn_id: base_data_level needs one for member level, real
-    # ids are 7 digits, and the random block dodges the tombstones a previous
-    # run's cleanup left reserving their numbers (vekn_id unique index).
+    # ids are 7 digits, and the random block keeps an uncleaned run's ids apart.
     run = secrets.randbelow(1000)
     for i in range(count):
         user = User(
@@ -75,6 +74,9 @@ async def cleanup() -> None:
             )
         ).fetchall()
     for (uid,) in rows:
+        user = await db.get_user_by_uid(uid)
+        user.vekn_id = None
+        await db.save_user(user)
         await db.soft_delete_user(uid)
     await db.close_db()
     print(f"{len(rows)} load-test users soft-deleted")
