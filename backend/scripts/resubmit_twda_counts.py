@@ -85,7 +85,9 @@ async def _candidate(t: Tournament, open_branches: set[str]) -> tuple[str, bool]
             return f"no count line  → {attested}", False
         if where == "archived":
             sent = await _count(ours)
-            if sent is not None and sent != published:
+            if sent is None:
+                return f"no branch to compare  {published} → {attested}", False
+            if sent != published:
                 return f"hand-corrected  {sent} → {published}, not {attested}", False
         if attested < TWDA_MIN_PLAYERS:
             return f"below floor  {published} → {attested}", False

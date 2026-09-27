@@ -131,6 +131,28 @@ async def submit_twda_pr(
             return "", f"fork_ref:{status}"
         base_sha = json.loads(text)["object"]["sha"]
 
+        file_status, file_text = await _req(
+            "GET",
+            f"/repos/{TWDA_FORK_REPO}/contents/{file_path}",
+            fork_token,
+            params={"ref": base_sha},
+        )
+        # A GET failure that is not the file's absence would drop the sha and
+        # turn the update into a 422 the organizer would read as a refusal.
+        if file_status not in (200, 404):
+            logger.error(f"Failed to read deck file: {file_status} {file_text}")
+            return "", f"commit:{file_status}"
+
+        verb = "Update" if file_status == 200 else "Add"
+        if file_status == 200:
+            archived = base64.b64decode(json.loads(file_text)["content"]).decode()
+            deck_text = keep_curated_header(archived, deck_text)
+            if deck_text == archived:
+                return (
+                    f"https://github.com/{TWDA_TARGET_REPO}/blob/master/{file_path}",
+                    "",
+                )
+
         ref_status, _ = await _req(
             "GET",
             f"/repos/{TWDA_FORK_REPO}/git/refs/heads/{branch}",
@@ -157,27 +179,6 @@ async def submit_twda_pr(
                 logger.error(f"Failed to create branch: {create_status} {create_text}")
                 return "", f"branch:{create_status}"
 
-        file_status, file_text = await _req(
-            "GET",
-            f"/repos/{TWDA_FORK_REPO}/contents/{file_path}",
-            fork_token,
-            params={"ref": branch},
-        )
-        # A GET failure that is not the file's absence would drop the sha and
-        # turn the update into a 422 the organizer would read as a refusal.
-        if file_status not in (200, 404):
-            logger.error(f"Failed to read deck file: {file_status} {file_text}")
-            return "", f"commit:{file_status}"
-
-        verb = "Update" if file_status == 200 else "Add"
-        if file_status == 200:
-            archived = base64.b64decode(json.loads(file_text)["content"]).decode()
-            deck_text = keep_curated_header(archived, deck_text)
-            if deck_text == archived:
-                return (
-                    f"https://github.com/{TWDA_TARGET_REPO}/blob/master/{file_path}",
-                    "",
-                )
         content_b64 = base64.b64encode(deck_text.encode()).decode()
         file_data: dict = {
             "message": f"{verb} TWD: {tournament_name}",
