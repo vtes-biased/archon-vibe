@@ -70,10 +70,12 @@ through `/intake` here.
 ## Resubmit the TWDA entries sent with the roster count
 
 Gated by `c30f107b`, which makes the TWDA header publish `attested_player_count`
-instead of the registered roster ([vekn](vekn.md#outbound)). Run earlier, the
-resubmission would publish the same wrong count again. Tell the TWDA admin a batch
-of `Update TWD` pull requests is coming, and that on a merged entry the diff also
-drops the city they completed by hand, which the header never carries. Then list:
+instead of the registered roster, and `1d4c6718`, which keeps the maintainer's
+header lines on an update ([vekn](vekn.md#outbound)). Run before both, the
+resubmission would publish the same wrong count again, or revert every city the
+maintainer added. Tell the TWDA admin a batch
+of `Update TWD` pull requests is coming; they keep the name, place and date lines the maintainer wrote
+([vekn](vekn.md#outbound)). Then list:
 
 ```sh
 sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
@@ -81,16 +83,14 @@ sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
   /opt/archon/backend/scripts/resubmit_twda_counts.py'
 ```
 
-Each line is an event code with its published count and the attested one — two
-published counts where the submission fell between the v1.0.9 tag and its deploy,
-when either could have gone out — or an event the old seats-only floor skipped that
-now clears it. A `below floor` line is an archived event whose field was under 10:
-`--apply` leaves it alone, since a resubmission would record the skip over its pull
-request and still leave the archive's line wrong, so hand those to the TWDA admin
-to correct or remove. Rerun with `--apply`: every other listed event opens or moves
-a pull request on the archive repo. Run it once: the listing reads the roster,
-which the apply does not change, so a rerun lists the same submissions and would
-push them again. It worked when the apply output shows every row `submitted` or a
-skip that is not `too_few_players`, and an open pull request diffs only the
-`N players` line. Delete this section and
+The listing reads each submission's count from GitHub — the open pull request's
+branch, else the archive's file — since the maintainer corrects counts by hand, and
+lists it where that differs from `attested_player_count`; it also lists events the
+old seats-only floor skipped that now clear it. Two kinds are held out of
+`--apply` for the TWDA admin: `below floor`, an archived event whose field was
+under 10, where a resubmission would only record a skip; and `not in the archive`,
+an entry the maintainer removed or refused, which a resubmission would add back. Rerun with
+`--apply`: every other listed event opens or moves a pull request on the archive
+repo. It worked when a second report-only run lists only held rows. Delete this
+section and
 `backend/scripts/resubmit_twda_counts.py` together.
