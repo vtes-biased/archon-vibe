@@ -41,6 +41,8 @@
     if (v === "online") {
       values.proxies = false;
       values.country = "";
+      values.city = "";
+      values.city_geoname_id = null;
     } else {
       values.venue = "";
       values.venue_url = "";

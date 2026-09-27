@@ -31,7 +31,7 @@ from .db import (
     save_tournament,
     tournament_transaction,
 )
-from .geonames import normalize_country
+from .geonames import City, CityIndex, city_index, match_city, normalize_country
 from .models import (
     AttributionKind,
     DeckAttribution,
@@ -193,8 +193,19 @@ def _twda_place(entry: TwdaEntry) -> tuple[str | None, str]:
     return country, head.split("(")[0].strip()
 
 
+def twda_city(entry: TwdaEntry, cities: CityIndex) -> City | None:
+    *head, tail = entry.place.split(",")
+    country = normalize_country(tail) if head else None
+    if not country:
+        return None
+    for segment in reversed(head):
+        if city := match_city(cities, segment.split("(")[0], country):
+            return city
+    return None
+
+
 def reconstructed_tournament(
-    entry: TwdaEntry, winner_uid: str, now: datetime
+    entry: TwdaEntry, winner_uid: str, now: datetime, city: City | None = None
 ) -> Tournament:
     """The canonical rounds-less archival shape, as the VEKN and archon imports
     already write it — with the attested field size the archive supplies.
@@ -220,6 +231,8 @@ def reconstructed_tournament(
         finish=start,
         timezone=_twda_timezone(country, city),
         country=country,
+        city=city["name"] if city else None,
+        city_geoname_id=city["geoname_id"] if city else None,
         state=TournamentState.FINISHED,
         max_rounds=int(rounds.group(1)) if rounds else 0,
         # The archive's own file key. Never `vekn`: these have no vekn.net row,
@@ -255,7 +268,9 @@ async def _tournaments_by_twda_id() -> dict[str, str]:
     return {row[0]: row[1] for row in rows}
 
 
-async def _settle_attachment(entry_id: str, uid: str, broadcast: bool) -> bool:
+async def _settle_attachment(
+    entry_id: str, uid: str, broadcast: bool, city: City | None = None
+) -> bool:
     """Stamp the archive key onto the tournament an `attach` names, so the next
     run reads the attachment off the corpus and never consults the file for it.
 
@@ -275,6 +290,14 @@ async def _settle_attachment(entry_id: str, uid: str, broadcast: bool) -> bool:
                 )
             return False
         tournament.external_ids["twda_entry"] = entry_id
+        if (
+            city
+            and not tournament.city_geoname_id
+            and not tournament.online
+            and (tournament.country or "").upper() == city["country_code"].upper()
+        ):
+            tournament.city = city["name"]
+            tournament.city_geoname_id = city["geoname_id"]
         tournament.modified = datetime.now(UTC)
         bd = await save_tournament(tournament, conn=conn)
     if broadcast:
@@ -334,6 +357,7 @@ async def run_twda_sync(
         "deferred_to_backfill": 0,
     }
     resolved: dict[str, str] = {}
+    cities: CityIndex | None = None
 
     pending = sum(
         1
@@ -364,14 +388,19 @@ async def run_twda_sync(
         if not action:
             stats["unresolved"] += 1
             continue
+        if bulk:
+            if action == "attach":
+                resolved[entry_id] = target
+            continue
+        if cities is None:
+            cities = city_index()
+        city = twda_city(entry, cities)
         if action == "attach":
             resolved[entry_id] = target
-            if not bulk and await _settle_attachment(entry_id, target, broadcast):
+            if await _settle_attachment(entry_id, target, broadcast, city):
                 stats["settled"] += 1
             continue
-        if bulk:
-            continue
-        tournament = reconstructed_tournament(entry, target, now)
+        tournament = reconstructed_tournament(entry, target, now, city)
         async with get_connection() as conn:
             tournament.event_code = await resolve_event_code(tournament, conn)
             bd = await save_object_from_model(

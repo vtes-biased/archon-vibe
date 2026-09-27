@@ -363,8 +363,11 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   edit survives the cycle. Freezing everything instead would be
   simpler and is wrong — it hands a filed event's title to a system the organizer
   cannot edit it on. An end date added on vekn.net after the app created the row
-  is therefore set in the app, not imported. Everything else — `country`, `venue`,
-  `address`, `venue_url`, `map_url` — stays a vekn.net refresh.
+  is therefore set in the app, not imported. `city` is app-owned too, but filled:
+  when a row has none, the sync takes the venue record's city, else the event's,
+  matched in GeoNames within the country, and never rewrites one it holds.
+  Everything else — `country`, `venue`, `address`, `venue_url`, `map_url` — stays a
+  vekn.net refresh.
 - **Event times are wall clock at the venue**, which is how `start`/`finish` are
   stored: naive, paired with `timezone`. The sync writes VEKN's time verbatim
   and, **at creation only**, fills `timezone` from a guess off the venue country
@@ -582,12 +585,10 @@ the date in US form with no time (`August 29th 2026`, ` -- <end>` for a multi-da
 event), `Online` as the place of an online event, the player count as
 `attested_player_count` — the field that played, never the registered roster with
 its no-shows — `NR+F` or `NR (no final)`, and the event link directly under the
-winner's name. An in-person event's place is its
-country alone, short of the archive's `City, Country`: a tournament holds no
-structured city — a synced event folds its venue's into free-text `address`, an
-app-created one has only what the organizer typed — and parsing one out would put
-guesses on a permanent line, so the maintainer completes the city by hand. A
-tournament city field is what would change that. Then a score line,
+winner's name. An in-person event's place is the archive's `City, Country`, the
+city its GeoNames name ([tournaments](tournaments.md#configuration)); an event that
+predates the field and was never given one still publishes its country alone. Then
+a score line,
 `-- 1GW4.5 + 3vp in final`: the winner's **standings** row, which is prelim-only,
 with the finals seat's VP beside it — never the aggregated `result`, which already
 folds the final in and would read to the archive as a double count. It is the
@@ -687,6 +688,11 @@ one event — what keeps that from becoming a duplicate is the `external_ids['tw
 carve-out in the adopt path above, and any pair that slips past it surfaces in the
 duplicate report, where an archive reconstruction is reported and never proposed
 for merging.
+
+**The archive's place names the city.** A reconstruction takes its city from the
+entry's `place`, and settling an attach fills an empty one the same way: read right
+to left, since the archive writes `Venue, City (STATE), Country` as often as
+`City, Country`, each segment matched in GeoNames within the place's country.
 
 **The scheduled run only ever does a delta.** More than `MAX_CREATES_PER_RUN`
 unsettled entries pending means it is standing in for the initial backfill, so it

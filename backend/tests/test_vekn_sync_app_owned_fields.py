@@ -1,4 +1,5 @@
-"""The inbound sync never rewrites a linked tournament's name, finish or timezone."""
+"""The inbound sync never rewrites a linked tournament's name, finish, timezone
+or city."""
 
 from datetime import UTC, datetime
 from uuid import uuid4, uuid7
@@ -11,6 +12,7 @@ from src.vekn_tournament_sync import sync_all_tournaments
 LOCAL_NAME = "Tampere Open (renamed by the organizer)"
 LOCAL_FINISH = datetime(2026, 8, 30, 20, 0)
 LOCAL_TIMEZONE = "Pacific/Auckland"  # unguessable from the payload's FR venue
+LOCAL_CITY = ("Lyon", 2996944)
 
 
 class _StubClient:
@@ -35,6 +37,9 @@ def _linked_local(event_id: str, **kwargs) -> Tournament:
         start=datetime(2026, 8, 29, 12, 0),
         finish=LOCAL_FINISH,
         timezone=LOCAL_TIMEZONE,
+        country="FR",
+        city=LOCAL_CITY[0],
+        city_geoname_id=LOCAL_CITY[1],
         external_ids={"vekn": event_id},
         **kwargs,
     )
@@ -51,6 +56,7 @@ def _incoming(event_id: str, players: list[dict]) -> dict:
         "event_endtime": "18:00",
         "venue_country": "FR",
         "venue_name": "Le Bar a Jeux",
+        "venue_city": "Paris",
         "rounds": "3",
         "players": players,
     }
@@ -106,6 +112,7 @@ async def test_sync_keeps_the_app_owned_fields_on_both_merge_branches(test_db):
             assert stored.name == LOCAL_NAME
             assert stored.finish == LOCAL_FINISH
             assert stored.timezone == LOCAL_TIMEZONE
+            assert (stored.city, stored.city_geoname_id) == LOCAL_CITY
             # The vekn-owned half still refreshed, so each branch did run.
             assert stored.venue == "Le Bar a Jeux"
             assert stored.country == "FR"

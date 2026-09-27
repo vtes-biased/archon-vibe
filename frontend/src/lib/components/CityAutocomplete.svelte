@@ -5,6 +5,7 @@
     import * as m from '$lib/paraglide/messages.js';
 
     let {
+        id = undefined,
         value = $bindable(""),
         geonameId = $bindable<number | null>(null),
         countryCode,
@@ -13,6 +14,7 @@
         class: className = "",
         onselect,
     }: {
+        id?: string;
         value?: string;
         geonameId?: number | null;
         countryCode: string;
@@ -109,6 +111,7 @@
 
 <div class="relative {className}">
     <input
+        {id}
         type="text"
         bind:value={inputValue}
         oninput={handleInput}

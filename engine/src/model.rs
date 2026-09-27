@@ -236,6 +236,8 @@ pub mod table {
 
 pub mod tournament {
     pub const ADDRESS: &str = "address";
+    pub const CITY: &str = "city";
+    pub const CITY_GEONAME_ID: &str = "city_geoname_id";
     pub const COUNTRY: &str = "country";
     pub const DECKLIST_REQUIRED: &str = "decklist_required";
     pub const DECKLISTS_MODE: &str = "decklists_mode";
@@ -282,6 +284,8 @@ pub mod tournament {
 
 pub mod tournament_config {
     pub const ADDRESS: &str = "address";
+    pub const CITY: &str = "city";
+    pub const CITY_GEONAME_ID: &str = "city_geoname_id";
     pub const COUNTRY: &str = "country";
     pub const DECKLIST_REQUIRED: &str = "decklist_required";
     pub const DECKLISTS_MODE: &str = "decklists_mode";

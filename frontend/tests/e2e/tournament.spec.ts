@@ -77,6 +77,8 @@ test.describe('Tournament lifecycle', () => {
     await page.locator('#name').fill('E2E Test Tournament');
     await page.locator('#start').fill('2099-01-01T10:00');
     await page.locator('#country').selectOption('US');
+    await page.locator('#city').fill('Chicago');
+    await page.getByRole('button', { name: /^Chicago/ }).first().click();
     await page.getByRole('button', { name: 'Create Tournament' }).click();
     // First optimistic mutation of the run: WASM/IndexedDB cold-start can push
     // the redirect past the 2s warm-path budget under CI load, so allow more.

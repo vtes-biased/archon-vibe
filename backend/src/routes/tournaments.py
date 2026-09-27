@@ -56,7 +56,7 @@ from ..db import (
     upsert_banner,
 )
 from ..engine_errors import EngineRejection
-from ..geonames import get_country, normalize_country, stored_country
+from ..geonames import city_by_id, get_country, normalize_country, stored_country
 from ..middleware.auth import get_optional_user
 from ..models import (
     Announcement,
@@ -513,9 +513,11 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
         tournament_date,
         "Online"
         if tournament.online
-        else named["name"]
-        if named
-        else (tournament.country or ""),
+        else ", ".join(
+            p
+            for p in (tournament.city, named["name"] if named else tournament.country)
+            if p
+        ),
         tournament_format,
         f"{frontend_url()}{handle}",
         _engine.attested_player_count(msgspec.json.encode(tournament).decode()),
@@ -983,6 +985,23 @@ async def delete_banner_image(
     return Response(content=b'{"success": true}', media_type="application/json")
 
 
+def _host_city(
+    online: bool, country: str | None, geoname_id: int | None
+) -> tuple[str | None, int | None]:
+    if online:
+        return None, None
+    if geoname_id is None:
+        raise HTTPException(
+            status_code=422, detail="A city is required for an event that is not online"
+        )
+    city = city_by_id(geoname_id)
+    if not city or city["country_code"].upper() != (country or "").upper():
+        raise HTTPException(
+            status_code=422, detail=f"Invalid city for this country: {geoname_id}"
+        )
+    return city["name"], geoname_id
+
+
 class CreateTournamentRequest(msgspec.Struct):
     name: str
     format: str = "Standard"
@@ -992,6 +1011,8 @@ class CreateTournamentRequest(msgspec.Struct):
     finish: str | None = None
     timezone: str = "UTC"
     country: str | None = None
+    city: str | None = None
+    city_geoname_id: int | None = None
     venue: str = ""
     venue_url: str = ""
     address: str = ""
@@ -1167,12 +1188,16 @@ async def create_tournament(
                 detail="You don't have permission to attach tournaments to this league",
             )
 
+    city, city_geoname_id = _host_city(data.online, country, data.city_geoname_id)
+
     start = _wall_clock(_parse_datetime(data.start), data.timezone)
     finish = _wall_clock(_parse_datetime(data.finish), data.timezone)
     config = msgspec.structs.asdict(data) | {
         "uid": str(uuid7()),
         "now": datetime.now(UTC).isoformat(),
         "country": country,
+        "city": city,
+        "city_geoname_id": city_geoname_id,
         "start": start.isoformat() if start else None,
         "finish": finish.isoformat() if finish else None,
         "league_uid": data.league_uid or None,
@@ -1677,6 +1702,19 @@ async def tournament_action(
                 status_code=423,
                 detail="Tournament is in offline mode on another device",
             )
+
+        if data.type == "UpdateConfig" and "config" in event_data:
+            patch = event_data["config"]
+            patch.pop("city", None)
+            online = patch.get("online", tournament.online)
+            if patch.keys() & {"online", "country", "city_geoname_id"}:
+                patch["city"], patch["city_geoname_id"] = _host_city(
+                    online,
+                    patch.get("country", tournament.country),
+                    patch.get("city_geoname_id", tournament.city_geoname_id),
+                )
+            elif not online and tournament.city_geoname_id is None:
+                _host_city(online, tournament.country, None)
 
         # Reads below reuse tx_conn instead of a fresh pooled connection while
         # holding FOR UPDATE, so one action never pins more than one pool slot.
@@ -2371,6 +2409,14 @@ async def go_online(
     # Before the player loop below, not at the convert: a minted account copies
     # this value into its own permission-bearing country field.
     data.tournament["country"] = stored_country(data.tournament.get("country"))
+    try:
+        data.tournament["city"], data.tournament["city_geoname_id"] = _host_city(
+            bool(data.tournament.get("online")),
+            data.tournament["country"],
+            data.tournament.get("city_geoname_id"),
+        )
+    except HTTPException:
+        data.tournament["city"], data.tournament["city_geoname_id"] = None, None
 
     # Pre-lock gate: authorize before creating any users (save_user/allocate_next_vekn_id).
     # Re-checked authoritatively under the lock below; this unlocked read only fails fast.

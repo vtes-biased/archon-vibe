@@ -601,6 +601,7 @@
   "tournament_new_error_name_required": "Name is required",
   "tournament_new_error_start_required": "Start date is required",
   "tournament_new_error_country_required": "Country is required for in-person tournaments",
+  "tournament_new_error_city_required": "City is required for in-person tournaments",
   "tournament_new_missing_fields": "Still needed: {fields}",
   "tournament_new_error_max_rounds": "Max rounds must be 2, 3, or 4",
   "tournament_new_offline_notice": "You're offline: the tournament is created and locked on this device, then uploaded when you reconnect.",

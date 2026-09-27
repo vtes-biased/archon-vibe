@@ -26,6 +26,8 @@ SAMPLE_CONFIG = {
     "finish": "2026-03-01T20:00:00",
     "timezone": "Europe/Paris",
     "country": "FR",
+    "city": "Paris",
+    "city_geoname_id": 2988507,
     "venue": "Sample Venue",
     "venue_url": "https://example.invalid/venue",
     "address": "1 Sample Street",

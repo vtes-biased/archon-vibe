@@ -861,7 +861,7 @@ import TournamentModals from "./TournamentModals.svelte";
                   <div class="text-ink-faint italic">{m.tournament_info_code_pending()}</div>
                 {/if}
               </div>
-              {#if tournament.venue || tournament.address}
+              {#if tournament.venue || tournament.address || tournament.city}
               <div>
                 <div class="text-ink-faint">{m.tournament_info_location()}</div>
                 <div class="text-ink-bright">
@@ -871,6 +871,10 @@ import TournamentModals from "./TournamentModals.svelte";
                     {:else}
                       <span class="text-ink-muted">{tournament.venue}</span>
                     {/if}
+                  {/if}
+                  {#if tournament.city && !tournament.online}
+                    {#if tournament.venue}<br />{/if}
+                    <span class="text-ink-muted">{tournament.city}</span>
                   {/if}
                   {#if tournament.address && !tournament.online}
                     <br />

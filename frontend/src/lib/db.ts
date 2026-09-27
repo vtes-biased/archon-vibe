@@ -1244,6 +1244,8 @@ export interface VenueInfo {
   venue_url: string;
   address: string;
   map_url: string;
+  city: string;
+  city_geoname_id: number | null;
 }
 
 export async function getVenuesByCountry(country: string): Promise<VenueInfo[]> {
@@ -1265,6 +1267,8 @@ export async function getVenuesByCountry(country: string): Promise<VenueInfo[]> 
           venue_url: t.venue_url ?? '',
           address: t.address ?? '',
           map_url: t.map_url ?? '',
+          city: t.city ?? '',
+          city_geoname_id: t.city_geoname_id ?? null,
         },
         modified: t.modified,
       });

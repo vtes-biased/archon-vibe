@@ -442,6 +442,8 @@ export interface CreateTournamentData {
   finish?: string | null;
   timezone?: string;
   country?: string | null;
+  city?: string | null;
+  city_geoname_id?: number | null;
   venue?: string;
   venue_url?: string;
   address?: string;

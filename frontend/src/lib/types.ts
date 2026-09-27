@@ -333,6 +333,8 @@ export interface Tournament extends BaseObject {
   finish: string | null;
   timezone: string;
   country: string | null;
+  city?: string | null;
+  city_geoname_id?: number | null;
   league_uid?: string | null;
   state: TournamentState;
   banner_path?: string | null;  // versioned hero / og:image URL (public)

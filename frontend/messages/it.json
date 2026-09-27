@@ -601,6 +601,7 @@
   "tournament_new_error_name_required": "Il nome è obbligatorio",
   "tournament_new_error_start_required": "La data di inizio è obbligatoria",
   "tournament_new_error_country_required": "La nazione è obbligatoria per i tornei in presenza",
+  "tournament_new_error_city_required": "La città è obbligatoria per i tornei in presenza",
   "tournament_new_missing_fields": "Ancora necessario: {fields}",
   "tournament_new_error_max_rounds": "Il numero massimo di round deve essere 2, 3 o 4",
   "tournament_new_offline_notice": "Offline: il torneo viene creato e bloccato su questo dispositivo, poi inviato al server alla riconnessione.",

@@ -13,6 +13,8 @@ TOURNAMENT = {
     "state": "Finished",
     "timer": {"paused": True, "started_at": None, "elapsed_before_pause": 0.0},
     "venue": 'Spelens hus "malmö"',
+    "city": "Malmö",
+    "city_geoname_id": 2692969,
     "finals": {
         "state": "Finished",
         "seating": [
@@ -474,6 +476,8 @@ MEMBER_TOURNAMENT = {
     "finish": None,
     "timezone": "Europe/Rome",
     "country": "IT",
+    "city": "Rome",
+    "city_geoname_id": 3169070,
     "league_uid": None,
     "state": "Playing",
     "organizers_uids": ["019f6a5e-a1b7-7c40-b0e2-63dd51ba7a10"],

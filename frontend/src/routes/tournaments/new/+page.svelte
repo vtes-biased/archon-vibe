@@ -28,6 +28,8 @@
     self_organized_rounds: false,
     online: false,
     country: "",
+    city: "",
+    city_geoname_id: null,
     venue: "",
     venue_url: "",
     address: "",
@@ -60,6 +62,7 @@
     ...(!values.name.trim() ? [m.tfield_name_label()] : []),
     ...(!values.start ? [m.tfield_start()] : []),
     ...(!values.online && !values.country ? [m.common_country()] : []),
+    ...(!values.online && !values.city_geoname_id ? [m.common_city()] : []),
   ]);
 
   // Offline creation routes to the local WASM engine and the tournament is born
@@ -90,6 +93,10 @@
       error = m.tournament_new_error_country_required();
       return;
     }
+    if (!values.online && !values.city_geoname_id) {
+      error = m.tournament_new_error_city_required();
+      return;
+    }
     if (veknPush && !values.open_rounds && (values.max_rounds < 2 || values.max_rounds > 4)) {
       error = m.tournament_new_error_max_rounds();
       return;
@@ -107,6 +114,8 @@
         start: values.start || null,
         finish: values.finish || null,
         country: values.country || null,
+        city: values.online ? null : values.city || null,
+        city_geoname_id: values.online ? null : values.city_geoname_id,
         venue: values.venue,
         venue_url: values.venue_url,
         address: values.address,

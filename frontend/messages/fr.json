@@ -601,6 +601,7 @@
   "tournament_new_error_name_required": "Le nom est requis",
   "tournament_new_error_start_required": "La date de début est requise",
   "tournament_new_error_country_required": "Le pays est requis pour les tournois en présentiel",
+  "tournament_new_error_city_required": "La ville est obligatoire pour les tournois en présentiel",
   "tournament_new_missing_fields": "Encore requis : {fields}",
   "tournament_new_error_max_rounds": "Le nombre maximum de rondes doit être 2, 3 ou 4",
   "tournament_new_offline_notice": "Vous êtes hors ligne : le tournoi est créé et verrouillé sur cet appareil, puis envoyé au serveur à la reconnexion.",

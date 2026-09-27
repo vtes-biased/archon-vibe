@@ -129,6 +129,10 @@ def get_countries_on_continent(country_code: str) -> list[str]:
     return [c["iso_code"] for c in countries.values() if c["continent"] == continent]
 
 
+def city_by_id(geoname_id: int) -> City | None:
+    return next((c for c in load_cities() if c["geoname_id"] == geoname_id), None)
+
+
 # Regex to strip parenthetical suffixes: "Washington (DC)" -> "Washington"
 _PAREN_RE = re.compile(r"\s*\(.*\)\s*$")
 

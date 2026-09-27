@@ -8,6 +8,7 @@
   import { canLinkTournamentToLeague } from "$lib/engine";
   import { OFFICIAL_DISCORD_INVITE, OFFICIAL_DISCORD_VENUE } from "$lib/tournament-utils";
   import VenueAutocomplete from "./VenueAutocomplete.svelte";
+  import CityAutocomplete from "./CityAutocomplete.svelte";
   import FoldableSection from "./FoldableSection.svelte";
   import { Info } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -22,6 +23,8 @@
     self_organized_rounds: boolean;
     online: boolean;
     country: string;
+    city: string;
+    city_geoname_id: number | null;
     venue: string;
     venue_url: string;
     address: string;
@@ -53,7 +56,7 @@
   }: {
     values: TournamentFieldValues;
     onchange?: (field: string, value: any) => void;
-    onvenueselect?: (fields: Record<string, string>) => void;
+    onvenueselect?: (fields: Record<string, string | number>) => void;
     disabled?: boolean;
     disabledFields?: Set<string>;
     idPrefix?: string;
@@ -142,11 +145,16 @@
     values.venue_url = venue.venue_url;
     values.address = venue.address;
     values.map_url = venue.map_url;
+    if (venue.city_geoname_id) {
+      values.city = venue.city;
+      values.city_geoname_id = venue.city_geoname_id;
+    }
     onvenueselect?.({
       venue: venue.venue,
       venue_url: venue.venue_url,
       address: venue.address,
       map_url: venue.map_url,
+      ...(venue.city_geoname_id ? { city_geoname_id: venue.city_geoname_id } : {}),
     });
   }
 </script>
@@ -377,7 +385,11 @@
         required
         value={values.country}
         {disabled}
-        onchange={(e) => handleInput("country", (e.target as HTMLSelectElement).value)}
+        onchange={(e) => {
+          values.city = "";
+          values.city_geoname_id = null;
+          handleInput("country", (e.target as HTMLSelectElement).value);
+        }}
         class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright {values.country ? 'border-line-strong' : 'border-accent-strong/50'}"
       >
         <option value="">{m.tfield_select_country()}</option>
@@ -385,6 +397,24 @@
           <option value={c.iso_code}>{c.name} {getCountryFlag(c.iso_code)}</option>
         {/each}
       </select>
+    </div>
+
+    <div>
+      <label class="block text-sm text-ink-muted mb-1" for={id("city")}>{m.common_city()} <span class="text-link text-xs">({m.common_required()})</span></label>
+      {#key `${values.country}|${values.city_geoname_id}`}
+        <CityAutocomplete
+          id={id("city")}
+          bind:value={values.city}
+          bind:geonameId={values.city_geoname_id}
+          countryCode={values.country}
+          required
+          disabled={disabled || !values.country}
+          onselect={() => onchange?.("city_geoname_id", values.city_geoname_id)}
+        />
+      {/key}
+      {#if !values.country}
+        <p class="mt-1 text-xs text-ink-faint">{m.city_select_country_first()}</p>
+      {/if}
     </div>
   {/if}
 

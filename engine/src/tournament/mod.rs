@@ -65,7 +65,7 @@ pub fn table_label(tournament: &JsonValue, table_idx: usize) -> (Option<String>,
     (None, number)
 }
 
-pub const CONFIG_FIELDS: [&str; 29] = [
+pub const CONFIG_FIELDS: [&str; 31] = [
     tournament_config::NAME,
     tournament_config::FORMAT,
     tournament_config::RANK,
@@ -74,6 +74,8 @@ pub const CONFIG_FIELDS: [&str; 29] = [
     tournament_config::FINISH,
     tournament_config::TIMEZONE,
     tournament_config::COUNTRY,
+    tournament_config::CITY,
+    tournament_config::CITY_GEONAME_ID,
     tournament_config::VENUE,
     tournament_config::VENUE_URL,
     tournament_config::ADDRESS,
@@ -261,6 +263,8 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
         tournament::FINISH => config[tournament_config::FINISH].clone(),
         tournament::TIMEZONE => config[tournament_config::TIMEZONE].as_str().unwrap_or(""),
         tournament::COUNTRY => config[tournament_config::COUNTRY].clone(),
+        tournament::CITY => config[tournament_config::CITY].clone(),
+        tournament::CITY_GEONAME_ID => config[tournament_config::CITY_GEONAME_ID].clone(),
         tournament::STATE => "Planned",
         tournament::ORGANIZERS_UIDS => json::array![actor.uid.clone()],
         tournament::VENUE => config[tournament_config::VENUE].as_str().unwrap_or(""),

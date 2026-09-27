@@ -522,6 +522,16 @@ class TournamentMinimal(BaseObject, kw_only=True):
             "the event predates the field, which many imported records do."
         ),
     ] = None
+    city: Annotated[
+        str | None,
+        msgspec.Meta(
+            description="Host city, its GeoNames name. Null for an online event and "
+            "for records that predate the field."
+        ),
+    ] = None
+    city_geoname_id: Annotated[
+        int | None, msgspec.Meta(description="GeoNames id of the host city.")
+    ] = None
     league_uid: Annotated[
         str | None,
         msgspec.Meta(

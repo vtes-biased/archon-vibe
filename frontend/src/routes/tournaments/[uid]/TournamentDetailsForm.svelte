@@ -27,7 +27,9 @@
   }
 
   // Stash location fields when toggling online mode, so we can restore on toggle-back
-  let stashedPhysical = $state<{ country: string; venue: string; venue_url: string; address: string; map_url: string } | null>(null);
+  let stashedPhysical = $state<{ country: string; city: string; city_geoname_id: number | null; venue: string; venue_url: string; address: string; map_url: string } | null>(null);
+  // A location change the backend would refuse without a city waits for the city pick.
+  let pendingLocation = $state<Record<string, any> | null>(null);
   let stashedOnline = $state<{ venue: string; venue_url: string } | null>(null);
 
   let fieldValues = $state<TournamentFieldValues>({
@@ -40,6 +42,8 @@
     self_organized_rounds: tournament.self_organized_rounds ?? false,
     online: tournament.online,
     country: tournament.country ?? "",
+    city: tournament.city ?? "",
+    city_geoname_id: tournament.city_geoname_id ?? null,
     venue: tournament.venue ?? "",
     venue_url: tournament.venue_url ?? "",
     address: tournament.address ?? "",
@@ -74,6 +78,8 @@
         self_organized_rounds: t.self_organized_rounds ?? false,
         online: t.online,
         country: t.country ?? "",
+        city: t.city ?? "",
+        city_geoname_id: t.city_geoname_id ?? null,
         venue: t.venue ?? "",
         venue_url: t.venue_url ?? "",
         address: t.address ?? "",
@@ -159,6 +165,16 @@
       handleToggleOnline(value);
       return;
     }
+    if (field === "country") {
+      pendingLocation = { ...(pendingLocation ?? {}), country: value || null };
+      return;
+    }
+    if (field === "city_geoname_id") {
+      const fields = { ...(pendingLocation ?? {}), city_geoname_id: value };
+      pendingLocation = null;
+      saveMultiple(fields);
+      return;
+    }
     if (field === "rank" && value) {
       // Selecting a rank also clears proxies/multideck (see TournamentFields
       // rank onchange) — persist together, or the rank-only save hits the
@@ -178,8 +194,11 @@
 
   async function handleToggleOnline(checked: boolean) {
     if (checked) {
+      pendingLocation = null;
       stashedPhysical = {
         country: tournament.country ?? "",
+        city: tournament.city ?? "",
+        city_geoname_id: tournament.city_geoname_id ?? null,
         venue: tournament.venue ?? "",
         venue_url: tournament.venue_url ?? "",
         address: tournament.address ?? "",
@@ -200,16 +219,24 @@
         venue: tournament.venue ?? "",
         venue_url: tournament.venue_url ?? "",
       };
-      const restored = stashedPhysical ?? { country: "", venue: "", venue_url: "", address: "", map_url: "" };
+      const restored = stashedPhysical ?? { country: "", city: "", city_geoname_id: null, venue: "", venue_url: "", address: "", map_url: "" };
       stashedPhysical = null;
-      await saveMultiple({
+      const fields = {
         online: false,
         country: restored.country || null,
         venue: restored.venue,
         venue_url: restored.venue_url,
         address: restored.address,
         map_url: restored.map_url,
-      });
+      };
+      fieldValues.country = restored.country;
+      fieldValues.city = restored.city;
+      fieldValues.city_geoname_id = restored.city_geoname_id;
+      if (restored.city_geoname_id) {
+        await saveMultiple({ ...fields, city_geoname_id: restored.city_geoname_id });
+      } else {
+        pendingLocation = fields;
+      }
     }
   }
 </script>
@@ -235,7 +262,13 @@
       <TournamentFields
         bind:values={fieldValues}
         onchange={handleFieldChange}
-        onvenueselect={(fields) => saveMultiple(fields)}
+        onvenueselect={(fields) => {
+          if (fields.city_geoname_id) {
+            fields = { ...(pendingLocation ?? {}), ...fields };
+            pendingLocation = null;
+          }
+          saveMultiple(fields);
+        }}
         {disabledFields}
         idPrefix="cfg"
         {venueExtra}

@@ -671,6 +671,8 @@ _TOURNAMENT_MEMBER_VISIBLE = {
     "finish",
     "timezone",
     "country",
+    "city",
+    "city_geoname_id",
     "league_uid",
     "state",
     "organizers_uids",

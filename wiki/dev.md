@@ -152,7 +152,9 @@ every scheduled job streams or holds a narrow projection: a `vekn_id → uid` ma
 rather than 19k decoded users, the archive decoded into only the fields the TWDA
 sync reads, rating tournaments by cursor and users in batches. Nothing large stays
 cached between passes either: the member sync builds the ~45 MB city index per
-run, krcg's ~75 MB card DB is dropped once the Amaranth id map is read off it, and
+run, and the tournament and TWDA syncs only on a run that has a city to fill (a
+create or a location edit reads the city list once to name the city from its id),
+krcg's ~75 MB card DB is dropped once the Amaranth id map is read off it, and
 fpdf is imported on the first NDA render (idle, 34 MB). Measured on beta at
 production corpus size (36.7k objects): imports 103 MB, the rating recompute
 +44 MB, the TWDA fetch +22 MB. `MALLOC_ARENA_MAX=2` changes nothing — measured

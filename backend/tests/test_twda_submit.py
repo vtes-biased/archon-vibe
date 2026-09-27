@@ -62,6 +62,7 @@ async def _published(
     seated: int = TWDA_MIN_PLAYERS,
     no_shows: int = 0,
     country: str | None = "FR",
+    city: str | None = "Paris",
 ):
     """Seed a finished event whose winner has a deck, and yield its TWDA text."""
     winner = _user(str(uuid7()), winner_name, winner_vekn)
@@ -85,6 +86,7 @@ async def _published(
         state=TournamentState.FINISHED,
         start=datetime(2025, 6, 1, tzinfo=UTC),
         country=country,
+        city=city,
         external_ids={"vekn": "12345"},
         # What the backfill leaves on a vekn-bearing row: the submission keys on
         # the code, and the code of such a row is its vekn event id.
@@ -179,12 +181,12 @@ async def test_update_keeps_the_maintainers_header(test_db):
 
 
 @pytest.mark.asyncio
-async def test_place_line_spells_the_country_out(test_db):
+async def test_place_line_names_the_city_and_spells_the_country_out(test_db):
     async with _published(attribution=DeckAttribution(kind=AttributionKind.OWNER)) as (
         _t,
         twda,
     ):
-        assert twda.splitlines()[1] == "France"
+        assert twda.splitlines()[1] == "Paris, France"
 
 
 @pytest.mark.asyncio

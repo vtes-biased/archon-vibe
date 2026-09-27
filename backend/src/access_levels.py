@@ -138,6 +138,8 @@ _TOURNAMENT_PUBLIC_FIELDS = {
     "finish",
     "timezone",
     "country",
+    "city",
+    "city_geoname_id",
     "league_uid",
     "state",
     "banner_path",  # public hero / og:image — visible pre-login

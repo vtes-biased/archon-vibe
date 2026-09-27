@@ -503,6 +503,8 @@ _FROM_OFFLINE_SNAPSHOT = {
     "finish",
     "timezone",
     "country",
+    "city",
+    "city_geoname_id",
     "league_uid",
     "state",
     "venue",

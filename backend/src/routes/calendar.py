@@ -76,8 +76,10 @@ def _tournament_to_vevent(t: Tournament, now_str: str) -> str:
     # venue/address render even in anonymous feeds: public-projection fields.
     if t.online:
         location = "Online"
-    elif t.venue or t.address:
+    elif t.venue or t.address or t.city:
         loc_parts = [p for p in [t.venue, t.address] if p]
+        if t.city and not t.address.endswith(t.city):
+            loc_parts.append(t.city)
         location = _escape_ical(", ".join(loc_parts))
     else:
         location = ""
