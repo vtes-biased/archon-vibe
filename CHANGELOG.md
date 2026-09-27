@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.3.1 — 2026-09-27
 
 - In-person tournaments now have a city, picked from a list for their country and shown on the tournament page.
 - Officials can now export the filtered member list and copy members' VEKN ids.
