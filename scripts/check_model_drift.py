@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Fail the build when models.py, types.ts and the engine disagree.
+"""Fail the build when models.py, types.ts and the engine disagree, or when the
+frontend's owner-only carry-forward and the backend's owner-only set do.
 
 The three are hand-synchronized and nothing generates one from another, so a
 field added on one side alone is invisible until it reaches a user.
@@ -10,6 +11,7 @@ wire and every optional spelling differs, so types would be noise.
 Run: just model-drift
 """
 
+import ast
 import enum
 import importlib.util
 import re
@@ -27,6 +29,8 @@ MODELS = ROOT / "backend" / "src" / "models.py"
 TYPES = ROOT / "frontend" / "src" / "lib" / "types.ts"
 ENGINE = ROOT / "engine" / "src"
 MODEL_RS = ENGINE / "model.rs"
+ACCESS_LEVELS = ROOT / "backend" / "src" / "access_levels.py"
+AUTH_STORE = ROOT / "frontend" / "src" / "lib" / "stores" / "auth.svelte.ts"
 
 # name -> why it has no counterpart. Anything not listed must exist on both
 # sides; a new unpaired name fails here rather than drifting unnoticed.
@@ -393,6 +397,39 @@ def _unwrap(kind):
     return kind
 
 
+_OWNER_ONLY_TS = re.compile(
+    r"^const OWNER_ONLY_USER_FIELDS\s*=\s*\[([^\]]*)\]", re.M | re.S
+)
+
+
+def owner_only_problems() -> list[str]:
+    backend = None
+    for node in ast.parse(ACCESS_LEVELS.read_text()).body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(t, ast.Name) and t.id == "_USER_OWNER_ONLY_FIELDS"
+            for t in node.targets
+        ):
+            backend = set(ast.literal_eval(node.value))
+    match = _OWNER_ONLY_TS.search(AUTH_STORE.read_text())
+    frontend = set(re.findall(r'"([^"]*)"', match.group(1))) if match else None
+    problems = []
+    if not backend:
+        problems.append("_USER_OWNER_ONLY_FIELDS: not found in access_levels.py")
+    if not frontend:
+        problems.append("OWNER_ONLY_USER_FIELDS: not found in auth.svelte.ts")
+    if backend and frontend:
+        sides = (
+            ("auth.svelte.ts", backend - frontend),
+            ("access_levels.py", frontend - backend),
+        )
+        for side, missing in sides:
+            if missing:
+                problems.append(
+                    f"owner-only User fields {sorted(missing)} missing from {side}"
+                )
+    return problems
+
+
 def main() -> int:
     py_structs, py_enums = python_side()
     ts_interfaces, ts_unions = typescript_side()
@@ -407,6 +444,7 @@ def main() -> int:
     problems += compare("struct", py_structs, ts_interfaces)
     problems += compare("enum", py_enums, ts_unions)
     problems += engine_problems(py_structs, py_enums)
+    problems += owner_only_problems()
 
     if not problems:
         return 0

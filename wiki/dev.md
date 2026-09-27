@@ -109,7 +109,10 @@ the same eleven gates:
   that let a key hide, since a macro body is one token tree and `has_key` is a
   call. It reads each `field == "literal"` against the enum the field's type
   names, including `matches!` arms and the allowed-values list `validate_enum`
-  takes. Test modules are outside the sweep, so `tests.rs` keeps raw keys. In CI
+  takes. Test modules are outside the sweep, so `tests.rs` keeps raw keys. A last
+  leg compares `access_levels`' owner-only `User` set with the list
+  `auth.svelte.ts` carries forward over its own sync frame
+  ([hazards](hazards.md)), failing too when either stops parsing. In CI
   it rides the backend job, not the lint one: `models.py` instantiates `PyEngine`
   at import, so it needs the built engine.
 

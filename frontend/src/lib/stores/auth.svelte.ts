@@ -9,6 +9,8 @@ const ACCESS_TOKEN_KEY = "archon_access_token";
 const REFRESH_TOKEN_KEY = "archon_refresh_token";
 const REFRESH_THRESHOLD_MS = 60 * 1000;
 
+const OWNER_ONLY_USER_FIELDS = ["calendar_token", "agenda_hidden", "agenda_added"] as const satisfies readonly (keyof User)[];
+
 interface AuthMethod {
   type: string;
   identifier: string;
@@ -152,7 +154,8 @@ function registerOwnUserSync(): void {
     const current = authState.user;
     if (!synced || !current || synced.uid !== current.uid) return;
     if (synced.modified === current.modified) return;
-    setAuthState({ user: { ...synced, calendar_token: current.calendar_token, agenda_hidden: current.agenda_hidden, agenda_added: current.agenda_added } });
+    const carried = Object.fromEntries(OWNER_ONLY_USER_FIELDS.map((field) => [field, current[field]]));
+    setAuthState({ user: { ...synced, ...carried } });
     void fetchCurrentUser().then((result) => {
       if (result && authState.user?.uid === result.user.uid) setAuthState({ user: result.user, authMethods: result.auth_methods });
     });
