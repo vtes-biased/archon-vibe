@@ -14,7 +14,19 @@ import msgspec
 import pytest
 import pytest_asyncio
 import src.db as db
-from src.models import Player, Role, Seat, Table, Tournament, TournamentState, User
+from src.access_levels import compute_deck_member
+from src.models import (
+    DeckObject,
+    DeckView,
+    ObjectType,
+    Player,
+    Role,
+    Seat,
+    Table,
+    Tournament,
+    TournamentState,
+    User,
+)
 from src.routes.tournaments import SERVER_OWNED_TOURNAMENT_FIELDS
 
 from tests.conftest import make_auth_header, seed_tournament
@@ -316,6 +328,50 @@ async def test_nested_uids_and_deck_attribution_remapped(test_client, test_db):
     assert decks[0].user_uid == real_uid
     assert decks[0].attribution.vekn_id == created.vekn_id
     assert not decks[0].attribution.vekn_id.startswith("TEMP-")
+
+
+@pytest.mark.asyncio
+async def test_member_level_deck_keeps_its_privacy_and_view_log(test_client, test_db):
+    """An organizer holds the winner's private deck at member level once the event
+    finishes; pushing that copy back must not clear what the device never held."""
+    org = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Org")
+    owner = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Owner")
+    await db.save_user(org)
+    await db.save_user(owner)
+    base_uid = await _seed(org.uid)
+    deck = DeckObject(
+        uid=str(uuid7()),
+        modified=datetime.now(UTC),
+        tournament_uid=base_uid,
+        user_uid=owner.uid,
+        name="Held back",
+        public=True,
+        winner=True,
+        private=True,
+        views=[DeckView(user_uid=org.uid, round=0)],
+    )
+    await db.save_object_from_model(ObjectType.DECK, deck)
+    offline_copy = compute_deck_member(msgspec.to_builtins(deck))
+    assert "private" not in offline_copy and "views" not in offline_copy
+    offline_copy["winner"] = False
+
+    body = {
+        "device_id": "devA",
+        "tournament": _offline_tournament_payload(base_uid, org.uid, "TEMP-seed"),
+        "offline_players": [],
+        "offline_decks": [offline_copy],
+    }
+    resp = await test_client.post(
+        f"/api/tournaments/{base_uid}/go-online",
+        json=body,
+        headers=make_auth_header(org.uid),
+    )
+    assert resp.status_code == 201
+
+    [saved] = await db.get_decks_for_tournament(base_uid)
+    assert saved.winner is False
+    assert saved.private is True
+    assert saved.views == deck.views
 
 
 @pytest.mark.asyncio
