@@ -66,3 +66,26 @@ and its `userinfo` carries `sub`, `roles`, `vekn_id`, `capabilities` and the
 member's verified `email`; the other two carry no `email`. Nothing is owed after:
 vekn-forum's `wiki/archon.md` already describes the scope, and a failure goes back
 through `/intake` here.
+
+## Resubmit the TWDA entries sent with the roster count
+
+Gated by `c30f107b`, which makes the TWDA header publish `attested_player_count`
+instead of the registered roster ([vekn](vekn.md#outbound)). Run earlier, the
+resubmission would publish the same wrong count again. Tell the TWDA admin a batch
+of `Update TWD` pull requests is coming, and that on a merged entry the diff also
+drops the city they completed by hand, which the header never carries. Then list:
+
+```sh
+sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
+  /opt/archon/backend/.venv/bin/python \
+  /opt/archon/backend/scripts/resubmit_twda_counts.py'
+```
+
+Each line is an event code with its published count and the attested one, or an
+event the old seats-only floor skipped that now clears it. Rerun with `--apply`:
+every listed event opens or moves a pull request on the archive repo. Run it
+once: the listing reads the roster, which the apply does not change, so a rerun
+lists the same submissions and would push them again. It worked when the apply
+output shows every row `submitted` or a skip that is not `too_few_players`, and
+an open pull request diffs only the `N players` line. Delete this section and
+`backend/scripts/resubmit_twda_counts.py` together.
