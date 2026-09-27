@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.3.0 — 2026-09-27
 
 - Organizers can now download a tournament's sanctions from its Tools panel.
 
