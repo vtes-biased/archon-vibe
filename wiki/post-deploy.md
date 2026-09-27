@@ -114,14 +114,17 @@ sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
 ```
 
 The cities are `backend/scripts/tournament_cities.json`, resolved offline from a
-production export of September 2026: the address first, then the TWDA entry's
-place, then vekn.net's venue record — its city, else its coordinates — with a
-town too small for the city list taken to the nearest listed city within 60 km,
-and a country filled from the archive, else vekn.net, only where the row had
-none. It covers 8,863 of the 9,345 in-person events; about 150 stay without a
-city and 330 without a country, 250 of those from 2004–2010. The listing prints each
-city it would write with its source and method, names every mapped row it would
-not — `gone`, `online now`, `country differs` — and lists the in-person events
-the mapping leaves without a city, those created since the export included.
-Rerun with `--apply`. It worked when a second report-only run
-counts no `write`. Delete this section, the script and its mapping together.
+production export of September 2026. The TWDA entry's place comes first, then the
+address, then the TWDA city of the venue's other events, then vekn.net's venue
+record — its city, else its coordinates, unless they contradict its own events. A
+town too small for the city list is taken to the nearest listed city within 60 km;
+a bare state or region is never read as a city. A missing country comes from the
+archive, else the event's name, and 9 events whose archive country contradicts
+vekn.net's are left out for vekn.net to correct. It covers 8,909 of the 9,345
+in-person events; 127 stay without a city and 300 without a country, 236 of those
+from 2004–2010. The listing prints each city it would write with its source and
+method, names every mapped row it would not — `gone`, `online now`, `country
+differs` — and lists the in-person events the mapping leaves without a city, those
+created since the export included. Rerun with `--apply`. It worked when a second
+report-only run counts no `write`. Delete this section, the script and its mapping
+together.

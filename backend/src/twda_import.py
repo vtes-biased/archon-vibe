@@ -45,6 +45,7 @@ from .models import (
     TournamentState,
 )
 from .ratings import recompute_wins
+from .vekn_api import LEGACY_PLACEHOLDER_SINCE
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +198,12 @@ def twda_city(entry: TwdaEntry, cities: CityIndex) -> City | None:
     *head, tail = entry.place.split(",")
     country = normalize_country(tail) if head else None
     if not country:
+        return None
+    if (
+        head[-1].strip() == "Palma de Mallorca"
+        and _ISO_DATE_RE.match(entry.date)
+        and entry.date >= LEGACY_PLACEHOLDER_SINCE
+    ):
         return None
     for segment in reversed(head):
         name, _, region = segment.partition("(")

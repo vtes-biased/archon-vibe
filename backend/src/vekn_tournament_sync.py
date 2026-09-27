@@ -532,7 +532,9 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
             return {}
         if cities is None:
             cities = city_index()
-        matched = match_city(cities, fix_city(name, target.country), target.country)
+        matched = match_city(cities, name, target.country) or match_city(
+            cities, fix_city(name, target.country), target.country
+        )
         if not matched:
             return {}
         return {"city": matched["name"], "city_geoname_id": matched["geoname_id"]}
@@ -604,6 +606,10 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                             venue_url=existing.venue_url,
                             address=existing.address,
                             map_url=existing.map_url,
+                        )
+                    if not tournament.country and not tournament.online:
+                        tournament = msgspec.structs.replace(
+                            tournament, country=existing.country
                         )
                     fill = city_fill(
                         msgspec.structs.replace(

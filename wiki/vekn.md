@@ -367,7 +367,8 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   when a row has none, the sync takes the venue record's city, else the event's,
   matched in GeoNames within the country, and never rewrites one it holds.
   Everything else — `country`, `venue`, `address`, `venue_url`, `map_url` — stays a
-  vekn.net refresh.
+  vekn.net refresh, except that an empty vekn.net country on an in-person event
+  keeps the app's: it means unknown there, and blanking it would orphan the city.
 - **Event times are wall clock at the venue**, which is how `start`/`finish` are
   stored: naive, paired with `timezone`. The sync writes VEKN's time verbatim
   and, **at creation only**, fills `timezone` from a guess off the venue country
@@ -383,7 +384,9 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   is the same stand-in from 2025 on**: legacy archon filed its events against that
   real Palma shop, so Budapest, Seville, Osnabrück and Itaocara all read back as
   Spain. It is a placeholder only by date — the events held there before 2025 were
-  held there — so the rule keys on venue *and* start date.
+  held there — so the rule keys on venue *and* start date. The archive copied it
+  onto some of those events as `Palma de Mallorca, Spain`, so the TWDA import
+  reads no city from that place on an entry dated 2025 or later.
 - Carries `proxies_allowed` onto `proxies`, **except under a championship rank,
   which forbids proxies by rule**. A few vekn.net championships do set the flag,
   and importing that combination would block every later config edit on engine
