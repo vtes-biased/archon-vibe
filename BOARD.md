@@ -25,7 +25,6 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 
 Board changes ride the commit that earns them.
 
-- Enforce "a member with a VEKN id is never soft-deleted" in the one soft-delete function rather than at each caller, and drop the nightly merge's unreachable tombstone branch. **Done when** the soft-delete refuses a VEKN-bearing member, a read-only production query counting such tombstones is parked in `wiki/post-deploy.md`, and the tombstone paragraphs in `wiki/hazards.md` and `wiki/access.md` are deleted or reduced to what that query shows.
 - Make the engine reject a decks-payload entry missing its public, winner or private flag instead of reading it as false, so a drifting builder fails loudly rather than republishing or leaking decks. **Done when** a missing flag errors on both the backend and frontend engine calls and the "decks payload is built twice" paragraph in `wiki/hazards.md` shrinks to one line.
 - Replace go-online's whole-document text replace of temporary player ids with a remap that swaps exact id values only. **Done when** the remap walks the tournament structure and the UUID-length caveat is deleted from `wiki/hazards.md`.
 - Guard the public API's two unenforced invariants: a revoked OAuth access token is refused, tested at the endpoint, and the process refuses to boot with more than one worker. **Done when** both exist, the token-revocation paragraph in `wiki/hazards.md` shrinks to the cross-file pointer, and the one-worker paragraph and `wiki/public-api.md#deployment` state it is enforced.

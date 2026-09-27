@@ -163,3 +163,21 @@ WHERE data->>'method_type' = 'email'
 
 Retiring it also drops `NOT VALID` and its comment from `schema.sql`. Nothing
 else is owed.
+
+## Count the tombstones still holding a VEKN id
+
+Gated by `55442086`, which makes `soft_delete_user` refuse a VEKN-bearing member
+([access](access.md#vekn-identity)). Before it, the legacy-archon merge and the
+load-test cleanup could still write one, so a count proves nothing. On production:
+
+```sql
+SELECT uid, "full"->>'vekn_id' AS vekn_id, deleted_at FROM objects
+WHERE type = 'user' AND deleted_at IS NOT NULL
+  AND "full"->>'vekn_id' IS NOT NULL
+ORDER BY deleted_at;
+```
+
+Each row reserves its number until the 30-day purge, 30 days after its
+`deleted_at`. It worked when the query returns no rows, run again past the last
+row's purge date if the first answer lists any. Then delete this section and the
+sentence in [hazards](hazards.md) pointing here.
