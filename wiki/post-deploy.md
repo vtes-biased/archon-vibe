@@ -103,7 +103,7 @@ section and
 ## Fill the city of existing tournaments
 
 Gated by `da7d0cc3`, which adds the tournament city and makes it required for an
-in-person event ([tournaments](tournaments.md#configuration)), and `GATE`, which
+in-person event ([tournaments](tournaments.md#configuration)), and `dd87e9f9`, which
 ships the resolved mapping. Before them the rows have no field to hold the city.
 List:
 
