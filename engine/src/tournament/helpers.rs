@@ -21,6 +21,23 @@ pub(super) fn count_player_rounds_played(tournament: &JsonValue, user_uid: &str)
         .count()
 }
 
+/// `count_player_rounds_played` for every player seated anywhere in the rounds, keyed by uid.
+pub fn rounds_played_by_player(tournament: &JsonValue) -> JsonValue {
+    let mut counts = JsonValue::new_object();
+    for round in tournament[tournament::ROUNDS].members() {
+        for table in round.members() {
+            for seat in table[table::SEATING].members() {
+                if let Some(uid) = seat[seat::PLAYER_UID].as_str() {
+                    if !counts.has_key(uid) {
+                        counts[uid] = count_player_rounds_played(tournament, uid).into();
+                    }
+                }
+            }
+        }
+    }
+    counts
+}
+
 /// Every player seated in `round_idx`, the finals being `rounds.len()`.
 fn seated_in_round(tournament: &JsonValue, round_idx: usize) -> std::collections::HashSet<String> {
     let rounds = &tournament[tournament::ROUNDS];

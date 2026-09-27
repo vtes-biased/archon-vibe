@@ -18,7 +18,7 @@
   import OrganizerDeck, { isDeckBehindViewLog } from "./OrganizerDeck.svelte";
   import Button from "$lib/components/Button.svelte";
   import Badge from "$lib/components/Badge.svelte";
-  import { validateDeck, finalsQualification, type ValidationError, type TournamentEventType } from "$lib/engine";
+  import { validateDeck, finalsQualification, roundsPlayedByPlayer, type ValidationError, type TournamentEventType } from "$lib/engine";
   import { translatePlayerState, seatDisplay, translateStandingsMode, getRatingPts, ratingContext, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -257,19 +257,7 @@
   // Per-player-cap MECHANICS (engine-driven by max_rounds), not the non-VEKN
   // `open_rounds` reporting flag — keep this keyed on max_rounds.
   const openRounds = $derived((tournament?.max_rounds ?? 0) > 0);
-  // Per-player rounds-played, computed once per render (open rounds: each player has their own count).
-  const roundsPlayedMap = $derived.by(() => {
-    const counts = new Map<string, number>();
-    for (const round of tournament?.rounds ?? []) {
-      for (const table of round) {
-        if (table.state === 'Cancelled') continue;
-        for (const seat of table.seating ?? []) {
-          counts.set(seat.player_uid, (counts.get(seat.player_uid) ?? 0) + 1);
-        }
-      }
-    }
-    return counts;
-  });
+  const roundsPlayedMap = $derived(roundsPlayedByPlayer(tournament));
 
   const sortedPlayers = $derived.by(() => {
     const players = [...(tournament.players ?? [])];
@@ -546,7 +534,7 @@
         {/if}
         <!-- Open rounds: progress toward the per-player cap while in-flight; the badge carries the capped/done state. -->
         {#if openRounds}
-          {@const rp = roundsPlayedMap.get(puid) ?? 0}
+          {@const rp = roundsPlayedMap[puid] ?? 0}
           {#if rp > 0 && rp < (tournament.max_rounds ?? 0)}
             <span class="text-xs text-ink-faint ml-1">{rp}/{tournament.max_rounds} {m.player_rounds_unit()}</span>
           {/if}
@@ -852,9 +840,9 @@
                   {:else}<FileX class="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" /><span class="text-ink-muted">{m.players_no_deck()}</span>{/if}
                 </Button>
               {/if}
-              {#if tournament.state === "Waiting" && puid && openRounds && player.state !== "Disqualified" && player.state !== "Finished" && (roundsPlayedMap.get(puid) ?? 0) >= (tournament.max_rounds ?? 0)}
+              {#if tournament.state === "Waiting" && puid && openRounds && player.state !== "Disqualified" && player.state !== "Finished" && (roundsPlayedMap[puid] ?? 0) >= (tournament.max_rounds ?? 0)}
                 <!-- Open rounds: at cap and not dropped — no check-in, show their played count. -->
-                <Button variant="ghost" size="sm" class="min-h-[44px]" disabled title={m.player_completed_hint()}>{roundsPlayedMap.get(puid)}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
+                <Button variant="ghost" size="sm" class="min-h-[44px]" disabled title={m.player_completed_hint()}>{roundsPlayedMap[puid]}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
               {:else if puid && player.waitlisted}
                 <Button variant="primary" size="sm" class="min-h-[44px]" onclick={() => doAction("SetWaitlisted", { player_uid: puid, waitlisted: false })}>{m.waitlist_promote()}</Button>
               {:else if puid && (tournament.state === "Waiting" || tournament.state === "Playing") && (player.state === "Finished" || player.state === "Registered")}
@@ -987,7 +975,7 @@
                   </span>
                 {/if}
                 {#if openRounds}
-                  {@const rp = roundsPlayedMap.get(puid) ?? 0}
+                  {@const rp = roundsPlayedMap[puid] ?? 0}
                   {#if rp > 0 && rp < (tournament.max_rounds ?? 0)}
                     <span class="text-xs text-ink-faint ml-1">{rp}/{tournament.max_rounds} {m.player_rounds_unit()}</span>
                   {/if}
@@ -1025,8 +1013,8 @@
                        leads with an icon (More); nowrap keeps labels from
                        wrapping under column squeeze. -->
                   <div class="flex items-center justify-end gap-1 whitespace-nowrap">
-                    {#if tournament.state === "Waiting" && puid && openRounds && player.state !== "Disqualified" && player.state !== "Finished" && (roundsPlayedMap.get(puid) ?? 0) >= (tournament.max_rounds ?? 0)}
-                      <Button variant="ghost" size="sm" disabled title={m.player_completed_hint()}>{roundsPlayedMap.get(puid)}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
+                    {#if tournament.state === "Waiting" && puid && openRounds && player.state !== "Disqualified" && player.state !== "Finished" && (roundsPlayedMap[puid] ?? 0) >= (tournament.max_rounds ?? 0)}
+                      <Button variant="ghost" size="sm" disabled title={m.player_completed_hint()}>{roundsPlayedMap[puid]}/{tournament.max_rounds} {m.player_rounds_unit()}</Button>
                     {:else if puid && player.waitlisted}
                       <Button variant="primary" size="sm" onclick={() => doAction("SetWaitlisted", { player_uid: puid, waitlisted: false })}>{m.waitlist_promote()}</Button>
                     {:else if puid && (tournament.state === "Waiting" || tournament.state === "Playing") && (player.state === "Finished" || player.state === "Registered")}

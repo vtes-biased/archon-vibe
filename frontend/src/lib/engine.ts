@@ -608,6 +608,11 @@ export function attestedPlayerCount(tournament: unknown): number {
   return getEngine().attestedPlayerCount(JSON.stringify(tournament));
 }
 
+/** Each seated player's own round count, the open-rounds per-player cap's measure. */
+export function roundsPlayedByPlayer(tournament: unknown): Record<string, number> {
+  return JSON.parse(getEngine().roundsPlayedByPlayer(JSON.stringify(tournament)));
+}
+
 export async function computeLeagueStandings(
   standingsMode: string,
   tournaments: Array<{

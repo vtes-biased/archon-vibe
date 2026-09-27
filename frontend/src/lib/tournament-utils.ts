@@ -145,15 +145,6 @@ export function translatePlayerState(state: string): string {
   }
 }
 
-/** Number of rounds in which a player is seated — the per-player count for open-rounds caps.
- *  Mirrors the engine's count_player_rounds_played (seating is the single source of truth). */
-export function roundsPlayed(tournament: Tournament, uid: string): number {
-  return (tournament.rounds ?? []).filter(
-    (round) => round.some((table) =>
-      table.state !== 'Cancelled' && table.seating?.some((seat) => seat.player_uid === uid)),
-  ).length;
-}
-
 /** Distinct players in ≥1 preliminary round (finals folded in), or — for a rounds-less import —
  * standings rows carrying any score. A twin of backend ratings.py's player-count function; keep them in sync. */
 export function playedPlayerUids(tournament: Tournament): Set<string> {

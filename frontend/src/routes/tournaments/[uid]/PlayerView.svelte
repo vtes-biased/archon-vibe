@@ -1,10 +1,10 @@
 <script lang="ts">
   import type { Tournament, Player, Sanction, DeckObject } from "$lib/types";
   import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
-  import { seatDisplay as seatDisplayUtil, vpOptions, translatePlayerState, translateTableState, translateStandingsMode, roundsPlayed, getRatingPts, ratingContext } from "$lib/tournament-utils";
+  import { seatDisplay as seatDisplayUtil, vpOptions, translatePlayerState, translateTableState, translateStandingsMode, getRatingPts, ratingContext } from "$lib/tournament-utils";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { formatScore, formatGwTp } from "$lib/utils";
-  import { previewScoresSync, tableLabel, type ValidationError, type TournamentEventType } from "$lib/engine";
+  import { previewScoresSync, roundsPlayedByPlayer, tableLabel, type ValidationError, type TournamentEventType } from "$lib/engine";
   import { TriangleAlert, QrCode, Gavel, Ban, Trash2, ExternalLink, Users, Lock, ShieldCheck, Undo2 } from "@lucide/svelte";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SelfOrganizeDialog from "./SelfOrganizeDialog.svelte";
@@ -99,8 +99,9 @@
   // Open rounds: gate self-check-in on rounds-played (not player state), so a
   // capped player can't self-check-in regardless of whether they rest in
   // Completed, Finished, or Registered.
+  const roundsPlayedMap = $derived(roundsPlayedByPlayer(tournament));
   const atCap = $derived(
-    (tournament.max_rounds ?? 0) > 0 && roundsPlayed(tournament, userUid) >= (tournament.max_rounds ?? 0),
+    (tournament.max_rounds ?? 0) > 0 && (roundsPlayedMap[userUid] ?? 0) >= (tournament.max_rounds ?? 0),
   );
   // Registration is never refused: past the cap a sign-up lands on the waitlist.
   const seatedCount = $derived(tournament.players?.filter(p => !p.waitlisted).length ?? 0);
@@ -119,7 +120,7 @@
     if (p.state !== "Registered" && p.state !== "Checked-in") return false;
     if (p.waitlisted) return false;
     // No cap (max_rounds 0) means no per-player limit; only gate when a cap is set.
-    return !((tournament.max_rounds ?? 0) > 0 && roundsPlayed(tournament, uid) >= (tournament.max_rounds ?? 0));
+    return !((tournament.max_rounds ?? 0) > 0 && (roundsPlayedMap[uid] ?? 0) >= (tournament.max_rounds ?? 0));
   }
   const canSelfOrganize = $derived(
     (tournament.self_organized_rounds ?? false) &&

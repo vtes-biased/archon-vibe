@@ -147,16 +147,7 @@ corpus around the allowlist. `require_api_token`
 purpose: the public API serves published data, so a token there is attribution,
 not authority, and a tournament-scoped one is no narrower.
 
-**A player's own round count is computed in three places, and a soft-cancelled
-table is what splits them.** The engine owns the rule — `count_player_rounds_played`,
-which **skips `Cancelled` tables** — and it decides the open-rounds per-player cap
-and nothing else. Two callers must produce the same number: `roundsPlayed` in
-`tournament-utils.ts` and the inline `roundsPlayedMap` in `PlayersTab.svelte`
-(kept separate deliberately, one pass per render). Both once omitted the
-`Cancelled` filter, which told a player they were at their cap when the engine
-would still have seated them.
-
-**That count is not a deck coordinate.** `DeckObject.round` is the tournament's
+**A player's rounds-played count is not a deck coordinate.** `DeckObject.round` is the tournament's
 own round index, stamped at seating — the same coordinate as
 `Sanction.round_number` and the delegated deck read's `round` field, `len(rounds)`
 meaning the finals ([tournaments](tournaments.md#engine-event-catalog)). Deriving it from the

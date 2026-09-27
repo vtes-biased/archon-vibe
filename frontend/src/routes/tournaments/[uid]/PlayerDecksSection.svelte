@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { Tournament, DeckObject, Table, VtesCard } from "$lib/types";
   import type { PlayerInfoMap } from "$lib/tournament-utils";
-  import { roundsPlayed, seatDisplay } from "$lib/tournament-utils";
+  import { seatDisplay } from "$lib/tournament-utils";
+  import { roundsPlayedByPlayer } from "$lib/engine";
   import { getDecksByTournamentGrouped } from "$lib/db";
   import DeckUpload from "$lib/components/DeckUpload.svelte";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
@@ -46,7 +47,7 @@
   const isMultideck = $derived(!!tournament.multideck);
   const maxRounds = $derived(tournament.max_rounds ?? 0);
   // Per-player rounds played (open rounds: each player progresses through the pool independently).
-  const myRoundsPlayed = $derived(roundsPlayed(tournament, myUid));
+  const myRoundsPlayed = $derived(roundsPlayedByPlayer(tournament)[myUid] ?? 0);
   const roundCount = $derived(tournament.rounds?.length ?? 0);
 
   const myStamped = $derived(

@@ -618,6 +618,13 @@ mod wasm {
             Ok(super::ratings::attested_player_count(&t))
         }
 
+        #[wasm_bindgen(js_name = roundsPlayedByPlayer)]
+        pub fn rounds_played_by_player(&self, tournament_json: &str) -> Result<String, String> {
+            let t =
+                json::parse(tournament_json).map_err(|e| super::EngineError::from(e).to_json())?;
+            Ok(super::tournament::rounds_played_by_player(&t).dump())
+        }
+
         #[wasm_bindgen(js_name = parseDeck)]
         pub fn parse_deck(&self, text: &str) -> Result<String, String> {
             js_str(with_card_map(&self.cards, |cm| parse_deck_json(text, cm)))

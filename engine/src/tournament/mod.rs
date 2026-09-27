@@ -16,6 +16,7 @@ mod standings;
 mod tests;
 mod types;
 
+pub use helpers::rounds_played_by_player;
 pub use raffle::get_raffle_pool;
 pub use scoring::{check_table_vps, compute_gw, compute_gw_finals, compute_tp};
 pub use standings::{

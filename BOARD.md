@@ -26,5 +26,4 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 Board changes ride the commit that earns them.
 
 - Compute the score preview and SetScore's SA/GW/TP cascade through one engine function. **Done when** both call it, the preview/SetScore equality test is deleted and the "deliberately duplicates" paragraph in `wiki/hazards.md` is deleted.
-- Export the engine's rounds-played count to the frontend and have the roster and the tournament utilities call it. **Done when** both frontend twins are gone and the "round count computed in three places" paragraph in `wiki/hazards.md` is deleted.
 
