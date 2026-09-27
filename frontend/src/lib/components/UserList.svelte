@@ -4,18 +4,21 @@
   import { goto } from "$app/navigation";
   import User from "./User.svelte";
   import DeceasedIcon from "./DeceasedIcon.svelte";
-  import { getFilteredUsers, hasAnyUsers, userHasPastSanctions, isUserCurrentlySanctioned } from "$lib/db";
+  import { getFilteredUsers, hasAnyUsers, userHasPastSanctions, isUserCurrentlySanctioned, getRegistrationBarringLevels } from "$lib/db";
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
   import { getRoleTone } from "$lib/roles";
   import Badge, { badgeToneClass } from "$lib/components/Badge.svelte";
   import { syncManager } from "$lib/sync";
   import { getAuthState } from "$lib/stores/auth.svelte";
-  import { isOfficial as engineIsOfficial, canSponsorMember, canListNonMember } from "$lib/engine";
+  import { isOfficial as engineIsOfficial, canSponsorMember, canListNonMember, canExportMembers } from "$lib/engine";
+  import { buildCsv } from "$lib/csv";
+  import { downloadBlob } from "$lib/utils";
+  import { showToast } from "$lib/stores/toast.svelte";
   import { displayContext } from "$lib/displayContext";
   import type { User as UserType, Role } from "$lib/types";
   import type { UserListItem } from "$lib/db";
   import Button from '$lib/components/Button.svelte';
-  import { RefreshCw, Users, Plus, X } from "@lucide/svelte";
+  import { RefreshCw, Users, Plus, X, Download, Copy } from "@lucide/svelte";
   import { dialogPanel } from "$lib/actions/dialog";
   import { syncQueryParams, currentParams, readPageParam, pageParam } from "$lib/url-filters";
   import * as m from '$lib/paraglide/messages.js';
@@ -72,6 +75,41 @@
   const isOfficial = $derived(engineIsOfficial(getAuthState().user));
 
   const canSponsor = $derived(canSponsorMember(getAuthState().user).allowed);
+  const canExport = $derived(canExportMembers(getAuthState().user));
+
+  async function exportMembers() {
+    const barring = await getRegistrationBarringLevels();
+    const rows: string[][] = [
+      ["name", "vekn_id", "country", "city", "roles", "sanction", "email", "phone", "discord"],
+      ...filteredUsers.map((u) => [
+        u.name,
+        u.vekn_id ?? "",
+        u.country ? countries[u.country]?.name ?? u.country : "",
+        u.city ?? "",
+        u.roles.join(" "),
+        (barring.get(u.uid) ?? []).join(" "),
+        u.contact_email ?? "",
+        u.contact_phone ?? "",
+        u.contact_discord ?? "",
+      ]),
+    ];
+    downloadBlob(new Blob([buildCsv(rows)], { type: "text/csv;charset=utf-8" }), `members-${new Date().toISOString().slice(0, 10)}.csv`);
+  }
+
+  async function copyVekn(vekn: string) {
+    try {
+      await navigator.clipboard.writeText(vekn);
+      showToast({ type: "success", message: m.user_list_vekn_copied({ vekn }) });
+    } catch {
+      showToast({ type: "error", message: m.user_list_vekn_copy_failed() });
+    }
+  }
+
+  function openRow(e: MouseEvent, uid: string) {
+    if ((e.target as Element).closest("a, button")) return;
+    if (window.getSelection()?.toString()) return;
+    goto(`/users/${uid}`);
+  }
 
   const countries = getCountries();
   const sortedCountries = getSortedCountries();
@@ -356,12 +394,31 @@
   });
 </script>
 
+{#snippet copyVeknButton(vekn: string)}
+  <button
+    type="button"
+    onclick={() => copyVekn(vekn)}
+    aria-label={m.user_list_copy_vekn({ vekn })}
+    title={m.user_list_copy_vekn({ vekn })}
+    class="p-2 -m-1 text-ink-faint hover:text-link transition-colors"
+  >
+    <Copy class="w-3.5 h-3.5" aria-hidden="true" />
+  </button>
+{/snippet}
+
 <div class="p-4 sm:p-8">
   <div class="max-w-6xl mx-auto">
     <div class="mb-8">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-3xl font-semibold text-accent">{m.nav_users()}</h1>
 
+        <div class="flex items-center gap-2">
+        {#if canExport && filteredUsers.length > 0}
+          <Button variant="ghost" onclick={exportMembers}>
+            <Download class="w-4 h-4" aria-hidden="true" />
+            {m.user_list_export_csv()}
+          </Button>
+        {/if}
         {#if canSponsor}
           <Button
             variant="create"
@@ -373,6 +430,7 @@
             {m.user_list_new_user()}
           </Button>
         {/if}
+        </div>
       </div>
 
       <div class="mb-4">
@@ -526,28 +584,26 @@
 
         <div id="users-rows-container" class="divide-y divide-line">
           {#each paginatedUsers as user (user.uid)}
+              <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
               <div
                 class="user-row px-6 py-4 hover:bg-surface-muted/50 transition-colors cursor-pointer"
-                onclick={() => goto(`/users/${user.uid}`)}
-                onkeydown={(e) =>
-                  e.key === "Enter" && goto(`/users/${user.uid}`)}
-                role="button"
-                tabindex="0"
+                onclick={(e) => openRow(e, user.uid)}
               >
                 <div class="sm:hidden space-y-2">
                   <div class="flex items-start justify-between">
                     <div>
-                      <div class="user-name font-semibold text-ink-strong">
+                      <a href="/users/{user.uid}" class="user-name block font-semibold text-ink-strong">
                         <DeceasedIcon deceased={user.deceased_at} />{user.name}
                         {#if user.nickname}
                           <span class="text-sm text-ink-faint"
                             >({user.nickname})</span
                           >
                         {/if}
-                      </div>
+                      </a>
                       {#if user.vekn_id}
-                        <div class="text-sm text-ink-muted mt-1">
+                        <div class="text-sm text-ink-muted mt-1 flex items-center gap-1">
                           VEKN: {user.vekn_id}
+                          {@render copyVeknButton(user.vekn_id)}
                         </div>
                       {/if}
                       <div class="text-sm text-ink-muted">
@@ -568,17 +624,22 @@
 
                 <div class="hidden sm:grid sm:grid-cols-12 gap-4 items-center">
                   <div class="col-span-3">
-                    <div class="user-name font-semibold text-ink-strong">
+                    <a href="/users/{user.uid}" class="user-name block font-semibold text-ink-strong">
                       <DeceasedIcon deceased={user.deceased_at} />{user.name}
-                    </div>
+                    </a>
                     {#if user.nickname}
                       <div class="text-sm text-ink-faint">
                         {user.nickname}
                       </div>
                     {/if}
                   </div>
-                  <div class="col-span-2 text-sm text-ink-muted">
-                    {user.vekn_id || "—"}
+                  <div class="col-span-2 text-sm text-ink-muted flex items-center gap-1">
+                    {#if user.vekn_id}
+                      {user.vekn_id}
+                      {@render copyVeknButton(user.vekn_id)}
+                    {:else}
+                      —
+                    {/if}
                   </div>
                   <div class="col-span-2 text-sm text-ink-muted">
                     {user.country

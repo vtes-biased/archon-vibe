@@ -52,7 +52,7 @@ with sealed-PDF records gating the PT role and retrievable by the member from
 their own Account tab, IC-only account merge, cooptation tracking with the
 sponsor correctable by IC or the member's NC, privacy-filtered directory of VEKN
 members (non-members only to the officials of their country,
-[access](access.md)), in-memoriam flag for deceased members,
+[access](access.md)) with a CSV export of the filtered list for officials, in-memoriam flag for deceased members,
 IC-only irreversible anonymization of a VEKN member, who then reads "Anonymized
 member" wherever a name appears.
 

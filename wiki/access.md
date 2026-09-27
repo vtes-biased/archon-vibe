@@ -25,6 +25,7 @@ omitted from the rows below.
 | `sponsor_member`, `create_tournament` | NC, Prince — global (a visiting official can sponsor abroad) |
 | `edit_member_profile`, `manage_vekn`, `mark_deceased` | NC — own country |
 | `list_non_member` | NC, Prince — own country (the user's country; a countryless one is IC's alone) |
+| `export_members` | NC, Prince — global |
 | `merge_accounts`, `delete_member`, `anonymize_member`, `force_unlock_tournament`, `manage_promos`, `run_admin_sync`, `promote_link_global`, `set_archival_results` | nobody |
 | `moderate_link`, `promote_link_national` | NC — own country |
 | `organize_tournament` | NC — own country; explicit organizer |
@@ -53,6 +54,12 @@ every member, and a non-member's profile link and the organizer's add-player sea
 stay open, so an official sponsoring abroad still finds them. The members directory
 lists only users holding a VEKN ID; the officials' "No VEKN" toggle swaps that for
 the non-members the viewer holds this capability over.
+
+`export_members` is display-only too: the CSV is the filtered directory as the
+viewer's device holds it, so its contact columns carry exactly what the viewer's
+[sync level](sync.md#access-levels) delivered — every member for IC, the NC's own
+country, and elsewhere only the contacts NCs and Princes publish. Its sanction
+column names the suspensions and probations currently barring registration.
 
 Two rows carry a security rationale. `merge_accounts` is IC-only because a merge
 **unions both accounts' roles** — anyone who could merge could land a role by

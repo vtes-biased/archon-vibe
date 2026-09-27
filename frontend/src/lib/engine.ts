@@ -428,6 +428,10 @@ export function canListNonMember(actor: UserContext | null, targetCountry: strin
   return checkPermission('list_non_member', actor, { targetCountry }).allowed;
 }
 
+export function canExportMembers(actor: UserContext | null): boolean {
+  return checkPermission('export_members', actor).allowed;
+}
+
 export function canMergeAccounts(actor: UserContext | null): PermissionResult {
   return checkPermission('merge_accounts', actor);
 }

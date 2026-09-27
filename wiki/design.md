@@ -575,6 +575,11 @@ and roles are the page's subject, not tab content. Below it:
   records with a re-download of each sealed file, settings, developer,
   administration, data. The NDA block renders only when a record exists.
 
+**A members directory row opens the profile without trapping its text.** The name
+is the row's link, so cmd- and middle-click work; a click elsewhere on the row opens
+the profile too, unless it ends a text selection. The VEKN ID carries a copy
+button with a success toast.
+
 **`/users/[uid]` carries a back link to the members directory**, its parent list and
 — with no browser chrome — the installed app's only dependable way back to it. The
 nav-menu memory is keyed on the bare `/users` path, so it holds whichever tab was

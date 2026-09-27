@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, type StoreNames } from 'idb';
-import type { User, Role, Sanction, Tournament, DeckObject, League, Promo, VtesCard, OfflinePlayer,
+import type { User, Role, Sanction, SanctionLevel, Tournament, DeckObject, League, Promo, VtesCard, OfflinePlayer,
   CommunityLink, RatingCategory, TournamentFormat, TournamentRank, TournamentState } from '$lib/types';
 import type { TournamentEvent } from './engine';
 import { expandRolesForFilter } from './roles';
@@ -635,15 +635,23 @@ export async function isUserCurrentlySanctioned(userUid: string): Promise<boolea
   return sanctions.some(s => barsRegistration(s, now, cutoff));
 }
 
+export async function getRegistrationBarredUids(): Promise<Set<string>> {
+  return new Set((await getRegistrationBarringLevels()).keys());
+}
+
 /** One pass over the sanctions store: the member pickers need this for a whole page of results at
  * once, and asking per-row cost one IDB transaction each on the path to first paint. */
-export async function getRegistrationBarredUids(): Promise<Set<string>> {
+export async function getRegistrationBarringLevels(): Promise<Map<string, SanctionLevel[]>> {
   const db = await getDB();
   const all = await db.getAll('sanctions');
   const { now, cutoff } = sanctionWindow();
-  const barred = new Set<string>();
-  for (const s of all) if (barsRegistration(s, now, cutoff)) barred.add(s.user_uid);
-  return barred;
+  const levels = new Map<string, SanctionLevel[]>();
+  for (const s of all) {
+    if (!barsRegistration(s, now, cutoff)) continue;
+    const held = levels.get(s.user_uid) ?? [];
+    if (!held.includes(s.level)) levels.set(s.user_uid, [...held, s.level]);
+  }
+  return levels;
 }
 
 /** Single scan of the sanctions store, for bulk filtering (e.g. rankings). */
