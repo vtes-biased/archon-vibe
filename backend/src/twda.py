@@ -9,10 +9,32 @@ import json
 import logging
 import os
 import re
+from datetime import UTC, datetime
 
 import aiohttp
+import msgspec
+from archon_engine import PyEngine
 
 from . import github_app, http_client
+from .broadcast import broadcast_precomputed
+from .card_data import cards_json_text
+from .db import (
+    TWDA_MIN_PLAYERS,
+    get_decks_for_tournament,
+    get_user_by_uid,
+    get_user_by_vekn_id,
+    save_tournament,
+    tournament_transaction,
+)
+from .geonames import get_country, normalize_country
+from .models import (
+    AttributionKind,
+    Tournament,
+    TournamentFormat,
+    TournamentState,
+    TwdaOutcome,
+    TwdaStatus,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +52,9 @@ _GH_API_VERSION = github_app.GH_API_VERSION
 
 
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}")
+
+_engine = PyEngine()
+_engine_cards_loaded = False
 
 
 def frontend_url() -> str:
@@ -238,3 +263,194 @@ async def submit_twda_pr(
     except Exception:
         logger.exception("TWDA PR submission failed")
         return "", "internal"
+
+
+async def winner_deck_twda(tournament: Tournament) -> str | None:
+    """TWDA-formatted winner decklist (event header + deck), or None if the
+    winner has no stored deck."""
+    if not tournament.winner:
+        return None
+
+    decks = await get_decks_for_tournament(tournament.uid)
+    finals_round = len(tournament.rounds) if tournament.multideck else None
+    winner_deck = next(
+        (
+            d
+            for d in decks
+            if d.user_uid == tournament.winner and d.round == finals_round
+        ),
+        None,
+    )
+    if not winner_deck:
+        return None
+
+    player_user = await get_user_by_uid(tournament.winner)
+    player_name = player_user.name if player_user else "Unknown"
+
+    credit = winner_deck.attribution
+    if credit.kind == AttributionKind.MEMBER:
+        designer = await get_user_by_vekn_id(credit.vekn_id)
+        designer_credit = designer.name if designer else ""
+    elif credit.kind == AttributionKind.ARCHIVE:
+        designer_credit = credit.name
+    else:
+        designer_credit = ""
+
+    deck_json = json.dumps(
+        {
+            "name": winner_deck.name,
+            "author": designer_credit,
+            "comments": winner_deck.comments,
+            "cards": winner_deck.cards,
+        }
+    )
+
+    def us_date(d: datetime) -> str:
+        suffix = (
+            "th"
+            if 11 <= d.day % 100 <= 13
+            else {1: "st", 2: "nd", 3: "rd"}.get(d.day % 10, "th")
+        )
+        return f"{d.strftime('%B')} {d.day}{suffix} {d.year}"
+
+    start = tournament.start or tournament.modified
+    tournament_date = us_date(start)
+    if tournament.finish and tournament.finish.date() != start.date():
+        tournament_date += f" -- {us_date(tournament.finish)}"
+    rounds_count = len(tournament.rounds)
+    tournament_format = f"{rounds_count}R" + (
+        "+F" if tournament.finals else " (no final)"
+    )
+
+    standing = next(
+        (s for s in tournament.standings if s.user_uid == tournament.winner), None
+    )
+    winner_score = ""
+    if standing:
+        winner_score = f"{int(standing.gw)}GW{standing.vp:g}"
+        finals_seat = next(
+            (
+                s
+                for s in (tournament.finals.seating if tournament.finals else [])
+                if s.player_uid == tournament.winner
+            ),
+            None,
+        )
+        if finals_seat:
+            winner_score += f" + {finals_seat.result.vp:g}vp in final"
+
+    # The archive keeps this line forever, so it must be the citable form. Two
+    # TWDA entries already point at legacy-archon uids that resolve to nothing.
+    handle = (
+        f"/t/{tournament.event_code}"
+        if tournament.event_code
+        else f"/tournaments/{tournament.uid}"
+    )
+
+    named = get_country(normalize_country(tournament.country or "") or "")
+
+    _load_engine_cards()
+    return _engine.export_twda(
+        deck_json,
+        tournament.name,
+        tournament_date,
+        "Online"
+        if tournament.online
+        else ", ".join(
+            p
+            for p in (tournament.city, named["name"] if named else tournament.country)
+            if p
+        ),
+        tournament_format,
+        f"{frontend_url()}{handle}",
+        _engine.attested_player_count(msgspec.json.encode(tournament).decode()),
+        player_name,
+        winner_score,
+    )
+
+
+async def _record_twda_status(
+    uid: str, outcome: TwdaOutcome, reason: str = "", pr_url: str = ""
+) -> None:
+    """Locked fetch-modify-save so only twda_status lands on the CURRENT row,
+    never clobbering concurrent edits; an unchanged outcome skips the write."""
+    async with tournament_transaction(uid) as (fresh, tx_conn):
+        if not fresh:
+            return
+        prev = fresh.twda_status
+        if prev and (prev.outcome, prev.reason, prev.pr_url) == (
+            outcome,
+            reason,
+            pr_url,
+        ):
+            return
+        fresh.twda_status = TwdaStatus(
+            outcome=outcome, reason=reason, pr_url=pr_url, at=datetime.now(UTC)
+        )
+        fresh.modified = datetime.now(UTC)
+        bd = await save_tournament(fresh, conn=tx_conn)
+    broadcast_precomputed(bd)
+
+
+async def maybe_submit_twda(tournament: Tournament) -> None:
+    """Self-contains its errors, recording outcome/reason on the tournament
+    either way. `ranking_eligibility` (the ranked-badge predicate) is distinct
+    from `rank` (the Basic/NC/CC championship axis) — don't conflate them."""
+    if tournament.state != TournamentState.FINISHED:
+        return
+    t_json = msgspec.json.encode(tournament).decode()
+    if not tournament.winner:
+        outcome = (TwdaOutcome.SKIPPED, "no_winner", "")
+    elif tournament.format == TournamentFormat.Limited:
+        # Limited events are rated (own category) but draft/sealed decks
+        # don't belong in a constructed-deck archive.
+        outcome = (TwdaOutcome.SKIPPED, "limited", "")
+    elif tournament.format == TournamentFormat.Storyline:
+        outcome = (TwdaOutcome.SKIPPED, "storyline", "")
+    elif tournament.external_ids.get("twda"):
+        outcome = (TwdaOutcome.SKIPPED, "reconstructed", "")
+    elif not tournament.rounds:
+        outcome = (TwdaOutcome.SKIPPED, "no_rounds", "")
+    elif _engine.attested_player_count(t_json) < TWDA_MIN_PLAYERS:
+        outcome = (TwdaOutcome.SKIPPED, "too_few_players", "")
+    elif _engine.ranking_eligibility(t_json) != "eligible":
+        outcome = (TwdaOutcome.SKIPPED, "unranked", "")
+    elif not tournament.event_code:
+        outcome = (TwdaOutcome.SKIPPED, "no_event_code", "")
+    elif not tournament.online and not tournament.country:
+        outcome = (TwdaOutcome.SKIPPED, "no_place", "")
+    elif not is_configured():
+        outcome = (TwdaOutcome.SKIPPED, "not_configured", "")
+    else:
+        try:
+            deck_text = await winner_deck_twda(tournament)
+            if not deck_text:
+                outcome = (TwdaOutcome.SKIPPED, "no_deck", "")
+            else:
+                pr_url, reason = await submit_twda_pr(
+                    tournament.event_code, deck_text, tournament.name
+                )
+                if pr_url:
+                    outcome = (TwdaOutcome.SUBMITTED, "", pr_url)
+                else:
+                    outcome = (TwdaOutcome.FAILED, reason, "")
+        except Exception:
+            logger.exception("Failed to submit TWDA PR")
+            outcome = (TwdaOutcome.FAILED, "deck", "")
+
+    try:
+        await _record_twda_status(tournament.uid, *outcome)
+    except Exception:
+        logger.exception("Failed to record TWDA status")
+
+
+def _load_engine_cards() -> None:
+    """Hand cards.json to the engine, which parses and holds it."""
+    global _engine_cards_loaded
+    if _engine_cards_loaded:
+        return
+    text = cards_json_text()
+    if text is None:
+        raise RuntimeError("Cards data not available. Run: just cards")
+    _engine.load_cards(text)
+    _engine_cards_loaded = True

@@ -1,6 +1,8 @@
+import asyncio
 import logging
 import os
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from typing import Any
 
 import aiohttp
@@ -443,9 +445,6 @@ class VEKNAPIClient:
         event. The yield below is not that verdict — it drops past events with no
         players, which exist upstream.
         """
-        import asyncio
-        from datetime import UTC, datetime
-
         now = datetime.now(UTC)
         await self._ensure_authenticated()
 

@@ -176,6 +176,7 @@ lint-check:
     just model-drift
     just migration-pairing
     just help-mockups
+    just function-imports
 
 # Fail when a role literal is used for gating outside the engine's capability
 # table — the drift this repo's permission model keeps re-growing without it.
@@ -235,6 +236,11 @@ index-drift:
 help-mockups:
     uv run python3 scripts/check_help_mockups.py
 
+# Fail on an import inside a function under backend/ — it hides a reference from
+# module load; only a heavy, rarely-needed library may be listed as an exception.
+function-imports:
+    uv run python3 scripts/check_function_imports.py
+
 # Lint and auto-fix all code
 lint:
     uv run ruff check --fix . && uv run ruff format .
@@ -249,6 +255,7 @@ lint:
     just model-drift
     just migration-pairing
     just help-mockups
+    just function-imports
 
 # Install git hooks (pre-commit: ruff auto-format of staged Python)
 hooks:

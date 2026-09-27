@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 import pytest
 from src.broadcast import SSEConnection, broadcast_judge_call
+from src.main import _sse_connections
 from src.models import Role, User
 
 NOW = datetime.now(UTC)
@@ -29,8 +30,6 @@ def _make_user(
 @pytest.mark.asyncio
 async def test_judge_call_only_sent_to_explicit_organizers():
     """Judge call SSE events must only reach explicit organizers of that tournament."""
-    from src.main import _sse_connections
-
     organizer = SSEConnection(user=_make_user(uid="org1", roles=[]))
     ic_user = SSEConnection(user=_make_user(uid="ic1", roles=[Role.IC]))
     random_member = SSEConnection(user=_make_user(uid="random", roles=[]))
@@ -60,8 +59,6 @@ async def test_judge_call_only_sent_to_explicit_organizers():
 @pytest.mark.asyncio
 async def test_judge_call_not_sent_to_other_tournament_organizer():
     """An organizer of tournament X should not get judge calls for tournament Y."""
-    from src.main import _sse_connections
-
     other_org = SSEConnection(user=_make_user(uid="org-other", roles=[]))
 
     _sse_connections.clear()

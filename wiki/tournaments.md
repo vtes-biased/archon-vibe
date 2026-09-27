@@ -1043,5 +1043,7 @@ The non-obvious structure:
   sanctions, decks) → {tournament, deck_ops}`.
 - `engine/src/seating/` — the seating algorithm.
 - `backend/src/routes/tournaments.py` — endpoints, offline lifecycle, push hooks.
+- `backend/src/decks.py` — deck writes from the engine's deck ops, and organizer
+  deck pushes.
 - `frontend/src/lib/engine.ts` — the WASM wrapper; `tournament-actions.ts` —
   `tournamentAction()` and the two mutation paths.

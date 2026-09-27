@@ -6,9 +6,15 @@ auto-assigned roles based on Archon organization/judge/playtest levels.
 
 import logging
 import os
+from datetime import UTC, datetime, timedelta
 
 from .. import http_client
-from ..db import delete_transient_token, get_transient_token, store_transient_token
+from ..db import (
+    delete_transient_token,
+    get_transient_token,
+    get_user_by_uid,
+    store_transient_token,
+)
 from ..models import Role
 
 logger = logging.getLogger(__name__)
@@ -140,8 +146,6 @@ async def refresh_discord_token(refresh_token: str) -> dict | None:
 async def sync_user_discord_roles(user_uid: str) -> None:
     """High-level: refresh stored token and push updated metadata. Fire-and-forget safe."""
     try:
-        from ..db import get_user_by_uid
-
         stored = await get_transient_token(f"discord_rc:{user_uid}")
         if not stored:
             return
@@ -165,8 +169,6 @@ async def sync_user_discord_roles(user_uid: str) -> None:
         if not new_tokens:
             await delete_transient_token(f"discord_rc:{user_uid}")
             return
-
-        from datetime import UTC, datetime, timedelta
 
         await store_transient_token(
             f"discord_rc:{user_uid}",

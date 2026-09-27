@@ -74,6 +74,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "backend/scripts/*" = ["E402"]  # sys.path manipulation before imports
 "backend/tests/conftest.py" = ["E402"]
+"backend/src/main.py" = ["E402"]  # load_dotenv() before the local imports
 
 [tool.ruff.format]
 quote-style = "double"

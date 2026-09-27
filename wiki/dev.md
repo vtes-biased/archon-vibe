@@ -47,7 +47,7 @@ sits at `9998001` deliberately — outside the e2e cleanup's reach
 
 `just lint` auto-fixes formatting, then runs the checks nothing can fix for you;
 `just lint-check` is the read-only half and is what `just test` calls. Both end on
-the same nine gates:
+the same eleven gates:
 
 - `just permission-drift` — a role literal used to gate outside the engine's
   capability table.
@@ -81,6 +81,9 @@ the same nine gates:
 - `just public-api-isolation` — the app naming the public API, or the API
   importing the app's machinery ([public-api](public-api.md#isolation)). It runs
   in CI too, unlike the three gates above it.
+- `just event-run-coverage` — the public API's Member API section and the app's
+  `event:run` allowlist disagreeing ([public-api](public-api.md#documentation)).
+  It imports both apps, so it runs locally only.
 - `just migration-pairing` — a stored-value migration with no proof section in
   [post-deploy](post-deploy.md), or a section proving an entry that no longer
   exists ([architecture](architecture.md#stored-value-migrations)). Nothing in
@@ -121,6 +124,13 @@ the same nine gates:
   see it; the few that collide are listed in the script with their reason. The
   label rule also covers the creation wizard's guidance panel, which draws no
   console but names the same live controls.
+- `just function-imports` — an import inside a function body anywhere under
+  `backend/`. It hides a reference from module load, so a rename breaks only when
+  the function runs, often inside a try/except that swallows it; an import cycle is
+  resolved by moving the shared code instead. The only exceptions are libraries
+  over 5MB resident and needed under once a week, listed in the script with their
+  measurement — today the NDA's PDF generator — and a listed one that stops
+  importing in-function fails too. It runs in CI, on the lint job.
 
 In dev only the **database** runs in Docker; backend and frontend run natively. The
 compose file is **not** production-hardened — uvicorn reload, a default password.

@@ -7,6 +7,7 @@ import msgspec
 from .broadcast import broadcast_precomputed
 from .db import (
     batch_read_connection,
+    decode_json,
     get_sanctions_for_tournament,
     get_tournament_by_uid,
     get_user_by_uid,
@@ -24,6 +25,7 @@ from .models import (
     User,
 )
 from .ratings import _compute_entry, _engine, _final_positions, _final_standings
+from .twda import maybe_submit_twda
 from .vekn_api import (
     PLACEHOLDER_VENUE_ID,
     VEKNAPIClient,
@@ -337,6 +339,15 @@ async def push_tournament_results(
     return True
 
 
+async def maybe_push_results(tournament: Tournament) -> None:
+    try:
+        client = vekn_push_client()
+        if client is not None:
+            await push_tournament_results(client, tournament)
+    except Exception:
+        logger.exception("Failed to push VEKN results")
+
+
 async def push_member(
     client: VEKNAPIClient,
     user: User,
@@ -436,8 +447,6 @@ async def batch_push(client: VEKNAPIClient) -> dict:
     """Push all unpushed tournaments and members. Returns stats dict.
     Fail-fast: the first VEKNAPIConnectionError aborts the whole batch rather than
     re-timing-out every remaining item serially; per-item data errors just skip that item."""
-    from .db import decode_json
-
     stats = {
         "events_created": 0,
         "results_pushed": 0,
@@ -514,10 +523,7 @@ async def batch_push(client: VEKNAPIClient) -> dict:
                 if await push_tournament_results(client, t):
                     stats["results_pushed"] += 1
                     # Retries the TWDA submission for events finished offline that
-                    # never saw it. Late import: routes.tournaments imports this module.
-                    from .routes.tournaments import maybe_submit_twda
-
-                    # Re-fetch: the push just rewrote the row.
+                    # never saw it. Re-fetch: the push just rewrote the row.
                     fresh = await get_tournament_by_uid(t.uid)
                     if fresh:
                         await maybe_submit_twda(fresh)

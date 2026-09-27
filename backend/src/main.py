@@ -10,7 +10,7 @@ import time
 import zipfile
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import msgspec
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
@@ -25,7 +25,10 @@ from litestar.params import FromPath, FromQuery
 from litestar.response import Redirect, Stream
 from litestar.status_codes import HTTP_500_INTERNAL_SERVER_ERROR
 
-from . import http_client
+# Before the local imports: several of them read their env at import.
+load_dotenv()
+
+from . import db, http_client
 from .broadcast import (
     SSEConnection,
     _sse_connections,
@@ -33,6 +36,7 @@ from .broadcast import (
     broadcast_precomputed,
     deck_org_uids,
     encoder,
+    entitled_level,
 )
 from .db import (
     base_data_level,
@@ -40,15 +44,23 @@ from .db import (
     close_db,
     compute_access_version,
     delete_sanction_hard,
+    ensure_event_code,
     get_expired_sanctions,
     get_league_public_projection,
     get_sanctions_for_cleanup,
+    get_tournament_by_event_code,
     get_tournament_public_projection,
+    get_tournament_uid_by_archon_uid,
+    get_user_by_uid,
     init_db,
+    purge_deleted_objects,
     save_sanction,
+    stream_objects_new,
+    tournament_uids_without_event_code,
 )
 from .db_oauth import cleanup_expired_oauth_codes, cleanup_expired_oauth_tokens
 from .engine_errors import EngineRejection
+from .jwt_config import AUDIENCE_APP, assert_production_keys, decode
 from .middleware.auth import get_current_user
 from .migrations import run_migrations
 from .models import (
@@ -58,6 +70,14 @@ from .models import (
     User,
     is_active_account,
 )
+from .og import (
+    render_help_og_html,
+    render_league_og_html,
+    render_og_html,
+    render_site_og_html,
+)
+from .promo_stock import recompute_promo_stock
+from .ratings import recompute_all_ratings
 from .request_log import RequestIdMiddleware, configure_logging, internal_error_handler
 from .roles_hook import register_metadata
 from .routes import (
@@ -76,10 +96,13 @@ from .routes import (
     users,
     vekn,
 )
+from .snapshots import generate_snapshots, get_snapshot_path, snapshot_generated_at
+from .twda_import import run_twda_sync as sync_twda
+from .vekn_push import batch_push, vekn_push_client
+from .vekn_status import record_error, record_success
 from .vekn_sync import VEKNSyncService
+from .vekn_tournament_sync import sync_all_tournaments
 from .version import __version__
-
-load_dotenv()
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -135,8 +158,6 @@ async def run_member_sync() -> None:
     if not _sync_service:
         return
 
-    from .vekn_status import record_error, record_success
-
     try:
         stats = await _sync_service.sync_all_members()
         record_success("member_sync", stats if isinstance(stats, dict) else None)
@@ -156,11 +177,7 @@ async def run_tournament_sync() -> None:
     if not _sync_service:
         return
 
-    from .vekn_status import record_error, record_success
-
     try:
-        from .vekn_tournament_sync import sync_all_tournaments
-
         async with _corpus_write_lock:
             stats = await sync_all_tournaments(_sync_service.client)
         record_success("tournament_sync", stats if isinstance(stats, dict) else None)
@@ -180,11 +197,7 @@ async def run_twda_sync() -> None:
     outlives the VEKN API — chained, it would be deleted along with the chain and
     take the historic Hall of Fame's only source with it.
     """
-    from .vekn_status import record_error, record_success
-
     try:
-        from .twda_import import run_twda_sync as sync_twda
-
         logger.info("Starting TWDA sync")
         async with _corpus_write_lock:
             stats = await sync_twda()
@@ -246,8 +259,6 @@ async def run_sanction_cleanup() -> None:
 async def run_promo_stock_recompute() -> None:
     """Daily full promo stock recompute (self-healing consistency pass)."""
     try:
-        from .promo_stock import recompute_promo_stock
-
         await recompute_promo_stock()
         logger.info("Promo stock recompute complete")
     except Exception as e:
@@ -260,8 +271,6 @@ async def run_rating_recompute() -> None:
     Ratings are now embedded in User objects, so we broadcast user events.
     """
     try:
-        from .ratings import recompute_all_ratings
-
         logger.info("Starting daily rating recompute")
         updated = await recompute_all_ratings()
         logger.info(f"Daily rating recompute complete: {updated} users updated")
@@ -270,11 +279,7 @@ async def run_rating_recompute() -> None:
 
 
 async def run_vekn_push() -> None:
-    from .vekn_status import record_error, record_success
-
     try:
-        from .vekn_push import batch_push, vekn_push_client
-
         client = vekn_push_client()
         if client is None:
             return
@@ -294,8 +299,6 @@ async def run_snapshot_generation() -> None:
     """Rebuild the access-level snapshots if the corpus moved (checked every 15
     minutes)."""
     try:
-        from .snapshots import generate_snapshots
-
         await generate_snapshots()
     except Exception as e:
         logger.error(f"Error generating snapshots: {e}", exc_info=True)
@@ -304,8 +307,6 @@ async def run_snapshot_generation() -> None:
 async def run_purge_deleted_objects() -> None:
     """Hard-delete objects that were soft-deleted more than 30 days ago."""
     try:
-        from .db import purge_deleted_objects
-
         count = await purge_deleted_objects(days=30)
         if count:
             logger.info(f"Purged {count} soft-deleted objects")
@@ -332,8 +333,6 @@ _MAX_EVENT_CODE_STAMPS = 100
 
 
 async def _stamp_missing_event_codes(booted_at: datetime) -> None:
-    from .db import ensure_event_code, tournament_uids_without_event_code
-
     try:
         uids = await tournament_uids_without_event_code(booted_at)
         if not uids:
@@ -359,8 +358,6 @@ async def lifespan(app: Litestar) -> AsyncIterator[None]:
     global _scheduler, _sync_service, _shutdown_event
 
     logger.info(f"Archon backend starting (version {__version__})")
-
-    from .jwt_config import assert_production_keys
 
     assert_production_keys(signing=True)
 
@@ -555,8 +552,6 @@ async def tournament_og_stub(uid: FromPath[str], request: Request) -> Response:
     Serves the public projection only (no auth on a crawler request); an unknown
     or soft-deleted uid falls back to the site-wide card rather than erroring.
     """
-    from .og import render_og_html
-
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme
     host = request.headers.get("host") or request.url.netloc
     pub = await get_tournament_public_projection(uid)
@@ -568,9 +563,6 @@ async def tournament_og_stub(uid: FromPath[str], request: Request) -> Response:
 async def tournament_code_og_stub(code: FromPath[str], request: Request) -> Response:
     """Same crawler-only UA-split as the uid stub, for the short link — which is
     the form actually pasted into chat, so it is the one that needs the card."""
-    from .db import get_tournament_by_event_code
-    from .og import render_og_html
-
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme
     host = request.headers.get("host") or request.url.netloc
     tournament = await get_tournament_by_event_code(code)
@@ -583,8 +575,6 @@ async def tournament_code_og_stub(code: FromPath[str], request: Request) -> Resp
 
 @get("/tournament/{archon_uid:str}/display.html")
 async def legacy_tournament_redirect(archon_uid: FromPath[str]) -> Redirect:
-    from .db import get_tournament_uid_by_archon_uid
-
     uid = await get_tournament_uid_by_archon_uid(archon_uid)
     if uid is None:
         raise NotFoundException()
@@ -595,8 +585,6 @@ async def legacy_tournament_redirect(archon_uid: FromPath[str]) -> Redirect:
 async def league_og_stub(uid: FromPath[str], request: Request) -> Response:
     """Open Graph stub for a league share link — same crawler-only UA-split
     as the tournament stub above; unknown/deleted uid → site-wide card."""
-    from .og import render_league_og_html
-
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme
     host = request.headers.get("host") or request.url.netloc
     pub_count = await get_league_public_projection(uid)
@@ -612,8 +600,6 @@ async def help_og_stub(slug: FromPath[str], request: Request) -> Response:
     Static content, so no projection lookup; an unknown slug falls back to the
     site-wide card rather than erroring.
     """
-    from .og import render_help_og_html
-
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme
     host = request.headers.get("host") or request.url.netloc
     return Response(
@@ -626,8 +612,6 @@ async def help_og_stub(slug: FromPath[str], request: Request) -> Response:
 async def site_og_stub(request: Request) -> Response:
     """Open Graph stub for the bare app link — same crawler-only UA-split as the
     object stubs, on a path of its own because `/` is the health check."""
-    from .og import render_site_og_html
-
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme
     host = request.headers.get("host") or request.url.netloc
     return Response(
@@ -652,15 +636,12 @@ async def _resolve_user_from_token(token: str | None) -> User | None:
     if not token:
         return None
     try:
-        from .jwt_config import AUDIENCE_APP, decode
-
         payload = decode(token, AUDIENCE_APP)
         if payload.get("type") != "access":
             return None
         user_uid = payload.get("sub")
         if not user_uid:
             return None
-        from .db import get_user_by_uid
 
         user = await get_user_by_uid(user_uid)
         return user if is_active_account(user) else None
@@ -773,8 +754,6 @@ async def get_snapshot(
     mid-stream atomic-rename regen leaves in-flight readers on their old inode.
     `download=1` re-envelopes the same content as a .zip attachment.
     """
-    from .snapshots import get_snapshot_path
-
     # Shielded: a reader hanging up mid-query costs the pool the connection.
     viewer = await asyncio.shield(_resolve_viewer(request, token))
     level = _viewer_level(viewer)
@@ -894,15 +873,12 @@ async def _scoped_catchup_frames(
     """Catch-up frames for a tournament-scoped SSE connection: one tournament +
     its sanctions + participant identities, far smaller than the full-corpus
     catch-up. Seeds `sent` so the first live event doesn't re-send everyone."""
-    from .broadcast import entitled_level
-    from .db import _pool
-
     frames: list[str] = []
     last_ts: str | None = None
-    if not _pool:
+    if not db._pool:
         return frames, last_ts
 
-    async with _pool.connection() as conn:
+    async with db._pool.connection() as conn:
         row = await (
             await conn.execute(
                 'SELECT public::text, member::text, "full"::text, modified_at '
@@ -966,14 +942,12 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
     level, plus NC same-country and organizer full data. Buffers every frame
     while holding ONE pooled connection, then returns them so the caller releases
     it BEFORE draining — yielding inside the `async with` would pin the slot."""
-    from .db import _pool
-
     frames: list[str] = []
     count = 0
-    if not _pool:
+    if not db._pool:
         return frames, count
 
-    async with _pool.connection() as db_conn:
+    async with db._pool.connection() as db_conn:
         row = await (
             await db_conn.execute(
                 'SELECT "full"::text FROM objects WHERE uid = %s AND type = %s',
@@ -1081,9 +1055,6 @@ async def stream_updates(
     """Stream object updates via SSE, reading pre-computed access columns — no
     per-item filtering. `tournament=<uid>` opens a bot-scoped stream: catch-up and
     live events restricted to that tournament + its sanctions, same access rule."""
-    from .db import _pool, stream_objects_new
-    from .snapshots import get_snapshot_path, snapshot_generated_at
-
     # Shielded, here and on every pooled read below: a client hanging up
     # cancels the awaiting task mid-query and costs the pool the connection.
     stream_user = await asyncio.shield(_resolve_viewer(request, token))
@@ -1095,8 +1066,6 @@ async def stream_updates(
     logger.info(f"SSE connection opening: {conn_label}")
 
     level = _viewer_level(stream_user)
-
-    from datetime import timedelta
 
     def _parse_ts(ts: str | None) -> datetime | None:
         if not ts:
@@ -1161,8 +1130,6 @@ async def stream_updates(
                 yield 'data: {"type":"resync"}\n\n'
                 return
 
-            import time
-
             start_time = time.time()
             last_timestamp: str | None = None
             totals: dict[str, int] = {}
@@ -1207,7 +1174,7 @@ async def stream_updates(
 
             # Built off one pooled connection (_overlay_frames), then drained —
             # never pinned across a client read.
-            if not scoped and stream_user and level == DataLevel.MEMBER and _pool:
+            if not scoped and stream_user and level == DataLevel.MEMBER and db._pool:
                 try:
                     overlay, overlay_count = await asyncio.shield(
                         _overlay_frames(stream_user)
@@ -1255,11 +1222,11 @@ async def stream_updates(
                     keepalive_counter = 0
                     # Clear the flag BEFORE fetching so a concurrent set isn't lost;
                     # fetch into a list with the pool released before yielding.
-                    if scoped and conn.needs_participant_refresh and _pool:
+                    if scoped and conn.needs_participant_refresh and db._pool:
                         conn.needs_participant_refresh = False
 
                         async def _refresh_participants() -> list[str]:
-                            async with _pool.connection() as db_conn:
+                            async with db._pool.connection() as db_conn:
                                 return await _participant_user_frames(
                                     db_conn, tournament, conn.sent_participant_uids
                                 )

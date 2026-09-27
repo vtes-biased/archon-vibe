@@ -15,6 +15,7 @@ from .db import (
     save_object,
     tournament_transaction,
 )
+from .decks import withdraw_private_decks
 from .models import (
     FinalsTable,
     ObjectType,
@@ -29,6 +30,13 @@ from .models import (
     TournamentState,
     User,
 )
+from .ratings import (
+    rating_category_for_tournament,
+    recompute_ratings_for_players,
+    recompute_wins,
+)
+from .twda import maybe_submit_twda
+from .vekn_push import maybe_push_results
 
 logger = logging.getLogger(__name__)
 
@@ -442,19 +450,11 @@ async def apply_archon_import(
         broadcast_tournament_event(tournament_bd)
 
     try:
-        from .routes.tournaments import _withdraw_private_decks
-
-        await _withdraw_private_decks(tournament)
+        await withdraw_private_decks(tournament)
     except Exception:
         logger.exception(f"Error withdrawing private decks for {tournament_uid}")
 
     try:
-        from .ratings import (
-            rating_category_for_tournament,
-            recompute_ratings_for_players,
-            recompute_wins,
-        )
-
         player_uids = {p.user_uid for p in players_list if p.user_uid}
         category = rating_category_for_tournament(tournament)
         results = await recompute_ratings_for_players(player_uids, category)
@@ -466,10 +466,8 @@ async def apply_archon_import(
         logger.exception(f"Error recomputing ratings for {tournament_uid}")
 
     try:
-        from .routes.tournaments import _maybe_push_vekn, maybe_submit_twda
-
         await maybe_submit_twda(tournament)
-        await _maybe_push_vekn(tournament)
+        await maybe_push_results(tournament)
     except Exception:
         logger.exception(f"Error in post-import effects for {tournament_uid}")
 

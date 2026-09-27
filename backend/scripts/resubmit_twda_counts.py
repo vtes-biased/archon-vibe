@@ -26,8 +26,12 @@ import msgspec  # noqa: E402
 from backend.src import db, http_client  # noqa: E402
 from backend.src.db import TWDA_MIN_PLAYERS  # noqa: E402
 from backend.src.models import Tournament, TwdaOutcome  # noqa: E402
-from backend.src.routes.tournaments import _engine, maybe_submit_twda  # noqa: E402
-from backend.src.twda import TWDA_FORK_REPO, TWDA_TARGET_REPO  # noqa: E402
+from backend.src.twda import (  # noqa: E402
+    TWDA_FORK_REPO,
+    TWDA_TARGET_REPO,
+    _engine,
+    maybe_submit_twda,
+)
 
 _PLAYERS = re.compile(r"^(\d+) players$", re.MULTILINE)
 

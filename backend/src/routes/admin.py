@@ -14,6 +14,7 @@ from ..broadcast import broadcast_precomputed
 from ..db import get_user_by_uid, remap_promo_ledger_user
 from ..middleware.auth import get_current_user
 from ..promo_stock import schedule_recompute
+from ..vekn_status import get_status
 
 logger = logging.getLogger(__name__)
 
@@ -99,8 +100,6 @@ async def vekn_status(request: Request) -> dict:
     manager = await get_current_user(request)
     if not permissions.can_run_admin_sync(manager):
         raise HTTPException(status_code=403, detail="Only IC can view VEKN status")
-
-    from ..vekn_status import get_status
 
     return {"jobs": get_status()}
 

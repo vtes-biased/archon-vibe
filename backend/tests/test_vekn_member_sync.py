@@ -5,8 +5,10 @@ inference skips a sponsor an official pinned. Runs end-to-end against the real
 DB, no mocks.
 """
 
+import msgspec
 import pytest
 from src.data.vekn_roster import ADMINS
+from src.db import get_user_by_uid, save_user
 from src.geonames import city_index
 from src.models import Role
 from src.vekn_sync import VEKNSyncService
@@ -43,8 +45,6 @@ async def test_update_never_writes_roles(test_db):
     assert action == "created"
     assert created.roles == []
 
-    from src.db import get_user_by_uid, save_user
-
     created.roles = [Role.IC]
     await save_user(created)
 
@@ -67,9 +67,6 @@ async def test_update_never_writes_roles(test_db):
 
 @pytest.mark.asyncio
 async def test_inference_respects_a_cleared_sponsor_pin(test_db):
-    import msgspec
-    from src.db import get_user_by_uid, save_user
-
     async def seed(vekn_id: int, **fields):
         user, _ = await VEKNSyncService().sync_player(
             {"veknid": vekn_id, "firstname": "M", "lastname": str(vekn_id)},

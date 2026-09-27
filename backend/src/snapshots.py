@@ -13,6 +13,9 @@ import time
 from contextlib import aclosing
 from pathlib import Path
 
+from . import db
+from .db import batch_read_connection, stream_objects_snapshot
+
 logger = logging.getLogger(__name__)
 
 # Directory for snapshot files
@@ -44,9 +47,7 @@ async def generate_snapshots() -> dict[str, int]:
     """
     global _built_from, _built_counts
 
-    from .db import _pool, batch_read_connection, stream_objects_snapshot
-
-    if not _pool:
+    if not db._pool:
         raise RuntimeError("Database not initialized")
 
     SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)

@@ -1,14 +1,28 @@
 """Tests for user API endpoints."""
 
+import json
 from datetime import UTC, datetime
 from uuid import uuid7
 
 import pytest
 from httpx import AsyncClient
 from src import db
-from src.models import Role, User
+from src.accounts import ANONYMIZED_NAME
+from src.broadcast import SSEConnection, _sse_connections
+from src.geonames import city_index
+from src.models import (
+    Announcement,
+    AuthMethod,
+    AuthMethodType,
+    Player,
+    Role,
+    Tournament,
+    User,
+)
+from src.routes.auth import create_refresh_token
+from src.vekn_sync import VEKNSyncService
 
-from tests.conftest import make_auth_header
+from tests.conftest import make_auth_header, seed_tournament
 
 
 async def _mk_user(country: str, roles: list[Role], vekn: str | None = None) -> User:
@@ -132,11 +146,6 @@ async def test_role_change_resyncs_only_for_access_roles(
 ):
     """Only NC/IC role changes trigger a resync (they widen what a client can
     see); Prince changes the user's own projection but grants no wider view."""
-    import json
-
-    from src import db
-    from src.broadcast import SSEConnection, _sse_connections
-
     # IC can change any role; target needs a vekn_id to be assigned roles.
     admin = next(u for u in populated_db if Role.IC in u.roles)
     target = next(
@@ -364,14 +373,6 @@ async def test_delete_member(test_db, test_client: AsyncClient):
 async def test_anonymize_member(test_db, test_client: AsyncClient):
     """The wipe must reach every copy of the name, end the sign-in, and survive
     the next VEKN member sync — the record keeps its uid and VEKN id."""
-    from src.accounts import ANONYMIZED_NAME
-    from src.geonames import city_index
-    from src.models import Announcement, AuthMethod, AuthMethodType, Player, Tournament
-    from src.routes.auth import create_refresh_token
-    from src.vekn_sync import VEKNSyncService
-
-    from tests.conftest import seed_tournament
-
     ic = await _mk_user("US", [Role.IC], vekn="4000011")
     member = User(
         uid=str(uuid7()),

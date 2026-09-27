@@ -830,7 +830,7 @@ class TwdaOutcome(StrEnum):
 
 class TwdaStatus(msgspec.Struct, kw_only=True):
     # organizer-facing transparency for the fire-and-forget PR flow in
-    # routes/tournaments.maybe_submit_twda.
+    # twda.maybe_submit_twda.
 
     outcome: TwdaOutcome
     reason: Annotated[

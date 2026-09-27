@@ -45,7 +45,11 @@ from scripts.migrate_from_archon import (
 )
 from src import db
 from src.models import (
+    CommunityLink,
+    CommunityLinkType,
+    League,
     Role,
+    Score,
     Seat,
     Standing,
     Table,
@@ -72,8 +76,6 @@ async def _cleanup():
 
 def _seats() -> list[Seat]:
     """A legal 5-seat finished table: VP 2(GW)/1/1/0.5/0.5."""
-    from src.models import Score
-
     vps = [(1, 2.0), (0, 1.0), (0, 1.0), (0, 0.5), (0, 0.5)]
     return [
         Seat(player_uid=f"p{i + 1}", result=Score(gw=gw, vp=vp, tp=12))
@@ -242,8 +244,6 @@ async def test_echo_skip_still_carries_league_membership(test_db):
     """League membership is archon-only knowledge: an echo-skipped legacy copy
     must still stamp its league ref onto the surviving row (the VEKN sync can't,
     and its rebuild used to clear it), idempotently."""
-    from src.models import League
-
     async with _cleanup():
         await db.save_league(
             League(uid="lg-e1", modified=datetime(2025, 5, 1, tzinfo=UTC), name="L")
@@ -353,8 +353,6 @@ async def test_member_merge_respects_field_ownership(test_db):
 async def test_claimed_account_not_detached_by_merge(test_db):
     """regression: the old bug matched on old-archon uid and tombstoned a claimed
     account (uuid7 ≠ old-archon uid), wiping its identity and community links."""
-    from src.models import CommunityLink, CommunityLinkType
-
     await db.save_user(
         User(
             uid="v-9",  # VEKN-sync uuid7, then claimed (≠ old-archon "o-9")

@@ -2,6 +2,7 @@
 
 import random
 from datetime import UTC, datetime, timedelta
+from uuid import uuid7
 
 from src.models import Role, User
 
@@ -295,8 +296,6 @@ def generate_mock_users(count: int = 400) -> list[User]:
 
         vekn_synced = random.random() > 0.3
         vekn_synced_at = modified if vekn_synced else None
-
-        from uuid import uuid7
 
         user = User(
             uid=str(uuid7()),

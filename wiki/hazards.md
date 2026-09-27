@@ -74,7 +74,7 @@ ever breaks ties and discards a filter that would empty the candidate set, so th
 silently drop the `XX` rows' true matches.
 
 **The TWDA export publishes the country as a name**, expanded back out of the
-stored code in `routes/tournaments.py`. The archive's `place` line is permanent and
+stored code in `twda.py`. The archive's `place` line is permanent and
 its convention is `City, Country` spelled out, so exporting the raw field would
 regress the published corpus with no way to take it back.
 
@@ -158,7 +158,7 @@ count instead is what a soft-cancel corrupts: the count skips `Cancelled`, so
 every later value shifts by one and a deck answers for a round it was not played
 in.
 
-**The engine's decks payload is built twice** — `_build_decks_json` and `buildDecksPayload` — and the engine refuses an entry missing `public`, `winner` or `private`; the frontend fills a withheld `private` from `winner`, which holds only while the member projection publishes no private deck but the winner's ([sync](sync.md#access-levels)).
+**The engine's decks payload is built twice** — `build_decks_json` and `buildDecksPayload` — and the engine refuses an entry missing `public`, `winner` or `private`; the frontend fills a withheld `private` from `winner`, which holds only while the member projection publishes no private deck but the winner's ([sync](sync.md#access-levels)).
 
 **`preview_scores_json` deliberately duplicates the `SetScore` GW/TP cascade** —
 the preview runs on not-yet-persisted scores, so the two paths cannot share state.
@@ -167,12 +167,6 @@ A cascade change must land on both sides; the single equality test
 one is enough — don't add a second.
 
 ## Renames and references
-
-**Lazy imports hide references.** Function-level imports are used across the
-tournament routes, the VEKN push and the archon import to break cycles. Renaming a
-symbol can therefore break a caller invisibly — invisible to module load, invisible
-to a green test suite, and swallowed by the try/except blocks around post-effects.
-**Grep all references including in-function imports.**
 
 **Reassigning object references** — sanctions, decks, cooptation on merge or detach
 — **must return `BroadcastData` and broadcast**, or other clients stay stale until
@@ -364,7 +358,7 @@ a resync re-delivers the lower projection ([sync](sync.md#access-entitlement)).
 after it, must push organizers their decks.** The organizer stamp changes
 without any projection column retracting, so `broadcast_precomputed` sends the
 organizer nothing and their copy of a private deck survives. The action route and
-go-online call `_withdraw_private_decks` or `_push_decks`, and so does the archon
+go-online call `withdraw_private_decks` or `push_decks`, and so does the archon
 import, which finishes an event outside the engine; a new
 writer of either fact has to as well ([sync](sync.md#targeted-overlay-invalidation-no-resync)).
 

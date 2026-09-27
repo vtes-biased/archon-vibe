@@ -18,6 +18,12 @@ import psycopg
 from archon_engine import PyEngine
 from psycopg_pool import AsyncConnectionPool
 
+from .access_levels import (
+    compute_api,
+    compute_full,
+    compute_member,
+    compute_public,
+)
 from .geonames import country_key
 from .models import (
     AuthMethod,
@@ -296,14 +302,6 @@ def decode_json[T](data: str | dict, type_: type[T]) -> T:
     if isinstance(data, dict):
         data = _encoder.encode(data).decode("utf-8")
     return decoder.decode(data)
-
-
-from .access_levels import (  # noqa: E402
-    compute_api,
-    compute_full,
-    compute_member,
-    compute_public,
-)
 
 
 async def get_decks_for_tournament(

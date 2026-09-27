@@ -35,8 +35,7 @@ from src.models import (
     TwdaOutcome,
     User,
 )
-from src.routes.tournaments import _winner_deck_twda, maybe_submit_twda
-from src.twda import keep_curated_header
+from src.twda import keep_curated_header, maybe_submit_twda, winner_deck_twda
 
 from tests.conftest import seed_tournament
 
@@ -118,7 +117,7 @@ async def _published(
     try:
         await seed_tournament(tournament)
         await db.save_object_from_model(ObjectType.DECK, deck)
-        yield tournament, await _winner_deck_twda(tournament)
+        yield tournament, await winner_deck_twda(tournament)
     finally:
         async with db.get_connection() as conn:
             await conn.execute("DELETE FROM objects WHERE uid = %s", (deck.uid,))

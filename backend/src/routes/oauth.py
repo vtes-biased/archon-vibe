@@ -1,5 +1,6 @@
 """OAuth 2.0 Authorization Server (RFC 6749 + RFC 7636 PKCE)."""
 
+import base64
 import hashlib
 import json
 import logging
@@ -74,7 +75,6 @@ def _generate_auth_code() -> str:
 
 def _verify_pkce(code_verifier: str, code_challenge: str) -> bool:
     digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
-    import base64
 
     computed = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
     return computed == code_challenge

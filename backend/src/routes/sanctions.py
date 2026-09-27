@@ -21,6 +21,7 @@ from ..db import (
     save_tournament,
     tournament_transaction,
 )
+from ..decks import build_decks_json, process_deck_ops
 from ..middleware.auth import get_optional_user
 from ..models import (
     SUBCATEGORIES_BY_CATEGORY,
@@ -33,6 +34,8 @@ from ..models import (
     Tournament,
     TournamentState,
 )
+from ..ratings import recompute_wins
+from ..twda import maybe_submit_twda
 
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
@@ -196,11 +199,10 @@ async def _apply_sanction_to_tournament(
                 }
                 for s in sanctions
             ]
-            from .tournaments import _build_decks_json
 
             tournament_json = encoder.encode(tournament).decode("utf-8")
             sanctions_json = msgspec.json.encode(sanctions_data).decode("utf-8")
-            decks_json = await _build_decks_json(tournament_uid, conn=tx_conn)
+            decks_json = await build_decks_json(tournament_uid, conn=tx_conn)
             result = json.loads(
                 _engine.update_standings(tournament_json, sanctions_json, decks_json)
             )
@@ -225,9 +227,7 @@ async def _apply_sanction_to_tournament(
         bd = await save_tournament(tournament, conn=tx_conn)
     broadcast_precomputed(bd)
 
-    from .tournaments import _process_deck_ops, maybe_submit_twda
-
-    for deck_bd in await _process_deck_ops(deck_ops, tournament_uid, tournament):
+    for deck_bd in await process_deck_ops(deck_ops, tournament_uid, tournament):
         broadcast_precomputed(deck_bd)
     if (
         tournament.state == TournamentState.FINISHED
@@ -235,8 +235,6 @@ async def _apply_sanction_to_tournament(
     ):
         asyncio.create_task(maybe_submit_twda(tournament))
         try:
-            from ..ratings import recompute_wins
-
             for _user, user_bd in await recompute_wins(
                 {winner_before, tournament.winner} - {""}
             ):

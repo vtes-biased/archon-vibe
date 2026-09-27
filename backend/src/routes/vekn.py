@@ -25,6 +25,7 @@ from ..db import (
 )
 from ..middleware.auth import get_current_user
 from ..models import User
+from ..vekn_push import push_member_background
 from .auth import create_access_token, create_refresh_token
 
 encoder = msgspec.json.Encoder()
@@ -195,7 +196,6 @@ async def sponsor_new_member(request: Request, data: SponsorRequest) -> Response
     )
 
     # Background task — the response must not wait on a vekn.net outage.
-    from ..vekn_push import push_member_background
 
     asyncio.create_task(push_member_background(updated))
 

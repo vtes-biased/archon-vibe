@@ -6,6 +6,8 @@ import logging
 import os
 import time
 
+import jwt
+
 from . import http_client
 
 logger = logging.getLogger(__name__)
@@ -39,8 +41,6 @@ def load_private_key(key: str) -> str:
 
 def create_jwt(client_id: str, private_key: str) -> str:
     """Create a short-lived RS256 JWT for GitHub App authentication."""
-    import jwt
-
     now = int(time.time())
     payload = {
         "iat": now - 60,  # clock-drift margin

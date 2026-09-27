@@ -10,7 +10,13 @@ from litestar import Response, Router, get
 from litestar.exceptions import HTTPException
 from litestar.params import FromPath, FromQuery
 
-from ..db import get_user_by_calendar_token
+from ..db import (
+    decode_json,
+    get_connection,
+    get_league_by_uid,
+    get_tournament_by_uid,
+    get_user_by_calendar_token,
+)
 from ..geonames import get_countries_on_continent
 from ..models import Tournament
 
@@ -145,8 +151,6 @@ def _agenda_filter(
 @get("/tournaments/{filename:str}")
 async def tournament_event_ics(filename: FromPath[str]) -> Response:
     """Public like the feeds: the same venue/address projection exception applies."""
-    from ..db import get_tournament_by_uid
-
     uid = filename.removesuffix(".ics")
     t = None if uid == filename else await get_tournament_by_uid(uid)
     if t is None or t.deleted_at is not None:
@@ -191,8 +195,6 @@ async def tournament_calendar(
     """iCal feed: league's events if `league`, else a personal agenda if `token`
     (own events always included, recently-finished ones stay for
     FINISHED_WINDOW_DAYS), else a public feed filtered by country/online/format."""
-    from ..db import decode_json, get_connection
-
     countries = {c.strip().upper() for c in (country or "").split(",") if c.strip()}
     now = datetime.now(UTC)
     now_str = now.strftime("%Y%m%dT%H%M%SZ")
@@ -267,8 +269,6 @@ async def tournament_calendar(
 
     cal_name = "Archon Tournaments"
     if league:
-        from ..db import get_league_by_uid
-
         league_obj = await get_league_by_uid(league)
         cal_name = f"VEKN League — {league_obj.name}" if league_obj else "VEKN League"
     elif user:

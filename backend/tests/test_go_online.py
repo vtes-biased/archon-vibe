@@ -27,6 +27,7 @@ from src.models import (
     TournamentState,
     User,
 )
+from src.ratings import rating_category_for_tournament
 from src.routes.tournaments import SERVER_OWNED_TOURNAMENT_FIELDS
 
 from tests.conftest import make_auth_header, seed_tournament
@@ -429,8 +430,6 @@ async def test_finished_go_online_recomputes_ratings(test_client, test_db):
     """An event run+finished offline gets its rating points immediately on
     go-online — not only when the daily recompute job next fires (~24h late).
     """
-    from src.ratings import rating_category_for_tournament
-
     org = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Org")
     player = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Player")
     await db.save_user(org)

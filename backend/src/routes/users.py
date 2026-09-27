@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import UTC, datetime
 from typing import Annotated
@@ -26,6 +27,7 @@ from ..db import user_has_nda as db_user_has_nda
 from ..geonames import stored_country
 from ..middleware.auth import get_current_user, get_optional_user
 from ..models import Role, User
+from ..vekn_push import push_member_background
 from .auth import send_invite_email
 
 logger = logging.getLogger(__name__)
@@ -140,9 +142,6 @@ async def create_user(request: Request, data: CreateUserRequest) -> Response:
             # Don't fail the request, user is already created
 
     # Fire-and-forget; batch_push catches failures.
-    import asyncio
-
-    from ..vekn_push import push_member_background
 
     asyncio.create_task(push_member_background(user))
 

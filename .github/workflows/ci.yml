@@ -45,6 +45,8 @@ jobs:
         run: uv run python3 scripts/check_public_api_isolation.py
       - name: migration pairing (a migration without its post-deploy proof)
         run: uv run python3 scripts/check_migration_pairing.py
+      - name: function imports (an import inside a function body)
+        run: uv run python3 scripts/check_function_imports.py
 
   # `just lint-check` (rust half) + engine unit tests. fmt/clippy/test share one
   # toolchain + cache, so they live together rather than fanning out further.

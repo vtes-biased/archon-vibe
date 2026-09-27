@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 import msgspec
 from archon_engine import PyEngine
 
+from .broadcast import broadcast_precomputed
 from .db import (
     BroadcastData,
     decode_json,
@@ -291,8 +292,6 @@ async def recompute_all_ratings() -> int:
     """Full recomputation of all ratings and wins, called daily. Broadcasts each
     category's deltas as produced and returns only the count: holding every
     (User, BroadcastData) until the end would spike memory on a full-corpus run."""
-    from .broadcast import broadcast_precomputed
-
     # Pass 1: stream tournaments to collect player sets per category
     players_by_category: dict[RatingCategory, set[str]] = {
         cat: set() for cat in RatingCategory

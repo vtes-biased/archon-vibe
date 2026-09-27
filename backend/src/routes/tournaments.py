@@ -17,8 +17,13 @@ from litestar.exceptions import HTTPException
 from litestar.params import Body, FromPath, FromQuery
 from litestar.response import File
 
-from .. import permissions
+from .. import permissions, push_service
 from ..accounts import save_member, scrub_anonymized_copies
+from ..archon_import import (
+    apply_archon_import,
+    parse_archon_file,
+    validate_archon_import,
+)
 from ..broadcast import (
     broadcast_judge_call,
     broadcast_personal,
@@ -26,9 +31,7 @@ from ..broadcast import (
     deck_org_uids,
     entitled_level,
 )
-from ..card_data import cards_json_text
 from ..db import (
-    TWDA_MIN_PLAYERS,
     BroadcastData,
     allocate_next_vekn_id,
     compute_access_version,
@@ -55,15 +58,20 @@ from ..db import (
     tournament_transaction,
     upsert_banner,
 )
+from ..decks import (
+    build_decks_json,
+    process_deck_ops,
+    push_decks,
+    withdraw_private_decks,
+)
 from ..engine_errors import EngineRejection
-from ..geonames import city_by_id, get_country, normalize_country, stored_country
+from ..geonames import city_by_id, stored_country
 from ..middleware.auth import get_optional_user
 from ..models import (
     Announcement,
     AttributionKind,
     DeckAttribution,
     DeckObject,
-    DeckView,
     ObjectType,
     PlayerState,
     Role,
@@ -73,14 +81,26 @@ from ..models import (
     TableState,
     TimerState,
     Tournament,
-    TournamentFormat,
     TournamentState,
-    TwdaOutcome,
-    TwdaStatus,
     User,
 )
 from ..promo_stock import schedule_recompute
+from ..providers import DeckFetchError, fetch_deck_from_url
+from ..ratings import (
+    rating_category_for_tournament,
+    recompute_ratings_for_players,
+    recompute_wins,
+)
+from ..twda import maybe_submit_twda
+from ..vekn_api import VEKNAPIConnectionError, VEKNAPIError
+from ..vekn_push import (
+    maybe_push_results,
+    push_tournament_event,
+    push_tournament_results,
+    vekn_push_client,
+)
 from .auth import send_invite_email
+from .sanctions import _apply_sanction_to_tournament
 
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
@@ -114,7 +134,6 @@ _RATING_IRRELEVANT_ACTIONS = frozenset(
 )
 
 _engine = PyEngine()
-_engine_cards_loaded = False
 
 SERVER_OWNED_TOURNAMENT_FIELDS = frozenset(
     {
@@ -138,23 +157,6 @@ def _promo_recompute_diff(old: Tournament | None, new: Tournament | None) -> Non
     affected = {r.promo_uid for t in (old, new) if t for r in t.promos_distributed}
     if affected:
         schedule_recompute(list(affected))
-
-
-async def _build_decks_json(tournament_uid: str, conn=None) -> str:
-    decks = await get_decks_for_tournament(tournament_uid, conn=conn)
-    return msgspec.json.encode(
-        [
-            {
-                "user_uid": d.user_uid,
-                "round": d.round,
-                "uid": d.uid,
-                "public": d.public,
-                "winner": d.winner,
-                "private": d.private,
-            }
-            for d in decks
-        ]
-    ).decode()
 
 
 async def _build_sanctions_json(
@@ -189,156 +191,8 @@ async def _build_sanctions_json(
     ).decode()
 
 
-async def _process_deck_ops(
-    deck_ops: list,
-    tournament_uid: str,
-    tournament: Tournament,
-) -> list[BroadcastData]:
-    if not deck_ops:
-        return []
-    existing_decks = await get_decks_for_tournament(tournament_uid)
-
-    def stamp(bd: BroadcastData, deck: DeckObject) -> BroadcastData:
-        bd.org_uids = deck_org_uids(
-            deck.private, tournament.state, tournament.organizers_uids
-        )
-        return bd
-
-    affected: list[BroadcastData] = []
-    for op in deck_ops:
-        op_type = op.get("op")
-        if op_type == "upsert":
-            deck_data = op["deck"]
-            player_uid = op["player_uid"]
-            round_val = deck_data.get("round")
-            existing = next(
-                (
-                    d
-                    for d in existing_decks
-                    if d.user_uid == player_uid and d.round == round_val
-                ),
-                None,
-            )
-            if existing:
-                deck_obj = existing
-                deck_obj.modified = datetime.now(UTC)
-            else:
-                deck_obj = DeckObject(
-                    uid=str(uuid7()),
-                    modified=datetime.now(UTC),
-                    tournament_uid=tournament_uid,
-                    user_uid=player_uid,
-                )
-            deck_obj.round = round_val
-            deck_obj.name = deck_data.get("name", "")
-            deck_obj.comments = deck_data.get("comments", "")
-            deck_obj.cards = deck_data.get("cards", {})
-            # The engine strips the credit off a replacement, so an absent one
-            # leaves a stored credit standing rather than clearing it.
-            if "attribution" in deck_data:
-                deck_obj.attribution = msgspec.convert(
-                    deck_data["attribution"], DeckAttribution
-                )
-            deck_obj.public = deck_data.get("public", False)
-            deck_obj.winner = deck_data.get("winner", False)
-            deck_obj.private = deck_data.get("private", False)
-            affected.append(
-                stamp(await save_object_from_model(ObjectType.DECK, deck_obj), deck_obj)
-            )
-
-        elif op_type == "delete":
-            player_uid = op["player_uid"]
-            deck_index = op.get("deck_index")
-            is_multideck = op.get("multideck", False)
-            for d in existing_decks:
-                if d.user_uid == player_uid:
-                    if is_multideck and d.round != deck_index:
-                        continue
-                    d.deleted_at = datetime.now(UTC)
-                    d.modified = datetime.now(UTC)
-                    affected.append(
-                        stamp(await save_object_from_model(ObjectType.DECK, d), d)
-                    )
-
-        elif op_type == "set_round":
-            deck_uid = op.get("deck_uid")
-            target = next((d for d in existing_decks if d.uid == deck_uid), None)
-            if target:
-                target.round = op.get("round")
-                target.modified = datetime.now(UTC)
-                affected.append(
-                    stamp(await save_object_from_model(ObjectType.DECK, target), target)
-                )
-
-        elif op_type == "set_publication":
-            deck_uid = op.get("deck_uid")
-            target = next((d for d in existing_decks if d.uid == deck_uid), None)
-            if target:
-                target.public = op.get("public", False)
-                target.winner = op.get("winner", False)
-                target.modified = datetime.now(UTC)
-                affected.append(
-                    stamp(await save_object_from_model(ObjectType.DECK, target), target)
-                )
-
-        elif op_type == "set_attribution":
-            deck_uid = op.get("deck_uid")
-            target = next((d for d in existing_decks if d.uid == deck_uid), None)
-            if target:
-                target.attribution = msgspec.convert(op["attribution"], DeckAttribution)
-                target.modified = datetime.now(UTC)
-                affected.append(
-                    stamp(await save_object_from_model(ObjectType.DECK, target), target)
-                )
-
-        elif op_type == "set_private":
-            deck_uid = op.get("deck_uid")
-            target = next((d for d in existing_decks if d.uid == deck_uid), None)
-            if target:
-                target.private = op.get("private", False)
-                target.modified = datetime.now(UTC)
-                affected.append(
-                    stamp(await save_object_from_model(ObjectType.DECK, target), target)
-                )
-
-        elif op_type == "log_view":
-            deck_uid = op.get("deck_uid")
-            viewer_uid = op["user_uid"]
-            # Re-read under the row lock: two organizers opening the same deck
-            # at once would otherwise each append to a stale list.
-            async with tournament_transaction(tournament_uid):
-                decks = await get_decks_for_tournament(tournament_uid)
-                target = next((d for d in decks if d.uid == deck_uid), None)
-                if target and all(v.user_uid != viewer_uid for v in target.views):
-                    target.views.append(
-                        DeckView(user_uid=viewer_uid, round=op["round"])
-                    )
-                    target.modified = datetime.now(UTC)
-                    affected.append(
-                        stamp(
-                            await save_object_from_model(ObjectType.DECK, target),
-                            target,
-                        )
-                    )
-
-    return affected
-
-
-async def _maybe_push_vekn(tournament: Tournament) -> None:
-    try:
-        from ..vekn_push import push_tournament_results, vekn_push_client
-
-        client = vekn_push_client()
-        if client is not None:
-            await push_tournament_results(client, tournament)
-    except Exception:
-        logger.exception("Failed to push VEKN results")
-
-
 async def _maybe_push_seating(tournament: Tournament, event_type: str) -> None:
     try:
-        from .. import push_service
-
         targets = push_service.build_seating_specs(tournament, event_type)
         await push_service.send_to_users(targets)
     except Exception:
@@ -347,8 +201,6 @@ async def _maybe_push_seating(tournament: Tournament, event_type: str) -> None:
 
 async def _maybe_push_reseat(old: Tournament, new: Tournament) -> None:
     try:
-        from .. import push_service
-
         targets = push_service.build_reseat_specs(old, new)
         await push_service.send_to_users(targets)
     except Exception:
@@ -359,8 +211,6 @@ async def _maybe_push_announcement(
     tournament: Tournament, body: str, exclude_uid: str
 ) -> None:
     try:
-        from .. import push_service
-
         spec = push_service.build_announcement_spec(tournament, body)
         states = {PlayerState.CHECKED_IN, PlayerState.PLAYING, PlayerState.COMPLETED}
         if not tournament.rounds:
@@ -386,8 +236,6 @@ async def _maybe_push_judge_call(
     """Same organizer audience as the ephemeral judge_call SSE — keep both in
     sync if the target set ever changes."""
     try:
-        from .. import push_service
-
         spec = push_service.build_judge_call_spec(
             tournament_uid=tournament.uid,
             tournament_name=tournament.name,
@@ -404,8 +252,6 @@ async def _maybe_push_judge_call(
 
 async def _maybe_push_vekn_event(tournament: Tournament) -> None:
     try:
-        from ..vekn_push import push_tournament_event, vekn_push_client
-
         client = vekn_push_client()
         if client is not None:
             await push_tournament_event(client, tournament)
@@ -419,188 +265,6 @@ async def _maybe_push_vekn_event(tournament: Tournament) -> None:
             broadcast_precomputed(bd)
     except Exception:
         logger.exception("Failed to stamp event code")
-
-
-async def _winner_deck_twda(tournament: Tournament) -> str | None:
-    """TWDA-formatted winner decklist (event header + deck), or None if the
-    winner has no stored deck."""
-    if not tournament.winner:
-        return None
-
-    decks = await get_decks_for_tournament(tournament.uid)
-    finals_round = len(tournament.rounds) if tournament.multideck else None
-    winner_deck = next(
-        (
-            d
-            for d in decks
-            if d.user_uid == tournament.winner and d.round == finals_round
-        ),
-        None,
-    )
-    if not winner_deck:
-        return None
-
-    player_user = await get_user_by_uid(tournament.winner)
-    player_name = player_user.name if player_user else "Unknown"
-
-    credit = winner_deck.attribution
-    if credit.kind == AttributionKind.MEMBER:
-        designer = await get_user_by_vekn_id(credit.vekn_id)
-        designer_credit = designer.name if designer else ""
-    elif credit.kind == AttributionKind.ARCHIVE:
-        designer_credit = credit.name
-    else:
-        designer_credit = ""
-
-    deck_json = json.dumps(
-        {
-            "name": winner_deck.name,
-            "author": designer_credit,
-            "comments": winner_deck.comments,
-            "cards": winner_deck.cards,
-        }
-    )
-
-    def us_date(d: datetime) -> str:
-        suffix = (
-            "th"
-            if 11 <= d.day % 100 <= 13
-            else {1: "st", 2: "nd", 3: "rd"}.get(d.day % 10, "th")
-        )
-        return f"{d.strftime('%B')} {d.day}{suffix} {d.year}"
-
-    start = tournament.start or tournament.modified
-    tournament_date = us_date(start)
-    if tournament.finish and tournament.finish.date() != start.date():
-        tournament_date += f" -- {us_date(tournament.finish)}"
-    rounds_count = len(tournament.rounds)
-    tournament_format = f"{rounds_count}R" + (
-        "+F" if tournament.finals else " (no final)"
-    )
-
-    standing = next(
-        (s for s in tournament.standings if s.user_uid == tournament.winner), None
-    )
-    winner_score = ""
-    if standing:
-        winner_score = f"{int(standing.gw)}GW{standing.vp:g}"
-        finals_seat = next(
-            (
-                s
-                for s in (tournament.finals.seating if tournament.finals else [])
-                if s.player_uid == tournament.winner
-            ),
-            None,
-        )
-        if finals_seat:
-            winner_score += f" + {finals_seat.result.vp:g}vp in final"
-    from ..twda import frontend_url
-
-    # The archive keeps this line forever, so it must be the citable form. Two
-    # TWDA entries already point at legacy-archon uids that resolve to nothing.
-    handle = (
-        f"/t/{tournament.event_code}"
-        if tournament.event_code
-        else f"/tournaments/{tournament.uid}"
-    )
-
-    named = get_country(normalize_country(tournament.country or "") or "")
-
-    _load_engine_cards()
-    return _engine.export_twda(
-        deck_json,
-        tournament.name,
-        tournament_date,
-        "Online"
-        if tournament.online
-        else ", ".join(
-            p
-            for p in (tournament.city, named["name"] if named else tournament.country)
-            if p
-        ),
-        tournament_format,
-        f"{frontend_url()}{handle}",
-        _engine.attested_player_count(msgspec.json.encode(tournament).decode()),
-        player_name,
-        winner_score,
-    )
-
-
-async def _record_twda_status(
-    uid: str, outcome: TwdaOutcome, reason: str = "", pr_url: str = ""
-) -> None:
-    """Locked fetch-modify-save so only twda_status lands on the CURRENT row,
-    never clobbering concurrent edits; an unchanged outcome skips the write."""
-    async with tournament_transaction(uid) as (fresh, tx_conn):
-        if not fresh:
-            return
-        prev = fresh.twda_status
-        if prev and (prev.outcome, prev.reason, prev.pr_url) == (
-            outcome,
-            reason,
-            pr_url,
-        ):
-            return
-        fresh.twda_status = TwdaStatus(
-            outcome=outcome, reason=reason, pr_url=pr_url, at=datetime.now(UTC)
-        )
-        fresh.modified = datetime.now(UTC)
-        bd = await save_tournament(fresh, conn=tx_conn)
-    broadcast_precomputed(bd)
-
-
-async def maybe_submit_twda(tournament: Tournament) -> None:
-    """Self-contains its errors, recording outcome/reason on the tournament
-    either way. `ranking_eligibility` (the ranked-badge predicate) is distinct
-    from `rank` (the Basic/NC/CC championship axis) — don't conflate them."""
-    from ..twda import is_configured, submit_twda_pr
-
-    if tournament.state != TournamentState.FINISHED:
-        return
-    t_json = msgspec.json.encode(tournament).decode()
-    if not tournament.winner:
-        outcome = (TwdaOutcome.SKIPPED, "no_winner", "")
-    elif tournament.format == TournamentFormat.Limited:
-        # Limited events are rated (own category) but draft/sealed decks
-        # don't belong in a constructed-deck archive.
-        outcome = (TwdaOutcome.SKIPPED, "limited", "")
-    elif tournament.format == TournamentFormat.Storyline:
-        outcome = (TwdaOutcome.SKIPPED, "storyline", "")
-    elif tournament.external_ids.get("twda"):
-        outcome = (TwdaOutcome.SKIPPED, "reconstructed", "")
-    elif not tournament.rounds:
-        outcome = (TwdaOutcome.SKIPPED, "no_rounds", "")
-    elif _engine.attested_player_count(t_json) < TWDA_MIN_PLAYERS:
-        outcome = (TwdaOutcome.SKIPPED, "too_few_players", "")
-    elif _engine.ranking_eligibility(t_json) != "eligible":
-        outcome = (TwdaOutcome.SKIPPED, "unranked", "")
-    elif not tournament.event_code:
-        outcome = (TwdaOutcome.SKIPPED, "no_event_code", "")
-    elif not tournament.online and not tournament.country:
-        outcome = (TwdaOutcome.SKIPPED, "no_place", "")
-    elif not is_configured():
-        outcome = (TwdaOutcome.SKIPPED, "not_configured", "")
-    else:
-        try:
-            deck_text = await _winner_deck_twda(tournament)
-            if not deck_text:
-                outcome = (TwdaOutcome.SKIPPED, "no_deck", "")
-            else:
-                pr_url, reason = await submit_twda_pr(
-                    tournament.event_code, deck_text, tournament.name
-                )
-                if pr_url:
-                    outcome = (TwdaOutcome.SUBMITTED, "", pr_url)
-                else:
-                    outcome = (TwdaOutcome.FAILED, reason, "")
-        except Exception:
-            logger.exception("Failed to submit TWDA PR")
-            outcome = (TwdaOutcome.FAILED, "deck", "")
-
-    try:
-        await _record_twda_status(tournament.uid, *outcome)
-    except Exception:
-        logger.exception("Failed to record TWDA status")
 
 
 def _build_actor_context(
@@ -667,54 +331,13 @@ async def _invalidate_organizer_view(
         modified_at=modified_at,
         access_version=av,
     )
-    _push_decks(
+    push_decks(
         tournament,
         [user_uid],
         await get_decks_for_tournament(tournament.uid),
         modified_at=modified_at,
         access_version=av,
     )
-
-
-def _push_decks(
-    tournament: Tournament,
-    user_uids: list[str],
-    decks: list[DeckObject],
-    *,
-    modified_at: str | None = None,
-    access_version: str | None = None,
-) -> None:
-    for user_uid in user_uids:
-        for deck in decks:
-            broadcast_personal(
-                user_uid,
-                obj_type=ObjectType.DECK,
-                uid=deck.uid,
-                full_dict=msgspec.to_builtins(deck),
-                org_uids=deck_org_uids(
-                    deck.private, tournament.state, tournament.organizers_uids
-                ),
-                obj_user_uid=deck.user_uid,
-                modified_at=modified_at,
-                access_version=access_version,
-            )
-
-
-async def _withdraw_private_decks(tournament: Tournament) -> None:
-    """The no-op re-save is what evicts the decks from an organizer offline now."""
-    bds = []
-    async with tournament_transaction(tournament.uid):
-        decks = [d for d in await get_decks_for_tournament(tournament.uid) if d.private]
-        for deck in decks:
-            deck.modified = datetime.now(UTC)
-            bd = await save_object_from_model(ObjectType.DECK, deck)
-            bd.org_uids = deck_org_uids(
-                deck.private, tournament.state, tournament.organizers_uids
-            )
-            bds.append(bd)
-    for bd in bds:
-        broadcast_precomputed(bd)
-    _push_decks(tournament, tournament.organizers_uids, decks)
 
 
 @post("/{uid:str}/organizers")
@@ -783,13 +406,6 @@ async def push_vekn(
         raise HTTPException(
             status_code=400, detail="Open-rounds events are not reported to VEKN"
         )
-
-    from ..vekn_api import VEKNAPIConnectionError, VEKNAPIError
-    from ..vekn_push import (
-        push_tournament_event,
-        push_tournament_results,
-        vekn_push_client,
-    )
 
     try:
         client = vekn_push_client()
@@ -1249,8 +865,6 @@ async def fetch_deck_proxy(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    from ..providers import DeckFetchError, fetch_deck_from_url
-
     try:
         result = await fetch_deck_from_url(url)
     except DeckFetchError as e:
@@ -1321,12 +935,6 @@ async def delete_tournament_endpoint(
     # (recompute reads only live finished tournaments, so the deleted one drops out).
     if was_finished:
         try:
-            from ..ratings import (
-                rating_category_for_tournament,
-                recompute_ratings_for_players,
-                recompute_wins,
-            )
-
             player_uids = {p.user_uid for p in tournament.players if p.user_uid}
             category = rating_category_for_tournament(tournament)
             for _user, bd in await recompute_ratings_for_players(player_uids, category):
@@ -1370,12 +978,6 @@ async def archon_import(
     file_bytes = await data.read()
     if len(file_bytes) > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large (max 5MB)")
-
-    from ..archon_import import (
-        apply_archon_import,
-        parse_archon_file,
-        validate_archon_import,
-    )
 
     try:
         parsed = parse_archon_file(file_bytes)
@@ -1508,7 +1110,7 @@ async def bulk_register(
             _build_actor_context(current_user, tournament)
         ).decode("utf-8")
         sanctions_json = await _build_sanctions_json(uid, seen_uids, conn=tx_conn)
-        decks_json = await _build_decks_json(uid, conn=tx_conn)
+        decks_json = await build_decks_json(uid, conn=tx_conn)
 
         t_data = msgspec.to_builtins(tournament)
         in_tournament = {p.user_uid for p in tournament.players if p.user_uid}
@@ -1745,7 +1347,7 @@ async def tournament_action(
         actor_json = msgspec.json.encode(actor_data).decode("utf-8")
         player_uids = {p.user_uid for p in tournament.players if p.user_uid}
         sanctions_json = await _build_sanctions_json(uid, player_uids, conn=tx_conn)
-        decks_json = await _build_decks_json(uid, conn=tx_conn)
+        decks_json = await build_decks_json(uid, conn=tx_conn)
 
         if data.type in ("CheckIn", "Register", "AddPlayer"):
             player_uid = data.player_uid or data.user_uid
@@ -1825,18 +1427,18 @@ async def tournament_action(
     # Below runs unlocked — the tournament row's FOR UPDATE lock was released.
     logger.info(f"Tournament {uid} action {data.type} by {current_user.uid}")
 
-    deck_bds = await _process_deck_ops(deck_ops, uid, updated)
+    deck_bds = await process_deck_ops(deck_ops, uid, updated)
     for bd in deck_bds:
         broadcast_precomputed(bd)
 
     was_finished = pre_state == TournamentState.FINISHED
     is_finished = updated.state == TournamentState.FINISHED
     if is_finished and not was_finished:
-        await _withdraw_private_decks(updated)
+        await withdraw_private_decks(updated)
     elif was_finished != is_finished or (
         is_finished and any(op.get("op") == "set_private" for op in deck_ops)
     ):
-        _push_decks(
+        push_decks(
             updated,
             updated.organizers_uids,
             [d for d in await get_decks_for_tournament(uid) if d.private],
@@ -1862,12 +1464,6 @@ async def tournament_action(
     results_may_change = is_finished and data.type not in _RATING_IRRELEVANT_ACTIONS
     if state_changed or results_may_change:
         try:
-            from ..ratings import (
-                rating_category_for_tournament,
-                recompute_ratings_for_players,
-                recompute_wins,
-            )
-
             player_uids = {p.user_uid for p in updated.players if p.user_uid}
             category = rating_category_for_tournament(updated)
             results = await recompute_ratings_for_players(player_uids, category)
@@ -1889,7 +1485,7 @@ async def tournament_action(
     # retries) — TWDA submission runs inline since it's local/fast.
     if is_finished and not was_finished:
         await maybe_submit_twda(updated)
-        asyncio.create_task(_maybe_push_vekn(updated))
+        asyncio.create_task(maybe_push_results(updated))
     elif is_finished:
         # Publication and privacy ops carry no player_uid: the archive and the Hall
         # of Fame ask whether a deck exists, never whether it is visible. A credit
@@ -1905,8 +1501,6 @@ async def tournament_action(
             asyncio.create_task(maybe_submit_twda(updated))
         if winner_moved:
             try:
-                from ..ratings import recompute_wins
-
                 for _user, bd in await recompute_wins(winners):
                     broadcast_precomputed(bd)
             except Exception as e:
@@ -1944,20 +1538,6 @@ async def qr_checkin(
         TournamentActionRequest(type="CheckIn", player_uid=current_user.uid),
         request=request,
     )
-
-
-def _load_engine_cards() -> None:
-    """Hand cards.json to the engine, which parses and holds it."""
-    global _engine_cards_loaded
-    if _engine_cards_loaded:
-        return
-    text = cards_json_text()
-    if text is None:
-        raise HTTPException(
-            status_code=503, detail="Cards data not available. Run: just cards"
-        )
-    _engine.load_cards(text)
-    _engine_cards_loaded = True
 
 
 def _validate_timer_tournament(user, tournament: Tournament | None):
@@ -2632,12 +2212,11 @@ async def go_online(
     for bd in pending_bds:
         broadcast_precomputed(bd)
     if updated.state == TournamentState.FINISHED:
-        await _withdraw_private_decks(updated)
+        await withdraw_private_decks(updated)
 
     if data.offline_sanctions:
         # One authoritative recompute over the now-saved sanctions, server-side
         # under the row lock (the offline client already recomputed via WASM).
-        from .sanctions import _apply_sanction_to_tournament
 
         await _apply_sanction_to_tournament(uid)
         # Return the FRESH row: the HTTP response is the initiating device's sole
@@ -2656,12 +2235,6 @@ async def go_online(
     # (~24h late) — mirror the action route and recompute immediately.
     if updated.state == TournamentState.FINISHED:
         try:
-            from ..ratings import (
-                rating_category_for_tournament,
-                recompute_ratings_for_players,
-                recompute_wins,
-            )
-
             player_uids = {p.user_uid for p in updated.players if p.user_uid}
             category = rating_category_for_tournament(updated)
             results = await recompute_ratings_for_players(player_uids, category)
