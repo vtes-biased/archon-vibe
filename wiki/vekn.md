@@ -367,8 +367,9 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   when a row has none, the sync takes the venue record's city, else the event's,
   matched in GeoNames within the country, and never rewrites one it holds.
   Everything else — `country`, `venue`, `address`, `venue_url`, `map_url` — stays a
-  vekn.net refresh, except that an empty vekn.net country on an in-person event
-  keeps the app's: it means unknown there, and blanking it would orphan the city.
+  vekn.net refresh, except that an empty or `XX` vekn.net country on an in-person
+  event keeps the app's: both mean unknown there, and taking them would orphan the
+  city.
 - **Event times are wall clock at the venue**, which is how `start`/`finish` are
   stored: naive, paired with `timezone`. The sync writes VEKN's time verbatim
   and, **at creation only**, fills `timezone` from a guess off the venue country

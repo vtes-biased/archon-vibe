@@ -81,8 +81,8 @@ async def run(args: argparse.Namespace) -> int:
                 verdicts[verdict] += 1
                 if verdict != "write" or t is None or city is None:
                     continue
-                if not t.country:
-                    t.country = country
+                if t.country in (None, "", "XX"):
+                    t.country = city["country_code"].upper()
                 t.city = city["name"]
                 t.city_geoname_id = geoname_id
                 t.modified = datetime.now(UTC)

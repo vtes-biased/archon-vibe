@@ -607,7 +607,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                             address=existing.address,
                             map_url=existing.map_url,
                         )
-                    if not tournament.country and not tournament.online:
+                    if tournament.country in (None, "XX") and not tournament.online:
                         tournament = msgspec.structs.replace(
                             tournament, country=existing.country
                         )
