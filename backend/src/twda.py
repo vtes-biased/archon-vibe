@@ -42,6 +42,17 @@ def is_configured() -> bool:
     )
 
 
+def keep_curated_header(archived: str, ours: str) -> str:
+    """The archive's maintainer completes the event name, the venue and city, and
+    the date by hand on every merged entry; an update carries the rest."""
+    kept = archived.splitlines()[:3]
+    if len(kept) < 3:
+        return ours
+    return "\n".join(kept + ours.splitlines()[3:]) + (
+        "\n" if ours.endswith("\n") else ""
+    )
+
+
 async def submit_twda_pr(
     event_key: str,
     deck_text: str,
@@ -157,8 +168,13 @@ async def submit_twda_pr(
             logger.error(f"Failed to read deck file: {file_status} {file_text}")
             return "", f"commit:{file_status}"
 
-        content_b64 = base64.b64encode(deck_text.encode()).decode()
         verb = "Update" if file_status == 200 else "Add"
+        if file_status == 200:
+            deck_text = keep_curated_header(
+                base64.b64decode(json.loads(file_text)["content"]).decode(),
+                deck_text,
+            )
+        content_b64 = base64.b64encode(deck_text.encode()).decode()
         file_data: dict = {
             "message": f"{verb} TWD: {tournament_name}",
             "content": content_b64,

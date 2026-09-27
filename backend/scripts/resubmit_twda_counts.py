@@ -10,8 +10,8 @@ import argparse
 import asyncio
 import importlib.util
 import os
+import re
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 
 try:
@@ -27,34 +27,64 @@ from backend.src import db, http_client  # noqa: E402
 from backend.src.db import TWDA_MIN_PLAYERS  # noqa: E402
 from backend.src.models import Tournament, TwdaOutcome  # noqa: E402
 from backend.src.routes.tournaments import _engine, maybe_submit_twda  # noqa: E402
+from backend.src.twda import TWDA_FORK_REPO, TWDA_TARGET_REPO  # noqa: E402
 
-# v1.0.9 held the waitlist out of the published roster count: tagged at the first
-# instant, live on production by the second.
-_WAITLIST_TAGGED = datetime(2026, 8, 30, 15, 2, tzinfo=UTC)
-_WAITLIST_DEPLOYED = datetime(2026, 9, 2, 13, 50, tzinfo=UTC)
+_PLAYERS = re.compile(r"^(\d+) players$", re.MULTILINE)
 
 
-def _candidate(t: Tournament) -> tuple[str, bool] | None:
+async def _get(url: str) -> tuple[int, str]:
+    async with http_client.session().get(url) as resp:
+        return resp.status, await resp.text()
+
+
+async def _open_branches() -> set[str]:
+    status, text = await _get(
+        f"https://api.github.com/repos/{TWDA_TARGET_REPO}/pulls?state=open&per_page=100"
+    )
+    if status != 200:
+        raise RuntimeError(f"open pull requests: {status}")
+    return {
+        pr["head"]["ref"]
+        for pr in msgspec.json.decode(text)
+        if (pr["head"]["repo"] or {}).get("full_name") == TWDA_FORK_REPO
+    }
+
+
+async def _published(t: Tournament, open_branches: set[str]) -> tuple[str, int | None]:
+    """Where the entry stands and the count it publishes, read from GitHub: the
+    maintainer corrects counts and removes entries by hand after merging."""
+    branch = f"archon/{t.event_code}"
+    path = f"decks/{t.event_code}.txt"
+    if branch in open_branches:
+        where = "open"
+        url = f"https://raw.githubusercontent.com/{TWDA_FORK_REPO}/{branch}/{path}"
+    else:
+        where = "archived"
+        url = f"https://raw.githubusercontent.com/{TWDA_TARGET_REPO}/master/{path}"
+    status, text = await _get(url)
+    if status == 404 and where == "archived":
+        return "not in the archive", None
+    if status != 200:
+        raise RuntimeError(f"{url}: {status}")
+    found = _PLAYERS.search(text)
+    return where, int(found.group(1)) if found else None
+
+
+async def _candidate(t: Tournament, open_branches: set[str]) -> tuple[str, bool] | None:
     """The listing line, and whether `--apply` resubmits it."""
     status = t.twda_status
     if not status:
         return None
     attested = _engine.attested_player_count(msgspec.json.encode(t).decode())
     if status.outcome == TwdaOutcome.SUBMITTED:
-        roster = len(t.players)
-        present = len([p for p in t.players if not p.waitlisted])
-        if not status.at or status.at < _WAITLIST_TAGGED:
-            published = {roster}
-        elif status.at >= _WAITLIST_DEPLOYED:
-            published = {present}
-        else:
-            published = {roster, present}
-        if published == {attested}:
+        where, published = await _published(t, open_branches)
+        if published == attested:
             return None
-        shown = "/".join(str(n) for n in sorted(published))
+        if published is None:
+            return f"{where}  → {attested}", False
         if attested < TWDA_MIN_PLAYERS:
-            return f"below floor  {shown} → {attested}", False
-        return f"submitted  {shown} → {attested}", True
+            return f"below floor  {published} → {attested}", False
+        return f"{where}  {published} → {attested}", True
     if (
         status.outcome == TwdaOutcome.SKIPPED
         and status.reason == "too_few_players"
@@ -79,11 +109,12 @@ async def run(args: argparse.Namespace) -> int:
                    ORDER BY "full"->>'event_code'"""
             )
             rows = await result.fetchall()
+        open_branches = await _open_branches()
         listed: list[str] = []
         held = 0
         for (full,) in rows:
             t = db.decode_json(full, Tournament)
-            candidate = _candidate(t)
+            candidate = await _candidate(t, open_branches)
             if not candidate:
                 continue
             line, resubmit = candidate
@@ -91,8 +122,8 @@ async def run(args: argparse.Namespace) -> int:
                 listed.append(t.uid)
             else:
                 held += 1
-            print(f"{t.event_code or t.uid:<12} {line:<24} {t.name}")
-        print(f"\n{len(listed)} to resubmit, {held} below floor for the TWDA admin")
+            print(f"{t.event_code or t.uid:<12} {line:<30} {t.name}")
+        print(f"\n{len(listed)} to resubmit, {held} held for the TWDA admin")
         if not args.apply:
             print("\nReport only — pass --apply to resubmit.")
             return 0

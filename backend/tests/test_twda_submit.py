@@ -36,6 +36,7 @@ from src.models import (
     User,
 )
 from src.routes.tournaments import _winner_deck_twda, maybe_submit_twda
+from src.twda import keep_curated_header
 
 from tests.conftest import seed_tournament
 
@@ -155,6 +156,25 @@ async def test_header_counts_the_field_not_the_roster(test_db):
             io.StringIO(twda), krcg_loader.load(), id="12345", twda=True
         )
         assert parsed.event.players_count == TWDA_MIN_PLAYERS
+
+
+@pytest.mark.asyncio
+async def test_update_keeps_the_maintainers_header(test_db):
+    async with _published(attribution=DeckAttribution(kind=AttributionKind.OWNER)) as (
+        _t,
+        twda,
+    ):
+        archived = "EC 2026 - Day 1\nKablys, Vilnius, France\nJune 1st 2025\n"
+        parsed = krcg_parser.deck_from_txt(
+            io.StringIO(keep_curated_header(archived, twda)),
+            krcg_loader.load(),
+            id="12345",
+            twda=True,
+        )
+        assert parsed.event.name == "EC 2026 - Day 1"
+        assert parsed.event.place == "Kablys, Vilnius, France"
+        assert parsed.event.players_count == TWDA_MIN_PLAYERS
+        assert parsed.player == "Winner Wendy"
 
 
 @pytest.mark.asyncio

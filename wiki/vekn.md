@@ -586,7 +586,12 @@ country alone, short of the archive's `City, Country`: a tournament holds no
 structured city — a synced event folds its venue's into free-text `address`, an
 app-created one has only what the organizer typed — and parsing one out would put
 guesses on a permanent line, so the maintainer completes the city by hand. A
-tournament city field is what would change that. Then a score line,
+tournament city field is what would change that. **An update keeps the archived
+header's first three lines** — event name, place, date — whenever the archive
+already holds the file: the maintainer rewrites them on nearly every merge (venue
+and city on 38 of the first 44, the name on 7, the date into ISO), and a full
+rewrite would revert that work on every correction. Format, count, winner, link,
+score and deck stay ours. Then a score line,
 `-- 1GW4.5 + 3vp in final`: the winner's **standings** row, which is prelim-only,
 with the finals seat's VP beside it — never the aggregated `result`, which already
 folds the final in and would read to the archive as a double count. It is the
