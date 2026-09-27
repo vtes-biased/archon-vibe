@@ -217,19 +217,19 @@ def reconstructed_tournament(
     prelim-only by contract — splitting it would plant a guess where later
     arithmetic trusts a measurement.
     """
-    country, city = _twda_place(entry)
+    country, place_city = _twda_place(entry)
     day = entry.date
     start = datetime.strptime(day, "%Y-%m-%d") if _ISO_DATE_RE.match(day) else None
     rounds = re.match(r"\s*(\d+)", entry.tournament_format)
     return Tournament(
         uid=str(uuid7()),
         modified=now,
-        name=entry.event or f"VTES Tournament — {city or country or day}",
+        name=entry.event or f"VTES Tournament — {place_city or country or day}",
         format=TournamentFormat.Standard,
         online=entry.place.strip().lower() == "online",
         start=start,
         finish=start,
-        timezone=_twda_timezone(country, city),
+        timezone=_twda_timezone(country, place_city),
         country=country,
         city=city["name"] if city else None,
         city_geoname_id=city["geoname_id"] if city else None,

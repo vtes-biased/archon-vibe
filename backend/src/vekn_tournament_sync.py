@@ -45,6 +45,7 @@ from .vekn_api import (
     PLACEHOLDER_VENUE_ID,
     VEKNAPIClient,
 )
+from .vekn_sync import fix_city
 
 logger = logging.getLogger(__name__)
 _engine = PyEngine()
@@ -531,7 +532,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
             return {}
         if cities is None:
             cities = city_index()
-        matched = match_city(cities, name, target.country)
+        matched = match_city(cities, fix_city(name, target.country), target.country)
         if not matched:
             return {}
         return {"city": matched["name"], "city_geoname_id": matched["geoname_id"]}

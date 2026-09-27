@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from datetime import UTC, datetime
+from functools import cache
 from pathlib import Path
 from typing import Any
 from uuid import uuid7
@@ -16,7 +17,7 @@ from .db import (
     get_users_without_coopted_by,
     save_user,
 )
-from .geonames import CityIndex, city_index, match_city
+from .geonames import CityIndex, city_index, match_city, normalize_country
 from .models import ObjectType, Role, User
 from .vekn_api import VEKNAPIClient, VEKNAPIError
 
@@ -516,6 +517,19 @@ FIX_CITIES: dict[str, dict[str, str]] = {
 }
 
 
+@cache
+def _city_fixes() -> dict[str, dict[str, str]]:
+    return {
+        normalize_country(country) or "": {k.lower(): v for k, v in fixes.items()}
+        for country, fixes in FIX_CITIES.items()
+    }
+
+
+def fix_city(name: str, country: str) -> str:
+    fixes = _city_fixes().get(normalize_country(country) or "", {})
+    return fixes.get(name.strip().lower(), name)
+
+
 class VEKNSyncService:
     def __init__(self) -> None:
         self.client = VEKNAPIClient()
@@ -529,8 +543,8 @@ class VEKNSyncService:
         city = vekn_player.get("city") or None
         country_name = vekn_player.get("countryname") or ""
         country_code = vekn_player.get("countrycode") or ""
-        if city and country_name in FIX_CITIES:
-            city = FIX_CITIES[country_name].get(city, city)
+        if city:
+            city = fix_city(city, country_code or country_name)
         city_geoname_id = None
         if city and country_code:
             matched = match_city(cities, city, country_code)

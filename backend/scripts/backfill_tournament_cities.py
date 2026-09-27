@@ -32,26 +32,20 @@ from backend.src.geonames import (  # noqa: E402
     CityIndex,
     city_index,
     match_city,
-    normalize_country,
 )
 from backend.src.models import Tournament  # noqa: E402
 from backend.src.snapshots import generate_snapshots  # noqa: E402
 from backend.src.twda_import import _fetch_twda, twda_city  # noqa: E402
-from backend.src.vekn_sync import FIX_CITIES  # noqa: E402
+from backend.src.vekn_sync import fix_city  # noqa: E402
 
 _POSTCODE = re.compile(r"\b[\w-]*\d[\w-]*\b")
-_FIXES = {
-    normalize_country(country): {k.lower(): v for k, v in fixes.items()}
-    for country, fixes in FIX_CITIES.items()
-}
 
 
 def _address_city(t: Tournament, cities: CityIndex) -> City | None:
-    fixes = _FIXES.get(t.country or "", {})
     for segment in reversed(re.split(r"[,\r\n]", t.address)):
         for name in (segment, _POSTCODE.sub(" ", segment)):
             name = " ".join(name.split())
-            name = fixes.get(name.lower(), name)
+            name = fix_city(name, t.country or "")
             if city := match_city(cities, name, t.country or ""):
                 return city
     return None

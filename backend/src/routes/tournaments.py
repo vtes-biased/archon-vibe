@@ -2773,6 +2773,14 @@ async def sync_offline(
 
         tournament_data = data.tournament
         tournament_data["country"] = stored_country(tournament_data.get("country"))
+        try:
+            tournament_data["city"], tournament_data["city_geoname_id"] = _host_city(
+                bool(tournament_data.get("online")),
+                tournament_data["country"],
+                tournament_data.get("city_geoname_id"),
+            )
+        except HTTPException:
+            tournament_data["city"], tournament_data["city_geoname_id"] = None, None
         tournament_data["offline_mode"] = True
         if tournament:
             tournament_data["offline_device_id"] = tournament.offline_device_id
