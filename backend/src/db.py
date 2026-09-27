@@ -667,11 +667,8 @@ async def get_users_by_uids(uids: set[str]) -> dict[str, User]:
 
 
 async def soft_delete_user(uid: str) -> tuple[User, BroadcastData] | None:
-    """Soft-delete a VEKN-less user. Returns (user, BroadcastData) for SSE.
-
-    Raises ValueError on a VEKN-bearing one: the next VEKN sync would recreate it
-    beside a tombstone still reserving its number in the vekn_id unique index.
-    """
+    """Soft-delete a VEKN-less user, raising ValueError on a VEKN-bearing one.
+    Returns (user, BroadcastData) for SSE."""
     user = await get_user_by_uid(uid)
     if not user:
         return None

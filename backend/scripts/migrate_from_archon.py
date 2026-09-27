@@ -538,7 +538,7 @@ async def resolve_known_remaps(member_uid_map: dict[str, str], stats: Stats) -> 
         if old_uid not in member_uid_map:
             continue  # not in this import (e.g. --limit subset)
         live = await live_user_by_vekn_id(target_vekn)
-        if live is not None and not live.deleted_at:
+        if live is not None:
             member_uid_map[old_uid] = live.uid
             stats.bump("members.veknless_remapped")
         else:
