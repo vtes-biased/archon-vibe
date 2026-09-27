@@ -99,3 +99,24 @@ header carries none. Rerun with
 repo. It worked when a second report-only run lists only held rows. Delete this
 section and
 `backend/scripts/resubmit_twda_counts.py` together.
+
+## Fill the city of existing tournaments
+
+Gated by `da7d0cc3`, which adds the tournament city and makes it required for an
+in-person event ([tournaments](tournaments.md#configuration)). Before it the rows
+have no field to hold the city. List:
+
+```sh
+sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
+  /opt/archon/backend/.venv/bin/python \
+  /opt/archon/backend/scripts/backfill_tournament_cities.py'
+```
+
+Each in-person event without a city gets one line: its source (`venue`, read from
+its address right to left, which already carries the city vekn.net gave it, else
+`twda`, the archive entry's place), the chosen city and the event; the unmatched
+ones follow with their address and TWDA place, and the last line counts each
+kind. Rerun with `--apply`. It worked when a second report-only run lists only
+unmatched rows and those without a country; those keep no city until an
+organizer's next edit asks for one. Delete this section and
+`backend/scripts/backfill_tournament_cities.py` together.
