@@ -18,7 +18,8 @@ There is **no frontend unit-test framework** — Playwright E2E only.
 ## Running them
 
 **Backend** — `just test-backend` is canonical: it builds the PyO3 engine into the
-venv, brings the `db` container up if needed, runs pytest, then stops the DB.
+venv, brings the `db` container up if needed, runs pytest, then the index-drift
+check ([hazards](hazards.md)), then stops the DB.
 `conftest.py` points at a separate `archon_test` database on `:5433` and
 **auto-creates it**, so no manual setup is needed beyond a running `db` container
 and a built engine. Override the target with `TEST_DATABASE_URL`. Pure-unit suites

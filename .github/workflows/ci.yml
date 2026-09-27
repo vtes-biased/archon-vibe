@@ -90,6 +90,8 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # index drift reads the previous release tag's schema
       - uses: actions/setup-python@v6
         with:
           python-version: '3.14'
@@ -109,6 +111,10 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://archon:archon_dev_password@localhost:5432/archon_test
         run: uv run python -m pytest backend/tests/ -q
+      - name: index drift (schema.sql over the previous release against a fresh database)
+        env:
+          INDEX_DRIFT_DATABASE_URL: postgresql://archon:archon_dev_password@localhost:5432/postgres
+        run: uv run python3 scripts/check_index_drift.py
 
   # `just test` (frontend half): svelte-check. It resolves engine types from
   # engine/pkg (the gitignored WASM build output), so the WASM engine must be built

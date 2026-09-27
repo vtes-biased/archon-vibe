@@ -704,8 +704,12 @@ would fail startup rather than slow it.
 **Changing an existing index in the schema file needs an explicit `DROP INDEX IF
 EXISTS` of the old name.** The file is applied at every startup with `CREATE …
 IF NOT EXISTS`, which is a no-op for any name a live database already holds: the
-edited definition takes effect on fresh databases only, and CI stays green while
-production keeps the old one. The consent index stayed keyed on (user, client)
+edited definition takes effect on fresh databases only while production keeps
+the old one. **`just index-drift`** catches it: it applies the previous release's
+schema then the current one to a scratch database, the current one alone to
+another, and fails on any index the two disagree on — an edit without its drop, or
+a removed index left behind. It runs in CI on the backend job and in
+`just test-backend`. The consent index stayed keyed on (user, client)
 in production for as long as it took a member to run the Discord bot on a second
 event. Give the replacement a **new name** so the drop is a one-time no-op and
 the create stays idempotent rather than rebuilding the index on every start.

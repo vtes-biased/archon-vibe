@@ -153,6 +153,7 @@ test-backend *ARGS='-v':
         needs_stop=true
     fi
     uv run python3 -m pytest backend/tests/ {{ ARGS }}; rc=$?
+    if [ $rc -eq 0 ]; then uv run python3 scripts/check_index_drift.py; rc=$?; fi
     if $needs_stop; then docker compose stop db > /dev/null 2>&1; fi
     exit $rc
 
@@ -222,6 +223,12 @@ model-drift:
 # an entry die in the commit that retires its proof.
 migration-pairing:
     uv run python3 scripts/check_migration_pairing.py
+
+# Fail when schema.sql applied over the previous release's leaves different
+# indexes than a fresh database — an index edited in place never reaches prod.
+# Needs the dev database; `just test-backend` runs it after pytest.
+index-drift:
+    uv run python3 scripts/check_index_drift.py
 
 # Fail when a help-guide mockup hand-rolls a Button/Badge or hard-codes a live UI
 # label — the drawings of the console rot silently as the real screens move.
