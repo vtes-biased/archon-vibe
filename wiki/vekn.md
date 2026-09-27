@@ -240,8 +240,8 @@ projection on the old value. **Deferred, with a trigger**: when vekn.net reports
 the entries fixed, run per event and check the report before writing.
 
 ```sh
-… /opt/archon/backend/scripts/fix_stuck_vekn_push.py --vekn <id> --stamp-only
-… fix_stuck_vekn_push.py --vekn <id> --stamp-only --apply
+… /opt/archon/backend/scripts/fix_stuck_vekn_push.py --vekn <id>
+… fix_stuck_vekn_push.py --vekn <id> --apply
 ```
 
 Then the next hourly batch uploads to the existing calendar event. It is

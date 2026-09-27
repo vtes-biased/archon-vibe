@@ -1,48 +1,11 @@
-"""Unstick a migrated tournament whose results never reached vekn.net.
-
-Legacy archon left one event mid-flight: a trailing EMPTY round its own UI would
-not let the organizer delete, which legacy's push validation then rejected, so
-the results were never uploaded. The migration carried the shape over verbatim
-and stamped `vekn_pushed_at` (imported history is stamped at import so batch_push
-leaves it alone), so nothing on this side retried it either.
+"""Hand a finished tournament back to the hourly VEKN results push.
 
     # report what would change
     /opt/archon/backend/.venv/bin/python \\
-      /opt/archon/backend/scripts/fix_stuck_vekn_push.py --vekn 13379
+      /opt/archon/backend/scripts/fix_stuck_vekn_push.py --vekn 12498
 
     # write it
-    … fix_stuck_vekn_push.py --vekn 13379 --apply
-
-Three writes on one tournament:
-
-1. clear `vekn_pushed_at` — the migration stamp is exactly what makes batch_push
-   skip it (UNPUSHED_RESULTS_QUERY).
-2. CancelRound on the trailing empty round — hard-removes the last round so the
-   pushed archondata reports the rounds actually played (generate_archondata's
-   nrounds is len(rounds) + finals). The app UI cannot do this: isRoundCancellable
-   requires Playing AND no finals, and these events have finals. The engine allows
-   it (require_state_or_finished).
-3. FinishTournament — the push set is Finished-only, and the migration left this
-   one Playing.
-
-The next hourly batch_push then uploads results to the EXISTING calendar event:
-`external_ids.vekn` is already set, so no duplicate event is created.
-
-Order note for anyone doing this by hand through the API instead: clear
-`vekn_pushed_at` FIRST. The action route stamps the sticky `vekn_results_stale`
-when rounds change while `vekn_pushed_at` is set, which would read as "diverged
-from vekn.net" on results vekn.net never received. This script bypasses the route,
-so it just clears the stamp up front.
-
-`--stamp-only` does step 1 alone, for a different case: an event vekn.net refused
-for a reason since corrected on its side. Nothing here can retry it otherwise —
-the stamp is what `UNPUSHED_RESULTS_QUERY` filters on, the manual push-vekn route
-skips the results push on a stamped tournament too, and a raw SQL update would
-leave the member projection carrying the old value.
-
-Targeted on purpose — never a sweep. A trailing empty round on a Playing
-tournament is also the normal transient shape of a round an organizer has just
-opened but not yet seated.
+    … fix_stuck_vekn_push.py --vekn 12498 --apply
 
 Saves without broadcasting, so connected clients pick the change up on their next
 snapshot/reconnect rather than live.
@@ -51,7 +14,6 @@ snapshot/reconnect rather than live.
 import argparse
 import asyncio
 import importlib.util
-import json
 import os
 import sys
 from datetime import UTC, datetime
@@ -64,17 +26,8 @@ except ModuleNotFoundError:
 if not _have_backend:
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-import msgspec  # noqa: E402
-from archon_engine import PyEngine  # noqa: E402
-
 from backend.src import db  # noqa: E402
 from backend.src.models import Tournament, TournamentState  # noqa: E402
-from backend.src.routes.tournaments import (  # noqa: E402
-    _build_decks_json,
-    _process_deck_ops,
-)
-
-_engine = PyEngine()
 
 FIND_BY_VEKN = """
     SELECT uid FROM objects
@@ -100,47 +53,22 @@ def describe(t: Tournament) -> str:
     return (
         f"{t.uid}  '{t.name}'\n"
         f"  state={t.state.value} vekn={t.external_ids.get('vekn') or '-'} "
-        f"rounds={len(t.rounds)} tables_per_round={[len(r) for r in t.rounds]}\n"
-        f"  finals={'y' if t.finals else '-'} standings={len(t.standings)} "
+        f"rounds={len(t.rounds)} standings={len(t.standings)} "
         f"winner={t.winner or '-'}\n"
         f"  vekn_pushed_at={t.vekn_pushed_at} vekn_results_stale={t.vekn_results_stale}"
     )
 
 
-async def check(t: Tournament, stamp_only: bool = False) -> list[str]:
-    """Preconditions. Anything returned here blocks --apply."""
+async def check(t: Tournament) -> list[str]:
     problems = []
     if not t.external_ids.get("vekn"):
         problems.append("no external_ids.vekn — push would create a NEW calendar event")
-    if not t.rounds:
-        problems.append("no rounds")
-    elif not stamp_only:
-        if t.rounds[-1]:
-            problems.append(
-                f"last round is not empty ({len(t.rounds[-1])} tables) "
-                "— nothing to remove"
-            )
-        elif len(t.rounds) < 2:
-            problems.append(
-                "removing the empty round would leave 0 rounds (push needs > 0)"
-            )
-    if stamp_only:
-        if not t.vekn_pushed_at:
-            problems.append("already unstamped — batch_push picks it up as it is")
-        if t.state is not TournamentState.FINISHED:
-            problems.append(f"state {t.state.value} — the push set is Finished-only")
-    elif t.state not in (
-        TournamentState.PLAYING,
-        TournamentState.WAITING,
-        TournamentState.FINISHED,
-    ):
-        problems.append(f"state {t.state.value} cannot be finished")
+    if not t.vekn_pushed_at:
+        problems.append("already unstamped — batch_push picks it up as it is")
+    if t.state is not TournamentState.FINISHED:
+        problems.append(f"state {t.state.value} — the push set is Finished-only")
     if not t.standings:
         problems.append("no standings — push_tournament_results would refuse")
-    # Sanctions shift finals scoring when rounds.len() changes, so a tournament
-    # carrying any is out of scope for this repair.
-    if await db.get_sanctions_for_tournament(t.uid):
-        problems.append("tournament has sanctions — finals re-scoring is not in scope")
     missing = []
     for s in t.standings:
         user = await db.get_user_by_uid(s.user_uid)
@@ -154,58 +82,6 @@ async def check(t: Tournament, stamp_only: bool = False) -> list[str]:
     return problems
 
 
-async def clear_stamp(t: Tournament) -> None:
-    """Hand a tournament back to batch_push, changing nothing else. For an event
-    refused for a reason that has since been fixed upstream: the stamp is what
-    UNPUSHED_RESULTS_QUERY filters on, and no route clears it."""
-    t.vekn_pushed_at = None
-    t.modified = datetime.now(UTC)
-    async with db.get_connection() as conn:
-        await db.save_tournament(t, conn=conn)
-    print("After:\n" + describe(t))
-    print("\nNext hourly batch_push will upload results to the existing vekn event.")
-
-
-async def apply(t: Tournament) -> None:
-    t.vekn_pushed_at = None
-    t_json = msgspec.json.encode(t).decode()
-    actor_json = json.dumps(
-        {
-            "uid": "fix_stuck_vekn_push",
-            "roles": ["IC"],
-            "is_organizer": True,
-            "can_organize_league_uids": [],
-            "now": datetime.now(UTC).isoformat(),
-        }
-    )
-    decks_json = await _build_decks_json(t.uid)
-
-    deck_ops: list = []
-    for event in (
-        {"type": "CancelRound", "round": len(t.rounds) - 1},
-        {"type": "FinishTournament"},
-    ):
-        result = json.loads(
-            _engine.process_tournament_event(
-                t_json, json.dumps(event), actor_json, "[]", decks_json
-            )
-        )
-        t_json = json.dumps(result["tournament"])
-        deck_ops.extend(result.get("deck_ops", []))
-        print(f"  applied {event['type']}")
-
-    updated = msgspec.convert(json.loads(t_json), Tournament)
-    updated.vekn_pushed_at = None  # authoritative: the engine round-trips the field
-    updated.modified = datetime.now(UTC)
-    async with db.get_connection() as conn:
-        await db.save_tournament(updated, conn=conn)
-    if deck_ops:
-        await _process_deck_ops(deck_ops, updated.uid, org_uids=updated.organizers_uids)
-        print(f"  processed {len(deck_ops)} deck op(s)")
-    print("\nAfter:\n" + describe(updated))
-    print("\nNext hourly batch_push will upload results to the existing vekn event.")
-
-
 async def run(args: argparse.Namespace) -> int:
     db.DB_URL = args.dsn
     os.environ["DATABASE_URL"] = args.dsn
@@ -215,23 +91,23 @@ async def run(args: argparse.Namespace) -> int:
         if t is None:
             return 1
         print("Before:\n" + describe(t))
-        problems = await check(t, stamp_only=args.stamp_only)
+        problems = await check(t)
         if problems:
             print("\nBLOCKED:")
             for p in problems:
                 print(f"  - {p}")
             return 1
         if not args.apply:
-            todo = (
-                "clear vekn_pushed_at"
-                if args.stamp_only
-                else f"clear vekn_pushed_at, CancelRound round "
-                f"{len(t.rounds) - 1} (empty), FinishTournament"
-            )
-            print(f"\nWould: {todo}. Re-run with --apply.")
+            print("\nWould: clear vekn_pushed_at. Re-run with --apply.")
             return 0
-        print("\nApplying:")
-        await (clear_stamp(t) if args.stamp_only else apply(t))
+        t.vekn_pushed_at = None
+        t.modified = datetime.now(UTC)
+        async with db.get_connection() as conn:
+            await db.save_tournament(t, conn=conn)
+        print("\nAfter:\n" + describe(t))
+        print(
+            "\nNext hourly batch_push will upload results to the existing vekn event."
+        )
         return 0
     finally:
         await db.close_db()
@@ -244,12 +120,6 @@ def parse_args() -> argparse.Namespace:
     g.add_argument("--vekn", help="vekn event id of the stuck tournament")
     g.add_argument("--uid", help="tournament uid")
     p.add_argument("--apply", action="store_true", help="write (default: report)")
-    p.add_argument(
-        "--stamp-only",
-        action="store_true",
-        help="only clear vekn_pushed_at, for an event refused for a reason since "
-        "fixed on vekn.net",
-    )
     args = p.parse_args()
     if not args.dsn:
         p.error("--dsn or DATABASE_URL is required")
