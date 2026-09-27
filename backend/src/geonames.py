@@ -188,3 +188,78 @@ def match_city(index: CityIndex, name: str, country_code: str) -> City | None:
     if city := by_base.get((cc, name.lower())):
         return city
     return None
+
+
+US_STATES = {
+    "AL": "Alabama",
+    "AK": "Alaska",
+    "AZ": "Arizona",
+    "AR": "Arkansas",
+    "CA": "California",
+    "CO": "Colorado",
+    "CT": "Connecticut",
+    "DE": "Delaware",
+    "DC": "District of Columbia",
+    "FL": "Florida",
+    "GA": "Georgia",
+    "HI": "Hawaii",
+    "ID": "Idaho",
+    "IL": "Illinois",
+    "IN": "Indiana",
+    "IA": "Iowa",
+    "KS": "Kansas",
+    "KY": "Kentucky",
+    "LA": "Louisiana",
+    "ME": "Maine",
+    "MD": "Maryland",
+    "MA": "Massachusetts",
+    "MI": "Michigan",
+    "MN": "Minnesota",
+    "MS": "Mississippi",
+    "MO": "Missouri",
+    "MT": "Montana",
+    "NE": "Nebraska",
+    "NV": "Nevada",
+    "NH": "New Hampshire",
+    "NJ": "New Jersey",
+    "NM": "New Mexico",
+    "NY": "New York",
+    "NC": "North Carolina",
+    "ND": "North Dakota",
+    "OH": "Ohio",
+    "OK": "Oklahoma",
+    "OR": "Oregon",
+    "PA": "Pennsylvania",
+    "RI": "Rhode Island",
+    "SC": "South Carolina",
+    "SD": "South Dakota",
+    "TN": "Tennessee",
+    "TX": "Texas",
+    "UT": "Utah",
+    "VT": "Vermont",
+    "VA": "Virginia",
+    "WA": "Washington",
+    "WV": "West Virginia",
+    "WI": "Wisconsin",
+    "WY": "Wyoming",
+}
+
+
+def match_city_in(
+    index: CityIndex, name: str, country_code: str, hints: list[str]
+) -> City | None:
+    """`match_city`, but a name GeoNames splits by region ("Springfield
+    (Illinois)") first takes the region any hint names — an address segment,
+    the archive's "(IL)" — before falling back to the most populous."""
+    cc = country_code.upper()
+    base = name.strip().lower()
+    for hint in hints:
+        hint = " ".join(hint.split())
+        region = US_STATES.get(hint.upper(), hint) if cc == "US" else hint
+        if (
+            base
+            and region
+            and (city := index[0].get((cc, f"{base} ({region.lower()})")))
+        ):
+            return city
+    return match_city(index, name, country_code)

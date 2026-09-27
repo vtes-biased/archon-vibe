@@ -31,7 +31,7 @@ from .db import (
     save_tournament,
     tournament_transaction,
 )
-from .geonames import City, CityIndex, city_index, match_city, normalize_country
+from .geonames import City, CityIndex, city_index, match_city_in, normalize_country
 from .models import (
     AttributionKind,
     DeckAttribution,
@@ -199,7 +199,8 @@ def twda_city(entry: TwdaEntry, cities: CityIndex) -> City | None:
     if not country:
         return None
     for segment in reversed(head):
-        if city := match_city(cities, segment.split("(")[0], country):
+        name, _, region = segment.partition("(")
+        if city := match_city_in(cities, name, country, [region.strip(" )"), *head]):
             return city
     return None
 

@@ -103,8 +103,9 @@ section and
 ## Fill the city of existing tournaments
 
 Gated by `da7d0cc3`, which adds the tournament city and makes it required for an
-in-person event ([tournaments](tournaments.md#configuration)). Before it the rows
-have no field to hold the city. List:
+in-person event ([tournaments](tournaments.md#configuration)), and `GATE`, which
+ships the resolved mapping. Before them the rows have no field to hold the city.
+List:
 
 ```sh
 sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
@@ -112,11 +113,13 @@ sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
   /opt/archon/backend/scripts/backfill_tournament_cities.py'
 ```
 
-Each in-person event without a city gets one line: its source (`venue`, read from
-its address right to left, which already carries the city vekn.net gave it, else
-`twda`, the archive entry's place), the chosen city and the event; the unmatched
-ones follow with their address and TWDA place, and the last line counts each
-kind. Rerun with `--apply`. It worked when a second report-only run lists only
-unmatched rows and those without a country; those keep no city until an
-organizer's next edit asks for one. Delete this section and
-`backend/scripts/backfill_tournament_cities.py` together.
+The cities are `backend/scripts/tournament_cities.json`, resolved offline from a
+production export of September 2026: the address first, then the TWDA entry's
+place, then vekn.net's venue record — its city, else its coordinates — with a
+town too small for the city list taken to the nearest listed city within 60 km,
+and a country filled from the archive, else vekn.net, only where the row had
+none. It covers 8,863 of the 9,345 in-person events; about 150 stay without a
+city and 330 without a country, 250 of those from 2004–2010. The listing counts
+each row's verdict and names every one it would not write: `gone`, `online now`,
+`country differs`. Rerun with `--apply`. It worked when a second report-only run
+counts no `write`. Delete this section, the script and its mapping together.

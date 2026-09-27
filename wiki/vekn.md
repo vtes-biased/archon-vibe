@@ -692,7 +692,9 @@ for merging.
 **The archive's place names the city.** A reconstruction takes its city from the
 entry's `place`, and settling an attach fills an empty one the same way: read right
 to left, since the archive writes `Venue, City (STATE), Country` as often as
-`City, Country`, each segment matched in GeoNames within the place's country.
+`City, Country`, each segment matched in GeoNames within the place's country. A
+name GeoNames splits by region, `Springfield (Illinois)`, takes the region the place
+names — the `(STATE)`, a US code spelled out — before the most populous.
 
 **The scheduled run only ever does a delta.** More than `MAX_CREATES_PER_RUN`
 unsettled entries pending means it is standing in for the initial backfill, so it

@@ -1,19 +1,22 @@
 """One-time fill of the tournament city across the corpus.
 
-    # lists each event's chosen city and source; --apply is the only thing that writes
+    # lists what would not be written; --apply is the only thing that writes
     /opt/archon/backend/.venv/bin/python \\
       /opt/archon/backend/scripts/backfill_tournament_cities.py
     … backfill_tournament_cities.py --apply
 
+The cities come from `tournament_cities.json` beside this script, resolved
+offline against a production export: uid -> [GeoNames id, country or null],
+the country set only where the row had none. A row is written only while it is
+in person, still has no city, and its country agrees with the city's.
 Regenerates the snapshot at the end rather than broadcasting each row.
-Idempotent: a row that already carries a city is skipped.
 """
 
 import argparse
 import asyncio
 import importlib.util
+import json
 import os
-import re
 import sys
 from collections import Counter
 from datetime import UTC, datetime
@@ -26,29 +29,27 @@ except ModuleNotFoundError:
 if not _have_backend:
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from backend.src import db, http_client  # noqa: E402
-from backend.src.geonames import (  # noqa: E402
-    City,
-    CityIndex,
-    city_index,
-    match_city,
-)
+from backend.src import db  # noqa: E402
+from backend.src.geonames import City, load_cities, normalize_country  # noqa: E402
 from backend.src.models import Tournament  # noqa: E402
 from backend.src.snapshots import generate_snapshots  # noqa: E402
-from backend.src.twda_import import _fetch_twda, twda_city  # noqa: E402
-from backend.src.vekn_sync import fix_city  # noqa: E402
 
-_POSTCODE = re.compile(r"\b[\w-]*\d[\w-]*\b")
+MAPPING = Path(__file__).with_name("tournament_cities.json")
 
 
-def _address_city(t: Tournament, cities: CityIndex) -> City | None:
-    for segment in reversed(re.split(r"[,\r\n]", t.address)):
-        for name in (segment, _POSTCODE.sub(" ", segment)):
-            name = " ".join(name.split())
-            name = fix_city(name, t.country or "")
-            if city := match_city(cities, name, t.country or ""):
-                return city
-    return None
+def _verdict(t: Tournament | None, city: City | None, country: str | None) -> str:
+    if city is None:
+        return "unknown id"
+    if t is None:
+        return "gone"
+    if t.online:
+        return "online now"
+    if t.city_geoname_id:
+        return "has a city"
+    cc = normalize_country(t.country or "") or country
+    if cc != city["country_code"].upper():
+        return "country differs"
+    return "write"
 
 
 async def run(args: argparse.Namespace) -> int:
@@ -56,69 +57,52 @@ async def run(args: argparse.Namespace) -> int:
     os.environ["DATABASE_URL"] = args.dsn
     await db.init_db()
     try:
+        mapping: dict[str, list] = json.loads(MAPPING.read_text())
+        wanted = {geoname_id for geoname_id, _ in mapping.values()}
+        cities = {
+            c["geoname_id"]: c for c in load_cities() if c["geoname_id"] in wanted
+        }
+
+        verdicts: Counter[str] = Counter()
+        for uid, (geoname_id, country) in mapping.items():
+            city = cities.get(geoname_id)
+            if not args.apply:
+                t = await db.get_tournament_by_uid(uid)
+                verdict = _verdict(t, city, country)
+                verdicts[verdict] += 1
+                if verdict not in ("write", "has a city"):
+                    print(f"{verdict:<16} {uid}  {t.name if t else ''}")
+                continue
+            async with db.tournament_transaction(uid) as (t, tx_conn):
+                verdict = _verdict(t, city, country)
+                verdicts[verdict] += 1
+                if verdict != "write" or t is None or city is None:
+                    continue
+                if not t.country:
+                    t.country = country
+                t.city = city["name"]
+                t.city_geoname_id = geoname_id
+                t.modified = datetime.now(UTC)
+                await db.save_tournament(t, conn=tx_conn)
+
         async with db.get_connection() as conn:
             result = await conn.execute(
-                """SELECT "full" FROM objects
+                """SELECT count(*) FROM objects
                    WHERE type = 'tournament' AND deleted_at IS NULL
                      AND ("full"->>'online') IS DISTINCT FROM 'true'
-                     AND "full"->>'city_geoname_id' IS NULL
-                   ORDER BY "full"->>'start'"""
+                     AND "full"->>'city_geoname_id' IS NULL"""
             )
-            rows = await result.fetchall()
-        entries = {e.id: e for e in await _fetch_twda()}
-        cities = city_index()
-
-        chosen: dict[str, tuple[City, str]] = {}
-        sources: Counter[str] = Counter()
-        for (full,) in rows:
-            t = db.decode_json(full, Tournament)
-            if not t.country:
-                sources["no country"] += 1
-                continue
-            key = t.external_ids.get("twda_entry") or t.external_ids.get("twda")
-            entry = entries.get(key or "")
-            archived = twda_city(entry, cities) if entry else None
-            if archived and archived["country_code"].upper() != t.country.upper():
-                archived = None
-            if city := _address_city(t, cities):
-                source = "venue"
-            elif city := archived:
-                source = "twda"
-            else:
-                sources["unmatched"] += 1
-                print(f"{'-':<8} {t.country}  {t.event_code or t.uid:<12} {t.name}")
-                print(
-                    f"{'':<11} address: {t.address!r}, twda: {entry.place if entry else ''!r}"
-                )
-                continue
-            sources[source] += 1
-            chosen[t.uid] = (city, source)
-            print(
-                f"{source:<8} {t.country}  {t.event_code or t.uid:<12} "
-                f"{city['name']:<24} {t.name}"
-            )
-        print(f"\n{len(rows)} in-person tournaments without a city: {dict(sources)}")
+            (left,) = await result.fetchone()
+        print(f"\n{len(mapping)} mapped: {dict(verdicts)}")
+        print(f"{left} in-person tournaments without a city in the database now")
         if not args.apply:
             print("\nReport only — pass --apply to write.")
             return 0
-
-        written = 0
-        for uid, (city, _source) in chosen.items():
-            async with db.tournament_transaction(uid) as (fresh, tx_conn):
-                if not fresh or fresh.city_geoname_id or fresh.online:
-                    continue
-                fresh.city = city["name"]
-                fresh.city_geoname_id = city["geoname_id"]
-                fresh.modified = datetime.now(UTC)
-                await db.save_tournament(fresh, conn=tx_conn)
-                written += 1
-        print(f"\n{written} written")
 
         print("\nRegenerating snapshots...")
         print(await generate_snapshots())
         return 0
     finally:
-        await http_client.close()
         await db.close_db()
 
 
