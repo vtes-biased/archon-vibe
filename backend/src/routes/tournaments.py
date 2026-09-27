@@ -2173,8 +2173,6 @@ async def go_online(
                     ObjectType.SANCTION, sanction, conn=tx_conn
                 )
             )
-        # The device may hold a deck below full level: a key it never held keeps
-        # the stored value, or a private deck would land public with no view log.
         stored_decks = {
             d.uid: msgspec.to_builtins(d)
             for d in await get_decks_for_tournament(uid, conn=tx_conn)
@@ -2182,9 +2180,14 @@ async def go_online(
         # A member credit earned offline names a TEMP- vekn; repoint it to the
         # resolved one, and withhold the credit where nothing resolves it.
         for deck_data in data.offline_decks:
+            stored = stored_decks.get(deck_data.get("uid"), {})
+            views = stored.get("views", [])
+            viewers = {v["user_uid"] for v in views}
+            views = views + [
+                v for v in deck_data.get("views", []) if v["user_uid"] not in viewers
+            ]
             deck_obj = msgspec.convert(
-                {**stored_decks.get(deck_data.get("uid"), {}), **deck_data},
-                DeckObject,
+                {**stored, **deck_data, "views": views}, DeckObject
             )
             deck_obj.tournament_uid = uid
             deck_obj.user_uid = uid_map.get(deck_obj.user_uid, deck_obj.user_uid)

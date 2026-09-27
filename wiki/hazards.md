@@ -25,6 +25,12 @@ device's copy, which can predate an anonymization and carry the Discord
 `accounts.scrub_anonymized_copies` before saving; a new copy of a member's name on a
 tournament must be scrubbed there too, or the next go-online republishes it.
 
+**An offline deck can be a member-level copy.** Once an event finishes, its
+organizers hold the winner's private deck without `private` or `views`, and
+go-online saves each offline deck over the stored one
+([sync](sync.md#offline-lifecycle)): a new field a device can hold at a lower
+level than the server must merge there too, or the push erases it.
+
 **`vekn_id` is deliberately absent from `TournamentActionRequest`.** `/action`
 derives `event_data` from that model, so a key reaches the Rust `TournamentEvent`
 exactly when it is declared there — a `msgspec.Struct` drops any other key a

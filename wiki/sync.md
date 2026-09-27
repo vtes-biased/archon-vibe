@@ -869,9 +869,11 @@ row, because the payload is upsert-only and a locally hard-deleted deck would
 otherwise resurrect.
 
 Each offline deck lands **over the stored one**: a field the device's copy lacks
-keeps the server's value. An organizer holds the winner's private deck at member
-level once the event finishes, so its copy carries no `private` or `views`, and
-saving it as sent would publish the deck and erase its view log.
+keeps the server's value, and the view log is the union of both, since a device
+holding a member-level copy logs its offline views onto an empty list. An organizer
+holds the winner's private deck at member level once the event finishes, so its
+copy carries no `private` or `views`, and saving it as sent would publish the deck
+and erase its view log.
 
 ## Tournament-embedded, online-only fields
 

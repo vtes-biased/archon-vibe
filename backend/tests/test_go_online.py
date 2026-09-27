@@ -334,7 +334,8 @@ async def test_nested_uids_and_deck_attribution_remapped(test_client, test_db):
 @pytest.mark.asyncio
 async def test_member_level_deck_keeps_its_privacy_and_view_log(test_client, test_db):
     """An organizer holds the winner's private deck at member level once the event
-    finishes; pushing that copy back must not clear what the device never held."""
+    finishes; pushing that copy back keeps what the device never held, and a view
+    logged offline joins the stored log rather than replacing it."""
     org = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Org")
     owner = User(uid=str(uuid7()), modified=datetime.now(UTC), name="Owner")
     await db.save_user(org)
@@ -355,6 +356,8 @@ async def test_member_level_deck_keeps_its_privacy_and_view_log(test_client, tes
     offline_copy = compute_deck_member(msgspec.to_builtins(deck))
     assert "private" not in offline_copy and "views" not in offline_copy
     offline_copy["winner"] = False
+    offline_copy["public"] = False
+    offline_copy["views"] = [{"user_uid": owner.uid, "round": 1}]
 
     body = {
         "device_id": "devA",
@@ -370,9 +373,8 @@ async def test_member_level_deck_keeps_its_privacy_and_view_log(test_client, tes
     assert resp.status_code == 201
 
     [saved] = await db.get_decks_for_tournament(base_uid)
-    assert saved.winner is False
-    assert saved.private is True
-    assert saved.views == deck.views
+    assert (saved.public, saved.winner, saved.private) == (False, False, True)
+    assert saved.views == [*deck.views, DeckView(user_uid=owner.uid, round=1)]
 
 
 @pytest.mark.asyncio
