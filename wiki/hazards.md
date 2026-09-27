@@ -187,8 +187,7 @@ to a green test suite, and swallowed by the try/except blocks around post-effect
 their next snapshot resync. Preserve that in any new merge-like flow.
 
 **`finals.seed_order` holds player user_uids**, easily missed in a per-player UID
-remap. The offline remap itself uses a naive JSON string replace, whose
-substring-collision risk is mitigated only by UUID v7 length.
+remap.
 
 **Svelte 5 `$props()`**: props must be listed in the destructure, not merely in the
 type annotation.

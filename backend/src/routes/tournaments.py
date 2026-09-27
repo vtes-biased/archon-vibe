@@ -4,7 +4,7 @@ import logging
 import os
 from datetime import UTC, datetime
 from importlib.resources import files
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import uuid7
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -2360,13 +2360,14 @@ async def _resolve_or_create_offline_player(
     return player_data.temp_uid, new_user, True
 
 
-def _remap_uids_in_tournament(tournament_data: dict, uid_map: dict[str, str]) -> dict:
-    """Whole-JSON byte replace of every temp_uid with its real UID — safe only
-    because temp uids are full 36-char UUIDs, limiting substring collisions."""
-    raw = msgspec.json.encode(tournament_data)
-    for temp_uid, real_uid in uid_map.items():
-        raw = raw.replace(temp_uid.encode(), real_uid.encode())
-    return msgspec.json.decode(raw)
+def _remap_uids_in_tournament(node: Any, uid_map: dict[str, str]) -> Any:
+    if isinstance(node, str):
+        return uid_map.get(node, node)
+    if isinstance(node, list):
+        return [_remap_uids_in_tournament(v, uid_map) for v in node]
+    if isinstance(node, dict):
+        return {k: _remap_uids_in_tournament(v, uid_map) for k, v in node.items()}
+    return node
 
 
 async def _gate_offline_created_insert(
