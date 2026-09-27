@@ -139,8 +139,18 @@ identifiers ([access](access.md#the-email-of-record)). The entry folds every
 stored mixed-case `identifier` of an email auth method; the schema's
 `auth_methods_email_identifier_lower` constraint is added `NOT VALID` so the boot
 reaches the entry. A case-twin — `Foo@x` beside `foo@x` — trips the unique index
-and the process does not serve: merge the two accounts, or drop the duplicate
-login if both are one member's, then restart.
+and the process does not serve, so **before deploying** that commit, this must
+answer 0 on production:
+
+```sql
+SELECT count(*) FROM (
+  SELECT 1 FROM auth_methods WHERE data->>'method_type' = 'email'
+  GROUP BY LOWER(data->>'identifier') HAVING count(*) > 1
+) t;
+```
+
+Otherwise merge the two accounts, or drop the duplicate login if both are one
+member's, first.
 
 Nothing to run: the entry rewrote the rows before the process served. It worked
 when this answers 0:

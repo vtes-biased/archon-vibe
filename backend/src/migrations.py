@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True, slots=True)
 class Migration:
     name: str
-    obj_type: ObjectType | None  # None: the row is in auth_methods
+    obj_type: ObjectType | None
     pending: str
     rewrite: Callable[..., None]
 
