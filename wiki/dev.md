@@ -290,8 +290,9 @@ read-only in the UI — a change goes through the script.
 **Production access is per developer.** Each has their own sudo account
 (`just add-admin-prod <name> <pubkey> <an existing admin>`) and a
 `Host archon.vekn.net` block with their `User` and `IdentityFile` in
-`~/.ssh/config`, which pyinfra reads — the inventory names no user. `ubuntu`,
-the image's account, is kept for `id_archon`. Kernel reboots are never
+`~/.ssh/config`, which pyinfra reads — the inventory names no user. The owner's
+is `lpanhaleux`, beside the `deploy` account; `ubuntu`, the image's, takes no key
+of ours. Kernel reboots are never
 automatic: tournaments run in every timezone, so `setup-prod` warns when one is
 pending and a person picks the moment to run `just reboot-prod`.
 

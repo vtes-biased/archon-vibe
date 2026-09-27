@@ -147,7 +147,7 @@ before the cleanup so it covers the day-straddling pairs too.
 
 ```sh
 # the probe (read-only; needs VEKN creds, which the service env carries)
-ssh ubuntu@46.226.104.123 "sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
+ssh archon.vekn.net "sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
   /opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/dedup_tournaments.py --probe-vekn'"
 ```
 

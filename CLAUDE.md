@@ -85,7 +85,7 @@ check against that page. The ones that bite most often:
 
 - **Beta** (`deploy@57.129.110.107`) is yours to operate over ssh: restarts, env
   edits, script runs. Restore the deploy-managed state after a window.
-- **Production** (`ubuntu@46.226.104.123`) is the owner's hand only: every command
+- **Production** (`ssh archon.vekn.net`, 46.226.104.123, as `lpanhaleux`) is the owner's hand only: every command
   against it, read-only probes included, is handed over as text and its output
   awaited. The owner's shell history is the audit trail.
 - **Secret material never enters context**: no `sops -d` or `sops` edit of
