@@ -164,7 +164,7 @@ async def test_update_keeps_the_maintainers_header(test_db):
         _t,
         twda,
     ):
-        archived = "EC 2026 - Day 1\nKablys, Vilnius, France\nJune 1st 2025\n"
+        archived = "EC 2026 - Day 1\nKablys, Vilnius, France\n2025-06-01 09:00:00\n"
         parsed = krcg_parser.deck_from_txt(
             io.StringIO(keep_curated_header(archived, twda)),
             krcg_loader.load(),
@@ -173,6 +173,7 @@ async def test_update_keeps_the_maintainers_header(test_db):
         )
         assert parsed.event.name == "EC 2026 - Day 1"
         assert parsed.event.place == "Kablys, Vilnius, France"
+        assert parsed.event.date == date(2025, 6, 1)
         assert parsed.event.players_count == TWDA_MIN_PLAYERS
         assert parsed.player == "Winner Wendy"
 

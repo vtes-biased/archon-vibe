@@ -8,6 +8,7 @@ import base64
 import json
 import logging
 import os
+import re
 
 import aiohttp
 
@@ -28,6 +29,9 @@ TWDA_FORK_REPO = f"{TWDA_GITHUB_FORK_OWNER}/{TWDA_TARGET_REPO.split('/')[1]}"
 _GH_API_VERSION = github_app.GH_API_VERSION
 
 
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}")
+
+
 def frontend_url() -> str:
     return os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
 
@@ -43,14 +47,11 @@ def is_configured() -> bool:
 
 
 def keep_curated_header(archived: str, ours: str) -> str:
-    """The archive's maintainer completes the event name, the venue and city, and
-    the date by hand on every merged entry; an update carries the rest."""
     kept = archived.splitlines()[:3]
-    if len(kept) < 3:
-        return ours
-    return "\n".join(kept + ours.splitlines()[3:]) + (
-        "\n" if ours.endswith("\n") else ""
-    )
+    lines = ours.splitlines()
+    if _ISO_DATE.match(kept[2]):
+        kept[2] = lines[2]
+    return "\n".join(kept + lines[3:]) + ("\n" if ours.endswith("\n") else "")
 
 
 async def submit_twda_pr(
@@ -170,10 +171,13 @@ async def submit_twda_pr(
 
         verb = "Update" if file_status == 200 else "Add"
         if file_status == 200:
-            deck_text = keep_curated_header(
-                base64.b64decode(json.loads(file_text)["content"]).decode(),
-                deck_text,
-            )
+            archived = base64.b64decode(json.loads(file_text)["content"]).decode()
+            deck_text = keep_curated_header(archived, deck_text)
+            if deck_text == archived:
+                return (
+                    f"https://github.com/{TWDA_TARGET_REPO}/blob/master/{file_path}",
+                    "",
+                )
         content_b64 = base64.b64encode(deck_text.encode()).decode()
         file_data: dict = {
             "message": f"{verb} TWD: {tournament_name}",

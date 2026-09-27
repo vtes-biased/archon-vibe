@@ -50,24 +50,14 @@ async def _open_branches() -> set[str]:
     }
 
 
-async def _published(t: Tournament, open_branches: set[str]) -> tuple[str, int | None]:
-    """Where the entry stands and the count it publishes, read from GitHub: the
-    maintainer corrects counts and removes entries by hand after merging."""
-    branch = f"archon/{t.event_code}"
-    path = f"decks/{t.event_code}.txt"
-    if branch in open_branches:
-        where = "open"
-        url = f"https://raw.githubusercontent.com/{TWDA_FORK_REPO}/{branch}/{path}"
-    else:
-        where = "archived"
-        url = f"https://raw.githubusercontent.com/{TWDA_TARGET_REPO}/master/{path}"
+async def _count(url: str) -> int | None:
     status, text = await _get(url)
-    if status == 404 and where == "archived":
-        return "not in the archive", None
+    if status == 404:
+        return None
     if status != 200:
         raise RuntimeError(f"{url}: {status}")
     found = _PLAYERS.search(text)
-    return where, int(found.group(1)) if found else None
+    return int(found.group(1)) if found else -1
 
 
 async def _candidate(t: Tournament, open_branches: set[str]) -> tuple[str, bool] | None:
@@ -77,11 +67,26 @@ async def _candidate(t: Tournament, open_branches: set[str]) -> tuple[str, bool]
         return None
     attested = _engine.attested_player_count(msgspec.json.encode(t).decode())
     if status.outcome == TwdaOutcome.SUBMITTED:
-        where, published = await _published(t, open_branches)
+        branch = f"archon/{t.event_code}"
+        path = f"decks/{t.event_code}.txt"
+        ours = f"https://raw.githubusercontent.com/{TWDA_FORK_REPO}/{branch}/{path}"
+        if branch in open_branches:
+            where, published = "open", await _count(ours)
+        else:
+            where = "archived"
+            published = await _count(
+                f"https://raw.githubusercontent.com/{TWDA_TARGET_REPO}/master/{path}"
+            )
         if published == attested:
             return None
         if published is None:
-            return f"{where}  → {attested}", False
+            return f"not in the archive  → {attested}", False
+        if published < 0:
+            return f"no count line  → {attested}", False
+        if where == "archived":
+            sent = await _count(ours)
+            if sent is not None and sent != published:
+                return f"hand-corrected  {sent} → {published}, not {attested}", False
         if attested < TWDA_MIN_PLAYERS:
             return f"below floor  {published} → {attested}", False
         return f"{where}  {published} → {attested}", True

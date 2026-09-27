@@ -549,7 +549,8 @@ the winner or a winner's deck — the post-finish pass
 ([tournaments](tournaments.md#engine-event-catalog)), so late uploads, owner
 corrections and a rescored final all reach the archive, the open pull request
 taking the new file and a merged one getting a fresh request; on a config edit
-of the Finished event that moves its country or online flag, the header's place;
+of the Finished event that moves its country or online flag, the header's place,
+while its pull request is still open;
 on the manual organizer publish; on the batch after a successful results push, covering events
 finished offline or whose VEKN event id only just arrived; and on go-online for a
 tournament finished offline. In a multideck event the archived deck is the one
@@ -586,16 +587,21 @@ country alone, short of the archive's `City, Country`: a tournament holds no
 structured city — a synced event folds its venue's into free-text `address`, an
 app-created one has only what the organizer typed — and parsing one out would put
 guesses on a permanent line, so the maintainer completes the city by hand. A
-tournament city field is what would change that. **An update keeps the archived
-header's first three lines** — event name, place, date — whenever the archive
-already holds the file: the maintainer rewrites them on nearly every merge (venue
-and city on 38 of the first 44, the name on 7, the date into ISO), and a full
-rewrite would revert that work on every correction. Format, count, winner, link,
-score and deck stay ours. Then a score line,
+tournament city field is what would change that. Then a score line,
 `-- 1GW4.5 + 3vp in final`: the winner's **standings** row, which is prelim-only,
 with the finals seat's VP beside it — never the aggregated `result`, which already
 folds the final in and would read to the archive as a double count. It is the
 archive's most common wording.
+
+**An update keeps the archived header's event name and place lines** whenever the
+archive already holds the file: the maintainer rewrites them on nearly every merge
+— venue and city on 38 of the first 44, the name on 7 — and a full rewrite would
+revert that work on every correction. The date line is kept too, unless it is
+still in the ISO form this bot first wrote, which the maintainer wants replaced by
+ours. Format, count, winner, link, score and deck stay ours. So a later edit of
+the event's name, place or date reaches an open pull request but never a merged
+entry, and an update that changes nothing past the kept lines commits nothing: the
+status links the archived file instead of a pull request.
 
 **The header is only as good as krcg's reading of it.** The archive is consumed
 through krcg's TWDA parser, and ours through it again on the next archive read, so
