@@ -59,6 +59,7 @@ async def _published(
     winner_name: str = "Winner Wendy",
     winner_vekn: str = "1000001",
     seated: int = TWDA_MIN_PLAYERS,
+    no_shows: int = 0,
     country: str | None = "FR",
 ):
     """Seed a finished event whose winner has a deck, and yield its TWDA text."""
@@ -88,7 +89,8 @@ async def _published(
         # the code, and the code of such a row is its vekn event id.
         event_code="12345",
         winner=winner.uid,
-        players=[Player(user_uid=u) for u in player_uids],
+        players=[Player(user_uid=u) for u in player_uids]
+        + [Player(user_uid=str(uuid7())) for _ in range(no_shows)],
         rounds=[
             [
                 Table(seating=seats[i : i + 5], state=TableState.FINISHED)
@@ -142,6 +144,17 @@ async def test_header_follows_the_archive_convention(test_db):
             parsed.score.round_vp,
             parsed.score.finals_vp,
         ) == (1, 4.5, 3)
+
+
+@pytest.mark.asyncio
+async def test_header_counts_the_field_not_the_roster(test_db):
+    async with _published(
+        attribution=DeckAttribution(kind=AttributionKind.OWNER), no_shows=2
+    ) as (_t, twda):
+        parsed = krcg_parser.deck_from_txt(
+            io.StringIO(twda), krcg_loader.load(), id="12345", twda=True
+        )
+        assert parsed.event.players_count == TWDA_MIN_PLAYERS
 
 
 @pytest.mark.asyncio
@@ -215,6 +228,20 @@ async def test_below_participation_floor_skips_twda(test_db):
         assert stored.twda_status is not None
         assert stored.twda_status.outcome == TwdaOutcome.SKIPPED
         assert stored.twda_status.reason == "too_few_players"
+
+
+@pytest.mark.asyncio
+async def test_reconstruction_never_reaches_the_archive(test_db):
+    async with _published(
+        attribution=DeckAttribution(kind=AttributionKind.ANONYMOUS)
+    ) as (tournament, _twda):
+        tournament.external_ids["twda"] = tournament.event_code
+        await maybe_submit_twda(tournament)
+        stored = await db.get_tournament_by_uid(tournament.uid)
+        assert stored is not None
+        assert stored.twda_status is not None
+        assert stored.twda_status.outcome == TwdaOutcome.SKIPPED
+        assert stored.twda_status.reason == "reconstructed"
 
 
 @pytest.mark.asyncio

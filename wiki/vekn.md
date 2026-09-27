@@ -558,8 +558,12 @@ stamped at the finals index; none on record is `no_deck`.
 Every attempt records its outcome on `Tournament.twda_status`: `submitted` with the
 PR URL, `skipped` with a reason code — no winner, Limited format (draft and sealed
 decks aren't archived), Storyline format (a deck can only be there from a
-pre-switch format, outside what the archive describes), fewer than 10 players
-played, unranked per the engine's
+pre-switch format, outside what the archive describes), reconstructed from the
+archive (`external_ids['twda']`, whose event code is the archive's own file key —
+[hazards](hazards.md#consumers-that-must-move-together)),
+no rounds on record (a rounds-less import, whose header could state no `NR`),
+fewer than 10 players by `attested_player_count` — proxies count, as they do for
+the rating — unranked per the engine's
 `ranking_eligibility` (the same predicate as the ranked badge — the championship
 rank axis never gates TWDA), no event code yet, no place (neither a country nor
 the online flag, which would publish an empty place line — setting one submits),
@@ -574,8 +578,10 @@ misconfiguration: both repeat identically, so neither offers the retry.
 
 **Header**: the archive's own convention, which its maintainer reviews against —
 the date in US form with no time (`August 29th 2026`, ` -- <end>` for a multi-day
-event), `Online` as the place of an online event, `NR+F` or `NR (no final)`, and the
-event link directly under the winner's name. An in-person event's place is its
+event), `Online` as the place of an online event, the player count as
+`attested_player_count` — the field that played, never the registered roster with
+its no-shows — `NR+F` or `NR (no final)`, and the event link directly under the
+winner's name. An in-person event's place is its
 country alone, short of the archive's `City, Country`: a tournament holds no
 structured city — a synced event folds its venue's into free-text `address`, an
 app-created one has only what the organizer typed — and parsing one out would put
@@ -692,11 +698,12 @@ what made a target that moves under a dedup transplant or a re-migration stop
 attaching, silently and for good.
 
 **The two archive keys are not interchangeable.** `external_ids['twda']` means
-*reconstructed from the archive*, is written only by the reconstruction, and seven
+*reconstructed from the archive*, is written only by the reconstruction, and eight
 readers turn on it: the adopt carve-out [above](#matching-an-incoming-event), the
 calendar push's `UNCREATED_EVENTS_QUERY`, `resolve_event_code` and the event-code
 backfill, the Hall of Fame's no-attestation grandfather, the duplicate report's
-refusal to propose, and the tournament page's archival badge. A settled attach
+refusal to propose, the tournament page's archival badge, and the TWDA
+submitter's `reconstructed` skip. A settled attach
 carries `external_ids['twda_entry']` instead — *this event is the one that entry
 describes* — which gates nothing but the TWDA sync's own recognition and the
 tournament sync's legacy-sheet fill. That fill, and its hold on a failed archive

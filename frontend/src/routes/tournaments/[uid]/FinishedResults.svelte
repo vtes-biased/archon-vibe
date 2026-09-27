@@ -36,6 +36,8 @@
       case "unranked":
       case "unsanctioned": // legacy stored reason from the pre-fix rank gate
         return m.twda_reason_unranked();
+      case "reconstructed": return m.twda_reason_reconstructed();
+      case "no_rounds": return m.twda_reason_no_rounds();
       case "too_few_players": return m.twda_reason_too_few_players();
       case "no_event_code":
       case "no_vekn_event": // legacy stored reason, from when the vekn id was the key

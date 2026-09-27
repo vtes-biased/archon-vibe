@@ -518,24 +518,10 @@ async def _winner_deck_twda(tournament: Tournament) -> str | None:
         else (tournament.country or ""),
         tournament_format,
         f"{frontend_url()}{handle}",
-        len([p for p in tournament.players if not p.waitlisted]),
+        _engine.attested_player_count(msgspec.json.encode(tournament).decode()),
         player_name,
         winner_score,
     )
-
-
-def _played_player_count(tournament: Tournament) -> int:
-    """TWDA-gate count: seated players only, no standings fallback (0 for a
-    rounds-less import), proxies subtracted. Deliberately distinct from other
-    player-count implementations elsewhere in the app."""
-    proxies = {p.user_uid for p in tournament.players if p.non_competing}
-    seated: set[str] = set()
-    for rnd in tournament.rounds:
-        for table in rnd:
-            seated.update(s.player_uid for s in table.seating if s.player_uid)
-    if tournament.finals:
-        seated.update(s.player_uid for s in tournament.finals.seating if s.player_uid)
-    return len(seated - proxies)
 
 
 async def _record_twda_status(
@@ -569,6 +555,7 @@ async def maybe_submit_twda(tournament: Tournament) -> None:
 
     if tournament.state != TournamentState.FINISHED:
         return
+    t_json = msgspec.json.encode(tournament).decode()
     if not tournament.winner:
         outcome = (TwdaOutcome.SKIPPED, "no_winner", "")
     elif tournament.format == TournamentFormat.Limited:
@@ -577,12 +564,15 @@ async def maybe_submit_twda(tournament: Tournament) -> None:
         outcome = (TwdaOutcome.SKIPPED, "limited", "")
     elif tournament.format == TournamentFormat.Storyline:
         outcome = (TwdaOutcome.SKIPPED, "storyline", "")
-    elif _played_player_count(tournament) < TWDA_MIN_PLAYERS:
+    elif tournament.external_ids.get("twda"):
+        # Its event code is the archive's own file key: a submission would
+        # overwrite the very file this row was reconstructed from.
+        outcome = (TwdaOutcome.SKIPPED, "reconstructed", "")
+    elif not tournament.rounds:
+        outcome = (TwdaOutcome.SKIPPED, "no_rounds", "")
+    elif _engine.attested_player_count(t_json) < TWDA_MIN_PLAYERS:
         outcome = (TwdaOutcome.SKIPPED, "too_few_players", "")
-    elif (
-        _engine.ranking_eligibility(msgspec.json.encode(tournament).decode())
-        != "eligible"
-    ):
+    elif _engine.ranking_eligibility(t_json) != "eligible":
         outcome = (TwdaOutcome.SKIPPED, "unranked", "")
     elif not tournament.event_code:
         outcome = (TwdaOutcome.SKIPPED, "no_event_code", "")

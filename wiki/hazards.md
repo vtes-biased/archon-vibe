@@ -312,22 +312,18 @@ PyO3 and WASM — every count now comes from there, so a rule change lands once.
 What still has hand-written twins is the played-player **set**
 (`ratings.py` `_players_with_rounds`, `tournament-utils.ts` `playedPlayerUids`),
 because callers need the uids, not a number. Those are enumeration; the rule is
-not in them. Two readings in `backend/src/routes/tournaments.py` stay divergent:
-`_played_player_count`, gating the TWDA floor, is seats only with no standings
-fallback — so 0 for a rounds-less import — and it *subtracts* non-competing
-proxies; and `_winner_deck_twda` sends `len(tournament.players)`, the registered
-roster including no-shows, onto the published TWDA header line. Neither is the
-rule. `TWDA_MIN_PLAYERS` lives in `db.py` and is shared by both floors that use
-it; the *function* is not — the Hall of Fame reads `attested_player_count`,
-because `_played_player_count` would score every rounds-less import and every
-reconstruction at 0 and empty the page.
+not in them. `TWDA_MIN_PLAYERS` lives in `db.py` and is shared by the two floors
+that use it, the TWDA submitter's and the Hall of Fame's; both read
+`attested_player_count`, as does the published TWDA header's player line. A
+seats-only count scores every rounds-less import and every reconstruction at 0,
+and the registered roster counts no-shows.
 
-That 0 is now load-bearing in a second, unobvious place: it is the only thing
-keeping a reconstructed row out of the TWDA submitter. Such a row's event code
-*is* the archive's own file key on 1118 of them, so a submission would open a pull
-request overwriting the very archive file it was reconstructed from. Giving
-`_played_player_count` a standings fallback would make that reachable —
-[vekn](vekn.md#outbound).
+**A reconstruction is kept out of the TWDA submitter by name, never by its count.**
+Its event code *is* the archive's own file key on 1118 rows, so a submission would
+open a pull request overwriting the very archive file it was rebuilt from. The
+`reconstructed` skip on `external_ids['twda']` stops it, ahead of the `no_rounds`
+skip — keep them apart, because a rounds-less import may one day earn a header
+and a reconstruction never may ([vekn](vekn.md#outbound)).
 
 **The Hall of Fame predicate and `ranking_eligibility` disagree on purpose.** 10
 players and the winner's deck on record, against 8 players and a played final:
