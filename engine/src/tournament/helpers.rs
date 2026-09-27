@@ -332,14 +332,12 @@ pub(super) fn recompute_deck_publication(
                 op[arg::OP].as_str() == Some("set_private")
                     && op[arg::DECK_UID].as_str() == Some(deck_uid)
             }) {
-                Some(op) => op[arg::PRIVATE].as_bool(),
-                None => d[deck_object::PRIVATE].as_bool(),
-            }
-            .unwrap_or(false);
+                Some(op) => op[arg::PRIVATE] == true,
+                None => d[deck_object::PRIVATE] == true,
+            };
             let is_public = compute_deck_public(tournament, user_uid, private);
             let is_winner = compute_deck_winner(tournament, user_uid);
-            (d[deck_object::PUBLIC].as_bool().unwrap_or(false) != is_public
-                || d[deck_object::WINNER].as_bool().unwrap_or(false) != is_winner)
+            (d[deck_object::PUBLIC] != is_public || d[deck_object::WINNER] != is_winner)
                 .then(|| (deck_uid.to_string(), is_public, is_winner))
         })
         .collect();

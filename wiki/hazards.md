@@ -160,13 +160,7 @@ count instead is what a soft-cancel corrupts: the count skips `Cancelled`, so
 every later value shifts by one and a deck answers for a round it was not played
 in.
 
-**The engine's decks payload is built twice** — `_build_decks_json` on the backend
-and `buildDecksPayload` on the frontend — and the post-finish publication pass
-reads `public`, `winner` and `private` off it to emit only the flags that moved. A
-field one builder drops is silently `false` to the engine: the pass then
-re-publishes every public deck on every action from that side and never retracts
-one — for `winner`, re-stamps the crown it should have left alone, and for
-`private`, publishes every deck its owner held back.
+**The engine's decks payload is built twice** — `_build_decks_json` and `buildDecksPayload` — and the engine refuses an entry missing `public`, `winner` or `private`; the frontend fills a withheld `private` from `winner`, which holds only while the member projection publishes no private deck but the winner's ([sync](sync.md#access-levels)).
 
 **`preview_scores_json` deliberately duplicates the `SetScore` GW/TP cascade** —
 the preview runs on not-yet-persisted scores, so the two paths cannot share state.

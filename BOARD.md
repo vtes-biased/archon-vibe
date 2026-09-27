@@ -25,7 +25,6 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 
 Board changes ride the commit that earns them.
 
-- Make the engine reject a decks-payload entry missing its public, winner or private flag instead of reading it as false, so a drifting builder fails loudly rather than republishing or leaking decks. **Done when** a missing flag errors on both the backend and frontend engine calls and the "decks payload is built twice" paragraph in `wiki/hazards.md` shrinks to one line.
 - Guard the public API's two unenforced invariants: a revoked OAuth access token is refused, tested at the endpoint, and the process refuses to boot with more than one worker. **Done when** both exist, the token-revocation paragraph in `wiki/hazards.md` shrinks to the cross-file pointer, and the one-worker paragraph and `wiki/public-api.md#deployment` state it is enforced.
 - Tie the signed-in user's carried-forward owner-only fields to the backend's owner-only field set, so a new owner-only field cannot be wiped on sync. **Done when** the frontend list and the backend set cannot disagree without a gate failing and the carry-forward sentence in `wiki/hazards.md` is deleted.
 - Save and stamp decks through one helper so no deck frame reaches the broadcast without its organizer stamp. **Done when** every deck writer, the TWDA import included, stamps through it, the org-stamp paragraph in `wiki/hazards.md` shrinks to naming the helper and `wiki/sync.md#broadcast-and-backpressure` is updated.

@@ -304,6 +304,22 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
     Ok(tournament.dump())
 }
 
+fn parse_decks(decks_json: &str) -> Result<JsonValue, EngineError> {
+    let decks = json::parse(decks_json)?;
+    for deck in decks.members() {
+        for flag in [
+            deck_object::PUBLIC,
+            deck_object::WINNER,
+            deck_object::PRIVATE,
+        ] {
+            if !deck[flag].is_boolean() {
+                return Err(format!("decks payload entry missing {flag}").into());
+            }
+        }
+    }
+    Ok(decks)
+}
+
 pub fn process_tournament_event(
     tournament_json: &str,
     event_json: &str,
@@ -315,7 +331,7 @@ pub fn process_tournament_event(
     let event_value = json::parse(event_json)?;
     let actor_value = json::parse(actor_json)?;
     let sanctions = json::parse(sanctions_json)?;
-    let decks = json::parse(decks_json)?;
+    let decks = parse_decks(decks_json)?;
 
     let event = TournamentEvent::from_json(&event_value)?;
     let actor = ActorContext::from_json(&actor_value)?;
@@ -350,7 +366,7 @@ pub fn update_standings_json(
 ) -> Result<String, EngineError> {
     let mut tournament = json::parse(tournament_json)?;
     let sanctions = json::parse(sanctions_json)?;
-    let decks = json::parse(decks_json)?;
+    let decks = parse_decks(decks_json)?;
     update_standings(&mut tournament, &sanctions);
     let mut deck_ops = JsonValue::new_array();
     if tournament[tournament::STATE].as_str() == Some("Finished") {
@@ -2497,8 +2513,7 @@ fn apply_event(
                 d[deck_object::USER_UID].as_str() == Some(player_uid.as_str())
                     && d[deck_object::ROUND].as_usize() == deck_data[deck_object::ROUND].as_usize()
             });
-            let private =
-                replaced.is_some_and(|d| d[deck_object::PRIVATE].as_bool().unwrap_or(false));
+            let private = replaced.is_some_and(|d| d[deck_object::PRIVATE] == true);
             if private && actor.uid != *player_uid && state == TournamentState::Finished {
                 return Err(EngineError::DeckPrivateOwnerOnly);
             }
@@ -2545,7 +2560,7 @@ fn apply_event(
             let deletes_private = decks.members().any(|d| {
                 d[deck_object::USER_UID].as_str() == Some(player_uid.as_str())
                     && (!*multideck || d[deck_object::ROUND].as_usize() == *deck_index)
-                    && d[deck_object::PRIVATE].as_bool().unwrap_or(false)
+                    && d[deck_object::PRIVATE] == true
             });
             if deletes_private && actor.uid != *player_uid && state == TournamentState::Finished {
                 return Err(EngineError::DeckPrivateOwnerOnly);

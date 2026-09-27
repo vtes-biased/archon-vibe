@@ -230,7 +230,8 @@ function buildDecksPayload(decks: DeckObject[]): string {
       uid: d.uid,
       public: d.public,
       winner: d.winner,
-      private: d.private,
+      // Withheld below full level; only the winner's private deck is ever published.
+      private: d.private ?? d.winner,
     }))
   );
 }

@@ -741,9 +741,8 @@ reopening, narrowing the mode, a finals rescore that moves the winner and an
 archival correction all publish and retract through it, and so does
 `SetDeckPrivate`: the payload predates the event, so the pass reads the event's
 own `set_private` ahead of it, and marking a published deck private retracts it
-at once. The pass reads the flags off the decks payload the engine is handed, so
-the two payload builders carry them
-([hazards](hazards.md#two-implementations-of-one-gate)). The sanction routes reach
+at once. The pass reads the flags off the decks payload the engine is handed, which
+refuses an entry missing one ([hazards](hazards.md#two-implementations-of-one-gate)). The sanction routes reach
 it through `update_standings`, which takes the decks and returns deck ops for the
 same reason: a standings adjustment or a DQ on the final re-scores it and can move
 the winner, and the server-side follow-up below runs there too. A retracted deck
