@@ -43,7 +43,7 @@ class LoginRequest(msgspec.Struct):
 
 @post("/register")
 async def register(data: RegisterRequest) -> Response:
-    existing = await get_auth_method_by_identifier("email", data.email.lower())
+    existing = await get_auth_method_by_identifier("email", data.email)
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
@@ -85,7 +85,7 @@ async def register(data: RegisterRequest) -> Response:
 
 @post("/login")
 async def login(data: LoginRequest) -> Response:
-    auth_method = await get_auth_method_by_identifier("email", data.email.lower())
+    auth_method = await get_auth_method_by_identifier("email", data.email)
     if not auth_method:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 

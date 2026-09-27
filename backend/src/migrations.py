@@ -8,6 +8,7 @@ Report mode runs the same guards without the app:
 
 import argparse
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -23,14 +24,30 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True, slots=True)
 class Migration:
     name: str
-    obj_type: ObjectType
+    obj_type: ObjectType | None  # None: the row is in auth_methods
     pending: str
     rewrite: Callable[..., None]
 
 
-MIGRATIONS: tuple[Migration, ...] = ()
+def _fold_email_identifier(data: dict, folded: str) -> None:
+    data["identifier"] = folded
+
+
+MIGRATIONS: tuple[Migration, ...] = (
+    Migration(
+        name="email-identifier-lowercase",
+        obj_type=None,
+        pending="""
+            SELECT uid, LOWER(data->>'identifier') FROM auth_methods
+            WHERE data->>'method_type' = 'email'
+              AND data->>'identifier' <> LOWER(data->>'identifier')
+        """,
+        rewrite=_fold_email_identifier,
+    ),
+)
 
 _LOCK_ROW = 'SELECT "full", deleted_at FROM objects WHERE uid = %s FOR UPDATE'
+_LOCK_AUTH_METHOD = "SELECT data FROM auth_methods WHERE uid = %s FOR UPDATE"
 
 
 async def run_migrations(*, apply: bool = True) -> dict[str, int]:
@@ -52,6 +69,18 @@ async def run_migrations(*, apply: bool = True) -> dict[str, int]:
                 # One transaction PER ROW: a shared CURRENT_TIMESTAMP is what a
                 # catch-up cursor's strict `modified_at > since` splits across.
                 async with conn.transaction():
+                    if migration.obj_type is None:
+                        result = await conn.execute(_LOCK_AUTH_METHOD, (uid,))
+                        row = await result.fetchone()
+                        if row is None:
+                            continue
+                        migration.rewrite(row[0], *computed)
+                        await conn.execute(
+                            "UPDATE auth_methods SET data = %s WHERE uid = %s",
+                            (json.dumps(row[0]), uid),
+                        )
+                        rewritten += 1
+                        continue
                     result = await conn.execute(_LOCK_ROW, (uid,))
                     row = await result.fetchone()
                     if row is None:

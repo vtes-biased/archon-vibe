@@ -359,17 +359,11 @@ tournament JSON silently satisfy that read with different semantics — which is
 the attested size is stored as `reported_player_count`. Name any further count
 field the same way.
 
-**An email auth method's `identifier` is matched exactly**, so every reader must
-fold the address it is handed to lowercase — that is how it is written on every
-path. A raw address finds nothing and falls silently through to the caller's next
-branch rather than erroring. `contact_email` and the stored Discord email are the
-opposite, compared `LOWER()` on both sides in SQL, so the sources of an email
-lookup do not normalize alike
-([access](access.md#the-email-of-record)). Resolving a member from an address is
-`db.get_user_by_email`, which folds for every source; a reader that queries one
-source directly misses members the others would find, and one that reads
-`contact_email` directly skips the never-activated gate, letting whoever typed an
-address into their profile claim its owner's login.
+**Resolving a member from an address is `db.get_user_by_email`**, which folds
+case for every source ([access](access.md#the-email-of-record)). A reader that
+queries one source directly misses members the others would find, and one that
+reads `contact_email` directly skips the never-activated gate, letting whoever
+typed an address into their profile claim its owner's login.
 
 **A new full-access branch in `entitled_level` wires only the live path.** A
 non-country, non-own-object full grant must also be added to the overlay frames, or

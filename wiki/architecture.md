@@ -165,6 +165,9 @@ per-row transactions commit as they go, and the previous build cannot decode a
 row the run already rewrote. `python -m backend.src.migrations` runs the
 same guards without the app, reporting by default and rewriting on `--apply`;
 that is how an entry is rehearsed against a copy of production before it lands.
+An entry with no `obj_type` targets an `auth_methods` row instead: its function
+mutates the `data` document, written back as is, since that table carries no
+projections.
 
 Nothing in the tree records that an entry has run, so its proof is a section in
 [post-deploy](post-deploy.md) and the two die in one commit —

@@ -190,12 +190,11 @@ holder and full-access readers, and no `api` projection carries it at all. It is
 not what `profile:email` hands a client either: that is a *verified* address,
 because the client keys accounts on it.
 
-**Case is folded at the lookup, not at the row, and the sources differ on
-which.** `contact_email` and the stored Discord email are compared `LOWER()` on
-both sides in SQL, so a row keeps whatever case its writer supplied and no caller
-has to think about it. An email **auth method's** `identifier` is compared
-exactly, so it is lowercased on every write and every reader must lowercase too — a hand-typed venue address
-passed through raw finds no one.
+**Case is folded at the lookup for the address of record and the Discord
+email.** Both are compared `LOWER()` on both sides in SQL, so a row keeps whatever
+case its writer supplied and no caller has to think about it. An email **auth
+method's** `identifier` is lowercase by database constraint instead, and
+`get_auth_method_by_identifier` folds the address it is handed.
 
 **A member is found by address in three places, in order**: an email login's
 address, the verified email Discord last reported for a linked Discord login, then

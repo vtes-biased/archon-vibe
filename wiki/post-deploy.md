@@ -129,3 +129,27 @@ differs` — and lists the in-person events the mapping leaves without a city, t
 created since the export included. Rerun with `--apply`. It worked when a second
 report-only run counts no `write`. Delete this section, the script and its mapping
 together.
+
+## Prove the email login identifiers are lowercase
+
+**Migration** `email-identifier-lowercase`
+
+Gated by the commit that made lowercase a database rule for email login
+identifiers ([access](access.md#the-email-of-record)). The entry folds every
+stored mixed-case `identifier` of an email auth method; the schema's
+`auth_methods_email_identifier_lower` constraint is added `NOT VALID` so the boot
+reaches the entry. A case-twin — `Foo@x` beside `foo@x` — trips the unique index
+and the process does not serve: merge the two accounts, or drop the duplicate
+login if both are one member's, then restart.
+
+Nothing to run: the entry rewrote the rows before the process served. It worked
+when this answers 0:
+
+```sql
+SELECT count(*) FROM auth_methods
+WHERE data->>'method_type' = 'email'
+  AND data->>'identifier' <> LOWER(data->>'identifier');
+```
+
+Retiring it also drops `NOT VALID` and its comment from `schema.sql`. Nothing
+else is owed.

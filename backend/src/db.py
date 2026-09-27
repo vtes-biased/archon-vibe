@@ -912,6 +912,8 @@ async def get_auth_method_by_identifier(
     identifier: str,
     conn: psycopg.AsyncConnection | None = None,
 ) -> AuthMethod | None:
+    if method_type == "email":
+        identifier = identifier.lower()
     async with _acquire(conn) as conn:
         result = await conn.execute(
             """
