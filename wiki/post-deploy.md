@@ -134,7 +134,7 @@ together.
 
 **Migration** `email-identifier-lowercase`
 
-Gated by the commit that made lowercase a database rule for email login
+Gated by `2f64fb7b`, which makes lowercase a database rule for email login
 identifiers ([access](access.md#the-email-of-record)). The entry folds every
 stored mixed-case `identifier` of an email auth method; the schema's
 `auth_methods_email_identifier_lower` constraint is added `NOT VALID` so the boot
