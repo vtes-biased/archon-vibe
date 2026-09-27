@@ -4,16 +4,6 @@
     /opt/archon/backend/.venv/bin/python \\
       /opt/archon/backend/scripts/resubmit_twda_counts.py
     … resubmit_twda_counts.py --apply
-
-The header used to count the registered roster, no-shows included, where the
-archive wants the field size `attested_player_count` gives. Before the waitlist
-was held out of that roster the waitlisted counted too, so a submission is listed
-when either roster count differs from the attested one. Also listed: events the
-old seats-only gate skipped as too small that the attested count now admits.
-
-`--apply` re-runs `maybe_submit_twda` on each: an open pull request takes the new
-file, a merged one gets a fresh `Update TWD` request. Each opens or moves a pull
-request on the archive repo.
 """
 
 import argparse
@@ -21,6 +11,7 @@ import asyncio
 import importlib.util
 import os
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 try:
@@ -37,6 +28,9 @@ from backend.src.db import TWDA_MIN_PLAYERS  # noqa: E402
 from backend.src.models import Tournament, TwdaOutcome  # noqa: E402
 from backend.src.routes.tournaments import _engine, maybe_submit_twda  # noqa: E402
 
+# v1.0.9 held the waitlist out of the published roster count.
+_WAITLIST_HELD_OUT = datetime(2026, 8, 30, 15, 2, tzinfo=UTC)
+
 
 def _candidate(t: Tournament) -> str | None:
     status = t.twda_status
@@ -44,11 +38,12 @@ def _candidate(t: Tournament) -> str | None:
         return None
     attested = _engine.attested_player_count(msgspec.json.encode(t).decode())
     if status.outcome == TwdaOutcome.SUBMITTED:
-        roster = len(t.players)
-        present = len([p for p in t.players if not p.waitlisted])
-        if attested != roster or attested != present:
-            old = str(present) if roster == present else f"{present}/{roster}"
-            return f"submitted  {old} → {attested}"
+        if status.at and status.at >= _WAITLIST_HELD_OUT:
+            published = len([p for p in t.players if not p.waitlisted])
+        else:
+            published = len(t.players)
+        if published != attested:
+            return f"submitted  {published} → {attested}"
     elif (
         status.outcome == TwdaOutcome.SKIPPED
         and status.reason == "too_few_players"

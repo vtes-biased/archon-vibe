@@ -565,8 +565,6 @@ async def maybe_submit_twda(tournament: Tournament) -> None:
     elif tournament.format == TournamentFormat.Storyline:
         outcome = (TwdaOutcome.SKIPPED, "storyline", "")
     elif tournament.external_ids.get("twda"):
-        # Its event code is the archive's own file key: a submission would
-        # overwrite the very file this row was reconstructed from.
         outcome = (TwdaOutcome.SKIPPED, "reconstructed", "")
     elif not tournament.rounds:
         outcome = (TwdaOutcome.SKIPPED, "no_rounds", "")

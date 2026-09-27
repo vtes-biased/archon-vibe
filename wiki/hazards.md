@@ -346,8 +346,8 @@ whole historic corpus. Measuring `len(rounds)` and reading it as a count has
 already produced one confidently wrong conclusion about the archive.
 
 **`external_ids['twda']` means *reconstructed from the archive*, not *linked to
-it*.** Seven unrelated decisions read it that way, from the VEKN adopt carve-out to
-the public archival badge, so an event we already held that the archive also
+it*.** Eight unrelated decisions read it that way, from the VEKN adopt carve-out to
+the TWDA submitter's skip, so an event we already held that the archive also
 describes carries `twda_entry` instead — [vekn](vekn.md#inbound) enumerates them,
 with the tournament sync's legacy-sheet fill, the one reader that takes either key
 alike.
