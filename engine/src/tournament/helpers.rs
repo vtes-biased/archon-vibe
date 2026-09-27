@@ -21,7 +21,6 @@ pub(super) fn count_player_rounds_played(tournament: &JsonValue, user_uid: &str)
         .count()
 }
 
-/// `count_player_rounds_played` for every player seated anywhere in the rounds, keyed by uid.
 pub fn rounds_played_by_player(tournament: &JsonValue) -> JsonValue {
     let mut counts = JsonValue::new_object();
     for round in tournament[tournament::ROUNDS].members() {

@@ -46,7 +46,6 @@
   const isPlayer = $derived(tournament.players?.some(p => p.user_uid === myUid) ?? false);
   const isMultideck = $derived(!!tournament.multideck);
   const maxRounds = $derived(tournament.max_rounds ?? 0);
-  // Per-player rounds played (open rounds: each player progresses through the pool independently).
   const myRoundsPlayed = $derived(roundsPlayedByPlayer(tournament)[myUid] ?? 0);
   const roundCount = $derived(tournament.rounds?.length ?? 0);
 

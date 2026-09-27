@@ -4,7 +4,7 @@
   import type { Tournament, Table, Sanction, DeckObject } from "$lib/types";
   import { tournamentAction } from "$lib/tournament-actions";
   import { timerAddTime } from "$lib/api";
-  import { scoreSeatingSync, computePlayerIssuesSync, previewScoresSync, checkTableVpsSync, tableLabel, type TournamentEventType } from "$lib/engine";
+  import { scoreSeatingSync, computePlayerIssuesSync, previewScoresSync, checkTableVpsSync, roundsPlayedByPlayer, tableLabel, type TournamentEventType } from "$lib/engine";
   import { vpIssueText } from "$lib/vpIssue";
   import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
   import SeatingSortable from "$lib/components/SeatingSortable.svelte";
@@ -410,15 +410,14 @@
     const round = tournament.rounds?.[roundIdx];
     if (!round) return [];
     const maxRounds = tournament.max_rounds ?? 0;
-    const countPlayed = (uid: string) =>
-      (tournament.rounds ?? []).filter(rd => rd.some(t => t.state !== 'Cancelled' && t.seating.some(s => s.player_uid === uid))).length;
+    const played = roundsPlayedByPlayer(tournament);
     const seated = [...new Set(round.flatMap(t => t.seating.map(s => s.player_uid)))];
     return seated
       .filter(uid => {
         const p = (tournament.players ?? []).find(pl => pl.user_uid === uid);
         if (!p) return false;
         if (p.state === 'Disqualified' || p.state === 'Finished') return true;
-        return maxRounds > 0 && countPlayed(uid) >= maxRounds;
+        return maxRounds > 0 && (played[uid] ?? 0) >= maxRounds;
       })
       .map(uid => seatDisplay(uid));
   }
