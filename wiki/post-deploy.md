@@ -103,7 +103,7 @@ section and
 ## Fill the city of existing tournaments
 
 Gated by `da7d0cc3`, which adds the tournament city and makes it required for an
-in-person event ([tournaments](tournaments.md#configuration)), and `df5254fe`, which
+in-person event ([tournaments](tournaments.md#configuration)), and `367caadd`, which
 ships the final mapping and stops the vekn.net sync blanking a country it does not
 know. Before them the rows have no field to hold the city, and the next sync would
 erase the countries this run fills. List:
