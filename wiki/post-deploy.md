@@ -81,11 +81,16 @@ sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
   /opt/archon/backend/scripts/resubmit_twda_counts.py'
 ```
 
-Each line is an event code with its published count and the attested one, or an
-event the old seats-only floor skipped that now clears it. Rerun with `--apply`:
-every listed event opens or moves a pull request on the archive repo. Run it
-once: the listing reads the roster, which the apply does not change, so a rerun
-lists the same submissions and would push them again. It worked when the apply
-output shows every row `submitted` or a skip that is not `too_few_players`, and
-an open pull request diffs only the `N players` line. Delete this section and
+Each line is an event code with its published count and the attested one — two
+published counts where the submission fell between the v1.0.9 tag and its deploy,
+when either could have gone out — or an event the old seats-only floor skipped that
+now clears it. A `below floor` line is an archived event whose field was under 10:
+`--apply` leaves it alone, since a resubmission would record the skip over its pull
+request and still leave the archive's line wrong, so hand those to the TWDA admin
+to correct or remove. Rerun with `--apply`: every other listed event opens or moves
+a pull request on the archive repo. Run it once: the listing reads the roster,
+which the apply does not change, so a rerun lists the same submissions and would
+push them again. It worked when the apply output shows every row `submitted` or a
+skip that is not `too_few_players`, and an open pull request diffs only the
+`N players` line. Delete this section and
 `backend/scripts/resubmit_twda_counts.py` together.

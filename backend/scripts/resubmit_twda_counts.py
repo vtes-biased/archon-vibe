@@ -28,30 +28,41 @@ from backend.src.db import TWDA_MIN_PLAYERS  # noqa: E402
 from backend.src.models import Tournament, TwdaOutcome  # noqa: E402
 from backend.src.routes.tournaments import _engine, maybe_submit_twda  # noqa: E402
 
-# v1.0.9 held the waitlist out of the published roster count.
-_WAITLIST_HELD_OUT = datetime(2026, 8, 30, 15, 2, tzinfo=UTC)
+# v1.0.9 held the waitlist out of the published roster count: tagged at the first
+# instant, live on production by the second.
+_WAITLIST_TAGGED = datetime(2026, 8, 30, 15, 2, tzinfo=UTC)
+_WAITLIST_DEPLOYED = datetime(2026, 9, 2, 13, 50, tzinfo=UTC)
 
 
-def _candidate(t: Tournament) -> str | None:
+def _candidate(t: Tournament) -> tuple[str, bool] | None:
+    """The listing line, and whether `--apply` resubmits it."""
     status = t.twda_status
     if not status:
         return None
     attested = _engine.attested_player_count(msgspec.json.encode(t).decode())
     if status.outcome == TwdaOutcome.SUBMITTED:
-        if status.at and status.at >= _WAITLIST_HELD_OUT:
-            published = len([p for p in t.players if not p.waitlisted])
+        roster = len(t.players)
+        present = len([p for p in t.players if not p.waitlisted])
+        if not status.at or status.at < _WAITLIST_TAGGED:
+            published = {roster}
+        elif status.at >= _WAITLIST_DEPLOYED:
+            published = {present}
         else:
-            published = len(t.players)
-        if published != attested:
-            return f"submitted  {published} → {attested}"
-    elif (
+            published = {roster, present}
+        if published == {attested}:
+            return None
+        shown = "/".join(str(n) for n in sorted(published))
+        if attested < TWDA_MIN_PLAYERS:
+            return f"below floor  {shown} → {attested}", False
+        return f"submitted  {shown} → {attested}", True
+    if (
         status.outcome == TwdaOutcome.SKIPPED
         and status.reason == "too_few_players"
         and t.rounds
         and not t.external_ids.get("twda")
         and attested >= TWDA_MIN_PLAYERS
     ):
-        return f"too small  now {attested}"
+        return f"too small  now {attested}", True
     return None
 
 
@@ -69,13 +80,19 @@ async def run(args: argparse.Namespace) -> int:
             )
             rows = await result.fetchall()
         listed: list[str] = []
+        held = 0
         for (full,) in rows:
             t = db.decode_json(full, Tournament)
-            line = _candidate(t)
-            if line:
+            candidate = _candidate(t)
+            if not candidate:
+                continue
+            line, resubmit = candidate
+            if resubmit:
                 listed.append(t.uid)
-                print(f"{t.event_code or t.uid:<12} {line:<22} {t.name}")
-        print(f"\n{len(listed)} of {len(rows)} tournaments with a TWDA outcome")
+            else:
+                held += 1
+            print(f"{t.event_code or t.uid:<12} {line:<24} {t.name}")
+        print(f"\n{len(listed)} to resubmit, {held} below floor for the TWDA admin")
         if not args.apply:
             print("\nReport only — pass --apply to resubmit.")
             return 0
