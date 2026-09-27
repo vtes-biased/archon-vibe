@@ -10,6 +10,14 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- In-person tournaments now have a city, picked from a list for their country and shown on the tournament page.
+- Officials can now export the filtered member list and copy members' VEKN ids.
+- Archon now opens any page offline, not only the ones you had already visited.
+- Winning decks sent to the TWDA now count only the players who actually played.
+- Existing tournaments have had their city filled in from the TWDA, their venue and vekn.net.
+
 ## v1.3.0 — 2026-09-27
 
 - Organizers can now download a tournament's sanctions from its Tools panel.
