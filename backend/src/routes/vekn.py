@@ -196,7 +196,6 @@ async def sponsor_new_member(request: Request, data: SponsorRequest) -> Response
     )
 
     # Background task — the response must not wait on a vekn.net outage.
-
     asyncio.create_task(push_member_background(updated))
 
     return Response(

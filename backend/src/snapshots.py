@@ -13,7 +13,6 @@ import time
 from contextlib import aclosing
 from pathlib import Path
 
-from . import db
 from .db import batch_read_connection, stream_objects_snapshot
 
 logger = logging.getLogger(__name__)
@@ -46,9 +45,6 @@ async def generate_snapshots() -> dict[str, int]:
     Reads the {level}::text columns directly — no Python deserialization.
     """
     global _built_from, _built_counts
-
-    if not db._pool:
-        raise RuntimeError("Database not initialized")
 
     SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
     start = time.time()

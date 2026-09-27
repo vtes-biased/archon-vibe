@@ -142,7 +142,6 @@ async def create_user(request: Request, data: CreateUserRequest) -> Response:
             # Don't fail the request, user is already created
 
     # Fire-and-forget; batch_push catches failures.
-
     asyncio.create_task(push_member_background(user))
 
     broadcast_precomputed(bd)

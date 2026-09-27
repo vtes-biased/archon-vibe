@@ -3,8 +3,7 @@
 from datetime import UTC, datetime
 
 import pytest
-from src.broadcast import SSEConnection, broadcast_judge_call
-from src.main import _sse_connections
+from src.broadcast import SSEConnection, _sse_connections, broadcast_judge_call
 from src.models import Role, User
 
 NOW = datetime.now(UTC)

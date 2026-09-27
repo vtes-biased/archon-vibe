@@ -28,7 +28,7 @@ from litestar.status_codes import HTTP_500_INTERNAL_SERVER_ERROR
 # Before the local imports: several of them read their env at import.
 load_dotenv()
 
-from . import db, http_client
+from . import http_client
 from .broadcast import (
     SSEConnection,
     _sse_connections,
@@ -45,6 +45,7 @@ from .db import (
     compute_access_version,
     delete_sanction_hard,
     ensure_event_code,
+    get_connection,
     get_expired_sanctions,
     get_league_public_projection,
     get_sanctions_for_cleanup,
@@ -875,10 +876,7 @@ async def _scoped_catchup_frames(
     catch-up. Seeds `sent` so the first live event doesn't re-send everyone."""
     frames: list[str] = []
     last_ts: str | None = None
-    if not db._pool:
-        return frames, last_ts
-
-    async with db._pool.connection() as conn:
+    async with get_connection() as conn:
         row = await (
             await conn.execute(
                 'SELECT public::text, member::text, "full"::text, modified_at '
@@ -944,10 +942,7 @@ async def _overlay_frames(viewer) -> tuple[list[str], int]:
     it BEFORE draining — yielding inside the `async with` would pin the slot."""
     frames: list[str] = []
     count = 0
-    if not db._pool:
-        return frames, count
-
-    async with db._pool.connection() as db_conn:
+    async with get_connection() as db_conn:
         row = await (
             await db_conn.execute(
                 'SELECT "full"::text FROM objects WHERE uid = %s AND type = %s',
@@ -1174,7 +1169,7 @@ async def stream_updates(
 
             # Built off one pooled connection (_overlay_frames), then drained —
             # never pinned across a client read.
-            if not scoped and stream_user and level == DataLevel.MEMBER and db._pool:
+            if not scoped and stream_user and level == DataLevel.MEMBER:
                 try:
                     overlay, overlay_count = await asyncio.shield(
                         _overlay_frames(stream_user)
@@ -1222,11 +1217,11 @@ async def stream_updates(
                     keepalive_counter = 0
                     # Clear the flag BEFORE fetching so a concurrent set isn't lost;
                     # fetch into a list with the pool released before yielding.
-                    if scoped and conn.needs_participant_refresh and db._pool:
+                    if scoped and conn.needs_participant_refresh:
                         conn.needs_participant_refresh = False
 
                         async def _refresh_participants() -> list[str]:
-                            async with db._pool.connection() as db_conn:
+                            async with get_connection() as db_conn:
                                 return await _participant_user_frames(
                                     db_conn, tournament, conn.sent_participant_uids
                                 )
