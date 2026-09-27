@@ -62,7 +62,7 @@ except ModuleNotFoundError:
 if not _have_backend:
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from backend.src import db, http_client  # noqa: E402
+from backend.src import accounts, db, http_client  # noqa: E402
 from backend.src.models import Role  # noqa: E402
 
 # Must match migrate_from_archon.ROLE_MAP. Inlined rather than imported — legacy
@@ -297,12 +297,14 @@ async def run(args: argparse.Namespace) -> None:
                 print(f"  ⚠ {vekn} {name}: vanished between plan and apply, skipped")
                 continue
             merged = sorted(set(user.roles) | set(missing), key=ROLE_ORDER.get)
-            await db.save_user(
-                msgspec.structs.replace(user, roles=merged, modified=datetime.now(UTC))
+            await accounts.save_member(
+                user,
+                msgspec.structs.replace(user, roles=merged, modified=datetime.now(UTC)),
             )
             written.append(uid)
+        # close_db() would kill the Linked Roles pushes save_member left in flight.
+        await asyncio.gather(*accounts.discord_pushes)
         print(f"Applied to {len(written)} users.")
-        await push_discord(written)
     finally:
         await http_client.close()
         await db.close_db()

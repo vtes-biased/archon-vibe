@@ -371,11 +371,6 @@ source directly misses members the others would find, and one that reads
 `contact_email` directly skips the never-activated gate, letting whoever typed an
 address into their profile claim its owner's login.
 
-**Role writes have two out-of-band consumers** — the Discord Linked Roles push,
-which fires on any role delta with no periodic reconcile, and the resync
-fingerprint, which moves only for IC and NC. A role writer outside the users route
-skips both silently ([access](access.md#capabilities)).
-
 **A new full-access branch in `entitled_level` wires only the live path.** A
 non-country, non-own-object full grant must also be added to the overlay frames, or
 a resync re-delivers the lower projection ([sync](sync.md#access-entitlement)).

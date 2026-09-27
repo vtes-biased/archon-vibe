@@ -251,6 +251,17 @@ async def organizer_tournament_uids(user_uid: str) -> list[str]:
     return sorted(r[0] for r in rows)
 
 
+def access_inputs(viewer: User | None) -> tuple[str, list[str], str | None]:
+    """The fingerprint inputs a write to the user row itself can move."""
+    level = base_data_level(viewer)
+    roles = sorted(r.value for r in _OVERLAY_ROLES if viewer and r in viewer.roles)
+    # country enters the fp ONLY for officials — it scopes their same-country overlay.
+    # Must stay in lockstep with entitled_level's same-country branch (broadcast.py).
+    official = bool(viewer and Role.NC in viewer.roles)
+    country = viewer.country if official else None
+    return level, roles, country
+
+
 async def compute_access_version(viewer: User | None) -> str:
     """Opaque per-user entitlement fingerprint for the SSE connect handshake.
 
@@ -258,12 +269,7 @@ async def compute_access_version(viewer: User | None) -> str:
     country, and organized-tournament uids. Backend-only and opaque — the client
     stores and echoes it without parsing, so the inputs stay server-evolvable.
     """
-    level = base_data_level(viewer)
-    roles = sorted(r.value for r in _OVERLAY_ROLES if viewer and r in viewer.roles)
-    # country enters the fp ONLY for officials — it scopes their same-country overlay.
-    # Must stay in lockstep with entitled_level's same-country branch (broadcast.py).
-    official = bool(viewer and Role.NC in viewer.roles)
-    country = viewer.country if official else None
+    level, roles, country = access_inputs(viewer)
     # The org-set only changes a MEMBER's entitlement (IC already sees full
     # everywhere; public/anon have no overlay) — so only members pay the query.
     org_uids = (

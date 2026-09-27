@@ -38,9 +38,10 @@ profile shows `platform_name = "Archon"` and
 **The push requires the target user's own OAuth token** with
 `role_connections.write` — the backend cannot push for a user who has never logged
 in through Discord, so metadata is only pushed when a stored token exists. It fires
-fire-and-forget on Discord login and link, on role changes, on VEKN-ID changes, and
-on periodic sync. Registration at startup needs `DISCORD_BOT_TOKEN`, which must
-belong to the **same application** as `DISCORD_CLIENTID`.
+fire-and-forget on Discord login and link, and on any change to the pushed metadata
+or to the member the token stands for ([access](access.md#capabilities)).
+Registration at startup needs `DISCORD_BOT_TOKEN`, which must belong to the
+**same application** as `DISCORD_CLIENTID`.
 
 **Portal setup**, once per app and environment:
 

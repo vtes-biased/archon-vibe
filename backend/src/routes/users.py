@@ -11,7 +11,7 @@ from litestar.exceptions import HTTPException
 from litestar.params import Body, FromPath
 
 from .. import accounts, community_links, permissions
-from ..broadcast import broadcast_precomputed, broadcast_resync
+from ..broadcast import broadcast_precomputed
 from ..db import (
     allocate_next_vekn_id,
     get_user_by_email,
@@ -189,14 +189,13 @@ async def update_user(
             status_code=403, detail="You don't have permission to edit this user"
         )
 
-    old_roles = set(user.roles)
-    old_country = user.country
+    before = user
 
     # Changing country moves an official's FULL-data overlay scope, so it needs the
     # authority that could change their role — gated on the target's CURRENT roles.
     if (
         country is not None
-        and country != old_country
+        and country != before.country
         and not permissions.can_change_country(current_user, user)
     ):
         raise HTTPException(
@@ -283,26 +282,7 @@ async def update_user(
             local_modifications=local_mods,
         )
 
-    bd = await db_save_user(user)
-
-    # Only NC/IC role changes or an NC's country change move the access-version
-    # fingerprint — must stay in lockstep with db._OVERLAY_ROLES and broadcast.entitled_level.
-    new_roles = set(user.roles)
-    access_roles = {Role.NC, Role.IC}
-    roles_access_changed = (old_roles & access_roles) != (new_roles & access_roles)
-    country_overlay_changed = (
-        country is not None and country != old_country and Role.NC in old_roles
-    )
-    if roles_access_changed or country_overlay_changed:
-        await broadcast_resync(user.uid)
-    if new_roles != old_roles:
-        # Any role delta, not just access-affecting ones.
-        import asyncio
-
-        from ..roles_hook import sync_user_discord_roles
-
-        asyncio.create_task(sync_user_discord_roles(user.uid))
-
+    bd = await accounts.save_member(before, user)
     broadcast_precomputed(bd)
 
     return Response(

@@ -4,14 +4,16 @@ db.py cannot import broadcast (layering), so each function here returns the
 BroadcastData for every synced row it changes and the calling route broadcasts it.
 """
 
-from datetime import UTC, datetime
+import asyncio
+from datetime import UTC, datetime, timedelta
 from uuid import uuid7
 
 import msgspec
 
-from .broadcast import deck_org_uids
+from .broadcast import broadcast_resync, deck_org_uids
 from .db import (
     BroadcastData,
+    access_inputs,
     clear_owner_columns,
     decode_json,
     delete_avatar,
@@ -21,6 +23,7 @@ from .db import (
     get_calendar_token,
     get_connection,
     get_sanctions_for_user,
+    get_transient_token,
     get_user_by_uid,
     get_users_by_uids,
     remap_nda_user,
@@ -29,6 +32,7 @@ from .db import (
     save_sanction,
     save_user,
     soft_delete_user,
+    store_transient_token,
     tournament_transaction,
 )
 from .db_oauth import (
@@ -45,6 +49,40 @@ from .models import (
     User,
 )
 from .ratings import recompute_wins
+from .roles_hook import build_metadata, build_platform_info, sync_user_discord_roles
+
+discord_pushes: set[asyncio.Task] = set()
+
+
+async def save_member(before: User, after: User) -> BroadcastData:
+    """The one writer of an existing member's roles, vekn_id or official country."""
+    bd = await save_user(after)
+    if access_inputs(before) != access_inputs(after):
+        await broadcast_resync(after.uid)
+    if (build_metadata(before), build_platform_info(before)) != (
+        build_metadata(after),
+        build_platform_info(after),
+    ):
+        _push_linked_roles(after.uid)
+    return bd
+
+
+def _push_linked_roles(user_uid: str) -> None:
+    task = asyncio.create_task(sync_user_discord_roles(user_uid))
+    discord_pushes.add(task)
+    task.add_done_callback(discord_pushes.discard)
+
+
+async def move_discord_role_token(from_user_uid: str, to_user_uid: str) -> None:
+    """The Discord account now stands for another member: call after saving it."""
+    stored = await get_transient_token(f"discord_rc:{from_user_uid}")
+    if not stored:
+        return
+    await store_transient_token(
+        f"discord_rc:{to_user_uid}", stored, datetime.now(UTC) + timedelta(days=365)
+    )
+    await delete_transient_token(f"discord_rc:{from_user_uid}")
+    _push_linked_roles(to_user_uid)
 
 
 async def reassign_auth_methods(from_user_uid: str, to_user_uid: str) -> int:
@@ -195,7 +233,8 @@ async def merge_users(
         agenda_added=merged_added,
     )
 
-    merged_bd = await save_user(merged)
+    merged_bd = await save_member(keep_user, merged)
+    await move_discord_role_token(delete_uid, keep_uid)
     # auth_methods aren't synced (no SSE); the rest are — collect their
     # BroadcastData too.
     await reassign_auth_methods(delete_uid, keep_uid)
@@ -304,7 +343,8 @@ async def detach_user_from_vekn(
         local_modifications=set(),
         **_defaults(UID_KEYED_FIELDS),
     )
-    personal_bd = await save_user(personal)
+    personal_bd = await save_member(user, personal)
+    await move_discord_role_token(user_uid, new_uid)
     await reassign_auth_methods(user_uid, new_uid)
     # The NDA is the human's contract, not the VEKN record's — it walks away
     # with the personal account, like the login and the calendar feed.
@@ -321,7 +361,7 @@ async def detach_user_from_vekn(
         local_modifications=set(),
         **_defaults(PERSONAL_FIELDS),
     )
-    vekn_bd = await save_user(vekn_record)
+    vekn_bd = await save_member(user, vekn_record)
 
     return personal, vekn_record, [personal_bd, vekn_bd]
 

@@ -84,10 +84,13 @@ Rules carrying a precondition the table cannot express keep a resolver beside it
 sanction level, tournament state, a target's own roles (`can_change_country`),
 the target's NDA record (PT), and the `open_to_country_princes` league flag.
 
-**Two out-of-band consumers watch role writes**: the Discord Linked Roles push
-fires on **any** role delta with no periodic reconcile, while the resync
-fingerprint moves only for IC and NC. A role writer outside the users route skips
-both silently.
+**Every write of an existing member's roles goes through `accounts.save_member`**,
+which resyncs the member when their access fingerprint moved and re-pushes their
+Discord Linked Roles when the pushed metadata moved — Discord has no periodic
+reconcile. A merge or a detach carries the Discord token to the account the human
+keeps and re-pushes from there. Creation writes roles plainly: a new uid has no
+session and no token. A script's resync reaches nobody, since sessions live in the
+app process; its member catches up at the next connect handshake.
 
 ## Authentication
 

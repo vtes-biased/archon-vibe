@@ -12,20 +12,19 @@ from .. import permissions
 from ..accounts import (
     detach_user_from_vekn,
     merge_users,
+    save_member,
     user_has_active_suspension,
 )
-from ..broadcast import broadcast_precomputed, broadcast_resync
+from ..broadcast import broadcast_precomputed
 from ..db import (
     allocate_next_vekn_id,
     get_auth_methods_for_user,
     get_user_by_uid,
     get_user_by_vekn_id,
     is_vekn_id_claimed,
-    save_user,
 )
 from ..middleware.auth import get_current_user
 from ..models import User
-from ..roles_hook import sync_user_discord_roles
 from .auth import create_access_token, create_refresh_token
 
 encoder = msgspec.json.Encoder()
@@ -87,15 +86,9 @@ async def claim_vekn_id(request: Request, data: ClaimRequest) -> Response:
         raise HTTPException(status_code=500, detail="Failed to merge accounts")
     merged, merge_bds = result
 
-    # Push the merge to other clients' caches live, then resync the
-    # owner (their data level changed — they gained a vekn_id).
     for bd in merge_bds:
         broadcast_precomputed(bd)
     logger.info(f"User claimed VEKN ID {data.vekn_id}: {merged.uid}")
-    await broadcast_resync(merged.uid)
-
-    # Update Discord Linked Roles (vekn_id changes org level)
-    asyncio.create_task(sync_user_discord_roles(merged.uid))
 
     # New tokens for the VEKN uid (different from the old one): consumed by the SPA
     # AND the Discord bot, which fires a follow-up action after a claim tombstones its OAuth identity.
@@ -146,10 +139,6 @@ async def abandon_vekn_id(request: Request) -> Response:
     # Push the orphaned record's nulled PII to other clients' caches live.
     for bd in detach_bds:
         broadcast_precomputed(bd)
-    await broadcast_resync(new_user.uid)
-
-    # Update Discord Linked Roles (lost vekn_id)
-    asyncio.create_task(sync_user_discord_roles(new_user.uid))
 
     access_token, expires_in = create_access_token(new_user.uid)
     refresh_token = create_refresh_token(new_user.uid)
@@ -199,15 +188,11 @@ async def sponsor_new_member(request: Request, data: SponsorRequest) -> Response
         vekn_synced_at=None,
     )
 
-    bd = await save_user(updated)
+    bd = await save_member(target, updated)
     broadcast_precomputed(bd)
     logger.info(
         f"Sponsored new VEKN member {new_vekn_id} for user {target.uid} by {manager.uid}"
     )
-    await broadcast_resync(updated.uid)
-
-    # Update Discord Linked Roles (gained vekn_id)
-    asyncio.create_task(sync_user_discord_roles(updated.uid))
 
     # Background task — the response must not wait on a vekn.net outage.
     from ..vekn_push import push_member_background
@@ -279,12 +264,6 @@ async def link_vekn_to_user(request: Request, data: LinkRequest) -> Response:
 
     logger.info(f"Linked VEKN ID {data.vekn_id} to user {merged.uid} by {manager.uid}")
 
-    await broadcast_resync(merged.uid)
-    asyncio.create_task(sync_user_discord_roles(merged.uid))
-    if displaced_user:
-        await broadcast_resync(displaced_user.uid)
-        asyncio.create_task(sync_user_discord_roles(displaced_user.uid))
-
     response_data = {
         "user": msgspec.to_builtins(merged),
         "message": message,
@@ -337,10 +316,6 @@ async def force_abandon_vekn_id(
     # Push the orphaned record's nulled PII to other clients' caches live.
     for bd in detach_bds:
         broadcast_precomputed(bd)
-    await broadcast_resync(new_user.uid)
-
-    # Update Discord Linked Roles (lost vekn_id + roles)
-    asyncio.create_task(sync_user_discord_roles(new_user.uid))
 
     return Response(
         content=encoder.encode(

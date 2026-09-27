@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid7
 
+import msgspec
+
+from .accounts import save_member
 from .broadcast import broadcast_precomputed
 from .data.vekn_roster import ADMINS
 from .db import (
@@ -626,13 +629,14 @@ class VEKNSyncService:
             return existing_user, False
 
         now = datetime.now(UTC)
+        before = msgspec.structs.replace(existing_user)
         for field, value in changed.items():
             setattr(existing_user, field, value)
         existing_user.vekn_synced = True
         existing_user.vekn_synced_at = now
         existing_user.modified = now
 
-        bd = await save_user(existing_user)
+        bd = await save_member(before, existing_user)
         broadcast_precomputed(bd)
 
         return existing_user, True

@@ -18,7 +18,7 @@ from litestar.params import Body, FromPath, FromQuery
 from litestar.response import File
 
 from .. import permissions
-from ..accounts import scrub_anonymized_copies
+from ..accounts import save_member, scrub_anonymized_copies
 from ..broadcast import (
     broadcast_judge_call,
     broadcast_personal,
@@ -2318,12 +2318,18 @@ async def _resolve_or_create_offline_player(
         user = await get_user_by_email(email)
         if user:
             if not user.vekn_id:
-                user.vekn_id = await allocate_next_vekn_id()
-                user.coopted_by = organizer_uid
-                user.coopted_at = datetime.now(UTC)
-                user.modified = datetime.now(UTC)
-                bd = await save_object_from_model(ObjectType.USER, user)
-                broadcast_precomputed(bd)
+                now = datetime.now(UTC)
+                before, user = (
+                    user,
+                    msgspec.structs.replace(
+                        user,
+                        vekn_id=await allocate_next_vekn_id(),
+                        coopted_by=organizer_uid,
+                        coopted_at=now,
+                        modified=now,
+                    ),
+                )
+                broadcast_precomputed(await save_member(before, user))
             return player_data.temp_uid, user, False
 
     now = datetime.now(UTC)
