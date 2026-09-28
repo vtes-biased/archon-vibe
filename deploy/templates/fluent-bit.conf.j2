@@ -7,6 +7,7 @@
     name           systemd
     tag            journal
     db             /var/lib/fluent-bit/journal.db
+    db.sync        off
     read_from_tail on
     max_entries    1000
     mem_buf_limit  5MB

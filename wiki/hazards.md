@@ -526,6 +526,13 @@ minute and never while offline. Safari's error names no URL, so a stale hover
 preload there reloads the current page instead. Unlike `maybeAutoApply`, it
 ignores the offline lock: a missing chunk has already broken the page.
 
+**Production's disk turns latency-bound every night, so a steady sync write
+saturates it.** From about 00:00 to 04:00 UTC the provider's volume answers in
+50–280 ms per operation instead of 1–5 ms (`sar -d` on the box). About 2 synchronous
+writes a second go unnoticed there; 12–15 keep it 70–97 % busy with PostgreSQL
+queued behind them. A daemon or loop on production must not fsync on a timer — why
+Fluent Bit's cursor runs with `db.sync off` ([dev](dev.md)).
+
 **Running out of file descriptors truncates responses mid-body — it does not
 refuse connects.** Measured in the local EC rehearsal at macOS's 256-fd
 default: 26 of 200 snapshot downloads cut mid-body (`TransferEncodingError` on

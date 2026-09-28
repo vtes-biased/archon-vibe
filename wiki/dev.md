@@ -231,8 +231,11 @@ against Alloy's ~73 MB, under a 40 MB systemd cap. It sends logs with
 the labels beta's Alloy sends to the personal stack (`unit`, `tag`, `level`,
 `host`), so a query carries over: `{host="archon.vekn.net", unit="archon-backend.service"}`
 in Explore on the Loki datasource. A first start ships no backlog, and a cursor in
-`/var/lib/fluent-bit` keeps a restart from sending anything twice. On the box,
-`journalctl -t archon` still reads the same lines.
+`/var/lib/fluent-bit` keeps a restart from sending anything twice. That cursor is
+written with `db.sync off`, since the default fsyncs it on every flush
+([hazards](hazards.md#deploy)). A Fluent Bit crash loses nothing, but a power loss
+can corrupt `journal.db` and stop log shipping; deleting it recovers, skipping the
+outage's lines. On the box, `journalctl -t archon` still reads the same lines.
 
 **Production reports its health to the same stack as metrics**, through the same
 Fluent Bit and the same token, which carries metrics write. Everything is scraped
