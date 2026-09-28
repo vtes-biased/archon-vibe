@@ -32,14 +32,18 @@ ON auth_methods((data->>'method_type'), (data->>'identifier'));
 CREATE INDEX IF NOT EXISTS idx_auth_methods_discord_email
 ON auth_methods(LOWER(data->>'email'))
 WHERE data->>'method_type' = 'discord';
--- NOT VALID: the schema loads before migrations.py folds stored stragglers.
 DO $$ BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'auth_methods_email_identifier_lower'
     ) THEN
         ALTER TABLE auth_methods ADD CONSTRAINT auth_methods_email_identifier_lower
         CHECK (data->>'method_type' <> 'email'
-               OR data->>'identifier' = LOWER(data->>'identifier')) NOT VALID;
+               OR data->>'identifier' = LOWER(data->>'identifier'));
+    ELSIF EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'auth_methods_email_identifier_lower' AND NOT convalidated
+    ) THEN
+        ALTER TABLE auth_methods VALIDATE CONSTRAINT auth_methods_email_identifier_lower;
     END IF;
 END $$;
 DROP TRIGGER IF EXISTS auth_methods_modified_trigger ON auth_methods;

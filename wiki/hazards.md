@@ -457,8 +457,7 @@ tournaments, because legacy archon never enforced a VEKN id at registration.
 
 **The `vekn_id` unique index spans tombstones**, so a tombstone holding a number
 would crash a seed insert that `deleted_at`-filtered lookups clear. None can be
-written: `soft_delete_user` refuses a VEKN-bearing member. One written before
-that refusal lives until the 30-day purge — [post-deploy](post-deploy.md) counts them.
+written: `soft_delete_user` refuses a VEKN-bearing member.
 
 **`authState.user` adopts its own sync frame, minus the owner-only fields.** The
 signed-in user's row arrives over SSE like anyone else's, and every other surface

@@ -29,22 +29,7 @@ class Migration:
     rewrite: Callable[..., None]
 
 
-def _fold_email_identifier(data: dict, folded: str) -> None:
-    data["identifier"] = folded
-
-
-MIGRATIONS: tuple[Migration, ...] = (
-    Migration(
-        name="email-identifier-lowercase",
-        obj_type=None,
-        pending="""
-            SELECT uid, LOWER(data->>'identifier') FROM auth_methods
-            WHERE data->>'method_type' = 'email'
-              AND data->>'identifier' <> LOWER(data->>'identifier')
-        """,
-        rewrite=_fold_email_identifier,
-    ),
-)
+MIGRATIONS: tuple[Migration, ...] = ()
 
 _LOCK_ROW = 'SELECT "full", deleted_at FROM objects WHERE uid = %s FOR UPDATE'
 _LOCK_AUTH_METHOD = "SELECT data FROM auth_methods WHERE uid = %s FOR UPDATE"
