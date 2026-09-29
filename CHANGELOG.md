@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.3.2 — 2026-09-29
 
 - The tournament list's rank filter now shows tournaments at that rank and above, league tournaments included, in the calendar feeds too.
 - Fixed sending feedback from the app, which failed for most players.
