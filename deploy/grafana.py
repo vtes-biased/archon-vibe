@@ -1,16 +1,32 @@
 import json
 import os
+import sys
 import urllib.error
 import urllib.request
 
-GRAFANA = "https://vtesbiased.grafana.net"
-FOLDER = "archon"
+UNITS = 'name=~"archon-.*|nginx.service|postgresql@.*|fluent-bit.*"'
+PROD = sys.argv[1:] == ["prod"]
+if not PROD and sys.argv[1:] != ["beta"]:
+    raise SystemExit("usage: grafana.py prod|beta")
+if PROD:
+    GRAFANA = "https://vtesbiased.grafana.net"
+    FOLDER, FOLDER_TITLE = "archon", "Archon"
+    MACHINE = "archon.vekn.net"
+    SHOWN = 'unit!~"fluent-bit.*"'
+    SHOWN_UNITS = f'{UNITS}, name!~"fluent-bit.*"'
+    UNIT_METRIC = "archon_unit"
+    UID, TITLE = "archon-prod", "Archon production"
+else:
+    GRAFANA = "https://codexofthedamned.grafana.net"
+    FOLDER, FOLDER_TITLE = "fnc5js", "Archon Beta"
+    MACHINE = "frankfurt"
+    SHOWN = 'unit=~"new-archon-.*|nginx.service|postgresql@.*"'
+    SHOWN_UNITS = 'name=~"new-archon-.*|nginx.service|postgresql@.*"'
+    UNIT_METRIC = "systemd_unit"
+    UID, TITLE = "archon-beta", "Archon beta"
 GROUP = "archon"
 RECEIVER = "archon-discord"
-HOST = 'instance="archon.vekn.net"'
-UNITS = 'name=~"archon-.*|nginx.service|postgresql@.*|fluent-bit.*"'
-SHOWN_UNITS = f'{UNITS}, name!~"fluent-bit.*"'
-SHOWN = 'unit!~"fluent-bit.*"'
+HOST = f'instance="{MACHINE}"'
 
 RULES = [
     (
@@ -72,9 +88,10 @@ RULES = [
 
 PROM = {"type": "prometheus", "uid": "grafanacloud-prom"}
 LOKI = {"type": "loki", "uid": "grafanacloud-logs"}
-LOGS = f'{{host="archon.vekn.net", {SHOWN}, unit=~"$unit", level=~"$level"}} |~ "(?i)$search"'
+LOGS = f'{{host="{MACHINE}", {SHOWN}, unit=~"$unit", level=~"$level"}} |~ "(?i)$search"'
 RATE = "$__rate_interval"
 LEVEL_COLORS = {
+    "crit": "dark-red",
     "error": "red",
     "warning": "orange",
     "notice": "blue",
@@ -346,7 +363,7 @@ LAYOUT = [
             "CPU per unit",
             "percentunit",
             (
-                f"rate(archon_unit_cpu_seconds_total{{{HOST}, {SHOWN}}}[{RATE}])",
+                f"rate({UNIT_METRIC}_cpu_seconds_total{{{HOST}, {SHOWN}}}[{RATE}])",
                 "{{unit}}",
             ),
             stack=True,
@@ -391,7 +408,7 @@ LAYOUT = [
         ts(
             "Memory per unit",
             "bytes",
-            (f"archon_unit_memory_bytes{{{HOST}, {SHOWN}}}", "{{unit}}"),
+            (f"{UNIT_METRIC}_memory_bytes{{{HOST}, {SHOWN}}}", "{{unit}}"),
             stack=True,
         ),
         8,
@@ -401,7 +418,7 @@ LAYOUT = [
         ts(
             "Swap per unit",
             "bytes",
-            (f"archon_unit_swap_bytes{{{HOST}, {SHOWN}}}", "{{unit}}"),
+            (f"{UNIT_METRIC}_swap_bytes{{{HOST}, {SHOWN}}}", "{{unit}}"),
             stack=True,
         ),
         8,
@@ -432,7 +449,7 @@ LAYOUT = [
             "Memory stall per unit",
             "percentunit",
             (
-                f"rate(archon_unit_memory_stalled_seconds_total{{{HOST}, {SHOWN}}}[{RATE}])",
+                f"rate({UNIT_METRIC}_memory_stalled_seconds_total{{{HOST}, {SHOWN}}}[{RATE}])",
                 "{{unit}}",
             ),
         ),
@@ -489,11 +506,11 @@ LAYOUT = [
             "Disk throughput per unit",
             "Bps",
             (
-                f"rate(archon_unit_io_read_bytes_total{{{HOST}, {SHOWN}}}[{RATE}])",
+                f"rate({UNIT_METRIC}_io_read_bytes_total{{{HOST}, {SHOWN}}}[{RATE}])",
                 "read {{unit}}",
             ),
             (
-                f"rate(archon_unit_io_written_bytes_total{{{HOST}, {SHOWN}}}[{RATE}])",
+                f"rate({UNIT_METRIC}_io_written_bytes_total{{{HOST}, {SHOWN}}}[{RATE}])",
                 "write {{unit}}",
             ),
             overrides=TX_BELOW,
@@ -506,11 +523,11 @@ LAYOUT = [
             "Disk operations per unit",
             "iops",
             (
-                f"rate(archon_unit_io_reads_total{{{HOST}, {SHOWN}}}[{RATE}])",
+                f"rate({UNIT_METRIC}_io_reads_total{{{HOST}, {SHOWN}}}[{RATE}])",
                 "read {{unit}}",
             ),
             (
-                f"rate(archon_unit_io_writes_total{{{HOST}, {SHOWN}}}[{RATE}])",
+                f"rate({UNIT_METRIC}_io_writes_total{{{HOST}, {SHOWN}}}[{RATE}])",
                 "write {{unit}}",
             ),
             overrides=TX_BELOW,
@@ -523,7 +540,7 @@ LAYOUT = [
             "I/O stall per unit",
             "percentunit",
             (
-                f"rate(archon_unit_io_stalled_seconds_total{{{HOST}, {SHOWN}}}[{RATE}])",
+                f"rate({UNIT_METRIC}_io_stalled_seconds_total{{{HOST}, {SHOWN}}}[{RATE}])",
                 "{{unit}}",
             ),
         ),
@@ -582,6 +599,13 @@ LAYOUT = [
     ),
     (LOG_PANEL, 24, 16),
 ]
+if not PROD:
+    LAYOUT = [
+        entry
+        for entry in LAYOUT
+        if entry[0]["title"]
+        not in ("VEKN push", "Failing tournaments", "Failing members")
+    ]
 
 
 def dashboard() -> dict:
@@ -602,7 +626,7 @@ def dashboard() -> dict:
             "datasource": LOKI,
             "query": {
                 "label": name,
-                "stream": f'{{host="archon.vekn.net", {SHOWN}}}',
+                "stream": f'{{host="{MACHINE}", {SHOWN}}}',
                 "type": 1,
             },
             "includeAll": True,
@@ -623,8 +647,8 @@ def dashboard() -> dict:
         }
     )
     return {
-        "uid": "archon-prod",
-        "title": "Archon production",
+        "uid": UID,
+        "title": TITLE,
         "tags": ["archon"],
         "time": {"from": "now-24h", "to": "now"},
         "refresh": "1m",
@@ -694,10 +718,10 @@ def rule(uid, title, expr, op, threshold, pending, no_data) -> dict:
 
 
 def main() -> None:
-    status, text = call("POST", "/api/folders", {"uid": FOLDER, "title": "Archon"})
+    status, text = call("POST", "/api/folders", {"uid": FOLDER, "title": FOLDER_TITLE})
     if status >= 300 and status not in (409, 412):
         raise SystemExit(f"folder: {status} {text}")
-    if webhook := os.environ.get("DISCORD_WEBHOOK"):
+    if PROD and (webhook := os.environ.get("DISCORD_WEBHOOK")):
         upsert(
             "/api/v1/provisioning/contact-points",
             RECEIVER,
@@ -719,7 +743,9 @@ def main() -> None:
     )
     if status >= 300:
         raise SystemExit(f"dashboard: {status} {text}")
-    print("dashboard archon-prod")
+    print(f"dashboard {UID}")
+    if not PROD:
+        return
     url = "https://grafana.com/api/dashboards/1860/revisions/latest/download"
     with urllib.request.urlopen(url, timeout=30) as response:
         node_full = json.load(response)

@@ -286,7 +286,7 @@ URL, so on production Fluent Bit's `journal.lua` masks the same values before
 shipping, and beta's Alloy, server-setup's, runs the same rule; the journal on
 the box keeps them.
 
-**`deploy/grafana.py` owns production's Grafana side**, applied with a
+**`deploy/grafana.py prod` owns production's Grafana side**, applied with a
 service-account token (Editor) as `GRAFANA_TOKEN`, and `DISCORD_WEBHOOK` only to
 change the contact point. It lays out, in the stack's Archon folder, the **Archon
 production** dashboard — health at a glance, CPU, memory, network and disk with
@@ -302,6 +302,16 @@ for 10 minutes, memory fully stalled over 10 % of the time, failed log or metric
 retries, and the host silent for 10 minutes. Each rule names its receiver, so the
 stack's shared notification policy is never touched, and provisioned rules are
 read-only in the UI — a change goes through the script.
+
+**`deploy/grafana.py beta` lays the same dashboard on beta**, as **Archon beta** in
+the personal stack's Archon Beta folder, with `GRAFANA_TOKEN=$GRAFANA_TOKEN_CODEX`;
+`prod` is the other argument. Beta's box is `frankfurt` in the shared server-setup
+fleet, whose Alloy ships the systemd collector and, from a textfile loop, the
+per-unit cgroup usage as `systemd_unit_*` — the names server-setup owns, where
+production's loop writes `archon_unit_*`. Beta never pushes to VEKN, so the VEKN
+push tables are left out there, along with the alerts and Node Exporter Full. Its
+panels and logs are scoped to the `new-archon-*` units, nginx and PostgreSQL, the
+box's other tenants left out.
 
 **Production access is per developer.** Each has their own sudo account
 (`just add-admin-prod <name> <pubkey> <an existing admin>`) and a
