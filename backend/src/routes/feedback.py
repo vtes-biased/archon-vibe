@@ -50,14 +50,18 @@ _DAILY_CAP = 10
 _recent: dict[str, list[float]] = {}
 
 
-def _rate_limited(user_uid: str) -> bool:
+def _take_slot(user_uid: str) -> float | None:
     now = time.monotonic()
     times = [t for t in _recent.get(user_uid, []) if now - t < 86400]
-    limited = (times and now - times[-1] < _COOLDOWN_S) or len(times) >= _DAILY_CAP
-    if not limited:
-        times.append(now)
     _recent[user_uid] = times
-    return limited
+    if (times and now - times[-1] < _COOLDOWN_S) or len(times) >= _DAILY_CAP:
+        return None
+    times.append(now)
+    return now
+
+
+def _release_slot(user_uid: str, slot: float) -> None:
+    _recent[user_uid].remove(slot)
 
 
 async def _resolve_login(
@@ -107,7 +111,8 @@ async def submit_feedback(request: Request, data: FeedbackRequest) -> Response:
     if not current_user.vekn_id:
         raise HTTPException(status_code=403, detail="Feedback requires a VEKN ID")
 
-    if _rate_limited(current_user.uid):
+    slot = _take_slot(current_user.uid)
+    if slot is None:
         raise HTTPException(
             status_code=429,
             detail="Too many feedback submissions; please wait a moment",
@@ -156,10 +161,6 @@ async def submit_feedback(request: Request, data: FeedbackRequest) -> Response:
             "body": issue_body,
             "labels": labels,
         }
-        # Non-collaborator assignees are silently dropped by the API; the
-        # body @-mention still notifies them.
-        if mention:
-            issue["assignees"] = [mention]
         async with http_client.session().post(
             f"https://api.github.com/repos/{FEEDBACK_TARGET_REPO}/issues",
             headers=gh_headers,
@@ -170,6 +171,7 @@ async def submit_feedback(request: Request, data: FeedbackRequest) -> Response:
                 logger.error(
                     "Feedback issue creation failed: %s %s", resp.status, text[:500]
                 )
+                _release_slot(current_user.uid, slot)
                 raise HTTPException(
                     status_code=502,
                     detail="Could not file feedback right now; please try again later",
@@ -179,6 +181,7 @@ async def submit_feedback(request: Request, data: FeedbackRequest) -> Response:
     # bad key content — all degrade to a clean 502 instead of a raw 500.
     except (aiohttp.ClientError, TimeoutError, ValueError, OSError, jwt.PyJWTError):
         logger.exception("Feedback issue creation error")
+        _release_slot(current_user.uid, slot)
         raise HTTPException(
             status_code=502,
             detail="Could not file feedback right now; please try again later",
