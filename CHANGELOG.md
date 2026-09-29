@@ -10,6 +10,11 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- The tournament list's rank filter now shows tournaments at that rank and above, league tournaments included, in the calendar feeds too.
+- Fixed sending feedback from the app, which failed for most players.
+
 ## v1.3.1 — 2026-09-27
 
 - In-person tournaments now have a city, picked from a list for their country and shown on the tournament page.
