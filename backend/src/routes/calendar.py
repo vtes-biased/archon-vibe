@@ -190,11 +190,12 @@ async def tournament_calendar(
     country: FromQuery[str | None] = None,
     online: FromQuery[bool] = True,
     format: FromQuery[str | None] = None,
+    rank: FromQuery[str | None] = None,
     league: FromQuery[str | None] = None,
 ) -> Response:
     """iCal feed: league's events if `league`, else a personal agenda if `token`
     (own events always included, recently-finished ones stay for
-    FINISHED_WINDOW_DAYS), else a public feed filtered by country/online/format."""
+    FINISHED_WINDOW_DAYS), else a public feed filtered by country/online; format and rank narrow both."""
     countries = {c.strip().upper() for c in (country or "").split(",") if c.strip()}
     now = datetime.now(UTC)
     now_str = now.strftime("%Y%m%dT%H%M%SZ")
@@ -232,33 +233,34 @@ async def tournament_calendar(
 
     tournaments = [decode_json(row[0], Tournament) for row in rows]
 
-    # Filter
     if league:
         tournaments = [t for t in tournaments if t.league_uid == league]
-    elif user and user.country:
-        # Finished events arrive only within FINISHED_WINDOW_DAYS (bounded by
-        # the SQL above), so the engine's own-event branches need no date check.
-        tournaments = _agenda_filter(
-            tournaments,
-            user.uid,
-            user.country,
-            get_countries_on_continent(user.country),
-            online,
-            user.agenda_hidden or [],
-            user.agenda_added or [],
-        )
     else:
-        # Public filtering
-        filtered = []
-        for t in tournaments:
-            if countries and t.country not in countries and not t.online:
-                continue
-            if not online and t.online:
-                continue
-            if format and t.format != format:
-                continue
-            filtered.append(t)
-        tournaments = filtered
+        tournaments = [
+            t
+            for t in tournaments
+            if (not format or t.format == format)
+            and _engine.meets_rank_floor(t.rank, bool(t.league_uid), rank or "all")
+        ]
+        if user and user.country:
+            # Finished events arrive only within FINISHED_WINDOW_DAYS (bounded by
+            # the SQL above), so the engine's own-event branches need no date check.
+            tournaments = _agenda_filter(
+                tournaments,
+                user.uid,
+                user.country,
+                get_countries_on_continent(user.country),
+                online,
+                user.agenda_hidden or [],
+                user.agenda_added or [],
+            )
+        else:
+            tournaments = [
+                t
+                for t in tournaments
+                if (not countries or t.country in countries or t.online)
+                and (online or not t.online)
+            ]
 
     # Generate iCal
     vevents = []

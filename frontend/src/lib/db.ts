@@ -5,6 +5,7 @@ import type { TournamentEvent } from './engine';
 import { expandRolesForFilter } from './roles';
 import { normalizeSearch, searchTokens } from './utils';
 import { filterAgenda, type AgendaViewer } from './agenda';
+import { getEngine } from './engine-instance';
 
 export function getDeviceId(): string {
   let id = localStorage.getItem('archon_device_id');
@@ -899,6 +900,8 @@ function inDateWindow(t: TournamentListItem, from?: string, to?: string): boolea
   return (!from || day >= from) && (!to || day <= to);
 }
 
+export type RankFloor = 'all' | 'league' | 'National Championship' | 'Continental Championship';
+
 /** Sorts upcoming/current ascending then past descending, returning the upcoming cluster size for an
  * Upcoming/Past divider. Filtering to Finished needs no separate sort flip — with no upcoming events left, the whole list is the past cluster already in recency order. */
 export function sortUpcomingFirst(items: TournamentListItem[]): number {
@@ -946,7 +949,7 @@ export async function getFilteredTournaments(
     if (!inDateWindow(t, filters.dateFrom, filters.dateTo)) continue;
     if (filters.includeOnline === false && t.online) continue;
     if (filters.format && filters.format !== 'all' && t.format !== filters.format) continue;
-    if (filters.rank && filters.rank !== 'all' && t.rank !== filters.rank) continue;
+    if (!getEngine().meetsRankFloor(t.rank, !!t.league_uid, filters.rank ?? 'all')) continue;
     if (q && !normalizeSearch(t.name).includes(q)) continue;
     items.push(t);
   }
@@ -972,7 +975,7 @@ export async function getAgendaTournaments(
   for (const t of index.values()) {
     if (filters.state && filters.state !== 'all' && !matchesState(t, filters.state, cutoff)) continue;
     if (filters.format && filters.format !== 'all' && t.format !== filters.format) continue;
-    if (filters.rank && filters.rank !== 'all' && t.rank !== filters.rank) continue;
+    if (!getEngine().meetsRankFloor(t.rank, !!t.league_uid, filters.rank ?? 'all')) continue;
     if (!inDateWindow(t, filters.dateFrom, filters.dateTo)) continue;
     if (q && !normalizeSearch(t.name).includes(q)) continue;
     candidates.push(t);

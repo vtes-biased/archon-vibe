@@ -53,6 +53,17 @@ pub fn toggle_entry(viewer: &JsonValue, event: &JsonValue) -> Option<&'static st
     }
 }
 
+pub fn meets_rank_floor(rank: &str, in_league: bool, floor: &str) -> bool {
+    match floor {
+        "Continental Championship" => rank == "Continental Championship",
+        "National Championship" => {
+            matches!(rank, "National Championship" | "Continental Championship")
+        }
+        "league" => in_league || !rank.is_empty(),
+        _ => true,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

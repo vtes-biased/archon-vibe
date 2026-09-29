@@ -1,15 +1,15 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
   import { untrack } from "svelte";
-  import { getFilteredTournaments, getAgendaTournaments, getMemberPlaying, getLeague, type TournamentListItem, type TournamentStateFilter } from "$lib/db";
+  import { getFilteredTournaments, getAgendaTournaments, getMemberPlaying, getLeague, type RankFloor, type TournamentListItem, type TournamentStateFilter } from "$lib/db";
   import { agendaViewer, filterAgenda, agendaToggleEntry } from "$lib/agenda";
   import { syncManager } from "$lib/sync";
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
   import { getAuthState, generateCalendarToken, setAgendaEntry } from "$lib/stores/auth.svelte";
   import { canCreateTournament } from "$lib/engine";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
-  import type { TournamentFormat, TournamentRank } from "$lib/types";
-  import { getStateTone, translateTournamentState, rankBadgeLabel } from "$lib/tournament-utils";
+  import type { TournamentFormat } from "$lib/types";
+  import { getStateTone, translateTournamentState } from "$lib/tournament-utils";
   import Badge from "$lib/components/Badge.svelte";
   import { zonedDate } from "$lib/utils";
   import { syncQueryParams, currentParams, readPageParam, pageParam } from "$lib/url-filters";
@@ -95,11 +95,17 @@
   let dateFrom = $state(urlParams.get("from") ?? "");
   let dateTo = $state(urlParams.get("to") ?? "");
   let selectedFormat = $state<string>(urlParams.get("format") ?? "all");
-  const RANK_FILTERS: TournamentRank[] = ["National Championship", "Continental Championship"];
+  const RANK_FILTERS: RankFloor[] = ["league", "National Championship", "Continental Championship"];
   const urlRank = urlParams.get("rank");
-  let selectedRank = $state<string>(
-    RANK_FILTERS.includes(urlRank as TournamentRank) ? (urlRank as string) : "all",
+  let selectedRank = $state<RankFloor>(
+    RANK_FILTERS.includes(urlRank as RankFloor) ? (urlRank as RankFloor) : "all",
   );
+  function rankFloorLabel(floor: RankFloor): string {
+    if (floor === "league") return m.tournaments_rank_floor_league();
+    if (floor === "National Championship") return m.tournaments_rank_floor_national();
+    if (floor === "Continental Championship") return m.tournaments_rank_floor_continental();
+    return m.tournaments_all_ranks();
+  }
   let includeOnline = $state(urlParams.get("online") !== "false");
 
   let calendarLoading = $state(false);
@@ -321,6 +327,8 @@
     if (viewMode === "agenda" && auth.user?.calendar_token) {
       const params = new URLSearchParams({ token: auth.user.calendar_token });
       if (!includeOnline) params.set("online", "false");
+      if (selectedFormat !== "all") params.set("format", selectedFormat);
+      if (selectedRank !== "all") params.set("rank", selectedRank);
       return `${CALENDAR_BASE}/api/calendar/tournaments.ics?${params}`;
     }
     const params = new URLSearchParams();
@@ -329,6 +337,9 @@
     }
     if (selectedFormat && selectedFormat !== "all") {
       params.set("format", selectedFormat);
+    }
+    if (selectedRank !== "all") {
+      params.set("rank", selectedRank);
     }
     if (!includeOnline) {
       params.set("online", "false");
@@ -342,14 +353,16 @@
 
   // Feed-scope summary so the copied URL doesn't read as "everything".
   const calendarScope = $derived.by(() => {
-    if (viewMode === "agenda" && auth.user?.calendar_token) {
-      return m.tournaments_calendar_scope_agenda();
-    }
     const parts: string[] = [];
-    parts.push(selectedCountries.length > 0
-      ? selectedCountries.map(c => countries[c]?.name ?? c).join(", ")
-      : m.rankings_all_countries());
+    if (viewMode === "agenda" && auth.user?.calendar_token) {
+      parts.push(m.tournaments_calendar_scope_agenda());
+    } else {
+      parts.push(selectedCountries.length > 0
+        ? selectedCountries.map(c => countries[c]?.name ?? c).join(", ")
+        : m.rankings_all_countries());
+    }
     if (selectedFormat !== "all") parts.push(selectedFormat);
+    if (selectedRank !== "all") parts.push(rankFloorLabel(selectedRank));
     if (includeOnline) parts.push(m.tournaments_calendar_scope_online());
     return parts.join(" · ");
   });
@@ -679,7 +692,7 @@
           >
             <option value="all">{m.tournaments_all_ranks()}</option>
             {#each RANK_FILTERS as r}
-              <option value={r}>{rankBadgeLabel(r)}</option>
+              <option value={r}>{rankFloorLabel(r)}</option>
             {/each}
           </select>
         </div>

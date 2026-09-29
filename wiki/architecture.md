@@ -397,7 +397,7 @@ rebuilds both targets; build one directly with `wasm-pack` or `maturin develop`
 | `deck.rs` | deck parse/validate, TWDA export, `library_type_order_json` |
 | `ratings.rs` | rating points, `ranking_eligibility`, the two player counts |
 | `league.rs` | league standings (RTP/Score/GP) |
-| `agenda.rs` | agenda matching and the member's overrides, for the app's agenda and the personal feed |
+| `agenda.rs` | agenda matching and the member's overrides, for the app's agenda and the personal feed; the list's "and above" rank ladder (`meets_rank_floor`, per item) for both list views and the personal and public feeds |
 | `cards.rs` | card database lookup and name normalization |
 | `error.rs` | the error taxonomy |
 
@@ -935,7 +935,10 @@ member typed, and `link_preview.py` holds the guards
 `GET /api/calendar/tournaments.ics` serves iCal for client subscriptions. Feeds:
 **personal** (`?token=<calendar_token>`, agenda-matched), **country**
 (`?country=XX`, or `XX,YY` for several) and **global** (no params);
-`?online=false` excludes online events from any feed. The list's date window never
+`?online=false` excludes online events from any feed. The personal and public
+feeds also take the list's `?format=` and `?rank=` (`league`, `National
+Championship` or `Continental Championship`, each meaning that step and above),
+so a subscription copied from either view carries what the screen shows. The list's date window never
 rides into a feed: a subscription is open-ended.
 
 `calendar_token` is nullable on User, generated on demand, stripped from SSE, only

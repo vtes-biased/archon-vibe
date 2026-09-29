@@ -456,6 +456,11 @@ mod wasm {
             js_str(agenda_filter_json(viewer_json, events_json, include_online))
         }
 
+        #[wasm_bindgen(js_name = meetsRankFloor)]
+        pub fn meets_rank_floor(&self, rank: &str, in_league: bool, floor: &str) -> bool {
+            super::agenda::meets_rank_floor(rank, in_league, floor)
+        }
+
         #[wasm_bindgen(js_name = agendaToggleEntry)]
         pub fn agenda_toggle_entry(
             &self,
@@ -806,6 +811,10 @@ mod python {
             include_online: bool,
         ) -> PyResult<String> {
             py_str(agenda_filter_json(viewer_json, events_json, include_online))
+        }
+
+        fn meets_rank_floor(&self, rank: &str, in_league: bool, floor: &str) -> bool {
+            super::agenda::meets_rank_floor(rank, in_league, floor)
         }
 
         fn can_link_tournament_to_league(

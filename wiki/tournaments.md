@@ -89,7 +89,9 @@ without GP scoring — because outside the multideck and proxy prohibitions
 (tournament rules §3.1.5, §4.5) it differs from an ordinary tournament in nothing
 the app models, and a rank value earning only two prohibitions is not worth the
 category. Those two prohibitions are therefore left to organizer opt-in on a GP.
-Revisit if a Grand Prix ever acquires real structural differences.
+Revisit if a Grand Prix ever acquires real structural differences. The list's
+"League events and above" filter step — any league event, or any NC or CC — is
+how a Grand Prix is found, and it also takes in casual club leagues.
 
 **Card-set restrictions (§6.1.1) and the Restricted format (§7.9) are not
 modelled.** Such an event is entered as Limited, which is close enough in practice
