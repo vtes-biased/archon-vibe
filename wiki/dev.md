@@ -259,17 +259,17 @@ PostgreSQL's checkpoints land on PostgreSQL. The nightly `postgres-backup.servic
 is tracked while it runs, but Fluent Bit scrapes every 60 s: a run under two
 minutes leaves at most one point and no rate. The loop is capped at 10 MB.
 
-**PostgreSQL logs to the journal through syslog** (`log_destination`, set in
-`setup.py`: Debian's cluster wrapper otherwise sends it to a file under
+**PostgreSQL logs to the journal through syslog** (`log_destination`, set by
+server-setup's conf.d: Debian's cluster wrapper otherwise sends it to a file under
 `/var/log/postgresql` Fluent Bit never reads), so its lines reach Loki as
 `unit="postgresql@17-main.service"`. `syslog_split_messages` is off: journald
 takes long lines, and a slow statement over ~900 bytes would otherwise arrive as
-several. server-setup's conf.d logs statements over a
+several. The same conf.d logs statements over a
 second, lock waits, autovacuum runs over a second, checkpoints, DDL and temp files
-over 10 MB. `setup.py` sets the prefix `[%p] %q%a %u@%d `, which names the
+over 10 MB, with the prefix `[%p] %q%a %u@%d `, which names the
 connection's application — `archon-backend` or `archon-public-api`, set on each
 pool and suffixed with `/<request id>` while a request holds the connection, and
-`pg_dump` for the backup. server-setup gives beta's cluster the same prefix. Syslog shifts PostgreSQL's severities down one step, so its `ERROR` lines
+`pg_dump` for the backup, on prod and beta alike. Syslog shifts PostgreSQL's severities down one step, so its `ERROR` lines
 carry `level="warning"` and a plain `LOG` line `info`. Its internal statistics
 are not reported: Fluent Bit cannot query it.
 

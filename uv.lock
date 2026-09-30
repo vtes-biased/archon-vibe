@@ -181,7 +181,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-deploy = [{ name = "server-setup", git = "https://github.com/lionel-panhaleux/server-setup?tag=v2.2.0" }]
+deploy = [{ name = "server-setup", git = "https://github.com/lionel-panhaleux/server-setup?tag=v2.2.1" }]
 dev = [
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "maturin", specifier = ">=1.12.4" },
@@ -1787,8 +1787,8 @@ wheels = [
 
 [[package]]
 name = "server-setup"
-version = "2.2.0"
-source = { git = "https://github.com/lionel-panhaleux/server-setup?tag=v2.2.0#edbbad6a0095687051d96cdf081d2bb0344058a5" }
+version = "2.2.1"
+source = { git = "https://github.com/lionel-panhaleux/server-setup?tag=v2.2.1#8aad7d6633593aab05a42d81d910dcef2a6ff484" }
 dependencies = [
     { name = "pyinfra" },
 ]

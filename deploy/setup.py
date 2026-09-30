@@ -41,9 +41,6 @@ s.postgres_config(
         "shared_buffers": "96MB",
         "max_connections": "20",
         "effective_cache_size": "384MB",
-        "log_destination": "syslog",
-        "syslog_split_messages": "off",
-        "log_line_prefix": "[%p] %q%a %u@%d ",
     }
 )
 s.postgres_backups(

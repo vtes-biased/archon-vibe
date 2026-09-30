@@ -89,7 +89,7 @@ extra-paths = ["engine"]
 dataclass-field-order = "ignore"
 
 [tool.uv.sources]
-server-setup = { git = "https://github.com/lionel-panhaleux/server-setup", tag = "v2.2.0" }
+server-setup = { git = "https://github.com/lionel-panhaleux/server-setup", tag = "v2.2.1" }
 
 [dependency-groups]
 deploy = [
