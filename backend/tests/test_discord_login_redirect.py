@@ -56,10 +56,8 @@ async def _roundtrip(test_client, redirect: str) -> dict:
     return parse_qs(location.query)
 
 
-async def _cleanup_auth_method(discord_id: str) -> None:
-    auth = await db.get_auth_method_by_identifier("discord", discord_id)
-    assert auth is not None
-    await db.delete_auth_method(auth.uid)
+async def _assert_auth_method(discord_id: str) -> None:
+    assert await db.get_auth_method_by_identifier("discord", discord_id) is not None
 
 
 @pytest.mark.asyncio
@@ -69,7 +67,7 @@ async def test_redirect_survives_discord_roundtrip(test_client, monkeypatch):
         query = await _roundtrip(test_client, CONSENT_PATH)
     assert "token" in query and "refresh" in query
     assert query["redirect"] == [CONSENT_PATH]
-    await _cleanup_auth_method(discord_id)
+    await _assert_auth_method(discord_id)
 
 
 @pytest.mark.asyncio
@@ -79,4 +77,4 @@ async def test_non_path_redirect_is_dropped(test_client, monkeypatch, evil):
     async with fake_discord(monkeypatch, discord_id):
         query = await _roundtrip(test_client, evil)
     assert "redirect" not in query
-    await _cleanup_auth_method(discord_id)
+    await _assert_auth_method(discord_id)

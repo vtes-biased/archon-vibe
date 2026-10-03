@@ -129,7 +129,7 @@ session is invalidated on purpose.
 | Email + password | register, login, and change from the profile — `POST /auth/me/password` rewrites the credential on the session alone | `routes/auth/email_password.py`, `routes/auth/profile.py` |
 | Magic link | signup, password reset, invite; the link stays valid until the password is actually set, not merely verified | `email_service.py` |
 | WebAuthn / passkeys | FIDO2; four endpoints — `register/{options,verify}` to add to an existing authenticated account, and `create/{options,verify}` unauthenticated to create a new user | `passkeys.svelte.ts` |
-| Discord OAuth | `GET /auth/discord/authorize` (`?link=true` attaches the Discord ID to the authenticated user) → callback; login matches by Discord ID, then by the Discord email when verified (see [the email of record](#the-email-of-record)), or creates a user; every login stores that verified email on the Discord auth method | `routes/auth/discord.py` |
+| Discord OAuth | `GET /auth/discord/authorize` (`?link=true` attaches the Discord ID to the authenticated user) → callback; login matches by Discord ID, then by the Discord email when verified (see [the email of record](#the-email-of-record)), or creates a user; every sign-in stores that verified email and the Discord username on the Discord auth method | `routes/auth/discord.py` |
 | GitHub OAuth | **link-only**, not a login method; stores `github_login`/`github_id` on User (full-only), used to @-mention a reporter on their feedback issue | `routes/auth/github.py` |
 
 **Password, passkey and Discord login honour `/login?redirect=<path>`** (magic
@@ -139,6 +139,19 @@ again at the Discord authorize ingress, which carries the path through the
 OAuth state and back onto the callback's `/login` URL. The consent page sends
 its own path and query there, so a third-party OAuth login — the Discord bot's
 `login_hint=discord` links included — resumes the authorization after login.
+
+**A member holds any number of passkeys and Discord logins**, listed on the profile
+with Add and Link always offered. `DELETE /auth/me/methods/{uid}` removes one;
+an email login is not removable, and **the last remaining method is refused
+server-side** ([hazards](hazards.md#consumers-that-must-move-together)).
+
+**`discord_id` and `contact_discord` name the Discord last signed in with**, set
+together at every Discord sign-in and pinned in `local_modifications`, and a merge
+takes both from the same side. Removing that Discord re-points both at the
+remaining Discord login used most recently, or clears them; a login recorded before
+usernames were stored leaves `contact_discord` empty until its next sign-in. The
+Linked Roles token records the Discord it was minted for and is dropped with it, so
+a remaining Discord pushes no roles until it signs in.
 
 **`/login?mode=signup` opens the signup tab**; the page otherwise starts on login,
 so a "sign up" link without it lands the reader on the wrong one.

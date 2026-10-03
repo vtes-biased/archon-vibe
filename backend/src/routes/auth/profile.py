@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 
 import msgspec
 from argon2 import PasswordHasher
-from litestar import Request, Response, get, patch, post, put
+from litestar import Request, Response, delete, get, patch, post, put
 from litestar.exceptions import HTTPException
 from litestar.params import FromPath, FromQuery
 
@@ -21,10 +21,13 @@ from ...community_links import (
     validated_type,
 )
 from ...db import (
+    delete_auth_method_unless_last,
+    delete_transient_token,
     get_agenda,
     get_auth_methods_for_user,
     get_calendar_token,
     get_tournament_by_uid,
+    get_transient_token,
     save_user,
     set_agenda_entry,
     update_auth_method,
@@ -63,6 +66,21 @@ class PasswordChangeRequest(msgspec.Struct):
     password: Annotated[str, msgspec.Meta(min_length=8)]
 
 
+async def _auth_methods_info(user_uid: str) -> list[dict]:
+    return [
+        {
+            "uid": m.uid,
+            "type": m.method_type.value,
+            "identifier": m.identifier,
+            "verified": m.verified,
+            "username": m.username,
+            "created_at": m.created_at,
+            "last_used_at": m.last_used_at,
+        }
+        for m in await get_auth_methods_for_user(user_uid)
+    ]
+
+
 @get("/me")
 async def get_me(request: Request) -> Response:
     current_user = await get_current_user(request)
@@ -71,19 +89,9 @@ async def get_me(request: Request) -> Response:
     user.calendar_token = await get_calendar_token(user.uid)
     user.agenda_hidden, user.agenda_added = await get_agenda(user.uid)
 
-    auth_methods = await get_auth_methods_for_user(user.uid)
-    methods_info = [
-        {
-            "type": m.method_type.value,
-            "identifier": m.identifier,
-            "verified": m.verified,
-        }
-        for m in auth_methods
-    ]
-
     response_data = {
         "user": msgspec.to_builtins(user),
-        "auth_methods": methods_info,
+        "auth_methods": await _auth_methods_info(user.uid),
     }
     return Response(
         content=encoder.encode(response_data),
@@ -191,19 +199,9 @@ async def update_current_user(
     user.calendar_token = await get_calendar_token(user.uid)
     user.agenda_hidden, user.agenda_added = await get_agenda(user.uid)
 
-    auth_methods = await get_auth_methods_for_user(user.uid)
-    methods_info = [
-        {
-            "type": m.method_type.value,
-            "identifier": m.identifier,
-            "verified": m.verified,
-        }
-        for m in auth_methods
-    ]
-
     response_data = {
         "user": msgspec.to_builtins(user),
-        "auth_methods": methods_info,
+        "auth_methods": await _auth_methods_info(user.uid),
     }
     return Response(
         content=encoder.encode(response_data),
@@ -235,6 +233,51 @@ async def change_password(
                 email_auth, modified=now, credential_hash=password_hash
             )
         )
+
+
+@delete("/me/methods/{method_uid:str}", status_code=204)
+async def remove_auth_method(method_uid: FromPath[str], request: Request) -> None:
+    current_user = await get_current_user(request)
+    methods = await get_auth_methods_for_user(current_user.uid)
+    target = next((m for m in methods if m.uid == method_uid), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Login method not found")
+    if target.method_type == AuthMethodType.EMAIL:
+        raise HTTPException(status_code=422, detail="An email login cannot be removed")
+    removed, remaining = await delete_auth_method_unless_last(
+        current_user.uid, method_uid
+    )
+    if removed is None:
+        raise HTTPException(status_code=409, detail="This is your last way to sign in")
+    if removed.method_type != AuthMethodType.DISCORD:
+        return
+
+    stored = await get_transient_token(f"discord_rc:{current_user.uid}")
+    if (
+        stored
+        and stored.get("discord_id", current_user.discord_id) == removed.identifier
+    ):
+        await delete_transient_token(f"discord_rc:{current_user.uid}")
+    if current_user.discord_id != removed.identifier:
+        return
+    successor = max(
+        (m for m in remaining if m.method_type == AuthMethodType.DISCORD),
+        key=lambda m: (
+            m.last_used_at or m.created_at or datetime.min.replace(tzinfo=UTC)
+        ),
+        default=None,
+    )
+    # Pinned: both are in the legacy merge's ARCHON_USER_FIELDS, which reverts
+    # untracked values nightly — a bare clear would resurrect the removed Discord.
+    user = msgspec.structs.replace(
+        current_user,
+        modified=datetime.now(UTC),
+        discord_id=successor.identifier if successor else None,
+        contact_discord=successor.username if successor else None,
+        local_modifications=set(current_user.local_modifications)
+        | {"discord_id", "contact_discord"},
+    )
+    broadcast_precomputed(await save_user(user))
 
 
 # In-process (per-worker) quota on the one route that fetches an address a
@@ -331,6 +374,7 @@ handlers = [
     get_me,
     update_current_user,
     change_password,
+    remove_auth_method,
     read_link_title,
     set_agenda,
     generate_calendar_token,

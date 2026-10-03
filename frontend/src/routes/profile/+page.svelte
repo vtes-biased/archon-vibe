@@ -12,7 +12,7 @@
   import { HOF_MIN_WINS } from "$lib/tournament-utils";
   import { registerPasskey } from "$lib/stores/passkeys.svelte";
   import { syncManager } from "$lib/sync";
-  import { claimVeknId, abandonVeknId, uploadAvatar, getNdaStatus, type NdaStatus } from "$lib/api";
+  import { apiRequest, claimVeknId, abandonVeknId, uploadAvatar, getNdaStatus, type NdaStatus } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
 
   import { CircleUser, TriangleAlert, Trophy, FileSignature, IdCard, Swords, Settings } from "@lucide/svelte";
@@ -70,15 +70,8 @@
   const emailIdentifier = $derived(
     auth.authMethods.find((am) => am.type === "email")?.identifier || null
   );
-  const hasPasskey = $derived(
-    auth.isAuthenticated && auth.authMethods.some((am) => am.type === "passkey")
-  );
-  const hasDiscord = $derived(
-    auth.isAuthenticated && auth.authMethods.some((am) => am.type === "discord")
-  );
-  const discordUsername = $derived(
-    auth.authMethods.find((am) => am.type === "discord")?.identifier || null
-  );
+  const passkeys = $derived(auth.authMethods.filter((am) => am.type === "passkey"));
+  const discordLogins = $derived(auth.authMethods.filter((am) => am.type === "discord"));
   // GitHub is a link-only field on the user (not a login method), so its state
   // comes from the user object rather than authMethods.
   const hasGithub = $derived(!!auth.user?.github_login);
@@ -155,6 +148,11 @@
     passkeyMessage = "";
     const success = await registerPasskey();
     if (success) passkeyMessage = m.profile_passkey_registered();
+  }
+
+  async function handleRemoveMethod(uid: string) {
+    await apiRequest(`/auth/me/methods/${uid}`, { method: "DELETE" }, { suppressErrorToast: true });
+    await initAuth();
   }
 
   async function handleLinkEmail(email: string): Promise<boolean> {
@@ -302,11 +300,11 @@
             <LinkedAccounts
               {hasEmail}
               {emailIdentifier}
-              {hasDiscord}
-              {discordUsername}
+              {discordLogins}
+              {passkeys}
+              canRemove={auth.authMethods.length > 1}
               {hasGithub}
               {githubUsername}
-              {hasPasskey}
               {discordMessage}
               {discordError}
               {githubMessage}
@@ -319,6 +317,7 @@
               onLinkGithub={handleLinkGithub}
               onUnlinkGithub={handleUnlinkGithub}
               onRegisterPasskey={handleRegisterPasskey}
+              onRemoveMethod={handleRemoveMethod}
             />
             <AuthorizedApps />
             {#if ndaRecords.length}

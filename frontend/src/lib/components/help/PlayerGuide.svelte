@@ -223,10 +223,13 @@
         <DiscordIcon class="w-5 h-5 text-[#5865F2] shrink-0" />
         <div class="min-w-0">
           <p class="text-ink-strong">Discord</p>
-          <p class="text-sm text-ink-muted">janedoe</p>
         </div>
       </div>
-      <span class="shrink-0 px-3 py-1 text-sm rounded badge-success">{m.profile_linked()}</span>
+      <button class="shrink-0 px-4 py-2 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded font-medium transition-colors">{m.profile_link()}</button>
+    </div>
+    <div class="ml-8 flex items-center justify-between gap-2">
+      <p class="text-sm text-ink-muted truncate">janedoe</p>
+      <Button variant="secondary" size="sm">{m.profile_remove()}</Button>
     </div>
     <div class="flex items-center justify-between gap-3">
       <div class="flex items-center gap-3 min-w-0">
@@ -246,7 +249,11 @@
           <p class="text-sm text-ink-muted">{m.profile_passkey_configured()}</p>
         </div>
       </div>
-      <span class="shrink-0 px-3 py-1 text-sm rounded badge-success">{m.profile_passkey_active()}</span>
+      <Button variant="secondary" size="lg" class="shrink-0">{m.common_add()}</Button>
+    </div>
+    <div class="ml-8 flex items-center justify-between gap-2">
+      <p class="text-sm text-ink-muted">{m.profile_passkey_added_on({ date: "12 Mar 2026" })}</p>
+      <Button variant="secondary" size="sm">{m.profile_remove()}</Button>
     </div>
 
     <div class="pt-4 border-t border-line space-y-4">

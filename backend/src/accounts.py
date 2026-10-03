@@ -200,6 +200,8 @@ async def merge_users(
     else:
         sponsor_side = keep_user if keep_user.coopted_by else delete_user_obj
 
+    discord_side = delete_user_obj if delete_user_obj.discord_id else keep_user
+
     # msgspec.structs.replace keeps every unlisted field; only fields with a
     # real merge policy are overridden below.
     merged = msgspec.structs.replace(
@@ -214,8 +216,8 @@ async def merge_users(
         roles=list(set(keep_user.roles) | set(delete_user_obj.roles)),
         avatar_path=delete_user_obj.avatar_path or keep_user.avatar_path,
         contact_email=delete_user_obj.contact_email or keep_user.contact_email,
-        contact_discord=delete_user_obj.contact_discord or keep_user.contact_discord,
-        discord_id=delete_user_obj.discord_id or keep_user.discord_id,
+        contact_discord=discord_side.contact_discord,
+        discord_id=discord_side.discord_id,
         contact_phone=delete_user_obj.contact_phone or keep_user.contact_phone,
         phone_is_whatsapp=delete_user_obj.phone_is_whatsapp
         or keep_user.phone_is_whatsapp,

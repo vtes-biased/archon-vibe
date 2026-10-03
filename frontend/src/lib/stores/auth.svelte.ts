@@ -11,10 +11,14 @@ const REFRESH_THRESHOLD_MS = 60 * 1000;
 
 const OWNER_ONLY_USER_FIELDS = ["calendar_token", "agenda_hidden", "agenda_added"] as const satisfies readonly (keyof User)[];
 
-interface AuthMethod {
+export interface AuthMethod {
+  uid: string;
   type: string;
   identifier: string;
   verified: boolean;
+  username: string | null;
+  created_at: string | null;
+  last_used_at: string | null;
 }
 
 interface AuthState {
@@ -34,7 +38,7 @@ interface TokenResponse {
 
 interface MeResponse {
   user: User;
-  auth_methods: { type: string; identifier: string; verified: boolean }[];
+  auth_methods: AuthMethod[];
 }
 
 let authState = $state<AuthState>({

@@ -939,9 +939,26 @@ async def get_auth_methods_for_user(user_uid: str) -> list[AuthMethod]:
         return [decode_json(row[0], AuthMethod) for row in rows]
 
 
-async def delete_auth_method(uid: str) -> None:
+async def delete_auth_method_unless_last(
+    user_uid: str, uid: str
+) -> tuple[AuthMethod | None, list[AuthMethod]]:
+    """(removed, remaining); removed is None when uid is not the member's or is
+    their last method, and nothing is deleted."""
     async with get_connection() as conn:
-        await conn.execute("DELETE FROM auth_methods WHERE uid = %s", (uid,))
+        async with conn.transaction():
+            result = await conn.execute(
+                "SELECT data FROM auth_methods WHERE data->>'user_uid' = %s FOR UPDATE",
+                (user_uid,),
+            )
+            methods = [
+                decode_json(row[0], AuthMethod) for row in await result.fetchall()
+            ]
+            target = next((m for m in methods if m.uid == uid), None)
+            remaining = [m for m in methods if m.uid != uid]
+            if target is None or not remaining:
+                return None, methods
+            await conn.execute("DELETE FROM auth_methods WHERE uid = %s", (uid,))
+            return target, remaining
 
 
 async def save_sanction(sanction: Sanction) -> BroadcastData:

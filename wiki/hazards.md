@@ -341,6 +341,13 @@ queries one source directly misses members the others would find, and one that
 reads `contact_email` directly skips the never-activated gate, letting whoever
 typed an address into their profile claim its owner's login.
 
+**Deleting a member's last auth method reopens their account to strangers.** With
+none, a VEKN record reads as unclaimed to `POST /vekn/claim` and
+`get_user_by_email` matches its unverified address of record. The removal route
+counts and deletes under `FOR UPDATE` on the member's rows
+(`db.delete_auth_method_unless_last`), so two concurrent removals cannot both
+pass; `anonymize_user` deletes them all on purpose. Any further deleter must count.
+
 **A new full-access branch in `entitled_level` wires only the live path.** A
 non-country, non-own-object full grant must also be added to the overlay frames, or
 a resync re-delivers the lower projection ([sync](sync.md#access-entitlement)).

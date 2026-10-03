@@ -172,7 +172,8 @@ async def sync_user_discord_roles(user_uid: str) -> None:
 
         await store_transient_token(
             f"discord_rc:{user_uid}",
-            {
+            stored
+            | {
                 "access_token": new_tokens["access_token"],
                 "refresh_token": new_tokens.get("refresh_token", rt),
             },

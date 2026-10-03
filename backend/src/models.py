@@ -293,6 +293,10 @@ class AuthMethod(msgspec.Struct, kw_only=True):
         str | None,
         msgspec.Meta(description="Verified email Discord reported at the last login."),
     ] = None
+    username: Annotated[
+        str | None,
+        msgspec.Meta(description="Discord username reported at the last login."),
+    ] = None
 
 
 class User(BaseObject, kw_only=True):

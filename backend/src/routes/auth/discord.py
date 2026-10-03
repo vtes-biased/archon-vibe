@@ -8,6 +8,7 @@ from typing import Annotated
 from urllib.parse import urlencode
 from uuid import uuid7
 
+import msgspec
 from litestar import get
 from litestar.exceptions import HTTPException
 from litestar.params import FromHeader, FromQuery, QueryParameter
@@ -162,211 +163,137 @@ async def discord_callback(
     discord_email = discord_user.get("email") if discord_email_verified else None
 
     existing_auth = await get_auth_method_by_identifier("discord", discord_id)
+    now = datetime.now(UTC)
 
     if link_mode and user_uid_from_state:
+        user_uid = user_uid_from_state
         redirect_path = stored.get("redirect") or "/profile"
-        if not is_active_account(await get_user_by_uid(user_uid_from_state)):
+        if not is_active_account(await get_user_by_uid(user_uid)):
             return Redirect(
                 f"{frontend_url}/login?error=account_deleted", status_code=302
             )
-        if existing_auth:
-            if existing_auth.user_uid == user_uid_from_state:
+        outcome = "success"
+        if existing_auth and existing_auth.user_uid == user_uid:
+            outcome = "already"
+        elif existing_auth:
+            # merge_users refuses to absorb a VEKN-bearing account — re-linking
+            # Discord must not swallow another account's VEKN identity.
+            try:
+                merge_result = await merge_users(user_uid, existing_auth.user_uid)
+            except ValueError:
+                merge_result = None
+            if not merge_result:
                 return Redirect(
-                    f"{frontend_url}{redirect_path}?discord_linked=already",
+                    f"{frontend_url}{redirect_path}?error=merge_failed",
                     status_code=302,
                 )
-            else:
-                # merge_users refuses to absorb a VEKN-bearing account — re-linking
-                # Discord must not swallow another account's VEKN identity.
-                try:
-                    merge_result = await merge_users(
-                        user_uid_from_state, existing_auth.user_uid
-                    )
-                except ValueError:
-                    merge_result = None
-                if not merge_result:
-                    return Redirect(
-                        f"{frontend_url}{redirect_path}?error=merge_failed",
-                        status_code=302,
-                    )
-                # Push the merge to other clients' caches live; the
-                # survivor's discord-field update broadcasts again below.
-                _merged, merge_bds = merge_result
-                for bd in merge_bds:
-                    broadcast_precomputed(bd)
-                # Auth method already reassigned by merge.
+            _merged, merge_bds = merge_result
+            for bd in merge_bds:
+                broadcast_precomputed(bd)
         else:
-            now = datetime.now(UTC)
-            auth_method = AuthMethod(
+            await insert_auth_method(_new_discord_method(user_uid, discord_id, now))
+
+        await _record_discord_sign_in(
+            user_uid, discord_id, discord_username, discord_global_name, discord_email
+        )
+        await _store_and_push_discord_roles(user_uid, discord_id, discord_tokens)
+
+        return Redirect(
+            f"{frontend_url}{redirect_path}?discord_linked={outcome}",
+            status_code=302,
+        )
+
+    if existing_auth:
+        user_uid = existing_auth.user_uid
+    else:
+        user = await get_user_by_email(discord_email) if discord_email else None
+        if not user:
+            user = User(
                 uid=str(uuid7()),
                 modified=now,
-                user_uid=user_uid_from_state,
-                method_type=AuthMethodType.DISCORD,
-                identifier=discord_id,
-                email=discord_email,
-                credential_hash=None,
-                verified=True,
-                created_at=now,
-                last_used_at=now,
+                name=discord_username or "",
+                contact_email=discord_email,
             )
-            await insert_auth_method(auth_method)
+            await save_user(user)
+        user_uid = user.uid
+        await insert_auth_method(_new_discord_method(user_uid, discord_id, now))
 
-        # Pin in local_modifications: these fields are in the legacy merge's
-        # ARCHON_USER_FIELDS, so untracked values get reverted by the nightly merge.
-        user = await get_user_by_uid(user_uid_from_state)
-        if user:
-            changed = False
-            local_mods = set(user.local_modifications)
-            if user.discord_id != discord_id:
-                user.discord_id = discord_id
-                local_mods.add("discord_id")
-                changed = True
-            if not user.contact_discord:
-                user.contact_discord = discord_username
-                local_mods.add("contact_discord")
-                changed = True
-            if not user.nickname and discord_global_name:
-                user.nickname = discord_global_name
-                local_mods.add("nickname")
-                changed = True
-            if changed:
-                user.local_modifications = local_mods
-                user.modified = datetime.now(UTC)
-                broadcast_precomputed(await save_user(user))
+    # A tombstoned (IC-deleted) account keeps its Discord auth method — block a
+    # fresh login from re-minting for it (a new signup has a live uid, passes).
+    if not is_active_account(await get_user_by_uid(user_uid)):
+        return Redirect(f"{frontend_url}/login?error=account_deleted", status_code=302)
 
-        await _store_and_push_discord_roles(user_uid_from_state, discord_tokens)
+    await _record_discord_sign_in(
+        user_uid, discord_id, discord_username, discord_global_name, discord_email
+    )
+    await _store_and_push_discord_roles(user_uid, discord_id, discord_tokens)
 
-        return Redirect(
-            f"{frontend_url}{redirect_path}?discord_linked=success",
-            status_code=302,
+    access_token, _ = create_access_token(user_uid)
+    refresh_token = create_refresh_token(user_uid)
+
+    token_params = {"token": access_token, "refresh": refresh_token}
+    if stored.get("redirect"):
+        token_params["redirect"] = stored["redirect"]
+    params = urlencode(token_params)
+    return Redirect(f"{frontend_url}/login?{params}", status_code=302)
+
+
+def _new_discord_method(user_uid: str, discord_id: str, now: datetime) -> AuthMethod:
+    return AuthMethod(
+        uid=str(uuid7()),
+        modified=now,
+        user_uid=user_uid,
+        method_type=AuthMethodType.DISCORD,
+        identifier=discord_id,
+        verified=True,
+        created_at=now,
+    )
+
+
+async def _record_discord_sign_in(
+    user_uid: str,
+    discord_id: str,
+    username: str,
+    global_name: str | None,
+    email: str | None,
+) -> None:
+    now = datetime.now(UTC)
+    method = await get_auth_method_by_identifier("discord", discord_id)
+    if method:
+        await update_auth_method(
+            msgspec.structs.replace(
+                method, modified=now, last_used_at=now, email=email, username=username
+            )
         )
-
-    else:
-        if existing_auth:
-            user_uid = existing_auth.user_uid
-
-            now = datetime.now(UTC)
-            updated_auth = AuthMethod(
-                uid=existing_auth.uid,
-                modified=now,
-                user_uid=existing_auth.user_uid,
-                method_type=existing_auth.method_type,
-                identifier=existing_auth.identifier,
-                credential_hash=existing_auth.credential_hash,
-                verified=existing_auth.verified,
-                created_at=existing_auth.created_at,
-                last_used_at=now,
-                email=discord_email,
-            )
-            await update_auth_method(updated_auth)
-
-            # Pin discord_id (in ARCHON_USER_FIELDS) so the nightly merge won't revert it.
-            user = await get_user_by_uid(user_uid)
-            if user and user.discord_id != discord_id:
-                user.discord_id = discord_id
-                user.local_modifications = set(user.local_modifications) | {
-                    "discord_id"
-                }
-                user.modified = now
-                await save_user(user)
-        else:
-            user = await get_user_by_email(discord_email) if discord_email else None
-
-            now = datetime.now(UTC)
-
-            if user:
-                user_uid = user.uid
-                auth_method = AuthMethod(
-                    uid=str(uuid7()),
-                    modified=now,
-                    user_uid=user_uid,
-                    method_type=AuthMethodType.DISCORD,
-                    identifier=discord_id,
-                    email=discord_email,
-                    credential_hash=None,
-                    verified=True,
-                    created_at=now,
-                    last_used_at=now,
-                )
-                await insert_auth_method(auth_method)
-
-                # Pin in local_modifications (fields in ARCHON_USER_FIELDS) so the
-                # nightly merge won't revert them.
-                changed = False
-                local_mods = set(user.local_modifications)
-                if user.discord_id != discord_id:
-                    user.discord_id = discord_id
-                    local_mods.add("discord_id")
-                    changed = True
-                if not user.contact_discord:
-                    user.contact_discord = discord_username
-                    local_mods.add("contact_discord")
-                    changed = True
-                if not user.nickname and discord_global_name:
-                    user.nickname = discord_global_name
-                    local_mods.add("nickname")
-                    changed = True
-                if changed:
-                    user.local_modifications = local_mods
-                    user.modified = now
-                    await save_user(user)
-            else:
-                user = User(
-                    uid=str(uuid7()),
-                    modified=now,
-                    name=discord_username or "",
-                    nickname=discord_global_name,
-                    discord_id=discord_id,
-                    contact_discord=discord_username,
-                    contact_email=discord_email,
-                )
-                await save_user(user)
-                user_uid = user.uid
-
-                auth_method = AuthMethod(
-                    uid=str(uuid7()),
-                    modified=now,
-                    user_uid=user_uid,
-                    method_type=AuthMethodType.DISCORD,
-                    identifier=discord_id,
-                    email=discord_email,
-                    credential_hash=None,
-                    verified=True,
-                    created_at=now,
-                    last_used_at=now,
-                )
-                await insert_auth_method(auth_method)
-
-        await _store_and_push_discord_roles(user_uid, discord_tokens)
-
-        # A tombstoned (IC-deleted) account keeps its Discord auth method — block a
-        # fresh login from re-minting for it (a new signup has a live uid, passes).
-        login_user = await get_user_by_uid(user_uid)
-        if not is_active_account(login_user):
-            return Redirect(
-                f"{frontend_url}/login?error=account_deleted", status_code=302
-            )
-
-        access_token, _ = create_access_token(user_uid)
-        refresh_token = create_refresh_token(user_uid)
-
-        token_params = {"token": access_token, "refresh": refresh_token}
-        if stored.get("redirect"):
-            token_params["redirect"] = stored["redirect"]
-        params = urlencode(token_params)
-        return Redirect(
-            f"{frontend_url}/login?{params}",
-            status_code=302,
-        )
+    user = await get_user_by_uid(user_uid)
+    if not user:
+        return
+    # Pinned: these are in the legacy merge's ARCHON_USER_FIELDS, which reverts
+    # untracked values nightly.
+    fields = {"discord_id": discord_id, "contact_discord": username or None}
+    if not user.nickname and global_name:
+        fields["nickname"] = global_name
+    if all(getattr(user, k) == v for k, v in fields.items()):
+        return
+    updated = msgspec.structs.replace(
+        user,
+        modified=now,
+        local_modifications=set(user.local_modifications) | fields.keys(),
+        **fields,
+    )
+    broadcast_precomputed(await save_user(updated))
 
 
-async def _store_and_push_discord_roles(user_uid: str, discord_tokens: dict) -> None:
+async def _store_and_push_discord_roles(
+    user_uid: str, discord_id: str, discord_tokens: dict
+) -> None:
     try:
         await store_transient_token(
             f"discord_rc:{user_uid}",
             {
                 "access_token": discord_tokens["access_token"],
                 "refresh_token": discord_tokens.get("refresh_token", ""),
+                "discord_id": discord_id,
             },
             datetime.now(UTC) + timedelta(days=365),
         )

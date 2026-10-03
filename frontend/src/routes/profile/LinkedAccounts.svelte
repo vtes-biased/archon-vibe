@@ -4,16 +4,18 @@
   import DiscordIcon from "$lib/components/DiscordIcon.svelte";
   import GithubIcon from "$lib/components/GithubIcon.svelte";
   import Button from "$lib/components/Button.svelte";
+  import ConfirmActionModal from "$lib/components/ConfirmActionModal.svelte";
+  import type { AuthMethod } from "$lib/stores/auth.svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   interface Props {
     hasEmail: boolean;
     emailIdentifier: string | null;
-    hasDiscord: boolean;
-    discordUsername: string | null;
+    discordLogins: AuthMethod[];
+    passkeys: AuthMethod[];
+    canRemove: boolean;
     hasGithub: boolean;
     githubUsername: string | null;
-    hasPasskey: boolean;
     discordMessage: string;
     discordError: string;
     githubMessage: string;
@@ -26,14 +28,28 @@
     onLinkGithub: () => void;
     onUnlinkGithub: () => void;
     onRegisterPasskey: () => void;
+    onRemoveMethod: (uid: string) => Promise<unknown>;
   }
   let {
     hasEmail, emailIdentifier,
-    hasDiscord, discordUsername,
-    hasGithub, githubUsername, hasPasskey,
+    discordLogins, passkeys, canRemove,
+    hasGithub, githubUsername,
     discordMessage, discordError, githubMessage, githubError, passkeyMessage, error,
     onLinkEmail, onChangePassword, onLinkDiscord, onLinkGithub, onUnlinkGithub, onRegisterPasskey,
+    onRemoveMethod,
   }: Props = $props();
+
+  let removing = $state<AuthMethod | null>(null);
+
+  function formatDate(iso: string): string {
+    return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
+
+  function passkeyDates(passkey: AuthMethod): string {
+    const added = passkey.created_at ? m.profile_passkey_added_on({ date: formatDate(passkey.created_at) }) : "";
+    const used = passkey.last_used_at ? m.profile_login_last_used({ date: formatDate(passkey.last_used_at) }) : "";
+    return [added, used].filter(Boolean).join(" · ");
+  }
 
   let registeringPasskey = $state(false);
   let showEmailSetup = $state(false);
@@ -164,22 +180,24 @@
       <DiscordIcon class="w-5 h-5 text-[#5865F2]" />
       <div>
         <p class="text-ink-strong">Discord</p>
-        {#if hasDiscord && discordUsername}
-          <p class="text-sm text-ink-muted">{discordUsername}</p>
-        {:else}
+        {#if !discordLogins.length}
           <p class="text-sm text-ink-muted">{m.profile_not_linked()}</p>
         {/if}
       </div>
     </div>
-    {#if !hasDiscord}
-      <button onclick={onLinkDiscord}
-        class="px-4 py-2 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded font-medium transition-colors">
-        {m.profile_link()}
-      </button>
-    {:else}
-      <span class="px-3 py-1 text-sm rounded badge-success">{m.profile_linked()}</span>
-    {/if}
+    <button onclick={onLinkDiscord}
+      class="px-4 py-2 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded font-medium transition-colors">
+      {m.profile_link()}
+    </button>
   </div>
+  {#each discordLogins as discord (discord.uid)}
+    <div class="ml-8 flex items-center justify-between gap-2">
+      <p class="text-sm text-ink-muted truncate">{discord.username ?? discord.identifier}</p>
+      {#if canRemove}
+        <Button variant="secondary" size="sm" onclick={() => (removing = discord)}>{m.profile_remove()}</Button>
+      {/if}
+    </div>
+  {/each}
   {#if discordMessage}
     <p class="text-sm text-info">{discordMessage}</p>
   {/if}
@@ -217,31 +235,47 @@
     <p class="text-sm text-link">{githubError}</p>
   {/if}
 
-  {#if isPasskeySupported()}
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <KeyRound class="w-5 h-5 text-ink-muted" />
-        <div>
-          <p class="text-ink-strong">Passkey</p>
-          <p class="text-sm text-ink-muted">
-            {hasPasskey ? m.profile_passkey_configured() : m.profile_passkey_not_setup()}
-          </p>
-        </div>
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <KeyRound class="w-5 h-5 text-ink-muted" />
+      <div>
+        <p class="text-ink-strong">Passkey</p>
+        <p class="text-sm text-ink-muted">
+          {passkeys.length ? m.profile_passkey_configured() : m.profile_passkey_not_setup()}
+        </p>
       </div>
-      {#if !hasPasskey}
-        <Button variant="secondary" size="lg" loading={registeringPasskey} onclick={handleRegisterPasskey}>
-          {registeringPasskey ? m.profile_passkey_adding() : m.common_add()}
-        </Button>
-      {:else}
-        <span class="px-3 py-1 text-sm rounded badge-success">{m.profile_passkey_active()}</span>
+    </div>
+    {#if isPasskeySupported()}
+      <Button variant="secondary" size="lg" loading={registeringPasskey} onclick={handleRegisterPasskey}>
+        {registeringPasskey ? m.profile_passkey_adding() : m.common_add()}
+      </Button>
+    {/if}
+  </div>
+  {#each passkeys as passkey (passkey.uid)}
+    <div class="ml-8 flex items-center justify-between gap-2">
+      <p class="text-sm text-ink-muted">{passkeyDates(passkey)}</p>
+      {#if canRemove}
+        <Button variant="secondary" size="sm" onclick={() => (removing = passkey)}>{m.profile_remove()}</Button>
       {/if}
     </div>
-    {#if passkeyMessage}
-      <p class="text-sm text-info">{passkeyMessage}</p>
-    {/if}
+  {/each}
+  {#if passkeyMessage}
+    <p class="text-sm text-info">{passkeyMessage}</p>
   {/if}
 
   {#if error}
     <p class="text-sm text-link">{error}</p>
   {/if}
 </div>
+
+{#if removing}
+  {@const method = removing}
+  <ConfirmActionModal
+    title={m.profile_login_remove_title()}
+    body={m.profile_login_remove_body()}
+    confirmLabel={m.profile_remove()}
+    reportResult={false}
+    action={() => onRemoveMethod(method.uid)}
+    onClose={() => (removing = null)}
+  />
+{/if}
