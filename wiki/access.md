@@ -41,8 +41,10 @@ omitted from the rows below.
 | `manage_nda` | PTC — global (request, upload, view and download playtest NDA records) |
 
 `moderate_link` and `promote_link_national` scope on the **link's** country, which
-a `CommunityLink` carries as a field of its own defaulting to its owner's — so an
-NC curates every link serving their country wherever its owner lives
+a channel carries as a field of its own defaulting to its owner's — so an NC
+curates every link serving their country wherever its owner lives. Content has a
+country only while pinned national, and any NC may pin unpinned content into
+their own card, which is the one cross-country reach the grant gives
 ([architecture](architecture.md#community-links)).
 
 `set_archival_results` is IC-only rather than organizer, because the rows it

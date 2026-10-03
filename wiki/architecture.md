@@ -875,13 +875,22 @@ line.
 frontend reads it through `getCommunityLinkReference()`. Adding a platform is a
 row there plus a label, colour and icon in `CommunityLinkPills.svelte`.
 
-**A link carries its own country**, defaulting to the owner's at creation and
-owner-settable — the Brazilian Discord run from Portugal. Every moderation
-decision keys off the link's country, never its owner's. It is **required**: a
-national pin files a link under a country, so one without a country would be
-pinned into a card nobody can reach. The editor's country field has no empty
-choice, so a member with no country of their own picks one there rather than
-being turned away.
+**A channel carries its own country**, defaulting to the owner's at creation and
+owner-settable — the Brazilian Discord run from Portugal. It is **required**: an
+unpinned channel lands in its country's card, so one without a country would sit
+in a card nobody can reach. The editor's country field has no empty choice, so a
+member with no country of their own picks one there rather than being turned
+away.
+
+**Content carries a country only while pinned national**, and it is the
+pinner's: any NC may pin an unpinned content link into their own card, the
+backend taking the actor's country, and unpinning clears it. Asking the owner for
+one read as an audience restriction (gh-44) when content serves whoever reads its
+languages. A pin held by one country is refused to another; a hidden or global
+link needs the owner country's authority to be pinned. The pin is all that reach
+grants — no hiding, no field edits. Unpinned content is moderated by its owner's
+country. Every moderation decision keys off the link's country where it has one,
+the owner's otherwise.
 
 **Placement follows the pins, not the platform**, because platform does not
 determine function: an NC's Instagram is an announcements channel and a player's

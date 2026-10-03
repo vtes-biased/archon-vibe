@@ -42,7 +42,9 @@
   const canModerate = (country: string | null) => canModerateLink(auth.user, country).allowed;
   const canPromoteNational = (country: string | null) => canPromoteLinkNational(auth.user, country).allowed;
   const isOwn = (e: LinkEntry) => e.user.uid === auth.user?.uid;
-  const canEdit = (e: LinkEntry) => isOwn(e) || canModerate(linkCountry(e));
+  const canPinContent = (e: LinkEntry) =>
+    !e.link.moderation && reference.placement[e.link.type] === "content" && canPromoteNational(ownCountry);
+  const canEdit = (e: LinkEntry) => isOwn(e) || canModerate(linkCountry(e)) || canPinContent(e);
 
   const pinScope = (l: CommunityLink) =>
     l.moderation === "global" || l.moderation === "national" ? l.moderation : null;

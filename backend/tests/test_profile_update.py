@@ -67,8 +67,7 @@ async def test_nc_can_set_community_links(test_client: AsyncClient, test_db):
     assert links[0]["type"] == "discord"
     assert links[0]["url"] == "https://discord.gg/vtes"
     assert links[1]["type"] == "website"
-    # An unstated country defaults to the owner's, which is what the page places on.
-    assert [link["country"] for link in links] == ["FR", "FR"]
+    assert [link["country"] for link in links] == ["FR", None]
 
 
 @pytest.mark.asyncio

@@ -159,8 +159,9 @@ class CommunityLink(msgspec.Struct, kw_only=True, frozen=True):
     country: Annotated[
         str | None,
         msgspec.Meta(
-            description="ISO 3166-1 alpha-2 code of the country the link serves. "
-            "Null falls back to the owner's country."
+            description="ISO 3166-1 alpha-2 code of the country a channel serves, "
+            "or that a content link is pinned into. Null falls back to the "
+            "owner's country."
         ),
     ] = None
     moderation: Annotated[

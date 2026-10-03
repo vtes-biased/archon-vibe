@@ -26,7 +26,7 @@ from ..db import upsert_avatar as db_upsert_avatar
 from ..db import user_has_nda as db_user_has_nda
 from ..geonames import stored_country
 from ..middleware.auth import get_current_user, get_optional_user
-from ..models import Role, User
+from ..models import CONTENT_LINK_TYPES, Role, User
 from ..vekn_push import push_member_background
 from .auth import send_invite_email
 
@@ -420,19 +420,17 @@ async def edit_community_link(
     if prior is None:
         raise HTTPException(status_code=404, detail="Link not found on target user")
 
-    # A move needs authority over where it lands as well as where it sits.
-    if not permissions.can_moderate_link(current_user, prior.country or target.country):
+    curates = permissions.can_moderate_link(
+        current_user, prior.country or target.country
+    )
+    pins_content = (
+        prior.type in CONTENT_LINK_TYPES
+        and prior.moderation is None
+        and data.state == "national"
+    )
+    if not curates and not pins_content:
         raise HTTPException(
             status_code=403, detail="Can only moderate links in your country"
-        )
-    country = community_links.validated_country(
-        data.country, prior.country or target.country
-    )
-    if country != prior.country and not permissions.can_moderate_link(
-        current_user, country
-    ):
-        raise HTTPException(
-            status_code=403, detail="Can only move a link into your own country"
         )
 
     link_type = community_links.validated_type(data.type) if data.type else prior.type
@@ -441,10 +439,16 @@ async def edit_community_link(
         link_type,
         prior,
     )
-    mod = prior.moderation
-    if data.state is not None:
-        mod = community_links.moderation_for(
-            current_user, data.state, country, mod, target.uid, data.url
+    country, mod = community_links.placement(
+        current_user, link_type, data.country, data.state, prior, target, data.url
+    )
+    if (
+        country
+        and country != prior.country
+        and not permissions.can_moderate_link(current_user, country)
+    ):
+        raise HTTPException(
+            status_code=403, detail="Can only move a link into your own country"
         )
 
     edited = msgspec.structs.replace(
@@ -455,6 +459,12 @@ async def edit_community_link(
         country=country,
         moderation=mod,
     )
+    if not curates and edited != msgspec.structs.replace(
+        prior, country=country, moderation=mod
+    ):
+        raise HTTPException(
+            status_code=403, detail="You can only pin this link into your country"
+        )
     target.community_links = [
         edited if link.url == data.url else link for link in target.community_links
     ]

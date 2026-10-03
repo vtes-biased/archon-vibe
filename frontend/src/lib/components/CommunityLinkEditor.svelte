@@ -42,18 +42,26 @@
   const auth = $derived(getAuthState());
   const currentModeration = original?.moderation ?? "none";
   let moderation = $state<string>(currentModeration);
-  const canPinNational = $derived(canPromoteLinkNational(auth.user, country || null).allowed);
+  const reference = $derived(getCommunityLinkReference());
+  const isContent = $derived(reference.placement[type] === "content");
+  // svelte-ignore state_referenced_locally
+  const pinnedIn = currentModeration === "national" ? original?.country ?? ownerCountry : null;
+  const scope = $derived(isContent ? pinnedIn ?? ownerCountry : country || null);
+  const canHide = $derived(canModerateLink(auth.user, scope).allowed);
+  const pinOnly = $derived(isContent && !canEditUrl && !canHide);
+  const canPinNational = $derived(
+    isContent && !pinnedIn
+      ? (currentModeration === "none" || canHide) && canPromoteLinkNational(auth.user, auth.user?.country ?? null).allowed
+      : canPromoteLinkNational(auth.user, scope).allowed
+  );
   const canPinGlobal = $derived(canPromoteLinkGlobal(auth.user).allowed);
-  const canHide = $derived(canModerateLink(auth.user, country || null).allowed);
   const moderationChoices = $derived([
-    ...(canHide ? [{ value: "none", label: m.community_pin_none() }] : []),
+    ...(canHide || pinOnly ? [{ value: "none", label: m.community_pin_none() }] : []),
     ...(canPinNational ? [{ value: "national", label: m.community_moderate_promote_national() }] : []),
     ...(canPinGlobal ? [{ value: "global", label: m.community_moderate_promote_global() }] : []),
     ...(canHide ? [{ value: "hidden", label: m.community_moderate_hide() }] : []),
   ]);
 
-  const reference = $derived(getCommunityLinkReference());
-  const isContent = $derived(reference.placement[type] === "content");
   const linkTypes = $derived(reference.types);
   const needsLanguage = $derived(isContent && languages.length === 0);
   const dropsPin = $derived(!!original?.moderation && url.trim() !== original.url);
@@ -80,14 +88,14 @@
 
   function save() {
     touched = true;
-    if (!url.trim().startsWith("http") || needsLanguage || !country) return;
+    if (!url.trim().startsWith("http") || needsLanguage || (!isContent && !country)) return;
     onsave(
       {
         type,
         url: url.trim(),
         label: label.trim(),
         languages: isContent ? languages : [],
-        country: country || null,
+        country: isContent ? null : country || null,
       },
       moderation === currentModeration ? null : moderation
     );
@@ -123,87 +131,89 @@
     </div>
 
     <div class="p-6 space-y-4">
-      <div>
-        <label for="link-type" class="block text-sm font-medium text-ink-muted mb-1">{m.community_link_type()}</label>
-        <select id="link-type" bind:value={type} class={inputClass}>
-          {#each linkTypes as value}
-            <option {value}>{LABELS[value]}</option>
-          {/each}
-        </select>
-      </div>
-
-      <div>
-        <label for="link-url" class="block text-sm font-medium text-ink-muted mb-1">{m.community_link_url()}</label>
-        <div class="relative">
-          <input id="link-url" type="url" bind:value={url} onblur={suggestLabel} disabled={!canEditUrl}
-            placeholder="https://..." class="{inputClass} disabled:opacity-50" />
-          {#if fetching}
-            <Loader2 class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint animate-spin motion-reduce:animate-none" />
-          {/if}
-        </div>
-        {#if touched && !url.trim().startsWith("http")}
-          <p class="mt-1 text-xs text-link">{m.community_link_url_invalid()}</p>
-        {/if}
-      </div>
-
-      <div>
-        <label for="link-label" class="block text-sm font-medium text-ink-muted mb-1">{m.community_link_label()}</label>
-        <input id="link-label" type="text" bind:value={label} placeholder={LABELS[type]} class={inputClass} />
-        {#if suggestion && suggestion !== label}
-          <button type="button" onclick={() => { label = suggestion; suggestion = ""; }}
-            class="mt-1 text-xs text-link hover:text-link-soft transition-colors">
-            {m.community_link_use_title()} “{suggestion}”
-          </button>
-        {/if}
-      </div>
-
-      <div>
-        <label for="link-country" class="block text-sm font-medium text-ink-muted mb-1">{m.common_country()}</label>
-        <select id="link-country" bind:value={country} class={inputClass}>
-          <option value="" disabled>{m.user_country_placeholder()}</option>
-          {#each sortedCountries as option}
-            <option value={option.iso_code}>{option.name} {getCountryFlag(option.iso_code)}</option>
-          {/each}
-        </select>
-        {#if touched && !country}
-          <p class="mt-1 text-xs text-link">{m.community_link_country_required()}</p>
-        {/if}
-        <p class="mt-1 text-xs text-ink-faint">{m.community_link_country_hint()}</p>
-      </div>
-
-      {#if isContent}
+      <fieldset disabled={pinOnly} class="min-w-0 space-y-4 disabled:opacity-50">
         <div>
-          <span class="block text-sm font-medium text-ink-muted mb-1">{m.community_link_languages()}</span>
-          <div class="flex flex-wrap items-center gap-1.5">
-            {#each languages as code (code)}
-              <span class="inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-full bg-surface-hover text-ink-bright text-xs">
-                {LANGUAGE_NAMES[code] ?? code}
-                <button type="button" aria-label={m.profile_remove_language({ lang: LANGUAGE_NAMES[code] ?? code })}
-                  onclick={() => { languages = languages.filter(c => c !== code); }}
-                  class="grid place-items-center w-6 h-6 -m-1 rounded-full text-ink-faint hover:text-link cursor-pointer">
-                  <X class="w-3.5 h-3.5" />
-                </button>
-              </span>
+          <label for="link-type" class="block text-sm font-medium text-ink-muted mb-1">{m.community_link_type()}</label>
+          <select id="link-type" bind:value={type} class={inputClass}>
+            {#each linkTypes as value}
+              <option {value}>{LABELS[value]}</option>
             {/each}
-            {#if languages.length < MAX_LANGUAGES}
-              <select value="" aria-label={m.profile_add_language()}
-                onchange={(e) => {
-                  const c = e.currentTarget.value; e.currentTarget.value = "";
-                  if (c && !languages.includes(c)) languages = [...languages, c];
-                }}
-                class="px-2 py-1.5 border border-line-strong rounded bg-surface-card text-ink-muted text-xs">
-                <option value="" disabled selected>+ {m.profile_add_language()}</option>
-                {#each LANGUAGES.filter(l => !languages.includes(l.value)) as language}
-                  <option value={language.value}>{language.label}</option>
-                {/each}
-              </select>
+          </select>
+        </div>
+
+        <div>
+          <label for="link-url" class="block text-sm font-medium text-ink-muted mb-1">{m.community_link_url()}</label>
+          <div class="relative">
+            <input id="link-url" type="url" bind:value={url} onblur={suggestLabel} disabled={!canEditUrl}
+              placeholder="https://..." class="{inputClass} disabled:opacity-50" />
+            {#if fetching}
+              <Loader2 class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint animate-spin motion-reduce:animate-none" />
             {/if}
           </div>
-          {#if touched && needsLanguage}
-            <p class="mt-1 text-xs text-link">{m.community_link_language_required()}</p>
+          {#if touched && !url.trim().startsWith("http")}
+            <p class="mt-1 text-xs text-link">{m.community_link_url_invalid()}</p>
           {/if}
         </div>
-      {/if}
+
+        <div>
+          <label for="link-label" class="block text-sm font-medium text-ink-muted mb-1">{m.community_link_label()}</label>
+          <input id="link-label" type="text" bind:value={label} placeholder={LABELS[type]} class={inputClass} />
+          {#if suggestion && suggestion !== label}
+            <button type="button" onclick={() => { label = suggestion; suggestion = ""; }}
+              class="mt-1 text-xs text-link hover:text-link-soft transition-colors">
+              {m.community_link_use_title()} “{suggestion}”
+            </button>
+          {/if}
+        </div>
+
+        {#if !isContent}
+          <div>
+            <label for="link-country" class="block text-sm font-medium text-ink-muted mb-1">{m.common_country()}</label>
+            <select id="link-country" bind:value={country} class={inputClass}>
+              <option value="" disabled>{m.user_country_placeholder()}</option>
+              {#each sortedCountries as option}
+                <option value={option.iso_code}>{option.name} {getCountryFlag(option.iso_code)}</option>
+              {/each}
+            </select>
+            {#if touched && !country}
+              <p class="mt-1 text-xs text-link">{m.community_link_country_required()}</p>
+            {/if}
+            <p class="mt-1 text-xs text-ink-faint">{m.community_link_country_hint()}</p>
+          </div>
+        {:else}
+          <div>
+            <span class="block text-sm font-medium text-ink-muted mb-1">{m.community_link_languages()}</span>
+            <div class="flex flex-wrap items-center gap-1.5">
+              {#each languages as code (code)}
+                <span class="inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-full bg-surface-hover text-ink-bright text-xs">
+                  {LANGUAGE_NAMES[code] ?? code}
+                  <button type="button" aria-label={m.profile_remove_language({ lang: LANGUAGE_NAMES[code] ?? code })}
+                    onclick={() => { languages = languages.filter(c => c !== code); }}
+                    class="grid place-items-center w-6 h-6 -m-1 rounded-full text-ink-faint hover:text-link cursor-pointer">
+                    <X class="w-3.5 h-3.5" />
+                  </button>
+                </span>
+              {/each}
+              {#if languages.length < MAX_LANGUAGES}
+                <select value="" aria-label={m.profile_add_language()}
+                  onchange={(e) => {
+                    const c = e.currentTarget.value; e.currentTarget.value = "";
+                    if (c && !languages.includes(c)) languages = [...languages, c];
+                  }}
+                  class="px-2 py-1.5 border border-line-strong rounded bg-surface-card text-ink-muted text-xs">
+                  <option value="" disabled selected>+ {m.profile_add_language()}</option>
+                  {#each LANGUAGES.filter(l => !languages.includes(l.value)) as language}
+                    <option value={language.value}>{language.label}</option>
+                  {/each}
+                </select>
+              {/if}
+            </div>
+            {#if touched && needsLanguage}
+              <p class="mt-1 text-xs text-link">{m.community_link_language_required()}</p>
+            {/if}
+          </div>
+        {/if}
+      </fieldset>
 
       {#if moderationChoices.length > 1}
         <div>

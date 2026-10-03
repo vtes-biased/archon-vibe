@@ -339,7 +339,7 @@ USER = {
             "url": "https://codex-of-the-damned.org",
             "type": "website",
             "label": "Codex of the Damned",
-            "country": "FR",
+            "country": None,
             "languages": ["fr", "en", "es", "pt"],
             "moderation": None,
         },

@@ -8,7 +8,8 @@ internationally, a non-official slipping through) would silently push
 unauthorized content into the public projection seen by the whole community.
 The matrix below pins each authorized/forbidden cell at the HTTP interface,
 so a behavior-preserving refactor of the route's `match` block stays green
-while any loosening of the policy turns it red.
+while any loosening of the policy turns it red. The one cross-country promotion
+allowed is an NC pinning an unpinned content link into their own card.
 """
 
 from datetime import UTC, datetime
@@ -120,3 +121,35 @@ async def test_self_moderation_allowed(test_client: AsyncClient, test_db):
     assert response.status_code == 200
     stored = await db.get_user_by_uid(ic.uid)
     assert stored.community_links[0].moderation == "global"
+
+
+@pytest.mark.asyncio
+async def test_any_nc_pins_unpinned_content_into_their_own_card(
+    test_client: AsyncClient, test_db
+):
+    url = "https://youtube.com/@vtes"
+    owner = await _insert_user(roles=[], country="BR")
+    owner.community_links = [
+        CommunityLink(type="youtube", url=url, label="VTES", languages=["pt"])
+    ]
+    await db.save_user(owner)
+    fr_nc = await _insert_user(roles=[Role.NC], country="FR")
+    us_nc = await _insert_user(roles=[Role.NC], country="US")
+    endpoint = f"/api/users/{owner.uid}/community-link-moderation"
+
+    async def send(actor: User, **body) -> int:
+        response = await test_client.patch(
+            endpoint, json={"url": url, **body}, headers=make_auth_header(actor.uid)
+        )
+        return response.status_code
+
+    assert await send(fr_nc, state="hidden") == 403
+    assert await send(fr_nc, state="national", label="Renamed") == 403
+    assert await send(fr_nc, state="national") == 200
+    stored = (await db.get_user_by_uid(owner.uid)).community_links[0]
+    assert (stored.moderation, stored.country) == ("national", "FR")
+
+    assert await send(us_nc, state="national") == 403
+    assert await send(fr_nc, state="none") == 200
+    stored = (await db.get_user_by_uid(owner.uid)).community_links[0]
+    assert (stored.moderation, stored.country) == (None, None)

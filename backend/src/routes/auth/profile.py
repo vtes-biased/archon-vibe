@@ -15,8 +15,7 @@ from litestar.params import FromPath, FromQuery
 from ... import permissions
 from ...broadcast import broadcast_precomputed
 from ...community_links import (
-    moderation_for,
-    validated_country,
+    placement,
     validated_languages,
     validated_type,
 )
@@ -174,10 +173,9 @@ async def update_current_user(
                 raise HTTPException(status_code=422, detail=f"Invalid URL: {link.url}")
             prior = existing_by_url.get(link.url)
             languages = validated_languages(link.languages, link_type, prior)
-            country = validated_country(link.country, user.country)
-            mod = prior.moderation if prior else None
-            if link.state is not None:
-                mod = moderation_for(user, link.state, country, mod, user.uid, link.url)
+            country, mod = placement(
+                user, link_type, link.country, link.state, prior, user, link.url
+            )
             links.append(
                 CommunityLink(
                     type=link_type,

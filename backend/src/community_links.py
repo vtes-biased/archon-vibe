@@ -45,6 +45,49 @@ def moderation_for(
     return None if state == "none" else LinkModeration(state)
 
 
+def placement(
+    actor: User,
+    link_type: CommunityLinkType,
+    raw_country: str | None,
+    state: str | None,
+    prior: CommunityLink | None,
+    owner: User,
+    url: str,
+) -> tuple[str | None, LinkModeration | None]:
+    """The country and moderation a link is saved with."""
+    current = prior.moderation if prior else None
+    if link_type not in CONTENT_LINK_TYPES:
+        country = validated_country(
+            raw_country, (prior and prior.country) or owner.country
+        )
+        if state is None:
+            return country, current
+        return country, moderation_for(actor, state, country, current, owner.uid, url)
+
+    pinned_in = None
+    if current is LinkModeration.NATIONAL:
+        pinned_in = (prior and prior.country) or owner.country
+    if state is None:
+        return pinned_in, current
+    sits_in = pinned_in or owner.country
+    lands_in = sits_in
+    if state == "national" and current is not LinkModeration.NATIONAL:
+        if current is not None and not permissions.can_moderate_link(actor, sits_in):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Only a moderator in {sits_in} can pin a {current.value} link",
+            )
+        lands_in = validated_country(actor.country, None)
+    elif state == "national" and not permissions.can_promote_link_national(
+        actor, pinned_in
+    ):
+        raise HTTPException(
+            status_code=403, detail=f"This link is already pinned in {pinned_in}"
+        )
+    mod = moderation_for(actor, state, lands_in, current, owner.uid, url)
+    return (lands_in if mod is LinkModeration.NATIONAL else None), mod
+
+
 def validated_type(raw: str) -> CommunityLinkType:
     try:
         return CommunityLinkType(raw)

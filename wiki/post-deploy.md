@@ -29,3 +29,28 @@ answers whether a given deploy has made it actionable — the same check
 `/post-deploy` already runs against a feedback issue's fix. An item states what
 gates it and why, what to run, what proves it worked, and what it owes afterwards:
 people to tell, and the wiki text that dies with it.
+
+## Prove unpinned content links carry no country
+
+**Migration** `content-link-country`
+
+Gated by the commit that dropped the country from content-type community links
+([architecture](architecture.md#community-links)). The entry nulls the country of
+every content link not pinned national. The old rows decode, but they are wrong
+rather than redundant: a stored country steers an unpinned link's moderation to
+that country's NC instead of its owner's, and is what read as an audience
+restriction to the member who set it.
+
+Nothing to run: the entry rewrote the rows before the process served. It worked
+when this answers 0:
+
+```sql
+SELECT count(*) FROM objects o, jsonb_array_elements(o."full"->'community_links') link
+WHERE o.type = 'user' AND o."full"->'community_links' <> '[]'::jsonb
+  AND link->>'type' IN ('blog', 'bluesky', 'facebook', 'instagram', 'other',
+    'reddit', 'spotify', 'twitch', 'website', 'x', 'youtube')
+  AND link->>'country' IS NOT NULL
+  AND coalesce(link->>'moderation', '') <> 'national';
+```
+
+Nothing else is owed.

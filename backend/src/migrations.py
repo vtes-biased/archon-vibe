@@ -16,7 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from . import db
-from .models import ObjectType
+from .models import CONTENT_LINK_TYPES, ObjectType
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,32 @@ class Migration:
     rewrite: Callable[..., None]
 
 
-MIGRATIONS: tuple[Migration, ...] = ()
+_CONTENT_TYPES = ", ".join(f"'{t.value}'" for t in sorted(CONTENT_LINK_TYPES))
+
+
+def _drop_content_link_country(full: dict) -> None:
+    for link in full["community_links"]:
+        if link["type"] in CONTENT_LINK_TYPES and link.get("moderation") != "national":
+            link["country"] = None
+
+
+MIGRATIONS: tuple[Migration, ...] = (
+    Migration(
+        name="content-link-country",
+        obj_type=ObjectType.USER,
+        pending=f"""
+            SELECT uid FROM objects
+            WHERE type = 'user' AND "full"->'community_links' <> '[]'::jsonb
+              AND EXISTS (
+                SELECT 1 FROM jsonb_array_elements("full"->'community_links') link
+                WHERE link->>'type' IN ({_CONTENT_TYPES})
+                  AND link->>'country' IS NOT NULL
+                  AND coalesce(link->>'moderation', '') <> 'national'
+              )
+        """,
+        rewrite=_drop_content_link_country,
+    ),
+)
 
 _LOCK_ROW = 'SELECT "full", deleted_at FROM objects WHERE uid = %s FOR UPDATE'
 _LOCK_AUTH_METHOD = "SELECT data FROM auth_methods WHERE uid = %s FOR UPDATE"

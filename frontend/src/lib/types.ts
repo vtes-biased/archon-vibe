@@ -29,7 +29,7 @@ export interface CommunityLink {
   url: string;
   label: string;
   languages?: string[]; // ISO 639-1 codes; empty/absent = shows under every filter
-  country?: string | null; // the country the link serves; absent = the owner's
+  country?: string | null; // a channel's served country, a content link's pinning one; absent = the owner's
   moderation?: LinkModeration | null;
 }
 
