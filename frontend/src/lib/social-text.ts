@@ -12,7 +12,7 @@ import * as m from "$lib/paraglide/messages.js";
 
 interface CardEntry { name: string; count: number; type: string; capacity: number }
 
-function formatDeckText(deck: DeckObject, cardsMap: Map<number, VtesCard>, credit: string): string[] {
+export function formatDeckText(deck: DeckObject, cardsMap: Map<number, VtesCard>, credit: string): string[] {
   const lines: string[] = [];
   if (deck.name) lines.push(deck.name);
   if (credit) lines.push(`by ${credit}`);

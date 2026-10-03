@@ -4,13 +4,15 @@
   import { creditName, isSettableCredit } from "$lib/deck-credit";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { getCards } from "$lib/cards";
+  import { formatDeckText } from "$lib/social-text";
+  import { showToast } from "$lib/stores/toast.svelte";
   import { normalizeSearch } from "$lib/utils";
   import { disciplineIcon, typeIcon } from "$lib/vtes-icons";
   import AttributionPicker from "./AttributionPicker.svelte";
   import { getLibraryTypeOrder, validateDeck, type ValidationError } from "$lib/engine";
   import CardSearch from "./CardSearch.svelte";
   import CardName from "./CardName.svelte";
-  import { CircleX, TriangleAlert } from "@lucide/svelte";
+  import { CircleX, Copy, TriangleAlert } from "@lucide/svelte";
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
   import { dialogPanel } from "$lib/actions/dialog";
@@ -119,6 +121,15 @@
     } catch (err: any) {
       box.checked = deck.private ?? false;
       privacyError = toUserMessage(err, m.deck_error_save());
+    }
+  }
+
+  async function copyText() {
+    try {
+      await navigator.clipboard.writeText(formatDeckText(deck, cards, credit).join("\n"));
+      showToast({ type: "success", message: m.deck_copied() });
+    } catch {
+      showToast({ type: "error", message: m.deck_copy_failed() });
     }
   }
 
@@ -297,19 +308,18 @@
     {/if}
   {/if}
 
-  {#if editable || onreplace || ondelete}
-    <div class="flex gap-2 mb-3">
-      {#if editable}
-        <Button variant="secondary" size="lg" onclick={startEditing}>{m.deck_edit()}</Button>
-      {/if}
-      {#if onreplace}
-        <Button variant="secondary" size="lg" onclick={onreplace}>{m.decks_replace()}</Button>
-      {/if}
-      {#if ondelete}
-        <Button variant="secondary" size="lg" onclick={ondelete}>{m.decks_delete()}</Button>
-      {/if}
-    </div>
-  {/if}
+  <div class="flex flex-wrap gap-2 mb-3">
+    {#if editable}
+      <Button variant="secondary" size="lg" onclick={startEditing}>{m.deck_edit()}</Button>
+    {/if}
+    {#if onreplace}
+      <Button variant="secondary" size="lg" onclick={onreplace}>{m.decks_replace()}</Button>
+    {/if}
+    {#if ondelete}
+      <Button variant="secondary" size="lg" onclick={ondelete}>{m.decks_delete()}</Button>
+    {/if}
+    <Button variant="ghost" size="lg" disabled={!cards.size} onclick={copyText}><Copy class="w-4 h-4" />{m.deck_copy_text()}</Button>
+  </div>
 {/if}
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">

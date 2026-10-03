@@ -988,8 +988,10 @@ is the join link rather than a venue website.
 all of which the device already holds offline. `copy-results.ts` takes that one
 render to either destination: the clipboard, or a `.txt` download named by the
 event code. There is no report endpoint; the server has no input the device
-lacks, and a download navigation cannot carry the bearer token anyway. Sharing
-also produces a canvas-rendered PNG, from the finished-tournament views. The
+lacks, and a download navigation cannot carry the bearer token anyway. Every
+deck view also copies its own decklist through `formatDeckText`, the deck
+renderer `generateResultsText` uses: TWDA-style text that VDB's import reads.
+Sharing also produces a canvas-rendered PNG, from the finished-tournament views. The
 player-facing copy-results action shares text plus the link only, with no image
 generation of its own — the OG stub below already turns the shared link into the
 picture card.

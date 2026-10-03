@@ -25,5 +25,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 
 Board changes ride the commit that earns them.
 
-
-- Add a copy-as-text button to every read-only decklist, reusing `formatDeckText` (`social-text.ts:15`) so the clipboard gets the TWDA-style text deckbuilders import — done when `DeckDisplay` offers the copy on published finals decks, a member's record and a player's own deck, pasting into VDB's text import reproduces the deck, and it works offline. Reported in gh-46 (a judge on Android could only copy the rendered list, which VDB rejects; "Copy results" carries the winner's deck alone).
