@@ -801,8 +801,10 @@ after a promo save and after a completed snapshot, it adds every active promo's
 missing image, then drops promo images no stored promo still points at. A new card catalog drops card
 images no longer in it. The page writes these itself because a freshly installed
 worker does not control the page that registered it, so a prefetch fetched through
-it would never be cached. A prune never runs mid-ingest, because the cleared,
-partial store would drop images still in use.
+it would never be cached. It does nothing while the stores are
+not whole (no sync cursor, or a snapshot mid-ingest), because pruning against a
+cleared store would drop images still in use. That is why clearing the stores
+nulls the cursor first.
 
 **Universal soft-delete**: on a tombstone the client **hard-deletes** the row from
 its store, otherwise it saves. No type is exempt, **users included** — every

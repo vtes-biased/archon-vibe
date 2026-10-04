@@ -103,6 +103,10 @@ const SPECS: ObjectSpec<any>[] = [
   },
 ];
 
+async function storesWhole(): Promise<boolean> {
+  return !(await getSnapshotIngesting()) && (await getLastSyncTimestamp()) !== null;
+}
+
 let promoImagesRun: Promise<void> | null = null;
 let promoImagesAgain = false;
 
@@ -114,11 +118,13 @@ function syncPromoImages(): void {
   promoImagesRun = (async () => {
     do {
       promoImagesAgain = false;
-      if (await getSnapshotIngesting()) return;
+      if (!(await storesWhole())) return;
+      const promos = await getAllPromos();
+      if (!(await storesWhole())) return;
       const cache = await caches.open(IMAGE_CACHE);
       const keep = new Set<string>();
       const missing: string[] = [];
-      for (const p of await getAllPromos()) {
+      for (const p of promos) {
         const src = promoImageUrl(p);
         if (!src) continue;
         const url = new URL(src, location.href).href;
@@ -336,11 +342,11 @@ class SyncManager {
       // Cleared before the supersede check: eof landed and every batch is flushed, so the stores are
       // whole even if a newer connect() is about to discard this cycle.
       await clearSnapshotIngesting();
-      syncPromoImages();
 
       if (this.superseded(epoch)) return null;
       if (timestamp) {
         await setLastSyncTimestamp(timestamp);
+        syncPromoImages();
       }
       if (generatedAt) {
         await setLastSyncGeneratedAt(generatedAt);
@@ -610,15 +616,15 @@ class SyncManager {
       }
     }
 
+    await clearLastSyncTimestamp();
+    await clearLastSyncGeneratedAt();
+    await clearLastSyncAccessVersion();
     await clearAllUsers();
     await clearAllSanctions();
     await clearAllTournaments();
     await clearAllDecks();
     await clearAllLeagues();
     await clearAllPromos();
-    await clearLastSyncTimestamp();
-    await clearLastSyncGeneratedAt();
-    await clearLastSyncAccessVersion();
 
     if (tournaments.length > 0) await saveTournamentsBatch(tournaments);
     if (users.length > 0) await saveUsersBatch(users);

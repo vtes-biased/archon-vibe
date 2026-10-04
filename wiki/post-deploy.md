@@ -54,3 +54,24 @@ WHERE o.type = 'user' AND o."full"->'community_links' <> '[]'::jsonb
 ```
 
 Nothing else is owed.
+
+## Confirm a deploy no longer surges promo images
+
+Gated by `43cfddab`, which moved promo and card images into a cache that
+outlives service-worker versions ([sync](sync.md#frontend-storage)). Before it,
+every version change wiped them. Measuring before the commit is live proves
+nothing.
+
+Run against production Loki (`grafanacloud-logs` on vtesbiased), over the six
+hours after the deploy that first carries the commit:
+
+```logql
+sum(count_over_time({tag="nginx"} |~ "GET /api/promos/[^ ]+/image" [1h]))
+```
+
+It worked when no hour in that window exceeds the highest hourly count of the
+seven days before the deploy. Before this commit that ceiling was about 4,000
+(16 full catalog prefetches of 253 images), all of it from fresh installs. If an
+hour does exceed it, the surge is the finding: bring it to the owner.
+
+Nothing else is owed.
