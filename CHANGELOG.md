@@ -10,6 +10,10 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- Card and promo images now stay available offline after an app update.
+
 ## v1.3.3 — 2026-10-04
 
 - You can now add and remove passkeys and Discord logins from your profile.
