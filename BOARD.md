@@ -24,5 +24,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
-
-- Keep immutable images across deploys: first confirm in Loki whether promo-image bursts follow deploys or new clients, then promo and card images live in a service-worker cache that a new version does not wipe, pruned to the images still in use, and nginx caches versioned promo-image responses so a client's first full prefetch does not mean 253 database reads. **Done when** Loki shows no promo-image surge after a deploy, and `wiki/sync.md`'s Cache Storage paragraph and `wiki/architecture.md`'s promo-image paragraphs describe the new caches.

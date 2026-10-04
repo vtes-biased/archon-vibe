@@ -538,7 +538,22 @@ if deployed(f"{www}/.bundle") != bundle:
 http2 = modern_http2(host.get_fact(Command, "nginx -v 2>&1"))
 available = "/etc/nginx/sites-available"
 log_format = f"{name}_masked"
+promo_cache = f"{name}_promo_images"
+promo_cache_dir = f"/var/cache/nginx/{promo_cache}"
+files.directory(
+    name="Promo image cache dir",
+    path=promo_cache_dir,
+    user="www-data",
+    group="www-data",
+    mode="700",
+)
 vhosts = [
+    put(
+        "promo-cache.conf.j2",
+        f"/etc/nginx/conf.d/{promo_cache}.conf",
+        zone=promo_cache,
+        cache_dir=promo_cache_dir,
+    ),
     put(
         "request-log.conf.j2",
         f"/etc/nginx/conf.d/{name}_request_log.conf",
@@ -555,6 +570,7 @@ vhosts = [
         backend_paths=ROUTES["backend_paths"],
         backend_patterns=ROUTES["backend_patterns"],
         sse_path=ROUTES["sse_path"],
+        promo_cache=promo_cache,
         backend_port=d.backend_port,
         snapshot_accel_prefix=SNAPSHOTS_PREFIX,
         snapshot_dir=snapshot_dir,

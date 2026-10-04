@@ -18,6 +18,7 @@ import {
   savePromo,
   savePromosBatch,
   deletePromo,
+  getAllPromos,
   clearAllUsers,
   clearAllSanctions,
   clearAllTournaments,
@@ -47,6 +48,8 @@ import {
 } from './db';
 import { getAccessToken, ensureSyncToken, refreshTokens } from '$lib/stores/auth.svelte';
 import { isOffline, getOfflineTournamentUids, lostOfflineLock, handleOfflineLockLost } from '$lib/stores/offline.svelte';
+import { IMAGE_CACHE, isPromoImage, pruneImages } from '$lib/image-cache';
+import { promoImageUrl } from '$lib/promo-utils';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -94,21 +97,40 @@ const SPECS: ObjectSpec<any>[] = [
   {
     batchType: 'promos',
     singleType: 'promo',
-    save: async (p: Promo) => { await savePromo(p); prefetchPromoImages([p]); },
-    saveBatch: async (ps: Promo[]) => { await savePromosBatch(ps); prefetchPromoImages(ps); },
-    del: deletePromo,
+    save: async (p: Promo) => { await savePromo(p); syncPromoImages(); },
+    saveBatch: async (ps: Promo[]) => { await savePromosBatch(ps); syncPromoImages(); },
+    del: async (uid: string) => { await deletePromo(uid); syncPromoImages(); },
   },
 ];
 
-// Prefetches into the SW cache since it only populates on fetch; offline
-// raffle display needs the bytes even if this device never viewed the promo.
-function prefetchPromoImages(promos: Promo[]): void {
-  const apiBase = import.meta.env.VITE_API_URL ?? "";
-  for (const p of promos) {
-    if (p.active && p.image_path && !p.deleted_at) {
-      fetch(`${apiBase}${p.image_path}`).catch(() => {});
-    }
+let promoImagesRun: Promise<void> | null = null;
+let promoImagesAgain = false;
+
+function syncPromoImages(): void {
+  if (promoImagesRun) {
+    promoImagesAgain = true;
+    return;
   }
+  promoImagesRun = (async () => {
+    do {
+      promoImagesAgain = false;
+      if (await getSnapshotIngesting()) return;
+      const cache = await caches.open(IMAGE_CACHE);
+      const keep = new Set<string>();
+      const missing: string[] = [];
+      for (const p of await getAllPromos()) {
+        const src = promoImageUrl(p);
+        if (!src) continue;
+        const url = new URL(src, location.href).href;
+        keep.add(url);
+        if (p.active && !(await cache.match(url))) missing.push(url);
+      }
+      await Promise.all(missing.map(url => cache.add(url).catch(() => {})));
+      await pruneImages(isPromoImage, keep);
+    } while (promoImagesAgain);
+  })()
+    .catch(() => {})
+    .finally(() => { promoImagesRun = null; });
 }
 
 class SyncManager {
@@ -314,6 +336,7 @@ class SyncManager {
       // Cleared before the supersede check: eof landed and every batch is flushed, so the stores are
       // whole even if a newer connect() is about to discard this cycle.
       await clearSnapshotIngesting();
+      syncPromoImages();
 
       if (this.superseded(epoch)) return null;
       if (timestamp) {
@@ -379,6 +402,7 @@ class SyncManager {
       await this.clearAllStores();
       await clearSnapshotIngesting();
     }
+    syncPromoImages();
     if (this.superseded(epoch)) return;
 
     let lastSync: string | null = await getLastSyncTimestamp();

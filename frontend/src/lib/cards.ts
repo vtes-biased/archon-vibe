@@ -2,6 +2,7 @@ import type { VtesCard } from '$lib/types';
 import { getDB } from './db';
 import { callEngine, initEngine } from './engine-instance';
 import { normalizeSearch, searchTokens, matchesAllTerms } from './utils';
+import { isCardImage, pruneImages } from './image-cache';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 const CARDS_ETAG_KEY = 'cards_etag';
@@ -90,6 +91,7 @@ async function refreshCardsFromAPI(): Promise<void> {
     }
     await tx.done;
     if (currentEtag) await db.put('metadata', currentEtag, CARDS_ETAG_KEY);
+    pruneImages(isCardImage, new Set(cards.map(c => c.img))).catch(() => {});
   } catch (e) {
     console.warn('Failed to refresh cards from API:', e);
   }

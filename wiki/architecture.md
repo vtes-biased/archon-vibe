@@ -633,9 +633,10 @@ warns — never blocks — when a submitted report drives the submitter's own st
 negative.
 
 Promo images are the one **unauthenticated** blob endpoint, so the service worker
-can cache them cache-first for offline raffle and picker display; the catalog sync
-prefetches every active promo's image on save, since the SW cache only populates
-lazily on fetch and a device may go offline having never viewed the promo.
+can cache them cache-first for offline raffle and picker display. The catalog sync
+also writes every active promo's image into that cache, because a device may go
+offline having never viewed the promo
+([sync](sync.md#frontend-storage)).
 
 ### Shared timer
 
@@ -800,6 +801,11 @@ The service worker routes same-origin `/api/promos/*/image` requests to a
 cache-first handler — a deliberate exception to its default rule that every other
 same-origin GET passes through untouched, so authenticated responses never land in
 Cache Storage.
+
+nginx also caches versioned promo-image responses (`proxy_cache`, honoring the
+backend's one-year `Cache-Control`, with `proxy_cache_lock`). Unversioned requests
+bypass that cache. A room of fresh devices prefetching the whole catalog at once
+then costs one database read per image, not one per device.
 
 ### NDA records
 

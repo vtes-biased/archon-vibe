@@ -1,0 +1,6 @@
+# proxy_cache_path and map only exist in the http context, hence conf.d and not the vhost.
+proxy_cache_path {{ cache_dir }} levels=1:2 keys_zone={{ zone }}:1m max_size=200m inactive=30d use_temp_path=off;
+map $arg_v ${{ zone }}_unversioned {
+  "" 1;
+  default 0;
+}

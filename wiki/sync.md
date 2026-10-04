@@ -785,14 +785,24 @@ over 300ms were reported before it. The map is in uid order, so
 `getUserListItems` sorts by name before returning — the community directory renders
 its link lists straight off that order and the rankings tie-break on it.
 
-**Cache Storage is allowlist-only.** The service worker writes exactly three
-things to Cache Storage: the precache (build assets, static files and the SPA
-shell), promo images (unauthenticated, versioned, cache-first) and cross-origin
-card images. No navigation response is ever cached — an offline reload of any
-route is answered by the shell. Every other same-origin GET — `/api`, `/stream`,
+**Cache Storage is allowlist-only.** It holds exactly three things, in two caches.
+The versioned precache (build assets, static files and the SPA shell) is replaced
+on every deploy. The `images` cache outlives versions and holds promo images
+(unauthenticated, versioned, cache-first) and krcg card images
+(`static.krcg.org/card/`, network-first). Every other cross-origin GET passes
+through. No navigation response is ever cached: an offline reload of any route is
+answered by the shell. Every other same-origin GET — `/api`, `/stream`,
 `/snapshot?token=`, `/auth`, `/admin` — passes through untouched, so a
 JWT-bearing response can never be served from cache. Widening the cache rule is a
 security change, not a performance tweak.
+
+The page writes to `images` too, and only those two URL shapes. On each connect,
+after a promo save and after a completed snapshot, it adds every active promo's
+missing image, then drops promo images no stored promo still points at. A new card catalog drops card
+images no longer in it. The page writes these itself because a freshly installed
+worker does not control the page that registered it, so a prefetch fetched through
+it would never be cached. A prune never runs mid-ingest, because the cleared,
+partial store would drop images still in use.
 
 **Universal soft-delete**: on a tombstone the client **hard-deletes** the row from
 its store, otherwise it saves. No type is exempt, **users included** — every

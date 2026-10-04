@@ -98,6 +98,14 @@ server {
     proxy_pass http://127.0.0.1:{{ backend_port }};
   }
 {% endfor %}
+  location ~ ^/api/promos/[^/]+/image$ {
+{{ proxy_headers() }}
+    proxy_cache {{ promo_cache }};
+    proxy_cache_lock on;
+    proxy_cache_bypass ${{ promo_cache }}_unversioned;
+    proxy_no_cache ${{ promo_cache }}_unversioned;
+    proxy_pass http://127.0.0.1:{{ backend_port }};
+  }
   # Its own named location: preserving the URI would reach the backend's `/`
   # health check.
   location = / {

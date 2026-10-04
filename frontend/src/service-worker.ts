@@ -5,6 +5,7 @@
 
 import { build, files, version } from '$service-worker';
 import routes from '../../deploy/routes.json';
+import { IMAGE_CACHE, isCardImage, isPromoImage } from '$lib/image-cache';
 
 const sw = globalThis.self as unknown as ServiceWorkerGlobalScope;
 const CACHE = `cache-${version}`;
@@ -27,7 +28,7 @@ sw.addEventListener('install', (event) => {
 sw.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => k !== CACHE && k !== IMAGE_CACHE).map((k) => caches.delete(k)))
     )
   );
 });
@@ -37,14 +38,8 @@ sw.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // Only handle http(s) requests — chrome-extension:// etc. can't be cached
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') return;
-
   if (url.origin === location.origin) {
-    // Promo images: unauthenticated by design, versioned/immutable URLs —
-    // cache-first so they display during offline tournaments. Populated by
-    // the catalog-sync prefetch (sync.ts).
-    if (url.pathname.startsWith('/api/promos/') && url.pathname.endsWith('/image')) {
+    if (isPromoImage(url)) {
       event.respondWith(cacheFirst(event.request));
       return;
     }
@@ -58,8 +53,7 @@ sw.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cross-origin (card images): network-first, cache fallback.
-  event.respondWith(networkFirst(event.request));
+  if (isCardImage(url)) event.respondWith(networkFirst(event.request));
 });
 
 function isBackend(pathname: string): boolean {
@@ -69,10 +63,8 @@ function isBackend(pathname: string): boolean {
   );
 }
 
-// Versioned promo-image URLs are immutable content: a cache hit is always
-// correct, and a re-upload changes the URL (new ?v=) so staleness can't occur.
 async function cacheFirst(request: Request): Promise<Response> {
-  const cache = await caches.open(CACHE);
+  const cache = await caches.open(IMAGE_CACHE);
   const cached = await cache.match(request);
   if (cached) return cached;
   const response = await fetch(request);
@@ -96,7 +88,7 @@ async function shell(request: Request): Promise<Response> {
 }
 
 async function networkFirst(request: Request): Promise<Response> {
-  const cache = await caches.open(CACHE);
+  const cache = await caches.open(IMAGE_CACHE);
   try {
     const response = await fetch(request);
     if (response.status === 200) {
