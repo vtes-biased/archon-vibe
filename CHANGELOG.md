@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.3.4 — 2026-10-04
 
 - Card and promo images now stay available offline after an app update.
 
