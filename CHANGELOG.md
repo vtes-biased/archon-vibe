@@ -10,6 +10,12 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- You can now add and remove passkeys and Discord logins from your profile.
+- Any decklist can now be copied as text, ready to paste into VDB or elsewhere.
+- Community videos and other content links no longer ask for a country.
+
 ## v1.3.2 — 2026-09-29
 
 - The tournament list's rank filter now shows tournaments at that rank and above, league tournaments included, in the calendar feeds too.
