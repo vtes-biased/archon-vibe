@@ -616,6 +616,7 @@ class SyncManager {
       }
     }
 
+    // Cursor first: syncPromoImages reads a null cursor as stores-not-whole and must never prune a half-cleared store.
     await clearLastSyncTimestamp();
     await clearLastSyncGeneratedAt();
     await clearLastSyncAccessVersion();
