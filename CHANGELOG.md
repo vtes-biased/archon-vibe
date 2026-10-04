@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.3.3 — 2026-10-04
 
 - You can now add and remove passkeys and Discord logins from your profile.
 - Any decklist can now be copied as text, ready to paste into VDB or elsewhere.
