@@ -25,5 +25,4 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 
 Board changes ride the commit that earns them.
 
-- Make production alerting fire on real trouble only: rule evaluation errors from Grafana Cloud stop notifying, log shipping retries through a few-minute outage instead of dropping the batch after one retry, and the logs-dropped rule catches a single dropped batch even when the failure counter appears only once. **Done when** the rules are re-applied to production, the log shipper config is deployed, and the alerting and log-shipping paragraphs of `wiki/dev.md` say so.
 - Keep immutable images across deploys: first confirm in Loki whether promo-image bursts follow deploys or new clients, then promo and card images live in a service-worker cache that a new version does not wipe, pruned to the images still in use, and nginx caches versioned promo-image responses so a client's first full prefetch does not mean 253 database reads. **Done when** Loki shows no promo-image surge after a deploy, and `wiki/sync.md`'s Cache Storage paragraph and `wiki/architecture.md`'s promo-image paragraphs describe the new caches.

@@ -1,6 +1,8 @@
 [SERVICE]
-    flush     5
-    log_level warn
+    flush          5
+    log_level      warn
+    scheduler.base 10
+    scheduler.cap  60
 
 # read_from_tail applies only without a cursor: a first start ships no backlog
 [INPUT]
@@ -46,6 +48,7 @@
     label_keys      $unit,$tag,$level
     remove_keys     unit,tag,level
     drop_single_key raw
+    retry_limit     15
 
 [OUTPUT]
     name        prometheus_remote_write
@@ -60,3 +63,4 @@
     add_label   job integrations/node_exporter
     add_label   cluster archon
     add_label   instance {{ host_name }}
+    retry_limit 15

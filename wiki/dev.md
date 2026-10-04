@@ -233,9 +233,15 @@ the labels beta's Alloy sends to the personal stack (`unit`, `tag`, `level`,
 in Explore on the Loki datasource. A first start ships no backlog, and a cursor in
 `/var/lib/fluent-bit` keeps a restart from sending anything twice. That cursor is
 written with `db.sync off`, since the default fsyncs it on every flush
-([hazards](hazards.md#deploy)). A Fluent Bit crash loses nothing, but a power loss
-can corrupt `journal.db` and stop log shipping; deleting it recovers, skipping the
-outage's lines. On the box, `journalctl -t archon` still reads the same lines.
+([hazards](hazards.md#deploy)). A failed push is retried 15 times, 10 s to 60 s
+apart with jitter — at least 2½ minutes, about 8 on average — so a Grafana Cloud
+hiccup delays a batch rather than dropping it. Retries hold the journal input at
+its 5 MB buffer, which pauses reading with the cursor in place; metric chunks are
+a few kB a minute, well under the cap. A filesystem buffer would survive longer
+outages but fsyncs on a timer, which this disk cannot afford. A Fluent Bit crash
+loses nothing, but a power loss can corrupt `journal.db` and stop log shipping;
+deleting it recovers, skipping the outage's lines. On the box, `journalctl -t
+archon` still reads the same lines.
 
 **Production reports its health to the same stack as metrics**, through the same
 Fluent Bit and the same token, which carries metrics write. Everything is scraped
@@ -298,8 +304,12 @@ text, where a user's uid finds their SSE connections and any error naming them �
 beside Node Exporter Full, and the
 alert rules sent to the `archon-discord` contact point: a unit failed or inactive
 for 3 minutes, more than 3 restarts in 30 minutes, under 10 % of memory available
-for 10 minutes, memory fully stalled over 10 % of the time, failed log or metric
-retries, and the host silent for 10 minutes. Each rule names its receiver, so the
+for 10 minutes, memory fully stalled over 10 % of the time, a log or metric batch
+dropped after its last retry, and the host silent for 10 minutes. Fluent Bit pushes
+its failure counter only when it moves, a single sample `increase()` never sees, so
+that rule reads a lone sample's value or the spread of several. A rule whose query
+fails keeps its last state: Grafana Cloud's own evaluation errors notify nobody,
+and a host truly gone trips the silent-host rule. Each rule names its receiver, so the
 stack's shared notification policy is never touched, and provisioned rules are
 read-only in the UI — a change goes through the script.
 

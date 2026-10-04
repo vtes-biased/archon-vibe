@@ -27,6 +27,7 @@ else:
 GROUP = "archon"
 RECEIVER = "archon-discord"
 HOST = f'instance="{MACHINE}"'
+DROPS = f"fluentbit_output_retries_failed_total{{{HOST}}}[15m]"
 
 RULES = [
     (
@@ -68,7 +69,8 @@ RULES = [
     (
         "archon-logs-dropped",
         "Production's log or metric shipping is failing",
-        f"increase(fluentbit_output_retries_failed_total{{{HOST}}}[15m])",
+        f"max by (name) ((max_over_time({DROPS}) - min_over_time({DROPS}))"
+        f" + max_over_time({DROPS}) * (count_over_time({DROPS}) == bool 1))",
         "gt",
         0,
         "0s",
@@ -711,7 +713,7 @@ def rule(uid, title, expr, op, threshold, pending, no_data) -> dict:
         ],
         "for": pending,
         "noDataState": no_data,
-        "execErrState": "Error",
+        "execErrState": "KeepLast",
         "annotations": {"summary": title},
         "notification_settings": {"receiver": RECEIVER},
     }
