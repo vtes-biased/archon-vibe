@@ -531,6 +531,15 @@ class TestUserApi:
         assert "contact_email" not in result
         assert "name" not in result
 
+    def test_only_officials_carry_a_city(self):
+        assert "city" not in compute_api(ObjectType.USER, _make_user())
+        for role in ("IC", "NC", "Prince", "Rulemonger", "Judge", "Sheriff"):
+            result = compute_api(ObjectType.USER, _make_user(roles=[role]))
+            assert result["city"] == "Paris"
+        for role in ("Ethics", "PTC", "PT", "DEV"):
+            result = compute_api(ObjectType.USER, _make_user(roles=[role]))
+            assert "city" not in result
+
 
 class TestTournamentApi:
     def test_strips_the_member_secrets_and_the_api_four(self):
@@ -736,8 +745,6 @@ _USER_API_WITHHELD = {
     "deleted_at",
     "name",
     "nickname",
-    "city",
-    "city_geoname_id",
     "state",
     "avatar_path",
     "promo_stock",

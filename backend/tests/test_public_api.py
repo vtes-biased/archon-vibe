@@ -28,6 +28,7 @@ from src.models import (
     OAuthToken,
     ObjectType,
     Player,
+    Role,
     Sanction,
     SanctionCategory,
     SanctionLevel,
@@ -61,14 +62,18 @@ def _every_field(struct, **overrides) -> dict:
     return full
 
 
-# A maximal object of each type — every field the struct declares — so the key
-# set the projection returns is the whole of what the column can ever carry.
+# A maximal object of each type — every field the struct declares, the user an
+# official since only an official's row carries a city — so the key set the
+# projection returns is the whole of what the column can ever carry.
 _SAMPLES = {
     ObjectType.TOURNAMENT: (
         "Tournament",
         _every_field(Tournament, players=[_every_field(Player)]),
     ),
-    ObjectType.USER: ("User", _every_field(User, vekn_id="1000001")),
+    ObjectType.USER: (
+        "User",
+        _every_field(User, vekn_id="1000001", roles=[Role.JUDGE]),
+    ),
     ObjectType.LEAGUE: ("League", _every_field(League)),
     ObjectType.DECK: (
         "DeckObject",

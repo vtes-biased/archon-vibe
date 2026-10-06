@@ -7,8 +7,10 @@ its own process on its own subdomain, serving the `api` projection
 ([sync](sync.md#access-levels)) and nothing else.
 
 It publishes **VEKN IDs, never names** — the projection carries no member name,
-contact, city or avatar, and a player without a VEKN ID has no row at all. That
-is a property of the column, not a filter this app applies
+contact or avatar, and a player without a VEKN ID has no row at all. **A city
+only for officials**: an IC, NC, Prince, Rulemonger, Judge or Sheriff, so an
+organizer can find the judges and organizers near an event. That is a property
+of the column, not a filter this app applies
 ([dogmas](dogmas.md#product)). Card data stays krcg's.
 
 **Sanctions are absent from the column, with one exception outside it**: the

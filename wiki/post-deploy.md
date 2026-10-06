@@ -51,6 +51,32 @@ hour does exceed it, the surge is the finding: bring it to the owner.
 
 Nothing else is owed.
 
+## Re-project users for the officials' city
+
+**Gated on** the commit carrying this section — *"Publish an official's city in the
+public API"*. A projection is computed at write time, so an official saved before
+it went live keeps a city-less `api` row until something writes them again; run
+earlier, the deployed projection rewrites the old shape and proves nothing.
+
+**Run** from the deployed tree, count first, then apply:
+
+```sh
+/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/reproject_public.py
+/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/reproject_public.py --apply
+```
+
+**Proves it worked**: this returns 0 —
+
+```sql
+SELECT count(*) FROM objects WHERE type = 'user' AND "api" IS NOT NULL
+  AND "full"->>'city' IS NOT NULL
+  AND "full"->'roles' ?| array['IC','NC','Prince','Rulemonger','Judge','Sheriff']
+  AND NOT "api" ? 'city';
+```
+
+**Owes afterwards**: telling the API consumer who asked for it that the city is
+live. Delete this section.
+
 ## Hand Judge and Sheriff to the judge directory on production
 
 **Gated on** the commit carrying this section — *"Take Judge and Sheriff from the

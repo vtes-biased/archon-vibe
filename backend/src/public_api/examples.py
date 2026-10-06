@@ -333,6 +333,8 @@ USER = {
     "roles": ["Rulemonger", "IC", "Prince"],
     "country": "FR",
     "vekn_id": "3200340",
+    "city": "Paris",
+    "city_geoname_id": 2988507,
     "limited_online": None,
     "community_links": [
         {

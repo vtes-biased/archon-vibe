@@ -100,6 +100,8 @@ _API_NOTES = {
     "User": {
         "vekn_id": "The only way to address a member here: this API publishes no "
         "names.",
+        "city": "Only for IC, NC, Prince, Rulemonger, Judge and Sheriff.",
+        "city_geoname_id": "Only for IC, NC, Prince, Rulemonger, Judge and Sheriff.",
     },
 }
 

@@ -309,7 +309,9 @@ class User(BaseObject, kw_only=True):
     vekn_id: Annotated[
         str | None, msgspec.Meta(description="The member's VEKN number.")
     ] = None
-    city: str | None = None
+    city: Annotated[
+        str | None, msgspec.Meta(description="The member's city, its GeoNames name.")
+    ] = None
     city_geoname_id: Annotated[
         int | None, msgspec.Meta(description="GeoNames id of the city.")
     ] = None
