@@ -3,8 +3,7 @@
 Projections are computed at WRITE time (`db.save_object` → `access_levels`), so
 adding or widening one only affects rows saved afterwards — every existing row
 stays on its old shape until something writes it again. `REPROJECT_TYPES` is the
-one knob: set it to the types the projection change touched and run the sweep.
-Its current value is users alone, for the officials' city in the `api` column;
+one knob: set it to the types the projection change touched and run the sweep —
 re-saving types a change left alone moves `modified_at` for nothing.
 
 A re-save is required rather than an UPDATE of the projection column, for two

@@ -7,9 +7,10 @@ from ..access_levels import (
     DECK_API_EXCLUDE,
     PLAYER_API_EXCLUDE,
     TOURNAMENT_API_EXCLUDE,
+    USER_API_CITY_ROLES,
     USER_API_FIELDS,
 )
-from ..models import DeckObject, League, Tournament, User
+from ..models import DeckObject, League, Role, Tournament, User
 from .examples import COMMUNITY_LINK_ENTRY, DECK, LEAGUE, TOURNAMENT, USER
 
 EXAMPLES = {
@@ -92,6 +93,8 @@ def _referenced(node, components: dict[str, dict], seen: set[str]) -> None:
 # Appended to what the model already says, never replacing it: what is left here
 # is true of this API rather than of the stored field. A missing key — or a field
 # with no description of its own — is a KeyError at import.
+_CITY_NOTE = "Only for " + ", ".join(r for r in Role if r in USER_API_CITY_ROLES) + "."
+
 _API_NOTES = {
     "Tournament": {
         "banner_path": "Append it to this API's base URL.",
@@ -100,8 +103,8 @@ _API_NOTES = {
     "User": {
         "vekn_id": "The only way to address a member here: this API publishes no "
         "names.",
-        "city": "Only for IC, NC, Prince, Rulemonger, Judge and Sheriff.",
-        "city_geoname_id": "Only for IC, NC, Prince, Rulemonger, Judge and Sheriff.",
+        "city": _CITY_NOTE,
+        "city_geoname_id": _CITY_NOTE,
     },
 }
 

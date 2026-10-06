@@ -66,6 +66,8 @@ _USER_MEMBER_FIELDS = (
 
 API_SYNC_FIELDS = {"modified", "deleted_at"}
 
+_USER_API_CITY_FIELDS = {"city", "city_geoname_id"}
+
 USER_API_FIELDS = {
     "uid",
     "vekn_id",
@@ -77,9 +79,9 @@ USER_API_FIELDS = {
     "limited_online",
     "limited_offline",
     "wins",
-} | {"city", "city_geoname_id"}
+} | _USER_API_CITY_FIELDS
 
-_USER_API_CITY_ROLES = {
+USER_API_CITY_ROLES = {
     Role.IC,
     Role.NC,
     Role.PRINCE,
@@ -124,8 +126,8 @@ def compute_user_api(d: dict) -> dict | None:
     # Matches idx_objects_user_vekn_id, which treats "" as no id.
     if not d.get("vekn_id"):
         return None
-    if _USER_API_CITY_ROLES.isdisjoint(d.get("roles") or []):
-        return _pick(d, USER_API_FIELDS - {"city", "city_geoname_id"})
+    if USER_API_CITY_ROLES.isdisjoint(d.get("roles") or []):
+        return _pick(d, USER_API_FIELDS - _USER_API_CITY_FIELDS)
     return _pick(d, USER_API_FIELDS)
 
 
