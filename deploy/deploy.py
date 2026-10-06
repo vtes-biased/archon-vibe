@@ -346,6 +346,7 @@ backend_env = {
     "VEKN_SYNC_ENABLED": "true",
     "VEKN_SYNC_INTERVAL_HOURS": 24,
     "TWDA_SYNC_ENABLED": "true",
+    "JUDGE_SYNC_ENABLED": d.judge_sync,
     "VEKN_API_BASE_URL": "https://www.vekn.net/api",
     "VEKN_API_USERNAME": secrets["vekn_username"],
     "VEKN_API_PASSWORD": secrets["vekn_password"],

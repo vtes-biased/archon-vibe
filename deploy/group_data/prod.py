@@ -10,5 +10,6 @@ environment = "production"
 app_name = "Archon"
 vekn_push = "true"
 twda_push = True
+judge_sync = "false"
 backend_env_extra = {"DB_POOL_MAX_SIZE": 8}
 public_api_env_extra = {}

@@ -119,7 +119,7 @@ The scans that stay, each deliberate:
 - **Scheduled jobs**, a scan per run rather than per request: the VEKN member and
   tournament syncs (with `find_same_event_tournaments` per synced event), the
   hourly VEKN push, the sanction cleanup, the full rating, Hall of Fame and promo
-  stock recomputes, the TWDA sync.
+  stock recomputes, the TWDA sync, the judge directory sync.
 - **Once per boot**: the migration guards and `_stamp_missing_event_codes`.
 - **Small partitions**: `league` and `promo` rows, read whole through
   `idx_objects_type`.

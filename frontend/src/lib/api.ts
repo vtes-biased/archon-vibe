@@ -319,6 +319,10 @@ export async function syncTwdaDecks(): Promise<AdminSyncResult> {
   return apiRequest<AdminSyncResult>('/admin/sync-twda-decks', { method: 'POST' }, { suppressErrorToast: true });
 }
 
+export async function syncJudges(): Promise<AdminSyncResult> {
+  return apiRequest<AdminSyncResult>('/admin/sync-judges', { method: 'POST' }, { suppressErrorToast: true });
+}
+
 export interface VeknJobStatus {
   last_success_at?: string;
   last_error_at?: string;

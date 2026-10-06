@@ -22,7 +22,7 @@ encoder = msgspec.json.Encoder()
 
 # Will be set by main.py
 _sync_service = None
-# Recorded background runners injected by main.py (member_sync / tournament_sync / twda_sync).
+# Recorded background runners injected by main.py (member_sync / tournament_sync / twda_sync / judge_sync).
 _runners: dict[str, Callable[[], Awaitable[None]]] = {}
 # In-flight admin-dispatched jobs, keyed by job name — keeps the task referenced
 # (so it isn't GC'd) and lets a re-trigger see a run is already going.
@@ -95,7 +95,7 @@ async def trigger_vekn_tournament_sync(request: Request) -> dict:
 @get("/vekn-status")
 async def vekn_status(request: Request) -> dict:
     """State is in-process (resets on restart); keys: member_sync,
-    tournament_sync, twda_sync, batch_push.
+    tournament_sync, twda_sync, judge_sync, batch_push.
     """
     manager = await get_current_user(request)
     if not permissions.can_run_admin_sync(manager):
@@ -119,6 +119,23 @@ async def trigger_twda_deck_import(request: Request) -> dict:
 
     logger.info("Manual TWDA sync dispatched via admin endpoint")
     return _dispatch("twda_sync", runner)
+
+
+@post("/sync-judges")
+async def trigger_judge_sync(request: Request) -> dict:
+    """Returns immediately; the outcome lands on the vekn-status panel as
+    `judge_sync`.
+    """
+    manager = await get_current_user(request)
+    if not permissions.can_run_admin_sync(manager):
+        raise HTTPException(status_code=403, detail="Only IC can trigger sync")
+
+    runner = _runners.get("judge_sync")
+    if not runner:
+        raise HTTPException(status_code=503, detail="Judge sync is not available")
+
+    logger.info("Manual judge directory sync dispatched via admin endpoint")
+    return _dispatch("judge_sync", runner)
 
 
 @post("/users/merge")
@@ -172,6 +189,7 @@ router = Router(
         trigger_vekn_tournament_sync,
         vekn_status,
         trigger_twda_deck_import,
+        trigger_judge_sync,
         merge_user_accounts,
     ],
 )

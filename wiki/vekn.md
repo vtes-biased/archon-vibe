@@ -14,6 +14,7 @@ retiring these syncs means is [below](#decommission); the work waiting on it is
 | `VEKN_SYNC_ENABLED` | backend env | enables periodic inbound member and tournament sync |
 | `VEKN_SYNC_INTERVAL_HOURS` | backend env | inbound period from 04:00 UTC, default 6h |
 | `TWDA_SYNC_ENABLED` | backend env | enables the archive sync — separate from `VEKN_SYNC_ENABLED`, because it must outlive the VEKN API |
+| `JUDGE_SYNC_ENABLED` | backend env | enables the daily [judge directory](#judge-directory) sync — a different upstream with no credentials |
 | `VEKN_PUSH_INTERVAL_HOURS` | backend env | outbound push period, default 1h |
 
 All directions need `VEKN_API_BASE_URL`, `VEKN_API_USERNAME`,
@@ -262,8 +263,8 @@ four in the archon file's terms and the `+F` must be added back —
 - Creates Users for unknown VEKN IDs, **seeding roles at creation only** — Prince
   and NC from the upstream `princeid`/`coordinatorid`, IC from a static roster.
   This is a bootstrap seed, not a transcription of legacy archon's role history.
-  Judge ranks are **not** seeded: they are app-managed with no vekn.net field to
-  derive them from.
+  Judge ranks are **not** seeded: vekn.net has no field for them, and the
+  [judge directory](#judge-directory) is their source.
 - Updates identity — name, country, city, state — for existing members.
 - **Never re-writes roles on update.** A member created by this sync before the
   legacy ETL ran keeps only its bootstrap seed, and the ETL's richer role data
@@ -822,6 +823,30 @@ tier judges a single entry, so a collision between two of them is invisible unti
 pass over the whole verdict set; the weaker tier's claim yields, a tie yields both,
 and the loser is an event we genuinely do not hold. Without that pass one win is
 attached to the wrong tournament and the other is never recorded at all.
+
+## Judge directory
+
+**The VTES Exams public judge directory is the sole source of Judge and Sheriff**
+([domain](domain/vekn.md)). `judge_directory.py` reads
+`www.vtesexams.com/api/v1/judges/` — public, no credentials, 60 requests a minute
+per IP — daily at 05:30 UTC as `judge_sync`, its own job under its own flag,
+recorded on the vekn-status panel and runnable from the admin panel.
+
+The directory is exhaustive for the app: a valid Elder entry makes the member a
+Judge, a valid Neonate or Ancilla entry a Sheriff, and any other holder of either
+role loses it — unlisted, or listed past `valid_until`. Rulemonger is never
+touched. Matching is by VEKN id; a listed id no member holds is logged and
+reported, never created. Every write goes through `accounts.save_member`, so the
+Discord Judge Level follows.
+
+The request carries the last ETag, and a 304 **still reconciles** from the cached
+body: our side moves while the directory sits still — a validity date passes, a
+member gains a VEKN id. A failed fetch writes nothing, and an empty directory is
+refused rather than read as everyone's revocation.
+
+`backend/scripts/preview_judge_sync.py` prints what a run would change, writing
+nothing. Applying is the admin panel's run, never a script: the Linked Roles push
+is a background task a script process would exit before.
 
 ## Legacy archon sync
 

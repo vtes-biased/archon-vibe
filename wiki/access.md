@@ -74,7 +74,9 @@ is not `sponsor_member`: sponsoring abroad is open to a visiting Prince, but
 rewriting who co-opted a member is the record-keeping of the member's own country.
 
 **Appointments** — NC grants **Prince** in their own country; PTC grants **PT**;
-Rulemonger grants **Judge** and **Sheriff**; everything else is IC's. **A target
+**Judge** and **Sheriff** are nobody's — the [judge directory
+sync](vekn.md#judge-directory) writes them, and a hand grant would be undone by its
+next run; everything else is IC's. **A target
 must hold a `vekn_id` to hold any role**, and **granting PT requires an NDA on
 record** ([architecture](architecture.md#nda-records)) — a grant, not a hold: a
 target already holding PT is being revoked, so grandfathered holders (role

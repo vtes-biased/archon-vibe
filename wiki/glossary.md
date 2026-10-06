@@ -40,7 +40,9 @@ whether **proxy cards** are allowed, while a **proxy player**
 **IC** — Inner Circle, the app's global administrator tier. **NC** — National
 Coordinator. **Prince** — a city-level organizer. **Ethics** — the Ethics
 Committee. **Rulemonger**, **Judge**, **Sheriff** — judge certifications, which
-are profile titles and grant no tournament power. The judges guide calls a Sheriff
+are profile titles and grant no tournament power. **Neonate**, **Ancilla**,
+**Elder** — VTES Exams accreditation ranks; Elder is a Judge, the other two
+Sheriffs. The judges guide calls a Sheriff
 a *Judgekin*, and legacy archon still stores that word.
 **PTC** / **PT** — playtest coordinator and playtester. **DEV** — the OAuth
 client manager role.

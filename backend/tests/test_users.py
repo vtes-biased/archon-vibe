@@ -169,9 +169,9 @@ async def test_role_change_resyncs_only_for_access_roles(
         return types
 
     try:
-        # Neither a plain badge (Judge) nor a Prince widens what the user sees.
-        # (Judge, not PT: granting PT is gated on an NDA record.)
-        for role in (Role.JUDGE, Role.PRINCE):
+        # Neither a plain badge (Rulemonger) nor a Prince widens what the user sees.
+        # (Rulemonger, not PT: granting PT is gated on an NDA record.)
+        for role in (Role.RULEMONGER, Role.PRINCE):
             current = await db.get_user_by_uid(target.uid)
             resp = await test_client.put(
                 f"/api/users/{target.uid}",
@@ -234,23 +234,26 @@ async def test_update_user_requires_edit_authority(test_db, test_client: AsyncCl
 async def test_role_only_edit_without_profile_authority(
     test_db, test_client: AsyncClient
 ):
-    """A Rulemonger appoints Judges anywhere without profile authority: profile
+    """A PTC appoints Playtesters anywhere without profile authority: profile
     fields and roles are independent gates over one endpoint."""
-    actor = await _mk_user("FR", [Role.RULEMONGER], vekn="2000001")
+    actor = await _mk_user("FR", [Role.PTC], vekn="2000001")
     target = await _mk_user("US", [], vekn="2000002")
+    await db.insert_nda_upload(
+        str(uuid7()), target.uid, actor.uid, b"%PDF-scan", "application/pdf"
+    )
 
     resp = await test_client.put(
         f"/api/users/{target.uid}",
-        json={"roles": [Role.JUDGE.value]},
+        json={"roles": [Role.PT.value]},
         headers=make_auth_header(actor.uid),
     )
     assert resp.status_code == 200
-    assert (await db.get_user_by_uid(target.uid)).roles == [Role.JUDGE]
+    assert (await db.get_user_by_uid(target.uid)).roles == [Role.PT]
 
     # ...but the same actor may not ride a profile edit in alongside it.
     resp = await test_client.put(
         f"/api/users/{target.uid}",
-        json={"roles": [Role.JUDGE.value], "name": "Hijacked"},
+        json={"roles": [Role.PT.value], "name": "Hijacked"},
         headers=make_auth_header(actor.uid),
     )
     assert resp.status_code == 403

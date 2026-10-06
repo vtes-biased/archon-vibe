@@ -25,7 +25,7 @@ Three `INTEGER_GREATER_THAN_OR_EQUAL` fields:
 | Key | Shown as | Values |
 |---|---|---|
 | `organization` | VEKN Role | 1 Member · 2 Prince · 3 NC · 4 IC |
-| `judge` | Judge Level | 1 Sheriff · 2 Judge · 3 Rulemonger |
+| `judge` | Judge Level | 1 Sheriff · 2 Judge · 3 Rulemonger — the first two follow the [judge directory](vekn.md#judge-directory) |
 | `playtest` | Playtest Role | 1 Playtester · 2 Playtest Coordinator |
 
 The builder takes the **max** matching level per axis and falls back to

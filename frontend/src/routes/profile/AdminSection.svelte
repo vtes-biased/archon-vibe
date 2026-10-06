@@ -6,6 +6,7 @@
     syncVeknMembers,
     syncVeknTournaments,
     syncTwdaDecks,
+    syncJudges,
     getVeknStatus,
     downloadDataExport,
     type AdminSyncResult,
@@ -26,6 +27,7 @@
     { key: 'member_sync', label: m.admin_status_member_sync },
     { key: 'tournament_sync', label: m.admin_status_tournament_sync },
     { key: 'twda_sync', label: m.admin_status_twda_sync },
+    { key: 'judge_sync', label: m.admin_status_judge_sync },
     { key: 'batch_push', label: m.admin_status_batch_push },
   ];
 
@@ -88,6 +90,13 @@
       desc: m.admin_sync_twda_desc(),
       confirmBody: m.admin_sync_twda_confirm(),
       run: syncTwdaDecks,
+    },
+    {
+      key: 'judges',
+      label: m.admin_sync_judges_label(),
+      desc: m.admin_sync_judges_desc(),
+      confirmBody: m.admin_sync_judges_confirm(),
+      run: syncJudges,
     },
   ];
 

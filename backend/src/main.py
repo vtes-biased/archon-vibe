@@ -61,6 +61,7 @@ from .db import (
 )
 from .db_oauth import cleanup_expired_oauth_codes, cleanup_expired_oauth_tokens
 from .engine_errors import EngineRejection
+from .judge_directory import sync_judges
 from .jwt_config import AUDIENCE_APP, assert_production_keys, decode
 from .middleware.auth import get_current_user
 from .migrations import run_migrations
@@ -209,6 +210,18 @@ async def run_twda_sync() -> None:
     except Exception as e:
         logger.error(f"Error during TWDA sync: {e}", exc_info=True)
         record_error("twda_sync", str(e))
+
+
+async def run_judge_sync() -> None:
+    try:
+        stats = await sync_judges()
+        record_success("judge_sync", stats)
+    except TimeoutError:
+        logger.error("Judge directory sync timed out")
+        record_error("judge_sync", "timed out")
+    except Exception as e:
+        logger.error(f"Error during judge directory sync: {e}", exc_info=True)
+        record_error("judge_sync", str(e))
 
 
 async def run_vekn_sync() -> None:
@@ -426,6 +439,19 @@ async def lifespan(app: Litestar) -> AsyncIterator[None]:
         logger.info("TWDA sync scheduled daily at 05:00 UTC")
     else:
         logger.info("TWDA sync is disabled")
+
+    admin.set_sync_runners(judge_sync=run_judge_sync)
+    if os.getenv("JUDGE_SYNC_ENABLED", "false").lower() == "true":
+        _scheduler.add_job(
+            run_judge_sync,
+            trigger=CronTrigger(hour=5, minute=30, timezone="UTC"),
+            id="judge_sync",
+            name="Judge Directory Sync",
+            replace_existing=True,
+        )
+        logger.info("Judge directory sync scheduled daily at 05:30 UTC")
+    else:
+        logger.info("Judge directory sync is disabled")
 
     _scheduler.add_job(
         run_sanction_cleanup,

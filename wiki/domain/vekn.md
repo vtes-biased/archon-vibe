@@ -39,8 +39,17 @@ Introduction).
 
 The app additionally models Judge, Sheriff — the rank the 2004 judges guide
 called *Judgekin*, a term the current guide does not use — Rulemonger, Playtest
-Coordinator, Playtester, Ethics and DEV. These are app-managed appointments; how
-they are granted is [access](../access.md), not domain.
+Coordinator, Playtester, Ethics and DEV. Except Judge and Sheriff, these are
+app-managed appointments; how they are granted is [access](../access.md), not
+domain.
+
+**Judge accreditation** is run by VTES Exams, maintained by Conclave Ibérico for
+the VEKN's Rulemongers. An accredited judge holds a rank — Neonate, Ancilla or
+Elder — from an accreditation date until a validity date, and may choose to appear
+in its public directory, the *Guardians*. The owner, as Rulemonger, set the
+correspondence: Elder is a Judge, Neonate and Ancilla are Sheriffs, and a judge
+who stays out of the public directory or lets the accreditation lapse holds
+neither title. Source: https://www.vtesexams.com/api/ (2026-10) and the owner.
 
 ## Ethics sanctions
 

@@ -35,7 +35,8 @@ since they are the ones physically present.
 
 VEKN judge certifications (Judge, Sheriff, Rulemonger)
 are profile titles. They appear on member profiles and grant no extra power in
-tournament management.
+tournament management. Judge and Sheriff follow the VTES Exams judge directory
+([vekn](vekn.md#judge-directory)); Rulemonger is appointed in the app.
 
 Who may do what: [access](access.md).
 

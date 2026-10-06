@@ -50,3 +50,27 @@ seven days before the deploy. Before this commit that ceiling was about 4,000
 hour does exceed it, the surge is the finding: bring it to the owner.
 
 Nothing else is owed.
+
+## Hand Judge and Sheriff to the judge directory on production
+
+**Gated on** the commit carrying this section — *"Take Judge and Sheriff from the
+VTES Exams judge directory"*. Before it, the preview script does not exist on the
+box and a Rulemonger can still grant the roles by hand behind it.
+`JUDGE_SYNC_ENABLED` ships off on production, so nothing changes until this runs.
+
+**Run**, as the owner's hand, and read the list it prints — the go/no-go is that
+read, since every current Judge or Sheriff not validly listed loses the title:
+
+```sh
+/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/preview_judge_sync.py
+```
+
+On go: as IC, Profile → Admin → *Sync judges*. Then set `judge_sync = "true"` in
+`deploy/group_data/prod.py`, commit, and deploy.
+
+**Proves it worked**: the vekn-status panel shows *Judge directory sync* green, and
+the preview re-run prints `0 members would change`.
+
+**Owes afterwards**: telling the VTES Exams maintainers the integration is live, and that
+leaving the public directory or letting an accreditation lapse now removes the
+Archon title. Delete this section.

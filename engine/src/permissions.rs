@@ -584,7 +584,8 @@ pub struct Appointment {
 }
 
 /// **The appointment matrix.** Every [`Role::ALL`] variant has a row (asserted
-/// below) — a role missing from here would silently become unassignable.
+/// below) — a role missing from here would silently become unassignable. Judge
+/// and Sheriff are deliberately nobody's: the judge directory sync writes them.
 pub const ROLE_APPOINTMENTS: &[Appointment] = &[
     Appointment {
         role: Prince,
@@ -598,12 +599,12 @@ pub const ROLE_APPOINTMENTS: &[Appointment] = &[
     },
     Appointment {
         role: Judge,
-        global: &[IC, Rulemonger],
+        global: &[],
         same_country: &[],
     },
     Appointment {
         role: Sheriff,
-        global: &[IC, Rulemonger],
+        global: &[],
         same_country: &[],
     },
     Appointment {
@@ -985,8 +986,11 @@ mod tests {
     }
 
     #[test]
-    fn test_every_role_can_be_appointed_by_someone() {
-        for role in Role::ALL {
+    fn test_every_role_but_the_directory_ones_can_be_appointed_by_someone() {
+        for role in Role::ALL
+            .into_iter()
+            .filter(|r| !matches!(r, Judge | Sheriff))
+        {
             let appointment = appointment_for(role);
             assert!(
                 !appointment.global.is_empty() || !appointment.same_country.is_empty(),
@@ -1143,11 +1147,12 @@ mod tests {
     }
 
     #[test]
-    fn test_ic_can_change_any_role() {
+    fn test_ic_can_change_any_role_but_the_directory_ones() {
         let ic = ctx(vec![IC], Some("US"));
         let target = ctx(vec![], Some("FR"));
         for role in Role::ALL {
-            assert!(can_change_role(&ic, &target, role).allowed);
+            let directory = matches!(role, Judge | Sheriff);
+            assert_eq!(can_change_role(&ic, &target, role).allowed, !directory);
         }
     }
 
@@ -1163,7 +1168,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ptc_and_rulemonger_appoint_anywhere() {
+    fn test_ptc_appoints_anywhere_and_rulemonger_nothing() {
         let target = ctx(vec![], Some("FR"));
         let ptc = ctx(vec![PTC], Some("US"));
         assert!(can_change_role(&ptc, &target, PT).allowed);
@@ -1171,8 +1176,8 @@ mod tests {
         assert!(!can_change_role(&ptc, &target, Judge).allowed);
 
         let rm = ctx(vec![Rulemonger], Some("US"));
-        assert!(can_change_role(&rm, &target, Judge).allowed);
-        assert!(can_change_role(&rm, &target, Sheriff).allowed);
+        assert!(!can_change_role(&rm, &target, Judge).allowed);
+        assert!(!can_change_role(&rm, &target, Sheriff).allowed);
         assert!(!can_change_role(&rm, &target, Prince).allowed);
         assert!(!can_change_role(&rm, &target, PT).allowed);
     }
@@ -1206,7 +1211,7 @@ mod tests {
         assert!(result.reason.unwrap().contains("NDA"));
         assert!(!can_change_role(&ic, &unsigned, PT).allowed);
         // Other roles ignore the NDA precondition.
-        assert!(can_change_role(&ic, &unsigned, Judge).allowed);
+        assert!(can_change_role(&ic, &unsigned, Rulemonger).allowed);
         // A grandfathered holder stays revocable without a record.
         let holder = UserContext {
             roles: vec![PT],
