@@ -30,8 +30,6 @@ _entries: list[JudgeEntry] = []
 
 
 async def _fetch_directory() -> list[JudgeEntry]:
-    """A 304 still reconciles from the cached body: our side moves while the
-    directory sits still — validity dates pass, members gain a VEKN id."""
     global _etag, _entries
     headers = {"If-None-Match": _etag} if _etag and _entries else {}
     async with http_client.session().get(DIRECTORY_URL, headers=headers) as resp:
@@ -68,7 +66,8 @@ async def sync_judges(*, apply: bool = True) -> dict:
     today = datetime.now(UTC).date().isoformat()
     wanted: dict[str, Role | None] = {}
     for entry in entries:
-        wanted[entry.vekn] = _directory_role(entry, today) or wanted.get(entry.vekn)
+        if wanted.get(entry.vekn) != Role.JUDGE:
+            wanted[entry.vekn] = _directory_role(entry, today) or wanted.get(entry.vekn)
     if unknown := {e.rank for e in entries} - _RANK_ROLES.keys():
         logger.warning(
             f"Judge directory: unknown ranks {sorted(unknown)} grant nothing"

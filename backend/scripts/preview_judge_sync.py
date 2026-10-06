@@ -2,10 +2,6 @@
 
     /opt/archon/backend/.venv/bin/python \\
       /opt/archon/backend/scripts/preview_judge_sync.py
-
-Applying is the admin panel's "Sync judges", never a script: the write goes through
-`save_member`, whose Discord Linked Roles push is a background task a script would
-exit before.
 """
 
 import argparse
