@@ -130,6 +130,7 @@
   <CommunityLinkEditor
     link={editing.link}
     ownerCountry={user.country || null}
+    takenUrls={editLinks.map(l => l.url).filter(u => u !== editing?.link?.url)}
     {defaultLanguage}
     onclose={() => { editing = null; }}
     onsave={(link, state) => saveLinks(

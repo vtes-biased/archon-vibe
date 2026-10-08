@@ -196,3 +196,19 @@ async def test_self_edited_contact_fields_flagged_local(
         "contact_phone",
         "phone_is_whatsapp",
     } <= after.local_modifications
+
+
+@pytest.mark.asyncio
+async def test_community_links_duplicate_url_rejected(
+    test_client: AsyncClient, test_db
+):
+    """A URL repeated in one member's links returns 422."""
+    user = await _insert_user(roles=[Role.NC], vekn_id="1000009")
+    link = {"type": "blog", "url": "https://example.com/", "languages": ["en"]}
+    response = await test_client.patch(
+        "/auth/me",
+        json={"community_links": [link, {**link, "type": "facebook"}]},
+        headers=make_auth_header(user.uid),
+    )
+    assert response.status_code == 422
+    assert "already have a link" in response.json()["detail"].lower()

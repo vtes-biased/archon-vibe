@@ -165,6 +165,10 @@ async def update_current_user(
                 status_code=422,
                 detail=f"Maximum {max_links} community links allowed",
             )
+        if len({link.url for link in data.community_links}) < len(data.community_links):
+            raise HTTPException(
+                status_code=422, detail="You already have a link to this address"
+            )
         links = []
         existing_by_url = {existing.url: existing for existing in user.community_links}
         for link in data.community_links:

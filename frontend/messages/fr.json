@@ -1674,6 +1674,7 @@
   "community_link_type": "Plateforme",
   "community_link_url": "Adresse",
   "community_link_url_invalid": "Saisissez une adresse complète commençant par http:// ou https://",
+  "community_link_url_taken": "Vous avez déjà un lien vers cette adresse — modifiez plutôt celui-ci",
   "community_link_label": "Libellé",
   "community_link_use_title": "Utiliser le titre de la page",
   "community_link_country_hint": "La communauté que sert ce lien, pas forcément là où vous vivez.",

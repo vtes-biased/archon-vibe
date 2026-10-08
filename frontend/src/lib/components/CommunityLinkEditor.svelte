@@ -15,12 +15,13 @@
     link: CommunityLink | null;
     ownerCountry: string | null;
     canEditUrl?: boolean;
+    takenUrls?: string[];
     defaultLanguage: string;
     onclose: () => void;
     onsave: (link: CommunityLink, state: string | null) => void;
     ondelete?: () => void;
   }
-  let { link, ownerCountry, canEditUrl = true, defaultLanguage, onclose, onsave, ondelete }: Props = $props();
+  let { link, ownerCountry, canEditUrl = true, takenUrls = [], defaultLanguage, onclose, onsave, ondelete }: Props = $props();
 
   const MAX_LANGUAGES = 5;
   const sortedCountries = getSortedCountries();
@@ -64,6 +65,7 @@
 
   const linkTypes = $derived(reference.types);
   const needsLanguage = $derived(isContent && languages.length === 0);
+  const urlTaken = $derived(takenUrls.includes(url.trim()));
   const dropsPin = $derived(!!original?.moderation && url.trim() !== original.url);
 
   async function suggestLabel() {
@@ -88,7 +90,7 @@
 
   function save() {
     touched = true;
-    if (!url.trim().startsWith("http") || needsLanguage || (!isContent && !country)) return;
+    if (!url.trim().startsWith("http") || urlTaken || needsLanguage || (!isContent && !country)) return;
     onsave(
       {
         type,
@@ -152,6 +154,8 @@
           </div>
           {#if touched && !url.trim().startsWith("http")}
             <p class="mt-1 text-xs text-link">{m.community_link_url_invalid()}</p>
+          {:else if urlTaken}
+            <p class="mt-1 text-xs text-link">{m.community_link_url_taken()}</p>
           {/if}
         </div>
 

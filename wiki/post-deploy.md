@@ -100,3 +100,26 @@ the preview re-run prints `0 members would change`.
 **Owes afterwards**: telling the VTES Exams maintainers the integration is live, and that
 leaving the public directory or letting an accreditation lapse now removes the
 Archon title. Delete this section.
+
+## Drop repeated community-link URLs on production
+
+**Gated on** the commit carrying this section — *"Refuse a repeated community-link
+URL"*. Before it, `PATCH /auth/me` still accepts a repeat, so a member could put one
+straight back. Two members hold one: a URL saved as both `blog` and `facebook`,
+which blanks the community page for everyone, and a Facebook page saved plain and
+pinned national.
+
+**Run** from the deployed tree, list first, then apply — the script keeps the
+moderated copy, else the first:
+
+```sh
+export DATABASE_URL="$(sudo sh -c '. /etc/archon/archon-backend.env && printf %s "$DATABASE_URL"')"
+/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/dedupe_community_links.py
+/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/dedupe_community_links.py --apply
+```
+
+**Proves it worked**: the list re-run prints `0 user(s) to rewrite`, and the
+community page renders past *Loading…*.
+
+**Owes afterwards**: deleting `backend/scripts/dedupe_community_links.py` with this
+section.

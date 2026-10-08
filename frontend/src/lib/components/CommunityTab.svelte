@@ -351,6 +351,7 @@
       link={editing?.link ?? null}
       ownerCountry={editing ? (editing.link.country ?? editing.user.country ?? null) : ownCountry}
       canEditUrl={!editing || isOwn(editing)}
+      takenUrls={editing && !isOwn(editing) ? [] : ownLinks.map(l => l.url).filter(u => u !== editing?.link.url)}
       defaultLanguage={COUNTRY_LANGUAGE[ownCountry ?? ""] || getLocale()}
       onclose={() => { adding = false; editing = null; }}
       onsave={saveLink}

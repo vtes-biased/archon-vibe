@@ -921,7 +921,10 @@ edit — and shows under every filter until rewritten.
 
 Any user with a `vekn_id` may add, limit 5 (10 for IC/NC/Prince). One editor
 modal serves both the community page and the profile, sending the whole array
-through `PATCH /auth/me`. On update, existing moderation is re-applied by URL
+through `PATCH /auth/me`. **A URL appears once per member**, and the update
+refuses a repeat: the moderation endpoint addresses a link by URL and the
+community page keys its lists by owner and URL, so two copies of one URL blank the
+whole page. On update, existing moderation is re-applied by URL
 match, so a rewritten URL drops its pin and the editor warns before saving.
 Hidden and the two pins are mutually exclusive, so a link carries **one
 four-valued state** — `none` (stored null) / `hidden` / `national` / `global` —
