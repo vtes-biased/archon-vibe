@@ -24,5 +24,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
-
-- Report "Couldn't reach the server" only for an actual transport failure of a request, not for any `TypeError`, so a code bug surfaces under the caller's own fallback message and is logged instead of reading as a connectivity problem. **Done when** a forced client-side `TypeError` on the Members tab shows the load-failure message rather than the network one, an offline request still shows the network one, and the fallback order in `wiki/architecture.md` lists the network case.

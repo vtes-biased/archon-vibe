@@ -439,7 +439,10 @@ Discord bot and legacy clients.
 Frontend fallback order (`toUserMessage`, which also localizes `apiRequest`
 toasts): a `code` resolves through `errorCodeToMessage(code, params)` to the
 paraglide `err_*` key in five locales; else the server `detail` in English; else
-`"Request failed: <statusText>"`. An `internal` code yields a generic localized
+`"Request failed: <statusText>"`. A `NetworkError` — what `fetchOrNetworkError` makes of
+fetch()'s own rejection, which `apiRequest` also toasts — yields the localized "couldn't
+reach the server"; any other `TypeError` is a code bug, logged and shown as the caller's
+fallback; a plain `Error` passes its message through. An `internal` code yields a generic localized
 message plus a `console.error` of the raw detail, so parse and invariant noise is
 never shown; an unknown future code from version skew falls through to `detail`.
 App-level checks mirroring engine rules reuse the engine codes so the same

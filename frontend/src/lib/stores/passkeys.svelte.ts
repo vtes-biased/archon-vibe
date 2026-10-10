@@ -1,5 +1,6 @@
 import * as m from '$lib/paraglide/messages.js';
 import { toUserMessage } from '$lib/errors';
+import { fetchOrNetworkError } from '$lib/error-codes';
 import { authorizedFetch, getAuthState, setAuthState, storeTokens, fetchCurrentUser } from './auth.svelte';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -118,7 +119,7 @@ export async function createAccountWithPasskey(): Promise<boolean> {
   setAuthState({ isLoading: true, error: null });
 
   try {
-    const optionsResponse = await fetch(`${API_BASE}/auth/passkey/create/options`, {
+    const optionsResponse = await fetchOrNetworkError(`${API_BASE}/auth/passkey/create/options`, {
       method: "POST",
     });
 
@@ -153,7 +154,7 @@ export async function createAccountWithPasskey(): Promise<boolean> {
       },
     };
 
-    const verifyResponse = await fetch(`${API_BASE}/auth/passkey/create/verify`, {
+    const verifyResponse = await fetchOrNetworkError(`${API_BASE}/auth/passkey/create/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ credential: credentialData }),
@@ -208,7 +209,7 @@ export async function startConditionalUI(
   conditionalUIAbortController = new AbortController();
 
   try {
-    const optionsResponse = await fetch(`${API_BASE}/auth/passkey/login/options`, {
+    const optionsResponse = await fetchOrNetworkError(`${API_BASE}/auth/passkey/login/options`, {
       method: "POST",
     });
 
@@ -255,7 +256,7 @@ export async function startConditionalUI(
       },
     };
 
-    const verifyResponse = await fetch(`${API_BASE}/auth/passkey/login/verify`, {
+    const verifyResponse = await fetchOrNetworkError(`${API_BASE}/auth/passkey/login/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ credential: credentialData }),
@@ -299,7 +300,7 @@ export async function loginWithPasskey(): Promise<boolean> {
   setAuthState({ isLoading: true, error: null });
 
   try {
-    const optionsResponse = await fetch(`${API_BASE}/auth/passkey/login/options`, {
+    const optionsResponse = await fetchOrNetworkError(`${API_BASE}/auth/passkey/login/options`, {
       method: "POST",
     });
 
@@ -345,7 +346,7 @@ export async function loginWithPasskey(): Promise<boolean> {
       },
     };
 
-    const verifyResponse = await fetch(`${API_BASE}/auth/passkey/login/verify`, {
+    const verifyResponse = await fetchOrNetworkError(`${API_BASE}/auth/passkey/login/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ credential: credentialData }),

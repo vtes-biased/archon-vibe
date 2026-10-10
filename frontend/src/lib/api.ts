@@ -2,7 +2,7 @@ import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcatego
 import { saveTournament, saveLeague } from './db';
 import { showToast } from '$lib/stores/toast.svelte';
 import { authorizedFetch, ensureSyncToken, getAuthState } from '$lib/stores/auth.svelte';
-import { errorCodeToMessage } from './error-codes';
+import { NetworkError, errorCodeToMessage } from './error-codes';
 import { downloadBlob } from './utils';
 import * as m from './paraglide/messages.js';
 
@@ -56,10 +56,8 @@ export async function apiRequest<T>(
       headers,
     });
   } catch (e) {
-    // fetch() rejects with a TypeError on a transport failure (dropped mid-flight, DNS, CORS, server
-    // down). This never reaches the !response.ok block below, so it used to escape untoasted — toast it.
-    if (!suppressErrorToast) showToast({ type: 'error', message: m.error_network_unreachable() });
-    throw e instanceof Error ? e : new Error(m.error_network_unreachable());
+    if (e instanceof NetworkError && !suppressErrorToast) showToast({ type: 'error', message: e.message });
+    throw e;
   }
 
   if (!response.ok) {

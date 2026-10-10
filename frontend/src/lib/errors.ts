@@ -1,15 +1,9 @@
 // EngineError/ApiError with a code → localized message; unknown code falls back to English. Plain
-// string → legacy WASM passthrough (parse a code if possible). TypeError → network failure.
+// string → legacy WASM passthrough (parse a code if possible).
 import { ApiError } from './api';
-import { EngineError, engineErrorFromThrown, errorCodeToMessage } from './error-codes';
-import * as m from './paraglide/messages.js';
+import { EngineError, NetworkError, engineErrorFromThrown, errorCodeToMessage } from './error-codes';
 
 export { EngineError } from './error-codes';
-
-/** True when `e` is a fetch() network rejection (offline, DNS, CORS, server down). */
-export function isNetworkError(e: unknown): boolean {
-  return e instanceof TypeError;
-}
 
 function engineMessage(code: string, params: Record<string, string>, english: string | undefined, fallback: string): string {
   if (code === 'internal') {
@@ -31,7 +25,11 @@ export function toUserMessage(e: unknown, fallback: string): string {
     if (engine) return engineMessage(engine.code, engine.params, engine.message, fallback);
     return e || fallback; // legacy WASM free-text rejection
   }
-  if (isNetworkError(e)) return m.error_network_unreachable();
+  if (e instanceof NetworkError) return e.message;
+  if (e instanceof TypeError) {
+    console.error(e);
+    return fallback;
+  }
   if (e instanceof Error && e.message) return e.message;
   return fallback;
 }

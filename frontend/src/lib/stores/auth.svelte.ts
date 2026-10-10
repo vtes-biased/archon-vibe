@@ -1,6 +1,7 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 import * as m from '$lib/paraglide/messages.js';
 import { toUserMessage } from '$lib/errors';
+import { fetchOrNetworkError } from '$lib/error-codes';
 import type { User } from "$lib/types";
 import { syncManager } from "$lib/sync";
 import { forgetViews } from "$lib/last-view";
@@ -225,7 +226,7 @@ export async function authorizedFetch(input: string, init: RequestInit = {}): Pr
     const token = getAccessToken();
     const headers = new Headers(init.headers);
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    return fetch(input, { ...init, headers });
+    return fetchOrNetworkError(input, { ...init, headers });
   };
   const response = await doFetch();
   if (response.status !== 401) return response;
@@ -241,7 +242,7 @@ async function doRefreshTokens(): Promise<boolean> {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/auth/refresh`, {
+    const response = await fetchOrNetworkError(`${API_BASE}/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token: refreshToken }),
@@ -361,7 +362,7 @@ export async function register(
   setAuthState({ isLoading: true, error: null });
 
   try {
-    const response = await fetch(`${API_BASE}/auth/register`, {
+    const response = await fetchOrNetworkError(`${API_BASE}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password, name }),
@@ -398,7 +399,7 @@ export async function login(email: string, password: string): Promise<boolean> {
   setAuthState({ isLoading: true, error: null });
 
   try {
-    const response = await fetch(`${API_BASE}/auth/login`, {
+    const response = await fetchOrNetworkError(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -514,7 +515,7 @@ export async function requestMagicLink(
       const token = getAccessToken();
       if (token) headers["Authorization"] = `Bearer ${token}`;
     }
-    const response = await fetch(`${API_BASE}/auth/email/request`, {
+    const response = await fetchOrNetworkError(`${API_BASE}/auth/email/request`, {
       method: "POST",
       headers,
       body: JSON.stringify({ email, purpose }),
@@ -550,7 +551,7 @@ export async function verifyMagicLink(
   setAuthState({ isLoading: true, error: null });
 
   try {
-    const response = await fetch(`${API_BASE}/auth/email/verify`, {
+    const response = await fetchOrNetworkError(`${API_BASE}/auth/email/verify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
@@ -583,7 +584,7 @@ export async function setPassword(token: string, password: string): Promise<bool
   setAuthState({ isLoading: true, error: null });
 
   try {
-    const response = await fetch(`${API_BASE}/auth/email/set-password`, {
+    const response = await fetchOrNetworkError(`${API_BASE}/auth/email/set-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token, password }),

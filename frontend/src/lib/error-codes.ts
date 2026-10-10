@@ -2,6 +2,20 @@
 // messages/en.json mirrors the Rust Display byte-for-byte. A missing key falls through to the caller's English fallback, never throws.
 import * as m from './paraglide/messages.js';
 
+/** fetch() rejected before any response: offline, DNS, CORS, server down. */
+export class NetworkError extends Error {
+  constructor(cause: unknown) {
+    super(m.error_network_unreachable(), { cause });
+    this.name = 'NetworkError';
+  }
+}
+
+export function fetchOrNetworkError(input: string, init?: RequestInit): Promise<Response> {
+  return fetch(input, init).catch((e) => {
+    throw e instanceof TypeError ? new NetworkError(e) : e;
+  });
+}
+
 /** A structured engine rejection, re-thrown from WASM calls and JS pre-checks. */
 export class EngineError extends Error {
   constructor(
