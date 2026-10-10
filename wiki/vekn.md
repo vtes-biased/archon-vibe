@@ -349,7 +349,11 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   legacy folded imports, self-heal.
 - **Authority follows content.** VEKN is authoritative for a matched event only
   where it has something to say: a local row *with* rounds, or an incoming event
-  with no players, gets a metadata-only refresh. Rebuilding a round-less row from
+  with no players, gets a metadata-only refresh. That refresh also takes `rounds`
+  while the row has no local rounds and both sides hold a cap, since the app
+  locks the field and a format change made on vekn.net would otherwise never
+  arrive; an uncapped app event is not capped by the calendar's filed minimum.
+  Rebuilding a round-less row from
   an empty calendar entry used to reset an in-app event still taking registrations
   back to `Planned` and discard everyone registered — on every sync until its first
   round started.

@@ -627,6 +627,14 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                     if existing.rounds or not tournament.players:
                         # Authority follows content: metadata-only refresh once local
                         # rounds exist, or the incoming event has no players to speak for.
+                        rounds_fill = (
+                            {"max_rounds": tournament.max_rounds}
+                            if not existing.rounds
+                            and existing.max_rounds
+                            and tournament.max_rounds
+                            and existing.max_rounds != tournament.max_rounds
+                            else {}
+                        )
                         meta_changed = (
                             existing.format != tournament.format
                             or existing.rank != tournament.rank
@@ -640,6 +648,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                             or existing.proxies != tournament.proxies
                             or merged_organizers != existing.organizers_uids
                             or bool(fill)
+                            or bool(rounds_fill)
                         )
                         if meta_changed:
                             updated = msgspec.structs.replace(
@@ -657,6 +666,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                                 proxies=tournament.proxies,
                                 organizers_uids=merged_organizers,
                                 **fill,
+                                **rounds_fill,
                             )
                             if updated.format == TournamentFormat.Storyline:
                                 # Reclassification writes `format` without the engine,

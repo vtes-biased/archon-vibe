@@ -63,3 +63,37 @@ async def test_sync_keeps_registered_players_on_a_roundless_local_event(test_db)
     stored = await db.get_tournament_by_uid(uid)
     assert stored.state == TournamentState.REGISTRATION
     assert [p.user_uid for p in stored.players] == [player_uid]
+
+
+@pytest.mark.asyncio
+async def test_sync_takes_a_rounds_change_on_a_roundless_local_event(test_db):
+    uid = str(uuid7())
+    event_id = str(uuid4().int % 100000)
+    local = Tournament(
+        uid=uid,
+        modified=datetime.now(UTC),
+        name="Liga Castellana",
+        start=datetime(2026, 10, 11, 10, 0, tzinfo=UTC),
+        state=TournamentState.REGISTRATION,
+        external_ids={"vekn": event_id},
+        max_rounds=3,
+    )
+    async with db.get_connection() as conn:
+        await db.save_tournament(local, conn=conn)
+
+    await sync_all_tournaments(
+        _StubClient(
+            {
+                "event_id": event_id,
+                "event_name": "Liga Castellana",
+                "event_startdate": "2026-10-11",
+                "event_starttime": "10:00",
+                "eventtype_id": 2,
+                "rounds": "2R+F",
+                "players": [],
+            }
+        )
+    )
+
+    stored = await db.get_tournament_by_uid(uid)
+    assert stored.max_rounds == 2
