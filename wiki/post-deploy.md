@@ -51,75 +51,18 @@ hour does exceed it, the surge is the finding: bring it to the owner.
 
 Nothing else is owed.
 
-## Re-project users for the officials' city
+## Confirm the judge directory sync runs on production
 
-**Gated on** the commit carrying this section — *"Publish an official's city in the
-public API"*. A projection is computed at write time, so an official saved before
-it went live keeps a city-less `api` row until something writes them again; run
-earlier, the deployed projection rewrites the old shape and proves nothing.
+**Gated on** the commit setting `judge_sync = "true"` in
+`deploy/group_data/prod.py`. The first run was triggered by hand from the admin
+panel; the daily 05:30 UTC job only exists once a deploy carries the flag.
 
-**Run** from the deployed tree, count first, then apply:
+**Run** nothing: after the first 05:30 UTC following that deploy, read the
+vekn-status panel.
 
-```sh
-/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/reproject_public.py
-/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/reproject_public.py --apply
-```
-
-**Proves it worked**: this returns 0 —
-
-```sql
-SELECT count(*) FROM objects WHERE type = 'user' AND "api" IS NOT NULL
-  AND "full"->>'city' IS NOT NULL
-  AND "full"->'roles' ?| array['IC','NC','Prince','Rulemonger','Judge','Sheriff']
-  AND NOT "api" ? 'city';
-```
-
-**Owes afterwards**: telling the API consumer who asked for it that the city is
-live. Delete this section.
-
-## Hand Judge and Sheriff to the judge directory on production
-
-**Gated on** the commit carrying this section — *"Take Judge and Sheriff from the
-VTES Exams judge directory"*. Before it, the preview script does not exist on the
-box and a Rulemonger can still grant the roles by hand behind it.
-`JUDGE_SYNC_ENABLED` ships off on production, so nothing changes until this runs.
-
-**Run**, as the owner's hand, and read the list it prints — the go/no-go is that
-read, since every current Judge or Sheriff not validly listed loses the title:
-
-```sh
-/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/preview_judge_sync.py
-```
-
-On go: as IC, Profile → Admin → *Sync judges*. Then set `judge_sync = "true"` in
-`deploy/group_data/prod.py`, commit, and deploy.
-
-**Proves it worked**: the vekn-status panel shows *Judge directory sync* green, and
-the preview re-run prints `0 members would change`.
+**Proves it worked**: *Judge directory sync* shows green with a run after the
+deploy, and `preview_judge_sync.py` on the box prints `0 members would change`.
 
 **Owes afterwards**: telling the VTES Exams maintainers the integration is live, and that
 leaving the public directory or letting an accreditation lapse now removes the
 Archon title. Delete this section.
-
-## Drop repeated community-link URLs on production
-
-**Gated on** the commit carrying this section — *"Refuse a repeated community-link
-URL"*. Before it, `PATCH /auth/me` still accepts a repeat, so a member could put one
-straight back. Two members hold one: a URL saved as both `blog` and `facebook`,
-which blanks the community page for everyone, and a Facebook page saved plain and
-pinned national.
-
-**Run** from the deployed tree, list first, then apply — the script keeps the
-moderated copy, else the first:
-
-```sh
-export DATABASE_URL="$(sudo sh -c '. /etc/archon/archon-backend.env && printf %s "$DATABASE_URL"')"
-/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/dedupe_community_links.py
-/opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/dedupe_community_links.py --apply
-```
-
-**Proves it worked**: the list re-run prints `0 user(s) to rewrite`, and the
-community page renders past *Loading…*.
-
-**Owes afterwards**: deleting `backend/scripts/dedupe_community_links.py` with this
-section.
