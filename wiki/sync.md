@@ -705,6 +705,15 @@ tombstones, no static card data. `pg_dump` remains the backup tool.
 
 ## Frontend storage
 
+**One local database serves whoever is signed in, and logout empties it.** The
+wipe is a privacy guard, not a sync economy: a venue laptop an organizer or IC
+signs out of must not keep the contact details and check-in codes their level
+could see. Per-account databases kept across logout, and an IC impersonation
+endpoint, were both refused for faster test-account switching — the first
+cannot spare the full-level account its reload without breaking this guard, the
+second is the sign-in-as affordance [dev](dev.md#the-dev-ic-account) rules out.
+Separate browser profiles give each test account its own IndexedDB for free.
+
 One `tournaments` store holds all data levels — there is no separate details store.
 A DB-version upgrade deletes all stores and recreates them fresh, triggering a full
 resync. **Exception**: unsynced offline-tournament data — the offline tournament
