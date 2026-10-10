@@ -61,6 +61,15 @@ local mutation. A new path that reaches either store without those helpers leave
 the lists stale and **nothing fails** — the row is right in IndexedDB and wrong on
 screen.
 
+**A `users` row can have no `name`, whatever the `User` type says.** The public
+level's links-only row — a non-official with community links — carries only
+uid, country, roles and links ([sync](sync.md#access-levels)), and an anonymous
+visitor or a VEKN-less member is served exactly that level. A name read off a raw
+row (`localeCompare`, `searchTokens`, the engine's `foldAscii`) throws a
+`TypeError` there and nowhere a named viewer looks. `db.ts` `buildEntry` folds the
+absence to `''`, so a `UserListItem` is always safe; a new reader of whole `User`
+rows is not, and beta, whose link-holders are all officials, does not reproduce it.
+
 **Our country rows are ISO codes; the corpora we compare them against are names.**
 Every write path normalises through `geonames.stored_country`, so a stored value is
 a two-letter code, vekn.net's `XX` unknown-venue placeholder, or nothing. The

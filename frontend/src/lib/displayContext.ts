@@ -69,6 +69,8 @@ class DisplayContext {
 
   matchesCurrentFilters(user: User): boolean {
     const { country, roles, nameSearch } = this.filters;
+    // The public level's links-only row carries no `name`, whatever `User` declares.
+    const userName = user.name ?? '';
 
     if (country && user.country !== country) {
       return false;
@@ -85,7 +87,7 @@ class DisplayContext {
 
     if (nameSearch) {
       const queryNorm = normalizeSearch(nameSearch);
-      const words = normalizeSearch(user.name).split(/\s+/);
+      const words = normalizeSearch(userName).split(/\s+/);
       const matchesName = words.some(word => word.startsWith(queryNorm));
       if (!matchesName) {
         return false;
@@ -101,7 +103,6 @@ class DisplayContext {
       return true;
     }
 
-    const userName = user.name;
     const { firstVisibleName, lastVisibleName } = this.pagination;
 
     return (

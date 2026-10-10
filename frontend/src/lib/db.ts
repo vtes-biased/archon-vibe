@@ -335,11 +335,13 @@ interface UserIndexEntry {
 let userIndexPromise: Promise<Map<string, UserIndexEntry>> | null = null;
 
 function buildEntry(user: User): UserIndexEntry {
+  // The public level's links-only row carries no `name`, whatever `User` declares.
+  const name = user.name ?? '';
   return {
     user: {
       uid: user.uid,
       deleted_at: user.deleted_at,
-      name: user.name,
+      name,
       nickname: user.nickname,
       country: user.country,
       city: user.city,
@@ -366,13 +368,13 @@ function buildEntry(user: User): UserIndexEntry {
     // Contact fields exist only in the full projection (an official's entitled members, see backend
     // access_levels.py), so email/Discord search is implicitly scoped to those.
     tokens: [
-      ...searchTokens(user.name),
+      ...searchTokens(name),
       ...(user.nickname ? searchTokens(user.nickname) : []),
       ...(user.city ? searchTokens(user.city) : []),
       ...(user.contact_email ? searchTokens(user.contact_email) : []),
       ...(user.contact_discord ? searchTokens(user.contact_discord) : []),
     ],
-    nameNorm: normalizeSearch(user.name),
+    nameNorm: normalizeSearch(name),
     vekn: user.vekn_id ?? '',
     discordId: user.discord_id ?? '',
   };
@@ -380,11 +382,13 @@ function buildEntry(user: User): UserIndexEntry {
 
 async function getUserIndex(): Promise<Map<string, UserIndexEntry>> {
   if (!userIndexPromise) {
-    userIndexPromise = (async () => {
+    const build = (async () => {
       const db = await getDB();
       const all = await db.getAll('users');
       return new Map(all.map(u => [u.uid, buildEntry(u)]));
     })();
+    userIndexPromise = build;
+    build.catch(() => { if (userIndexPromise === build) userIndexPromise = null; });
   }
   return userIndexPromise;
 }

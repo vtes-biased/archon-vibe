@@ -1862,6 +1862,7 @@
   "deck_unknown_cards": "{count} carta(s) não encontrada(s) na base de dados (IDs: {ids})",
   "sync_error_generic": "Erro de sincronização",
   "community_moderation_failed": "Falha na moderação",
+  "community_error_load": "Não foi possível carregar o diretório da comunidade.",
   "example_box_label": "Exemplo",
   "auth_verify_error_failed": "Falha na verificação",
   "auth_verify_error_set_password": "Falha ao definir a senha",

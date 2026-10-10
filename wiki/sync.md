@@ -794,6 +794,13 @@ over 300ms were reported before it. The map is in uid order, so
 `getUserListItems` sorts by name before returning — the community directory renders
 its link lists straight off that order and the rankings tie-break on it.
 
+The index holds every row the viewer's level delivers, so at the public level it
+holds the nameless links-only rows too: `buildEntry` gives them an empty name,
+which yields no search tokens and ranks after every named match. A failed build
+is not cached — the next read retries it rather than failing for the rest of the
+session — and the Community tab shows its load error instead of "Loading…"
+([hazards](hazards.md#fields-silently-dropped)).
+
 **Cache Storage is allowlist-only.** It holds exactly three things, in two caches.
 The versioned precache (build assets, static files and the SPA shell) is replaced
 on every deploy. The `images` cache outlives versions and holds promo images

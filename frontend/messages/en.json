@@ -1862,6 +1862,7 @@
   "deck_unknown_cards": "{count} card(s) not found in card database (IDs: {ids})",
   "sync_error_generic": "Sync error occurred",
   "community_moderation_failed": "Moderation failed",
+  "community_error_load": "Couldn't load the community directory.",
   "example_box_label": "Example",
   "auth_verify_error_failed": "Verification failed",
   "auth_verify_error_set_password": "Failed to set password",

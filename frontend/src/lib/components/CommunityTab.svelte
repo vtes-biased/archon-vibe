@@ -5,6 +5,7 @@
   import { getCountries, getCountryFlag } from "$lib/geonames";
   import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
   import { apiRequest } from "$lib/api";
+  import { toUserMessage } from "$lib/errors";
   import { showToast } from "$lib/stores/toast.svelte";
   import { canModerateLink, canPromoteLinkNational, getCommunityLinkReference } from "$lib/engine";
   import { getLocale } from "$lib/paraglide/runtime.js";
@@ -29,6 +30,7 @@
   let allUsersWithLinks = $state<UserListItem[]>([]);
   let officials = $state<UserListItem[]>([]);
   let loaded = $state(false);
+  let loadError = $state<string | null>(null);
   let searchQuery = $state("");
   let pickedCountry = $state<string | null>(null);
   // Codes whose expansion differs from the default (own and picked open).
@@ -157,16 +159,23 @@
   const ownLinks = $derived(auth.user?.community_links ?? []);
 
   async function loadData() {
-    const allUsers = await getUserListItems();
-    allUsersWithLinks = allUsers.filter(u => !u.deleted_at && u.community_links?.length);
-    // Officials directory: NC/Prince reachable by contact info — independent of
-    // community_links (an official with an email but no link must still show).
-    officials = allUsers.filter(u =>
-      !u.deleted_at &&
-      u.roles?.some(r => r === "NC" || r === "Prince") &&
-      (u.contact_email || u.discord_id || u.contact_phone)
-    );
-    loaded = true;
+    try {
+      const allUsers = await getUserListItems();
+      allUsersWithLinks = allUsers.filter(u => !u.deleted_at && u.community_links?.length);
+      // Officials directory: NC/Prince reachable by contact info — independent of
+      // community_links (an official with an email but no link must still show).
+      officials = allUsers.filter(u =>
+        !u.deleted_at &&
+        u.roles?.some(r => r === "NC" || r === "Prince") &&
+        (u.contact_email || u.discord_id || u.contact_phone)
+      );
+      loadError = null;
+    } catch (e) {
+      loadError = toUserMessage(e, m.community_error_load());
+      console.error("Error loading community:", e);
+    } finally {
+      loaded = true;
+    }
   }
 
   const isExpanded = (code: string) =>
@@ -229,6 +238,8 @@
 
 {#if !loaded}
   <div class="text-center py-8 text-ink-muted">{m.common_loading()}</div>
+{:else if loadError}
+  <div class="text-center py-8 text-ink-muted">{loadError}</div>
 {:else}
   {#if sponsorMode && auth.isAuthenticated}
     <div class="p-4 mb-6 rounded-lg border text-sm banner-info">
