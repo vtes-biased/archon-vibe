@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.3.5 — 2026-10-10
 
 - Judge and Sheriff titles now follow the VTES Exams judge directory instead of being granted by hand.
 - A round-count change made on vekn.net now reaches the linked tournament.
