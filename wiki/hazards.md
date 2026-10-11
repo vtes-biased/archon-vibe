@@ -337,6 +337,15 @@ describes carries `twda_entry` instead — [vekn](vekn.md#inbound) enumerates th
 with the tournament sync's legacy-sheet fill, the one reader that takes either key
 alike.
 
+**The legacy merge recognises a deck only by its own uid.** `migrate_from_archon.py
+--merge` derives a deck's uid from the tournament, the old player and the round,
+and matches on nothing else, so a winner's deck the TWDA attach already wrote gets
+a second copy beside it, and the tournament page lists both because the snapshot
+loader keeps every row. The attach is the safe direction: it skips a winner who
+holds any deck there. A `--merge` rerun from a restored dump recreates a missing
+uuid5 copy and still never sees a uuid7 one, which is why a duplicate is resolved
+by keeping the uuid5 copy.
+
 **`player_count` is a taken name.** `engine/src/league.rs` reads
 `tournament["player_count"]` from a **caller-synthesized** summary object, not from
 the Tournament model. A `player_count` field on `Tournament` would make real
