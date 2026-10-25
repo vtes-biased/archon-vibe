@@ -428,21 +428,21 @@
     <div class="space-y-3">
       <div class="flex gap-2 flex-wrap">
         {#if puid && hasRounds && tournament.state === "Waiting" && player.state !== "Finished"}
-          <Button variant="danger" size="sm" onclick={() => removalTarget = { kind: "drop", uid: puid, name: playerInfo[puid]?.name ?? puid }}><Trash2 class="w-4 h-4" aria-hidden="true" />{m.players_drop_player()}</Button>
+          <Button variant="danger" size="sm" onclick={() => removalTarget = { kind: "drop", uid: puid, name: playerInfo[puid]?.name ?? m.rankings_unknown_player() }}><Trash2 class="w-4 h-4" aria-hidden="true" />{m.players_drop_player()}</Button>
         {:else if puid && !hasRounds && tournament.state !== "Finished"}
-          <Button variant="danger" size="sm" onclick={() => removalTarget = { kind: "remove", uid: puid, name: playerInfo[puid]?.name ?? puid }}><X class="w-4 h-4" aria-hidden="true" />{m.players_remove_title()}</Button>
+          <Button variant="danger" size="sm" onclick={() => removalTarget = { kind: "remove", uid: puid, name: playerInfo[puid]?.name ?? m.rankings_unknown_player() }}><X class="w-4 h-4" aria-hidden="true" />{m.players_remove_title()}</Button>
         {/if}
         <!-- Available offline too: sanctions are offline-manageable on the
              lock-holding device (saved to IDB, reconciled at go-online). -->
         {#if puid && hasRounds}
-          <Button variant="secondary" size="sm" onclick={() => sanctionTarget = { uid: puid, name: playerInfo[puid]?.name ?? puid }}>
+          <Button variant="secondary" size="sm" onclick={() => sanctionTarget = { uid: puid, name: playerInfo[puid]?.name ?? m.rankings_unknown_player() }}>
             <TriangleAlert class="w-4 h-4 text-warn" aria-hidden="true" />{m.players_sanction_btn()}
           </Button>
         {/if}
         <!-- The mobile card's sanction dot is inert (it sits inside the card's
              own tap target), so the list opens from here. -->
         {#if playerSanctionsMap[puid]?.length}
-          <Button variant="secondary" size="sm" onclick={() => sanctionListTarget = { uid: puid, name: playerInfo[puid]?.name ?? puid }}>
+          <Button variant="secondary" size="sm" onclick={() => sanctionListTarget = { uid: puid, name: playerInfo[puid]?.name ?? m.rankings_unknown_player() }}>
             {m.players_view_sanctions()}
           </Button>
         {/if}
@@ -504,7 +504,7 @@
         <span class="text-ink-faint text-xs font-medium shrink-0">{#if entry.unplaced}—{:else}<RankCell rank={entry.rank} finalist={entry.finalist} hash />{/if}</span>
       {/if}
       <span class="min-w-0 truncate {entry?.unplaced ? 'text-ink-faint' : (isTop5 && playerSort === 'standings' ? 'text-ink-strong font-medium' : 'text-ink')} text-sm">
-        {playerInfo[puid]?.name ?? (puid || m.players_no_account())}
+        {playerInfo[puid]?.name ?? (puid ? m.rankings_unknown_player() : m.players_no_account())}
       </span>
       {#if player.waitlisted}
         <Badge kind="status" tone="pending" title={m.waitlist_hint()}>{m.waitlist_label()}</Badge>
@@ -918,7 +918,7 @@
               {/if}
               <td class="py-1.5 pr-2">
                 <span class="truncate flex items-center gap-1">
-                  {playerInfo[puid]?.name ?? (puid || m.players_no_account())}
+                  {playerInfo[puid]?.name ?? (puid ? m.rankings_unknown_player() : m.players_no_account())}
                   {#if player.waitlisted}
                     <Badge kind="status" tone="pending" title={m.waitlist_hint()}>{m.waitlist_label()}</Badge>
                   {/if}
@@ -928,7 +928,7 @@
                   {#if playerSanctionsMap[puid]?.length}
                     <SanctionIndicator
                       sanctions={playerSanctionsMap[puid]}
-                      onclick={() => sanctionListTarget = { uid: puid, name: playerInfo[puid]?.name ?? puid }}
+                      onclick={() => sanctionListTarget = { uid: puid, name: playerInfo[puid]?.name ?? m.rankings_unknown_player() }}
                     />
                   {/if}
                 </span>

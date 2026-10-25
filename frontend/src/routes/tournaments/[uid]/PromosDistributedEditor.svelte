@@ -148,7 +148,7 @@
         class="w-full px-2 py-1 min-h-[44px] text-sm bg-surface-muted border border-line-strong rounded text-ink-strong focus:border-accent-strong-hover focus:outline-none"
       >
         {#each organizers as uid}
-          <option value={uid}>{organizerNames[uid] ?? uid}</option>
+          <option value={uid}>{organizerNames[uid] ?? m.rankings_unknown_player()}</option>
         {/each}
       </select>
       <p class="text-xs text-ink-faint mt-1">{m.promos_stock_source_hint()}</p>

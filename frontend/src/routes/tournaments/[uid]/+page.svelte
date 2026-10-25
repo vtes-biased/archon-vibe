@@ -8,7 +8,7 @@
   import { getAuthState, setAgendaEntry } from "$lib/stores/auth.svelte";
   import { agendaViewer, filterAgenda, agendaToggleEntry } from "$lib/agenda";
   import { canTakeTournamentOffline, canForceUnlockTournament } from "$lib/engine";
-  import { syncManager } from "$lib/sync";
+  import { syncManager, storesWhole } from "$lib/sync";
   import { getUser, getTournament, getTournamentContextSanctions, getDeviceId, getDecksByTournamentGrouped, getLeague, saveTournament } from "$lib/db";
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
   import { attestedPlayerCount, finalsQualification, rankingEligibility, validateDeck, isOrganizer as engineIsOrganizer, type TournamentEventType, type ValidationError } from "$lib/engine";
@@ -59,7 +59,7 @@ import TournamentModals from "./TournamentModals.svelte";
   let organizerNames = $state<Record<string, string>>({});
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let hasSynced = $state(syncManager.isSynced);
+  let storesReady = $state(false);
   let actionLoading = $state(false);
 
   const auth = $derived(getAuthState());
@@ -239,18 +239,18 @@ import TournamentModals from "./TournamentModals.svelte";
   // newest run may assign state, or the display rolls back mid-round.
   let playerNamesEpoch = 0;
 
-  async function loadPlayerNames() {
-    if (!tournament) return;
+  async function loadPlayerNames(t: Tournament | null = tournament) {
+    if (!t) return;
     const epoch = ++playerNamesEpoch;
     const displayNames: Record<string, string | null> = {};
-    for (const p of tournament.players ?? []) {
+    for (const p of t.players ?? []) {
       if (p.user_uid) displayNames[p.user_uid] = p.display_name ?? null;
     }
     const uids = new Set<string>();
-    for (const p of tournament.players ?? []) {
+    for (const p of t.players ?? []) {
       if (p.user_uid) uids.add(p.user_uid);
     }
-    for (const round of tournament.rounds ?? []) {
+    for (const round of t.rounds ?? []) {
       for (const table of round) {
         for (const seat of table.seating) {
           if (seat.player_uid) uids.add(seat.player_uid);
@@ -258,13 +258,13 @@ import TournamentModals from "./TournamentModals.svelte";
       }
     }
     // Imported records can carry standings/winner/finals without a roster.
-    for (const s of tournament.standings ?? []) {
+    for (const s of t.standings ?? []) {
       if (s.user_uid) uids.add(s.user_uid);
     }
-    for (const seat of tournament.finals?.seating ?? []) {
+    for (const seat of t.finals?.seating ?? []) {
       if (seat.player_uid) uids.add(seat.player_uid);
     }
-    if (tournament.winner) uids.add(tournament.winner);
+    if (t.winner) uids.add(t.winner);
     const uidList = [...uids];
     const users = await Promise.all(uidList.map(u => getUser(u)));
     if (epoch !== playerNamesEpoch) return; // superseded by a newer run
@@ -272,7 +272,7 @@ import TournamentModals from "./TournamentModals.svelte";
     uidList.forEach((u, i) => {
       const user = users[i];
       info[u] = {
-        name: user?.name || u,
+        name: user?.name || displayNames[u] || m.rankings_unknown_player(),
         nickname: user?.nickname ?? null,
         vekn: user?.vekn_id ?? null,
         display_name: displayNames[u] ?? null,
@@ -287,7 +287,7 @@ import TournamentModals from "./TournamentModals.svelte";
   async function fetchOrganizerNames(t: Tournament): Promise<Record<string, string>> {
     const uids = t.organizers_uids ?? [];
     const users = await Promise.all(uids.map(u => getUser(u)));
-    return Object.fromEntries(uids.map((u, i) => [u, users[i]?.name || u.slice(0, 8)]));
+    return Object.fromEntries(uids.map((u, i) => [u, users[i]?.name || m.rankings_unknown_player()]));
   }
 
   const standings = $derived(computeStandings(tournament, tournamentSanctions));
@@ -436,16 +436,17 @@ import TournamentModals from "./TournamentModals.svelte";
     if (!tournament) loading = true;
     error = null;
     try {
-      const t = await getTournament(uid);
+      const [whole, t] = await Promise.all([storesWhole(), getTournament(uid)]);
       if (epoch !== loadEpoch) return; // superseded by a newer run
-      if (t) {
-        tournament = t;
+      storesReady = whole;
+      if (t && (whole || isOffline(uid))) {
         const [, sanctions, orgNames] = await Promise.all([
-          loadPlayerNames(), // self-guarded by playerNamesEpoch
+          loadPlayerNames(t), // self-guarded by playerNamesEpoch
           getTournamentContextSanctions(uid, playerUidsOf(t)),
           fetchOrganizerNames(t),
         ]);
         if (epoch !== loadEpoch) return;
+        tournament = t;
         tournamentSanctions = sanctions;
         organizerNames = orgNames;
       }
@@ -643,7 +644,6 @@ import TournamentModals from "./TournamentModals.svelte";
       // Snapshot ingest writes the whole corpus in one pass with no per-object
       // events, so the branches below never fire for a page that mounted empty.
       if (event.type === "sync_complete") {
-        hasSynced = true;
         untrack(() => load());
         getDecksByTournamentGrouped(uid).then(grouped => { decksByUser = grouped; });
       }
@@ -1040,7 +1040,7 @@ import TournamentModals from "./TournamentModals.svelte";
         />
       {/if}
       {/if}
-    {:else if !hasSynced}
+    {:else if !storesReady}
       <div class="text-center py-12">
         <Loader2 class="mx-auto h-12 w-12 text-ink-faint animate-spin" />
         <p class="text-ink-muted mt-4">{m.tournament_waiting_for_data()}</p>

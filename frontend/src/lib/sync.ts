@@ -103,7 +103,7 @@ const SPECS: ObjectSpec<any>[] = [
   },
 ];
 
-async function storesWhole(): Promise<boolean> {
+export async function storesWhole(): Promise<boolean> {
   return !(await getSnapshotIngesting()) && (await getLastSyncTimestamp()) !== null;
 }
 

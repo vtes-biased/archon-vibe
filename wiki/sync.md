@@ -677,6 +677,13 @@ sets an in-progress marker *before* clearing the stores and removes it only when
 stores hold a partial snapshot — which otherwise looks perfectly valid — and the
 client clears and refetches.
 
+**Pages wait for whole stores** — a sync cursor and no marker (`storesWhole` in
+`sync.ts`). Mid-ingest a present row is no more final than an absent one: the
+tournament page would render the event as soon as its row landed and every player
+whose user row had not yet arrived by uid. It holds its waiting state instead,
+except for an event this device holds offline, whose organiser keeps running it
+through a resync.
+
 **Both meta fields carry the same value: the DB-clock instant generation started**,
 read before any row. This is a correctness requirement, not a simplification. The
 cursor takes its MVCC snapshot at some instant *after* that one, so a max over the
@@ -759,8 +766,9 @@ Snapshot ingest writes the whole corpus in one pass and emits no per-object
 events, so a page that mounted against an empty store — which signing in
 guarantees, since `refresh()` clears and refills — otherwise waits for an
 unrelated live edit to wake it, and reloading only restarts the ingest it was
-waiting on. Until `isSynced`, an absent row is a wait and renders as progress;
-only once the corpus has landed is it genuinely missing.
+waiting on. Until the stores are whole ([file format](#file-format-version-2)),
+an absent row is a wait and renders as progress; only once the corpus has landed
+is it genuinely missing.
 
 ### The list projections
 

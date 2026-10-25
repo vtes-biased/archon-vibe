@@ -116,7 +116,7 @@
     }
     const players = [...byPlayer].map(([uid, list]) => ({
       key: playerInfo[uid]?.vekn || uid,
-      name: playerInfo[uid]?.name ?? uid,
+      name: playerInfo[uid]?.name ?? m.rankings_unknown_player(),
       list: list.sort((a, b) => a.issued_at.localeCompare(b.issued_at)),
     }));
     const lines: string[] = [];
