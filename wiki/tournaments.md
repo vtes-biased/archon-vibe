@@ -740,7 +740,9 @@ mode, the winner, the finalist flags and the deck's `private` — and its `winne
 flag with it — then
 emits `set_publication` in both directions for every deck whose flags moved —
 skipping the decks the same event upserted or deleted, whose ops already carry
-the answer. There is no other writer: finishing,
+the answer. `All` publishes a deck only for a player seated at a non-cancelled
+table, so a registered no-show's stays with its owner; an event without rounds
+records no seating and publishes them all. There is no other writer: finishing,
 reopening, narrowing the mode, a finals rescore that moves the winner and an
 archival correction all publish and retract through it, and so does
 `SetDeckPrivate`: the payload predates the event, so the pass reads the event's

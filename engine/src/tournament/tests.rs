@@ -2356,6 +2356,34 @@ fn test_finals_rescore_moves_publication_with_the_winner() {
 }
 
 #[test]
+fn test_all_mode_withholds_the_deck_of_a_player_who_never_sat() {
+    let mut tournament = finished_with_finals();
+    tournament["decklists_mode"] = "All".into();
+    tournament["players"].push(json::object! {
+        user_uid: "p9", state: "Registered", payment_status: "Pending", toss: 0, finalist: false,
+    }).unwrap();
+    let decks = json::array![
+        { uid: "d6", user_uid: "p6", round: 0, public: false, winner: false, private: false },
+        { uid: "d9", user_uid: "p9", round: json::Null, public: true, winner: false, private: false },
+    ];
+    let result =
+        json::parse(&update_standings_json(&tournament.dump(), "[]", &decks.dump()).unwrap())
+            .unwrap();
+    let mut flags: Vec<(&str, bool)> = result["deck_ops"]
+        .members()
+        .filter(|op| op["op"].as_str() == Some("set_publication"))
+        .map(|op| {
+            (
+                op["deck_uid"].as_str().unwrap(),
+                op["public"].as_bool().unwrap(),
+            )
+        })
+        .collect();
+    flags.sort();
+    assert_eq!(flags, vec![("d6", true), ("d9", false)]);
+}
+
+#[test]
 fn test_finish_finals_publishes_the_winner_deck() {
     // Publication is derived from the Finished state, so it must come back when the
     // organizer re-finishes a final they reopened to correct.

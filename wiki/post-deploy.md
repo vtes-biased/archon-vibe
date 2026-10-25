@@ -63,3 +63,18 @@ jsonb_array_length(coalesce("full"->'promos_distributed', '[]'::jsonb)) > 0;`
 answers above 0.
 
 **Owes afterwards**: closing gh-55 through `/post-deploy`. Delete this section.
+
+## Retract the decks published for players who never sat
+
+**Gated on** the commit requiring a seat for `All`-mode publication
+(`compute_deck_public`). Before it is live the old pass re-publishes a retracted
+deck on the next action its event takes.
+
+**Run** `backend/scripts/retract_noshow_decks.py` on the box, dry run first, then
+`--apply`.
+
+**Proves it worked**: a second dry run reports 0 decks, and the no-show's deck on
+the event behind VEKN 13609 is gone from its public deck list.
+
+**Owes afterwards**: closing gh-52 through `/post-deploy`. Delete the script and
+this section in one commit.

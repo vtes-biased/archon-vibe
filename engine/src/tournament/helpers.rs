@@ -296,7 +296,10 @@ pub(super) fn compute_deck_public(tournament: &JsonValue, player_uid: &str, priv
         .as_str()
         .unwrap_or("Winner");
     match mode {
-        "All" => true,
+        "All" => {
+            tournament[tournament::ROUNDS].is_empty()
+                || count_player_rounds_played(tournament, player_uid) > 0
+        }
         "Finalists" => {
             tournament[tournament::WINNER].as_str() == Some(player_uid)
                 || tournament[tournament::PLAYERS].members().any(|p| {
