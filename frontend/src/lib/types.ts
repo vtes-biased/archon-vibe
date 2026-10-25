@@ -161,8 +161,8 @@ export interface League extends BaseObject {
   standings_mode: LeagueStandingsMode;
   format: string | null; // TournamentFormat value or null = any
   country: string | null; // null = worldwide
-  start: string | null;
-  finish: string | null; // null = ongoing
+  start: string | null; // calendar date YYYY-MM-DD
+  finish: string | null; // YYYY-MM-DD, last day inclusive; null = ongoing
   description: string;
   organizers_uids?: string[]; // absent at public level
   parent_uid: string | null; // FK → leagues (child of meta-league)

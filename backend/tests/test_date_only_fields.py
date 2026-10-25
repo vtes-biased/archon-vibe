@@ -1,5 +1,5 @@
 """A date-only field takes `YYYY-MM-DD` — what the frontend's date inputs send —
-and stores naive midnight."""
+and stores it as a calendar date carrying no time."""
 
 from datetime import UTC, datetime
 from uuid import uuid7
@@ -28,4 +28,5 @@ async def test_league_takes_a_date_only_start(test_client: AsyncClient, test_db)
         headers=make_auth_header(ic.uid),
     )
     assert response.status_code == 201, response.text
-    assert response.json()["start"] == "2026-01-15T00:00:00"
+    assert response.json()["start"] == "2026-01-15"
+    assert response.json()["finish"] == "2026-06-30"

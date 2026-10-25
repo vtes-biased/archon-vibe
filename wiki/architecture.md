@@ -464,10 +464,12 @@ condition localizes identically on every path.
 - **The signed-in member is resolved in the handler**, `await
   get_current_user(request)` or `get_optional_user`, not injected: Litestar injects
   a dependency by parameter name only, and runs one only when a handler names it.
-- **Date-only fields** accept `YYYY-MM-DD`. A sanction's expiry stores UTC
-  midnight; a league's dates and a promo's release date store **naive** midnight,
-  because the frontend renders them with `new Date(…)` in local time, where UTC
-  midnight is the day before west of Greenwich. Full tz-aware datetimes are
+- **Date-only fields** accept `YYYY-MM-DD`. A league's dates store exactly that,
+  a calendar date compared as text against the viewer's local today and formatted
+  in UTC, since `new Date("YYYY-MM-DD")` reads UTC midnight. A sanction's expiry
+  stores UTC midnight; a promo's release date stores **naive** midnight, because
+  the frontend renders it with `new Date(…)` in local time, where UTC midnight is
+  the day before west of Greenwich. Full tz-aware datetimes are
   reserved for precise timestamps (`issued_at`, `modified`).
 - **Scheduled times** (`Tournament.start`/`finish`) are stored **naive**, paired
   with the separate `Tournament.timezone` — never tz-aware. Readers anchor the

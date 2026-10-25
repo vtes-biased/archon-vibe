@@ -86,8 +86,8 @@ async def create_league(request: Request, data: LeagueCreate) -> Response:
         standings_mode=data.standings_mode,
         format=data.format,
         country=country,
-        start=datetime(d.year, d.month, d.day) if (d := data.start) else None,
-        finish=datetime(d.year, d.month, d.day) if (d := data.finish) else None,
+        start=data.start,
+        finish=data.finish,
         description=data.description,
         organizers_uids=[user.uid],
         parent_uid=data.parent_uid,
@@ -155,8 +155,6 @@ async def update_league_endpoint(
                 )
 
     for field, value in updates.items():
-        if isinstance(value, date):
-            value = datetime(value.year, value.month, value.day)
         setattr(league, field, value)
 
     # Inert without a country — keep stored state canonical.

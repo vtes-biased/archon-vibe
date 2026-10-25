@@ -36,7 +36,7 @@ import subprocess
 import sys
 import uuid
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import NamedTuple
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -240,6 +240,12 @@ def parse_dt(v) -> datetime | None:
     """Parse an instant (modified, deleted_at, …) — a naive value reads as UTC."""
     d = _raw_dt(v)
     return None if d is None else (d if d.tzinfo else d.replace(tzinfo=UTC))
+
+
+def parse_date(v) -> date | None:
+    """Parse a league start/finish instant into its UTC calendar date."""
+    d = parse_dt(v)
+    return None if d is None else d.astimezone(UTC).date()
 
 
 def parse_wall_dt(v, tz_name: str | None) -> datetime | None:
@@ -754,8 +760,8 @@ async def migrate_leagues(
             ),
             format=(FORMAT_MAP[fmt].value if fmt in FORMAT_MAP else None),
             country=normalize_country(d.get("country") or ""),
-            start=parse_dt(row["start"]),
-            finish=parse_dt(row["finish"]),
+            start=parse_date(row["start"]),
+            finish=parse_date(row["finish"]),
             description=d.get("description") or "",
             organizers_uids=[
                 member_uid_map.get(str(o["uid"]), str(o["uid"]))

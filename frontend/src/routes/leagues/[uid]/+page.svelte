@@ -13,7 +13,7 @@
   import { attestedPlayerCount, canEditLeague, canLinkTournamentToLeague, computeLeagueStandings, isOrganizer as engineIsOrganizer } from "$lib/engine";
   import { tournamentAction } from "$lib/tournament-actions";
   import { translateTournamentState, getStateTone } from "$lib/tournament-utils";
-  import { formatScore } from "$lib/utils";
+  import { formatCalendarDate, formatScore, localToday } from "$lib/utils";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
   import Button from '$lib/components/Button.svelte';
@@ -132,8 +132,7 @@
 
   function isActive(): boolean {
     if (!league) return false;
-    if (!league.finish) return true;
-    return new Date(league.finish) >= new Date();
+    return !league.finish || league.finish > localToday();
   }
 
   async function loadLeague() {
@@ -244,18 +243,13 @@
   let editStandingsMode = $state<LeagueStandingsMode>("RTP");
   let editOpenPrinces = $state(false);
 
-  function toDateInput(d: string | null): string {
-    if (!d) return "";
-    try { return new Date(d).toISOString().slice(0, 10); } catch { return ""; }
-  }
-
   function startEdit() {
     if (!league) return;
     editName = league.name;
     editFormat = league.format || "";
     editCountry = league.country || "";
-    editStart = toDateInput(league.start);
-    editFinish = toDateInput(league.finish);
+    editStart = league.start ?? "";
+    editFinish = league.finish ?? "";
     editDescription = league.description;
     editStandingsMode = league.standings_mode;
     editOpenPrinces = league.open_to_country_princes ?? false;
@@ -292,12 +286,12 @@
     }
   }
 
-  // Sets finish = now; trivially reversible by editing the date, so no confirm.
+  // Sets finish = today; trivially reversible by editing the date, so no confirm.
   async function finishLeague() {
     if (!league) return;
     error = null;
     try {
-      await updateLeague(league.uid, { finish: new Date().toISOString().slice(0, 10) }, { suppressErrorToast: true });
+      await updateLeague(league.uid, { finish: localToday() }, { suppressErrorToast: true });
       await loadLeague();
     } catch (e) {
       error = toUserMessage(e, m.league_error_update());
@@ -380,7 +374,7 @@
               <Badge kind="status" tone={isActive() ? "info" : "slate"}>
                 {isActive() ? m.league_status_active() : m.league_status_finished()}
               </Badge>
-              <span>{formatDate(league.start)} – {league.finish ? formatDate(league.finish) : m.league_ongoing()}</span>
+              <span>{league.start ? formatCalendarDate(league.start) : "—"} – {league.finish ? formatCalendarDate(league.finish) : m.league_ongoing()}</span>
               <span>· {standingsModeLabel(league.standings_mode)}</span>
               {#if league.format}
                 <span>· {league.format}</span>
@@ -554,7 +548,7 @@
           <div class="bg-surface-card rounded-lg shadow overflow-hidden border border-line">
             <div class="divide-y divide-line">
               {#each childLeagues as child (child.uid)}
-                {@const childOver = !!child.finish && new Date(child.finish) < new Date()}
+                {@const childOver = !!child.finish && child.finish <= localToday()}
                 <div class="flex items-center justify-between px-6 py-3 hover:bg-surface-muted/50 transition-colors">
                   <a href="/leagues/{child.uid}" class="flex-1 min-w-0">
                     <div class="font-semibold text-ink-strong truncate">{child.name}</div>

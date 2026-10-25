@@ -53,6 +53,18 @@ export function zonedDate(iso: string, timeZone: string): Date {
   return new Date(asUtc.getTime() - tzOffsetMs(timeZone, new Date(approx)));
 }
 
+/** The viewer's local calendar date as `YYYY-MM-DD`, comparable as text against League.start/finish. */
+export function localToday(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/** A `YYYY-MM-DD` calendar date: `new Date` reads it as UTC midnight, so it is formatted in UTC to keep its day. */
+export function formatCalendarDate(d: string): string {
+  return new Date(d).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
+}
+
 /** Sanctions visible on member-directory surfaces. Cautions stay private to their tournament (even
  * IC/Ethics see them only inside it); warnings/SA/DQ are member-visible for 18 months, suspension/probation are membership-level. */
 export function visibleSanctions(sanctions: Sanction[]): Sanction[] {

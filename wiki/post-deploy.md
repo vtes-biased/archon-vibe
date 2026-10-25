@@ -78,3 +78,24 @@ the event behind VEKN 13609 is gone from its public deck list.
 
 **Owes afterwards**: closing gh-52 through `/post-deploy`. Delete the script and
 this section in one commit.
+
+## Prove league dates carry no time
+
+**Migration** `league-calendar-dates`
+
+Gated by the commit that made league `start` and `finish` calendar dates
+([product](product.md#capabilities)). The entry rewrites every league date still
+carrying a time — the legacy UTC instants and the naive midnights the routes used
+to store — to its UTC calendar date. The old rows do not decode as a `date`, and a
+league list raises whole on one of them.
+
+Nothing to run: the entry rewrote the rows before the process served. It worked
+when this answers 0:
+
+```sql
+SELECT count(*) FROM objects
+WHERE type = 'league'
+  AND (length("full"->>'start') > 10 OR length("full"->>'finish') > 10);
+```
+
+**Owes afterwards**: closing gh-56 through `/post-deploy`.

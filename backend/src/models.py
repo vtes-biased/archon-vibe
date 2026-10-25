@@ -2,7 +2,7 @@
 
 import json
 import secrets
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Annotated
 
@@ -451,16 +451,16 @@ class League(BaseObject, kw_only=True):
         msgspec.Meta(description="ISO 3166-1 alpha-2 code. Null means worldwide."),
     ] = None
     start: Annotated[
-        datetime | None,
+        date | None,
         msgspec.Meta(
-            description="Local opening of the league window, ISO 8601 and "
-            "carrying no offset."
+            description="First day of the league, a calendar date `YYYY-MM-DD`."
         ),
     ] = None
     finish: Annotated[
-        datetime | None,
+        date | None,
         msgspec.Meta(
-            description="Local close, same convention as `start`. Null means ongoing."
+            description="Last day of the league, inclusive, a calendar date "
+            "`YYYY-MM-DD`. Null means ongoing."
         ),
     ] = None
     description: str = ""

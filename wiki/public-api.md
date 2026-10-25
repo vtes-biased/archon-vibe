@@ -145,6 +145,9 @@ pool: do not "fix" this with a held transaction.
 `start_after`/`start_before` compare ISO-8601 text carrying no offset, so each
 tournament is bounded in its own local time and a bare date bounds at midnight.
 
+A league's `start` and `finish` are calendar dates, `YYYY-MM-DD`, the finish day
+inclusive — never a datetime, unlike a tournament's.
+
 `/v1/export` is the pre-generated snapshot file rather than a live stream, so a
 full read costs one pass and arrives gzipped — the same file the app's own
 `/snapshot` serves at its levels.

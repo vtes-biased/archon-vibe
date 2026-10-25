@@ -92,7 +92,10 @@ categories and escalation hints. Rules and visibility:
 **Leagues** — league and meta-league, standings modes RTP / Score / GP,
 tournament association by league editors or by same-country Princes when the
 league opts in, auto-updating standings, organizer Finish action and rank-1
-Champion crowning.
+Champion crowning. A league's start and finish are plain calendar dates, read
+against the viewer's own today: the finish day is the league's last day and
+already shows it finished, and Finish stamps the organiser's local today, so the
+button goes at once whatever the time zone.
 
 **Ratings and Hall of Fame** — server-side rating from the best 8 tournaments in
 a trailing 18 months, rating points in finished standings, a rankings page per

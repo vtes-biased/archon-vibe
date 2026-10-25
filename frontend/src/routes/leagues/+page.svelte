@@ -5,7 +5,7 @@
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { canManageLeagues } from "$lib/engine";
-  import { normalizeSearch } from "$lib/utils";
+  import { formatCalendarDate, localToday, normalizeSearch } from "$lib/utils";
   import type { League, LeagueStandingsMode } from "$lib/types";
   import { Loader2, FlagTriangleRight, Plus } from "@lucide/svelte";
   import Badge from "$lib/components/Badge.svelte";
@@ -39,22 +39,12 @@
 
   function formatDateRange(league: League): string {
     if (!league.start) return "—";
-    try {
-      const opts: Intl.DateTimeFormatOptions = { year: "numeric", month: "short", day: "numeric" };
-      const start = new Date(league.start).toLocaleDateString(undefined, opts);
-      if (league.finish) {
-        const end = new Date(league.finish).toLocaleDateString(undefined, opts);
-        return `${start} – ${end}`;
-      }
-      return `${start} – ${m.league_ongoing()}`;
-    } catch {
-      return league.start;
-    }
+    const start = formatCalendarDate(league.start);
+    return `${start} – ${league.finish ? formatCalendarDate(league.finish) : m.league_ongoing()}`;
   }
 
   function isActive(league: League): boolean {
-    if (!league.finish) return true;
-    return new Date(league.finish) >= new Date();
+    return !league.finish || league.finish > localToday();
   }
 
   async function loadLeagues() {

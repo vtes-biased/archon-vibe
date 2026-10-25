@@ -7,6 +7,7 @@
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { canLinkTournamentToLeague } from "$lib/engine";
   import { OFFICIAL_DISCORD_INVITE, OFFICIAL_DISCORD_VENUE } from "$lib/tournament-utils";
+  import { localToday } from "$lib/utils";
   import VenueAutocomplete from "./VenueAutocomplete.svelte";
   import CityAutocomplete from "./CityAutocomplete.svelte";
   import FoldableSection from "./FoldableSection.svelte";
@@ -76,7 +77,7 @@
   $effect(() => {
     getAllLeagues().then(all => {
       allActiveLeagues = all
-        .filter(l => !l.deleted_at && (!l.finish || new Date(l.finish) >= new Date()))
+        .filter(l => !l.deleted_at && (!l.finish || l.finish >= localToday()))
         .sort((a, b) => a.name.localeCompare(b.name));
     });
   });
