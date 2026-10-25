@@ -45,3 +45,21 @@ deploy, and `preview_judge_sync.py` on the box prints `0 members would change`.
 **Owes afterwards**: telling the VTES Exams maintainers the integration is live, and that
 leaving the public directory or letting an accreditation lapse now removes the
 Archon title. Delete this section.
+
+## Ask organisers to re-enter their promo reports
+
+**Gated on** the commit declaring `promos` and `stock_source_uid` on
+`TournamentActionRequest`. Until it is live every `ReportPromos` still fails with
+"promos required", so asking earlier only earns a second failure. Every report
+since the feature shipped on 17 July was refused, and so was every raffle prize
+(`prize_promo_uid`).
+
+**Run** the reply on gh-55: promo reports save again, and organisers of events
+finished since 17 July should open the event and re-enter what they handed out.
+
+**Proves it worked**: within a few days, on production,
+`SELECT count(*) FROM objects WHERE type = 'tournament' AND
+jsonb_array_length(coalesce("full"->'promos_distributed', '[]'::jsonb)) > 0;`
+answers above 0.
+
+**Owes afterwards**: closing gh-55 through `/post-deploy`. Delete this section.

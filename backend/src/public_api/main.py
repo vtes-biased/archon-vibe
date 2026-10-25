@@ -264,6 +264,7 @@ _ACTION_STATES: dict[str, tuple[tuple[str, ...], str]] = {
     "RaffleDraw": (("Waiting", "Playing", "Finished"), ""),
     "RaffleUndo": (_ANY_STATE, ""),
     "RaffleClear": (_ANY_STATE, ""),
+    "ReportPromos": (_ANY_STATE, ""),
     "UpdateConfig": (_ANY_STATE, ""),
     "SetArchivalResults": (("Finished",), ""),
 }
@@ -658,6 +659,11 @@ _ACTION_FIELDS: dict[str, dict] = {
         "type": "object",
         "description": "The decklist, as `/v1/decks` publishes one.",
     },
+    "deck_index": {
+        **_INT,
+        "description": "The round a multideck list is stamped with. Absent is the"
+        " list not yet played.",
+    },
     "attribution": {
         "type": "object",
         "description": "The typed credit, as `/v1/decks` publishes one. `Anonymous`"
@@ -683,6 +689,25 @@ _ACTION_FIELDS: dict[str, dict] = {
     "seed": {
         **_INT,
         "description": "Drives the draw. The same seed redraws the same winners.",
+    },
+    "prize_promo_uid": {
+        **_STR,
+        "description": "The promo handed to the winners. Display only: report it"
+        " with `ReportPromos` too.",
+    },
+    "promos": {
+        "type": "array",
+        "description": "Every promo handed out, the whole list each time.",
+        "items": {
+            "type": "object",
+            "required": ["promo_uid", "qty"],
+            "properties": {"promo_uid": _STR, "qty": {**_INT, "minimum": 1}},
+        },
+    },
+    "stock_source_uid": {
+        **_STR,
+        "description": "The organizer whose promo stock it came from. Defaults to"
+        " the sender.",
     },
     "winner": {**_STR, "description": "Member uid. Empty clears the recorded winner."},
     "players": {
@@ -810,10 +835,9 @@ _ACTIONS: dict[str, tuple[str, tuple[str, ...], tuple[str, ...]]] = {
         ("multideck",),
     ),
     "DeleteDeck": (
-        "Drop a player's decklist. It cannot single out one list of a multideck set:"
-        " the engine takes an index this endpoint has no field for.",
+        "Drop a player's decklist.",
         ("player_uid",),
-        ("multideck",),
+        ("multideck", "deck_index"),
     ),
     "SetDeckAttribution": (
         "Re-credit one of your own decklists. It touches no cards, so it works on"
@@ -831,10 +855,15 @@ _ACTIONS: dict[str, tuple[str, tuple[str, ...], tuple[str, ...]]] = {
     "RaffleDraw": (
         "Draw prize winners from a pool.",
         ("label", "pool", "count", "seed"),
-        ("exclude_drawn",),
+        ("exclude_drawn", "prize_promo_uid"),
     ),
     "RaffleUndo": ("Undo the last draw.", (), ()),
     "RaffleClear": ("Clear every draw.", (), ()),
+    "ReportPromos": (
+        "Record the promos the event handed out, replacing the previous report.",
+        ("promos",),
+        ("stock_source_uid",),
+    ),
     "UpdateConfig": ("Change the event's settings.", ("config",), ()),
     "SetArchivalResults": (
         "Record the result of an event Archon holds no play data for. IC only.",
@@ -849,7 +878,6 @@ _UNDOCUMENTED_ACTIONS: dict[str, str] = {
     "UploadDeck": "spelling of UpsertDeck",
     "UpdateDeck": "spelling of UpsertDeck",
     "ReopenTournament": "refused for a third-party token",
-    "ReportPromos": "needs `promos`, which the request model does not carry",
     "ViewDeck": "logs an organizer opening a decklist on the app's roster",
 }
 

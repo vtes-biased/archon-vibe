@@ -138,7 +138,8 @@ the tournament denylist, the api-visible complement of the tournament and player
 api denylists and the withheld complement of the user api allowlist, and pins
 `compute_user_full` to withholding exactly the owner-only columns;
 `test_tournament_field_contracts.py` classifies every
-`TournamentActionRequest` field as truthy-only or any-value, and compares the
+`TournamentActionRequest` field as truthy-only or any-value, fails on an argument
+`TournamentEvent::from_json` reads that the struct does not declare, and compares the
 engine's `CONFIG_FIELDS`, `TournamentConfig` and `CreateTournamentRequest` while
 driving a real create through the shipped engine so the create literal cannot
 forget a field. Only the half each classification's code actually uses is

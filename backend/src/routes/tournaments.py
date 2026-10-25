@@ -1208,6 +1208,7 @@ class TournamentActionRequest(msgspec.Struct):
     player_uids: list[str] | None = None  # For SelfOrganizeRound: the chosen pod
     config: dict | None = None  # For UpdateConfig: partial config fields
     deck: dict | None = None
+    deck_index: int | None = None  # For DeleteDeck: the deck's round stamp
     attribution: dict | None = None  # For SetDeckAttribution
     private: bool | None = None  # For SetDeckPrivate
     multideck: bool | None = None
@@ -1216,13 +1217,16 @@ class TournamentActionRequest(msgspec.Struct):
     exclude_drawn: bool | None = None
     count: int | None = None
     seed: int | None = None
+    prize_promo_uid: str | None = None  # For RaffleDraw
+    promos: list[dict] | None = None  # For ReportPromos: [{promo_uid, qty}]
+    stock_source_uid: str | None = None  # For ReportPromos
     winner: str | None = None  # For SetArchivalResults
     players: list[str] | None = None  # For SetArchivalResults: the known roster
     reported_player_count: int | None = None  # For SetArchivalResults
 
 
 # Every other field reaches the engine whenever it is not null — including the
-# empty string, which is how `winner` clears. These nine are the exceptions: an
+# empty string, which is how `winner` clears. These eleven are the exceptions: an
 # empty value means "not part of this action", so it must not reach the engine.
 _ACTION_TRUTHY_ONLY = frozenset(
     {
@@ -1235,6 +1239,8 @@ _ACTION_TRUTHY_ONLY = frozenset(
         "seating",
         "label",
         "pool",
+        "prize_promo_uid",
+        "stock_source_uid",
     }
 )
 

@@ -1,5 +1,8 @@
 """The hand-maintained field lists in `routes/tournaments.py`, pinned."""
 
+import re
+from pathlib import Path
+
 import msgspec
 import pytest
 from archon_engine import PyEngine
@@ -104,6 +107,7 @@ _ACTION_ANY_VALUE = {
     "player_uids",
     "config",
     "deck",
+    "deck_index",
     "attribution",
     "private",
     "multideck",
@@ -113,6 +117,7 @@ _ACTION_ANY_VALUE = {
     "winner",
     "players",
     "reported_player_count",
+    "promos",
 }
 
 
@@ -121,3 +126,27 @@ def test_every_action_field_is_classified():
     assert _ACTION_TRUTHY_ONLY | _ACTION_ANY_VALUE == set(
         TournamentActionRequest.__struct_fields__
     ) - {"type"}
+
+
+ENGINE_SRC = Path(__file__).resolve().parents[2] / "engine" / "src"
+
+_SERVER_SUPPLIED_ARGS = {"vekn_id", "waitlist_past_cap"}
+
+
+def _engine_action_args() -> set[str]:
+    model = (ENGINE_SRC / "model.rs").read_text()
+    arg_mod = model[model.index("pub mod arg {") :]
+    arg_mod = arg_mod[: arg_mod.index("\n}")]
+    consts = dict(re.findall(r'pub const (\w+): &str = "(\w+)";', arg_mod))
+    parsing = (ENGINE_SRC / "tournament" / "parsing.rs").read_text()
+    from_json = parsing[parsing.index("pub fn from_json(value: &JsonValue)") :]
+    reads = set(re.findall(r"\bvalue\[arg::(\w+)\]", from_json))
+    assert len(reads) > 30, reads
+    return {consts[name] for name in reads}
+
+
+def test_every_engine_action_arg_reaches_the_engine():
+    fields = set(TournamentActionRequest.__struct_fields__)
+    args = _engine_action_args()
+    assert args - _SERVER_SUPPLIED_ARGS - fields == set()
+    assert not _SERVER_SUPPLIED_ARGS & fields

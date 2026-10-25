@@ -302,8 +302,8 @@ union of everything. It is published against three authorities rather than one:
 decides which fields can reach one, and the same lint asserts both — an action the
 engine grows lands in `_ACTIONS` or in `_UNDOCUMENTED_ACTIONS` with a reason, never
 nowhere. Four sit in that second list today: `ReopenTournament` is barred for a
-third-party token, `ReportPromos` wants a field the request model has no room for,
-and `UploadDeck` and `UpdateDeck` are spellings of `UpsertDeck`. Publishing the
+third-party token, `UploadDeck` and `UpdateDeck` are spellings of `UpsertDeck`, and
+`ViewDeck` only logs an organizer opening a decklist in the app. Publishing the
 vocabulary does bind it — that is the point, and the lint is what makes the binding
 survive an engine change ([access](access.md#event-access-is-per-event)).
 
