@@ -131,6 +131,39 @@ fn test_register_without_vekn_id_rejected() {
 }
 
 #[test]
+fn test_registration_after_a_round() {
+    let mut tournament = make_tournament();
+    tournament["state"] = "Waiting".into();
+    tournament["rounds"] = json::array![json::array![]];
+
+    assert_eq!(
+        run_event(
+            &tournament,
+            &json::object! { type: "ReopenRegistration" },
+            &make_organizer()
+        )
+        .unwrap_err(),
+        EngineError::ReopenAfterRound
+    );
+
+    let register = json::object! {
+        type: "Register",
+        user_uid: "player-1",
+        vekn_id: "1000001",
+    };
+    let actor = make_player("player-1");
+    assert!(matches!(
+        run_event(&tournament, &register, &actor).unwrap_err(),
+        EngineError::WrongState { .. }
+    ));
+
+    tournament["open_rounds"] = true.into();
+    let updated = json::parse(&run_event(&tournament, &register, &actor).unwrap()).unwrap();
+    assert_eq!(updated["state"].as_str(), Some("Waiting"));
+    assert_eq!(updated["players"][0]["state"].as_str(), Some("Registered"));
+}
+
+#[test]
 fn test_external_registration_refuses_self_service() {
     let mut tournament = make_tournament();
     tournament["state"] = "Registration".into();

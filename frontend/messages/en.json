@@ -1770,6 +1770,7 @@
   "err_tournament_player_wrong_state": "Player must be Registered (currently {current})",
   "err_tournament_wrong_state": "Tournament must be in {expected} state (currently {current})",
   "err_tournament_cannot_add_players": "Cannot add players in this state",
+  "err_tournament_reopen_after_round": "Registration cannot reopen once a round has been played",
   "err_tournament_cannot_remove_players": "Cannot remove players in this state",
   "err_tournament_use_drop_out": "Use DropOut for players who have played",
   "err_tournament_cannot_drop_out": "Cannot drop out in this state",

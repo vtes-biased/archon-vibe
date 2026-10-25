@@ -1770,6 +1770,7 @@
   "err_tournament_player_wrong_state": "Il giocatore deve essere Iscritto (attualmente {current})",
   "err_tournament_wrong_state": "Il torneo deve essere nello stato {expected} (attualmente {current})",
   "err_tournament_cannot_add_players": "Impossibile aggiungere giocatori in questo stato",
+  "err_tournament_reopen_after_round": "Le iscrizioni non possono riaprire dopo che è stato giocato un round",
   "err_tournament_cannot_remove_players": "Impossibile rimuovere giocatori in questo stato",
   "err_tournament_use_drop_out": "Usa Abbandona per i giocatori che hanno già giocato",
   "err_tournament_cannot_drop_out": "Impossibile abbandonare in questo stato",

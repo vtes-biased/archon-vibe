@@ -142,8 +142,8 @@ Planned ──open──> Registration ──close──> Waiting ⇄ Playing �
 |---|---|---|
 | `Planned` | initial | OpenRegistration |
 | `Registration` | players register/unregister | Register, AddPlayer, CloseRegistration, CancelRegistration |
-| `Waiting` | between rounds, check-in active | CheckIn, CheckInAll, StartRound, StartFinals, FinishTournament, ReopenRegistration |
-| `Playing` | round in progress | SetScore, Override, FinishRound, CancelRound, seating edits |
+| `Waiting` | between rounds, check-in active | CheckIn, CheckInAll, StartRound, StartFinals, FinishTournament, ReopenRegistration until the first round, Register on open rounds |
+| `Playing` | round in progress | SetScore, Override, FinishRound, CancelRound, seating edits, Register on open rounds before the finals |
 | `Finished` | complete | ReopenTournament, organizer SetScore/Override, owner deck corrections |
 
 **`ReopenTournament` destroys nothing.** An event finished on a played final
@@ -803,7 +803,7 @@ and the VEKN record outranks the archive from that moment on.
 | Action | Who |
 |---|---|
 | Create tournament | IC, NC, Prince |
-| Register / Unregister | any authenticated member, during Registration |
+| Register / Unregister | any authenticated member, during Registration; Register also in Waiting and Playing on an open-rounds event before the finals |
 | Self-organize a round | registered players, open rounds with `self_organized_rounds`, Waiting/Playing, no finals |
 | Set score | players at the table during Playing; organizers whenever rounds exist |
 | Deck upload / delete | players for their own deck — any of their own, naming its round, once Finished — organizers for any but a private one once Finished |
@@ -845,6 +845,16 @@ naturally:
   deck with its round and a stamped deck is immutable, so between rounds every
   multideck player has exactly one editable deck.
 - Standings are cumulative GW > VP > TP across all rounds played, as usual.
+
+**Registration stays open past the first round on an open-rounds event**, so a
+pool running over days takes late sign-ups: members `Register` themselves in
+Waiting and Playing until the finals are seated, under the same cap and waitlist,
+landing `Registered` to check in or self-organize — an in-person walk-in
+registers first, then checks in by QR. A standard event takes its
+latecomers through the organizer's `AddPlayer` instead. `ReopenRegistration` is
+refused once any round exists on either kind — back in Registration the organizer
+can neither alter seating nor correct scores, while the roster looks just like a
+`ResetCheckIn`.
 
 ### Self-organized rounds
 

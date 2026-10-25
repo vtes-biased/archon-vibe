@@ -303,7 +303,7 @@
       <ActionMenu label={m.common_more()} items={[
         { label: m.payment_mark_all_paid(), icon: Banknote, onclick: () => doAction("MarkAllPaid"), disabled: actionLoading },
         ...(hasRounds && !tournament.online ? [{ label: m.overview_reset_checkin(), icon: RotateCcw, onclick: () => doAction("ResetCheckIn"), disabled: actionLoading }] : []),
-        { label: m.overview_reopen_registration(), icon: Undo2, onclick: () => doAction("ReopenRegistration"), disabled: actionLoading },
+        ...(!hasRounds ? [{ label: m.overview_reopen_registration(), icon: Undo2, onclick: () => doAction("ReopenRegistration"), disabled: actionLoading }] : []),
         ...(finalsQual.enough_rounds ? [{ label: m.overview_finish_tournament(), icon: TriangleAlert, onclick: onFinishTournament, disabled: actionLoading }] : []),
       ]} />
 

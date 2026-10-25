@@ -1770,6 +1770,7 @@
   "err_tournament_player_wrong_state": "Le joueur doit être Inscrit (actuellement {current})",
   "err_tournament_wrong_state": "Le tournoi doit être dans l'état {expected} (actuellement {current})",
   "err_tournament_cannot_add_players": "Impossible d'ajouter des joueurs dans cet état",
+  "err_tournament_reopen_after_round": "Les inscriptions ne peuvent pas rouvrir une fois une ronde jouée",
   "err_tournament_cannot_remove_players": "Impossible de retirer des joueurs dans cet état",
   "err_tournament_use_drop_out": "Utilisez Abandonner pour les joueurs ayant déjà joué",
   "err_tournament_cannot_drop_out": "Impossible d'abandonner dans cet état",

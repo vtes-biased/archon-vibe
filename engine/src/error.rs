@@ -33,6 +33,7 @@ pub enum EngineError {
     PlayerWrongState { current: String },
     WrongState { expected: String, current: String },
     CannotAddPlayers,
+    ReopenAfterRound,
     CannotRemovePlayers,
     UseDropOut,
     CannotDropOut,
@@ -142,6 +143,7 @@ impl EngineError {
             PlayerAlreadyFinished => "tournament.player_already_finished",
             PlayerWrongState { .. } => "tournament.player_wrong_state",
             WrongState { .. } => "tournament.wrong_state",
+            ReopenAfterRound => "tournament.reopen_after_round",
             CannotAddPlayers => "tournament.cannot_add_players",
             CannotRemovePlayers => "tournament.cannot_remove_players",
             UseDropOut => "tournament.use_drop_out",
@@ -310,6 +312,9 @@ impl fmt::Display for EngineError {
                 "Tournament must be in {} state (currently {})",
                 expected, current
             ),
+            ReopenAfterRound => {
+                write!(f, "Registration cannot reopen once a round has been played")
+            }
             CannotAddPlayers => write!(f, "Cannot add players in this state"),
             CannotRemovePlayers => write!(f, "Cannot remove players in this state"),
             UseDropOut => write!(f, "Use DropOut for players who have played"),

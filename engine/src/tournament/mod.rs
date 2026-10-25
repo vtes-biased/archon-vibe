@@ -459,6 +459,9 @@ fn apply_event(
         TournamentEvent::ReopenRegistration => {
             require_organizer(actor)?;
             require_state(state, TournamentState::Waiting)?;
+            if !tournament[tournament::ROUNDS].is_empty() {
+                return Err(EngineError::ReopenAfterRound);
+            }
             tournament[tournament::STATE] = "Registration".into();
             let players = &mut tournament[tournament::PLAYERS];
             for i in 0..players.len() {
@@ -513,7 +516,22 @@ fn apply_event(
             vekn_id,
             display_name,
         } => {
-            require_state(state, TournamentState::Registration)?;
+            let open_rounds = tournament[tournament::OPEN_ROUNDS]
+                .as_bool()
+                .unwrap_or(false);
+            if !matches!(
+                state,
+                TournamentState::Registration | TournamentState::Waiting | TournamentState::Playing
+            ) || (state != TournamentState::Registration && !open_rounds)
+            {
+                return Err(EngineError::WrongState {
+                    expected: TournamentState::Registration.as_str().to_string(),
+                    current: state.as_str().to_string(),
+                });
+            }
+            if !tournament[tournament::FINALS].is_null() {
+                return Err(EngineError::FinalsAlreadyStarted);
+            }
 
             let external = tournament[tournament::REGISTRATION_URL]
                 .as_str()

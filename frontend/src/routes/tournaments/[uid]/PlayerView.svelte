@@ -286,6 +286,40 @@
   </div>
 {/snippet}
 
+{#snippet selfRegister()}
+  {#if userSuspended}
+    <div class="text-sm text-link">{m.error_suspended_cannot_register()}</div>
+  {:else if tournament.registration_url}
+    {@render externalRegistration()}
+  {:else if !userVeknId}
+    <div class="banner-warn border rounded-lg p-3 text-sm">
+      <div class="flex items-center gap-2">
+        <TriangleAlert class="w-4 h-4 shrink-0" aria-hidden="true" />
+        <span class="font-medium">{m.tournament_vekn_id_required_to_register()}</span>
+      </div>
+      <p class="mt-2">
+        {m.vekn_guidance_have_id()}
+        <a href="/profile?claim=1" class="underline hover:text-warn">{m.vekn_guidance_claim_link()}</a>
+      </p>
+      <p class="mt-1">{m.vekn_guidance_new_member()}</p>
+    </div>
+  {:else}
+    {#if registrationCapReached}
+      <div class="banner-warn border rounded-lg p-3 text-sm flex items-start gap-2">
+        <TriangleAlert class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+        <span>{m.tournament_cap_waitlist_player({ count: String(seatedCount), cap: String(tournament.max_players ?? 0) })}</span>
+      </div>
+    {/if}
+    <Button
+      variant="primary"
+      size="lg"
+      onclick={() => playerAction("Register", { user_uid: userUid, vekn_id: userVeknId })}
+      disabled={actionLoading}
+    >{m.tournament_register_btn()}</Button>
+    {#if actionError}{@render refusal(actionError)}{/if}
+  {/if}
+{/snippet}
+
 <div class="bg-surface-card rounded-lg shadow border border-line mb-6 p-6 space-y-4">
   {#if iAmWaitlisted}
     <div class="banner-warn border rounded-lg p-3 text-sm flex items-start gap-2">
@@ -294,37 +328,7 @@
     </div>
   {/if}
   {#if tournament.state === "Registration" && !currentPlayerEntry}
-    {#if userSuspended}
-      <div class="text-sm text-link">{m.error_suspended_cannot_register()}</div>
-    {:else if tournament.registration_url}
-      {@render externalRegistration()}
-    {:else if !userVeknId}
-      <div class="banner-warn border rounded-lg p-3 text-sm">
-        <div class="flex items-center gap-2">
-          <TriangleAlert class="w-4 h-4 shrink-0" aria-hidden="true" />
-          <span class="font-medium">{m.tournament_vekn_id_required_to_register()}</span>
-        </div>
-        <p class="mt-2">
-          {m.vekn_guidance_have_id()}
-          <a href="/profile?claim=1" class="underline hover:text-warn">{m.vekn_guidance_claim_link()}</a>
-        </p>
-        <p class="mt-1">{m.vekn_guidance_new_member()}</p>
-      </div>
-    {:else}
-      {#if registrationCapReached}
-        <div class="banner-warn border rounded-lg p-3 text-sm flex items-start gap-2">
-          <TriangleAlert class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
-          <span>{m.tournament_cap_waitlist_player({ count: String(seatedCount), cap: String(tournament.max_players ?? 0) })}</span>
-        </div>
-      {/if}
-      <Button
-        variant="primary"
-        size="lg"
-        onclick={() => playerAction("Register", { user_uid: userUid, vekn_id: userVeknId })}
-        disabled={actionLoading}
-      >{m.tournament_register_btn()}</Button>
-      {#if actionError}{@render refusal(actionError)}{/if}
-    {/if}
+    {@render selfRegister()}
   {:else if tournament.state === "Registration" && currentPlayerEntry}
     <div class="text-sm mb-3 flex items-center justify-between gap-2">
       <span class="text-ink-bright">
@@ -344,6 +348,9 @@
   {:else if tournament.state === "Waiting" && !currentPlayerEntry}
     {#if tournament.registration_url}
       {@render externalRegistration()}
+    {:else if tournament.open_rounds}
+      {#if tournament.online}{@render onlineJoin()}{/if}
+      {@render selfRegister()}
     {:else if tournament.online}
       {@render onlineJoin()}
       <p class="text-sm text-ink-muted">{m.tournament_online_checkin_unregistered()}</p>
@@ -378,10 +385,11 @@
            Before finals, tell a would-be latecomer they can still get in. -->
       <div class="banner-info border rounded-lg p-3 mb-3 text-sm">
         <p>{m.tournament_event_in_progress()}</p>
-        {#if !isFinals}
+        {#if !isFinals && !tournament.open_rounds}
           <p class="text-ink-muted mt-1">{m.tournament_playing_latecomer()}</p>
         {/if}
       </div>
+      {#if !isFinals && tournament.open_rounds}{@render selfRegister()}{/if}
     {:else}
     <!-- State, score and the bar to clear are one fact: one line. -->
     <div class="text-sm mb-3 flex items-start justify-between gap-2">

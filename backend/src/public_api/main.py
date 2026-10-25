@@ -224,7 +224,7 @@ _ACTION_STATES: dict[str, tuple[tuple[str, ...], str]] = {
     "CloseRegistration": (("Registration",), "Waiting"),
     "CancelRegistration": (("Registration",), "Planned"),
     "ReopenRegistration": (("Waiting",), "Registration"),
-    "Register": (("Registration",), ""),
+    "Register": (("Registration", "Waiting", "Playing"), ""),
     "Unregister": (("Registration",), ""),
     "AddPlayer": (_ANY_STATE, ""),
     "RemovePlayer": (("Planned", "Registration", "Waiting", "Finished"), ""),
@@ -290,8 +290,7 @@ _IC_ACTIONS = frozenset({"SetArchivalResults"})
 _STATE_BLURBS = {
     "Planned": "Nobody can enter yet. The event exists, and that is all.",
     "Registration": "The roster is open, and a member may take their own seat.",
-    "Waiting": "The roster is settled and no round is running — between rounds, or"
-    " before the first one.",
+    "Waiting": "No round is running — between rounds, or before the first one.",
     "Playing": "A round is on the table.",
     "Finished": "The result stands. What is listed here is re-admitted for"
     " correction only and moves nothing: a finished event stays finished unless it"
@@ -732,11 +731,16 @@ _ACTIONS: dict[str, tuple[str, tuple[str, ...], tuple[str, ...]]] = {
         (),
         (),
     ),
-    "ReopenRegistration": ("Back to `Registration` from `Waiting`.", (), ()),
+    "ReopenRegistration": (
+        "Back to `Registration` from `Waiting`, refused once the event has a round.",
+        (),
+        (),
+    ),
     "CancelRegistration": ("Back to `Planned`, roster and all.", (), ()),
     "Register": (
         "Put a member on the roster. Their account must carry a VEKN ID — the server"
-        " reads it from the account, never from you, and refuses one without.",
+        " reads it from the account, never from you, and refuses one without."
+        " `Waiting` and `Playing` accept it on an open-rounds event before the finals.",
         ("user_uid",),
         ("display_name",),
     ),

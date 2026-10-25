@@ -1770,6 +1770,7 @@
   "err_tournament_player_wrong_state": "O jogador deve estar Inscrito (atualmente {current})",
   "err_tournament_wrong_state": "O torneio deve estar no estado {expected} (atualmente {current})",
   "err_tournament_cannot_add_players": "Não é possível adicionar jogadores neste estado",
+  "err_tournament_reopen_after_round": "As inscrições não podem reabrir depois de uma rodada jogada",
   "err_tournament_cannot_remove_players": "Não é possível remover jogadores neste estado",
   "err_tournament_use_drop_out": "Use Desistir para jogadores que já jogaram",
   "err_tournament_cannot_drop_out": "Não é possível desistir neste estado",
