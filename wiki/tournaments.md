@@ -454,10 +454,12 @@ was imported with. On top of the sheet it decides the DQ/proxy flags from the
 combined signals, zeroes the DQ'd, sorts the cascade and calls
 `compute_final_standings`. A final places only once the tournament is `Finished`:
 until then the winner is dropped and the display stays on the preliminary ranking,
-and each finalist row then carries its finals `{gw, vp, tp}` for display. Toss and
-finalist are sourced apart: toss off the roster when rounds exist and off the sheet
-row when they do not, finalist off the finals seating — the roster flag serves only
-as the round-less fallback, where neither a finals table nor a roster toss exists.
+and each finalist row then carries its finals `{gw, vp, tp}` for display — a
+round-less VEKN import included, whose finals table the sync rebuilds from `vpf`
+([vekn](vekn.md#tournaments)). Toss and finalist are sourced apart: toss off the
+roster when rounds exist and off the sheet row when they do not, finalist off the
+finals seating when rounds exist and off the sheet row (roster flag as fallback)
+when they do not, so a round-less finals table shows scores but never re-places.
 The screen hands `compute_final_standings` that resolved row while the backend
 hands it the stored sheet; the two agree because every producer writes the sheet
 flag from finals membership, not because the stamp reconciles them.

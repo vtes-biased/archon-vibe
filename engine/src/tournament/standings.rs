@@ -367,9 +367,9 @@ pub fn display_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<J
     let sheet = &tournament[tournament::STANDINGS];
     let rounds_less = tournament[tournament::ROUNDS].is_empty();
     let finals = &tournament[tournament::FINALS];
-    let use_finals = !rounds_less
-        && tournament[tournament::STATE].as_str() == Some("Finished")
-        && !finals.is_null();
+    let finals_scored =
+        tournament[tournament::STATE].as_str() == Some("Finished") && !finals.is_null();
+    let use_finals = !rounds_less && finals_scored;
 
     let player_of = |uid: &str| {
         players
@@ -382,7 +382,7 @@ pub fn display_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<J
             .find(|s| s[standing::USER_UID].as_str() == Some(uid))
     };
     let finals_seat = |uid: &str| {
-        use_finals
+        finals_scored
             .then(|| {
                 finals[finals_table::SEATING]
                     .members()
@@ -912,7 +912,11 @@ mod tests {
         // The sheet arrives unsorted, so the display path must sort and place it.
         let t = json::parse(
             r#"{
-            "state":"Finished","rounds":[],"finals":null,"winner":"w",
+            "state":"Finished","rounds":[],"winner":"w",
+            "finals":{"seating":[
+                {"player_uid":"w","result":{"gw":1,"vp":3.0,"tp":0}},
+                {"player_uid":"f","result":{"gw":0,"vp":2.0,"tp":0}}
+            ]},
             "players":[
                 {"user_uid":"w"},{"user_uid":"f"},{"user_uid":"a"},
                 {"user_uid":"b"},{"user_uid":"p","non_competing":true}
@@ -940,6 +944,18 @@ mod tests {
             r.last().unwrap()["user_uid"].as_str(),
             Some("p"),
             "the proxy sorts last despite the second-best VP total"
+        );
+        let finals_vp = |u: &str| {
+            r.iter()
+                .find(|e| e["user_uid"].as_str() == Some(u))
+                .unwrap()["finals"]["vp"]
+                .as_f64()
+        };
+        assert_eq!(finals_vp("w"), Some(3.0), "the vpf finals table displays");
+        assert_eq!(
+            finals_vp("a"),
+            None,
+            "a non-finalist carries no finals score"
         );
     }
 
