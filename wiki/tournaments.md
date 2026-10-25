@@ -730,7 +730,10 @@ owner and IC alone. The engine then refuses anyone but the owner releasing,
 replacing or deleting it: a release would hand the deck back, and the organizer's
 roster, no longer holding it, shows the player deckless and offers an upload
 that would overwrite it blind. The winner's deck is
-the exception and publishes regardless, so the archive keeps its win registry.
+the exception: it publishes regardless, so the archive keeps its win registry, and
+its organizers, who still hold it, may replace or delete it. Its stored
+`private` stays put, and only its owner releases it, so a later winner swap hides
+it again.
 Credit and disclosure compose rather than replace each other: an anonymous deck
 still publishes, with no owner, and a private one keeps whatever credit it has.
 
@@ -806,7 +809,7 @@ and the VEKN record outranks the archive from that moment on.
 | Register / Unregister | any authenticated member, during Registration; Register also in Waiting and Playing on an open-rounds event before the finals |
 | Self-organize a round | registered players, open rounds with `self_organized_rounds`, Waiting/Playing, no finals |
 | Set score | players at the table during Playing; organizers whenever rounds exist |
-| Deck upload / delete | players for their own deck — any of their own, naming its round, once Finished — organizers for any but a private one once Finished |
+| Deck upload / delete | players for their own deck — any of their own, naming its round, once Finished — organizers for any but a private one once Finished, the winner's excepted |
 | Set a deck's credit | the deck's owner alone, in any state |
 | Hold a deck private | the deck's owner or an organizer, in any state; releasing it once Finished, the owner alone |
 | Correct an archival record | IC |

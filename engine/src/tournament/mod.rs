@@ -2511,7 +2511,11 @@ fn apply_event(
                     && d[deck_object::ROUND].as_usize() == deck_data[deck_object::ROUND].as_usize()
             });
             let private = replaced.is_some_and(|d| d[deck_object::PRIVATE] == true);
-            if private && actor.uid != *player_uid && state == TournamentState::Finished {
+            if private
+                && actor.uid != *player_uid
+                && state == TournamentState::Finished
+                && !compute_deck_winner(tournament, player_uid)
+            {
                 return Err(EngineError::DeckPrivateOwnerOnly);
             }
             deck_data[deck_object::PRIVATE] = private.into();
@@ -2559,7 +2563,11 @@ fn apply_event(
                     && (!*multideck || d[deck_object::ROUND].as_usize() == *deck_index)
                     && d[deck_object::PRIVATE] == true
             });
-            if deletes_private && actor.uid != *player_uid && state == TournamentState::Finished {
+            if deletes_private
+                && actor.uid != *player_uid
+                && state == TournamentState::Finished
+                && !compute_deck_winner(tournament, player_uid)
+            {
                 return Err(EngineError::DeckPrivateOwnerOnly);
             }
             let op = json::object! {

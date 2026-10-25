@@ -1135,7 +1135,7 @@ fn test_the_owner_or_an_organizer_marks_a_deck_private() {
 }
 
 #[test]
-fn test_only_the_owner_touches_a_private_deck_once_finished() {
+fn test_only_the_owner_touches_a_private_deck_once_finished_but_the_winners_content() {
     let tournament = tournament_with_player("Finished");
     let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "private": true, "public": false, "winner": false}]"#;
     let event = json::object! {
@@ -1161,6 +1161,16 @@ fn test_only_the_owner_touches_a_private_deck_once_finished() {
     let delete = json::object! { type: "DeleteDeck", player_uid: "player-1", multideck: false };
     assert!(matches!(
         run_event_with_decks(&tournament, &delete, &make_organizer(), decks),
+        Err(EngineError::DeckPrivateOwnerOnly)
+    ));
+
+    let mut won = tournament.clone();
+    won["winner"] = "player-1".into();
+    let (_, deck_ops) = run_event_with_decks(&won, &replace, &make_organizer(), decks).unwrap();
+    assert_eq!(deck_ops[0]["deck"]["private"].as_bool(), Some(true));
+    assert!(run_event_with_decks(&won, &delete, &make_organizer(), decks).is_ok());
+    assert!(matches!(
+        run_event_with_decks(&won, &event, &make_organizer(), decks),
         Err(EngineError::DeckPrivateOwnerOnly)
     ));
 }
