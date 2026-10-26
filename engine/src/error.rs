@@ -281,7 +281,7 @@ impl fmt::Display for EngineError {
                 write!(f, "Only organizers or the player can make a deck private")
             }
             DeckPrivateOwnerOnly => {
-                write!(f, "Once the event is finished, only the player can change a private deck")
+                write!(f, "This player kept their deck private. Only they can publish or replace it, from the Your Deck section of this tournament page")
             }
             ScoreForbidden => write!(f, "Not authorized to score this table"),
             ScoreLocked => write!(f, "Table score is locked by judge"),
