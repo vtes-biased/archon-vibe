@@ -4,10 +4,11 @@
   import { getTournamentListItems, getDecksByUser, getTournament, getTournamentsNaming, getSanctionsForTournament } from "$lib/db";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { getCountryFlag } from "$lib/geonames";
-  import { computeStandings, playedPlayerUids } from "$lib/tournament-utils";
+  import { computeStandings, playedPlayerUids, getStateTone, translateTournamentState } from "$lib/tournament-utils";
   import { attestedPlayerCount } from "$lib/engine";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
+  import Badge from "$lib/components/Badge.svelte";
   import { TriangleAlert, ChevronDown, ChevronRight } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
@@ -24,6 +25,7 @@
 
   let events = $state<PlayedEvent[]>([]);
   let undocumented = $state<TournamentListItem[]>([]);
+  let organised = $state<TournamentListItem[]>([]);
   let expandedDeck = $state<string | null>(null);
   const winCount = $derived(events.filter(e => e.won).length);
   const finalCount = $derived(events.filter(e => e.won || e.finalist).length);
@@ -61,13 +63,17 @@
       .filter((e): e is PlayedEvent => !!e)
       .sort((a, b) => day(b.tournament).localeCompare(day(a.tournament)));
 
+    const listed = await getTournamentListItems();
+    if (uid !== viewedUid) return;
+    organised = listed
+      .filter(t => !t.deleted_at && t.organizers_uids?.includes(uid))
+      .sort((a, b) => (b.start ?? b.modified).localeCompare(a.start ?? a.modified));
+
     if (!owner) {
       undocumented = [];
       return;
     }
     const owned = new Set(mine.map(d => d.tournament_uid));
-    const listed = await getTournamentListItems();
-    if (uid !== viewedUid) return;
     undocumented = listed
       .filter(t => t.winner === uid && !t.deleted_at && !owned.has(t.uid))
       .sort((a, b) => day(b).localeCompare(day(a)));
@@ -79,6 +85,7 @@
     if (!uid) {
       events = [];
       undocumented = [];
+      organised = [];
       return;
     }
     load(uid, getAuthState().user?.uid === uid);
@@ -149,6 +156,28 @@
               <DeckDisplay {deck} />
             </div>
           {/if}
+        </li>
+      {/each}
+    </ul>
+  </section>
+{/if}
+
+{#if organised.length}
+  <section class="mt-6">
+    <h2 class="text-lg font-semibold text-ink-bright mb-3">
+      {m.user_detail_organised({ count: String(organised.length) })}
+    </h2>
+    <ul class="bg-surface-card border border-line rounded-lg divide-y divide-line">
+      {#each organised as t (t.uid)}
+        <li class="px-4 py-2 text-sm flex flex-wrap items-center gap-x-2">
+          <a href="/tournaments/{t.uid}" class="min-w-0 text-ink-strong hover:text-link">{t.name}</a>
+          {#if t.state !== "Finished"}
+            <Badge kind="status" tone={getStateTone(t.state)}>{translateTournamentState(t.state)}</Badge>
+          {/if}
+          <span class="text-xs text-ink-faint ml-auto whitespace-nowrap">
+            {#if t.country}{getCountryFlag(t.country)}{/if}
+            {day(t)}
+          </span>
         </li>
       {/each}
     </ul>

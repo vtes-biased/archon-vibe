@@ -1083,6 +1083,7 @@
   "user_detail_no_rating": "Nessun dato rating disponibile.",
   "user_detail_no_contact": "Nessun contatto condiviso.",
   "user_detail_events": "Tornei giocati ({count})",
+  "user_detail_organised": "Tornei organizzati ({count})",
   "user_detail_wins_count": "Vittorie: {count}",
   "user_detail_hof_count": "Hall of Fame: {count}",
   "user_detail_finals_count": "Finali: {count}",

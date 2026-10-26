@@ -571,6 +571,8 @@ and roles are the page's subject, not tab content. Below it:
   The undocumented-decklist nudge sits above the list on the viewer's own record,
   by whichever route they reached it: it is actionable by the player alone and
   reads as a reproach on anyone else's page.
+  The events the member organised follow as a second list, newest first, a state
+  badge marking the ones not yet finished.
 - **Account** — linked accounts, authorized apps, the member's own playtest NDA
   records with a re-download of each sealed file, settings, developer,
   administration, data. The NDA block renders only when a record exists.

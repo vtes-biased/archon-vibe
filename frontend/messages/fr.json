@@ -1083,6 +1083,7 @@
   "user_detail_no_rating": "Aucune donnée de classement disponible.",
   "user_detail_no_contact": "Aucune coordonnée partagée.",
   "user_detail_events": "Tournois joués ({count})",
+  "user_detail_organised": "Tournois organisés ({count})",
   "user_detail_wins_count": "Victoires : {count}",
   "user_detail_hof_count": "Hall of Fame : {count}",
   "user_detail_finals_count": "Finales : {count}",

@@ -1083,6 +1083,7 @@
   "user_detail_no_rating": "No rating data available.",
   "user_detail_no_contact": "No contact details shared.",
   "user_detail_events": "Events played ({count})",
+  "user_detail_organised": "Events organised ({count})",
   "user_detail_wins_count": "Wins: {count}",
   "user_detail_hof_count": "Hall of Fame: {count}",
   "user_detail_finals_count": "Finals: {count}",
