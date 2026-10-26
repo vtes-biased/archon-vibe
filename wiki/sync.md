@@ -168,7 +168,7 @@ decision.
 |---|---|---|
 | Officials directory | hidden | yes, public projection |
 | Members tab | sign-in prompt | partial — officials and link-holders only |
-| Tournament list | current and upcoming only | yes, full list in IndexedDB |
+| Tournament list | Upcoming tab only, no tabs shown | yes, full list in IndexedDB |
 | League list | active only | yes |
 | Finished tournament detail | accessible by direct link | yes |
 

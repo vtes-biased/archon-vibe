@@ -364,7 +364,8 @@ three layers:
   filtered list is shareable. Read `window.location`, never the page store —
   shallow routing leaves the store behind. **A filter whose control only some
   viewers can see is excluded**: a shared link would hand everyone else a filter
-  they can neither see nor clear. On `/users` that is the officials-only sponsor
+  they can neither see nor clear — unless those viewers ignore the parameter, as
+  logged-out visitors ignore the tournament list's members-only `tab=past`. On `/users` that is the officials-only sponsor
   and no-VEKN toggles — the sanction toggles render for every signed-in viewer and
   so are mirrored. An arrival pointer is not a filter and is neither mirrored nor
   remembered (`/users?sponsor`).

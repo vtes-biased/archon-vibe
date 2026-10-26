@@ -128,7 +128,10 @@ dual-audience user may get both for the same event — deliberate, no dedup.
 **Social and discovery** — shareable finished-tournament image and text,
 per-tournament and per-league Open Graph crawler stubs, iCal feeds (personal,
 country, global), agenda matching with the member's own hide and add overrides,
-list filters including an "and above" rank ladder (league events, then
+Upcoming and Past tabs over the list for members (Upcoming holds events dated
+today or later plus in-progress ones started within the last two days, soonest
+first; Past holds finished and older unfinished events, newest first), list
+filters including an "and above" rank ladder (league events, then
 National, then Continental championships), a start-date window, several
 countries at once, and online events included, excluded or alone — a choice
 remembered per device like the agenda view, the URL winning.

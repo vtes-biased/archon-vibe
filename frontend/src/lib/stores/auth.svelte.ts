@@ -434,8 +434,6 @@ export async function login(email: string, password: string): Promise<boolean> {
 
 export async function logout(): Promise<void> {
   clearTokens();
-  // Remembered list views can hold filters an anonymous viewer has no control for (state=finished
-  // is authenticated-only), so they would filter unaccountably.
   forgetViews();
   await syncManager.reset();
   setAuthState({ user: null, authMethods: [], isAuthenticated: false, isLoading: false, error: null });

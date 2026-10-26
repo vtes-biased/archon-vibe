@@ -857,44 +857,26 @@ export async function getTournamentListItems(): Promise<TournamentListItem[]> {
 export interface FilteredTournamentsResult {
   items: TournamentListItem[];
   total: number;
-  /** Size of the leading upcoming/current cluster (see sortUpcomingFirst). */
-  upcomingCount: number;
 }
 
-const ONGOING_STATES: Set<string> = new Set(['Registration', 'Waiting', 'Playing']);
+export type TournamentTab = 'upcoming' | 'past';
 
-export type TournamentStateFilter = 'all' | 'upcoming' | 'ongoing' | 'finished';
-
-/** Naive local wall-clock "today", same format as Tournament.start. */
-function todayCutoff(): string {
-  const now = new Date();
+/** Naive local wall-clock midnight `daysAgo` days back, same format as Tournament.start. */
+function dayCutoff(daysAgo = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T00:00`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T00:00`;
 }
 
 const tournamentDate = (t: TournamentListItem) => t.start || t.modified;
 
-// "Upcoming" = not Finished and dated today or later, plus a Playing/Waiting
-// event from an earlier date, which belongs with the live ones.
-function isUpcoming(t: TournamentListItem, cutoff: string): boolean {
-  return (
-    t.state !== 'Finished' &&
-    (tournamentDate(t) >= cutoff || t.state === 'Playing' || t.state === 'Waiting')
-  );
-}
+const LIVE_WINDOW_DAYS = 2;
 
-/** Shared by both list queries so the filter and the divider agree on "upcoming". */
-function matchesState(t: TournamentListItem, state: TournamentStateFilter, cutoff: string): boolean {
-  switch (state) {
-    case 'upcoming':
-      return isUpcoming(t, cutoff);
-    case 'ongoing':
-      return ONGOING_STATES.has(t.state);
-    case 'finished':
-      return t.state === 'Finished';
-    default:
-      return true;
-  }
+function isUpcoming(t: TournamentListItem, today: string, liveFrom: string): boolean {
+  if (t.state === 'Finished') return false;
+  const date = tournamentDate(t);
+  return date >= today || ((t.state === 'Playing' || t.state === 'Waiting') && date >= liveFrom);
 }
 
 function inDateWindow(t: TournamentListItem, from?: string, to?: string): boolean {
@@ -908,12 +890,13 @@ export type RankFloor = 'all' | 'league' | 'National Championship' | 'Continenta
 
 export type OnlineFilter = 'all' | 'exclude' | 'only';
 
-/** Sorts upcoming/current ascending then past descending, returning the upcoming cluster size for an
- * Upcoming/Past divider. Filtering to Finished needs no separate sort flip — with no upcoming events left, the whole list is the past cluster already in recency order. */
+/** Sorts upcoming ascending then past descending, returning the upcoming cluster size for an
+ * Upcoming/Past divider. */
 export function sortUpcomingFirst(items: TournamentListItem[]): number {
-  const cutoff = todayCutoff();
+  const today = dayCutoff();
+  const liveFrom = dayCutoff(LIVE_WINDOW_DAYS);
   const date = tournamentDate;
-  const isUpcomingHere = (t: TournamentListItem) => isUpcoming(t, cutoff);
+  const isUpcomingHere = (t: TournamentListItem) => isUpcoming(t, today, liveFrom);
   let upcomingCount = 0;
   items.sort((a, b) => {
     const ua = isUpcomingHere(a);
@@ -929,13 +912,12 @@ export function sortUpcomingFirst(items: TournamentListItem[]): number {
 
 export async function getFilteredTournaments(
   filters: {
-    state?: TournamentStateFilter;
+    tab: TournamentTab;
     online?: OnlineFilter;
     countries?: string[];
     format?: string;
     rank?: string;
     search?: string;
-    excludePast?: boolean;
     dateFrom?: string;
     dateTo?: string;
   },
@@ -943,14 +925,13 @@ export async function getFilteredTournaments(
   pageSize = 50,
 ): Promise<FilteredTournamentsResult> {
   const index = await getTournamentIndex();
-  const cutoff = todayCutoff();
+  const today = dayCutoff();
+  const liveFrom = dayCutoff(LIVE_WINDOW_DAYS);
   const q = filters.search?.trim() ? normalizeSearch(filters.search.trim()) : '';
 
   const items: TournamentListItem[] = [];
   for (const t of index.values()) {
-    if (filters.state && filters.state !== 'all' && !matchesState(t, filters.state, cutoff)) continue;
-    // Logged-out viewers see current + upcoming only (no finished/past events).
-    if (filters.excludePast && t.state === 'Finished') continue;
+    if (isUpcoming(t, today, liveFrom) !== (filters.tab === 'upcoming')) continue;
     if (filters.countries?.length && !filters.countries.includes(t.country ?? '')) continue;
     if (!inDateWindow(t, filters.dateFrom, filters.dateTo)) continue;
     if (filters.online === 'exclude' && t.online) continue;
@@ -961,26 +942,31 @@ export async function getFilteredTournaments(
     items.push(t);
   }
 
-  const upcomingCount = sortUpcomingFirst(items);
+  items.sort((a, b) =>
+    filters.tab === 'upcoming'
+      ? tournamentDate(a).localeCompare(tournamentDate(b))
+      : tournamentDate(b).localeCompare(tournamentDate(a)),
+  );
 
   const total = items.length;
   const start = page * pageSize;
-  return { items: items.slice(start, start + pageSize), total, upcomingCount };
+  return { items: items.slice(start, start + pageSize), total };
 }
 
 export async function getAgendaTournaments(
   viewer: AgendaViewer,
-  filters: { state?: TournamentStateFilter; online?: OnlineFilter; format?: string; rank?: string; search?: string; dateFrom?: string; dateTo?: string },
+  filters: { tab: TournamentTab; online?: OnlineFilter; format?: string; rank?: string; search?: string; dateFrom?: string; dateTo?: string },
   page = 0,
   pageSize = 50,
 ): Promise<FilteredTournamentsResult> {
   const [index, playing] = await Promise.all([getTournamentIndex(), getMemberPlaying(viewer.uid)]);
-  const cutoff = todayCutoff();
+  const today = dayCutoff();
+  const liveFrom = dayCutoff(LIVE_WINDOW_DAYS);
   const q = filters.search?.trim() ? normalizeSearch(filters.search.trim()) : '';
 
   const candidates: TournamentListItem[] = [];
   for (const t of index.values()) {
-    if (filters.state && filters.state !== 'all' && !matchesState(t, filters.state, cutoff)) continue;
+    if (isUpcoming(t, today, liveFrom) !== (filters.tab === 'upcoming')) continue;
     if (filters.format && filters.format !== 'all' && t.format !== filters.format) continue;
     if (!getEngine().meetsRankFloor(t.rank, !!t.league_uid, filters.rank ?? 'all')) continue;
     if (!inDateWindow(t, filters.dateFrom, filters.dateTo)) continue;
@@ -990,11 +976,15 @@ export async function getAgendaTournaments(
   }
   const items = filterAgenda(candidates, viewer, playing, filters.online !== 'exclude');
 
-  const upcomingCount = sortUpcomingFirst(items);
+  items.sort((a, b) =>
+    filters.tab === 'upcoming'
+      ? tournamentDate(a).localeCompare(tournamentDate(b))
+      : tournamentDate(b).localeCompare(tournamentDate(a)),
+  );
 
   const total = items.length;
   const start = page * pageSize;
-  return { items: items.slice(start, start + pageSize), total, upcomingCount };
+  return { items: items.slice(start, start + pageSize), total };
 }
 
 export async function getDeck(uid: string): Promise<DeckObject | undefined> {

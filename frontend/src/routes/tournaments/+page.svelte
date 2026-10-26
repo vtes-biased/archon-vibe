@@ -1,7 +1,7 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
   import { untrack } from "svelte";
-  import { getFilteredTournaments, getAgendaTournaments, getMemberPlaying, getLeague, type OnlineFilter, type RankFloor, type TournamentListItem, type TournamentStateFilter } from "$lib/db";
+  import { getFilteredTournaments, getAgendaTournaments, getMemberPlaying, getLeague, type OnlineFilter, type RankFloor, type TournamentListItem, type TournamentTab } from "$lib/db";
   import { agendaViewer, filterAgenda, agendaToggleEntry } from "$lib/agenda";
   import { syncManager } from "$lib/sync";
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
@@ -25,7 +25,6 @@
 
   let tournaments = $state<TournamentListItem[]>([]);
   let totalCount = $state(0);
-  let upcomingCount = $state(0);
   let loaded = $state(false);
   let showLoading = $state(false);
   // Delay showing spinner to avoid flash on fast IDB reads
@@ -83,11 +82,9 @@
     const timer = setTimeout(() => { debouncedSearch = q; }, 250);
     return () => clearTimeout(timer);
   });
-  const STATE_FILTERS: TournamentStateFilter[] = ["all", "upcoming", "ongoing", "finished"];
-  const urlState = urlParams.get("state");
-  let selectedState = $state<TournamentStateFilter>(
-    STATE_FILTERS.includes(urlState as TournamentStateFilter) ? (urlState as TournamentStateFilter) : "all",
-  );
+  let selectedTab = $state<TournamentTab>(urlParams.get("tab") === "past" ? "past" : "upcoming");
+  // Logged-out visitors have no tabs, so a shared ?tab=past must not reach them.
+  const tab = $derived<TournamentTab>(auth.isAuthenticated ? selectedTab : "upcoming");
   let selectedCountries = $state<string[]>((urlParams.get("country") ?? "").split(",").filter(Boolean));
   let dateFrom = $state(urlParams.get("from") ?? "");
   let dateTo = $state(urlParams.get("to") ?? "");
@@ -128,14 +125,6 @@
   const countries = getCountries();
   const sortedCountries = getSortedCountries();
   const formats: TournamentFormat[] = ["Standard", "V5", "Limited", "Storyline"];
-  // Finished is authenticated-only: logged-out viewers are restricted to
-  // current + upcoming (excludePast below), so it would always come up empty.
-  const stateOptions = $derived<{ value: TournamentStateFilter; label: string }[]>([
-    { value: "all", label: m.tournaments_all_states() },
-    { value: "upcoming", label: m.tournaments_state_upcoming() },
-    { value: "ongoing", label: m.tournaments_ongoing() },
-    ...(auth.isAuthenticated ? [{ value: "finished" as const, label: m.state_finished() }] : []),
-  ]);
 
   const totalPages = $derived(Math.ceil(totalCount / PAGE_SIZE));
   const canCreate = $derived(canCreateTournament(auth.user).allowed);
@@ -166,17 +155,16 @@
       if (viewMode === "agenda" && viewer) {
         const result = await getAgendaTournaments(
           viewer,
-          { state: selectedState, online: onlineFilter, format: selectedFormat, rank: selectedRank, search: debouncedSearch, dateFrom, dateTo },
+          { tab, online: onlineFilter, format: selectedFormat, rank: selectedRank, search: debouncedSearch, dateFrom, dateTo },
           page,
           PAGE_SIZE,
         );
         tournaments = result.items;
         totalCount = result.total;
-        upcomingCount = result.upcomingCount;
       } else {
         const result = await getFilteredTournaments(
           {
-            state: selectedState,
+            tab,
             online: onlineFilter,
             countries: selectedCountries,
             dateFrom,
@@ -184,15 +172,12 @@
             format: selectedFormat,
             rank: selectedRank,
             search: debouncedSearch,
-            // Logged-out visitors see current + upcoming only, not past events.
-            excludePast: !auth.isAuthenticated,
           },
           page,
           PAGE_SIZE,
         );
         tournaments = result.items;
         totalCount = result.total;
-        upcomingCount = result.upcomingCount;
       }
     } catch (e) {
       error = toUserMessage(e, m.tournament_error_load_list());
@@ -226,7 +211,7 @@
 
   $effect(() => {
     const _s = debouncedSearch;
-    const _o = selectedState;
+    const _t = tab;
     const _c = selectedCountries.join(",");
     const _df = dateFrom;
     const _dt = dateTo;
@@ -241,14 +226,13 @@
   });
 
   const filterKey = $derived(
-    [debouncedSearch, selectedState, selectedCountries.join(","), dateFrom, dateTo, selectedFormat, selectedRank, onlineFilter, viewMode].join("|"),
+    [debouncedSearch, tab, selectedCountries.join(","), dateFrom, dateTo, selectedFormat, selectedRank, onlineFilter, viewMode].join("|"),
   );
 
   // The badge counts what the sheet holds: search sits outside it, and the
   // country select is absent in agenda mode.
   const activeFilterCount = $derived(
-    (selectedState !== "all" ? 1 : 0)
-      + (viewMode !== "agenda" && selectedCountries.length > 0 ? 1 : 0)
+    (viewMode !== "agenda" && selectedCountries.length > 0 ? 1 : 0)
       + (dateFrom || dateTo ? 1 : 0)
       + (selectedFormat !== "all" ? 1 : 0)
       + (selectedRank !== "all" ? 1 : 0)
@@ -256,13 +240,12 @@
   );
 
   const hasFilters = $derived(
-    !!searchQuery.trim() || selectedState !== "all" || selectedCountries.length > 0 || !!dateFrom || !!dateTo
+    !!searchQuery.trim() || selectedCountries.length > 0 || !!dateFrom || !!dateTo
       || selectedFormat !== "all" || selectedRank !== "all" || onlineFilter !== "all",
   );
 
   function clearFilters() {
     searchQuery = "";
-    selectedState = "all";
     selectedCountries = [];
     dateFrom = "";
     dateTo = "";
@@ -296,7 +279,7 @@
   $effect(() => {
     syncQueryParams({
       q: debouncedSearch,
-      state: selectedState === "all" ? null : selectedState,
+      tab: auth.isAuthenticated && selectedTab === "past" ? "past" : null,
       country: selectedCountries.join(",") || null,
       from: dateFrom || null,
       to: dateTo || null,
@@ -407,20 +390,38 @@
       {/if}
     </div>
 
-    {#if canUseAgenda}
-      <div class="flex mb-4 bg-surface-card rounded-lg border border-line p-1 w-fit">
-        <button
-          onclick={() => viewMode = "agenda"}
-          class="px-4 py-2 text-sm font-medium rounded-md transition-colors {viewMode === 'agenda' ? 'bg-accent-strong text-white' : 'text-ink-muted hover:text-ink-bright'}"
-        >
-          {m.tournaments_view_agenda()}
-        </button>
-        <button
-          onclick={() => viewMode = "all"}
-          class="px-4 py-2 text-sm font-medium rounded-md transition-colors {viewMode === 'all' ? 'bg-accent-strong text-white' : 'text-ink-muted hover:text-ink-bright'}"
-        >
-          {m.tournaments_view_all()}
-        </button>
+    {#if auth.isAuthenticated}
+      <div class="flex flex-wrap gap-2 mb-4">
+        {#if canUseAgenda}
+          <div class="flex bg-surface-card rounded-lg border border-line p-1 w-fit">
+            <button
+              onclick={() => viewMode = "agenda"}
+              class="px-4 py-2 text-sm font-medium rounded-md transition-colors {viewMode === 'agenda' ? 'bg-accent-strong text-white' : 'text-ink-muted hover:text-ink-bright'}"
+            >
+              {m.tournaments_view_agenda()}
+            </button>
+            <button
+              onclick={() => viewMode = "all"}
+              class="px-4 py-2 text-sm font-medium rounded-md transition-colors {viewMode === 'all' ? 'bg-accent-strong text-white' : 'text-ink-muted hover:text-ink-bright'}"
+            >
+              {m.tournaments_view_all()}
+            </button>
+          </div>
+        {/if}
+        <div class="flex bg-surface-card rounded-lg border border-line p-1 w-fit">
+          <button
+            onclick={() => selectedTab = "upcoming"}
+            class="px-4 py-2 text-sm font-medium rounded-md transition-colors {selectedTab === 'upcoming' ? 'bg-accent-strong text-white' : 'text-ink-muted hover:text-ink-bright'}"
+          >
+            {m.tournaments_state_upcoming()}
+          </button>
+          <button
+            onclick={() => selectedTab = "past"}
+            class="px-4 py-2 text-sm font-medium rounded-md transition-colors {selectedTab === 'past' ? 'bg-accent-strong text-white' : 'text-ink-muted hover:text-ink-bright'}"
+          >
+            {m.tournaments_tab_past()}
+          </button>
+        </div>
       </div>
     {/if}
 
@@ -500,12 +501,7 @@
         </div>
 
         <div class="divide-y divide-line">
-          {#each tournaments as tournament, i (tournament.uid)}
-            {#if i === upcomingCount - page * PAGE_SIZE}
-              <div class="px-6 py-2 bg-surface-muted text-xs font-medium text-ink-faint uppercase tracking-wide">
-                {m.tournaments_past_divider()}
-              </div>
-            {/if}
+          {#each tournaments as tournament (tournament.uid)}
             <div class="flex items-center hover:bg-surface-muted/50 transition-colors">
             <a
               href="/tournaments/{tournament.uid}"
@@ -632,8 +628,10 @@
             {m.tournaments_adjust_filters()}
           {:else if viewMode === "agenda"}
             {m.tournaments_agenda_empty()}
+          {:else if tab === "past"}
+            {m.tournaments_none_past()}
           {:else}
-            {m.tournaments_none_yet()}
+            {m.tournaments_none_upcoming()}
           {/if}
         </p>
         <!-- A view restored by the nav menu can come up empty on filters the
@@ -759,19 +757,6 @@
             />
           </div>
         </fieldset>
-
-        <div>
-          <label for="state-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.tournaments_col_state()}</label>
-          <select
-            id="state-filter"
-            bind:value={selectedState}
-            class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
-          >
-            {#each stateOptions as option}
-              <option value={option.value}>{option.label}</option>
-            {/each}
-          </select>
-        </div>
 
         <div>
           <label for="online-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.tournaments_filter_online()}</label>
