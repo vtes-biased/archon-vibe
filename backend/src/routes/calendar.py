@@ -188,7 +188,7 @@ async def tournament_event_ics(filename: FromPath[str]) -> Response:
 async def tournament_calendar(
     token: FromQuery[str | None] = None,
     country: FromQuery[str | None] = None,
-    online: FromQuery[bool] = True,
+    online: FromQuery[str | None] = None,
     format: FromQuery[str | None] = None,
     rank: FromQuery[str | None] = None,
     league: FromQuery[str | None] = None,
@@ -197,6 +197,8 @@ async def tournament_calendar(
     (own events always included, recently-finished ones stay for
     FINISHED_WINDOW_DAYS), else a public feed filtered by country/online; format and rank narrow both."""
     countries = {c.strip().upper() for c in (country or "").split(",") if c.strip()}
+    include_online = online != "false"
+    only_online = online == "only"
     now = datetime.now(UTC)
     now_str = now.strftime("%Y%m%dT%H%M%SZ")
     cutoff = (now - timedelta(days=7)).isoformat()
@@ -250,7 +252,7 @@ async def tournament_calendar(
                 user.uid,
                 user.country,
                 get_countries_on_continent(user.country),
-                online,
+                include_online,
                 user.agenda_hidden or [],
                 user.agenda_added or [],
             )
@@ -259,8 +261,10 @@ async def tournament_calendar(
                 t
                 for t in tournaments
                 if (not countries or t.country in countries or t.online)
-                and (online or not t.online)
+                and (include_online or not t.online)
             ]
+        if only_online:
+            tournaments = [t for t in tournaments if t.online]
 
     # Generate iCal
     vevents = []

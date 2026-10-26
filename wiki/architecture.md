@@ -958,7 +958,8 @@ member typed, and `link_preview.py` holds the guards
 `GET /api/calendar/tournaments.ics` serves iCal for client subscriptions. Feeds:
 **personal** (`?token=<calendar_token>`, agenda-matched), **country**
 (`?country=XX`, or `XX,YY` for several) and **global** (no params);
-`?online=false` excludes online events from any feed. The personal and public
+`?online=false` excludes online events from any feed and `?online=only` keeps
+only online events, dropping even an in-person event the member added. The personal and public
 feeds also take the list's `?format=` and `?rank=` (`league`, `National
 Championship` or `Continental Championship`, each meaning that step and above),
 so a subscription copied from either view carries what the screen shows. The list's date window never

@@ -375,7 +375,9 @@ three layers:
   for, not starting over. Only the page number is dropped: it is a position in the
   results, not part of the view.
 - **localStorage** only for true display preferences outliving the tab — the
-  agenda/all toggle, the theme.
+  agenda/all toggle, the theme, and the tournament list's online filter: the one
+  filter kept across visits, because a member who never plays online (or only
+  does) makes that choice once, not per visit.
 
 Because a restored filter can hide data, **every list's empty state must
 distinguish "nothing matches these filters" from "nothing here yet"** and offer a

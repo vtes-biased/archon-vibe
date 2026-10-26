@@ -1,7 +1,7 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
   import { untrack } from "svelte";
-  import { getFilteredTournaments, getAgendaTournaments, getMemberPlaying, getLeague, type RankFloor, type TournamentListItem, type TournamentStateFilter } from "$lib/db";
+  import { getFilteredTournaments, getAgendaTournaments, getMemberPlaying, getLeague, type OnlineFilter, type RankFloor, type TournamentListItem, type TournamentStateFilter } from "$lib/db";
   import { agendaViewer, filterAgenda, agendaToggleEntry } from "$lib/agenda";
   import { syncManager } from "$lib/sync";
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
@@ -49,9 +49,6 @@
   // in local state.
   const urlParams = currentParams();
 
-  // Agenda-vs-all is a display preference, not a filter: it outlives the tab
-  // via localStorage like the theme, while filters below only get the
-  // short-lived nav-menu memory ($lib/last-view).
   const VIEW_PREF_KEY = "archon:tournaments-view";
   const auth = $derived(getAuthState());
   const canUseAgenda = $derived(auth.isAuthenticated && auth.user?.vekn_id && auth.user?.country);
@@ -106,7 +103,16 @@
     if (floor === "Continental Championship") return m.tournaments_rank_floor_continental();
     return m.tournaments_all_ranks();
   }
-  let includeOnline = $state(urlParams.get("online") !== "false");
+  const ONLINE_PREF_KEY = "archon:tournaments-online";
+  const ONLINE_FILTERS: OnlineFilter[] = ["all", "exclude", "only"];
+  const urlOnline = urlParams.get("online");
+  const initialOnline = urlOnline === "false" ? "exclude" : urlOnline === "only" ? "only" : localStorage.getItem(ONLINE_PREF_KEY);
+  let onlineFilter = $state<OnlineFilter>(
+    ONLINE_FILTERS.includes(initialOnline as OnlineFilter) ? (initialOnline as OnlineFilter) : "all",
+  );
+  $effect(() => {
+    localStorage.setItem(ONLINE_PREF_KEY, onlineFilter);
+  });
 
   let calendarLoading = $state(false);
   let copied = $state(false);
@@ -160,7 +166,7 @@
       if (viewMode === "agenda" && viewer) {
         const result = await getAgendaTournaments(
           viewer,
-          { state: selectedState, includeOnline, format: selectedFormat, rank: selectedRank, search: debouncedSearch, dateFrom, dateTo },
+          { state: selectedState, online: onlineFilter, format: selectedFormat, rank: selectedRank, search: debouncedSearch, dateFrom, dateTo },
           page,
           PAGE_SIZE,
         );
@@ -171,7 +177,7 @@
         const result = await getFilteredTournaments(
           {
             state: selectedState,
-            includeOnline,
+            online: onlineFilter,
             countries: selectedCountries,
             dateFrom,
             dateTo,
@@ -226,7 +232,7 @@
     const _dt = dateTo;
     const _f = selectedFormat;
     const _r = selectedRank;
-    const _io = includeOnline;
+    const _io = onlineFilter;
     const _vm = viewMode;
     const _p = page;
     const _a = auth.isAuthenticated;
@@ -235,7 +241,7 @@
   });
 
   const filterKey = $derived(
-    [debouncedSearch, selectedState, selectedCountries.join(","), dateFrom, dateTo, selectedFormat, selectedRank, includeOnline, viewMode].join("|"),
+    [debouncedSearch, selectedState, selectedCountries.join(","), dateFrom, dateTo, selectedFormat, selectedRank, onlineFilter, viewMode].join("|"),
   );
 
   // The badge counts what the sheet holds: search sits outside it, and the
@@ -246,14 +252,12 @@
       + (dateFrom || dateTo ? 1 : 0)
       + (selectedFormat !== "all" ? 1 : 0)
       + (selectedRank !== "all" ? 1 : 0)
-      + (includeOnline ? 0 : 1),
+      + (onlineFilter !== "all" ? 1 : 0),
   );
 
-  // includeOnline counts: it hides data like any other filter, so an empty list
-  // under it must read as filtered, not as "no tournaments yet".
   const hasFilters = $derived(
     !!searchQuery.trim() || selectedState !== "all" || selectedCountries.length > 0 || !!dateFrom || !!dateTo
-      || selectedFormat !== "all" || selectedRank !== "all" || !includeOnline,
+      || selectedFormat !== "all" || selectedRank !== "all" || onlineFilter !== "all",
   );
 
   function clearFilters() {
@@ -264,7 +268,7 @@
     dateTo = "";
     selectedFormat = "all";
     selectedRank = "all";
-    includeOnline = true;
+    onlineFilter = "all";
   }
 
   // Reset page on filter change; comparing against the last key (not resetting
@@ -298,7 +302,7 @@
       to: dateTo || null,
       format: selectedFormat === "all" ? null : selectedFormat,
       rank: selectedRank === "all" ? null : selectedRank,
-      online: includeOnline ? null : "false",
+      online: onlineFilter === "exclude" ? "false" : onlineFilter === "only" ? "only" : null,
       view: canUseAgenda ? viewMode : null,
       page: pageParam(page),
     });
@@ -326,7 +330,8 @@
   const calendarUrl = $derived.by(() => {
     if (viewMode === "agenda" && auth.user?.calendar_token) {
       const params = new URLSearchParams({ token: auth.user.calendar_token });
-      if (!includeOnline) params.set("online", "false");
+      if (onlineFilter === "exclude") params.set("online", "false");
+      if (onlineFilter === "only") params.set("online", "only");
       if (selectedFormat !== "all") params.set("format", selectedFormat);
       if (selectedRank !== "all") params.set("rank", selectedRank);
       return `${CALENDAR_BASE}/api/calendar/tournaments.ics?${params}`;
@@ -341,9 +346,8 @@
     if (selectedRank !== "all") {
       params.set("rank", selectedRank);
     }
-    if (!includeOnline) {
-      params.set("online", "false");
-    }
+    if (onlineFilter === "exclude") params.set("online", "false");
+    if (onlineFilter === "only") params.set("online", "only");
     const qs = params.toString();
     return `${CALENDAR_BASE}/api/calendar/tournaments.ics${qs ? '?' + qs : ''}`;
   });
@@ -363,7 +367,8 @@
     }
     if (selectedFormat !== "all") parts.push(selectedFormat);
     if (selectedRank !== "all") parts.push(rankFloorLabel(selectedRank));
-    if (includeOnline) parts.push(m.tournaments_calendar_scope_online());
+    if (onlineFilter === "all") parts.push(m.tournaments_calendar_scope_online());
+    if (onlineFilter === "only") parts.push(m.tournaments_calendar_scope_online_only());
     return parts.join(" · ");
   });
 
@@ -768,13 +773,18 @@
           </select>
         </div>
 
-        <label class="inline-flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" bind:checked={includeOnline} class="sr-only peer" />
-          <div class="relative w-11 h-6 bg-surface-active rounded-full peer-checked:bg-accent-strong transition-colors">
-            <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform" class:translate-x-5={includeOnline}></div>
-          </div>
-          <span class="text-sm text-ink">{m.tournaments_include_online()}</span>
-        </label>
+        <div>
+          <label for="online-filter" class="block text-sm font-medium text-ink-muted mb-1">{m.tournaments_filter_online()}</label>
+          <select
+            id="online-filter"
+            bind:value={onlineFilter}
+            class="w-full px-3 py-2 border border-line-strong rounded-lg bg-surface-card text-ink-bright"
+          >
+            <option value="all">{m.tournaments_online_include()}</option>
+            <option value="exclude">{m.tournaments_online_exclude()}</option>
+            <option value="only">{m.tournaments_online_only()}</option>
+          </select>
+        </div>
       </div>
 
       <div class="flex items-center justify-between gap-2 border-t border-line px-4 py-3">
