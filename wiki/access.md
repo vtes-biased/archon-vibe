@@ -24,7 +24,7 @@ omitted from the rows below.
 |---|---|
 | `sponsor_member`, `create_tournament` | NC, Prince — global (a visiting official can sponsor abroad) |
 | `edit_member_profile`, `manage_vekn`, `mark_deceased` | NC — own country |
-| `list_non_member` | NC, Prince — own country (the user's country; a countryless one is IC's alone) |
+| `list_non_member` | NC, Prince — own country (the user's country; a countryless one, any NC or Prince) |
 | `export_members` | NC, Prince — global |
 | `merge_accounts`, `delete_member`, `anonymize_member`, `force_unlock_tournament`, `manage_promos`, `run_admin_sync`, `promote_link_global`, `set_archival_results` | nobody |
 | `moderate_link`, `promote_link_national` | NC — own country |
@@ -55,7 +55,10 @@ import's is whatever upstream claimed. Invalidation authority is IC's anyway (9.
 every member, and a non-member's profile link and the organizer's add-player search
 stay open, so an official sponsoring abroad still finds them. The members directory
 lists only users holding a VEKN ID; the officials' "No VEKN" toggle swaps that for
-the non-members the viewer holds this capability over.
+the non-members the viewer holds this capability over, and a name search lists them
+beside the members, marked No VEKN with a Sponsor link to their profile. A
+countryless one is in no official's country — signup collects none — so every NC
+and Prince holds it, or a Prince could not find a new player to sponsor.
 
 `export_members` is display-only too: the CSV is the filtered directory as the
 viewer's device holds it, so its contact columns carry exactly what the viewer's

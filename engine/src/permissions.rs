@@ -235,6 +235,8 @@ pub struct Rule {
     /// Denial used instead when the actor holds a `same_country` role but the
     /// countries differ — "you, but not here" rather than "not you".
     pub deny_scope: Option<&'static str>,
+    /// The `same_country` roles also cover a target with no country.
+    pub countryless_target: bool,
 }
 
 /// The "official" roles that create tournaments and members. Shared with
@@ -255,6 +257,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC, NC, or Prince can sponsor members",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::EditMemberProfile,
@@ -265,6 +268,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "You don't have permission to edit this user",
         deny_scope: Some("You can only edit users in your country"),
+        countryless_target: false,
     },
     Rule {
         capability: Capability::DeleteMember,
@@ -275,6 +279,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC can delete members",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::AnonymizeMember,
@@ -285,6 +290,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC can anonymize members",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::MarkDeceased,
@@ -295,6 +301,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC, or the member's national coordinator, can change deceased status",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::ManageVekn,
@@ -305,6 +312,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC, or the member's national coordinator, can manage VEKN IDs",
         deny_scope: Some("You can only manage VEKN IDs for users in your country"),
+        countryless_target: false,
     },
     Rule {
         capability: Capability::ListNonMember,
@@ -315,6 +323,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "You don't have permission to list users without a VEKN ID",
         deny_scope: None,
+        countryless_target: true,
     },
     Rule {
         capability: Capability::ExportMembers,
@@ -325,6 +334,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC, NC, or Prince can export the member list",
         deny_scope: None,
+        countryless_target: false,
     },
     // IC-only: the merge unions both accounts' roles, so anyone who could merge
     // could land a role by absorbing a shell that carries it.
@@ -337,6 +347,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC can merge accounts",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::CreateTournament,
@@ -347,6 +358,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC, NC, or Prince can manage tournaments",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::OrganizeTournament,
@@ -357,6 +369,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: true,
         deny: "You are not an organizer of this tournament",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::ForceUnlockTournament,
@@ -367,6 +380,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC can force-unlock a tournament",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::ManageLeagues,
@@ -377,6 +391,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC or NC can manage leagues",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::EditLeague,
@@ -387,6 +402,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: true,
         deny: "You don't have permission to edit this league",
         deny_scope: None,
+        countryless_target: false,
     },
     // Officials pin/clear their own links through the ordinary same-country
     // grant, not self-service — no self_service row needed.
@@ -399,6 +415,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "You don't have permission to moderate this link",
         deny_scope: Some("You can only moderate links in your country"),
+        countryless_target: false,
     },
     Rule {
         capability: Capability::PromoteLinkNational,
@@ -409,6 +426,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC, or the country's national coordinator, can promote a link nationally",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::PromoteLinkGlobal,
@@ -419,6 +437,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC can promote a link globally",
         deny_scope: None,
+        countryless_target: false,
     },
     // "Restricted" = suspension/probation; see `restricted_level`.
     Rule {
@@ -430,6 +449,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC or Ethics can issue suspensions or probations",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::IssueTournamentSanction,
@@ -440,6 +460,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: true,
         deny: "Only IC, Ethics, or a tournament organizer can issue this sanction",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::LiftRestrictedSanction,
@@ -450,6 +471,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC or Ethics can lift suspensions or probations",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::LiftTournamentSanction,
@@ -460,6 +482,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "You don't have permission to lift this sanction",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::ModifySanction,
@@ -470,6 +493,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC or Ethics can modify a sanction",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::DeleteAnySanction,
@@ -480,6 +504,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "You don't have permission to delete this sanction",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::DeleteOrganizerSanction,
@@ -490,6 +515,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: true,
         deny: "You don't have permission to delete this sanction",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::ViewSanctionReason,
@@ -500,6 +526,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: true,
         deny: "You don't have permission to see this sanction's reason",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::ManagePromos,
@@ -510,6 +537,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC can manage promos",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::RecordPromoIntake,
@@ -520,6 +548,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC or NC can record promo intakes",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::ViewFullPromoLedger,
@@ -530,6 +559,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC or NC can view the full promo ledger",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::ManageOauthClients,
@@ -540,6 +570,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC or DEV can manage OAuth clients",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::RunAdminSync,
@@ -550,6 +581,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC can trigger a sync",
         deny_scope: None,
+        countryless_target: false,
     },
     Rule {
         capability: Capability::ManageNda,
@@ -560,6 +592,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC or PTC can manage NDA records",
         deny_scope: None,
+        countryless_target: false,
     },
     // Not the organizer: a reconstruction has none, and an import's organizer is
     // whatever upstream claimed. Invalidation authority is IC's anyway (8.6).
@@ -572,6 +605,7 @@ pub const CAPABILITIES: &[Rule] = &[
         organizer: false,
         deny: "Only IC can correct an archival record",
         deny_scope: None,
+        countryless_target: false,
     },
 ];
 
@@ -700,7 +734,7 @@ pub fn check(capability: Capability, req: &Request) -> PermissionResult {
         return PermissionResult::allow();
     }
     if req.actor.has_any(rule.same_country) {
-        if req.in_own_country() {
+        if req.in_own_country() || (rule.countryless_target && req.target_country.is_none()) {
             return PermissionResult::allow();
         }
         // Held the role, wrong country — say so rather than "not you".
@@ -1036,6 +1070,18 @@ mod tests {
         assert!(!over_country(cap, &ctx(vec![NC], Some("FR")), Some("US")));
         // A countryless actor never matches, not even a countryless target.
         assert!(!over_country(cap, &ctx(vec![NC], None), None));
+    }
+
+    #[test]
+    fn test_countryless_non_member_listable_by_any_prince() {
+        let cap = Capability::ListNonMember;
+        assert!(over_country(cap, &ctx(vec![Prince], Some("BR")), None));
+        assert!(!over_country(
+            cap,
+            &ctx(vec![Prince], Some("BR")),
+            Some("FR")
+        ));
+        assert!(!over_country(cap, &ctx(vec![Judge], Some("BR")), None));
     }
 
     #[test]

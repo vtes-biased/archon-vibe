@@ -201,8 +201,8 @@
       const viewer = getAuthState().user;
       const listable = new Map<string | null, boolean>();
       users = users.filter((u) => {
-        if (!noVekn) return !!u.vekn_id;
-        if (u.vekn_id) return false;
+        if (u.vekn_id) return !noVekn;
+        if (!noVekn && !nameSearch) return false;
         const country = u.country ?? null;
         if (!listable.has(country)) listable.set(country, canListNonMember(viewer, country));
         return listable.get(country)!;
@@ -406,6 +406,13 @@
   </button>
 {/snippet}
 
+{#snippet noVeknSponsor(uid: string)}
+  <span class="flex flex-wrap items-center gap-2">
+    <Badge kind="status" tone="pending">{m.user_list_filter_no_vekn()}</Badge>
+    <Button variant="primary" size="sm" href="/users/{uid}">{m.vekn_sponsor()}</Button>
+  </span>
+{/snippet}
+
 <div class="p-4 sm:p-8">
   <div class="max-w-6xl mx-auto">
     <div class="mb-8">
@@ -605,6 +612,8 @@
                           VEKN: {user.vekn_id}
                           {@render copyVeknButton(user.vekn_id)}
                         </div>
+                      {:else}
+                        <div class="mt-1">{@render noVeknSponsor(user.uid)}</div>
                       {/if}
                       <div class="text-sm text-ink-muted">
                         {user.country
@@ -638,7 +647,7 @@
                       {user.vekn_id}
                       {@render copyVeknButton(user.vekn_id)}
                     {:else}
-                      —
+                      {@render noVeknSponsor(user.uid)}
                     {/if}
                   </div>
                   <div class="col-span-2 text-sm text-ink-muted">

@@ -52,7 +52,8 @@ Sheriff, Rulemonger, Ethics, PTC, Playtester, DEV), playtest NDA click-to-sign
 with sealed-PDF records gating the PT role and retrievable by the member from
 their own Account tab, IC-only account merge, cooptation tracking with the
 sponsor correctable by IC or the member's NC, privacy-filtered directory of VEKN
-members (non-members only to the officials of their country,
+members (non-members only to the officials of their country, or to any official
+when they have none,
 [access](access.md)) with a CSV export of the filtered list for officials, in-memoriam flag for deceased members,
 IC-only irreversible anonymization of a VEKN member, who then reads "Anonymized
 member" wherever a name appears.
