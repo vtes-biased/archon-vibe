@@ -6,7 +6,12 @@ from hikari.impl import MessageActionRowBuilder
 
 from .. import config
 from ..archon_api import ArchonAPI
-from ..channel_manager import create_tournament_channels, teardown_tournament
+from ..channel_manager import (
+    add_onboarding_defaults,
+    create_tournament_channels,
+    remove_onboarding_defaults,
+    teardown_tournament,
+)
 from ..command_mentions import command_mention
 from ..oauth_utils import (
     generate_pkce,
@@ -196,6 +201,21 @@ class SetupCommand(
         except Exception as e:
             logger.warning("Failed to post welcome messages: %s", e)
 
+        if not await add_onboarding_defaults(
+            ctx.client.app, ctx.guild_id, [ann_id, lobby_id]
+        ):
+            try:
+                await ctx.client.app.rest.create_message(
+                    judges_id,
+                    "ℹ️ Members who only see the channels they opted into won't "
+                    f"see this tournament. Add <#{ann_id}> and <#{lobby_id}> to "
+                    "Server Settings → Onboarding → Default Channels, or grant me "
+                    "the **Manage Server** permission before the next "
+                    f"{command_mention('setup')}.",
+                )
+            except Exception as e:
+                logger.warning("Failed to post onboarding guidance: %s", e)
+
         await ctx.respond(
             f"Tournament linked! Channels created.\n"
             f"Announcement: <#{channels['announcement_channel_id']}>\n"
@@ -272,6 +292,16 @@ class TeardownCommand(
 
             await stop_sse(guild_id, tournament_uid)
             await store.unlink_tournament(guild_id, tournament_uid)
+
+            await remove_onboarding_defaults(
+                ctx.client.app,
+                ctx.guild_id,
+                [
+                    int(link[k])
+                    for k in ("announcement_channel_id", "lobby_channel_id")
+                    if link.get(k)
+                ],
+            )
 
             try:
                 failed = await teardown_tournament(

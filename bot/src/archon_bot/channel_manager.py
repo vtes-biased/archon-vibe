@@ -18,6 +18,16 @@ JUDGE_DENY = hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.CONNECT
 JUDGE_ALLOW = hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.CONNECT
 JUDGES_BOT_ALLOW = JUDGE_ALLOW | hikari.Permissions.SEND_MESSAGES
 
+
+def _everyone_sees(guild_id: int, deny=hikari.Permissions.NONE):
+    return hikari.PermissionOverwrite(
+        id=guild_id,
+        type=hikari.PermissionOverwriteType.ROLE,
+        allow=hikari.Permissions.VIEW_CHANNEL,
+        deny=deny,
+    )
+
+
 # The legacy unprefixed "Table {m}" form is still matched so tournaments
 # mid-flight when the round prefix shipped are discovered/cleaned correctly.
 _TABLE_NAME_RE = re.compile(r"^(?:R\d+ - )?Table (\d+)$")
@@ -91,6 +101,7 @@ async def create_tournament_channels(
     category = await bot.rest.create_guild_category(
         guild_id,
         name=f"Tournament: {tournament_name[:50]}",
+        permission_overwrites=[_everyone_sees(guild_id)],
     )
     logger.info("✓ created tournament category id=%s", category.id)
 
@@ -99,11 +110,7 @@ async def create_tournament_channels(
         name="announcement",
         category=category.id,
         permission_overwrites=[
-            hikari.PermissionOverwrite(
-                id=guild_id,  # @everyone
-                type=hikari.PermissionOverwriteType.ROLE,
-                deny=hikari.Permissions.SEND_MESSAGES,
-            ),
+            _everyone_sees(guild_id, deny=hikari.Permissions.SEND_MESSAGES),
             hikari.PermissionOverwrite(
                 id=me.id,
                 type=hikari.PermissionOverwriteType.MEMBER,
@@ -116,6 +123,7 @@ async def create_tournament_channels(
         guild_id,
         name="lobby",
         category=category.id,
+        permission_overwrites=[_everyone_sees(guild_id)],
     )
 
     judges = await bot.rest.create_guild_voice_channel(
@@ -147,6 +155,45 @@ async def create_tournament_channels(
         "lobby_channel_id": str(lobby.id),
         "judges_channel_id": str(judges.id),
     }
+
+
+async def add_onboarding_defaults(
+    bot: hikari.GatewayBot, guild_id: int, channel_ids: list[int]
+) -> bool:
+    """False when onboarding is on and its default channels could not be
+    edited, so the caller tells the organizers to add them by hand."""
+    try:
+        onboarding = await bot.rest.fetch_guild_onboarding(guild_id)
+    except Exception as e:
+        logger.warning("Failed to read onboarding in guild=%s: %s", guild_id, e)
+        return True
+    if not onboarding.enabled:
+        return True
+    current = [int(c) for c in onboarding.default_channel_ids]
+    try:
+        await bot.rest.edit_guild_onboarding(
+            guild_id,
+            default_channel_ids=current + [c for c in channel_ids if c not in current],
+        )
+    except Exception as e:
+        logger.warning("Failed to edit onboarding in guild=%s: %s", guild_id, e)
+        return False
+    return True
+
+
+async def remove_onboarding_defaults(
+    bot: hikari.GatewayBot, guild_id: int, channel_ids: list[int]
+) -> None:
+    try:
+        onboarding = await bot.rest.fetch_guild_onboarding(guild_id)
+        current = [int(c) for c in onboarding.default_channel_ids]
+        if any(c in current for c in channel_ids):
+            await bot.rest.edit_guild_onboarding(
+                guild_id,
+                default_channel_ids=[c for c in current if c not in channel_ids],
+            )
+    except Exception as e:
+        logger.warning("Failed to restore onboarding in guild=%s: %s", guild_id, e)
 
 
 def member_override_ids(channel: object) -> set[int]:
@@ -277,13 +324,7 @@ async def create_round_voice_channel(
     discord_id_map: dict[str, int],
 ) -> int:
     logger.info("→ create_guild_voice_channel '%s' guild=%s", name, guild_id)
-    overwrites = [
-        hikari.PermissionOverwrite(
-            id=guild_id,
-            type=hikari.PermissionOverwriteType.ROLE,
-            deny=hikari.Permissions.CONNECT,
-        ),
-    ]
+    overwrites = [_everyone_sees(guild_id, deny=hikari.Permissions.CONNECT)]
     me = bot.get_me()
     if me is not None:
         overwrites.append(

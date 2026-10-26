@@ -29,12 +29,14 @@ CALLS: dict[str, tuple[int, tuple[str, ...]]] = {
     "fetch_guild_channels": (1, ()),
     "fetch_channel": (1, ()),
     "delete_channel": (1, ()),
-    "create_guild_category": (1, ("name",)),
+    "create_guild_category": (1, ("name", "permission_overwrites")),
     "create_guild_text_channel": (1, ("name", "category", "permission_overwrites")),
     "create_guild_voice_channel": (1, ("name", "category", "permission_overwrites")),
     "edit_permission_overwrite": (2, ("target_type", "allow", "deny")),
     "delete_permission_overwrite": (2, ()),
     "create_message": (2, ()),
+    "fetch_guild_onboarding": (1, ()),
+    "edit_guild_onboarding": (1, ("default_channel_ids",)),
 }
 
 FAKES = [reconcile.FakeRest, teardown.FakeRest]

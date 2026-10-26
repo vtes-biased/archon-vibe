@@ -57,8 +57,10 @@ Registration at startup needs `DISCORD_BOT_TOKEN`, which must belong to the
    surfaces them on the install consent screen, so an app without them asks a
    server owner to grant permissions with nothing to read first.
 4. Installation → Default Install Settings: Guild Install, scopes `bot` and
-   `applications.commands`, permissions `8861518864` (Manage Channels, Manage
-   Roles, Manage Events, View Channels, Send Messages, Connect, Speak).
+   `applications.commands`, permissions `8861518896` (Manage Server, Manage
+   Channels, Manage Roles, Manage Events, View Channels, Send Messages, Connect,
+   Speak). Manage Server is only for the onboarding default channels below; an
+   install authorised before it keeps the old grant until re-authorised.
 
 The organizer guide hands out the parameterless install link
 `https://discord.com/oauth2/authorize?client_id={client_id}`, which carries no
@@ -209,11 +211,24 @@ synced flag, so a restart never re-posts past announcements. A `resync` message
 triggers a fresh reconnect. A shared aiohttp session spans reconnects, and
 module-level state is cleaned up on stop and teardown.
 
-**Channel permissions** — #announcement denies SEND_MESSAGES to `@everyone` with
-the bot allowed; table voice denies CONNECT to `@everyone` and allows
-CONNECT+SPEAK to each seated player plus organizers, who may join any table to
-judge; #judges denies VIEW_CHANNEL and CONNECT to `@everyone` and allows the bot
-and organizers. All synced idempotently.
+**Channel permissions** — the section must show on servers that withhold View
+Channels from `@everyone` or let members opt into channels through Channels &
+Roles. The category allows VIEW_CHANNEL to `@everyone`, and since Discord never
+inherits a category's overwrites at check time, #announcement, #lobby and every
+table channel carry that same allow with only our rules on top: #announcement
+denies SEND_MESSAGES to `@everyone` with the bot allowed; table voice denies
+CONNECT to `@everyone` and allows CONNECT+SPEAK to each seated player plus
+organizers, who may join any table to judge. #judges denies VIEW_CHANNEL and
+CONNECT to `@everyone` and allows the bot and organizers. All synced
+idempotently. Channels linked before the VIEW_CHANNEL allow are not retrofitted:
+`/teardown` then `/setup` rebuilds them.
+
+**Onboarding** — when the server's onboarding is on, `/setup` appends
+#announcement and #lobby to its default channels and `/teardown` removes exactly
+those two ids, sending only `default_channel_ids` so prompts, mode and the
+enabled flag stay untouched. Without Manage Server, or on any refusal, `/setup`
+posts a hint to #judges to add them by hand. Table voice channels are never
+added: per-round churn in the server's onboarding is not worth it.
 
 **Scheduled events** — one Discord EXTERNAL Guild Scheduled Event per linked online
 tournament, driven off the SSE snapshot with no setup-time create path: created on
