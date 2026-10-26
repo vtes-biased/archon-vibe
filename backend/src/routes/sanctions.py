@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 from datetime import UTC, date, datetime, timedelta
+from typing import Annotated
 from uuid import uuid7
 
 import msgspec
@@ -251,7 +252,7 @@ class CreateSanctionRequest(msgspec.Struct, kw_only=True):
     category: str
     subcategory: str | None = None
     round_number: int | None = None
-    description: str
+    description: Annotated[str, msgspec.Meta(max_length=2000)]
     expires_at: str | None = None  # YYYY-MM-DD date string
     tournament_uid: str | None = None
 
@@ -261,7 +262,7 @@ class UpdateSanctionRequest(msgspec.Struct):
     category: str | None = None
     subcategory: str | None = None
     round_number: int | None = None
-    description: str | None = None
+    description: Annotated[str, msgspec.Meta(max_length=2000)] | None = None
     expires_at: str | None = None  # YYYY-MM-DD date string
     lifted: bool | None = None
 

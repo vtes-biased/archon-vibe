@@ -346,6 +346,7 @@
         <textarea
           id="ts-description"
           bind:value={description}
+          maxlength="2000"
           rows="3"
           placeholder={m.sanction_mgr_description_placeholder()}
           required

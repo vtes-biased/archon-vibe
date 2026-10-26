@@ -90,7 +90,7 @@
               {/if}
             </div>
             {#if canSeeReason}
-              <p class="mt-1 text-sm text-ink">{sanction.description}</p>
+              <p class="mt-1 text-sm text-ink whitespace-pre-line wrap-anywhere">{sanction.description}</p>
             {/if}
             <p class="mt-1 text-xs text-ink-faint">{m.sanction_issued({ date: new Date(sanction.issued_at).toLocaleDateString() })}</p>
           </div>

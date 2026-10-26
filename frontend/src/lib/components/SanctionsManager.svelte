@@ -236,14 +236,12 @@
           <div class="space-y-2 {canIssueSanctions ? 'mb-4' : ''}">
             {#each shownSanctions as sanction (sanction.uid)}
               {@const canSeeReason = showReason(sanction)}
-              <div class="flex items-center justify-between gap-2 p-3 bg-surface-muted rounded border border-line-strong">
+              <div class="flex items-start justify-between gap-2 p-3 bg-surface-muted rounded border border-line-strong">
                 <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2">
-                    <SanctionBadge {sanction} showReason={canSeeReason} />
-                    {#if canSeeReason}
-                      <span class="text-sm text-ink truncate">{sanction.description}</span>
-                    {/if}
-                  </div>
+                  <SanctionBadge {sanction} showReason={canSeeReason} />
+                  {#if canSeeReason}
+                    <p class="text-sm text-ink mt-1 whitespace-pre-line wrap-anywhere">{sanction.description}</p>
+                  {/if}
                   <div class="text-xs text-ink-faint mt-1">
                     {formatDate(sanction.issued_at)}
                     {#if sanction.expires_at}
@@ -353,6 +351,7 @@
           <textarea
             id="sanction-description"
             bind:value={sanctionDescription}
+            maxlength="2000"
             rows="3"
             placeholder={m.sanction_mgr_description_placeholder()}
             required
@@ -483,6 +482,7 @@
           <textarea
             id="edit-sanction-description"
             bind:value={editSanctionDescription}
+            maxlength="2000"
             onchange={handleDescriptionChange}
             disabled={!!editingSanction.lifted_at}
             rows="3"
