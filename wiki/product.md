@@ -103,7 +103,8 @@ button goes at once whatever the time zone.
 
 **Ratings and Hall of Fame** — server-side rating from the best 8 tournaments in
 a trailing 18 months, rating points in finished standings, a rankings page per
-rating category with a country filter, and a Hall of Fame for five wins that
+rating category with a country filter, narrowed to a city once a country is
+picked, and a Hall of Fame for five wins that
 would have made the TWDA with the winning deck on record
 ([the rule](tournaments.md#configuration)), stated on the page. A member profile
 lists every finished event the member played — newest first, whatever its age or

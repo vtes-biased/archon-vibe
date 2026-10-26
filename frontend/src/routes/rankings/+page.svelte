@@ -22,11 +22,12 @@
   let isSyncing = $state(!syncManager.isSynced);
 
   // Filters. Tab is deep-linkable (?tab=halloffame — the guide and the profile
-  // HoF chip land there); country and page ride along so Back restores the view.
+  // HoF chip land there); country, city and page ride along so Back restores the view.
   const urlParams = currentParams();
   const urlTab = urlParams.get("tab") as Tab | null;
   let activeTab = $state<Tab>(urlTab && TAB_VALUES.includes(urlTab) ? urlTab : "constructed_offline");
   let selectedCountry = $state<string>(urlParams.get("country") ?? "all");
+  let selectedCity = $state<string>(urlParams.get("city") ?? "all");
   let page = $state(readPageParam());
 
   // Ratings and wins are member-level, so every tab is necessarily empty when
@@ -47,13 +48,30 @@
   const countries = getCountries();
   const countryList = getSortedCountries();
 
+  let cityList = $derived.by(() => {
+    if (selectedCountry === "all") return [];
+    const cities = new Map<number, string>();
+    for (const u of users) {
+      if (u.country !== selectedCountry || !u.city_geoname_id || !u.city) continue;
+      if (suspendedUids.has(u.uid)) continue;
+      if (u.win_count < HOF_MIN_WINS && !Object.values(u.ratings).some(r => r > 0)) continue;
+      cities.set(u.city_geoname_id, u.city);
+    }
+    return [...cities].map(([id, name]) => ({ id: String(id), name })).sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  function inPlace(u: UserListItem): boolean {
+    if (selectedCountry !== "all" && u.country !== selectedCountry) return false;
+    if (selectedCity !== "all" && String(u.city_geoname_id) !== selectedCity) return false;
+    return true;
+  }
+
   let filtered = $derived.by(() => {
     if (isHof) {
       let result = users.filter(u => {
         if (u.win_count < HOF_MIN_WINS) return false;
         if (suspendedUids.has(u.uid)) return false;
-        if (selectedCountry !== "all" && u.country !== selectedCountry) return false;
-        return true;
+        return inPlace(u);
       });
       result.sort((a, b) => b.win_count - a.win_count);
       return result;
@@ -62,11 +80,8 @@
     const cat = activeTab as RatingCategory;
     let result = users.filter(u => {
       if (suspendedUids.has(u.uid)) return false;
-      return u.ratings[cat] > 0;
+      return u.ratings[cat] > 0 && inPlace(u);
     });
-    if (selectedCountry !== "all") {
-      result = result.filter(u => u.country === selectedCountry);
-    }
     result.sort((a, b) => b.ratings[cat] - a.ratings[cat]);
     return result;
   });
@@ -85,7 +100,7 @@
 
   // Reset page on tab/filter change — but not on the mount pass, which would
   // discard a page number restored from the URL.
-  const filterKey = $derived(`${activeTab}|${selectedCountry}`);
+  const filterKey = $derived(`${activeTab}|${selectedCountry}|${selectedCity}`);
   let lastFilterKey = untrack(() => filterKey);
   $effect(() => {
     const key = filterKey;
@@ -108,6 +123,7 @@
     syncQueryParams({
       tab: activeTab === "constructed_offline" ? null : activeTab,
       country: selectedCountry === "all" ? null : selectedCountry,
+      city: selectedCity === "all" ? null : selectedCity,
       page: pageParam(page),
     });
   });
@@ -148,11 +164,12 @@
 
     <p class="text-ink-muted text-sm mb-6">{tabs.find(t => t.value === activeTab)?.captionFn()}</p>
 
-    <div class="mb-4">
+    <div class="mb-4 flex flex-col sm:flex-row gap-2">
       <label for="ranking-country" class="sr-only">{m.common_country()}</label>
       <select
         id="ranking-country"
         bind:value={selectedCountry}
+        onchange={() => { selectedCity = "all"; }}
         class="bg-surface-card border border-line rounded-lg px-3 py-2 text-sm text-ink-bright w-full sm:w-64"
       >
         <option value="all">{m.rankings_all_countries()}</option>
@@ -160,6 +177,19 @@
           <option value={c.iso_code}>{c.name} {getCountryFlag(c.iso_code)}</option>
         {/each}
       </select>
+      {#if cityList.length > 0}
+        <label for="ranking-city" class="sr-only">{m.common_city()}</label>
+        <select
+          id="ranking-city"
+          bind:value={selectedCity}
+          class="bg-surface-card border border-line rounded-lg px-3 py-2 text-sm text-ink-bright w-full sm:w-64"
+        >
+          <option value="all">{m.rankings_all_cities()}</option>
+          {#each cityList as c}
+            <option value={c.id}>{c.name}</option>
+          {/each}
+        </select>
+      {/if}
     </div>
 
     {#if !auth.isLoading && !auth.isAuthenticated}
@@ -179,7 +209,7 @@
              so an empty table needs a visible way out of it. -->
         {#if selectedCountry !== "all"}
           <div>
-            <Button variant="secondary" size="md" class="mt-4" onclick={() => selectedCountry = "all"}>
+            <Button variant="secondary" size="md" class="mt-4" onclick={() => { selectedCountry = "all"; selectedCity = "all"; }}>
               {m.filters_clear()}
             </Button>
           </div>

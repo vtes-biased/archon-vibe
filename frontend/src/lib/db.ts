@@ -306,6 +306,7 @@ export interface UserListItem {
   nickname?: string | null;
   country: string | null;
   city?: string | null;
+  city_geoname_id?: number | null;
   vekn_id?: string | null;
   roles: Role[];
   deceased_at?: string | null;
@@ -345,6 +346,7 @@ function buildEntry(user: User): UserIndexEntry {
       nickname: user.nickname,
       country: user.country,
       city: user.city,
+      city_geoname_id: user.city_geoname_id,
       // A missing `vekn_id` key is a level the field is hidden at; an empty one is an unsponsored
       // member. The player-add path decides between sponsoring and adding on exactly that.
       ...('vekn_id' in user ? { vekn_id: user.vekn_id } : {}),
