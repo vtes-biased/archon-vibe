@@ -99,3 +99,23 @@ WHERE type = 'league'
 ```
 
 **Owes afterwards**: closing gh-56 through `/post-deploy`.
+
+## Verify the Discord tournament section on a server that hides channels by default
+
+**Gated on** `709c0f1c` (View Channels allowed to `@everyone` on the tournament
+channels, onboarding default channels managed by `/setup` and `/teardown`). The
+install link points at the production bot, so nothing earlier runs this code.
+
+**Run** on a test server whose `@everyone` lacks View Channels and whose
+onboarding is on with at least one prompt: re-authorise the bot for Manage
+Server (install integer `8861518896`, [discord](discord.md)), `/setup`, start a
+round, `/teardown`.
+
+**Proves it worked**: a member who opted into nothing sees #announcement,
+#lobby and their table channel, cannot post in #announcement and cannot see
+#judges; the onboarding prompts are unchanged, and after `/teardown` the default
+channels are back as they were. Any failed check goes through `/intake` as a fix.
+
+**Owes afterwards**: stating in [discord](discord.md) (Onboarding) whether
+default channels reach existing members and whether a table channel needs
+onboarding to show. Delete this section.
