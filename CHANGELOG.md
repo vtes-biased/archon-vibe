@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.3.6 — 2026-10-28
 
 - The tournament list now has Upcoming and Past tabs.
 - The tournament list and the Agenda can show online tournaments only, and remember your choice.
