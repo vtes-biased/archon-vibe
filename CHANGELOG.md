@@ -10,6 +10,23 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- The tournament list now has Upcoming and Past tabs.
+- The tournament list and the Agenda can show online tournaments only, and remember your choice.
+- The rankings can be filtered by city once a country is picked.
+- A member's profile now lists the tournaments they organised.
+- Officials can now find players without a VEKN ID from the Members search.
+- A sanction's full description now shows on the member page.
+- Organisers can now replace or delete a winner's private deck after the finish.
+- Decks are now published only for players who actually played in the tournament.
+- A tournament can no longer be sent back to Registration once a round has been played.
+- The Discord tournament channels now show on servers that hide channels by default.
+- Fixed league dates shifting by a day and Finish League doing nothing in some timezones.
+- Fixed promo reports and raffle prizes failing to save.
+- Fixed a tournament page briefly showing ids instead of player names.
+- Imported vekn.net tournaments without rounds now show their finals score.
+
 ## v1.3.5 — 2026-10-10
 
 - Judge and Sheriff titles now follow the VTES Exams judge directory instead of being granted by hand.
