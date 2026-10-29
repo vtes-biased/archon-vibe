@@ -24,3 +24,5 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
+
+- Let a league name one of its tournaments as its final and crown that final's winner Champion instead of the standings leader — **Done when** a league organiser can pick the final from the league's tournaments in the league edit form, a finished league with a final crowns its winner (the standings leader when none is named), and the Leagues paragraph in `wiki/product.md` and a "league final" row in `wiki/glossary.md` state it.
