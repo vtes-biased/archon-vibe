@@ -32,6 +32,9 @@ and nothing else, so without it there is no second way in. It is idempotent by
 no-op: the account already being there ends the run, so roles edited in the UI
 survive a re-run, and it refuses rather than adopt a VEKN ID it did not create.
 
+The dev dump also strips members' phones and Discord links, so any count of
+contact channels has to come from production.
+
 **A dev login is never an app feature.** No sign-in-as button, no seeded-credentials
 banner, no backend endpoint — anything the app can reach in dev, it can reach in
 production, so the affordance is a script the repository ships and production never
