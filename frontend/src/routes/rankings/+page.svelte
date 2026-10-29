@@ -66,24 +66,27 @@
     return true;
   }
 
-  let filtered = $derived.by(() => {
-    if (isHof) {
-      let result = users.filter(u => {
-        if (u.win_count < HOF_MIN_WINS) return false;
-        if (suspendedUids.has(u.uid)) return false;
-        return inPlace(u);
-      });
-      result.sort((a, b) => b.win_count - a.win_count);
-      return result;
-    }
+  function score(u: UserListItem): number {
+    return isHof ? u.win_count : u.ratings[activeTab as RatingCategory];
+  }
 
-    const cat = activeTab as RatingCategory;
-    let result = users.filter(u => {
+  let filtered = $derived.by(() => {
+    const result = users.filter(u => {
       if (suspendedUids.has(u.uid)) return false;
-      return u.ratings[cat] > 0 && inPlace(u);
+      if (isHof ? u.win_count < HOF_MIN_WINS : score(u) <= 0) return false;
+      return inPlace(u);
     });
-    result.sort((a, b) => b.ratings[cat] - a.ratings[cat]);
+    result.sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
     return result;
+  });
+
+  let ranks = $derived.by(() => {
+    const r: number[] = [];
+    filtered.forEach((u, i) => {
+      const prev = filtered[i - 1];
+      r.push(prev && score(prev) === score(u) ? r[i - 1]! : i + 1);
+    });
+    return r;
   });
 
   let totalPages = $derived(Math.ceil(filtered.length / pageSize));
@@ -230,8 +233,8 @@
           </thead>
           <tbody>
             {#each paged as user, i}
-              {@const rank = page * pageSize + i + 1}
-              {@const value = isHof ? user.win_count : user.ratings[activeTab as RatingCategory]}
+              {@const rank = ranks[page * pageSize + i]}
+              {@const value = score(user)}
               <!-- Whole row navigates; the name <a> keeps keyboard focus + cmd-click new-tab,
                    so the row onclick is a mouse-only enhancement (skips clicks on the link). -->
               <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->

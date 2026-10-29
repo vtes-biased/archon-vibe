@@ -261,8 +261,8 @@ export async function getUserListItem(uid: string): Promise<UserListItem | undef
   return index.get(uid)?.user;
 }
 
-/** Name-ordered: the community directory renders its link lists straight off this order, and the
- * rankings' stable sort falls back to it on equal ratings. The index itself is in uid order. */
+/** Name-ordered: the community directory renders its link lists straight off this order. The index
+ * itself is in uid order. */
 export async function getUserListItems(): Promise<UserListItem[]> {
   const index = await getUserIndex();
   const items: UserListItem[] = [];
