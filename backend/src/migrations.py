@@ -14,7 +14,6 @@ import os
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
 
 from . import db
 from .models import ObjectType
@@ -30,28 +29,7 @@ class Migration:
     rewrite: Callable[..., None]
 
 
-def _league_calendar_dates(full: dict) -> None:
-    for field in ("start", "finish"):
-        value = full.get(field)
-        if value and len(value) > 10:
-            stamp = datetime.fromisoformat(value)
-            if stamp.tzinfo:
-                stamp = stamp.astimezone(UTC)
-            full[field] = stamp.date().isoformat()
-
-
-MIGRATIONS: tuple[Migration, ...] = (
-    Migration(
-        name="league-calendar-dates",
-        obj_type=ObjectType.LEAGUE,
-        pending="""
-            SELECT uid FROM objects
-            WHERE type = 'league'
-              AND (length("full"->>'start') > 10 OR length("full"->>'finish') > 10)
-        """,
-        rewrite=_league_calendar_dates,
-    ),
-)
+MIGRATIONS: tuple[Migration, ...] = ()
 
 _LOCK_ROW = 'SELECT "full", deleted_at FROM objects WHERE uid = %s FOR UPDATE'
 _LOCK_AUTH_METHOD = "SELECT data FROM auth_methods WHERE uid = %s FOR UPDATE"

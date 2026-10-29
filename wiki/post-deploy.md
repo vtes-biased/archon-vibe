@@ -54,51 +54,14 @@ Archon title. Delete this section.
 since the feature shipped on 17 July was refused, and so was every raffle prize
 (`prize_promo_uid`).
 
-**Run** the reply on gh-55: promo reports save again, and organisers of events
-finished since 17 July should open the event and re-enter what they handed out.
+**Run** nothing: the reply on gh-55 is posted and the issue closed.
 
 **Proves it worked**: within a few days, on production,
 `SELECT count(*) FROM objects WHERE type = 'tournament' AND
 jsonb_array_length(coalesce("full"->'promos_distributed', '[]'::jsonb)) > 0;`
 answers above 0.
 
-**Owes afterwards**: closing gh-55 through `/post-deploy`. Delete this section.
-
-## Retract the decks published for players who never sat
-
-**Gated on** the commit requiring a seat for `All`-mode publication
-(`compute_deck_public`). Before it is live the old pass re-publishes a retracted
-deck on the next action its event takes.
-
-**Run** `backend/scripts/retract_noshow_decks.py` on the box, dry run first, then
-`--apply`.
-
-**Proves it worked**: a second dry run reports 0 decks, and the no-show's deck on
-the event behind VEKN 13609 is gone from its public deck list.
-
-**Owes afterwards**: closing gh-52 through `/post-deploy`. Delete the script and
-this section in one commit.
-
-## Prove league dates carry no time
-
-**Migration** `league-calendar-dates`
-
-Gated by the commit that made league `start` and `finish` calendar dates
-([product](product.md#capabilities)). The entry rewrites every league date still
-carrying a time — the legacy UTC instants and the naive midnights the routes used
-to store — to its UTC calendar date. The old rows do not decode as a `date`, and a
-league list raises whole on one of them.
-
-Nothing to run: the entry rewrote the rows before the process served. It worked
-when this answers 0:
-
-```sql
-SELECT count(*) FROM objects
-WHERE type = 'league'
-  AND (length("full"->>'start') > 10 OR length("full"->>'finish') > 10);
-```
-
-**Owes afterwards**: closing gh-56 through `/post-deploy`.
+**Owes afterwards**: nothing. Delete this section once the count is above 0.
 
 ## Verify the Discord tournament section on a server that hides channels by default
 
