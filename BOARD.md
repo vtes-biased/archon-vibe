@@ -25,4 +25,4 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 
 Board changes ride the commit that earns them.
 
-- Let a league name one of its tournaments as its final and crown that final's winner Champion instead of the standings leader — **Done when** a league organiser can pick the final from the league's tournaments in the league edit form, a finished league with a final crowns its winner (the standings leader when none is named), and the Leagues paragraph in `wiki/product.md` and a "league final" row in `wiki/glossary.md` state it.
+- Let a league play its own final and crown its winner Champion instead of the standings leader ([context](board/league-final.md)) — **Done when** a league organiser can seat a final from the league's top five and enter its result on the league page, scored like a tournament final with seeds from league rank, a finished league crowns that final's winner (the standings leader when no final was played), and the Leagues paragraph in `wiki/product.md`, a "league final" row in `wiki/glossary.md` and the finals scoring section of `wiki/tournaments.md` state it.
