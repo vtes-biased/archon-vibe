@@ -199,6 +199,29 @@ async def test_self_edited_contact_fields_flagged_local(
 
 
 @pytest.mark.asyncio
+async def test_prince_cannot_clear_their_last_contact_channel(
+    test_client: AsyncClient, test_db
+):
+    prince = await _insert_user(
+        roles=[Role.PRINCE],
+        vekn_id="1000006",
+        contact_email="prince@example.com",
+        contact_phone="+33123456789",
+    )
+    headers = make_auth_header(prince.uid)
+    response = await test_client.patch(
+        "/auth/me", json={"contact_phone": ""}, headers=headers
+    )
+    assert response.status_code == 200
+    assert response.json()["user"]["contact_phone"] is None
+    response = await test_client.patch(
+        "/auth/me", json={"contact_email": ""}, headers=headers
+    )
+    assert response.status_code == 422
+    assert (await db.get_user_by_uid(prince.uid)).contact_email == "prince@example.com"
+
+
+@pytest.mark.asyncio
 async def test_community_links_duplicate_url_rejected(
     test_client: AsyncClient, test_db
 ):

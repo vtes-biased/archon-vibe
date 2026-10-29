@@ -8,7 +8,7 @@
     requestMagicLink,
     changePassword,
   } from "$lib/stores/auth.svelte";
-  import { canManageOauthClients, canRunAdminSync } from "$lib/engine";
+  import { breaksContactFloor, canManageOauthClients, canRunAdminSync } from "$lib/engine";
   import { HOF_MIN_WINS } from "$lib/tournament-utils";
   import { registerPasskey } from "$lib/stores/passkeys.svelte";
   import { syncManager } from "$lib/sync";
@@ -151,6 +151,12 @@
   }
 
   async function handleRemoveMethod(uid: string) {
+    const method = auth.authMethods.find((am) => am.uid === uid);
+    if (method?.type === "discord" && discordLogins.length === 1 && auth.user
+      && breaksContactFloor(auth.user, { ...auth.user, discord_id: null })) {
+      discordError = m.profile_contact_floor_refused();
+      return;
+    }
     await apiRequest(`/auth/me/methods/${uid}`, { method: "DELETE" }, { suppressErrorToast: true });
     await initAuth();
   }

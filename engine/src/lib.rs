@@ -17,10 +17,11 @@ pub mod tournament;
 pub use error::EngineError;
 
 pub use permissions::{
-    can_change_country, can_change_role, can_delete_sanction, can_edit_league, can_issue_sanction,
-    can_lift_sanction, can_link_tournament_to_league, can_take_tournament_offline, check,
-    is_official, is_organizer, unconditional_capabilities, Capability, OwnedResource,
-    PermissionResult, Request, Role, SanctionContext, UserContext,
+    breaks_contact_floor, can_change_country, can_change_role, can_delete_sanction,
+    can_edit_league, can_issue_sanction, can_lift_sanction, can_link_tournament_to_league,
+    can_take_tournament_offline, check, contact_floor, is_official, is_organizer,
+    unconditional_capabilities, Capability, OwnedResource, PermissionResult, Request, Role,
+    SanctionContext, UserContext,
 };
 
 // Shared JSON→core→JSON functions used by both WASM and PyO3 shims; appear
@@ -100,6 +101,17 @@ mod shared {
         Ok(is_official(&UserContext::from_json(&json::parse(
             actor_json,
         )?)?))
+    }
+
+    pub fn contact_floor_json(user_json: &str) -> Result<String, EngineError> {
+        Ok(contact_floor(&json::parse(user_json)?)?.dump())
+    }
+
+    pub fn breaks_contact_floor_json(
+        before_json: &str,
+        after_json: &str,
+    ) -> Result<bool, EngineError> {
+        breaks_contact_floor(&json::parse(before_json)?, &json::parse(after_json)?)
     }
 
     pub fn can_change_country_json(
@@ -444,6 +456,20 @@ mod wasm {
         #[wasm_bindgen(js_name = isOfficial)]
         pub fn is_official(&self, actor_json: &str) -> Result<bool, String> {
             is_official_json(actor_json).map_err(|e| e.to_json())
+        }
+
+        #[wasm_bindgen(js_name = contactFloor)]
+        pub fn contact_floor(&self, user_json: &str) -> Result<String, String> {
+            js_str(contact_floor_json(user_json))
+        }
+
+        #[wasm_bindgen(js_name = breaksContactFloor)]
+        pub fn breaks_contact_floor(
+            &self,
+            before_json: &str,
+            after_json: &str,
+        ) -> Result<bool, String> {
+            breaks_contact_floor_json(before_json, after_json).map_err(|e| e.to_json())
         }
 
         #[wasm_bindgen(js_name = agendaFilter)]
@@ -801,6 +827,15 @@ mod python {
 
         fn is_official(&self, actor_json: &str) -> PyResult<bool> {
             is_official_json(actor_json)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_json()))
+        }
+
+        fn contact_floor(&self, user_json: &str) -> PyResult<String> {
+            py_str(contact_floor_json(user_json))
+        }
+
+        fn breaks_contact_floor(&self, before_json: &str, after_json: &str) -> PyResult<bool> {
+            breaks_contact_floor_json(before_json, after_json)
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_json()))
         }
 

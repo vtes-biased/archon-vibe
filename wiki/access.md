@@ -210,6 +210,14 @@ holder and full-access readers, and no `api` projection carries it at all. It is
 not what `profile:email` hands a client either: that is a *verified* address,
 because the client keys accounts on it.
 
+**An NC or Prince keeps at least one channel** — the address of record, a phone,
+or a linked Discord login (`discord_id`). `PATCH /auth/me` refuses a clear and
+`DELETE /auth/me/methods/{uid}` refuses unlinking the last Discord when it would
+leave none; a role holder who already has none is not blocked, only warned on the
+profile, which also nudges a holder of a single non-Discord channel towards Discord.
+Every other member is told their contact reaches only them, IC and their country's
+NC.
+
 **Case is folded at the lookup for the address of record and the Discord
 email.** Both are compared `LOWER()` on both sides in SQL, so a row keeps whatever
 case its writer supplied and no caller has to think about it. An email **auth

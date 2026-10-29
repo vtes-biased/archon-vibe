@@ -39,6 +39,11 @@ from ...models import AuthMethodType, CommunityLink
 encoder = msgspec.json.Encoder()
 ph = PasswordHasher()
 
+_UNREACHABLE = (
+    "An NC or Prince must stay reachable: keep a contact email, a phone number "
+    "or a linked Discord login"
+)
+
 
 class CommunityLinkInput(msgspec.Struct):
     type: str
@@ -109,6 +114,7 @@ async def update_current_user(
     # Self-edits must land in local_modifications, or the VEKN sync and the
     # legacy-archon merge — both skip locally-modified fields — silently revert them.
     local_mods = set(user.local_modifications)
+    before = msgspec.structs.replace(user)
 
     if data.name is not None:
         user.name = data.name
@@ -149,6 +155,8 @@ async def update_current_user(
     if data.contact_phone is not None:
         user.contact_phone = data.contact_phone if data.contact_phone else None
         local_mods.add("contact_phone")
+    if permissions.breaks_contact_floor(before, user):
+        raise HTTPException(status_code=422, detail=_UNREACHABLE)
     if data.phone_is_whatsapp is not None:
         user.phone_is_whatsapp = data.phone_is_whatsapp
         local_mods.add("phone_is_whatsapp")
@@ -246,6 +254,18 @@ async def remove_auth_method(method_uid: FromPath[str], request: Request) -> Non
         raise HTTPException(status_code=404, detail="Login method not found")
     if target.method_type == AuthMethodType.EMAIL:
         raise HTTPException(status_code=422, detail="An email login cannot be removed")
+    if (
+        target.method_type == AuthMethodType.DISCORD
+        and target.identifier == current_user.discord_id
+        and not any(
+            m.method_type == AuthMethodType.DISCORD and m.uid != target.uid
+            for m in methods
+        )
+        and permissions.breaks_contact_floor(
+            current_user, msgspec.structs.replace(current_user, discord_id=None)
+        )
+    ):
+        raise HTTPException(status_code=409, detail=_UNREACHABLE)
     removed, remaining = await delete_auth_method_unless_last(
         current_user.uid, method_uid
     )

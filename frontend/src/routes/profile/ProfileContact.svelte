@@ -2,9 +2,10 @@
   import { Plus, Pencil } from "@lucide/svelte";
   import CommunityLinkEditor from "$lib/components/CommunityLinkEditor.svelte";
   import CommunityLinkPills from "$lib/components/CommunityLinkPills.svelte";
+  import InlineNotice from "$lib/components/InlineNotice.svelte";
   import { updateProfile } from "$lib/stores/auth.svelte";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { isOfficial as engineIsOfficial } from "$lib/engine";
+  import { isOfficial as engineIsOfficial, contactFloor, breaksContactFloor } from "$lib/engine";
   import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
   import { getLocale } from "$lib/paraglide/runtime.js";
   import type { CommunityLink } from "$lib/types";
@@ -20,6 +21,8 @@
   let editContactEmail = $state(initial.contact_email || "");
   let editContactPhone = $state(initial.contact_phone || "");
   let editPhoneIsWhatsapp = $state(initial.phone_is_whatsapp ?? false);
+
+  const floor = $derived(contactFloor(user));
 
   const editLinks = $derived<CommunityLink[]>(user.community_links ?? []);
   let editing = $state<{ link: CommunityLink | null } | null>(null);
@@ -43,6 +46,16 @@
     } else {
       showToast({ type: "error", message: m.profile_save_error() });
     }
+  }
+
+  function saveContact(field: "contact_email" | "contact_phone", value: string) {
+    if (!value && breaksContactFloor(user, { ...user, [field]: null })) {
+      showToast({ type: "error", message: m.profile_contact_floor_refused() });
+      if (field === "contact_email") editContactEmail = user.contact_email ?? "";
+      else editContactPhone = user.contact_phone ?? "";
+      return;
+    }
+    saveField(field, value);
   }
 
   function saveLinks(links: CommunityLink[], moderated?: { url: string; state: string }) {
@@ -71,18 +84,28 @@
         {m.profile_official_contact_visibility()}
       {/if}
     </div>
+  {:else}
+    <div class="p-3 rounded border text-sm banner-info">
+      {m.profile_member_contact_visibility()}
+    </div>
+  {/if}
+
+  {#if floor.publishes && floor.channels.length === 0}
+    <InlineNotice tone="warn">{m.profile_contact_none()}</InlineNotice>
+  {:else if floor.publishes && floor.channels.length === 1 && floor.channels[0] !== "discord_id"}
+    <InlineNotice>{m.profile_contact_discord_nudge()}</InlineNotice>
   {/if}
 
   <div>
     <label for="edit-contact-email" class="block text-sm font-medium text-ink-muted mb-1">{m.profile_contact_email()}</label>
     <input id="edit-contact-email" type="email" bind:value={editContactEmail}
-      onblur={() => saveField("contact_email", editContactEmail || undefined)}
+      onblur={() => saveContact("contact_email", editContactEmail)}
       class={inputClass} />
   </div>
   <div>
     <label for="edit-contact-phone" class="block text-sm font-medium text-ink-muted mb-1">{m.profile_phone()}</label>
     <input id="edit-contact-phone" type="tel" bind:value={editContactPhone}
-      onblur={() => saveField("contact_phone", editContactPhone || undefined)}
+      onblur={() => saveContact("contact_phone", editContactPhone)}
       class={inputClass} />
     <label class="flex items-center gap-2 mt-2 text-sm text-ink-muted cursor-pointer">
       <input type="checkbox" bind:checked={editPhoneIsWhatsapp}

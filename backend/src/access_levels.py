@@ -1,5 +1,6 @@
 import base64
 
+from . import permissions
 from .models import AttributionKind, ObjectType, Role
 
 # Reversible, not security — a harvester speed-bump only. Mirror the prefix +
@@ -98,7 +99,7 @@ def _pick(d: dict, keys: set[str]) -> dict:
 
 def compute_user_public(d: dict) -> dict | None:
     roles = d.get("roles", [])
-    if Role.NC in roles or Role.PRINCE in roles:
+    if permissions.publishes_contact(roles):
         return _obfuscate_public_contacts(
             _pick(d, _USER_PUBLIC_FIELDS | _USER_CONTACT_FIELDS | _USER_COMMUNITY_LINKS)
         )
@@ -111,7 +112,7 @@ def compute_user_public(d: dict) -> dict | None:
 
 def compute_user_member(d: dict) -> dict:
     roles = d.get("roles", [])
-    if Role.NC in roles or Role.PRINCE in roles:
+    if permissions.publishes_contact(roles):
         return _pick(
             d, _USER_MEMBER_FIELDS | _USER_CONTACT_FIELDS | _USER_COMMUNITY_LINKS
         )

@@ -17,10 +17,13 @@ pub mod arg {
     pub const CAPACITY: &str = "capacity";
     pub const CARDS: &str = "cards";
     pub const CATEGORIES: &str = "categories";
+    pub const CHANNELS: &str = "channels";
     pub const CLAN: &str = "clan";
     pub const CODE: &str = "code";
     pub const COMMENT: &str = "comment";
     pub const COMMENTS: &str = "comments";
+    pub const CONTACT_EMAIL: &str = "contact_email";
+    pub const CONTACT_PHONE: &str = "contact_phone";
     pub const CONFIG: &str = "config";
     pub const CONTINENT_COUNTRIES: &str = "continent_countries";
     pub const COUNT: &str = "count";
@@ -30,6 +33,7 @@ pub mod arg {
     pub const DECK_OPS: &str = "deck_ops";
     pub const DECK_UID: &str = "deck_uid";
     pub const DISCIPLINES: &str = "disciplines";
+    pub const DISCORD_ID: &str = "discord_id";
     pub const DISPLAY_NAME: &str = "display_name";
     pub const DISQUALIFIED: &str = "disqualified";
     pub const ENOUGH_ROUNDS: &str = "enough_rounds";
@@ -74,6 +78,7 @@ pub mod arg {
     pub const POOL: &str = "pool";
     pub const POSSIBLE: &str = "possible";
     pub const PRINTED_NAME: &str = "printed_name";
+    pub const PUBLISHES: &str = "publishes";
     pub const PRIVATE: &str = "private";
     pub const PRIZE_PROMO_UID: &str = "prize_promo_uid";
     pub const PROMO_UID: &str = "promo_uid";

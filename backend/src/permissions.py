@@ -59,6 +59,27 @@ def is_official(user: User) -> bool:
     return _engine.is_official(json.dumps(user_to_context(user)))
 
 
+def publishes_contact(roles: list[str]) -> bool:
+    return json.loads(_engine.contact_floor(json.dumps({"roles": roles})))["publishes"]
+
+
+def _contact_context(user: User) -> str:
+    return json.dumps(
+        {
+            **user_to_context(user),
+            "contact_email": user.contact_email,
+            "contact_phone": user.contact_phone,
+            "discord_id": user.discord_id,
+        }
+    )
+
+
+def breaks_contact_floor(before: User, after: User) -> bool:
+    return _engine.breaks_contact_floor(
+        _contact_context(before), _contact_context(after)
+    )
+
+
 def can_sponsor_member(user: User) -> bool:
     """Bring someone into VEKN: mint a member record, or issue a VEKN ID to an
     account that has none. One authority — both allocate an ID and stamp

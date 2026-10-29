@@ -826,6 +826,31 @@ pub fn is_official(actor: &UserContext) -> bool {
     actor.has_any(&OFFICIAL_ROLES)
 }
 
+pub const CONTACT_PUBLISHING_ROLES: [Role; 2] = [NC, Prince];
+const CONTACT_CHANNELS: [&str; 3] = [arg::CONTACT_EMAIL, arg::CONTACT_PHONE, arg::DISCORD_ID];
+
+fn contact_channels(user: &JsonValue) -> Vec<&'static str> {
+    CONTACT_CHANNELS
+        .into_iter()
+        .filter(|c| user[*c].as_str().is_some_and(|s| !s.is_empty()))
+        .collect()
+}
+
+pub fn contact_floor(user: &JsonValue) -> Result<JsonValue, EngineError> {
+    Ok(json::object! {
+        arg::PUBLISHES => UserContext::from_json(user)?.has_any(&CONTACT_PUBLISHING_ROLES),
+        arg::CHANNELS => contact_channels(user),
+    })
+}
+
+pub fn breaks_contact_floor(before: &JsonValue, after: &JsonValue) -> Result<bool, EngineError> {
+    Ok(
+        UserContext::from_json(after)?.has_any(&CONTACT_PUBLISHING_ROLES)
+            && !contact_channels(before).is_empty()
+            && contact_channels(after).is_empty(),
+    )
+}
+
 pub fn is_organizer(actor: &UserContext, actor_uid: &str, tournament: &OwnedResource) -> bool {
     allows(
         Capability::OrganizeTournament,

@@ -411,6 +411,30 @@ export function isOfficial(user: UserContext | null): boolean {
   return callEngine(() => getEngine().isOfficial(JSON.stringify({ roles: user.roles ?? [] })));
 }
 
+type ContactHolder = {
+  roles?: string[];
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  discord_id?: string | null;
+};
+
+function contactContext(user: ContactHolder): string {
+  return JSON.stringify({
+    roles: user.roles ?? [],
+    contact_email: user.contact_email ?? null,
+    contact_phone: user.contact_phone ?? null,
+    discord_id: user.discord_id ?? null,
+  });
+}
+
+export function contactFloor(user: ContactHolder): { publishes: boolean; channels: string[] } {
+  return JSON.parse(callEngine(() => getEngine().contactFloor(contactContext(user))));
+}
+
+export function breaksContactFloor(before: ContactHolder, after: ContactHolder): boolean {
+  return callEngine(() => getEngine().breaksContactFloor(contactContext(before), contactContext(after)));
+}
+
 /** Mints a member record or issues a VEKN ID to an existing account — one authority for both,
  * which also stamps `coopted_by`. Deliberately cross-country. */
 export function canSponsorMember(actor: UserContext | null): PermissionResult {
