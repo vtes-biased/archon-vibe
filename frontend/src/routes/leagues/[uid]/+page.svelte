@@ -3,23 +3,25 @@
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
   import { getLeague, getTournament, getTournamentListItems, getAllLeagues, sortUpcomingFirst, type TournamentListItem } from "$lib/db";
-  import { updateLeague, deleteLeagueApi, addLeagueOrganizer, removeLeagueOrganizer } from "$lib/api";
+  import { updateLeague, deleteLeagueApi, addLeagueOrganizer, removeLeagueOrganizer, setLeagueFinal, clearLeagueFinal } from "$lib/api";
   import { syncManager } from "$lib/sync";
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
   import { getUser } from "$lib/db";
   import type { League, Tournament, LeagueStandingsMode } from "$lib/types";
-  import { attestedPlayerCount, canEditLeague, canLinkTournamentToLeague, computeLeagueStandings, isOrganizer as engineIsOrganizer } from "$lib/engine";
+  import { attestedPlayerCount, canEditLeague, canLinkTournamentToLeague, checkTableVpsSync, computeLeagueStandings, isOrganizer as engineIsOrganizer } from "$lib/engine";
+  import { vpIssueText } from "$lib/vpIssue";
   import { tournamentAction } from "$lib/tournament-actions";
-  import { translateTournamentState, getStateTone } from "$lib/tournament-utils";
-  import { formatCalendarDate, formatScore, localToday } from "$lib/utils";
+  import { translateTournamentState, getStateTone, vpOptions } from "$lib/tournament-utils";
+  import { formatCalendarDate, formatGwTp, formatScore, localToday } from "$lib/utils";
   import OrganizerManager from "$lib/components/OrganizerManager.svelte";
   import FoldableDescription from "$lib/components/FoldableDescription.svelte";
+  import VpInput from "$lib/components/VpInput.svelte";
   import Button from '$lib/components/Button.svelte';
   import Badge from '$lib/components/Badge.svelte';
   import TabStrip from "$lib/components/TabStrip.svelte";
-  import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X, Trophy, Calendar, Crown, Flag, ListOrdered, FlagTriangleRight } from "@lucide/svelte";
+  import { Loader2, CircleAlert, ArrowLeft, Pencil, Trash2, Plus, X, Trophy, Calendar, Crown, Flag, ListOrdered, FlagTriangleRight, ChevronUp, ChevronDown, TriangleAlert } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
 
   const uid = $derived(page.params.uid);
@@ -93,8 +95,78 @@
   const isOrganizer = $derived(league ? canEditLeague(auth.user, league) : false);
   // Attach tier: organizers, plus same-country Princes when the league is open to them.
   const canAttach = $derived(league ? canLinkTournamentToLeague(auth.user, league) : false);
-  // Crowned on a finished league; ties share rank 1 (co-champions).
-  const champions = $derived(standings.filter(e => e.rank === 1));
+  let finalNames = $state<Record<string, string>>({});
+  const champions = $derived.by(() => {
+    const winner = league?.final?.winner;
+    if (winner) return [{ user_uid: winner, name: finalNames[winner] }];
+    return standings.filter(e => e.rank === 1);
+  });
+
+  let seedDraft = $state<StandingEntry[] | null>(null);
+  const seedDraftHasTie = $derived(
+    !!seedDraft && seedDraft.some((e, i) => i > 0 && seedDraft![i - 1]?.rank === e.rank),
+  );
+  let seatingDraft = $state<string[]>([]);
+  let vpDraft = $state<Record<string, number>>({});
+  let finalSaving = $state(false);
+  let draftedFinal = "";
+  const finalVps = $derived(seatingDraft.map(u => vpDraft[u] ?? 0));
+  const finalVpIssue = $derived(seatingDraft.length ? checkTableVpsSync(finalVps) : null);
+
+  $effect(() => {
+    const f = league?.final;
+    const key = JSON.stringify(f ?? null);
+    if (key === draftedFinal) return;
+    draftedFinal = key;
+    seatingDraft = f ? f.seating.map(s => s.player_uid) : [];
+    vpDraft = f ? Object.fromEntries(f.seating.map(s => [s.player_uid, s.result?.vp ?? 0])) : {};
+  });
+
+  function startSeeding() {
+    const fifth = standings[Math.min(4, standings.length - 1)];
+    if (!fifth) return;
+    seedDraft = standings.filter(e => e.rank <= fifth.rank);
+  }
+
+  function moveSeed(i: number, j: number) {
+    if (!seedDraft || seedDraft[i]?.rank !== seedDraft[j]?.rank) return;
+    const next = [...seedDraft];
+    [next[i], next[j]] = [next[j]!, next[i]!];
+    seedDraft = next;
+  }
+
+  function moveSeat(i: number, j: number) {
+    if (j < 0 || j >= seatingDraft.length) return;
+    const next = [...seatingDraft];
+    [next[i], next[j]] = [next[j]!, next[i]!];
+    seatingDraft = next;
+  }
+
+  async function saveFinal(data: { seed_order: string[]; seating: string[]; vps?: number[] }) {
+    if (!league) return;
+    error = null;
+    finalSaving = true;
+    try {
+      league = await setLeagueFinal(league.uid, data, { suppressErrorToast: true });
+      seedDraft = null;
+      await loadLeague();
+    } catch (e) {
+      error = toUserMessage(e, m.league_final_error());
+    } finally {
+      finalSaving = false;
+    }
+  }
+
+  async function cancelFinal() {
+    if (!league || !confirm(m.league_final_cancel_confirm())) return;
+    error = null;
+    try {
+      league = await clearLeagueFinal(league.uid, { suppressErrorToast: true });
+      await loadLeague();
+    } catch (e) {
+      error = toUserMessage(e, m.league_final_error());
+    }
+  }
 
   type TabId = 'leagues' | 'tournaments' | 'standings';
   let activeTab = $state<TabId>('tournaments');
@@ -177,6 +249,13 @@
       names[ouid] = u?.name || ouid.slice(0, 8);
     }
     organizerNames = names;
+
+    const fnames: Record<string, string> = {};
+    for (const fuid of l.final?.seed_order ?? []) {
+      const u = await getUser(fuid);
+      fnames[fuid] = u?.name || fuid.slice(0, 8);
+    }
+    finalNames = fnames;
 
     standingsError = false;
     const finished = await Promise.all(
@@ -671,6 +750,111 @@
                   {#each champions as c, i (c.user_uid)}{#if i > 0} · {/if}<a href="/users/{c.user_uid}" class="hover:text-link">{c.name}</a>{/each}
                 </div>
               </div>
+            </div>
+          {/if}
+          {#if league.final || (isOrganizer && standings.length >= 4)}
+            <div class="bg-surface-card rounded-lg shadow border border-line p-4 mb-3">
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <h2 class="text-sm font-semibold text-ink-strong">{m.league_final_heading()}</h2>
+                {#if isOrganizer && league.final}
+                  <Button variant="secondary" size="sm" onclick={cancelFinal}>{m.league_final_cancel()}</Button>
+                {/if}
+              </div>
+              {#if !league.final}
+                {#if seedDraft}
+                  {#if seedDraftHasTie}
+                    <p class="text-xs text-ink-faint mb-2">{m.league_final_tie_hint()}</p>
+                  {/if}
+                  <div class="divide-y divide-line">
+                    {#each seedDraft as entry, i (entry.user_uid)}
+                      <div class="flex items-center gap-2 py-1.5 text-sm {i >= 5 ? 'opacity-60' : ''}">
+                        <span class="w-6 shrink-0 text-right text-ink-muted">{entry.rank}</span>
+                        <span class="flex-1 min-w-0 truncate text-ink-strong">{entry.name}</span>
+                        <span class="shrink-0 text-xs text-ink-faint">{i < 5 ? m.finals_seed({ n: String(i + 1) }) : m.league_final_not_seated()}</span>
+                        {#if seedDraftHasTie}
+                          <button onclick={() => moveSeed(i, i - 1)} disabled={seedDraft[i - 1]?.rank !== entry.rank}
+                            class="p-2 sm:p-1 text-ink-faint hover:text-ink-strong disabled:opacity-30" aria-label={m.rooms_move_up()}>
+                            <ChevronUp class="w-4 h-4" />
+                          </button>
+                          <button onclick={() => moveSeed(i, i + 1)} disabled={seedDraft[i + 1]?.rank !== entry.rank}
+                            class="p-2 sm:p-1 text-ink-faint hover:text-ink-strong disabled:opacity-30" aria-label={m.rooms_move_down()}>
+                            <ChevronDown class="w-4 h-4" />
+                          </button>
+                        {/if}
+                      </div>
+                    {/each}
+                  </div>
+                  <div class="flex gap-2 justify-end mt-3">
+                    <Button variant="secondary" size="md" onclick={() => (seedDraft = null)}>{m.common_cancel()}</Button>
+                    <Button variant="primary" size="md" loading={finalSaving} disabled={finalSaving}
+                      onclick={() => { const seeds = seedDraft!.slice(0, 5).map(e => e.user_uid); saveFinal({ seed_order: seeds, seating: seeds }); }}>
+                      {m.league_final_seat_confirm()}
+                    </Button>
+                  </div>
+                {:else}
+                  <p class="text-sm text-ink-muted mb-3">{m.league_final_hint()}</p>
+                  <Button variant="secondary" size="md" onclick={startSeeding}>{m.league_final_seat()}</Button>
+                {/if}
+              {:else}
+                {@const lf = league.final}
+                {#if isOrganizer}
+                  <p class="text-xs text-ink-faint mb-2">{m.league_final_seating_hint()}</p>
+                {/if}
+                <div class="divide-y divide-line">
+                  {#each isOrganizer ? seatingDraft : lf.seating.map(s => s.player_uid) as puid, i (puid)}
+                    {@const result = lf.seating.find(s => s.player_uid === puid)?.result}
+                    <div class="py-2">
+                      <div class="flex items-center justify-between gap-2 text-sm">
+                        <div class="min-w-0">
+                          <a href="/users/{puid}" class="text-ink-strong hover:text-link truncate">
+                            {#if lf.winner === puid}<Crown class="w-4 h-4 inline -mt-0.5 text-accent" aria-label={m.league_champion()} />{/if}
+                            {finalNames[puid] || "..."}
+                          </a>
+                          <div class="text-xs text-ink-faint">{m.finals_seed({ n: String(lf.seed_order.indexOf(puid) + 1) })}</div>
+                        </div>
+                        <div class="flex items-center gap-1 shrink-0">
+                          {#if result}
+                            <span class="text-xs text-ink-faint">{isOrganizer ? "" : `${result.vp}VP `}{formatGwTp(result.gw, result.tp)}</span>
+                          {/if}
+                          {#if isOrganizer}
+                            <button onclick={() => moveSeat(i, i - 1)} disabled={i === 0}
+                              class="p-2 sm:p-1 text-ink-faint hover:text-ink-strong disabled:opacity-30" aria-label={m.rooms_move_up()}>
+                              <ChevronUp class="w-4 h-4" />
+                            </button>
+                            <button onclick={() => moveSeat(i, i + 1)} disabled={i === seatingDraft.length - 1}
+                              class="p-2 sm:p-1 text-ink-faint hover:text-ink-strong disabled:opacity-30" aria-label={m.rooms_move_down()}>
+                              <ChevronDown class="w-4 h-4" />
+                            </button>
+                          {/if}
+                        </div>
+                      </div>
+                      {#if isOrganizer}
+                        <div class="mt-1.5">
+                          <VpInput value={vpDraft[puid] ?? 0} options={vpOptions(seatingDraft.length, false)}
+                            label={finalNames[puid]} disabled={finalSaving}
+                            onchange={(v) => (vpDraft = { ...vpDraft, [puid]: v })} />
+                        </div>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+                {#if isOrganizer}
+                  {#if finalVpIssue && finalVpIssue.code !== 'incomplete'}
+                    <div class="mt-2 banner-warn border rounded-lg p-3">
+                      <p class="text-xs flex items-start gap-1.5">
+                        <TriangleAlert class="w-4 h-4 shrink-0" />
+                        <span>{vpIssueText(finalVpIssue, seatingDraft.length)}</span>
+                      </p>
+                    </div>
+                  {/if}
+                  <div class="flex justify-end mt-3">
+                    <Button variant="primary" size="md" loading={finalSaving} disabled={finalSaving || !!finalVpIssue}
+                      onclick={() => saveFinal({ seed_order: lf.seed_order, seating: seatingDraft, vps: finalVps })}>
+                      {m.league_final_save_result()}
+                    </Button>
+                  </div>
+                {/if}
+              {/if}
             </div>
           {/if}
           <div class="sm:hidden bg-surface-card rounded-lg shadow overflow-hidden border border-line divide-y divide-line">

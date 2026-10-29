@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime
 from uuid import uuid7
 
 import msgspec
+from archon_engine import PyEngine
 from litestar import Request, Response, Router, delete, post, put
 from litestar.exceptions import HTTPException
 from litestar.params import FromPath
@@ -19,10 +20,18 @@ from ..db import (
 )
 from ..geonames import stored_country
 from ..middleware.auth import get_optional_user
-from ..models import League, LeagueKind, LeagueStandingsMode
+from ..models import (
+    League,
+    LeagueFinal,
+    LeagueFinalSeat,
+    LeagueKind,
+    LeagueStandingsMode,
+    Score,
+)
 
 logger = logging.getLogger(__name__)
 encoder = msgspec.json.Encoder()
+_engine = PyEngine()
 
 
 class LeagueCreate(msgspec.Struct):
@@ -261,6 +270,86 @@ async def remove_organizer(
     )
 
 
+class LeagueFinalInput(msgspec.Struct):
+    seed_order: list[str]
+    seating: list[str]
+    vps: list[float] | None = None
+
+
+@put("/{uid:str}/final")
+async def set_league_final(
+    request: Request, uid: FromPath[str], data: LeagueFinalInput
+) -> Response:
+    """Seat the league final, with its result when `vps` (seating order) is given."""
+    user = await get_optional_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    league = await get_league_by_uid(uid)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found")
+    if not permissions.can_edit_league(user, league):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    size = len(data.seating)
+    if size not in (4, 5):
+        raise HTTPException(status_code=400, detail="A final seats 4 or 5 players")
+    if len(set(data.seating)) != size or sorted(data.seating) != sorted(
+        data.seed_order
+    ):
+        raise HTTPException(
+            status_code=400, detail="Seating and seeds must name the same players"
+        )
+
+    seats = [LeagueFinalSeat(player_uid=p) for p in data.seating]
+    winner = None
+    if data.vps is not None:
+        if len(data.vps) != size:
+            raise HTTPException(status_code=400, detail="One VP score per seat")
+        if vp_error := _engine.check_table_vps(data.vps):
+            raise HTTPException(
+                status_code=400, detail=f"Invalid VP distribution: {vp_error}"
+            )
+        no_sanctions = [0.0] * size
+        gws = _engine.compute_gw_finals(
+            data.vps, no_sanctions, data.seating, data.seed_order
+        )
+        tps = _engine.compute_tp(size, data.vps, no_sanctions)
+        for seat, vp, gw, tp in zip(seats, data.vps, gws, tps, strict=True):
+            seat.result = Score(gw=int(gw), vp=vp, tp=int(tp))
+            if gw:
+                winner = seat.player_uid
+
+    league.final = LeagueFinal(seed_order=data.seed_order, seating=seats, winner=winner)
+    league.modified = datetime.now(UTC)
+    bd = await save_league(league)
+    broadcast_precomputed(bd)
+    return Response(
+        content=encoder.encode(msgspec.to_builtins(league)),
+        media_type="application/json",
+    )
+
+
+@delete("/{uid:str}/final", status_code=200)
+async def clear_league_final(request: Request, uid: FromPath[str]) -> Response:
+    user = await get_optional_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    league = await get_league_by_uid(uid)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found")
+    if not permissions.can_edit_league(user, league):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    league.final = None
+    league.modified = datetime.now(UTC)
+    bd = await save_league(league)
+    broadcast_precomputed(bd)
+    return Response(
+        content=encoder.encode(msgspec.to_builtins(league)),
+        media_type="application/json",
+    )
+
+
 router = Router(
     "/api/leagues",
     route_handlers=[
@@ -269,5 +358,7 @@ router = Router(
         delete_league_endpoint,
         add_organizer,
         remove_organizer,
+        set_league_final,
+        clear_league_final,
     ],
 )

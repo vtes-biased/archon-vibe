@@ -141,6 +141,7 @@ especially for house-format and beta-ish features.
 | registration cap (soft) | plafond (des inscriptions) | tope (de inscripciones) | teto (de inscrições) | tetto (iscrizioni) |
 | seats/spots (venue capacity) | places | plazas | vagas | posti |
 | league champion | Champion | Campeón | Campeão | Campione |
+| league final | finale de ligue | final de liga | final da liga | finale del campionato |
 | season | saison | temporada | temporada | stagione |
 | crowned | couronné | coronado | coroado | incoronato |
 | promo (card) | promo (fem.) | promo (fem.) | promo (fem.) | promo (fem., invariable pl. "le promo")¹³ |

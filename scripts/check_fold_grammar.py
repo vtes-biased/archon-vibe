@@ -63,6 +63,9 @@ ALLOW = {
     "frontend/src/routes/tournaments/[uid]/TableRoomsEditor.svelte": (
         "row reorder arrows, not a disclosure"
     ),
+    "frontend/src/routes/leagues/[uid]/+page.svelte": (
+        "league final seed and seat reorder arrows, not a disclosure"
+    ),
     "frontend/src/lib/components/help/OrganizerGuide.svelte": (
         "mockups drawing the console, not live controls"
     ),

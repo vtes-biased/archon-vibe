@@ -459,6 +459,7 @@ LEAGUE = {
     "organizers_uids": ["019f6a5e-d5dd-74b9-9aab-00919d4de7dc"],
     "parent_uid": None,
     "open_to_country_princes": True,
+    "final": None,
 }
 
 

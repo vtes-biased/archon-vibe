@@ -559,7 +559,8 @@ Meta-League, two levels maximum), `standings_mode` (RTP / Score / GP), `format`,
 `country`, `start`/`finish`, `description`, `organizers_uids`, `parent_uid`, and
 `open_to_country_princes` — a country-league-only flag letting same-country
 Princes attach their own tournaments without becoming organizers (attach-only,
-inert on a worldwide league).
+inert on a worldwide league), and `final` — the league final's seeds, seating,
+per-seat result and winner, scored server-side.
 
 Standings are computed at read time through the engine on both sides; the league
 SSE payload is **config only**, with standings derived client-side from IndexedDB

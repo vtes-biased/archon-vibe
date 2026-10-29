@@ -537,6 +537,14 @@ owns every state transition and the toss-needed warning, and finishing without a
 final is a legitimate exit — a panel-level launch button would present the final
 as mandatory and bypass the toss warning.
 
+**A league final is scored like a tournament final**: the top VP takes the game
+win with no 2-VP threshold, a VP tie going to the higher seed. It is a lone finals table held on
+the league, not a tournament — `StartFinals` needs two played rounds and seats the
+event's own top five — so `PUT /api/leagues/{uid}/final` runs `check_table_vps`,
+`compute_gw_finals` with the league seed order and `compute_tp` itself, with no
+sanctions and no override. Seeds are the league top five in rank order, ties
+ordered by the organizer rather than tossed.
+
 ### Trigger: the Rules Director answers on no-final rating credit
 
 *Asked 2026-08. The interim stance above is owner-approved and shipped; what is

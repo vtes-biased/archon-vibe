@@ -169,6 +169,18 @@ export interface League extends BaseObject {
   // Same-country Princes may attach their own tournaments (attach-only).
   // Optional: rows synced before the field existed lack it (treat as false).
   open_to_country_princes?: boolean;
+  final?: LeagueFinal | null; // absent on rows synced before the field existed
+}
+
+export interface LeagueFinalSeat {
+  player_uid: string;
+  result: Score | null;
+}
+
+export interface LeagueFinal {
+  seed_order: string[];
+  seating: LeagueFinalSeat[];
+  winner: string | null;
 }
 
 export type PromoKind = "card" | "pack" | "other";

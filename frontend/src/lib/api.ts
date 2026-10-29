@@ -591,6 +591,27 @@ export async function deleteLeagueApi(uid: string, opts?: { suppressErrorToast?:
   await deleteLeague(uid);
 }
 
+export async function setLeagueFinal(
+  uid: string,
+  data: { seed_order: string[]; seating: string[]; vps?: number[] },
+  opts?: { suppressErrorToast?: boolean },
+): Promise<League> {
+  const updated = await apiRequest<League>(`/api/leagues/${uid}/final`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, opts);
+  await saveLeague(updated);
+  return updated;
+}
+
+export async function clearLeagueFinal(uid: string, opts?: { suppressErrorToast?: boolean }): Promise<League> {
+  const updated = await apiRequest<League>(`/api/leagues/${uid}/final`, {
+    method: 'DELETE',
+  }, opts);
+  await saveLeague(updated);
+  return updated;
+}
+
 export async function addLeagueOrganizer(uid: string, userUid: string): Promise<League> {
   return apiRequest<League>(`/api/leagues/${uid}/organizers`, {
     method: 'POST',

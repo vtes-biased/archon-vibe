@@ -95,11 +95,15 @@ categories and escalation hints. Rules and visibility:
 
 **Leagues** — league and meta-league, standings modes RTP / Score / GP,
 tournament association by league editors or by same-country Princes when the
-league opts in, auto-updating standings, organizer Finish action and rank-1
-Champion crowning. A league's start and finish are plain calendar dates, read
-against the viewer's own today: the finish day is the league's last day and
-already shows it finished, and Finish stamps the organiser's local today, so the
-button goes at once whatever the time zone.
+league opts in, auto-updating standings, organizer Finish action, and a **league
+final**: organizers seat the top five of the standings on the league page — the
+organizer orders tied players — and enter its result, scored like a tournament
+final with seeds from league rank. A finished league crowns that final's winner
+Champion, or the standings leader (co-champions on a tie) when no final was
+played; the final leaves the standings themselves untouched. A league's start and
+finish are plain calendar dates, read against the viewer's own today: the finish
+day is the league's last day and already shows it finished, and Finish stamps the
+organiser's local today, so the button goes at once whatever the time zone.
 
 **Ratings and Hall of Fame** — server-side rating from the best 8 tournaments in
 a trailing 18 months, rating points in finished standings, a rankings page per

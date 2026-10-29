@@ -438,6 +438,30 @@ class LeagueStandingsMode(StrEnum):
     GP = "GP"  # Grand Prix position-based points
 
 
+class LeagueFinalSeat(msgspec.Struct, kw_only=True):
+    player_uid: Annotated[
+        str, msgspec.Meta(description="Uid of the member seated here.")
+    ]
+    result: Annotated[
+        Score | None,
+        msgspec.Meta(description="Final result, null until the result is entered."),
+    ] = None
+
+
+class LeagueFinal(msgspec.Struct, kw_only=True):
+    seed_order: Annotated[
+        list[str],
+        msgspec.Meta(description="Finalist uids, top seed first, by league rank."),
+    ]
+    seating: Annotated[
+        list[LeagueFinalSeat], msgspec.Meta(description="Seats in table order.")
+    ]
+    winner: Annotated[
+        str | None,
+        msgspec.Meta(description="Uid of the final's winner, the league Champion."),
+    ] = None
+
+
 class League(BaseObject, kw_only=True):
     name: str
     kind: LeagueKind = LeagueKind.LEAGUE
@@ -472,6 +496,10 @@ class League(BaseObject, kw_only=True):
         msgspec.Meta(description="Uid of the meta-league this one belongs to."),
     ] = None
     open_to_country_princes: bool = False  # attach-only; inert without a country
+    final: Annotated[
+        LeagueFinal | None,
+        msgspec.Meta(description="The league's own final, null if none was seated."),
+    ] = None
 
 
 class TournamentState(StrEnum):
