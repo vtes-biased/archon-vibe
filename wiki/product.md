@@ -67,7 +67,10 @@ over nine priorities including staggered seatings for impossible player counts,
 VP entry with oust-order validation, automatic GW/TP, judge override, standings,
 finals qualification and toss, seating edits, round and tournament reopen/cancel,
 delete, roster CSV export carrying each player's name, VEKN id, country and
-region. Details: [tournaments](tournaments.md).
+region. The tournaments page leads, for an organizer, with a warning listing their
+events dated two or more days ago with rounds played and never finished, each
+linking to the event to finish it; a scored final left open finishes by itself a
+week later. Details: [tournaments](tournaments.md).
 
 **Open rounds** — a non-VEKN house format gaining traction online: each player
 plays up to `max_rounds` rounds of a continuously-run pool, so the event may run
@@ -126,8 +129,8 @@ per-table extra time, client-side countdown), organizer announcements, call for
 judge, raffle draws with an optional promo prize, promo catalog and distribution
 reporting with an inventory ledger, table rooms, QR check-in, printable seating.
 
-**Web Push** (opt-in) — seating on round start, announcements, and judge calls to
-organizers. iOS requires Add-to-Home-Screen first. Discord-bot notifications serve
+**Web Push** (opt-in) — seating on round start, announcements, judge calls to
+organizers, and organizers told when their event finished automatically. iOS requires Add-to-Home-Screen first. Discord-bot notifications serve
 online events where Discord is the venue; Web Push serves in-person events. A
 dual-audience user may get both for the same event — deliberate, no dedup.
 

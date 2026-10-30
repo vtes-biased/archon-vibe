@@ -1,7 +1,7 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
   import { untrack } from "svelte";
-  import { getFilteredTournaments, getAgendaTournaments, getMemberPlaying, getLeague, type OnlineFilter, type RankFloor, type TournamentListItem, type TournamentTab } from "$lib/db";
+  import { getFilteredTournaments, getAgendaTournaments, getMemberPlaying, getUnfinishedOrganized, getLeague, type OnlineFilter, type RankFloor, type TournamentListItem, type TournamentTab } from "$lib/db";
   import { agendaViewer, filterAgenda, agendaToggleEntry } from "$lib/agenda";
   import { syncManager } from "$lib/sync";
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
@@ -11,6 +11,7 @@
   import type { TournamentFormat } from "$lib/types";
   import { getStateTone, translateTournamentState } from "$lib/tournament-utils";
   import Badge from "$lib/components/Badge.svelte";
+  import InlineNotice from "$lib/components/InlineNotice.svelte";
   import { zonedDate } from "$lib/utils";
   import { syncQueryParams, currentParams, readPageParam, pageParam } from "$lib/url-filters";
   import { Loader2, Trophy, Calendar, BookmarkPlus, BookmarkMinus, Copy, Check, Plus, SlidersHorizontal, X } from "@lucide/svelte";
@@ -53,6 +54,7 @@
   const canUseAgenda = $derived(auth.isAuthenticated && auth.user?.vekn_id && auth.user?.country);
   const viewer = $derived(auth.isAuthenticated ? agendaViewer(auth.user) : null);
   let playing = $state<Set<string>>(new Set());
+  let unfinished = $state<TournamentListItem[]>([]);
   const onAgendaUids = $derived(new Set(viewer ? filterAgenda(tournaments, viewer, playing).map(t => t.uid) : []));
   const urlView = urlParams.get("view");
   const storedView = localStorage.getItem(VIEW_PREF_KEY);
@@ -152,6 +154,7 @@
   async function loadTournaments() {
     try {
       if (viewer) playing = await getMemberPlaying(viewer.uid);
+      unfinished = viewer ? await getUnfinishedOrganized(viewer.uid) : [];
       if (viewMode === "agenda" && viewer) {
         const result = await getAgendaTournaments(
           viewer,
@@ -389,6 +392,22 @@
         </Button>
       {/if}
     </div>
+
+    {#if unfinished.length}
+      <div class="mb-4">
+        <InlineNotice tone="warn">
+          {m.tournaments_unfinished_notice()}
+          <ul class="mt-1 list-disc pl-5">
+            {#each unfinished as t (t.uid)}
+              <li>
+                <a href="/tournaments/{t.uid}" class="text-link hover:text-link-soft underline">{t.name}</a>
+                <span class="text-ink-muted">· {formatDate(t)}</span>
+              </li>
+            {/each}
+          </ul>
+        </InlineNotice>
+      </div>
+    {/if}
 
     {#if auth.isAuthenticated}
       <div class="flex flex-wrap gap-2 mb-4">

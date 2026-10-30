@@ -159,6 +159,17 @@ they are at the per-player `max_rounds` cap and `Checked-in` otherwise. Decklist
 unpublish, since publication is derived from the finished state by the post-finish
 pass.
 
+**A scored final left open finishes by itself.** A daily job runs `FinishFinals`
+on a `Playing` event whose final table is `Finished` and which nobody has written
+for 7 days, through the action route's own path — ratings, wins, deck
+publication, the vekn.net push and the TWDA pull request all follow — and tells
+its organizers by Web Push — an organizer without a subscription hears nothing,
+the event simply leaving their warning. The engine credits nobody until that finish. An event
+held offline is skipped: its device holds the copy that counts. An event stuck
+before its final, or finished without one, is left to the organizers' warning on
+the tournaments page ([product](product.md)), since only they can say whether it
+ended.
+
 `UpdateConfig`, `ReportPromos` and Delete are available in any state.
 `SetScore`/`Override`/`Unoverride` are open to players only during `Playing`, and
 to organizers whenever rounds exist — Waiting, Playing or Finished — with standings

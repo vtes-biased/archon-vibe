@@ -68,6 +68,7 @@ _PUSH_MESSAGES: dict[str, dict[str, str]] = {
         "judge_title": "Judge call",
         "judge_body": "{player} needs a judge at Table {table}.",
         "judge_body_room": "{player} needs a judge at {table}.",
+        "auto_finished": "Finished automatically: its final was scored a week ago and never closed.",
     },
     "fr": {
         "seating_round": "Ronde {round} — vous êtes à la table {table}, siège {seat}.",
@@ -76,6 +77,7 @@ _PUSH_MESSAGES: dict[str, dict[str, str]] = {
         "judge_title": "Appel d'arbitre",
         "judge_body": "{player} demande un arbitre à la table {table}.",
         "judge_body_room": "{player} demande un arbitre à {table}.",
+        "auto_finished": "Terminé automatiquement : sa finale a été notée il y a une semaine sans être clôturée.",
     },
     "es": {
         "seating_round": "Ronda {round} — estás en la mesa {table}, asiento {seat}.",
@@ -84,6 +86,7 @@ _PUSH_MESSAGES: dict[str, dict[str, str]] = {
         "judge_title": "Llamada al juez",
         "judge_body": "{player} necesita un juez en la mesa {table}.",
         "judge_body_room": "{player} necesita un juez en {table}.",
+        "auto_finished": "Finalizado automáticamente: su final se puntuó hace una semana y nunca se cerró.",
     },
     "pt": {
         "seating_round": "Rodada {round} — você está na mesa {table}, assento {seat}.",
@@ -92,6 +95,7 @@ _PUSH_MESSAGES: dict[str, dict[str, str]] = {
         "judge_title": "Chamada de juiz",
         "judge_body": "{player} precisa de um juiz na mesa {table}.",
         "judge_body_room": "{player} precisa de um juiz em {table}.",
+        "auto_finished": "Encerrado automaticamente: a final foi pontuada há uma semana e nunca foi fechada.",
     },
     "it": {
         "seating_round": "Round {round} — sei al tavolo {table}, posto {seat}.",
@@ -100,6 +104,7 @@ _PUSH_MESSAGES: dict[str, dict[str, str]] = {
         "judge_title": "Chiamata giudice",
         "judge_body": "{player} chiede un giudice al tavolo {table}.",
         "judge_body_room": "{player} chiede un giudice a {table}.",
+        "auto_finished": "Concluso automaticamente: la finale è stata segnata una settimana fa e mai chiusa.",
     },
 }
 
@@ -246,6 +251,15 @@ def build_judge_call_spec(
     return spec
 
 
+def build_auto_finished_spec(t: Tournament) -> dict:
+    return {
+        "kind": "auto_finished",
+        "title": t.name,
+        "url": f"/tournaments/{t.uid}",
+        "tag": f"auto-finished-{t.uid}",
+    }
+
+
 def render_payload(spec: dict, locale: str) -> dict:
     """Localize a notification spec into the wire payload for a subscription's locale."""
     m = _PUSH_MESSAGES[_loc(locale)]
@@ -263,6 +277,9 @@ def render_payload(spec: dict, locale: str) -> dict:
     elif kind == "seating_finals":
         title = spec["title"]
         body = m["seating_finals"].format(seat=spec["seat"])
+    elif kind == "auto_finished":
+        title = spec["title"]
+        body = m["auto_finished"]
     elif kind == "judge":
         title = f"{m['judge_title']} · {spec['title']}"
         key = "judge_body_room" if spec.get("table_label") else "judge_body"

@@ -567,6 +567,7 @@
   "tournaments_view_agenda": "Votre agenda",
   "tournaments_view_all": "Tous les tournois",
   "tournaments_state_upcoming": "À venir",
+  "tournaments_unfinished_notice": "Ces événements que vous organisez ont des rondes jouées mais n'ont jamais été terminés : personne n'a ses résultats. Ouvrez chacun pour le terminer :",
   "tournaments_tab_past": "Passés",
   "tournaments_filter_online": "Événements en ligne",
   "tournaments_online_include": "Inclure",

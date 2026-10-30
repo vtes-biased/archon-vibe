@@ -749,6 +749,7 @@ export interface TournamentListItem {
   state: TournamentState;
   organizers_uids?: string[];
   winner?: string;
+  played?: boolean;
 }
 
 function projectTournament(t: Tournament): TournamentListItem {
@@ -767,6 +768,7 @@ function projectTournament(t: Tournament): TournamentListItem {
     state: t.state,
     organizers_uids: t.organizers_uids,
     winner: t.winner,
+    played: (t.rounds?.length ?? 0) > 0,
   };
 }
 
@@ -953,6 +955,14 @@ export async function getFilteredTournaments(
   const total = items.length;
   const start = page * pageSize;
   return { items: items.slice(start, start + pageSize), total };
+}
+
+export async function getUnfinishedOrganized(userUid: string): Promise<TournamentListItem[]> {
+  const index = await getTournamentIndex();
+  const before = dayCutoff(1);
+  return [...index.values()]
+    .filter(t => t.played && t.state !== 'Finished' && t.organizers_uids?.includes(userUid) && tournamentDate(t) < before)
+    .sort((a, b) => tournamentDate(a).localeCompare(tournamentDate(b)));
 }
 
 export async function getAgendaTournaments(

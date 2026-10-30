@@ -567,6 +567,7 @@
   "tournaments_view_agenda": "Sua agenda",
   "tournaments_view_all": "Todos os torneios",
   "tournaments_state_upcoming": "Próximos",
+  "tournaments_unfinished_notice": "Estes eventos que você organiza têm rodadas jogadas mas nunca foram encerrados, então ninguém recebe seus resultados. Abra cada um para encerrá-lo:",
   "tournaments_tab_past": "Passados",
   "tournaments_filter_online": "Eventos online",
   "tournaments_online_include": "Incluir",

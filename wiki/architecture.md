@@ -119,7 +119,8 @@ The scans that stay, each deliberate:
 - **Scheduled jobs**, a scan per run rather than per request: the VEKN member and
   tournament syncs (with `find_same_event_tournaments` per synced event), the
   hourly VEKN push, the sanction cleanup, the full rating, Hall of Fame and promo
-  stock recomputes, the TWDA sync, the judge directory sync.
+  stock recomputes, the TWDA sync, the judge directory sync, the stale-finals
+  finish.
 - **Once per boot**: the migration guards and `_stamp_missing_event_codes`.
 - **Small partitions**: `league` and `promo` rows, read whole through
   `idx_objects_type`.
@@ -732,14 +733,15 @@ RFC 8291 payload encryption and RFC 8292 VAPID signing; we own only the transpor
 | `AlterSeating` / `SwapSeats` / `SeatPlayer` / `UnseatPlayer` | only players whose table or seat changed, landing on a still-live table of a Playing tournament — corrections to finished tables page no one, and unseated players get nothing |
 | `POST /{uid}/announce` | checked-in, playing and completed participants except the poster; registered players too before round 1, since check-in-window announcements must reach the unchecked |
 | `POST /{uid}/call-judge` | the tournament's organizers except the caller |
+| the daily stale-finals finish | the tournament's organizers |
 
 `RestoreRound` is excluded — it re-seats no one. Seating and judge-call bodies
 resolve table-room labels so a push says "Main Hall 3" exactly like the app and
 the wall signs, each locale carrying its own "Table N" for an unroomed table, and a
 re-seat push reuses the round's tag to replace the player's stale assignment
 notification. The judge-call push carries `renotify: true` so a repeat call
-re-alerts. Every send is fire-and-forget and fires **after** the tournament
-transaction commits.
+re-alerts. Every send fires **after** the tournament transaction commits — from
+a request as fire-and-forget, from the daily job awaited in turn.
 
 There is deliberately no unauthenticated rotate endpoint — an endpoint-only
 rewrite would be a notification-hijack vector. The service worker's
@@ -1149,6 +1151,7 @@ rounds, tables, seating, scores and players, matching players by VEKN ID.
 | Snapshot rebuild, only if the corpus moved | at startup, then checked every 15 min | `snapshots.py` |
 | OAuth cleanup | hourly | `db_oauth.py` |
 | VEKN push batch | hourly, configurable | `vekn_push.py` |
+| Stale-finals finish | daily, 00:30 UTC | `routes/tournaments.py` |
 | Sanction cleanup | daily, 01:00 UTC | `db.py` |
 | Deleted-objects purge | daily, 01:30 UTC | `db.py` |
 | Promo stock recompute | daily, 02:00 UTC | `promo_stock.py` |

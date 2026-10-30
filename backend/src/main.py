@@ -510,6 +510,15 @@ async def lifespan(app: Litestar) -> AsyncIterator[None]:
     logger.info("Snapshot check scheduled every 15 minutes")
 
     _scheduler.add_job(
+        tournaments.finish_stale_finals,
+        trigger=CronTrigger(hour=0, minute=30, timezone="UTC"),
+        id="finish_stale_finals",
+        name="Finish Stale Finals",
+        replace_existing=True,
+    )
+    logger.info("Stale finals finish scheduled daily at 00:30 UTC")
+
+    _scheduler.add_job(
         run_purge_deleted_objects,
         trigger=CronTrigger(hour=1, minute=30, timezone="UTC"),
         id="purge_deleted",

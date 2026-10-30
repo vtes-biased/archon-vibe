@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from importlib.resources import files
 from typing import Annotated, Any
 from uuid import uuid7
@@ -1245,6 +1245,179 @@ _ACTION_TRUTHY_ONLY = frozenset(
 )
 
 
+async def _process_event(
+    tournament: Tournament, event_data: dict, actor_data: dict, tx_conn
+) -> tuple[Tournament, list[dict], BroadcastData]:
+    """Call inside `tournament_transaction`, holding its lock."""
+    tournament_json = encoder.encode(tournament).decode("utf-8")
+    event_json = msgspec.json.encode(event_data).decode("utf-8")
+    actor_json = msgspec.json.encode(actor_data).decode("utf-8")
+    player_uids = {p.user_uid for p in tournament.players if p.user_uid}
+    sanctions_json = await _build_sanctions_json(
+        tournament.uid, player_uids, conn=tx_conn
+    )
+    decks_json = await build_decks_json(tournament.uid, conn=tx_conn)
+
+    try:
+        result_json = _engine.process_tournament_event(
+            tournament_json, event_json, actor_json, sanctions_json, decks_json
+        )
+    except ValueError as e:
+        # Engine rejections arrive as ValueError carrying the wire JSON
+        raise EngineRejection.from_engine(e) from e
+
+    result = json.loads(result_json)
+    # Normalize datetime fields: frontend sends "YYYY-MM-DDTHH:MM" (no seconds)
+    # but msgspec requires at least "YYYY-MM-DDTHH:MM:SS" for RFC3339 decoding
+    t_data = result["tournament"]
+    for dt_field in ("start", "finish"):
+        v = t_data.get(dt_field)
+        if isinstance(v, str) and len(v) == 16:  # "YYYY-MM-DDTHH:MM"
+            t_data[dt_field] = v + ":00"
+    # msgspec.convert applies the same coercion as JSON decode without the
+    # redundant encode→decode round-trip — meaningful CPU on a large scoring burst.
+    updated = msgspec.convert(t_data, Tournament)
+    updated.modified = datetime.now(UTC)
+    _normalize_wall_clock(updated)
+    # Stamp finish when entering Finished with none set — the engine never
+    # writes it, and ratings/VEKN push depend on it.
+    if (
+        updated.state == TournamentState.FINISHED
+        and tournament.state != TournamentState.FINISHED
+        and updated.finish is None
+    ):
+        updated.finish = _wall_clock_now(updated.timezone)
+
+    # Timer lifecycle is backend-only: every round/finals transition resets to
+    # a fresh paused timer and clears extra time. AddTable is excluded (no reset).
+    TIMER_EVENTS = (
+        "StartRound",
+        "SelfOrganizeRound",
+        "StartFinals",
+        "RestoreRound",
+        "FinishRound",
+        "CancelRound",
+        "FinishFinals",
+        "FinishTournament",
+        "CancelFinals",
+    )
+    if event_data["type"] in TIMER_EVENTS:
+        updated.timer = TimerState()
+        updated.table_extra_time = {}
+
+    # Detected by CONTENT diff, not event type, so any edit touching those
+    # fields after a VEKN push is caught; sticky, so this runs at most once.
+    if updated.vekn_pushed_at and not updated.vekn_results_stale:
+        if (
+            tournament.winner != updated.winner
+            or encoder.encode(tournament.standings) != encoder.encode(updated.standings)
+            or encoder.encode(tournament.finals) != encoder.encode(updated.finals)
+            or encoder.encode(tournament.rounds) != encoder.encode(updated.rounds)
+        ):
+            updated.vekn_results_stale = True
+
+    bd = await save_object(
+        ObjectType.TOURNAMENT,
+        updated.uid,
+        msgspec.to_builtins(updated),
+        conn=tx_conn,
+    )
+    return updated, result.get("deck_ops", []), bd
+
+
+async def _after_event(
+    event_type: str,
+    tournament: Tournament,
+    updated: Tournament,
+    deck_ops: list[dict],
+    tournament_bd: BroadcastData,
+) -> None:
+    """Everything an event sets off once its transaction has committed and the
+    lock is released."""
+    deck_bds = await process_deck_ops(deck_ops, updated.uid, updated)
+    for bd in deck_bds:
+        broadcast_precomputed(bd)
+
+    was_finished = tournament.state == TournamentState.FINISHED
+    is_finished = updated.state == TournamentState.FINISHED
+    if is_finished and not was_finished:
+        await withdraw_private_decks(updated)
+    elif was_finished != is_finished or (
+        is_finished and any(op.get("op") == "set_private" for op in deck_ops)
+    ):
+        push_decks(
+            updated,
+            updated.organizers_uids,
+            [d for d in await get_decks_for_tournament(updated.uid) if d.private],
+        )
+
+    broadcast_precomputed(tournament_bd)
+
+    if event_type == "ReportPromos":
+        _promo_recompute_diff(tournament, updated)
+
+    # Fire-and-forget, post-commit (a DB-touching task must not run inside
+    # tournament_transaction). RestoreRound re-seats no one, so it's excluded.
+    if event_type in ("StartRound", "SelfOrganizeRound", "StartFinals"):
+        asyncio.create_task(_maybe_push_seating(updated, event_type))
+    elif event_type in ("AlterSeating", "SwapSeats", "SeatPlayer", "UnseatPlayer"):
+        # Only players whose table/seat actually changed are pushed — the
+        # stale seating notification they may act on gets replaced.
+        asyncio.create_task(_maybe_push_reseat(tournament, updated))
+
+    # Recompute on entering/leaving Finished, or on a result-affecting action on
+    # an already-finished tournament (see _RATING_IRRELEVANT_ACTIONS for the skip list).
+    state_changed = was_finished != is_finished
+    results_may_change = is_finished and event_type not in _RATING_IRRELEVANT_ACTIONS
+    if state_changed or results_may_change:
+        try:
+            player_uids = {p.user_uid for p in updated.players if p.user_uid}
+            category = rating_category_for_tournament(updated)
+            results = await recompute_ratings_for_players(player_uids, category)
+            results += await recompute_wins(player_uids)
+            for _user, bd in results:
+                broadcast_precomputed(bd)
+            # If category changed (format/online toggle), also recompute old category
+            old_category = rating_category_for_tournament(tournament)
+            if old_category != category:
+                old_results = await recompute_ratings_for_players(
+                    player_uids, old_category
+                )
+                for _user, bd in old_results:
+                    broadcast_precomputed(bd)
+        except Exception as e:
+            logger.error(
+                f"Error recomputing ratings for {updated.uid}: {e}", exc_info=True
+            )
+
+    # VEKN push backgrounds (vekn.net can take 30-120s or be down; batch_push
+    # retries) — TWDA submission runs inline since it's local/fast.
+    if is_finished and not was_finished:
+        await maybe_submit_twda(updated)
+        asyncio.create_task(maybe_push_results(updated))
+    elif is_finished:
+        # Publication and privacy ops carry no player_uid: the archive and the Hall
+        # of Fame ask whether a deck exists, never whether it is visible. A credit
+        # change does carry one — it rewrites the submission's Created-by line.
+        winners = {tournament.winner, updated.winner} - {""}
+        winner_deck_moved = any(op.get("player_uid") in winners for op in deck_ops)
+        winner_moved = tournament.winner != updated.winner or winner_deck_moved
+        place_moved = (tournament.country, tournament.online) != (
+            updated.country,
+            updated.online,
+        )
+        if winner_moved or place_moved:
+            asyncio.create_task(maybe_submit_twda(updated))
+        if winner_moved:
+            try:
+                for _user, bd in await recompute_wins(winners):
+                    broadcast_precomputed(bd)
+            except Exception as e:
+                logger.error(
+                    f"Error recomputing wins for {updated.uid}: {e}", exc_info=True
+                )
+
+
 @post("/{uid:str}/action")
 async def tournament_action(
     uid: FromPath[str],
@@ -1348,174 +1521,71 @@ async def tournament_action(
             # ignores it for one already on the roster.
             event_data["vekn_id"] = target_user.vekn_id or ""
 
-        tournament_json = encoder.encode(tournament).decode("utf-8")
-        event_json = msgspec.json.encode(event_data).decode("utf-8")
-        actor_json = msgspec.json.encode(actor_data).decode("utf-8")
-        player_uids = {p.user_uid for p in tournament.players if p.user_uid}
-        sanctions_json = await _build_sanctions_json(uid, player_uids, conn=tx_conn)
-        decks_json = await build_decks_json(uid, conn=tx_conn)
-
         if data.type in ("CheckIn", "Register", "AddPlayer"):
             player_uid = data.player_uid or data.user_uid
             if player_uid:
                 await _check_player_barred(player_uid, conn=tx_conn)
 
-        engine = _engine
-        try:
-            result_json = engine.process_tournament_event(
-                tournament_json, event_json, actor_json, sanctions_json, decks_json
-            )
-        except ValueError as e:
-            # Engine rejections arrive as ValueError carrying the wire JSON
-            raise EngineRejection.from_engine(e) from e
-
-        # Parse new result format: {"tournament": {...}, "deck_ops": [...]}
-        result = json.loads(result_json)
-        # Normalize datetime fields: frontend sends "YYYY-MM-DDTHH:MM" (no seconds)
-        # but msgspec requires at least "YYYY-MM-DDTHH:MM:SS" for RFC3339 decoding
-        t_data = result["tournament"]
-        for dt_field in ("start", "finish"):
-            v = t_data.get(dt_field)
-            if isinstance(v, str) and len(v) == 16:  # "YYYY-MM-DDTHH:MM"
-                t_data[dt_field] = v + ":00"
-        # msgspec.convert applies the same coercion as JSON decode without the
-        # redundant encode→decode round-trip — meaningful CPU on a large scoring burst.
-        updated = msgspec.convert(t_data, Tournament)
-        updated.modified = datetime.now(UTC)
-        _normalize_wall_clock(updated)
-        # Stamp finish when entering Finished with none set — the engine never
-        # writes it, and ratings/VEKN push depend on it.
-        if (
-            updated.state == TournamentState.FINISHED
-            and tournament.state != TournamentState.FINISHED
-            and updated.finish is None
-        ):
-            updated.finish = _wall_clock_now(updated.timezone)
-        deck_ops = result.get("deck_ops", [])
-
-        # Timer lifecycle is backend-only: every round/finals transition resets to
-        # a fresh paused timer and clears extra time. AddTable is excluded (no reset).
-        TIMER_EVENTS = (
-            "StartRound",
-            "SelfOrganizeRound",
-            "StartFinals",
-            "RestoreRound",
-            "FinishRound",
-            "CancelRound",
-            "FinishFinals",
-            "FinishTournament",
-            "CancelFinals",
+        updated, deck_ops, tournament_bd = await _process_event(
+            tournament, event_data, actor_data, tx_conn
         )
-        if data.type in TIMER_EVENTS:
-            updated.timer = TimerState()
-            updated.table_extra_time = {}
-
-        # Detected by CONTENT diff, not event type, so any edit touching those
-        # fields after a VEKN push is caught; sticky, so this runs at most once.
-        if updated.vekn_pushed_at and not updated.vekn_results_stale:
-            if (
-                tournament.winner != updated.winner
-                or encoder.encode(tournament.standings)
-                != encoder.encode(updated.standings)
-                or encoder.encode(tournament.finals) != encoder.encode(updated.finals)
-                or encoder.encode(tournament.rounds) != encoder.encode(updated.rounds)
-            ):
-                updated.vekn_results_stale = True
-
-        tournament_bd = await save_object(
-            ObjectType.TOURNAMENT,
-            updated.uid,
-            msgspec.to_builtins(updated),
-            conn=tx_conn,
-        )
-        pre_state = tournament.state
 
     # Below runs unlocked — the tournament row's FOR UPDATE lock was released.
     logger.info(f"Tournament {uid} action {data.type} by {current_user.uid}")
 
-    deck_bds = await process_deck_ops(deck_ops, uid, updated)
-    for bd in deck_bds:
-        broadcast_precomputed(bd)
-
-    was_finished = pre_state == TournamentState.FINISHED
-    is_finished = updated.state == TournamentState.FINISHED
-    if is_finished and not was_finished:
-        await withdraw_private_decks(updated)
-    elif was_finished != is_finished or (
-        is_finished and any(op.get("op") == "set_private" for op in deck_ops)
-    ):
-        push_decks(
-            updated,
-            updated.organizers_uids,
-            [d for d in await get_decks_for_tournament(uid) if d.private],
-        )
-
-    broadcast_precomputed(tournament_bd)
-
-    if data.type == "ReportPromos":
-        _promo_recompute_diff(tournament, updated)
-
-    # Fire-and-forget, post-commit (a DB-touching task must not run inside
-    # tournament_transaction). RestoreRound re-seats no one, so it's excluded.
-    if data.type in ("StartRound", "SelfOrganizeRound", "StartFinals"):
-        asyncio.create_task(_maybe_push_seating(updated, data.type))
-    elif data.type in ("AlterSeating", "SwapSeats", "SeatPlayer", "UnseatPlayer"):
-        # Only players whose table/seat actually changed are pushed — the
-        # stale seating notification they may act on gets replaced.
-        asyncio.create_task(_maybe_push_reseat(tournament, updated))
-
-    # Recompute on entering/leaving Finished, or on a result-affecting action on
-    # an already-finished tournament (see _RATING_IRRELEVANT_ACTIONS for the skip list).
-    state_changed = was_finished != is_finished
-    results_may_change = is_finished and data.type not in _RATING_IRRELEVANT_ACTIONS
-    if state_changed or results_may_change:
-        try:
-            player_uids = {p.user_uid for p in updated.players if p.user_uid}
-            category = rating_category_for_tournament(updated)
-            results = await recompute_ratings_for_players(player_uids, category)
-            results += await recompute_wins(player_uids)
-            for _user, bd in results:
-                broadcast_precomputed(bd)
-            # If category changed (format/online toggle), also recompute old category
-            old_category = rating_category_for_tournament(tournament)
-            if old_category != category:
-                old_results = await recompute_ratings_for_players(
-                    player_uids, old_category
-                )
-                for _user, bd in old_results:
-                    broadcast_precomputed(bd)
-        except Exception as e:
-            logger.error(f"Error recomputing ratings for {uid}: {e}", exc_info=True)
-
-    # VEKN push backgrounds (vekn.net can take 30-120s or be down; batch_push
-    # retries) — TWDA submission runs inline since it's local/fast.
-    if is_finished and not was_finished:
-        await maybe_submit_twda(updated)
-        asyncio.create_task(maybe_push_results(updated))
-    elif is_finished:
-        # Publication and privacy ops carry no player_uid: the archive and the Hall
-        # of Fame ask whether a deck exists, never whether it is visible. A credit
-        # change does carry one — it rewrites the submission's Created-by line.
-        winners = {tournament.winner, updated.winner} - {""}
-        winner_deck_moved = any(op.get("player_uid") in winners for op in deck_ops)
-        winner_moved = tournament.winner != updated.winner or winner_deck_moved
-        place_moved = (tournament.country, tournament.online) != (
-            updated.country,
-            updated.online,
-        )
-        if winner_moved or place_moved:
-            asyncio.create_task(maybe_submit_twda(updated))
-        if winner_moved:
-            try:
-                for _user, bd in await recompute_wins(winners):
-                    broadcast_precomputed(bd)
-            except Exception as e:
-                logger.error(f"Error recomputing wins for {uid}: {e}", exc_info=True)
+    await _after_event(data.type, tournament, updated, deck_ops, tournament_bd)
 
     return Response(
         content=encoder.encode(updated),
         media_type="application/json",
     )
+
+
+_STALE_FINALS_DAYS = 7
+
+
+async def finish_stale_finals() -> None:
+    now = datetime.now(UTC)
+    cutoff = now - timedelta(days=_STALE_FINALS_DAYS)
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """SELECT uid FROM objects
+            WHERE type = 'tournament' AND deleted_at IS NULL
+              AND "full"->>'state' = 'Playing'
+              AND "full"->'finals'->>'state' = 'Finished'
+              AND modified_at < %s""",
+            (cutoff,),
+        )
+        uids = [row[0] for row in await result.fetchall()]
+    actor = {
+        "uid": "",
+        "roles": [],
+        "is_organizer": True,
+        "can_organize_league_uids": [],
+        "now": now.isoformat(),
+    }
+    for uid in uids:
+        try:
+            async with tournament_transaction(uid) as (tournament, tx_conn):
+                if (
+                    tournament is None
+                    or tournament.offline_mode
+                    or tournament.modified > cutoff
+                ):
+                    continue
+                updated, deck_ops, tournament_bd = await _process_event(
+                    tournament, {"type": "FinishFinals"}, actor, tx_conn
+                )
+            logger.info(f"Tournament {uid} finished automatically")
+            await _after_event(
+                "FinishFinals", tournament, updated, deck_ops, tournament_bd
+            )
+            spec = push_service.build_auto_finished_spec(updated)
+            await push_service.send_to_users(
+                [(o, spec) for o in updated.organizers_uids]
+            )
+        except Exception:
+            logger.exception("Failed to finish stale finals of %s", uid)
 
 
 class QrCheckinRequest(msgspec.Struct):
