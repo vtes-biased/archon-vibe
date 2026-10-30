@@ -11,7 +11,7 @@
 
   const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
-  let { onClose }: { onClose: () => void } = $props();
+  let { route, onClose }: { route: string; onClose: () => void } = $props();
 
   const auth = $derived(getAuthState());
 
@@ -82,7 +82,7 @@
           title: title.trim(),
           description: description.trim(),
           app_version: __APP_VERSION__,
-          route: location.pathname,
+          route,
           locale: getLocale(),
           user_agent: navigator.userAgent,
         },

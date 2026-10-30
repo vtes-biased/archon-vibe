@@ -14,9 +14,9 @@ beta` line — a tester's report against the beta build, not production. The own
 also files issues by hand under the same `feedback` label, usually with their own
 analysis appended.
 
-**`Page:` is always `/help`** — that's the only screen the feedback form lives on,
-so the route says nothing about where the problem was. Ignore it; never treat it
-as a hint about the affected page.
+**`Page:` is where the member was** when they opened the form — from the side
+rail, the page itself; from Help, the page they came from (`/help` only when they
+landed there directly). A hint at the affected screen, not proof of it.
 
 **The repo is public and reporters are real, named people.** Every comment is
 permanent, public, and attached to someone's VEKN identity. No PII, no internal

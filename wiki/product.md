@@ -148,7 +148,10 @@ remembered per device like the agenda view, the URL winning.
 **Help and feedback** — in-app rulebook, VEKN tournament rules, Judges Guide v2,
 Code of Ethics, and player/organizer guides; members with a VEKN ID can
 file bug/feature/question reports that become GitHub issues carrying the VEKN ID
-only, never name, email or Discord.
+only, never name, email or Discord. The form opens from the side rail on any page
+and from the top of the Help page — the phone's way in, its bottom bar having no
+room — and the issue names the page the member was on, the one they came from when
+filed from Help.
 
 ## Product behaviors
 

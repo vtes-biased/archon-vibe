@@ -6,8 +6,13 @@
   import Button from "$lib/components/Button.svelte";
   import FeedbackModal from "$lib/components/FeedbackModal.svelte";
   import { getAuthState } from "$lib/stores/auth.svelte";
+  import { afterNavigate } from "$app/navigation";
 
   let showFeedback = $state(false);
+  let cameFrom = $state("/help");
+  afterNavigate(({ from }) => {
+    if (from?.url) cameFrom = from.url.pathname;
+  });
 
   const iconMap: Record<string, typeof BookOpen> = {
     book: BookOpen,
@@ -31,6 +36,19 @@
 <div class="p-4 sm:p-8">
   <div class="max-w-4xl mx-auto">
     <h1 class="text-3xl font-semibold text-accent mb-8">{m.help_page_title()}</h1>
+
+    {#if getAuthState().user?.vekn_id}
+      <section class="mb-8">
+        <h2 class="text-lg font-medium text-ink-strong mb-4">{m.feedback_section()}</h2>
+        <div class="bg-surface-card rounded-lg border border-line p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+          <p class="text-sm text-ink-muted flex-1">{m.feedback_section_blurb()}</p>
+          <Button variant="primary" size="lg" onclick={() => (showFeedback = true)}>
+            <MessageSquarePlus class="w-4 h-4" />
+            {m.feedback_open_button()}
+          </Button>
+        </div>
+      </section>
+    {/if}
 
     <section class="mb-8">
       <h2 class="text-lg font-medium text-ink-strong mb-4">{m.help_reference_docs()}</h2>
@@ -80,20 +98,6 @@
       </div>
     </section>
 
-    {#if getAuthState().user?.vekn_id}
-      <!-- Feedback (VEKN members only — backend gates on a VEKN id) -->
-      <section class="mb-8">
-        <h2 class="text-lg font-medium text-ink-strong mb-4">{m.feedback_section()}</h2>
-        <div class="bg-surface-card rounded-lg border border-line p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-          <p class="text-sm text-ink-muted flex-1">{m.feedback_section_blurb()}</p>
-          <Button variant="primary" size="lg" onclick={() => (showFeedback = true)}>
-            <MessageSquarePlus class="w-4 h-4" />
-            {m.feedback_open_button()}
-          </Button>
-        </div>
-      </section>
-    {/if}
-
     <section>
       <h2 class="text-lg font-medium text-ink-strong mb-4">{m.help_legal_section()}</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -120,5 +124,5 @@
 </div>
 
 {#if showFeedback}
-  <FeedbackModal onClose={() => (showFeedback = false)} />
+  <FeedbackModal route={cameFrom} onClose={() => (showFeedback = false)} />
 {/if}

@@ -3,16 +3,17 @@
   import { page } from '$app/stores';
   import { openLastView } from '$lib/last-view';
   import { syncManager } from '$lib/sync';
-  import { initAuth } from '$lib/stores/auth.svelte';
+  import { initAuth, getAuthState } from '$lib/stores/auth.svelte';
   import { initEngine } from '$lib/engine-instance';
   import { initServiceWorker, getUpdateAvailable, applyUpdate, reloadOnStaleChunk } from '$lib/stores/sw.svelte';
   import { initOfflineState, getOfflineTournamentUids } from '$lib/stores/offline.svelte';
   import { reconcilePush } from '$lib/stores/push.svelte';
   import { onMount } from 'svelte';
-  import { Wifi, WifiOff, RefreshCw, Download, TriangleAlert, Trophy, FlagTriangleRight, ListOrdered, Users, CircleUser, BookOpen } from '@lucide/svelte';
+  import { Wifi, WifiOff, RefreshCw, Download, TriangleAlert, Trophy, FlagTriangleRight, ListOrdered, Users, CircleUser, BookOpen, MessageSquarePlus } from '@lucide/svelte';
   import Badge from '$lib/components/Badge.svelte';
   import Toast from '$lib/components/Toast.svelte';
   import WhatsNewModal from '$lib/components/WhatsNewModal.svelte';
+  import FeedbackModal from '$lib/components/FeedbackModal.svelte';
   import * as m from '$lib/paraglide/messages.js';
   import { getLocale } from '$lib/paraglide/runtime.js';
   import { initTheme } from '$lib/stores/theme.svelte';
@@ -32,6 +33,7 @@
   // Suppressed while offline-locked (mid-event refresh is the wrong nudge);
   // tracked in state and refreshed on sync events since the getter isn't reactive.
   let hasOfflineLocked = $state(false);
+  let feedbackRoute = $state<string | null>(null);
 
   const navItems = [
     { href: '/tournaments', labelFn: () => m.nav_tournaments(), icon: Trophy },
@@ -219,7 +221,17 @@
       {/each}
     </div>
 
-    <div class="mt-auto pt-4">
+    <div class="mt-auto pt-4 flex flex-col items-center gap-4 w-full">
+      {#if getAuthState().user?.vekn_id && $page.url.pathname !== '/help'}
+        <button
+          onclick={() => (feedbackRoute = $page.url.pathname)}
+          class="flex flex-col items-center w-full py-3 px-2 rounded-lg transition-colors text-ink-muted hover:text-ink-bright hover:bg-surface-hover/50"
+          title={m.feedback_open_button()}
+        >
+          <MessageSquarePlus class="w-6 h-6" />
+          <span class="text-xs mt-1">{m.feedback_section()}</span>
+        </button>
+      {/if}
       <!-- data-sync-state is a stable, color-independent hook for E2E (the visual
            cue is icon + semantic color, which a design refactor can freely change). -->
       <div
@@ -245,4 +257,7 @@
 
   <Toast />
   <WhatsNewModal />
+  {#if feedbackRoute}
+    <FeedbackModal route={feedbackRoute} onClose={() => (feedbackRoute = null)} />
+  {/if}
 </div>
