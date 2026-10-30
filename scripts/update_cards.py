@@ -16,16 +16,6 @@ OUTPUT = Path(
     or Path(__file__).resolve().parent.parent / "engine" / "data" / "cards.json"
 )
 
-# Fixed VEKN V5 allowlist, not a company/date cutoff: V5A/V5C/EoG are Paradox-published
-# yet excluded. PP3/PP4 promos aren't recoverable from set membership; krcg flags them via Format.V5.
-V5_LEGAL_SETS = {"V5", "NB", "NB2", "NB3", "FoL", "SoB", "30th", "SV5"}
-
-
-def _is_v5(card: Card) -> bool:
-    if Format.V5 in card.formats:
-        return True
-    return any(p.set.code in V5_LEGAL_SETS for p in card.prints)
-
 
 def _group(card: Card) -> str:
     """Crypt group as a bare digit ("3"), "any" for group-independent, else ""."""
@@ -70,7 +60,7 @@ def transform(card: Card, cards: CardDict) -> dict:
         "group": _group(card) if crypt else "",
         "capacity": (card.capacity or 0) if crypt else 0,
         "adv": bool(getattr(card, "advanced", False)),
-        "v5": _is_v5(card),
+        "v5": Format.V5 in card.formats,
         "banned": card.banned.isoformat() if card.banned else "",
         "sets": _sets(card, cards),
         "name_variants": list(dict.fromkeys(nv.name for nv in card.name_variants)),
