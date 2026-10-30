@@ -6,7 +6,7 @@
   import GithubIcon from '$lib/components/GithubIcon.svelte';
   import Button from '$lib/components/Button.svelte';
   import { submitFeedback } from '$lib/api';
-  import { getAuthState, getAccessToken } from '$lib/stores/auth.svelte';
+  import { getAuthState, getAccessToken, FEEDBACK_DRAFT_KEY } from '$lib/stores/auth.svelte';
   import { toUserMessage } from '$lib/errors';
 
   const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
@@ -16,9 +16,12 @@
   const auth = $derived(getAuthState());
 
   type Category = 'bug' | 'feature' | 'question';
-  let category = $state<Category>('bug');
-  let title = $state('');
-  let description = $state('');
+  const DESCRIPTION_MAX = 4000;
+  const draft: { category?: Category; title?: string; description?: string } =
+    JSON.parse(sessionStorage.getItem(FEEDBACK_DRAFT_KEY) ?? '{}');
+  let category = $state<Category>(draft.category ?? 'bug');
+  let title = $state(draft.title ?? '');
+  let description = $state(draft.description ?? '');
   let status = $state<'idle' | 'loading' | 'success' | 'error'>('idle');
   let errorMsg = $state('');
   let issueUrl = $state('');
@@ -37,11 +40,23 @@
     };
   });
   const offline = $derived(!online);
+
+  $effect(() => {
+    if (status === 'success') sessionStorage.removeItem(FEEDBACK_DRAFT_KEY);
+    else sessionStorage.setItem(FEEDBACK_DRAFT_KEY, JSON.stringify({ category, title, description }));
+  });
+
+  let descriptionEl = $state<HTMLTextAreaElement>();
+  $effect(() => {
+    void description;
+    if (!descriptionEl) return;
+    descriptionEl.style.height = 'auto';
+    descriptionEl.style.height = `${descriptionEl.scrollHeight + descriptionEl.offsetHeight - descriptionEl.clientHeight}px`;
+  });
   const canSubmit = $derived(
     !offline && title.trim().length > 0 && description.trim().length > 0
   );
 
-  // Shown before the fields: linking is a full-page redirect that drops the draft.
   const showGithubNudge = $derived(!offline && !!auth.user && !auth.user.github_login);
 
   function linkGithub() {
@@ -167,12 +182,14 @@
             <label for="fb-description" class="block text-sm text-ink-muted mb-1">{m.feedback_description_label()}</label>
             <textarea
               id="fb-description"
+              bind:this={descriptionEl}
               bind:value={description}
               rows="4"
-              maxlength="4000"
+              maxlength={DESCRIPTION_MAX}
               placeholder={m.feedback_description_placeholder()}
-              class="{inputClass} resize-y"
+              class="{inputClass} resize-none max-h-64 overflow-y-auto"
             ></textarea>
+            <p class="text-right text-xs text-ink-muted mt-1 tabular-nums">{description.length} / {DESCRIPTION_MAX}</p>
           </div>
         </div>
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dialogPanel } from "$lib/actions/dialog";
   import type { Sanction } from "$lib/types";
   import { removeTournamentSanction } from "$lib/sanction-actions";
   import { getTournamentListItems, type TournamentListItem } from "$lib/db";
@@ -39,10 +40,6 @@
   // Same filter as the SanctionIndicator dot
   const active = $derived(sanctions.filter(s => !s.lifted_at && !s.deleted_at));
 
-  function focusOnMount(node: HTMLElement) {
-    node.focus();
-  }
-
   // No confirm: sanction deletes are soft and IC-recoverable for 30 days
   // (db cleanup job) — reversibility over confirmation, per the owner ruling.
   async function handleDelete(uid: string) {
@@ -68,8 +65,7 @@
     aria-modal="true"
     aria-labelledby="sanction-list-title"
     tabindex="-1"
-    use:focusOnMount
-    onkeydown={(e) => e.key === 'Escape' && onClose()}
+    use:dialogPanel={onClose}
     class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
   >
     <div class="p-6 border-b border-line">

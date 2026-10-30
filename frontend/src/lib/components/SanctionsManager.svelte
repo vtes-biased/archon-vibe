@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dialogPanel } from "$lib/actions/dialog";
   import type { User, Sanction, SanctionLevel, SanctionCategory } from "$lib/types";
   import { createSanction, updateSanction, deleteSanctionApi } from "$lib/api";
   import { getActiveSanctionsForUser, getTournamentListItems, type TournamentListItem } from "$lib/db";
@@ -293,8 +294,8 @@
       aria-modal="true"
       aria-labelledby="sanction-modal-title"
       tabindex="-1"
+      use:dialogPanel={() => (showSanctionModal = false)}
       use:focusOnMount
-      onkeydown={(e) => e.key === 'Escape' && (showSanctionModal = false)}
       class="bg-surface-card rounded-lg shadow-xl border border-accent-soft-border/50 w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">
@@ -414,8 +415,8 @@
       aria-modal="true"
       aria-labelledby="edit-sanction-modal-title"
       tabindex="-1"
+      use:dialogPanel={closeEditSanctionModal}
       use:focusOnMount
-      onkeydown={(e) => e.key === 'Escape' && closeEditSanctionModal()}
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">

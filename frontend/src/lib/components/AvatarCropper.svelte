@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dialogPanel } from "$lib/actions/dialog";
   import Button from '$lib/components/Button.svelte';
   import { ImagePlus, ZoomOut, ZoomIn } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -172,8 +173,8 @@
     aria-modal="true"
     aria-labelledby="avatar-modal-title"
     tabindex="-1"
+    use:dialogPanel={onCancel}
     use:focusOnMount
-    onkeydown={(e) => e.key === 'Escape' && onCancel()}
     class="bg-surface-card rounded-lg p-6 max-w-sm w-full max-h-[85dvh] overflow-y-auto"
   >
     <h2 id="avatar-modal-title" class="text-lg font-semibold text-ink-strong mb-4">{m.avatar_title()}</h2>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dialogPanel } from "$lib/actions/dialog";
   import Button from '$lib/components/Button.svelte';
   import { Check, Users } from "@lucide/svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -40,10 +41,6 @@
     picked = next;
   }
 
-  function focusOnMount(node: HTMLElement) {
-    node.focus();
-  }
-
   function submit() {
     if (!valid || submitting) return;
     onSubmit([...picked]);
@@ -60,9 +57,9 @@
     aria-modal="true"
     aria-labelledby="self-organize-title"
     tabindex="-1"
-    use:focusOnMount
-    onkeydown={(e) => e.key === 'Escape' && onClose()}
+    use:dialogPanel={onClose}
     onclick={(e) => e.stopPropagation()}
+    onkeydown={(e) => e.stopPropagation()}
     class="bg-surface-card rounded-t-lg sm:rounded-lg shadow-xl border border-line w-full sm:max-w-md sm:mx-4 max-h-[85dvh] pb-safe-b sm:pb-0 flex flex-col"
   >
     <div class="p-6 border-b border-line">

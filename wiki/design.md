@@ -435,7 +435,9 @@ preference:
   legend attached to a score and not a section of the page.
 
 **Modals** — `fixed inset-0 z-50` with backdrop blur, `role="dialog"`,
-`aria-modal`, `aria-labelledby`, Escape handling and a focus-on-mount action.
+`aria-modal`, `aria-labelledby`, and `use:dialogPanel` on the panel, which closes
+on Escape, focuses the panel on mount and keeps a drag that ends on the backdrop
+from closing it.
 Always `stopPropagation` on the backdrop, the content container and any form
 inside: without it, clicking a text input inside a modal can trigger parent
 handlers like collapsing the expanded list item behind it.

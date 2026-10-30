@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dialogPanel } from "$lib/actions/dialog";
   import type { User } from "$lib/types";
   import type { UserListItem } from "$lib/db";
   import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased, setMemberSponsor, deleteMember, anonymizeMember } from "$lib/api";
@@ -305,8 +306,8 @@
       aria-modal="true"
       aria-labelledby="sponsor-modal-title"
       tabindex="-1"
+      use:dialogPanel={() => (showSponsorConfirm = false)}
       use:focusOnMount
-      onkeydown={(e) => e.key === 'Escape' && (showSponsorConfirm = false)}
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">
@@ -340,8 +341,8 @@
       aria-modal="true"
       aria-labelledby="link-modal-title"
       tabindex="-1"
+      use:dialogPanel={() => (showLinkModal = false)}
       use:focusOnMount
-      onkeydown={(e) => e.key === 'Escape' && (showLinkModal = false)}
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">
@@ -401,8 +402,8 @@
       aria-modal="true"
       aria-labelledby="force-abandon-modal-title"
       tabindex="-1"
+      use:dialogPanel={() => (showForceAbandonConfirm = false)}
       use:focusOnMount
-      onkeydown={(e) => e.key === 'Escape' && (showForceAbandonConfirm = false)}
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">
@@ -440,8 +441,8 @@
       aria-modal="true"
       aria-labelledby="merge-modal-title"
       tabindex="-1"
+      use:dialogPanel={() => (showMergeModal = false)}
       use:focusOnMount
-      onkeydown={(e) => e.key === 'Escape' && (showMergeModal = false)}
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">
@@ -541,8 +542,8 @@
       aria-modal="true"
       aria-labelledby="sponsor-edit-modal-title"
       tabindex="-1"
+      use:dialogPanel={() => (showSponsorEdit = false)}
       use:focusOnMount
-      onkeydown={(e) => e.key === 'Escape' && (showSponsorEdit = false)}
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">
@@ -578,8 +579,8 @@
       aria-modal="true"
       aria-labelledby="anonymize-modal-title"
       tabindex="-1"
+      use:dialogPanel={() => (showAnonymizeConfirm = false)}
       use:focusOnMount
-      onkeydown={(e) => e.key === 'Escape' && (showAnonymizeConfirm = false)}
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">
@@ -617,8 +618,8 @@
       aria-modal="true"
       aria-labelledby="delete-modal-title"
       tabindex="-1"
+      use:dialogPanel={() => (showDeleteConfirm = false)}
       use:focusOnMount
-      onkeydown={(e) => e.key === 'Escape' && (showDeleteConfirm = false)}
       class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     >
       <div class="p-6 border-b border-line">

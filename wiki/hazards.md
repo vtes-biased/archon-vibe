@@ -526,6 +526,14 @@ and an empty DNS cache on every call, and a pool that never mixes
 member-supplied hosts with the first-party ones. Folding it into the shared
 session to "finish the job" is the mistake this entry exists to stop.
 
+## Browser events
+
+**A drag that ends outside a dialog clicks its backdrop.** A press inside the panel
+released on the backdrop fires `click` on their common ancestor, the backdrop, and
+its `onclick` closes the dialog — a text selection or a resize handle let go a few
+pixels too far loses the form. `dialogPanel` swallows that click in the capture
+phase; a modal that does not take the action has the trap again.
+
 ## Deploy
 
 **The boot auto-reload fires on every device the first time it opens after a

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dialogPanel } from "$lib/actions/dialog";
   import type { Tournament } from "$lib/types";
   import type { TournamentEventType } from "$lib/engine";
   import { TriangleAlert } from "@lucide/svelte";
@@ -16,10 +17,6 @@
     doAction?: (action: TournamentEventType, body?: any) => Promise<string | null>;
     onClose: () => void;
   } = $props();
-
-  function focusOnMount(node: HTMLElement) {
-    node.focus();
-  }
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -32,12 +29,12 @@
   <div
     class="bg-surface-card rounded-lg shadow-xl border border-line w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
     onclick={(e) => e.stopPropagation()}
-    onkeydown={(e) => e.key === 'Escape' && onClose()}
+    onkeydown={(e) => e.stopPropagation()}
+    use:dialogPanel={onClose}
     role="dialog"
     aria-modal="true"
     aria-labelledby="reopen-confirm-title"
     tabindex="-1"
-    use:focusOnMount
   >
     <div class="p-6 border-b border-line">
       <h2 id="reopen-confirm-title" class="text-xl font-medium text-link">{m.reopen_confirm_title()}</h2>

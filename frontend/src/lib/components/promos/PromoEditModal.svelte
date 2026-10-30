@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dialogPanel } from "$lib/actions/dialog";
   import { onDestroy } from 'svelte';
   import type { League, Promo, PromoKind, TournamentRank } from "$lib/types";
   import { getAllLeagues } from "$lib/db";
@@ -193,8 +194,9 @@
     aria-modal="true"
     aria-labelledby="promo-edit-title"
     tabindex="-1"
+    use:dialogPanel={requestClose}
     use:focusOnMount
-    onkeydown={(e) => { e.stopPropagation(); if (e.key === 'Escape') requestClose(); }}
+    onkeydown={(e) => e.stopPropagation()}
     class="bg-surface-card w-full h-full overflow-y-auto pt-safe-t pb-safe-b sm:pt-0 sm:pb-safe-b sm:h-auto sm:max-h-[85dvh] sm:max-w-lg sm:rounded-lg sm:border sm:border-line sm:shadow-xl"
   >
     <div class="p-6 border-b border-line">

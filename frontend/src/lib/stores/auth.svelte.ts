@@ -432,9 +432,12 @@ export async function login(email: string, password: string): Promise<boolean> {
   }
 }
 
+export const FEEDBACK_DRAFT_KEY = 'feedback_draft';
+
 export async function logout(): Promise<void> {
   clearTokens();
   forgetViews();
+  sessionStorage.removeItem(FEEDBACK_DRAFT_KEY);
   await syncManager.reset();
   setAuthState({ user: null, authMethods: [], isAuthenticated: false, isLoading: false, error: null });
   // An anonymous tab still streams the public view. Without this the tab is left deaf with no

@@ -1,7 +1,6 @@
-/** Binds Escape to the element that actually holds focus, not the backdrop — the previous pattern's
- * stopPropagation on the panel meant the keydown never reached a backdrop-bound handler. Sets tabindex="-1" when missing, since an unfocusable panel defeats this silently. */
 export function dialogPanel(node: HTMLElement, onClose?: () => void) {
   let close = onClose;
+  let pressedInside = false;
   if (!node.hasAttribute('tabindex')) node.tabIndex = -1;
   node.focus();
 
@@ -11,13 +10,26 @@ export function dialogPanel(node: HTMLElement, onClose?: () => void) {
     close?.();
   }
 
+  function onpointerdown(e: PointerEvent) {
+    pressedInside = node.contains(e.target as Node);
+  }
+
+  function onclick(e: MouseEvent) {
+    if (pressedInside && !node.contains(e.target as Node)) e.stopPropagation();
+    pressedInside = false;
+  }
+
   node.addEventListener('keydown', onkeydown);
+  window.addEventListener('pointerdown', onpointerdown, true);
+  window.addEventListener('click', onclick, true);
   return {
     update(next?: () => void) {
       close = next;
     },
     destroy() {
       node.removeEventListener('keydown', onkeydown);
+      window.removeEventListener('pointerdown', onpointerdown, true);
+      window.removeEventListener('click', onclick, true);
     },
   };
 }

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dialogPanel } from "$lib/actions/dialog";
   import type { Tournament, SanctionLevel, SanctionCategory, SanctionSubcategory, Sanction } from "$lib/types";
   import { getSanctionReference } from "$lib/engine";
   import { issueTournamentSanction } from "$lib/sanction-actions";
@@ -206,8 +207,8 @@
     aria-modal="true"
     aria-labelledby="tournament-sanction-title"
     tabindex="-1"
+    use:dialogPanel={onClose}
     use:focusOnMount
-    onkeydown={(e) => e.key === 'Escape' && onClose()}
     class="bg-surface-card rounded-lg shadow-xl border border-accent-soft-border/50 w-full max-w-md mx-4 max-h-[85dvh] overflow-y-auto"
   >
     <div class="p-6 border-b border-line">
