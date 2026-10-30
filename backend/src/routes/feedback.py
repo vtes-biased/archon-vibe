@@ -4,6 +4,7 @@ Config: FEEDBACK_GITHUB_{CLIENT_ID,PRIVATE_KEY,INSTALLATION_ID}; any unset -> 50
 
 import json
 import logging
+import math
 import os
 import time
 from typing import Annotated, Literal
@@ -50,12 +51,19 @@ _DAILY_CAP = 10
 _recent: dict[str, list[float]] = {}
 
 
-def _take_slot(user_uid: str) -> float | None:
+def _take_slot(user_uid: str) -> float:
     now = time.monotonic()
     times = [t for t in _recent.get(user_uid, []) if now - t < 86400]
     _recent[user_uid] = times
-    if (times and now - times[-1] < _COOLDOWN_S) or len(times) >= _DAILY_CAP:
-        return None
+    wait = _COOLDOWN_S - (now - times[-1]) if times else 0.0
+    if len(times) >= _DAILY_CAP:
+        wait = max(wait, 86400 - (now - times[0]))
+    if wait > 0:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many feedback submissions; please wait a moment",
+            headers={"Retry-After": str(math.ceil(wait))},
+        )
     times.append(now)
     return now
 
@@ -112,11 +120,6 @@ async def submit_feedback(request: Request, data: FeedbackRequest) -> Response:
         raise HTTPException(status_code=403, detail="Feedback requires a VEKN ID")
 
     slot = _take_slot(current_user.uid)
-    if slot is None:
-        raise HTTPException(
-            status_code=429,
-            detail="Too many feedback submissions; please wait a moment",
-        )
 
     prefix, category_label = _CATEGORIES[data.category]
     roles = ", ".join(r.value for r in current_user.roles) or "player"

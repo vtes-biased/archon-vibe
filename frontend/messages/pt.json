@@ -1276,6 +1276,8 @@
   "feedback_view_issue": "Ver no GitHub →",
   "feedback_offline_hint": "O envio de feedback requer conexão.",
   "feedback_error": "Não foi possível enviar o feedback. Tente novamente.",
+  "feedback_wait": "Poderá enviar mais feedback dentro de {wait}.",
+  "feedback_submit_wait": "Enviar ({wait})",
   "rooms_title": "Salas",
   "rooms_total": "{count} mesas",
   "rooms_add": "Adicionar sala",

@@ -1331,9 +1331,9 @@ app = Litestar(
         EngineRejection: engine_rejection_handler,
         HTTP_500_INTERNAL_SERVER_ERROR: internal_error_handler,
     },
-    # Dev only: nginx serves production same-origin. Neither header is
+    # Dev only: nginx serves production same-origin. These headers are not
     # CORS-safelisted, so the cross-origin dev frontend reads them only if exposed.
-    cors_config=CORSConfig(expose_headers=["X-Access-Version", "ETag"])
+    cors_config=CORSConfig(expose_headers=["X-Access-Version", "ETag", "Retry-After"])
     if os.getenv("ENVIRONMENT", "development") == "development"
     else None,
     openapi_config=None,

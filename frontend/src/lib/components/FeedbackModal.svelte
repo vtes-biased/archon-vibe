@@ -5,7 +5,7 @@
   import { CircleCheck, TriangleAlert } from '@lucide/svelte';
   import GithubIcon from '$lib/components/GithubIcon.svelte';
   import Button from '$lib/components/Button.svelte';
-  import { submitFeedback } from '$lib/api';
+  import { submitFeedback, ApiError } from '$lib/api';
   import { getAuthState, getAccessToken, FEEDBACK_DRAFT_KEY } from '$lib/stores/auth.svelte';
   import { toUserMessage } from '$lib/errors';
 
@@ -25,6 +25,30 @@
   let status = $state<'idle' | 'loading' | 'success' | 'error'>('idle');
   let errorMsg = $state('');
   let issueUrl = $state('');
+  let retryAt = $state(0);
+  let now = $state(Date.now());
+  const waitS = $derived(Math.max(0, Math.ceil((retryAt - now) / 1000)));
+
+  $effect(() => {
+    if (!retryAt) return;
+    const timer = setInterval(() => {
+      now = Date.now();
+      if (now >= retryAt) {
+        retryAt = 0;
+        status = 'idle';
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  });
+
+  function formatWait(seconds: number): string {
+    const [value, unit] =
+      seconds < 60 ? [seconds, 'second'] : seconds < 3600 ? [Math.ceil(seconds / 60), 'minute'] : [Math.ceil(seconds / 3600), 'hour'];
+    return new Intl.NumberFormat(getLocale(), { style: 'unit', unit, unitDisplay: seconds < 60 ? 'short' : 'long' }).format(value);
+  }
+  const waitMsg = $derived(
+    waitS === 0 ? '' : m.feedback_wait({ wait: formatWait(waitS) })
+  );
 
   // Live online state — `navigator.onLine` is non-reactive, so mirror it into a
   // rune and track the browser events (same pattern as +layout / UserList).
@@ -54,7 +78,7 @@
     descriptionEl.style.height = `${descriptionEl.scrollHeight + descriptionEl.offsetHeight - descriptionEl.clientHeight}px`;
   });
   const canSubmit = $derived(
-    !offline && title.trim().length > 0 && description.trim().length > 0
+    !offline && waitS === 0 && title.trim().length > 0 && description.trim().length > 0
   );
 
   const showGithubNudge = $derived(!offline && !!auth.user && !auth.user.github_login);
@@ -91,7 +115,12 @@
       issueUrl = res.issue_url;
       status = 'success';
     } catch (e) {
-      errorMsg = toUserMessage(e, m.feedback_error());
+      if (e instanceof ApiError && e.status === 429 && e.retryAfter) {
+        now = Date.now();
+        retryAt = now + e.retryAfter * 1000;
+      } else {
+        errorMsg = toUserMessage(e, m.feedback_error());
+      }
       status = 'error';
     }
   }
@@ -196,7 +225,7 @@
         {#if status === 'error'}
           <div class="flex items-start gap-2 text-link mt-4" aria-live="polite">
             <TriangleAlert class="w-5 h-5 shrink-0 mt-0.5" />
-            <span class="text-sm break-words">{errorMsg || m.feedback_error()}</span>
+            <span class="text-sm break-words">{waitMsg || errorMsg || m.feedback_error()}</span>
           </div>
         {:else if offline}
           <p class="text-ink-muted text-xs mt-4">{m.feedback_offline_hint()}</p>
@@ -211,7 +240,11 @@
             disabled={!canSubmit}
             onclick={submit}
           >
-            {status === 'loading' ? m.feedback_submitting() : m.feedback_submit()}
+            {status === 'loading'
+              ? m.feedback_submitting()
+              : waitS > 0 && waitS < 60
+                ? m.feedback_submit_wait({ wait: formatWait(waitS) })
+                : m.feedback_submit()}
           </Button>
           <Button variant="secondary" size="lg" disabled={status === 'loading'} onclick={requestClose}>
             {m.common_cancel()}

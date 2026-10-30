@@ -1276,6 +1276,8 @@
   "feedback_view_issue": "Voir sur GitHub →",
   "feedback_offline_hint": "L'envoi de commentaires nécessite une connexion.",
   "feedback_error": "Impossible d'envoyer votre commentaire. Veuillez réessayer.",
+  "feedback_wait": "Vous pourrez envoyer un autre commentaire dans {wait}.",
+  "feedback_submit_wait": "Envoyer ({wait})",
   "rooms_title": "Salles",
   "rooms_total": "{count} tables",
   "rooms_add": "Ajouter une salle",

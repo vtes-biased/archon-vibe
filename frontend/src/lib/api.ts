@@ -16,7 +16,8 @@ export class ApiError extends Error {
     public status: number,
     public detail?: string,
     public code?: string,
-    public params?: Record<string, string>
+    public params?: Record<string, string>,
+    public retryAfter?: number
   ) {
     super(message);
     this.name = 'ApiError';
@@ -77,7 +78,8 @@ export async function apiRequest<T>(
     const localized = code ? errorCodeToMessage(code, params) : undefined;
     const message = localized || detail || `Request failed: ${response.statusText}`;
     if (!suppressErrorToast) showToast({ type: 'error', message });
-    throw new ApiError(message, response.status, detail, code, params);
+    const retryAfter = Number(response.headers.get('Retry-After')) || undefined;
+    throw new ApiError(message, response.status, detail, code, params, retryAfter);
   }
 
   if (response.status === 204 || response.headers.get('content-length') === '0') {
