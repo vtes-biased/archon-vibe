@@ -10,6 +10,21 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- Leagues can now play their own final and crown its winner Champion.
+- Organisers are warned of the tournaments they never finished, and a scored online final left open for a week now finishes itself.
+- The play record now shows win rate, game wins and VPs per game.
+- The Members list shows when each member was last active, and officials can filter for inactive members.
+- The feedback form now opens from every page and keeps your unsent draft.
+- The feedback form now tells you how long to wait when you hit its limit.
+- Tied members now share the same rank on the rankings and the Hall of Fame.
+- Dragging from inside a dialog onto its backdrop no longer closes it.
+- A cleared email or phone number now stays cleared on your profile.
+- Members and tournaments from vekn.net now land in the right city when the same name exists in several states.
+- Secrets of New York and Noites Brasileiras are in, along with the Brujah *antitribu* print-on-demand cards.
+- The Anarch and Companion preconstructed decks' cards are now legal in V5, as the tournament rules list them.
+
 ## v1.3.6 — 2026-10-28
 
 - The tournament list now has Upcoming and Past tabs.
