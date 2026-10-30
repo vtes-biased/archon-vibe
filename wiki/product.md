@@ -58,7 +58,11 @@ their own Account tab, IC-only account merge, cooptation tracking with the
 sponsor correctable by IC or the member's NC, privacy-filtered directory of VEKN
 members (non-members only to the officials of their country, or to any official
 when they have none,
-[access](access.md)) with a CSV export of the filtered list for officials, in-memoriam flag for deceased members,
+[access](access.md)) showing a viewer with a VEKN ID each member's last-active date — their latest
+finished event played or organised, which the public projection does not carry —
+with a filter for officials to those with none in the
+trailing 18 months, and a CSV export of the filtered list, date included, for
+officials, in-memoriam flag for deceased members,
 IC-only irreversible anonymization of a VEKN member, who then reads "Anonymized
 member" wherever a name appears.
 

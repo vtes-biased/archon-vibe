@@ -145,6 +145,13 @@ export function translatePlayerState(state: string): string {
   }
 }
 
+/** Exact calendar months, clamped to the month's length: the rating window's cutoff. */
+export function eighteenMonthsAgo(): string {
+  const now = new Date();
+  const lastDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 17, 0)).getUTCDate();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 18, Math.min(now.getUTCDate(), lastDay))).toISOString().slice(0, 10);
+}
+
 /** Distinct players in ≥1 preliminary round (finals folded in), or — for a rounds-less import —
  * standings rows carrying any score. A twin of backend ratings.py's player-count function; keep them in sync. */
 export function playedPlayerUids(tournament: Tournament): Set<string> {

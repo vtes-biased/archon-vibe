@@ -4,7 +4,7 @@
   import { getTournamentListItems, getDecksByUser, getTournament, getTournamentsNaming, getSanctionsForTournament } from "$lib/db";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { getCountryFlag } from "$lib/geonames";
-  import { computeStandings, playedPlayerUids, getStateTone, translateTournamentState, RATING_CATEGORIES, ratingCategoryLabel } from "$lib/tournament-utils";
+  import { computeStandings, eighteenMonthsAgo, playedPlayerUids, getStateTone, translateTournamentState, RATING_CATEGORIES, ratingCategoryLabel } from "$lib/tournament-utils";
   import { attestedPlayerCount, playerGameRecord, ratingCategory } from "$lib/engine";
   import type { PlayerGameRecord } from "$lib/engine";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
@@ -52,13 +52,6 @@
 
   function eventDay(t: Tournament): string {
     return (t.finish ?? t.start)?.slice(0, 10) ?? "";
-  }
-
-  // Exact calendar months, clamped to the month's length: the rating window's cutoff.
-  function eighteenMonthsAgo(): string {
-    const now = new Date();
-    const lastDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 17, 0)).getUTCDate();
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 18, Math.min(now.getUTCDate(), lastDay))).toISOString().slice(0, 10);
   }
 
   function perGame(total: number): string {

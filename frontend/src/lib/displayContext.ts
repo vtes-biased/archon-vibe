@@ -9,10 +9,11 @@ export interface DisplayFilters {
   nameSearch?: string;
   hasPastSanctions?: boolean;
   currentlySanctioned?: boolean;
-  // Official-only sponsor-management filters (coopted_by / vekn_id), applied client-side in loadUsers
+  // Official-only filters (coopted_by / vekn_id / last active), applied client-side in loadUsers
   // — deliberately NOT in matchesCurrentFilters, which stays a coarse refresh gate.
   sponsor?: 'mine' | 'none';
   noVekn?: boolean;
+  inactive?: boolean;
 }
 
 interface PaginationContext {
@@ -36,7 +37,8 @@ class DisplayContext {
     hasPastSanctions?: boolean,
     currentlySanctioned?: boolean,
     sponsor?: 'mine' | 'none',
-    noVekn?: boolean
+    noVekn?: boolean,
+    inactive?: boolean
   ): void {
     this.filters = {
       country: country && country !== 'all' ? country : undefined,
@@ -48,6 +50,7 @@ class DisplayContext {
       currentlySanctioned: currentlySanctioned || undefined,
       sponsor: sponsor || undefined,
       noVekn: noVekn || undefined,
+      inactive: inactive || undefined,
     };
     // Boundaries aren't reset here — they'll be updated by loadUsers(). Keeping stale boundaries
     // briefly is fine, better than triggering excessive refreshes.

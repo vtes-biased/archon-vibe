@@ -332,6 +332,8 @@
   "user_list_filter_sponsor_title": "Parrainage",
   "user_list_filter_my_recruits": "Mes recrues",
   "user_list_filter_no_sponsor": "Sans parrain",
+  "user_list_last_active": "Dernière activité",
+  "user_list_filter_inactive": "Inactif depuis 18 mois ou plus",
   "user_list_filter_no_vekn": "Sans VEKN",
   "user_list_filter_recruits_have_vekn": "Vos recrues ont toujours un identifiant VEKN",
   "user_list_showing_range": "Affichage de {from} à {to} sur {total} utilisateurs",

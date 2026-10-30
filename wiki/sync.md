@@ -788,10 +788,12 @@ The agenda's "am I in this event" is a separate `Set` of the signed-in member's
 tournament uids, rebuilt when that uid changes: carrying `player_uids` on the
 projection would re-add ~3.6KB per large event to answer what is two dozen uids for
 a real member. A surface needing a whole object reads it **by key** — league
-scoring pulls each finished event's result sheet that way. A profile's events
-played is the one exception: no key names a member's events, so it scans the
-store once per viewed member and keeps a separate cache, patched on writes like
-the agenda's `Set`. `sanctions`, `leagues`
+scoring pulls each finished event's result sheet that way. Two exceptions have no
+key to read by. A profile's events played scans the store once per viewed member
+and keeps a separate cache, patched on writes like the agenda's `Set`. The
+directory's last-active dates scan it once per tab, at member level and above, into
+a member-to-day `Map` that the list renders ahead of. A new finished event raises it; a write to an event already
+counted can lower a date, so it drops the map for the next read. `sanctions`, `leagues`
 and `promos` stay whole-store reads: they are small enough that a projection would
 buy nothing.
 

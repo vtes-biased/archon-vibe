@@ -5,6 +5,7 @@ import type { TournamentEvent } from './engine';
 import { expandRolesForFilter } from './roles';
 import { normalizeSearch, searchTokens } from './utils';
 import { filterAgenda, type AgendaViewer } from './agenda';
+import { playedPlayerUids } from './tournament-utils';
 import { getEngine } from './engine-instance';
 
 export function getDeviceId(): string {
@@ -732,6 +733,7 @@ export async function clearAllTournaments(): Promise<void> {
   memberPlayingUid = null;
   playedByPromise = null;
   playedByUid = null;
+  lastActivePromise = null;
 }
 
 export interface TournamentListItem {
@@ -783,6 +785,22 @@ let memberPlayingUid: string | null = null;
 let playedByPromise: Promise<Map<string, Tournament>> | null = null;
 let playedByUid: string | null = null;
 
+interface LastActive {
+  days: Map<string, string>;
+  events: Set<string>;
+}
+
+let lastActivePromise: Promise<LastActive> | null = null;
+
+function raiseLastActive({ days, events }: LastActive, t: Tournament): void {
+  const day = (t.finish ?? t.start)?.slice(0, 10);
+  if (t.deleted_at || t.state !== 'Finished' || !day) return;
+  events.add(t.uid);
+  const active = [...playedPlayerUids(t), ...(t.organizers_uids ?? [])];
+  if (t.winner) active.push(t.winner);
+  for (const uid of active) if (day > (days.get(uid) ?? '')) days.set(uid, day);
+}
+
 function namesMember(t: Tournament, userUid: string): boolean {
   return t.winner === userUid
     || !!t.players?.some(pl => pl.user_uid === userUid)
@@ -833,7 +851,36 @@ export async function getTournamentsNaming(userUid: string): Promise<Tournament[
   return [...(await playedByPromise).values()];
 }
 
+export async function getLastActive(): Promise<Map<string, string>> {
+  if (!lastActivePromise) {
+    const build = (async () => {
+      const db = await getDB();
+      const lastActive: LastActive = { days: new Map(), events: new Set() };
+      let after: string | undefined;
+      for (;;) {
+        const batch = await db.getAll('tournaments', after === undefined ? undefined : IDBKeyRange.lowerBound(after, true), 500);
+        for (const t of batch) raiseLastActive(lastActive, t);
+        if (batch.length < 500) return lastActive;
+        after = batch[batch.length - 1]!.uid;
+      }
+    })();
+    lastActivePromise = build;
+    build.catch(() => { if (lastActivePromise === build) lastActivePromise = null; });
+  }
+  return new Map((await lastActivePromise).days);
+}
+
+function patchLastActive(uid: string, t?: Tournament): void {
+  const build = lastActivePromise;
+  if (!build) return;
+  void build.then(lastActive => {
+    if (lastActive.events.has(uid)) { if (lastActivePromise === build) lastActivePromise = null; }
+    else if (t) raiseLastActive(lastActive, t);
+  });
+}
+
 function patchTournamentIndex(t: Tournament): void {
+  patchLastActive(t.uid, t);
   if (tournamentIndexPromise) void tournamentIndexPromise.then(idx => idx.set(t.uid, projectTournament(t)));
   const uid = memberPlayingUid;
   if (uid && memberPlayingPromise) {
@@ -848,6 +895,7 @@ function patchTournamentIndex(t: Tournament): void {
 }
 
 function dropFromTournamentIndex(uid: string): void {
+  patchLastActive(uid);
   if (tournamentIndexPromise) void tournamentIndexPromise.then(idx => idx.delete(uid));
   if (memberPlayingPromise) void memberPlayingPromise.then(set => set.delete(uid));
   if (playedByPromise) void playedByPromise.then(map => map.delete(uid));

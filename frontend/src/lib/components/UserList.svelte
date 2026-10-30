@@ -4,7 +4,7 @@
   import { goto } from "$app/navigation";
   import User from "./User.svelte";
   import DeceasedIcon from "./DeceasedIcon.svelte";
-  import { getFilteredUsers, hasAnyUsers, userHasPastSanctions, isUserCurrentlySanctioned, getRegistrationBarringLevels } from "$lib/db";
+  import { getFilteredUsers, getLastActive, hasAnyUsers, userHasPastSanctions, isUserCurrentlySanctioned, getRegistrationBarringLevels } from "$lib/db";
   import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
   import { getRoleTone } from "$lib/roles";
   import Badge, { badgeToneClass } from "$lib/components/Badge.svelte";
@@ -12,7 +12,8 @@
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { isOfficial as engineIsOfficial, canSponsorMember, canListNonMember, canExportMembers } from "$lib/engine";
   import { buildCsv } from "$lib/csv";
-  import { downloadBlob } from "$lib/utils";
+  import { downloadBlob, formatCalendarDate } from "$lib/utils";
+  import { eighteenMonthsAgo } from "$lib/tournament-utils";
   import { showToast } from "$lib/stores/toast.svelte";
   import { displayContext } from "$lib/displayContext";
   import type { User as UserType, Role } from "$lib/types";
@@ -24,6 +25,7 @@
   import * as m from '$lib/paraglide/messages.js';
 
   let filteredUsers = $state<UserListItem[]>([]);
+  let lastActive = $state.raw(new Map<string, string>());
   let error = $state<string | null>(null);
   let isOnline = $state(navigator.onLine);
   let isSyncing = $state(true);
@@ -49,7 +51,7 @@
     "DEV",
   ];
 
-  // Deliberately absent from the syncQueryParams call below: the officials-only sponsor and no-VEKN toggles.
+  // Deliberately absent from the syncQueryParams call below: the officials-only sponsor, no-VEKN and inactive toggles.
   const urlParams = currentParams();
   let currentPage = $state(readPageParam() + 1);
   let pageSize = 250;
@@ -66,6 +68,7 @@
   // 'none' are mutually exclusive (a member either was coopted by me or by no one).
   let sponsorFilter = $state<"all" | "mine" | "none">("all");
   let filterNoVekn = $state(false);
+  let filterInactive = $state(false);
 
   let displayRefreshTimer: ReturnType<typeof setTimeout> | undefined;
   let isLoadingUsers = false;
@@ -74,13 +77,16 @@
   // — advertise it in the placeholder for them alone. Identity, not authority: the search is filtered by what synced.
   const isOfficial = $derived(engineIsOfficial(getAuthState().user));
 
+  // Below member level the store carries no standings or organisers, so no date can exist.
+  const seesActivity = $derived(!!getAuthState().user?.vekn_id);
+
   const canSponsor = $derived(canSponsorMember(getAuthState().user).allowed);
   const canExport = $derived(canExportMembers(getAuthState().user));
 
   async function exportMembers() {
-    const barring = await getRegistrationBarringLevels();
+    const [barring, days] = await Promise.all([getRegistrationBarringLevels(), getLastActive()]);
     const rows: string[][] = [
-      ["name", "vekn_id", "country", "city", "roles", "sanction", "email", "phone", "discord"],
+      ["name", "vekn_id", "country", "city", "roles", "sanction", "last_active", "email", "phone", "discord"],
       ...filteredUsers.map((u) => [
         u.name,
         u.vekn_id ?? "",
@@ -88,6 +94,7 @@
         u.city ?? "",
         u.roles.join(" "),
         (barring.get(u.uid) ?? []).join(" "),
+        days.get(u.uid) ?? "",
         u.contact_email ?? "",
         u.contact_phone ?? "",
         u.contact_discord ?? "",
@@ -124,7 +131,7 @@
 
   const hasFilters = $derived(
     !!searchQuery.trim() || selectedCountry !== "all" || selectedRoles.length > 0
-      || filterHasPastSanctions || filterCurrentlySanctioned || sponsorFilter !== "all" || filterNoVekn,
+      || filterHasPastSanctions || filterCurrentlySanctioned || sponsorFilter !== "all" || filterNoVekn || filterInactive,
   );
 
   // One way out of a filtered-empty list, including one the nav menu restored.
@@ -137,6 +144,7 @@
     filterCurrentlySanctioned = false;
     sponsorFilter = "all";
     filterNoVekn = false;
+    filterInactive = false;
     currentPage = 1;
     updateDisplayContext();
     loadUsers();
@@ -172,7 +180,11 @@
     try {
       error = null;
 
-      const { country, roles, nameSearch, hasPastSanctions, currentlySanctioned, sponsor, noVekn } = displayContext.getFilters();
+      if (seesActivity) {
+        getLastActive().then((days) => { lastActive = days; }, (e) => console.error("Error loading last active dates:", e));
+      }
+
+      const { country, roles, nameSearch, hasPastSanctions, currentlySanctioned, sponsor, noVekn, inactive } = displayContext.getFilters();
       let users = await getFilteredUsers(country, roles, nameSearch);
 
       if (hasPastSanctions || currentlySanctioned) {
@@ -207,6 +219,12 @@
         if (!listable.has(country)) listable.set(country, canListNonMember(viewer, country));
         return listable.get(country)!;
       });
+
+      if (inactive) {
+        const days = await getLastActive();
+        const cutoff = eighteenMonthsAgo();
+        users = users.filter((u) => (days.get(u.uid) ?? "") < cutoff);
+      }
 
       filteredUsers = users;
 
@@ -291,7 +309,8 @@
       filterHasPastSanctions,
       filterCurrentlySanctioned,
       sponsorFilter !== "all" ? sponsorFilter : undefined,
-      filterNoVekn
+      filterNoVekn,
+      filterInactive
     );
   }
 
@@ -304,6 +323,13 @@
 
   function toggleNoVekn() {
     filterNoVekn = !filterNoVekn;
+    currentPage = 1;
+    updateDisplayContext();
+    loadUsers();
+  }
+
+  function toggleInactive() {
+    filterInactive = !filterInactive;
     currentPage = 1;
     updateDisplayContext();
     loadUsers();
@@ -360,6 +386,8 @@
     const handleSyncEvent = (event: any) => {
       if (event.type === "user" && event.data) {
         handleSyncUserUpdate(event.data);
+      } else if (event.type === "tournament" && event.data?.state === "Finished") {
+        scheduleDisplayRefresh();
       } else if (event.type === "sync_complete") {
         isSyncing = false;
         scheduleDisplayRefresh();
@@ -561,6 +589,22 @@
                 </button>
               </div>
             </div>
+            {#if seesActivity}
+            <div class="mt-4">
+              <div class="block text-sm font-medium text-ink-muted mb-2">{m.user_list_last_active()}</div>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  onclick={toggleInactive}
+                  aria-pressed={filterInactive}
+                  class="px-3 min-h-[44px] inline-flex items-center rounded text-sm font-medium transition-colors {filterInactive
+                    ? 'bg-accent-soft/60 text-link-soft'
+                    : 'bg-surface-hover text-ink-muted hover:bg-surface-active'}"
+                >
+                  {m.user_list_filter_inactive()}
+                </button>
+              </div>
+            </div>
+            {/if}
           {/if}
         </div>
       </div>
@@ -586,7 +630,10 @@
           <div id="header-name" class="col-span-3">{m.common_name()}</div>
           <div id="header-vekn-id" class="col-span-2">{m.add_player_vekn_id_label()}</div>
           <div id="header-country" class="col-span-2">{m.common_country()}</div>
-          <div id="header-roles" class="col-span-5">{m.common_roles()}</div>
+          <div id="header-roles" class={seesActivity ? "col-span-3" : "col-span-5"}>{m.common_roles()}</div>
+          {#if seesActivity}
+            <div id="header-last-active" class="col-span-2">{m.user_list_last_active()}</div>
+          {/if}
         </div>
 
         <div id="users-rows-container" class="divide-y divide-line">
@@ -620,6 +667,11 @@
                           ? `${getCountryFlag(user.country)} ${countries[user.country]?.name || user.country}`
                           : m.common_na()}{user.city ? ` · ${user.city}` : ""}
                       </div>
+                      {#if seesActivity && lastActive.get(user.uid)}
+                        <div class="text-sm text-ink-muted">
+                          {m.user_list_last_active()}: {formatCalendarDate(lastActive.get(user.uid)!)}
+                        </div>
+                      {/if}
                     </div>
                   </div>
                   {#if user.roles.length > 0}
@@ -658,7 +710,7 @@
                       <div class="text-xs text-ink-faint">{user.city}</div>
                     {/if}
                   </div>
-                  <div class="col-span-5">
+                  <div class={seesActivity ? "col-span-3" : "col-span-5"}>
                     {#if user.roles.length > 0}
                       <div class="flex flex-wrap gap-1">
                         {#each user.roles as role}
@@ -669,6 +721,11 @@
                       <span class="text-sm text-ink-faint">—</span>
                     {/if}
                   </div>
+                  {#if seesActivity}
+                    <div class="col-span-2 text-sm text-ink-muted">
+                      {lastActive.has(user.uid) ? formatCalendarDate(lastActive.get(user.uid)!) : "—"}
+                    </div>
+                  {/if}
                 </div>
               </div>
           {/each}

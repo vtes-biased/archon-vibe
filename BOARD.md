@@ -25,4 +25,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 
 Board changes ride the commit that earns them.
 
-- Show each member's last-active date in the members directory — their latest event played or organised — with an "inactive for 18+ months" filter and the date in the CSV export for officials — gh-77: the directory filters by role and country (`frontend/src/lib/components/UserList.svelte:41-58`) but nothing shows activity, though every play record already lists events played and organised — **Done when** a member row shows the date of their latest finished event played or event organised, an official can filter the list to members with none in the last 18 months, the export carries the date, and the Members paragraph in `wiki/product.md` describes it.

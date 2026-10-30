@@ -332,6 +332,8 @@
   "user_list_filter_sponsor_title": "Patrocínio",
   "user_list_filter_my_recruits": "Meus recrutas",
   "user_list_filter_no_sponsor": "Sem patrocinador",
+  "user_list_last_active": "Última atividade",
+  "user_list_filter_inactive": "Inativo há 18 meses ou mais",
   "user_list_filter_no_vekn": "Sem VEKN",
   "user_list_filter_recruits_have_vekn": "Seus recrutas sempre têm um ID VEKN",
   "user_list_showing_range": "Mostrando {from} a {to} de {total} usuários",
