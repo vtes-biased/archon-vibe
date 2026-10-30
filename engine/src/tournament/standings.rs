@@ -1,6 +1,7 @@
 use crate::model::{
-    arg, finals_table, player, score, seat, standing, standing_row, table, tournament,
+    arg, finals_table, game_record, player, score, seat, standing, standing_row, table, tournament,
 };
+use crate::ratings::players_with_rounds;
 use json::JsonValue;
 
 use super::helpers::count_played_rounds;
@@ -529,14 +530,7 @@ pub fn display_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<J
     compute_final_standings(&JsonValue::Array(arr), &winner)
 }
 
-/// SA-adjusted rating VP/GW for a finished tournament, including finals VP/GW unlike
-/// preliminary standings. A win credits +1 GW where a final was played but no finals
-/// table recorded it (inert when `winner == ""`).
-pub fn compute_rating_vp_gw(
-    tournament: &JsonValue,
-    sanctions: &JsonValue,
-    user_uid: &str,
-) -> (f64, f64) {
+fn forfeits_rating(tournament: &JsonValue, sanctions: &JsonValue, user_uid: &str) -> bool {
     // DQ'd players earn no rating: forfeit their rating VP/GW too (the participation
     // base + finalist bonus are suppressed upstream in the rating-entry builder).
     let disqualified = tournament[tournament::PLAYERS].members().any(|p| {
@@ -548,7 +542,18 @@ pub fn compute_rating_vp_gw(
         p[player::USER_UID].as_str() == Some(user_uid)
             && p[player::NON_COMPETING].as_bool() == Some(true)
     });
-    if disqualified || non_competing {
+    disqualified || non_competing
+}
+
+/// SA-adjusted rating VP/GW for a finished tournament, including finals VP/GW unlike
+/// preliminary standings. A win credits +1 GW where a final was played but no finals
+/// table recorded it (inert when `winner == ""`).
+pub fn compute_rating_vp_gw(
+    tournament: &JsonValue,
+    sanctions: &JsonValue,
+    user_uid: &str,
+) -> (f64, f64) {
+    if forfeits_rating(tournament, sanctions, user_uid) {
         return (0.0, 0.0);
     }
 
@@ -599,6 +604,80 @@ pub fn compute_rating_vp_gw(
         gw += 1.0;
     }
     (vp, gw)
+}
+
+/// One event's share of a member's per-game figures. `left_out` names why it has
+/// none: `withdrawn` (also DQ, proxy, no-show) or `unknown_rounds`.
+pub fn player_game_record(
+    tournament: &JsonValue,
+    sanctions: &JsonValue,
+    user_uid: &str,
+) -> JsonValue {
+    let left_out = |reason: &str| {
+        json::object! {
+            game_record::VP => 0.0,
+            game_record::GW => 0.0,
+            game_record::GAMES => 0,
+            game_record::LEFT_OUT => reason,
+        }
+    };
+    let standings = &tournament[tournament::STANDINGS];
+    let winner = tournament[tournament::WINNER].as_str().unwrap_or("");
+    let row = standings
+        .members()
+        .find(|s| s[standing::USER_UID].as_str() == Some(user_uid));
+    if forfeits_rating(tournament, sanctions, user_uid)
+        || row.is_some_and(|s| s[standing::WITHDRAWN].as_bool().unwrap_or(false))
+    {
+        return left_out("withdrawn");
+    }
+
+    let finals = &tournament[tournament::FINALS];
+    let in_final = if finals.is_null() {
+        final_played(standings)
+            && (winner == user_uid
+                || row.is_some_and(|s| s[standing::FINALIST].as_bool().unwrap_or(false)))
+    } else {
+        finals[finals_table::SEATING]
+            .members()
+            .any(|s| s[seat::PLAYER_UID].as_str() == Some(user_uid))
+    };
+    let rounds = &tournament[tournament::ROUNDS];
+    let prelim_games = if rounds.is_empty() {
+        let max_rounds = tournament[tournament::MAX_ROUNDS].as_usize().unwrap_or(0);
+        if max_rounds == 0
+            || players_with_rounds(tournament) == 0
+            || (row.is_none() && winner == user_uid)
+        {
+            return left_out("unknown_rounds");
+        }
+        if row.is_none_or(|s| is_no_show(s, winner)) {
+            return left_out("withdrawn");
+        }
+        max_rounds
+    } else {
+        rounds
+            .members()
+            .flat_map(|round| round.members())
+            .filter(|t| {
+                t[table::STATE].as_str() == Some("Finished")
+                    && t[table::SEATING]
+                        .members()
+                        .any(|s| s[seat::PLAYER_UID].as_str() == Some(user_uid))
+            })
+            .count()
+    };
+    let games = prelim_games + usize::from(in_final);
+    if games == 0 {
+        return left_out("withdrawn");
+    }
+    let (vp, gw) = compute_rating_vp_gw(tournament, sanctions, user_uid);
+    json::object! {
+        game_record::VP => vp,
+        game_record::GW => gw,
+        game_record::GAMES => games,
+        game_record::LEFT_OUT => JsonValue::Null,
+    }
 }
 
 pub(super) fn scores_tied(a: &Standing, b: &Standing) -> bool {

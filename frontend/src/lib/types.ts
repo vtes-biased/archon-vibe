@@ -273,6 +273,7 @@ export interface Standing {
   finalist: boolean;
   disqualified?: boolean;
   non_competing?: boolean;
+  withdrawn?: boolean;
 }
 
 export type RafflePool = "AllPlayers" | "NonFinalists" | "GameWinners" | "NoGameWin" | "NoVictoryPoint";

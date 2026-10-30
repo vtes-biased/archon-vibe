@@ -325,6 +325,7 @@ def _map_vekn_to_tournament(
                     toss=toss,
                     finalist=is_finalist,
                     disqualified=disqualified,
+                    withdrawn=str(vp_data.get("wd") or "0") == "1",
                 )
             )
 

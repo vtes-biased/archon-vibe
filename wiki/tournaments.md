@@ -1085,3 +1085,15 @@ The non-obvious structure:
   deck pushes.
 - `frontend/src/lib/engine.ts` — the WASM wrapper; `tournament-actions.ts` —
   `tournamentAction()` and the two mutation paths.
+
+## Per-game figures
+
+A member's GW and VP per game are `player_game_record` over the rating's own VP and
+GW, finals included, with the final counted as a game. An event with rounds counts
+the finished tables the member sat at, so a dropout there stays in on the games
+they played. A rounds-less import counts `max_rounds`, plus one for a finalist, and
+is **left out**, and said to be, when the row is withdrawn, DQ'd, a proxy or a
+no-show, or when the round count is unknown — `max_rounds` 0, or a row holding no
+play data, whose winner has no score to divide. The aggregate is over
+the events left, blank only when none are: blanking it for any unknown event
+would blank every pre-2011 career for good.

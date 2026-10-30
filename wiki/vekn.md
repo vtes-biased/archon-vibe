@@ -341,7 +341,9 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   and its rating. Withdrawing is not an excluded class in this app: a player who
   drops mid-event stays ranked on what they earned and is barred only from the
   final ([tournaments](tournaments.md#finals)). Excluding an imported withdrawal
-  would import a rule we do not have. A `wd` row that scored nothing is a no-show
+  would import a rule we do not have. Its flag is kept as `Standing.withdrawn` for
+  one reader: the play record's per-game figures, since a dropout's games are
+  unknown on a rounds-less sheet. A `wd` row that scored nothing is a no-show
   by the ordinary derivation and needs no flag to become one — which is what makes
   the round trip of our own push, where `no_show` goes out as `WD`, come back
   unchanged.

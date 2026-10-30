@@ -1,15 +1,17 @@
 <script lang="ts">
-  import type { User, Tournament, DeckObject } from "$lib/types";
+  import type { User, Tournament, DeckObject, RatingCategory } from "$lib/types";
   import type { TournamentListItem } from "$lib/db";
   import { getTournamentListItems, getDecksByUser, getTournament, getTournamentsNaming, getSanctionsForTournament } from "$lib/db";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { getCountryFlag } from "$lib/geonames";
-  import { computeStandings, playedPlayerUids, getStateTone, translateTournamentState } from "$lib/tournament-utils";
-  import { attestedPlayerCount } from "$lib/engine";
+  import { computeStandings, playedPlayerUids, getStateTone, translateTournamentState, RATING_CATEGORIES, ratingCategoryLabel } from "$lib/tournament-utils";
+  import { attestedPlayerCount, playerGameRecord, ratingCategory } from "$lib/engine";
+  import type { PlayerGameRecord } from "$lib/engine";
   import DeckDisplay from "$lib/components/DeckDisplay.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
   import Badge from "$lib/components/Badge.svelte";
   import { TriangleAlert, ChevronDown, ChevronRight } from "@lucide/svelte";
+  import { getLocale } from '$lib/paraglide/runtime.js';
   import * as m from '$lib/paraglide/messages.js';
 
   let { user }: { user: User | undefined } = $props();
@@ -21,27 +23,55 @@
     won: boolean;
     finalist: boolean;
     deck: DeckObject | undefined;
+    category: RatingCategory;
+    games: PlayerGameRecord;
   }
 
   let events = $state<PlayedEvent[]>([]);
   let undocumented = $state<TournamentListItem[]>([]);
   let organised = $state<TournamentListItem[]>([]);
   let expandedDeck = $state<string | null>(null);
-  const winCount = $derived(events.filter(e => e.won).length);
-  const finalCount = $derived(events.filter(e => e.won || e.finalist).length);
+  let category = $state<RatingCategory | "">("");
+  let recentOnly = $state(false);
+  const categories = $derived(RATING_CATEGORIES.filter(c => events.some(e => e.category === c)));
+  const windowStart = $derived(recentOnly ? eighteenMonthsAgo() : "");
+  const shown = $derived(events.filter(e => (!category || e.category === category) && eventDay(e.tournament) >= windowStart));
+  const winCount = $derived(shown.filter(e => e.won).length);
+  const finalCount = $derived(shown.filter(e => e.won || e.finalist).length);
   const hofWins = $derived(new Set(user?.wins ?? []));
+  const hofCount = $derived(shown.filter(e => hofWins.has(e.tournament.uid)).length);
+  const counted = $derived(shown.filter(e => !e.games.left_out));
+  const gameCount = $derived(counted.reduce((sum, e) => sum + e.games.games, 0));
+  const leftOutCount = $derived(shown.filter(e => e.games.left_out === "withdrawn").length);
+  const unknownRoundsCount = $derived(shown.filter(e => e.games.left_out === "unknown_rounds").length);
   let viewedUid: string | undefined;
 
   function day(t: { start: string | null }): string {
     return t.start?.slice(0, 10) ?? "";
   }
 
+  function eventDay(t: Tournament): string {
+    return (t.finish ?? t.start)?.slice(0, 10) ?? "";
+  }
+
+  // Exact calendar months, clamped to the month's length: the rating window's cutoff.
+  function eighteenMonthsAgo(): string {
+    const now = new Date();
+    const lastDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 17, 0)).getUTCDate();
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 18, Math.min(now.getUTCDate(), lastDay))).toISOString().slice(0, 10);
+  }
+
+  function perGame(total: number): string {
+    return gameCount ? (total / gameCount).toLocaleString(getLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
+  }
+
   async function playedEvent(t: Tournament, uid: string, deck: DeckObject | undefined): Promise<PlayedEvent | null> {
-    const entry = computeStandings(t, await getSanctionsForTournament(t.uid)).find(e => e.user_uid === uid);
+    const sanctions = await getSanctionsForTournament(t.uid);
+    const entry = computeStandings(t, sanctions).find(e => e.user_uid === uid);
     const played = t.rounds?.length ? playedPlayerUids(t).has(uid) : !!entry && !entry.unplaced;
     if (!played && !deck && t.winner !== uid) return null;
     const place = entry && !entry.unplaced ? entry.rank : null;
-    return { tournament: t, place, field: attestedPlayerCount(t) || undefined, won: t.winner === uid || place === 1, finalist: !!entry?.finalist, deck };
+    return { tournament: t, place, field: attestedPlayerCount(t) || undefined, won: t.winner === uid || place === 1, finalist: !!entry?.finalist, deck, category: ratingCategory(t.format, t.online), games: playerGameRecord(t, sanctions, uid) };
   }
 
   async function load(uid: string, owner: boolean) {
@@ -59,6 +89,7 @@
     const finished = [...named.values()].filter(t => !t.deleted_at && t.state === "Finished");
     const played = await Promise.all(finished.map(t => playedEvent(t, uid, shown.get(t.uid))));
     if (uid !== viewedUid) return;
+    category = "";
     events = played
       .filter((e): e is PlayedEvent => !!e)
       .sort((a, b) => day(b.tournament).localeCompare(day(a.tournament)));
@@ -112,17 +143,40 @@
 {#if events.length}
   <section class="mt-6">
     <h2 class="text-lg font-semibold text-ink-bright">
-      {m.user_detail_events({ count: String(events.length) })}
+      {m.user_detail_events({ count: String(shown.length) })}
     </h2>
-    <p class="text-sm text-ink-muted mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+    <div class="flex flex-wrap items-center gap-3 my-2 text-sm">
+      <select bind:value={category} aria-label={m.user_detail_filter_category()} class="bg-surface-card border border-line rounded-lg px-3 py-2 text-sm text-ink-bright min-h-[44px]">
+        <option value="">{m.user_detail_filter_all_categories()}</option>
+        {#each categories as c}
+          <option value={c}>{ratingCategoryLabel(c)}</option>
+        {/each}
+      </select>
+      <label class="flex items-center gap-2 text-ink-muted min-h-[44px]">
+        <input type="checkbox" bind:checked={recentOnly} />
+        {m.user_detail_filter_18_months()}
+      </label>
+    </div>
+    <p class="text-sm text-ink-muted flex flex-wrap items-center gap-x-3 gap-y-1">
       <span class="whitespace-nowrap">{m.user_detail_wins_count({ count: String(winCount) })}</span>
-      {#if hofWins.size}
-        <span class="whitespace-nowrap text-[10px] px-1 py-0.5 rounded badge-highlight">{m.user_detail_hof_count({ count: String(hofWins.size) })}</span>
+      {#if hofCount}
+        <span class="whitespace-nowrap text-[10px] px-1 py-0.5 rounded badge-highlight">{m.user_detail_hof_count({ count: String(hofCount) })}</span>
       {/if}
       <span class="whitespace-nowrap">{m.user_detail_finals_count({ count: String(finalCount) })}</span>
+      {#if shown.length}
+        <span class="whitespace-nowrap">{m.user_detail_win_rate({ rate: String(Math.round(winCount / shown.length * 100)) })}</span>
+      {/if}
+      <span class="whitespace-nowrap">{m.user_detail_gw_per_game({ value: perGame(counted.reduce((sum, e) => sum + e.games.gw, 0)) })}</span>
+      <span class="whitespace-nowrap">{m.user_detail_vp_per_game({ value: perGame(counted.reduce((sum, e) => sum + e.games.vp, 0)) })}</span>
     </p>
-    <ul class="bg-surface-card border border-line rounded-lg divide-y divide-line">
-      {#each events as { tournament: t, place, field, won, finalist, deck } (t.uid)}
+    {#if leftOutCount || unknownRoundsCount}
+      <p class="text-xs text-ink-faint mt-1">
+        {#if leftOutCount}{m.user_detail_left_out_withdrawn({ count: String(leftOutCount) })}{/if}
+        {#if unknownRoundsCount}{m.user_detail_left_out_unknown_rounds({ count: String(unknownRoundsCount) })}{/if}
+      </p>
+    {/if}
+    <ul class="mt-3 bg-surface-card border border-line rounded-lg divide-y divide-line">
+      {#each shown as { tournament: t, place, field, won, finalist, deck } (t.uid)}
         {@const open = !!deck && expandedDeck === deck.uid}
         <li class="px-4 py-2 text-sm">
           <div class="flex flex-wrap items-center gap-x-2">

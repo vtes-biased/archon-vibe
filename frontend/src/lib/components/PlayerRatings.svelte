@@ -2,6 +2,7 @@
   import type { User, RatingCategory, CategoryRating, TournamentRatingEntry } from "$lib/types";
   import FoldableSection from "$lib/components/FoldableSection.svelte";
   import RankCell from "$lib/components/RankCell.svelte";
+  import { RATING_CATEGORIES, ratingCategoryLabel } from "$lib/tournament-utils";
   import { getLocale } from '$lib/paraglide/runtime.js';
   import * as m from '$lib/paraglide/messages.js';
 
@@ -10,22 +11,8 @@
 
   let expandedCategories = $state<Set<RatingCategory>>(new Set());
 
-  const categoryLabelFns: Record<RatingCategory, () => string> = {
-    constructed_offline: () => m.rankings_cat_constructed(),
-    constructed_online: () => m.rankings_cat_constructed_online(),
-    limited_offline: () => m.rankings_cat_limited(),
-    limited_online: () => m.rankings_cat_limited_online(),
-  };
-
-  const allCategories: RatingCategory[] = [
-    "constructed_offline",
-    "constructed_online",
-    "limited_offline",
-    "limited_online",
-  ];
-
   let availableCategories = $derived(
-    allCategories.filter(c => user?.[c] && (user[c] as CategoryRating).total > 0)
+    RATING_CATEGORIES.filter(c => user?.[c] && (user[c] as CategoryRating).total > 0)
   );
 
   function sortedByDate(entries: TournamentRatingEntry[]): TournamentRatingEntry[] {
@@ -60,7 +47,7 @@
       {@const catRating = user?.[cat] as CategoryRating}
       {@const isExpanded = expandedCategories.has(cat)}
       <FoldableSection
-        title={categoryLabelFns[cat]()}
+        title={ratingCategoryLabel(cat)}
         open={isExpanded}
         ontoggle={() => toggleCategory(cat)}
       >

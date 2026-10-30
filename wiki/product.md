@@ -47,9 +47,10 @@ passkeys, Discord OAuth plus Linked Roles, GitHub link (link-only, used to
 @-mention a reporter on their feedback issue), JWT sessions with refresh.
 
 **Members** — profiles with contact and socials, avatar upload, VEKN ID
-claim/sponsor/link/abandon/force-abandon, a play record of the events played
-followed by the events the member organised (any state, VEKN-synced ones
-included, shown to members since organisers are member-level data), the role
+claim/sponsor/link/abandon/force-abandon, a play record of the events played — with win rate (wins / events), GW and VP
+per game, filterable by rating category and to the trailing 18 months — followed
+by the events the member organised (any state, VEKN-synced ones included, shown
+to members since organisers are member-level data), the role
 set (IC, NC, Prince, Judge, Sheriff, Rulemonger, Ethics, PTC, Playtester,
 DEV), playtest NDA click-to-sign with sealed-PDF records gating the PT role and
 retrievable by the member from

@@ -158,6 +158,14 @@ pub mod finals_table {
     pub const STATE: &str = "state";
 }
 
+/// What `player_game_record` returns: derived, never stored.
+pub mod game_record {
+    pub const GAMES: &str = "games";
+    pub const GW: &str = "gw";
+    pub const LEFT_OUT: &str = "left_out";
+    pub const VP: &str = "vp";
+}
+
 pub mod player {
     pub const DISPLAY_NAME: &str = "display_name";
     pub const FINALIST: &str = "finalist";
@@ -223,6 +231,7 @@ pub mod standing {
     pub const TP: &str = "tp";
     pub const USER_UID: &str = "user_uid";
     pub const VP: &str = "vp";
+    pub const WITHDRAWN: &str = "withdrawn";
 }
 
 /// The display projection `compute_final_standings` stamps: derived, never

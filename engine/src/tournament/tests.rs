@@ -4535,3 +4535,42 @@ fn test_table_label_numbering() {
     let before_numbering = json::object! { "table_rooms": rooms };
     assert_eq!(label(&before_numbering, 5), "Annex 1");
 }
+
+#[test]
+fn test_player_game_record_on_a_rounds_less_import() {
+    let t = json::parse(
+        r#"{"max_rounds": 3, "rounds": [], "winner": "w",
+            "players": [], "finals": null, "standings": [
+              {"user_uid": "w", "gw": 2, "vp": 7, "tp": 72, "finalist": true},
+              {"user_uid": "f", "gw": 1, "vp": 4, "tp": 48, "finalist": true},
+              {"user_uid": "p", "gw": 1, "vp": 3, "tp": 36},
+              {"user_uid": "d", "gw": 1, "vp": 2, "tp": 24, "withdrawn": true},
+              {"user_uid": "n", "gw": 0, "vp": 0, "tp": 0}]}"#,
+    )
+    .unwrap();
+    let none = json::array![];
+    let record = |uid: &str| player_game_record(&t, &none, uid);
+
+    assert_eq!(record("w")["games"], 4);
+    assert_eq!(record("w")["gw"], 3.0);
+    assert_eq!(record("f")["games"], 4);
+    assert_eq!(record("p")["games"], 3);
+    assert_eq!(record("d")["left_out"], "withdrawn");
+    assert_eq!(record("n")["left_out"], "withdrawn");
+
+    let mut unknown = t.clone();
+    unknown["max_rounds"] = 0.into();
+    assert_eq!(
+        player_game_record(&unknown, &none, "p")["left_out"],
+        "unknown_rounds"
+    );
+    let reconstruction = json::parse(
+        r#"{"max_rounds": 3, "rounds": [], "winner": "w", "players": [], "finals": null,
+            "standings": [{"user_uid": "w", "finalist": true}]}"#,
+    )
+    .unwrap();
+    assert_eq!(
+        player_game_record(&reconstruction, &none, "w")["left_out"],
+        "unknown_rounds"
+    );
+}

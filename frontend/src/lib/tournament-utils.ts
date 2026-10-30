@@ -1,4 +1,4 @@
-import type { Sanction, Tournament, TournamentState, TournamentRank } from "./types";
+import type { RatingCategory, Sanction, Tournament, TournamentState, TournamentRank } from "./types";
 import type { BadgeTone } from "./components/Badge.svelte";
 import { attestedPlayerCount, buildSanctionsPayload, computeRatingPoints, computeRatingVpGw, displayStandings, rankingEligibility } from "./engine";
 import { formatScore } from "./utils";
@@ -253,5 +253,16 @@ export function translateTableState(state: string): string {
     case "Invalid": return m.table_state_invalid();
     case "Cancelled": return m.table_state_cancelled();
     default: return state;
+  }
+}
+
+export const RATING_CATEGORIES: RatingCategory[] = ["constructed_offline", "constructed_online", "limited_offline", "limited_online"];
+
+export function ratingCategoryLabel(category: RatingCategory): string {
+  switch (category) {
+    case "constructed_offline": return m.rankings_cat_constructed();
+    case "constructed_online": return m.rankings_cat_constructed_online();
+    case "limited_offline": return m.rankings_cat_limited();
+    case "limited_online": return m.rankings_cat_limited_online();
   }
 }

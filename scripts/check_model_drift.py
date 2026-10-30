@@ -61,6 +61,7 @@ TS_ONLY = {
 # name a struct in models.py; a new unpaired module fails here.
 ENGINE_UNCHECKED = {
     "arg": "keys on argument envelopes the caller builds for one call",
+    "game_record": "the per-game line player_game_record returns for the play record",
     "standing_row": "the display projection compute_final_standings stamps",
 }
 

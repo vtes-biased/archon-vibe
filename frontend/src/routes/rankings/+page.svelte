@@ -6,7 +6,7 @@
   import DeceasedIcon from "$lib/components/DeceasedIcon.svelte";
   import Button from "$lib/components/Button.svelte";
   import type { RatingCategory } from "$lib/types";
-  import { HOF_MIN_WINS } from "$lib/tournament-utils";
+  import { HOF_MIN_WINS, ratingCategoryLabel } from "$lib/tournament-utils";
   import { Trophy, Loader2, ChevronLeft, ChevronRight } from "@lucide/svelte";
   import { goto } from "$app/navigation";
   import { untrack } from "svelte";
@@ -38,10 +38,10 @@
   const pageSize = $derived(isHof ? 100 : 50);
 
   const tabs: { value: Tab; labelFn: () => string; captionFn: () => string }[] = [
-    { value: "constructed_offline", labelFn: () => m.rankings_cat_constructed(), captionFn: () => m.rankings_cat_constructed_desc() },
-    { value: "constructed_online", labelFn: () => m.rankings_cat_constructed_online(), captionFn: () => m.rankings_cat_constructed_online_desc() },
-    { value: "limited_offline", labelFn: () => m.rankings_cat_limited(), captionFn: () => m.rankings_cat_limited_desc() },
-    { value: "limited_online", labelFn: () => m.rankings_cat_limited_online(), captionFn: () => m.rankings_cat_limited_online_desc() },
+    { value: "constructed_offline", labelFn: () => ratingCategoryLabel("constructed_offline"), captionFn: () => m.rankings_cat_constructed_desc() },
+    { value: "constructed_online", labelFn: () => ratingCategoryLabel("constructed_online"), captionFn: () => m.rankings_cat_constructed_online_desc() },
+    { value: "limited_offline", labelFn: () => ratingCategoryLabel("limited_offline"), captionFn: () => m.rankings_cat_limited_desc() },
+    { value: "limited_online", labelFn: () => ratingCategoryLabel("limited_online"), captionFn: () => m.rankings_cat_limited_online_desc() },
     { value: "halloffame", labelFn: () => m.hof_page_title(), captionFn: () => m.hof_description() },
   ];
 

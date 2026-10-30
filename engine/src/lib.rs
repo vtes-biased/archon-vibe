@@ -627,6 +627,20 @@ mod wasm {
             Ok(vec![vp, gw])
         }
 
+        #[wasm_bindgen(js_name = playerGameRecord)]
+        pub fn player_game_record(
+            &self,
+            tournament_json: &str,
+            sanctions_json: &str,
+            user_uid: &str,
+        ) -> Result<String, String> {
+            let tournament =
+                json::parse(tournament_json).map_err(|e| super::EngineError::from(e).to_json())?;
+            let sanctions =
+                json::parse(sanctions_json).map_err(|e| super::EngineError::from(e).to_json())?;
+            Ok(super::tournament::player_game_record(&tournament, &sanctions, user_uid).dump())
+        }
+
         #[wasm_bindgen(js_name = ratingCategory)]
         pub fn rating_category(&self, format: &str, online: bool) -> String {
             super::ratings::rating_category(format, online).to_string()

@@ -1,4 +1,4 @@
-import type { CommunityLinkType, DeckAttribution, DeckObject, LinkMedia, LinkPlacement, RafflePool, Sanction, SanctionCategory, SanctionLevel, SanctionSubcategory, Tournament, User } from './types';
+import type { CommunityLinkType, DeckAttribution, DeckObject, LinkMedia, LinkPlacement, RafflePool, RatingCategory, Sanction, SanctionCategory, SanctionLevel, SanctionSubcategory, Tournament, User } from './types';
 import { getAllLeagues } from './db';
 import { callEngine, getEngine, initEngine } from './engine-instance';
 import * as m from './paraglide/messages.js';
@@ -630,6 +630,21 @@ export function rankingEligibility(tournament: unknown): string | null {
  * the played-player set the caller enumerates for membership. */
 export function attestedPlayerCount(tournament: unknown): number {
   return getEngine().attestedPlayerCount(JSON.stringify(tournament));
+}
+
+export interface PlayerGameRecord {
+  vp: number;
+  gw: number;
+  games: number;
+  left_out: "withdrawn" | "unknown_rounds" | null;
+}
+
+export function playerGameRecord(tournament: Tournament, sanctions: Sanction[], userUid: string): PlayerGameRecord {
+  return JSON.parse(getEngine().playerGameRecord(JSON.stringify(tournament), buildSanctionsPayload(sanctions, tournament.uid), userUid));
+}
+
+export function ratingCategory(format: string, online: boolean): RatingCategory {
+  return getEngine().ratingCategory(format, online) as RatingCategory;
 }
 
 /** Each seated player's own round count, the open-rounds per-player cap's measure. */
