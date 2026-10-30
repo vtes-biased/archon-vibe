@@ -22,7 +22,7 @@ from .db import (
     save_tournament,
     tournament_transaction,
 )
-from .geonames import CityIndex, city_index, match_city
+from .geonames import CityIndex, city_index, match_city_in
 from .models import (
     FinalsTable,
     ObjectType,
@@ -117,6 +117,7 @@ class _TwdaScore(msgspec.Struct):
 
 
 _TWDA_SCORE_RE = re.compile(r"(?:(\d+)GW([\d.]+))?(?:\+([\d.]+))?")
+_ZIP_RE = re.compile(r"[\s\d-]+$")
 
 
 async def _twda_scores() -> dict[str, _TwdaScore]:
@@ -524,7 +525,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
     venue_cache: dict[str, dict[str, str]] = {}
     cities: CityIndex | None = None
 
-    def city_fill(target: Tournament, name: str) -> dict[str, Any]:
+    def city_fill(target: Tournament, name: str, address: str) -> dict[str, Any]:
         nonlocal cities
         if target.city_geoname_id or target.online or not target.country:
             return {}
@@ -532,8 +533,9 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
             return {}
         if cities is None:
             cities = city_index()
-        matched = match_city(cities, name, target.country) or match_city(
-            cities, fix_city(name, target.country), target.country
+        regions = [_ZIP_RE.sub("", part) for part in re.split(r"[\r\n,]+", address)]
+        matched = match_city_in(cities, name, target.country, regions) or match_city_in(
+            cities, fix_city(name, target.country), target.country, regions
         )
         if not matched:
             return {}
@@ -565,6 +567,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                 venue_cache[venue_id] = await client.fetch_venue(venue_id)
             venue_data = venue_cache.get(venue_id, {})
             vekn_city = venue_data.get("city") or event_data.get("venue_city") or ""
+            vekn_address = venue_data.get("address") or ""
 
             tournament = _map_vekn_to_tournament(event_data, uid_by_vekn_id, venue_data)
             if not tournament:
@@ -618,6 +621,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                             country=tournament.country,
                         ),
                         vekn_city,
+                        vekn_address,
                     )
                     merged_organizers = list(
                         dict.fromkeys(
@@ -767,7 +771,7 @@ async def sync_all_tournaments(client: VEKNAPIClient) -> dict[str, int]:
                     broadcast_precomputed(bd)
             else:
                 tournament = msgspec.structs.replace(
-                    tournament, **city_fill(tournament, vekn_city)
+                    tournament, **city_fill(tournament, vekn_city, vekn_address)
                 )
                 async with get_connection() as conn:
                     tournament.event_code = await resolve_event_code(tournament, conn)

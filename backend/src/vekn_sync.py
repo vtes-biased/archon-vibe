@@ -20,7 +20,7 @@ from .db import (
     get_users_without_coopted_by,
     save_user,
 )
-from .geonames import CityIndex, city_index, match_city, normalize_country
+from .geonames import CityIndex, city_index, match_city_in, normalize_country
 from .models import ObjectType, Role, User
 from .vekn_api import VEKNAPIClient, VEKNAPIError
 
@@ -546,11 +546,14 @@ class VEKNSyncService:
         city = vekn_player.get("city") or None
         country_name = vekn_player.get("countryname") or ""
         country_code = vekn_player.get("countrycode") or ""
+        state = vekn_player.get("statename") or None
         if city:
             city = fix_city(city, country_code or country_name)
         city_geoname_id = None
         if city and country_code:
-            matched = match_city(cities, city, country_code)
+            matched = match_city_in(
+                cities, city, country_code, [state] if state else []
+            )
             if matched:
                 city = matched["name"]
                 city_geoname_id = matched["geoname_id"]
@@ -570,7 +573,7 @@ class VEKNSyncService:
             "vekn_id": vekn_id,
             "city": city,
             "city_geoname_id": city_geoname_id,
-            "state": vekn_player.get("statename") or None,
+            "state": state,
             "vekn_prefix": vekn_prefix,
         }
         # Set only when present in the scraped list, so non-officials' emails and

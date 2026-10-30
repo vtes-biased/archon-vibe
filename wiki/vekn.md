@@ -265,7 +265,9 @@ four in the archon file's terms and the `+F` must be added back —
   This is a bootstrap seed, not a transcription of legacy archon's role history.
   Judge ranks are **not** seeded: vekn.net has no field for them, and the
   [judge directory](#judge-directory) is their source.
-- Updates identity — name, country, city, state — for existing members.
+- Updates identity — name, country, city, state — for existing members. **The
+  state disambiguates the city** in GeoNames before the most populous of that
+  name wins, so Newark, Ohio does not land in New Jersey (gh-76).
 - **Never re-writes roles on update.** A member created by this sync before the
   legacy ETL ran keeps only its bootstrap seed, and the ETL's richer role data
   never lands for that member. This is the intended end state: roles are
@@ -371,6 +373,8 @@ Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
   is therefore set in the app, not imported. `city` is app-owned too, but filled:
   when a row has none, the sync takes the venue record's city, else the event's,
   matched in GeoNames within the country, and never rewrites one it holds.
+  vekn.net venues have no state field: the segments of the venue address, ZIP
+  stripped, stand in as the state hint.
   Everything else — `country`, `venue`, `address`, `venue_url`, `map_url` — stays a
   vekn.net refresh, except that an empty or `XX` vekn.net country on an in-person
   event keeps the app's: both mean unknown there, and taking them would orphan the
