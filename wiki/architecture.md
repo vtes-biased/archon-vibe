@@ -483,8 +483,10 @@ condition localizes identically on every path.
 **Build-time card database.** `scripts/update_cards.py` sources canonical card
 data via `krcg.loader.load_online` and writes `engine/data/cards.json`. Refresh is
 build-time, not boot: a daily workflow commits and tags `cards-<date>`, and the
-file ships bundled in the wheel and the frontend build. At runtime it loads into
-IndexedDB (`cards` store, keyed by card ID), and is handed to the engine once —
+file ships bundled in the wheel and the frontend build, so a new expansion reaches
+a server only through a release and a deploy, never through a restart. At runtime
+it loads into IndexedDB (`cards` store, keyed by card ID), and is handed to the
+engine once —
 `loadCards` / `load_cards`, which parses it into the map the engine holds — so a
 deck call passes a deck alone. The frontend memoizes that hand-off on the card
 map's identity and rebuilds the map only when the served ETag differs from the one

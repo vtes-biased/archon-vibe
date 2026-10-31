@@ -612,8 +612,7 @@ Devices that synced before the event skip it entirely — they reconnect with
 cursors, which beta served in under a second at 200 clients.
 
 **A scheduled job whose period reaches a day never fires.** The backend unit sets
-`RuntimeMaxSec=1d` — a daily restart that re-fetches the krcg-static card data
-without a redeploy — and APScheduler 3.x fires an `IntervalTrigger` at start + N,
+`RuntimeMaxSec=1d` and APScheduler 3.x fires an `IntervalTrigger` at start + N,
 not immediately. Registration happens seconds into startup, so systemd's kill
 always precedes the first fire of a 24-hour job: it is not a race a quieter
 restart schedule wins. What survives is a `CronTrigger` at a fixed hour, a period

@@ -17,8 +17,7 @@ LimitNOFILE=65536
 Restart=always
 RestartSec=3
 TimeoutStartSec=30
-# Daily restart: primarily to re-fetch upstream assets loaded at startup
-# (krcg-static card data) without a redeploy; also a low-key memory-leak defense.
+# Daily restart: a low-key memory-leak defense. It refreshes no card data.
 RuntimeMaxSec=1d
 # Bounds the worst case if a connection ignores both SIGTERM and the 5s
 # graceful-shutdown drain (was a ~90s hang via the default 90s TimeoutStopSec).
