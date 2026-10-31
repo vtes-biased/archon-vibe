@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.3.7 — 2026-10-31
 
 - Leagues can now play their own final and crown its winner Champion.
 - Organisers are warned of the tournaments they never finished, and a scored online final left open for a week now finishes itself.
