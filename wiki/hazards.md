@@ -454,8 +454,9 @@ high-water mark for the tab's lifetime.
 **The card catalog must stay out of the precache, and nothing fails if it comes
 back.** It is a build asset, so `$service-worker`'s `build` lists it, and the
 service worker filters it out by file name. Rename the emitted file and every
-deploy silently re-downloads 1.7MB on every device at worker install, whether the
-catalog changed or not ([sync](sync.md#frontend-storage)).
+first visit silently downloads 208KB gzipped at worker install, deck page or not,
+and every device keeps a second copy in Cache Storage beside the IndexedDB one
+([sync](sync.md#frontend-storage)).
 
 ## Rounds and the bot
 

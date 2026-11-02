@@ -834,8 +834,8 @@ session — and the Community tab shows its load error instead of "Loading…"
 **Cache Storage is allowlist-only.** It holds exactly three things, in two caches.
 The versioned precache (build assets, static files and the SPA shell) is replaced
 on every deploy; the card catalog is the one build asset left out of it, because
-IndexedDB already holds it and a precache entry would re-download it every deploy
-([architecture](architecture.md#cards-and-decks)). The `images` cache outlives
+IndexedDB already holds it and a visitor who never opens a deck should not download
+it ([architecture](architecture.md#cards-and-decks)). The `images` cache outlives
 versions and holds promo images (unauthenticated, versioned, cache-first) and krcg
 card images
 (`static.krcg.org/card/`, network-first). Every other cross-origin GET passes
