@@ -1,37 +1,34 @@
 import type { VtesCard } from '$lib/types';
+import cardsUrl from '../../../engine/data/cards.json?url';
 import { getDB } from './db';
 import { callEngine, initEngine } from './engine-instance';
 import { normalizeSearch, searchTokens, matchesAllTerms } from './utils';
 import { isCardImage, pruneImages } from './image-cache';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
-const CARDS_ETAG_KEY = 'cards_etag';
+const CARDS_URL_KEY = 'cards_url';
 
-let cardsMap: Map<number, VtesCard> | null = null;
+let cardsLoad: Promise<Map<number, VtesCard>> | null = null;
 /** Word-prefix token cache, keyed by card id — see searchCards. */
 let cardTokens: Map<number, string[]> | null = null;
-let currentEtag: string | null = null;
 let engineCardsPromise: Promise<void> | null = null;
 let engineCardsFor: Map<number, VtesCard> | null = null;
 
-export async function getCards(): Promise<Map<number, VtesCard>> {
-  if (cardsMap && cardsMap.size > 0) return cardsMap;
+export function getCards(): Promise<Map<number, VtesCard>> {
+  cardsLoad ??= readCards().catch(e => {
+    cardsLoad = null;
+    throw e;
+  });
+  return cardsLoad;
+}
 
+async function readCards(): Promise<Map<number, VtesCard>> {
   const db = await getDB();
   const stored = await db.getAll('cards');
-  if (stored.length > 0) {
-    cardsMap = new Map(stored.map(c => [c.id, c]));
-    cardTokens = null;
-    currentEtag = (await db.get('metadata', CARDS_ETAG_KEY)) ?? null;
-    refreshCardsFromAPI().catch(() => {});
-    return cardsMap;
-  }
+  if (stored.length === 0) return fetchCards();
 
-  await refreshCardsFromAPI();
-  if (!cardsMap || cardsMap.size === 0) {
-    throw new Error('Failed to load card database');
-  }
-  return cardsMap;
+  const current = !import.meta.env.DEV && (await db.get('metadata', CARDS_URL_KEY)) === cardsUrl;
+  if (!current) fetchCards().catch(e => console.warn('Failed to refresh cards:', e));
+  return new Map(stored.map(c => [c.id, c]));
 }
 
 /** Memoized on a promise, not a flag: the deck surfaces fire their validations concurrently. */
@@ -54,47 +51,26 @@ export async function loadEngineCards(): Promise<void> {
   return engineCardsPromise;
 }
 
+async function fetchCards(): Promise<Map<number, VtesCard>> {
+  const resp = await fetch(cardsUrl);
+  if (!resp.ok) throw new Error(`Failed to load card database: ${resp.status}`);
+  const cards = Object.values((await resp.json()) as Record<string, VtesCard>);
 
-async function refreshCardsFromAPI(): Promise<void> {
-  try {
-    const headers: Record<string, string> = {};
-    // Only conditional when there is something to keep: a body that fails mid-download leaves
-    // currentEtag set with no cards, and a 304 would then wedge getCards() into throwing for
-    // the rest of the session.
-    if (currentEtag && cardsMap?.size) {
-      headers['If-None-Match'] = currentEtag;
-    }
-
-    const resp = await fetch(`${API_URL}/api/cards`, { headers });
-
-    if (resp.status === 304) return; // Not modified
-    if (!resp.ok) return;
-
-    const etag = resp.headers.get('etag')?.replace(/"/g, '') ?? null;
-    // The catalog is cacheable for an hour, so a cold page gets a 200 from the browser's
-    // own cache and never revalidates. Compare versions rather than trust the status: a
-    // fresh map would re-hand an identical catalog to the engine, growing its memory again.
-    if (etag && etag === currentEtag && cardsMap?.size) return;
-    currentEtag = etag;
-
-    const data: Record<string, VtesCard> = await resp.json();
-    const cards = Object.values(data);
-
-    cardsMap = new Map(cards.map(c => [c.id, c]));
-    cardTokens = null;
-
-    const db = await getDB();
-    const tx = db.transaction('cards', 'readwrite');
-    await tx.store.clear();
-    for (const card of cards) {
-      tx.store.put(card);
-    }
-    await tx.done;
-    if (currentEtag) await db.put('metadata', currentEtag, CARDS_ETAG_KEY);
-    pruneImages(isCardImage, new Set(cards.map(c => c.img))).catch(() => {});
-  } catch (e) {
-    console.warn('Failed to refresh cards from API:', e);
+  const db = await getDB();
+  const tx = db.transaction(['cards', 'metadata'], 'readwrite');
+  const store = tx.objectStore('cards');
+  await store.clear();
+  for (const card of cards) {
+    store.put(card);
   }
+  tx.objectStore('metadata').put(cardsUrl, CARDS_URL_KEY);
+  await tx.done;
+
+  const map = new Map(cards.map(c => [c.id, c]));
+  cardsLoad = Promise.resolve(map);
+  cardTokens = null;
+  pruneImages(isCardImage, new Set(cards.map(c => c.img))).catch(() => {});
+  return map;
 }
 
 function tokensFor(card: VtesCard): string[] {

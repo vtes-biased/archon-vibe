@@ -484,13 +484,23 @@ condition localizes identically on every path.
 data via `krcg.loader.load_online` and writes `engine/data/cards.json`. Refresh is
 build-time, not boot: a daily workflow commits and tags `cards-<date>`, and the
 file ships bundled in the wheel and the frontend build, so a new expansion reaches
-a server only through a release and a deploy, never through a restart. At runtime
-it loads into IndexedDB (`cards` store, keyed by card ID), and is handed to the
-engine once —
-`loadCards` / `load_cards`, which parses it into the map the engine holds — so a
-deck call passes a deck alone. The frontend memoizes that hand-off on the card
-map's identity and rebuilds the map only when the served ETag differs from the one
-it stored, so a session re-hands the catalog only when the catalog itself changed.
+a server only through a release and a deploy, never through a restart.
+
+The backend reads its wheel's copy and serves none of it. The frontend build emits
+the file as a content-hashed `_app/immutable` asset and compiles its URL into
+`cards.ts`, so a release names the catalog it ships and nginx serves those bytes.
+That URL is the version: a device stores it beside the `cards` IndexedDB store,
+keyed by card ID, and a matching URL means no request at all. A different one
+downloads the new catalog behind the stored copy, which keeps serving, so a device
+that cannot reach the file stays usable; only a device holding no catalog waits on
+it. `getCards` is one promise per session, so concurrent callers share one read and
+one download. Vite dev serves the URL unhashed, so a dev tab always re-downloads.
+
+The catalog is handed to the engine once — `loadCards` / `load_cards`, which parses
+it into the map the engine holds — so a deck call passes a deck alone. The frontend
+memoizes that hand-off on the card map's identity, and a new map exists only when
+the stored URL was stale, so a session re-hands the catalog only when the catalog
+itself changed.
 
 **Deck validation** is `validate_deck` in `engine/src/deck.rs`: unknown cards,
 the banned list and a library over 90 are errors whatever the format. Storyline

@@ -447,9 +447,15 @@ WASM instance from 1.3MB to 17.4MB — 9.36× — and it stays there: WebAssembl
 grows and never shrinks, so replacing the catalog with a one-card one leaves the
 17.4MB. That is why the catalog is handed over once
 ([architecture](architecture.md#cards-and-decks)) rather than per call, and why the
-frontend skips the hand-off when the fetched ETag matches the one it holds — an
-identical catalog re-handed still costs the growth. Any new bulk argument to the
-engine sets a high-water mark for the tab's lifetime.
+frontend builds a new card map only for a new catalog URL — an identical catalog
+re-handed still costs the growth. Any new bulk argument to the engine sets a
+high-water mark for the tab's lifetime.
+
+**The card catalog must stay out of the precache, and nothing fails if it comes
+back.** It is a build asset, so `$service-worker`'s `build` lists it, and the
+service worker filters it out by file name. Rename the emitted file and every
+deploy silently re-downloads 1.7MB on every device at worker install, whether the
+catalog changed or not ([sync](sync.md#frontend-storage)).
 
 ## Rounds and the bot
 

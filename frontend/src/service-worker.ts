@@ -9,7 +9,7 @@ import { IMAGE_CACHE, isCardImage, isPromoImage } from '$lib/image-cache';
 
 const sw = globalThis.self as unknown as ServiceWorkerGlobalScope;
 const CACHE = `cache-${version}`;
-const ASSETS = [...build, ...files];
+const ASSETS = [...build.filter((path) => !/\/cards\.[^/]+\.json$/.test(path)), ...files];
 // adapter-static writes the fallback after the build, so `build` never lists it;
 // vite dev serves no such file, and one 404 fails the whole install.
 const SHELL = '/200.html';

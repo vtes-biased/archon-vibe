@@ -27,6 +27,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy WASM engine output to where the $engine alias resolves
 COPY --from=wasm-builder /engine/pkg /engine/pkg
 
+# cards.ts imports the catalog's URL from the repository root the same way.
+COPY --from=wasm-builder /engine/data /engine/data
+
 COPY frontend/package*.json ./
 RUN npm ci
 

@@ -38,6 +38,7 @@ from .broadcast import (
     encoder,
     entitled_level,
 )
+from .card_data import cards_json_bytes
 from .db import (
     base_data_level,
     cleanup_expired_tokens,
@@ -86,7 +87,6 @@ from .routes import (
     admin,
     auth,
     calendar,
-    cards,
     feedback,
     leagues,
     nda,
@@ -375,8 +375,7 @@ async def lifespan(app: Litestar) -> AsyncIterator[None]:
 
     assert_production_keys(signing=True)
 
-    cards_data, _ = cards._load_cards()
-    if cards_data is None:
+    if cards_json_bytes() is None:
         logger.warning(
             "engine/data/cards.json not found — card database unavailable. "
             "Run: python scripts/update_cards.py"
@@ -1318,7 +1317,6 @@ app = Litestar(
         sanctions.router,
         tournaments.router,
         oauth.router,
-        cards.router,
         leagues.router,
         promos.router,
         calendar.router,
