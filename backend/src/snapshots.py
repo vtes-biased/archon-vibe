@@ -44,8 +44,6 @@ def _open_level_files(
 ) -> None:
     for level in _LEVELS:
         fd, tmp_paths[level] = tempfile.mkstemp(dir=SNAPSHOT_DIR, suffix=".tmp")
-        # 0640, not mkstemp's 0600: production nginx reads these via
-        # X-Accel-Redirect, through the dir's setgid-assigned group.
         os.fchmod(fd, 0o640)
         os.close(fd)
         writers[level] = gzip.open(
@@ -63,11 +61,8 @@ def _write_rows(
     rows: list[tuple[str, str | None, str | None, str | None, str | None]],
 ) -> None:
     for obj_type, *projections in rows:
-        # `{"type":"x","data":` + the raw column + `}` — string concat around the
-        # stored JSON, so no row is ever deserialized here.
         prefix = f'{{"type":"{obj_type}","data":'
         for level, projection in zip(_LEVELS, projections, strict=True):
-            # NULL = this level can't see the object at all.
             if projection is None:
                 continue
             writers[level].write(f"{prefix}{projection}}}\n")
@@ -135,15 +130,11 @@ async def generate_snapshots() -> dict[str, int]:
         tmp_paths: dict[str, str] = {}
         writers: dict[str, io.TextIOWrapper] = {}
         loop = asyncio.get_running_loop()
-        # One thread, not to_thread: a cancelled await leaves its batch compressing,
-        # and _discard must queue behind it rather than close the writers under it.
         with ThreadPoolExecutor(max_workers=1) as gzipper:
             try:
                 await loop.run_in_executor(
                     gzipper, _open_level_files, tmp_paths, writers, generated_at
                 )
-                # aclosing: a write failure must unwind the streamer's cursor+transaction
-                # NOW, before batch_read_connection releases the conn, not at GC.
                 async with aclosing(stream_objects_snapshot(conn=conn)) as batches:
                     async for rows in batches:
                         await loop.run_in_executor(

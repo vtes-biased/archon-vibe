@@ -647,17 +647,17 @@ its whole lifetime even under READ COMMITTED, so REPEATABLE READ isn't needed. A
 row is simply omitted from a file whose projection column is NULL.
 
 **The projections live in the row, compressed, not in TOAST.** All four columns are
-`STORAGE MAIN`, so a pass walks the heap instead of making some 31k out-of-line
-lookups, 84 % of them non-contiguous and so read a page at a time. TOAST reads also
-skip the sequential scan's buffer ring, which is how a pass used to flush
-`shared_buffers`. Measured cold on beta at 36k objects: 8,779 device reads and
-105 MB of `shared_buffers` before, 1,443 and 31 MB after — and 286 to 402 reads with
-production's 1 MB read-ahead ([dev](dev.md#deployment)). A value too large for its
-row still goes out of line: 5,464 of them on beta. The cost is wider rows for narrow
-queries, cold catch-up going from 536 to 837 reads and the open-tournament scan from
-248 to 423, and 1,000 tournament saves added 4 % to a pass, against 12 % on a rewritten
-default-storage table. `pg_prewarm` ahead of the pass was rejected: 1,697 reads, and
-it left `shared_buffers` as flushed as before.
+`STORAGE MAIN`, so a pass walks the heap. Out of line it would make some 31k lookups,
+84 % of them non-contiguous and so read a page at a time, and TOAST reads skip the
+sequential scan's buffer ring, so they flush `shared_buffers`. Measured cold on beta
+at 36k objects: 8,779 device reads and 105 MB of `shared_buffers` out of line, 1,443
+and 31 MB in the row, and 286 to 402 reads with production's 1 MB read-ahead
+([dev](dev.md#deployment)). A value too large for its row still goes out of line:
+5,464 of them on beta. The cost is wider rows for narrow queries: a cold catch-up
+reads 837 pages against 536 and the open-tournament scan 423 against 248. 1,000
+tournament saves add 4 % to a pass, against 12 % on a rewritten default-storage
+table. `pg_prewarm` ahead of the pass was rejected: 1,697 reads, and it leaves
+105 MB in `shared_buffers`.
 
 **The pass compresses on a thread of its own.** The event loop only fetches: opening
 the files, writing each batch, the `eof` and the renames all run on one executor
