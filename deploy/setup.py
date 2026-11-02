@@ -41,6 +41,7 @@ s.postgres_config(
         "shared_buffers": "96MB",
         "max_connections": "20",
         "effective_cache_size": "384MB",
+        "synchronous_commit": "off",
     }
 )
 s.postgres_backups(

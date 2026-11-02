@@ -159,6 +159,13 @@ so a deploy leaves no build cache behind. PostgreSQL is sized to the pools that 
 the app's 8 and the public API's 4, leaving the superuser reserve of 3 and
 headroom for pg_dump and ad-hoc psql — not to a client count the box never sees.
 
+**Production commits with `synchronous_commit=off`**, because the provider's volume
+has spells of 50–280 ms per operation ([hazards](hazards.md#deploy)) and a request
+should not wait one out on a WAL flush. It costs at most the last ~600 ms of commits
+(three times `wal_writer_delay`) on a server or operating-system crash, never
+consistency, and that is an accepted trade: the owner's call, not an oversight.
+Beta's box belongs to server-setup and keeps the default.
+
 **The backend's resident size is its jobs' peak, not its idle footprint.** glibc
 keeps freed heap, so whatever a job materializes would stay resident until the
 daily `RuntimeMaxSec` restart. Two defences: a scheduler listener calls
