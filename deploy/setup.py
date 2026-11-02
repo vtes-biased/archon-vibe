@@ -36,6 +36,23 @@ server.shell(
     commands=["systemctl daemon-reexec"],
     _if=io_accounting.did_change,
 )
+read_ahead = files.put(
+    name="1 MB read-ahead on the data volume",
+    src=StringIO(
+        'ACTION=="add|change", SUBSYSTEM=="block", KERNEL=="xvda", '
+        'ATTR{queue/read_ahead_kb}="1024"\n'
+    ),
+    dest="/etc/udev/rules.d/60-read-ahead.rules",
+    mode="644",
+)
+server.shell(
+    name="Apply the read-ahead rule",
+    commands=[
+        "udevadm control --reload",
+        "udevadm trigger --action=change --sysname-match=xvda --settle",
+    ],
+    _if=read_ahead.did_change,
+)
 s.postgres_config(
     settings={
         "shared_buffers": "96MB",

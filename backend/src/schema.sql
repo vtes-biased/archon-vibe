@@ -222,6 +222,20 @@ ALTER TABLE objects ADD COLUMN IF NOT EXISTS calendar_token TEXT;
 ALTER TABLE objects ADD COLUMN IF NOT EXISTS agenda_hidden TEXT[];
 ALTER TABLE objects ADD COLUMN IF NOT EXISTS agenda_added TEXT[];
 ALTER TABLE objects ADD COLUMN IF NOT EXISTS "api" JSONB;
+-- SET STORAGE takes ACCESS EXCLUSIVE: guarded so a boot only pays it once.
+DO $$
+DECLARE
+    projection TEXT;
+BEGIN
+    FOR projection IN
+        SELECT attname FROM pg_attribute
+        WHERE attrelid = 'objects'::regclass
+          AND attname IN ('public', 'member', 'api', 'full')
+          AND attstorage <> 'm'
+    LOOP
+        EXECUTE format('ALTER TABLE objects ALTER COLUMN %I SET STORAGE MAIN', projection);
+    END LOOP;
+END $$;
 -- Composite index for SSE catch-up queries (type + modified_at + uid)
 CREATE INDEX IF NOT EXISTS idx_objects_type_modified
 ON objects(type, modified_at, uid);

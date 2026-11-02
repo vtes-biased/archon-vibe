@@ -166,6 +166,12 @@ should not wait one out on a WAL flush. It costs at most the last ~600 ms of com
 consistency, and that is an accepted trade: the owner's call, not an oversight.
 Beta's box belongs to server-setup and keeps the default.
 
+**Production reads ahead 1 MB on `xvda`**, against the kernel's 128 KB, for the same
+disk: every operation it can skip is one that cannot land in a slow spell, and the
+snapshot pass is the reader that gains ([sync](sync.md#snapshots)). `setup.py`
+installs it as a udev rule, so `add` carries it across a reboot and `change` applies
+it on the run that writes the rule. Beta stays at 128 KB.
+
 **The backend's resident size is its jobs' peak, not its idle footprint.** glibc
 keeps freed heap, so whatever a job materializes would stay resident until the
 daily `RuntimeMaxSec` restart. Two defences: a scheduler listener calls

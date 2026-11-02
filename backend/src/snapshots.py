@@ -3,6 +3,7 @@ each line self-describes its type. The `api` file is the public API's bulk
 export; no app client is ever served it. The `eof` trailer is load-bearing: a streaming
 client has already written rows by the time it could notice a truncated file."""
 
+import asyncio
 import gzip
 import io
 import json
@@ -10,6 +11,7 @@ import logging
 import os
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import aclosing
 from pathlib import Path
 
@@ -35,6 +37,66 @@ _built_counts: dict[str, int] = {}
 
 def _snapshot_path(level: str) -> Path:
     return SNAPSHOT_DIR / f"{level}.jsonl.gz"
+
+
+def _open_level_files(
+    tmp_paths: dict[str, str], writers: dict[str, io.TextIOWrapper], generated_at: str
+) -> None:
+    for level in _LEVELS:
+        fd, tmp_paths[level] = tempfile.mkstemp(dir=SNAPSHOT_DIR, suffix=".tmp")
+        # 0640, not mkstemp's 0600: production nginx reads these via
+        # X-Accel-Redirect, through the dir's setgid-assigned group.
+        os.fchmod(fd, 0o640)
+        os.close(fd)
+        writers[level] = gzip.open(
+            tmp_paths[level], "wt", encoding="utf-8", compresslevel=6
+        )
+        writers[level].write(
+            f'{{"type":"header","version":{SNAPSHOT_FORMAT_VERSION},'
+            f'"timestamp":"{generated_at}","generated_at":"{generated_at}"}}\n'
+        )
+
+
+def _write_rows(
+    writers: dict[str, io.TextIOWrapper],
+    counts: dict[str, int],
+    rows: list[tuple[str, str | None, str | None, str | None, str | None]],
+) -> None:
+    for obj_type, *projections in rows:
+        # `{"type":"x","data":` + the raw column + `}` — string concat around the
+        # stored JSON, so no row is ever deserialized here.
+        prefix = f'{{"type":"{obj_type}","data":'
+        for level, projection in zip(_LEVELS, projections, strict=True):
+            # NULL = this level can't see the object at all.
+            if projection is None:
+                continue
+            writers[level].write(f"{prefix}{projection}}}\n")
+            counts[level] += 1
+
+
+def _publish(
+    tmp_paths: dict[str, str],
+    writers: dict[str, io.TextIOWrapper],
+    counts: dict[str, int],
+) -> None:
+    for level in _LEVELS:
+        writers[level].write(f'{{"type":"eof","count":{counts[level]}}}\n')
+        writers[level].close()
+        os.rename(tmp_paths[level], _snapshot_path(level))
+
+
+def _discard(tmp_paths: dict[str, str], writers: dict[str, io.TextIOWrapper]) -> None:
+    for level, path in tmp_paths.items():
+        writer = writers.get(level)
+        if writer is not None:
+            try:
+                writer.close()
+            except OSError:
+                pass
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
 
 
 async def generate_snapshots() -> dict[str, int]:
@@ -72,53 +134,27 @@ async def generate_snapshots() -> dict[str, int]:
         # atomic rename per level: a failed generation leaves the previous snapshot in place.
         tmp_paths: dict[str, str] = {}
         writers: dict[str, io.TextIOWrapper] = {}
-        try:
-            for level in _LEVELS:
-                fd, tmp_paths[level] = tempfile.mkstemp(dir=SNAPSHOT_DIR, suffix=".tmp")
-                # 0640, not mkstemp's 0600: production nginx reads these via
-                # X-Accel-Redirect, through the dir's setgid-assigned group.
-                os.fchmod(fd, 0o640)
-                os.close(fd)
-                writers[level] = gzip.open(
-                    tmp_paths[level], "wt", encoding="utf-8", compresslevel=6
+        loop = asyncio.get_running_loop()
+        # One thread, not to_thread: a cancelled await leaves its batch compressing,
+        # and _discard must queue behind it rather than close the writers under it.
+        with ThreadPoolExecutor(max_workers=1) as gzipper:
+            try:
+                await loop.run_in_executor(
+                    gzipper, _open_level_files, tmp_paths, writers, generated_at
                 )
-                writers[level].write(
-                    f'{{"type":"header","version":{SNAPSHOT_FORMAT_VERSION},'
-                    f'"timestamp":"{generated_at}","generated_at":"{generated_at}"}}\n'
+                # aclosing: a write failure must unwind the streamer's cursor+transaction
+                # NOW, before batch_read_connection releases the conn, not at GC.
+                async with aclosing(stream_objects_snapshot(conn=conn)) as batches:
+                    async for rows in batches:
+                        await loop.run_in_executor(
+                            gzipper, _write_rows, writers, counts, rows
+                        )
+                await loop.run_in_executor(
+                    gzipper, _publish, tmp_paths, writers, counts
                 )
-
-            # aclosing: a write failure must unwind the streamer's cursor+transaction
-            # NOW, before batch_read_connection releases the conn, not at GC.
-            async with aclosing(stream_objects_snapshot(conn=conn)) as batches:
-                async for rows in batches:
-                    for obj_type, *projections in rows:
-                        # `{"type":"x","data":` + the raw column + `}` — string concat
-                        # around the stored JSON, so no row is ever deserialized here.
-                        prefix = f'{{"type":"{obj_type}","data":'
-                        for level, projection in zip(_LEVELS, projections, strict=True):
-                            # NULL = this level can't see the object at all.
-                            if projection is None:
-                                continue
-                            writers[level].write(f"{prefix}{projection}}}\n")
-                            counts[level] += 1
-
-            for level in _LEVELS:
-                writers[level].write(f'{{"type":"eof","count":{counts[level]}}}\n')
-                writers[level].close()
-                os.rename(tmp_paths[level], _snapshot_path(level))
-        except BaseException:
-            for level, path in tmp_paths.items():
-                writer = writers.get(level)
-                if writer is not None:
-                    try:
-                        writer.close()
-                    except OSError:
-                        pass
-                try:
-                    os.unlink(path)
-                except OSError:
-                    pass
-            raise
+            except BaseException:
+                gzipper.submit(_discard, tmp_paths, writers)
+                raise
 
     _built_from, _built_counts = sentinel, counts
 
