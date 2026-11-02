@@ -1,7 +1,6 @@
 -- Database schema for archon. Applied by db.init_db() on every startup.
 --
--- Idempotent by construction: every statement uses IF NOT EXISTS /
--- CREATE OR REPLACE / DROP ... IF EXISTS, so re-running is a no-op. Executed as a
+-- Idempotent by construction: re-running changes nothing. Executed as a
 -- single multi-statement script (no parameters), which PostgreSQL parses
 -- server-side — including the $$-quoted plpgsql bodies — so no client-side
 -- statement splitting is needed.
