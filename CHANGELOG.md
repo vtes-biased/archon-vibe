@@ -10,6 +10,10 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- Archon now responds faster.
+
 ## v1.3.7 — 2026-10-31
 
 - Leagues can now play their own final and crown its winner Champion.
