@@ -130,6 +130,31 @@ why the Hall of Fame predicate and the TWDA skip name Storyline explicitly inste
 of resting on "a Storyline event has no winning deck" — a switched event has one,
 and so does an imported type-9 event that arrived with one.
 
+### Trigger: the two-player format becomes official
+
+*Asked 2026-11 in gh-83. Black Chantry is still
+[testing the format](domain/tournament-rules.md#two-player-format-in-testing), so it
+waits here rather than on the board.*
+
+**Deferred ask** — run 1v1 events, once the format is official **and** its rules say
+how an event is run. **Trigger**: Black Chantry or VEKN publish it as an official
+format, with those rules. The playtest has no deadline, and a passing test is not
+guaranteed.
+
+A label on Limited is not this. Limited already takes these decks, and a tag would
+sit on an event the app cannot run: seating, the VP sheet and TP all stop at tables
+of 4–5. The real work is:
+
+- pairings instead of seating, and whatever the preliminaries turn out to be;
+- a match result, with what it scores and how the standings rank it;
+- a top-eight playoff of 1v1 matches in place of the five-player final;
+- deck validation against the format's allowed list and library size;
+- ratings, the VEKN event type, and whether the TWDA takes its winners.
+
+The playtest rules only recommend pairings and the playoff, and say nothing on
+scoring, ratings or the event type, which is why the trigger needs the event rules
+and not only the announcement.
+
 ## State machine
 
 ```

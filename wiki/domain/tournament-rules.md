@@ -223,6 +223,67 @@ two-hour cap
 example of events where decklists are not used (`reference/judges-guide-v2.md`
 §3.1.3).
 
+## Two-player format (in testing)
+
+**This is an open playtest, not an official format.** Nothing here is part of the
+tournament rules above, and the app does not implement it
+([deferred](../tournaments.md#trigger-the-two-player-format-becomes-official)).
+Black Chantry opened the test to every player with no set deadline, and the rules
+keep moving: the page below as read on 2026-11-02, last updated 2026-10-03. Its
+[update log](https://www.vekn.net/two-player-format/675-two-player-format-updates)
+keeps adding and removing cards, and the final products will bring new crypt and
+library cards. Check the source before relying on any of this.
+
+Source throughout: [vekn.net](https://www.vekn.net/two-player-format), the
+[variant rules](https://www.vekn.net/two-player-format/655-two-player-variant-for-vampire-the-eternal-struggle)
+and the
+[tournament format](https://www.vekn.net/two-player-format/656-two-player-vtes-tournament-format).
+It answers stores asking for something easier to organize and quicker to play, and
+deliberately adds as few rules as possible.
+
+**Game rules.** The rulebook applies, except:
+
+- **Players**: 2, instead of 4–5.
+- **Library**: 40–60 cards, instead of 60–90. No exception is listed for the crypt.
+- **Card pool**: only the
+  [list of allowed cards](https://www.vekn.net/two-player-format/657-list-of-allowed-cards-in-2-player-vtes),
+  V5 cards, with the idea of marking them with an icon. The list is the rule. The
+  proposal's exclusions explain it: among them permanent abilities without
+  drawback, +2 bleed on an action or +3 on a modifier, bleed redirection, recursion,
+  crypt accelerators, vampires below capacity 5, cards that end combat or force a
+  second round.
+- **Contested crypt cards** stay in play and usable, unlike the normal rule: the
+  contest costs 1 pool at each of your unlock phases, and you may instead yield the
+  card, which burns it with whatever is stacked on it.
+- **Contested titles**: two copies of a titled vampire do not contest the title.
+- **Transfers**: the player going first gets 3 on their first influence phase, and
+  4 from then on.
+- **Time limit**: none required; 30 minutes suggested if one is wanted.
+
+**Events** run as a modified Swiss: paired rounds, then a single-elimination playoff
+for the top eight, seeded 1v8, 2v7, 3v6, 4v5, the winner being whoever wins the
+final match.
+
+| Players | Rounds |
+|---|---|
+| 4 (team or two-headed giant only) | 2 single-elimination, no Swiss |
+| 5–8 | 3 single-elimination, no Swiss |
+| 9–16 | 4 Swiss |
+| 17–32 | 5 Swiss |
+| 33–64 | 6 Swiss |
+| 65–128 | 7 Swiss |
+| 129–226 | 8 Swiss |
+| 227–409 | 9 Swiss |
+| 410+ | 10 Swiss |
+
+Swiss rounds pair equal records where possible, a slightly better or worse opponent
+otherwise. The organizer sets the rounds, the playoff structure, banned cards and
+time limits per event, so all of the above is a recommendation.
+
+**Left unstated**: how a game or match scores, whether a match is one game or a
+series, how the top eight is ranked and tie-broken, sanctioning, ratings, and
+decklist handling.
+
 ## Cards
 
 All cards must be genuine VTES or Jyhad cards, or official VEKN-issued cards from
