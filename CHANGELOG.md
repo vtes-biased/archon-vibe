@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.3.8 — 2026-11-02
 
 - Archon now responds faster.
 
