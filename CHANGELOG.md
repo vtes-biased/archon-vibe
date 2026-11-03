@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.3.9 — 2026-11-04
 
 - The menu now shows Sign In when you are signed out, and going offline no longer signs you out.
 - Online tournaments still running after their start date are no longer flagged as never finished.
