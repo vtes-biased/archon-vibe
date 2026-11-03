@@ -10,6 +10,14 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- The menu now shows Sign In when you are signed out, and going offline no longer signs you out.
+- Online tournaments still running after their start date are no longer flagged as never finished.
+- Importing an Archon sheet now brings in the judge-overridden tables listed on its Override tab.
+- Officials can now group the promo inventory by promo or by holder.
+- Developers can now edit an app's scopes and redirect URIs.
+
 ## v1.3.8 — 2026-11-02
 
 - Archon now responds faster.
