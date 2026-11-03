@@ -778,6 +778,9 @@ the exception: it publishes regardless, so the archive keeps its win registry, a
 its organizers, who still hold it, may replace or delete it. Its stored
 `private` stays put, and only its owner releases it, so a later winner swap hides
 it again.
+The checkbox states the event's `decklists_mode` beside it, so a player decides
+knowing what would publish. Private stays opt-in: it outranks the mode, so a
+private default would void Finalists and All.
 Credit and disclosure compose rather than replace each other: an anonymous deck
 still publishes, with no owner, and a private one keeps whatever credit it has.
 

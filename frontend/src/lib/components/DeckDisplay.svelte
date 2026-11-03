@@ -1,6 +1,6 @@
 <script lang="ts">
   import { toUserMessage } from '$lib/errors';
-  import type { DeckAttribution, DeckObject, VtesCard } from "$lib/types";
+  import type { DeckAttribution, DeckListsMode, DeckObject, VtesCard } from "$lib/types";
   import { creditName, isSettableCredit } from "$lib/deck-credit";
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { getCards } from "$lib/cards";
@@ -24,6 +24,7 @@
     organizer = false,
     multideck = false,
     format = '',
+    decklistsMode = 'Winner',
     onsaved,
     onreplace,
     ondelete,
@@ -34,6 +35,7 @@
     organizer?: boolean;
     multideck?: boolean;
     format?: string;
+    decklistsMode?: DeckListsMode;
     onsaved?: () => void;
     onreplace?: () => void;
     ondelete?: () => void;
@@ -54,6 +56,11 @@
   const anonymous = $derived(deck.attribution.kind === 'Anonymous');
   const canSetPrivate = $derived(!!tournamentUid && (ownsDeck || organizer));
   let privacyError = $state<string | null>(null);
+  const publicationHint = $derived(
+    decklistsMode === 'All' ? m.tfield_decklists_help_all()
+    : decklistsMode === 'Finalists' ? m.tfield_decklists_help_finalists()
+    : m.tfield_decklists_help_winner()
+  );
 
   $effect(() => {
     creditName(deck.attribution).then(n => credit = n);
@@ -302,7 +309,7 @@
       />
       <span class="text-sm text-ink-bright">{m.deck_private_label()}</span>
     </label>
-    <p class="text-xs text-ink-faint mb-2">{m.deck_private_hint()}</p>
+    <p class="text-xs text-ink-faint mb-2">{publicationHint} {m.deck_private_hint()}</p>
     {#if privacyError}
       <p class="text-sm text-link mb-2">{privacyError}</p>
     {/if}

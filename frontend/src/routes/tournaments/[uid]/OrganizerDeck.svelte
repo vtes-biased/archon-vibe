@@ -59,7 +59,7 @@
     <p class="text-xs text-ink-faint">{m.decks_view_logged_hint()}</p>
   </div>
 {:else}
-  <DeckDisplay {deck} editable={!!onreplace} tournamentUid={tournament.uid} {organizer} multideck={!!tournament.multideck} {onreplace} />
+  <DeckDisplay {deck} editable={!!onreplace} tournamentUid={tournament.uid} {organizer} multideck={!!tournament.multideck} decklistsMode={tournament.decklists_mode} {onreplace} />
 {/if}
 {#if organizer}
   <DeckViews views={deck.views ?? []} roundCount={tournament.rounds?.length ?? 0} />

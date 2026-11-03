@@ -248,6 +248,7 @@
                 tournamentUid={tournament.uid}
                 multideck
                 format={tournament.format}
+                decklistsMode={tournament.decklists_mode}
                 onreplace={editable ? () => { uploadingFor = myUid; uploadingRound = slot.round ?? undefined; } : undefined}
                 ondelete={editable ? () => { confirmDeleteRound = slot.round; } : undefined}
               />
@@ -285,7 +286,7 @@
               {#if uploadingFor === myUid && singleDeckEditable}
                 <DeckUpload tournamentUid={tournament.uid} onuploaded={onUploaded} />
               {:else}
-                <DeckDisplay deck={myDecks[0]} editable={singleDeckEditable} tournamentUid={tournament.uid} format={tournament.format} onreplace={singleDeckEditable ? () => uploadingFor = myUid : undefined} ondelete={singleDeckEditable ? () => { confirmDeleteRound = null; } : undefined} />
+                <DeckDisplay deck={myDecks[0]} editable={singleDeckEditable} tournamentUid={tournament.uid} format={tournament.format} decklistsMode={tournament.decklists_mode} onreplace={singleDeckEditable ? () => uploadingFor = myUid : undefined} ondelete={singleDeckEditable ? () => { confirmDeleteRound = null; } : undefined} />
                 <DeckViews views={myDecks[0].views ?? []} {roundCount} />
                 {#if confirmDeleteRound === null}
                   {@render deleteConfirm(null)}
