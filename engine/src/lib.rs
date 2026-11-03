@@ -1102,7 +1102,8 @@ mod python {
         }
 
         fn check_table_vps(&self, vps: Vec<f64>) -> PyResult<Option<String>> {
-            Ok(super::tournament::check_table_vps(&vps).map(|e| format!("{:?}", e)))
+            Ok(super::tournament::check_table_vps(&vps)
+                .map(|e| e.to_json()[crate::model::arg::CODE].to_string()))
         }
 
         fn compute_gw(&self, vps: Vec<f64>, adjustments: Vec<f64>) -> Vec<f64> {

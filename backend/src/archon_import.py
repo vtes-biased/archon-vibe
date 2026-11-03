@@ -23,6 +23,7 @@ from .models import (
     Player,
     PlayerState,
     Score,
+    ScoreOverride,
     Seat,
     Standing,
     Table,
@@ -55,6 +56,15 @@ class ArchonRoundTable:
     """A single table in a round: list of (player_number, vp) in seat order."""
 
     seats: list[tuple[int, float]]
+    number: int = 0
+
+
+@dataclass
+class ArchonOverride:
+    row: int
+    round: str
+    table: int
+    explanation: str
 
 
 @dataclass
@@ -64,6 +74,7 @@ class ArchonData:
     players: list[ArchonPlayer]
     rounds: list[list[ArchonRoundTable]]  # per round: list of tables
     finals: ArchonRoundTable | None = None
+    overrides: list[ArchonOverride] = field(default_factory=list)
 
 
 @dataclass
@@ -100,9 +111,23 @@ def _cell_str(val) -> str:
     return str(val).strip()
 
 
+def _round_label(val) -> str:
+    if isinstance(val, float) and val.is_integer():
+        val = int(val)
+    return _cell_str(val).upper()
+
+
+def override_comment(data: ArchonData, round_label: str, table: int) -> str | None:
+    for o in data.overrides:
+        if o.round == round_label and (round_label == "F" or o.table == table):
+            return o.explanation
+    return None
+
+
 def parse_archon_file(file_bytes: bytes) -> ArchonData:
     """Parse a filled-in Archon v1.5l spreadsheet. Sheet layout (0-indexed):
-    1 tournament info, 2 methuselahs (players), 4-6 rounds 1-3, 7 final round."""
+    1 tournament info, 2 methuselahs (players), 4-6 rounds 1-3, 7 final round,
+    8 override."""
     wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
     sheets = wb.sheetnames
 
@@ -156,7 +181,9 @@ def parse_archon_file(file_bytes: bytes) -> ArchonData:
             vp = _cell_float(ws_round.cell(row=row, column=5).value)
 
             if current_table_num is not None and table_num != current_table_num:
-                tables.append(ArchonRoundTable(seats=current_seats))
+                tables.append(
+                    ArchonRoundTable(seats=current_seats, number=current_table_num)
+                )
                 current_seats = []
 
             current_table_num = table_num
@@ -164,7 +191,9 @@ def parse_archon_file(file_bytes: bytes) -> ArchonData:
             row += 1
 
         if current_seats:
-            tables.append(ArchonRoundTable(seats=current_seats))
+            tables.append(
+                ArchonRoundTable(seats=current_seats, number=current_table_num or 0)
+            )
 
         if tables:
             rounds.append(tables)
@@ -186,6 +215,24 @@ def parse_archon_file(file_bytes: bytes) -> ArchonData:
         if finals_seats:
             finals = ArchonRoundTable(seats=finals_seats)
 
+    overrides: list[ArchonOverride] = []
+    if "Override" in sheets:
+        ws_override = wb["Override"]
+        for row in range(6, ws_override.max_row + 1):
+            round_val = ws_override.cell(row=row, column=1).value
+            table_val = ws_override.cell(row=row, column=2).value
+            explanation = _cell_str(ws_override.cell(row=row, column=4).value)
+            if round_val is None and table_val is None and not explanation:
+                continue
+            overrides.append(
+                ArchonOverride(
+                    row=row,
+                    round=_round_label(round_val),
+                    table=_cell_int(table_val),
+                    explanation=explanation,
+                )
+            )
+
     wb.close()
     return ArchonData(
         event_name=event_name,
@@ -193,6 +240,24 @@ def parse_archon_file(file_bytes: bytes) -> ArchonData:
         players=players,
         rounds=rounds,
         finals=finals,
+        overrides=overrides,
+    )
+
+
+_VP_REASONS = {
+    "incomplete": "the VPs add up to less than the table can award",
+    "excessive_total": "the VPs add up to more than the table can award",
+    "redirected_vp": "a VP went to a Methuselah who did not oust that prey",
+    "impossible_oust_order": "the VPs follow no possible order of ousts",
+    "half_vp_mismatch": "a half VP does not match how the game ended",
+}
+
+
+def _vp_refusal(where: str, vp_error: str, override_hint: str) -> str:
+    reason = _VP_REASONS.get(vp_error, "the VPs are not a valid result")
+    return (
+        f"{where}: {reason}. If a judge ruled this result, list {override_hint} "
+        "on the Override sheet with an explanation."
     )
 
 
@@ -216,46 +281,69 @@ def validate_archon_import(data: ArchonData, engine) -> list[str]:
             errors.append(f"Duplicate VEKN ID: {vid}")
         seen.add(vid)
 
+    listed: set[tuple[str, int]] = set()
+    for o in data.overrides:
+        where = f"Override sheet, row {o.row}"
+        is_final = o.round == "F"
+        key = (o.round, 0 if is_final else o.table)
+        name = (
+            "the final"
+            if is_final
+            else f"Round {o.round or '?'}, Table {o.table or '?'}"
+        )
+        if not o.explanation:
+            errors.append(f"{where}: {name} is listed without an Explanation")
+        if is_final:
+            exists = data.finals is not None
+        else:
+            r_idx = int(o.round) - 1 if o.round.isdigit() else -1
+            exists = 0 <= r_idx < len(data.rounds) and any(
+                t.number == o.table for t in data.rounds[r_idx]
+            )
+        if not exists:
+            errors.append(f"{where}: {name} does not exist in this file")
+        elif key in listed:
+            errors.append(f"{where}: {name} is listed twice")
+        listed.add(key)
+
     for r_idx, tables in enumerate(data.rounds):
-        for t_idx, table in enumerate(tables):
+        for table in tables:
+            where = f"Round {r_idx + 1}, Table {table.number}"
             table_size = len(table.seats)
             vps = [s[1] for s in table.seats]
 
             if table_size not in (4, 5):
                 errors.append(
-                    f"Round {r_idx + 1}, Table {t_idx + 1}: "
-                    f"invalid table size {table_size} (must be 4 or 5)"
+                    f"{where}: invalid table size {table_size} (must be 4 or 5)"
                 )
                 continue
 
             for s_idx, vp in enumerate(vps):
                 if vp < 0 or vp > table_size:
                     errors.append(
-                        f"Round {r_idx + 1}, Table {t_idx + 1}, Seat {s_idx + 1}: "
+                        f"{where}, Seat {s_idx + 1}: "
                         f"VP {vp} out of range [0, {table_size}]"
                     )
                 if (vp * 2) != int(vp * 2):
                     errors.append(
-                        f"Round {r_idx + 1}, Table {t_idx + 1}, Seat {s_idx + 1}: "
-                        f"VP {vp} not in 0.5 increments"
+                        f"{where}, Seat {s_idx + 1}: VP {vp} not in 0.5 increments"
                     )
 
+            if override_comment(data, str(r_idx + 1), table.number) is not None:
+                continue
             vp_error = engine.check_table_vps(vps)
             if vp_error:
-                errors.append(
-                    f"Round {r_idx + 1}, Table {t_idx + 1}: "
-                    f"invalid VP distribution: {vp_error}"
-                )
+                errors.append(_vp_refusal(where, vp_error, "this round and table"))
 
     if data.finals:
         fsize = len(data.finals.seats)
         if fsize not in (4, 5):
             errors.append(f"Finals: invalid table size {fsize} (must be 4 or 5)")
-        else:
+        elif override_comment(data, "F", 0) is None:
             fvps = [s[1] for s in data.finals.seats]
             vp_error = engine.check_table_vps(fvps)
             if vp_error:
-                errors.append(f"Finals: invalid VP distribution: {vp_error}")
+                errors.append(_vp_refusal("Finals", vp_error, "F"))
 
     return errors
 
@@ -303,7 +391,7 @@ async def apply_archon_import(
         player_scores[user_uid] = {"gw": 0.0, "vp": 0.0, "tp": 0}
         player_prelim[user_uid] = {"gw": 0.0, "vp": 0.0, "tp": 0}
 
-    for tables in data.rounds:
+    for r_idx, tables in enumerate(data.rounds):
         round_tables: list[Table] = []
         for table in tables:
             vps = [s[1] for s in table.seats]
@@ -330,10 +418,14 @@ async def apply_archon_import(
                 player_prelim[user_uid]["vp"] += vp
                 player_prelim[user_uid]["tp"] += tp
 
+            comment = override_comment(data, str(r_idx + 1), table.number)
             round_tables.append(
                 Table(
                     seating=seats,
                     state=TableState.FINISHED,
+                    override=None
+                    if comment is None
+                    else ScoreOverride(judge_uid=actor_uid, comment=comment),
                 )
             )
         built_rounds.append(round_tables)
@@ -369,10 +461,14 @@ async def apply_archon_import(
             if gw == 1:
                 finals_winner_uid = user_uid
 
+        f_comment = override_comment(data, "F", 0)
         built_finals = FinalsTable(
             seating=finals_seats,
             seed_order=seed_order,
             state=TableState.FINISHED,
+            override=None
+            if f_comment is None
+            else ScoreOverride(judge_uid=actor_uid, comment=f_comment),
         )
 
     finalist_uids = set()

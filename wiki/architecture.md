@@ -1158,6 +1158,15 @@ and broadcast, or other clients stay stale until the next snapshot resync.
 `POST /api/tournaments/{uid}/archon-import` uploads one. The importer extracts
 rounds, tables, seating, scores and players, matching players by VEKN ID.
 
+The sheet's **Override** tab is the organizer's judge override: a row names a
+round (or `F` for the final), a table and an Explanation, and that table imports
+as Finished with an override stamped to the importing organizer, the Explanation
+as its comment. Only the VP-distribution check is skipped; table size, VP range
+and half-steps still apply. A listed row with a blank Explanation, or naming a
+table the file does not have, refuses the import. A table failing the VP check
+and not listed refuses it with a plain-language reason that points to the
+Override tab.
+
 ## Scheduled background tasks
 
 | Job | Schedule | Module |
