@@ -1364,6 +1364,8 @@
   "promo_holdings_none_left": "aucune restante",
   "promo_holdings_remaining": "{count} restante(s)",
   "promo_holdings_received": "{count} reçue(s)",
+  "promo_inventory_by_promo": "Par promo",
+  "promo_inventory_by_holder": "Par détenteur",
   "promo_inventory_title": "Inventaire",
   "promo_inventory_offline": "Enregistrer les mouvements et consulter le registre nécessitent une connexion.",
   "promo_inventory_no_holdings": "Aucun stock enregistré pour le moment — enregistrez un mouvement pour commencer à suivre le stock.",

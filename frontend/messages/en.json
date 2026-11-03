@@ -1364,6 +1364,8 @@
   "promo_holdings_none_left": "none left",
   "promo_holdings_remaining": "{count} remaining",
   "promo_holdings_received": "{count} received",
+  "promo_inventory_by_promo": "By promo",
+  "promo_inventory_by_holder": "By holder",
   "promo_inventory_title": "Inventory",
   "promo_inventory_offline": "Recording movements and the ledger need a connection.",
   "promo_inventory_no_holdings": "No recorded holdings yet — record a movement to start tracking stock.",

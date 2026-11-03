@@ -1,6 +1,4 @@
 <script lang="ts">
-  // Officials-only inventory: per-promo holdings (synced, offline-capable) plus
-  // the online-only ledger controls (record movement, CSV export, ledger list).
   import type { Promo } from "$lib/types";
   import { getUser } from "$lib/db";
   import { getPromoLedger } from "$lib/api";
@@ -8,6 +6,7 @@
   import { buildCsv } from "$lib/csv";
   import { downloadBlob } from "$lib/utils";
   import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
+  import { syncQueryParams, currentParams } from "$lib/url-filters";
   import Button from "$lib/components/Button.svelte";
   import PromoLedgerList from "./PromoLedgerList.svelte";
   import RecordMovementModal from "./RecordMovementModal.svelte";
@@ -31,12 +30,31 @@
   let ledgerRefreshKey = $state(0);
   let exporting = $state(false);
 
+  let grouping = $state<"promo" | "holder">(currentParams().get("inventory") === "holder" ? "holder" : "promo");
+  $effect(() => {
+    syncQueryParams({ inventory: grouping === "holder" ? grouping : null });
+  });
+
   const holdingBlocks = $derived(
     promos
       .map((promo) => ({ promo, rows: holdingRows(promo) }))
       .filter((b) => b.rows.length > 0)
       .sort((a, b) => a.promo.name.localeCompare(b.promo.name))
   );
+
+  const holderBlocks = $derived.by(() => {
+    const byHolder = new Map<string, { promo: Promo; remaining: number; assigned: number }[]>();
+    for (const block of holdingBlocks) {
+      for (const row of block.rows) {
+        const list = byHolder.get(row.uid) ?? [];
+        list.push({ promo: block.promo, remaining: row.remaining, assigned: row.assigned });
+        byHolder.set(row.uid, list);
+      }
+    }
+    return [...byHolder.entries()]
+      .map(([uid, items]) => ({ uid, items }))
+      .sort((a, b) => (names[a.uid] ?? a.uid).localeCompare(names[b.uid] ?? b.uid));
+  });
 
   // Resolve holder names defensively: missing/soft-deleted users show their uid.
   let names = $state<Record<string, string>>({});
@@ -99,6 +117,23 @@
   }
 </script>
 
+{#snippet retired(promo: Promo)}
+  {#if !promo.active}
+    <span class="px-1.5 py-0.5 text-xs font-normal rounded badge-slate">{m.promo_retired()}</span>
+  {/if}
+{/snippet}
+
+{#snippet counts(remaining: number, assigned: number)}
+  <span class="text-xs shrink-0">
+    {#if remaining === 0}
+      <span class="text-ink-faint">{m.promo_holdings_none_left()}</span>
+    {:else}
+      <span class="text-ink-muted">{m.promo_holdings_remaining({ count: String(remaining) })}</span>
+    {/if}
+    <span class="text-ink-faint"> · {m.promo_holdings_received({ count: String(assigned) })}</span>
+  </span>
+{/snippet}
+
 <div class="bg-surface-card rounded-lg shadow border border-line p-5">
   <div class="flex items-center gap-2 mb-3">
     <Boxes class="w-5 h-5 text-accent" aria-hidden="true" />
@@ -123,32 +158,53 @@
   {#if holdingBlocks.length === 0}
     <p class="text-sm text-ink-muted">{m.promo_inventory_no_holdings()}</p>
   {:else}
-    <div class="space-y-4">
-      {#each holdingBlocks as block (block.promo.uid)}
-        <div>
-          <h3 class="text-sm font-medium text-ink-strong flex items-center gap-2">
-            {block.promo.name}
-            {#if !block.promo.active}
-              <span class="px-1.5 py-0.5 text-xs font-normal rounded badge-slate">{m.promo_retired()}</span>
-            {/if}
-          </h3>
-          <div class="divide-y divide-line/50">
-            {#each block.rows as row (row.uid)}
-              <div class="flex items-center justify-between gap-2 py-1.5 text-sm">
-                <span class="text-ink min-w-0 truncate">{names[row.uid] ?? row.uid}</span>
-                <span class="text-xs shrink-0">
-                  {#if row.remaining === 0}
-                    <span class="text-ink-faint">{m.promo_holdings_none_left()}</span>
-                  {:else}
-                    <span class="text-ink-muted">{m.promo_holdings_remaining({ count: String(row.remaining) })}</span>
-                  {/if}
-                  <span class="text-ink-faint"> · {m.promo_holdings_received({ count: String(row.assigned) })}</span>
-                </span>
-              </div>
-            {/each}
-          </div>
-        </div>
+    <div class="inline-flex w-fit mb-4 bg-surface-muted rounded-lg border border-line p-1">
+      {#each [["promo", m.promo_inventory_by_promo()], ["holder", m.promo_inventory_by_holder()]] as [value, label] (value)}
+        <button
+          onclick={() => (grouping = value as "promo" | "holder")}
+          aria-pressed={grouping === value}
+          class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors {grouping === value ? 'bg-accent-strong text-white' : 'text-ink-muted hover:text-ink-bright'}"
+        >
+          {label}
+        </button>
       {/each}
+    </div>
+    <div class="space-y-4">
+      {#if grouping === "promo"}
+        {#each holdingBlocks as block (block.promo.uid)}
+          <div>
+            <h3 class="text-sm font-medium text-ink-strong flex items-center gap-2">
+              {block.promo.name}
+              {@render retired(block.promo)}
+            </h3>
+            <div class="divide-y divide-line/50">
+              {#each block.rows as row (row.uid)}
+                <div class="flex items-center justify-between gap-2 py-1.5 text-sm">
+                  <span class="text-ink min-w-0 truncate">{names[row.uid] ?? row.uid}</span>
+                  {@render counts(row.remaining, row.assigned)}
+                </div>
+              {/each}
+            </div>
+          </div>
+        {/each}
+      {:else}
+        {#each holderBlocks as block (block.uid)}
+          <div>
+            <h3 class="text-sm font-medium text-ink-strong truncate">{names[block.uid] ?? block.uid}</h3>
+            <div class="divide-y divide-line/50">
+              {#each block.items as item (item.promo.uid)}
+                <div class="flex items-center justify-between gap-2 py-1.5 text-sm">
+                  <span class="text-ink min-w-0 truncate flex items-center gap-2">
+                    {item.promo.name}
+                    {@render retired(item.promo)}
+                  </span>
+                  {@render counts(item.remaining, item.assigned)}
+                </div>
+              {/each}
+            </div>
+          </div>
+        {/each}
+      {/if}
     </div>
   {/if}
 
