@@ -50,6 +50,8 @@ let authState = $state<AuthState>({
   error: null,
 });
 
+let storedSession = $state(typeof localStorage !== "undefined" && localStorage.getItem(ACCESS_TOKEN_KEY) !== null);
+
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
 let crossTabSyncRegistered = false;
@@ -99,12 +101,14 @@ function scheduleRefresh(expiresIn: number) {
 export function storeTokens(tokens: TokenResponse) {
   localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
   localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
+  storedSession = true;
   scheduleRefresh(tokens.expires_in);
 }
 
 function clearTokens() {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
+  storedSession = false;
   if (refreshTimer) {
     clearTimeout(refreshTimer);
     refreshTimer = null;
@@ -115,10 +119,15 @@ export function getAccessToken(): string | null {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
+export function hasStoredSession(): boolean {
+  return storedSession;
+}
+
 /** Tokens live in shared localStorage, so a login/logout/claim in another tab changes this tab's
  * effective access level; if unnoticed, this tab's old-level SSE clobbers the shared IndexedDB with a lower-access projection. Converges this tab to match. */
 async function handleCrossTabAuthChange(): Promise<void> {
   const token = getAccessToken();
+  storedSession = token !== null;
 
   // Logout in another tab → drop to anonymous and resync the public view.
   if (!token) {
@@ -183,6 +192,7 @@ export async function storeTokensFromCallback(
 ): Promise<void> {
   localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
   localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  storedSession = true;
 
   const payload = parseJwt(accessToken);
   if (payload) {

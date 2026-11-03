@@ -297,6 +297,12 @@ Design for touch first, then enhance for desktop.
   exchange (*gagliardetto*, *banderín*) rather than a season; and `User` beside community's `Users` is one shape at that size,
   so profile takes the circled bust. `/tournaments`, `/leagues` and `/profile`
   repeat their nav icon in their own empty state.
+- **The sixth slot is the sign-in state.** Signed in, it is `/profile`
+  `CircleUser`; signed out, it is `/login` `LogIn` labelled *Sign In* — a shape
+  change, never a colour, since [green is the beta mark's](#the-beta-green). It reads the stored
+  session, not `isAuthenticated`, for [the landing forward's](#landing) reason: a
+  member offline stays signed in, and `/profile` tells them it needs a connection
+  rather than asking them to sign in. Coming back online re-runs `initAuth()`.
 - **Forms**: large inputs, no complex multi-column layouts on mobile. A form
   reveals invalid state only once the user has touched it — a pristine form that
   opens already flagging its own empty required fields reads as an error the

@@ -3,13 +3,13 @@
   import { page } from '$app/stores';
   import { openLastView } from '$lib/last-view';
   import { syncManager } from '$lib/sync';
-  import { initAuth, getAuthState } from '$lib/stores/auth.svelte';
+  import { initAuth, getAuthState, hasStoredSession } from '$lib/stores/auth.svelte';
   import { initEngine } from '$lib/engine-instance';
   import { initServiceWorker, getUpdateAvailable, applyUpdate, reloadOnStaleChunk } from '$lib/stores/sw.svelte';
   import { initOfflineState, getOfflineTournamentUids } from '$lib/stores/offline.svelte';
   import { reconcilePush } from '$lib/stores/push.svelte';
   import { onMount } from 'svelte';
-  import { Wifi, WifiOff, RefreshCw, Download, TriangleAlert, Trophy, FlagTriangleRight, ListOrdered, Users, CircleUser, BookOpen, MessageSquarePlus } from '@lucide/svelte';
+  import { Wifi, WifiOff, RefreshCw, Download, TriangleAlert, Trophy, FlagTriangleRight, ListOrdered, Users, CircleUser, LogIn, BookOpen, MessageSquarePlus } from '@lucide/svelte';
   import Badge from '$lib/components/Badge.svelte';
   import Toast from '$lib/components/Toast.svelte';
   import WhatsNewModal from '$lib/components/WhatsNewModal.svelte';
@@ -35,14 +35,16 @@
   let hasOfflineLocked = $state(false);
   let feedbackRoute = $state<string | null>(null);
 
-  const navItems = [
+  const navItems = $derived([
     { href: '/tournaments', labelFn: () => m.nav_tournaments(), icon: Trophy },
     { href: '/leagues', labelFn: () => m.nav_leagues(), icon: FlagTriangleRight },
     { href: '/rankings', labelFn: () => m.nav_rankings(), icon: ListOrdered },
     { href: '/users', labelFn: () => m.nav_community(), icon: Users },
     { href: '/help', labelFn: () => m.nav_help(), icon: BookOpen },
-    { href: '/profile', labelFn: () => m.nav_profile(), icon: CircleUser },
-  ];
+    hasStoredSession()
+      ? { href: '/profile', labelFn: () => m.nav_profile(), icon: CircleUser }
+      : { href: '/login', labelFn: () => m.login_sign_in(), icon: LogIn },
+  ]);
 
   function isActive(href: string, currentPath: string): boolean {
     if (href === '/') return currentPath === '/';
@@ -98,6 +100,8 @@
     let onlineStableTimer: ReturnType<typeof setTimeout> | undefined;
     const handleOnline = () => {
       syncManager.connect();
+      const auth = getAuthState();
+      if (hasStoredSession() && !auth.isAuthenticated && !auth.isLoading) void initAuth();
       clearTimeout(onlineStableTimer);
       onlineStableTimer = setTimeout(() => {
         isOnline = true;

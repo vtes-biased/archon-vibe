@@ -425,6 +425,8 @@
   "profile_tab_account": "Compte",
   "profile_sign_in_required": "Connexion requise",
   "profile_sign_in_msg": "Veuillez vous connecter pour voir votre profil.",
+  "profile_offline_title": "Connecté, hors ligne",
+  "profile_offline_msg": "Votre profil se chargera dès qu'Archon pourra de nouveau joindre le serveur.",
   "profile_save_error": "Échec de la sauvegarde",
   "profile_contact_info": "Informations de contact",
   "profile_phone": "Téléphone",

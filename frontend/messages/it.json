@@ -425,6 +425,8 @@
   "profile_tab_account": "Account",
   "profile_sign_in_required": "Accesso Richiesto",
   "profile_sign_in_msg": "Effettua l'accesso per visualizzare il tuo profilo.",
+  "profile_offline_title": "Accesso effettuato, offline",
+  "profile_offline_msg": "Il tuo profilo si caricherà non appena Archon potrà di nuovo raggiungere il server.",
   "profile_save_error": "Salvataggio non riuscito",
   "profile_contact_info": "Informazioni di Contatto",
   "profile_phone": "Telefono",

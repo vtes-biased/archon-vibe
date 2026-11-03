@@ -1,12 +1,11 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { getAccessToken } from '$lib/stores/auth.svelte';
+  import { hasStoredSession } from '$lib/stores/auth.svelte';
   import Button from '$lib/components/Button.svelte';
   import * as m from '$lib/paraglide/messages.js';
 
-  // `isAuthenticated` is false whenever /auth/me is unreachable, offline included.
-  const signedIn = getAccessToken() !== null;
+  const signedIn = hasStoredSession();
 
   onMount(() => {
     if (signedIn) goto('/tournaments', { replaceState: true });
