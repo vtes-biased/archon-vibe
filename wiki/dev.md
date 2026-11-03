@@ -168,7 +168,9 @@ Beta's box belongs to server-setup and keeps the default.
 
 **Production reads ahead 1 MB on `xvda`**, against the kernel's 128 KB, for the same
 disk: every operation it can skip is one that cannot land in a slow spell, and the
-snapshot pass is the reader that gains ([sync](sync.md#snapshots)). `setup.py`
+snapshot pass is the reader meant to gain. It gains little: the provider's volume
+caps a request at 128 KB (`max_sectors_kb`, not ours to change), so a 1 MB
+read-ahead is split back into 128 KB reads ([sync](sync.md#snapshots)). `setup.py`
 installs it as a udev rule, so `add` carries it across a reboot and `change` applies
 it on the run that writes the rule. Beta stays at 128 KB.
 

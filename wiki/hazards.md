@@ -576,14 +576,16 @@ at no load. About 2 synchronous writes a second go unnoticed there; 12–15 keep
 70–97 % busy with PostgreSQL queued behind them. A daemon or loop on production must
 not fsync on a timer — why Fluent Bit's cursor runs with `db.sync off`
 ([dev](dev.md)). Reads pay the same way: a snapshot pass over out-of-line projections
-takes 12 s warm and 615 s at worst ([sync](sync.md#snapshots)).
+took 12 s warm and 615 s at worst, and in the row it still makes 2,804 device reads
+cold, 7.9 s on an idle disk and minutes in a spell ([sync](sync.md#snapshots)).
 
 **`SET STORAGE` moves nothing already written, and a new database setting never
 reaches a row by itself.** Existing values stay where they are until the table is
 rewritten, so a column can read `m` in `pg_attribute` while the corpus sits in TOAST.
 `VACUUM FULL objects` is that rewrite, under an exclusive lock, and it fails on the
 database's own 5 s `lock_timeout` and 15 s `statement_timeout` unless both are 0 for
-the session.
+the session. On production it held that lock 105 s on an idle disk, against 4.7 s on
+beta, and every request touching `objects` failed meanwhile: an outage to schedule.
 
 **Running out of file descriptors truncates responses mid-body — it does not
 refuse connects.** Measured in the local EC rehearsal at macOS's 256-fd

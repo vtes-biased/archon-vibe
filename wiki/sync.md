@@ -651,13 +651,22 @@ row is simply omitted from a file whose projection column is NULL.
 84 % of them non-contiguous and so read a page at a time, and TOAST reads skip the
 sequential scan's buffer ring, so they flush `shared_buffers`. Measured cold on beta
 at 36k objects: 8,779 device reads and 105 MB of `shared_buffers` out of line, 1,443
-and 31 MB in the row, and 286 to 402 reads with production's 1 MB read-ahead
-([dev](dev.md#deployment)). A value too large for its row still goes out of line:
-5,464 of them on beta. The cost is wider rows for narrow queries: a cold catch-up
+and 31 MB in the row, and 286 to 402 reads with a 1 MB read-ahead. Production does
+not get that last figure: its volume splits every read at 128 KB
+([dev](dev.md#deployment)), and a cold pass there measured 2,804 device reads,
+7.9 s on an idle disk and 28 MB of `shared_buffers` at 39k objects (2026-11-03,
+146 MB of heap). A value too large for its row still goes out of line: 5,464 of
+them on beta, 28 MB of TOAST on production. The cost is wider rows for narrow queries: a cold catch-up
 reads 837 pages against 536 and the open-tournament scan 423 against 248. 1,000
 tournament saves add 4 % to a pass, against 12 % on a rewritten default-storage
 table. `pg_prewarm` ahead of the pass was rejected: 1,697 reads, and it leaves
 105 MB in `shared_buffers`.
+
+**Every pass is a full pass, by decision.** Patching the previous files from the
+rows changed since was prototyped (2.2 s of CPU, 21–27 MB and about 130 cold pages
+for 50 rows) and not enacted: a patch that misses a change ships an inconsistent
+snapshot with nothing to catch it. It stays the fallback only if a cold pass proves
+a serious issue on production and nothing better exists.
 
 **The pass compresses on a thread of its own.** The event loop only fetches: opening
 the files, writing each batch, the `eof` and the renames all run on one executor
