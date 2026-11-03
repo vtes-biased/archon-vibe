@@ -228,6 +228,23 @@ class TestDaemonIdentity:
         ).status_code == 401
 
     @pytest.mark.asyncio
+    async def test_removing_the_scope_kills_a_live_token(self, test_client, live_api):
+        client_id, secret = await _register("unscoped", [OAuthScope.API_READ])
+        token = (await _mint(test_client, client_id, secret)).json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        assert (
+            await live_api.get("/v1/tournaments", headers=headers)
+        ).status_code == 200
+
+        record = await get_oauth_client_by_client_id(client_id)
+        await update_oauth_client(
+            msgspec.structs.replace(record, scopes=[OAuthScope.PROFILE_READ])
+        )
+        assert (
+            await live_api.get("/v1/tournaments", headers=headers)
+        ).status_code == 401
+
+    @pytest.mark.asyncio
     async def test_revoking_a_member_token_kills_it(self, test_client, live_api):
         client_id, secret = await _register("member-revoked", [OAuthScope.PROFILE_READ])
         jti = str(uuid7())

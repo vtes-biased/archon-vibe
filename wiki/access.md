@@ -260,7 +260,7 @@ page navigated to the empty string, which reloads the consent page, which calls
 Endpoints `/oauth/{authorize,token,revoke,userinfo}`; `GET /oauth/consents` lists
 authorized apps; `DELETE /oauth/consents/{client_id}` revokes consent and
 immediately revokes live tokens for that client, across every event it holds; and
-client CRUD plus secret regeneration under `/oauth/clients` (IC or DEV). The four
+client CRUD plus secret regeneration under `/oauth/clients` (IC or DEV). The five
 `/oauth/clients` routes are **first-party session only** like the consent
 endpoints, rejecting OAuth tokens with 403 — the role gate alone would let an app
 a DEV or IC member signed in with `profile:read` deactivate that member's clients
@@ -290,9 +290,24 @@ address unless it also asks for one. Both `/authorize` verbs refuse a scope the
 client was not registered with — the consent page is not a way around
 registration.
 
+**An owner edits a client's scopes and redirect URIs** (`PATCH
+/oauth/clients/{client_id}`) under the registration rules, but not its name.
+Removing a scope takes it back from every member at once: it is stripped from
+each consent — a consent left empty, or naming an event without `event:run`, is
+deleted, since it can never match an authorize request again — and every token
+carrying it is revoked, which kills whole lineages because a lineage keeps one
+scope set. Both are needed: a refresh re-issues the
+token's own scopes, and a kept consent would re-grant the scope with no page
+shown. The code and refresh grants also refuse a scope or redirect URI the client
+no longer holds, closing the window of a code or refresh in flight across the
+edit, and the public API refuses a daemon token once its client drops `api:read`.
+A deactivated client leaves its owner's list but keeps its row, which members'
+consents and token records still name.
+
 **`profile:email` is registered with a purpose.** Registering it requires a
 statement of what the client does with the address, and the consent page shows it
-under the scope. `/oauth/userinfo` then adds `email`: the address of a verified
+under the scope. An edit cannot reword it while the client holds the scope, since
+members consented to that wording; dropping the scope clears it. `/oauth/userinfo` then adds `email`: the address of a verified
 email login, else the verified address Discord last reported for a linked Discord
 login, and absent when there is neither — never [the address of
 record](#the-email-of-record).
@@ -383,9 +398,9 @@ one-hour `oauth_client` JWT carrying `client_id` and `api:read` — and **no
 the app's middleware unconditionally resolves a User from a token, so the type
 never touches either. The main app rejects an `oauth_client` token by
 construction — it knows two token types and this is neither — and the
-[public API](public-api.md#auth) accepts it, checking the client's `active` flag,
-which is therefore the whole of revocation. There is no refresh token: mint
-another.
+[public API](public-api.md#auth) accepts it, checking that the client is `active`
+and still holds `api:read`, which is therefore the whole of revocation. There is
+no refresh token: mint another.
 
 A client registered for `api:read` alone needs no `redirect_uri`, since it never
 sends a browser anywhere. The public API also accepts a user's `oauth_access`

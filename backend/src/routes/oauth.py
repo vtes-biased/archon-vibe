@@ -14,7 +14,7 @@ import jwt
 import msgspec
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from litestar import Request, Router, delete, get, post
+from litestar import Request, Router, delete, get, patch, post
 from litestar.exceptions import HTTPException
 from litestar.params import FromPath, FromQuery, QueryParameter
 
@@ -33,6 +33,8 @@ from ..db_oauth import (
     insert_oauth_token,
     revoke_oauth_token_chain,
     revoke_oauth_tokens_for_user_client,
+    revoke_oauth_tokens_with_scopes,
+    strip_oauth_consent_scopes,
     update_oauth_client,
     update_oauth_code,
     update_oauth_token,
@@ -420,6 +422,11 @@ async def _handle_authorization_code(body: TokenRequest, client: OAuthClient) ->
     if auth_code.redirect_uri != redirect_uri:
         raise HTTPException(status_code=400, detail="Redirect URI mismatch")
 
+    if redirect_uri not in client.redirect_uris:
+        raise HTTPException(status_code=400, detail="Invalid redirect_uri")
+    if not set(auth_code.scopes) <= set(client.scopes):
+        raise HTTPException(status_code=400, detail="Scope no longer allowed")
+
     now = datetime.now(UTC)
     if auth_code.expires_at < now:
         raise HTTPException(status_code=400, detail="Authorization code expired")
@@ -527,6 +534,8 @@ async def _handle_refresh_token(body: TokenRequest, client: OAuthClient) -> dict
             status_code=400,
             detail="Token carries a scope this build no longer issues",
         ) from err
+    if not set(scopes) <= set(client.scopes):
+        raise HTTPException(status_code=400, detail="Scope no longer allowed")
 
     return await _issue_token_pair(
         user_uid=payload["sub"],
@@ -539,8 +548,7 @@ async def _handle_refresh_token(body: TokenRequest, client: OAuthClient) -> dict
 
 async def _handle_client_credentials(body: TokenRequest, client: OAuthClient) -> dict:
     """Stateless on purpose: no `oauth_tokens` row, because that record is keyed on
-    a user and a daemon has none. Revocation is the client's `active` flag, which
-    the public API checks for itself."""
+    a user and a daemon has none."""
     if OAuthScope.API_READ not in client.scopes:
         raise HTTPException(
             status_code=400, detail="Client is not allowed the api:read scope"
@@ -762,7 +770,6 @@ async def revoke_consent(request: Request, client_id: FromPath[str]) -> dict:
     return {"status": "revoked", "client_id": client_id, "tokens_revoked": revoked}
 
 
-# One gate, four routes.
 async def _require_oauth_admin(request: Request) -> User:
     user = await get_current_user(request)
     _require_first_party(request, "Client management requires a first-party session")
@@ -783,17 +790,9 @@ class RegisterClientRequest(msgspec.Struct):
     email_purpose: str = ""
 
 
-@post("/clients")
-async def register_client(request: Request, data: RegisterClientRequest) -> dict:
-    """Register a new OAuth client. Returns client_secret once."""
-    user = await _require_oauth_admin(request)
-    name = data.name.strip()
-    redirect_uris = data.redirect_uris
-    scope_strs = data.scopes
-
-    if not name:
-        raise HTTPException(status_code=400, detail="Client name is required")
-
+def _client_rules(
+    redirect_uris: list[str], scope_strs: list[str], email_purpose: str
+) -> tuple[list[OAuthScope], str | None]:
     scopes = []
     for scope_str in scope_strs:
         try:
@@ -808,14 +807,29 @@ async def register_client(request: Request, data: RegisterClientRequest) -> dict
             status_code=400, detail="At least one redirect_uri is required"
         )
 
-    email_purpose = None
-    if OAuthScope.PROFILE_EMAIL in scopes:
-        email_purpose = data.email_purpose.strip()
-        if not email_purpose:
-            raise HTTPException(
-                status_code=400,
-                detail="profile:email requires a statement of what the app does with it",
-            )
+    if OAuthScope.PROFILE_EMAIL not in scopes:
+        return scopes, None
+    if not email_purpose.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="profile:email requires a statement of what the app does with it",
+        )
+    return scopes, email_purpose.strip()
+
+
+@post("/clients")
+async def register_client(request: Request, data: RegisterClientRequest) -> dict:
+    """Register a new OAuth client. Returns client_secret once."""
+    user = await _require_oauth_admin(request)
+    name = data.name.strip()
+    redirect_uris = data.redirect_uris
+
+    if not name:
+        raise HTTPException(status_code=400, detail="Client name is required")
+
+    scopes, email_purpose = _client_rules(
+        redirect_uris, data.scopes, data.email_purpose
+    )
 
     client_id = _generate_client_id()
     client_secret = _generate_client_secret()
@@ -858,11 +872,60 @@ async def list_clients(request: Request) -> list[dict]:
             "redirect_uris": c.redirect_uris,
             "scopes": [s.value for s in c.scopes],
             "email_purpose": c.email_purpose,
-            "active": c.active,
             "modified": c.modified.isoformat(),
         }
         for c in clients
+        if c.active
     ]
+
+
+class EditClientRequest(msgspec.Struct):
+    redirect_uris: list[str] = []
+    scopes: list[str] = []
+    email_purpose: str = ""
+
+
+@patch("/clients/{client_id:str}")
+async def edit_client(
+    request: Request, client_id: FromPath[str], data: EditClientRequest
+) -> dict:
+    user = await _require_oauth_admin(request)
+    client = await get_oauth_client_by_client_id(client_id)
+    if not client or not client.active or client.created_by_uid != user.uid:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    email_purpose = data.email_purpose
+    if OAuthScope.PROFILE_EMAIL in client.scopes:
+        if email_purpose.strip() not in ("", client.email_purpose):
+            raise HTTPException(
+                status_code=400,
+                detail="The email purpose is fixed: members consented to it",
+            )
+        email_purpose = client.email_purpose or ""
+    scopes, email_purpose = _client_rules(
+        data.redirect_uris, data.scopes, email_purpose
+    )
+
+    await update_oauth_client(
+        msgspec.structs.replace(
+            client,
+            modified=datetime.now(UTC),
+            redirect_uris=data.redirect_uris,
+            scopes=scopes,
+            email_purpose=email_purpose,
+        )
+    )
+    removed = [s.value for s in client.scopes if s not in scopes]
+    if removed:
+        await revoke_oauth_tokens_with_scopes(client_id, removed)
+        await strip_oauth_consent_scopes(client_id, removed)
+
+    return {
+        "client_id": client_id,
+        "redirect_uris": data.redirect_uris,
+        "scopes": [s.value for s in scopes],
+        "email_purpose": email_purpose,
+    }
 
 
 @post("/clients/{client_id:str}/regenerate-secret")
@@ -914,6 +977,7 @@ router = Router(
         revoke_consent,
         register_client,
         list_clients,
+        edit_client,
         regenerate_secret,
         deactivate_client,
     ],

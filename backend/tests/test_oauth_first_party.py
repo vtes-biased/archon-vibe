@@ -85,7 +85,7 @@ async def test_self_service_oauth_endpoints_reject_third_party_token(
         await test_client.delete(f"/oauth/consents/{client_id}", headers=oauth_header)
     ).status_code == 403
 
-    # And on all four client-management routes, before any client lookup.
+    # And on all five client-management routes, before any client lookup.
     assert (
         await test_client.get("/oauth/clients", headers=oauth_header)
     ).status_code == 403
@@ -103,4 +103,11 @@ async def test_self_service_oauth_endpoints_reject_third_party_token(
     ).status_code == 403
     assert (
         await test_client.delete(f"/oauth/clients/{client_id}", headers=oauth_header)
+    ).status_code == 403
+    assert (
+        await test_client.patch(
+            f"/oauth/clients/{client_id}",
+            headers=oauth_header,
+            json={"redirect_uris": ["https://x.test/cb"], "scopes": ["profile:read"]},
+        )
     ).status_code == 403

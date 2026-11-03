@@ -171,7 +171,8 @@ daemon token reads. A third party's **daemon token** — the
 `client_credentials` grant's `oauth_client` JWT
 ([access](access.md#the-daemon-grant)) — is the intended one: it carries a
 `client_id` and `api:read`, has no row anywhere, and is checked against the
-client's `active` flag, which is the whole of its revocation. A **user's
+client's `active` flag and its still holding `api:read`, which are the whole of
+its revocation. A **user's
 `oauth_access` token** is accepted beside it at any scope, checked against its
 `oauth_tokens` row so a revoked token dies here too; it grants nothing extra, and
 exists so a user-facing client need not mint a second identity.

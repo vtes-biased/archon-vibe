@@ -210,6 +210,48 @@ async def revoke_oauth_tokens_for_user_client(user_uid: str, client_id: str) -> 
         return len(rows)
 
 
+async def revoke_oauth_tokens_with_scopes(client_id: str, scopes: list[str]) -> int:
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """
+            UPDATE oauth_tokens
+            SET data = jsonb_set(data, '{revoked}', 'true')
+            WHERE data->>'client_id' = %s
+              AND data->>'revoked' = 'false'
+              AND data->'scopes' ?| %s
+            RETURNING uid
+            """,
+            (client_id, scopes),
+        )
+        return len(await result.fetchall())
+
+
+async def strip_oauth_consent_scopes(client_id: str, scopes: list[str]) -> None:
+    async with get_connection() as conn:
+        await conn.execute(
+            """
+            UPDATE oauth_consents
+            SET data = jsonb_set(data, '{scopes}', (
+                SELECT COALESCE(jsonb_agg(s), '[]'::jsonb)
+                FROM jsonb_array_elements(data->'scopes') s
+                WHERE s #>> '{}' <> ALL(%s)
+            ))
+            WHERE data->>'client_id' = %s AND data->'scopes' ?| %s
+            """,
+            (scopes, client_id, scopes),
+        )
+        await conn.execute(
+            """
+            DELETE FROM oauth_consents
+            WHERE data->>'client_id' = %s
+              AND (data->'scopes' = '[]'::jsonb
+                   OR (data->>'tournament_uid' IS NOT NULL
+                       AND NOT data->'scopes' ? 'event:run'))
+            """,
+            (client_id,),
+        )
+
+
 async def cleanup_expired_oauth_codes() -> int:
     async with get_connection() as conn:
         result = await conn.execute(

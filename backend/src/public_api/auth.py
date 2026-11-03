@@ -41,11 +41,12 @@ async def _require_active_client(payload: dict) -> None:
 
     async with get_connection() as conn:
         cursor = await conn.execute(
-            "SELECT data->>'active' FROM oauth_clients WHERE data->>'client_id' = %s",
+            "SELECT data->>'active' = 'true' AND data->'scopes' ? 'api:read' "
+            "FROM oauth_clients WHERE data->>'client_id' = %s",
             (client_id,),
         )
         row = await cursor.fetchone()
-    if not row or row[0] != "true":
+    if not row or not row[0]:
         raise HTTPException(
             status_code=401, detail="Client is no longer active", headers=_CHALLENGE
         )

@@ -2,7 +2,7 @@
   import { getAuthState } from "$lib/stores/auth.svelte";
   import { apiRequest } from "$lib/api";
   import { showToast } from "$lib/stores/toast.svelte";
-  import { Plus, TriangleAlert, Copy, Loader2, Code2, RefreshCw, PowerOff } from "@lucide/svelte";
+  import { Plus, TriangleAlert, Copy, Loader2, Code2, RefreshCw, PowerOff, Pencil } from "@lucide/svelte";
   import FoldableSection from "$lib/components/FoldableSection.svelte";
   import Button from "$lib/components/Button.svelte";
   import * as m from '$lib/paraglide/messages.js';
@@ -19,7 +19,7 @@
     client_id: string;
     redirect_uris: string[];
     scopes: string[];
-    active: boolean;
+    email_purpose: string | null;
     modified: string;
   }
 
@@ -32,6 +32,7 @@
   let newScopes = $state<string[]>(["profile:read"]);
   let newEmailPurpose = $state("");
   let registering = $state(false);
+  let editing = $state<OAuthClientInfo | null>(null);
 
   let displayedSecret = $state<string | null>(null);
   let displayedClientId = $state<string | null>(null);
@@ -40,6 +41,8 @@
 
   const daemonOnly = $derived(newScopes.length === 1 && newScopes[0] === "api:read");
   const purposeMissing = $derived(newScopes.includes("profile:email") && !newEmailPurpose.trim());
+  const purposeFixed = $derived(!!editing?.scopes.includes("profile:email"));
+  const scopesRemoved = $derived(!!editing?.scopes.some((s) => !newScopes.includes(s)));
 
   async function loadClients() {
     loading = true;
@@ -55,6 +58,49 @@
   function toggle() {
     expanded = !expanded;
     if (expanded && !loaded) loadClients();
+  }
+
+  function resetForm() {
+    showRegister = false;
+    editing = null;
+    newName = "";
+    newRedirectUris = "";
+    newScopes = ["profile:read"];
+    newEmailPurpose = "";
+  }
+
+  function openRegister() {
+    const wasOpen = showRegister && !editing;
+    resetForm();
+    showRegister = !wasOpen;
+  }
+
+  function openEdit(client: OAuthClientInfo) {
+    editing = client;
+    newRedirectUris = client.redirect_uris.join("\n");
+    newScopes = [...client.scopes];
+    newEmailPurpose = client.email_purpose ?? "";
+    showRegister = true;
+  }
+
+  async function handleSave() {
+    if (!editing) return;
+    registering = true;
+    try {
+      await apiRequest(`/oauth/clients/${editing.client_id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          redirect_uris: newRedirectUris.split("\n").map((u) => u.trim()).filter(Boolean),
+          scopes: newScopes,
+          email_purpose: newEmailPurpose.trim(),
+        }),
+      });
+      resetForm();
+      await loadClients();
+    } catch {
+      // handled by apiRequest
+    }
+    registering = false;
   }
 
   async function handleRegister() {
@@ -77,11 +123,7 @@
       });
       displayedSecret = result.client_secret;
       displayedClientId = result.client_id;
-      showRegister = false;
-      newName = "";
-      newRedirectUris = "";
-      newScopes = ["profile:read"];
-      newEmailPurpose = "";
+      resetForm();
       await loadClients();
     } catch {
       // handled by apiRequest
@@ -131,7 +173,7 @@
   <FoldableSection title={m.profile_developer_section()} open={expanded} ontoggle={toggle} level={3}>
     <div class="flex items-center justify-between">
       <p class="text-ink-muted text-sm">{m.developer_subtitle()}</p>
-      <Button variant="primary" size="lg" onclick={() => (showRegister = !showRegister)}>
+      <Button variant="primary" size="lg" onclick={openRegister}>
         <Plus class="w-3.5 h-3.5" />
         {m.developer_register_btn()}
       </Button>
@@ -167,13 +209,15 @@
 
     {#if showRegister}
       <div class="bg-surface-muted rounded-lg border border-line-strong p-4">
-        <h4 class="text-sm font-medium text-ink-strong mb-3">{m.developer_register_title()}</h4>
-        <form onsubmit={(e) => { e.preventDefault(); handleRegister(); }} class="space-y-3">
+        <h4 class="text-sm font-medium text-ink-strong mb-3">{editing ? m.developer_edit_title({ name: editing.name }) : m.developer_register_title()}</h4>
+        <form onsubmit={(e) => { e.preventDefault(); if (editing) handleSave(); else handleRegister(); }} class="space-y-3">
+          {#if !editing}
           <div>
             <label for="app-name" class="block text-xs text-ink-muted mb-1">{m.developer_app_name()}</label>
             <input type="text" id="app-name" bind:value={newName} placeholder="My App"
               class="w-full px-3 py-2 bg-surface-card border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint focus:outline-none focus:border-accent-strong-hover" />
           </div>
+          {/if}
           <div>
             <label for="redirect-uris" class="block text-xs text-ink-muted mb-1">{m.developer_redirect_uris()}</label>
             <textarea id="redirect-uris" bind:value={newRedirectUris} placeholder="https://myapp.com/callback" rows="2"
@@ -200,8 +244,11 @@
               </label>
               {#if newScopes.includes("profile:email")}
                 <textarea bind:value={newEmailPurpose} rows="2" aria-label={m.developer_email_purpose()}
-                  placeholder={m.developer_email_purpose()}
-                  class="w-full px-3 py-2 bg-surface-card border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint focus:outline-none focus:border-accent-strong-hover"></textarea>
+                  placeholder={m.developer_email_purpose()} readonly={purposeFixed}
+                  class="w-full px-3 py-2 bg-surface-card border border-line-strong rounded text-sm text-ink-strong placeholder-ink-faint focus:outline-none focus:border-accent-strong-hover read-only:text-ink-muted"></textarea>
+                {#if purposeFixed}
+                  <p class="text-ink-faint text-xs">{m.developer_email_purpose_fixed()}</p>
+                {/if}
               {/if}
               <label class="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={newScopes.includes("event:run")} onchange={() => toggleScope("event:run")}
@@ -221,10 +268,13 @@
               </label>
             </div>
           </div>
+          {#if scopesRemoved}
+            <p class="text-xs banner-warn border rounded px-3 py-2">{m.developer_edit_scope_removed()}</p>
+          {/if}
           <div class="flex gap-2">
-            <Button type="button" variant="secondary" size="lg" class="flex-1" onclick={() => (showRegister = false)}>{m.common_cancel()}</Button>
-            <Button type="submit" variant="primary" size="lg" class="flex-1" loading={registering} disabled={!newName.trim() || (!daemonOnly && !newRedirectUris.trim()) || newScopes.length === 0 || purposeMissing}>
-              {m.developer_register_submit()}
+            <Button type="button" variant="secondary" size="lg" class="flex-1" onclick={resetForm}>{m.common_cancel()}</Button>
+            <Button type="submit" variant="primary" size="lg" class="flex-1" loading={registering} disabled={(!editing && !newName.trim()) || (!daemonOnly && !newRedirectUris.trim()) || newScopes.length === 0 || purposeMissing}>
+              {editing ? m.developer_edit_submit() : m.developer_register_submit()}
             </Button>
           </div>
         </form>
@@ -247,14 +297,7 @@
           <div class="bg-surface-muted rounded-lg border border-line-strong p-4">
             <div class="flex items-start justify-between">
               <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <h4 class="text-ink-strong font-medium text-sm">{client.name}</h4>
-                  {#if client.active}
-                    <span class="px-1.5 py-0.5 badge-success text-xs rounded-full">{m.developer_status_active()}</span>
-                  {:else}
-                    <span class="px-1.5 py-0.5 badge-danger text-xs rounded-full">{m.developer_status_inactive()}</span>
-                  {/if}
-                </div>
+                <h4 class="text-ink-strong font-medium text-sm">{client.name}</h4>
                 <div class="mt-1.5 space-y-0.5">
                   <div class="flex items-center gap-2">
                     <span class="text-ink-faint text-xs">{m.developer_client_id()}</span>
@@ -270,18 +313,20 @@
                   <div class="text-xs text-ink-faint">{m.developer_redirect_uris_label({ uris: client.redirect_uris.join(", ") })}</div>
                 </div>
               </div>
-              {#if client.active}
-                <div class="flex gap-1.5 shrink-0">
-                  <button onclick={() => (confirmAction = { clientId: client.client_id, action: "regenerate" })}
-                    class="p-1.5 text-ink-muted hover:text-ink-bright hover:bg-surface-card rounded transition-colors" title={m.developer_regenerate_title()}>
-                    <RefreshCw class="w-4 h-4" />
-                  </button>
-                  <button onclick={() => (confirmAction = { clientId: client.client_id, action: "deactivate" })}
-                    class="p-1.5 text-link hover:text-link-soft hover:bg-surface-card rounded transition-colors" title={m.developer_deactivate_title()}>
-                    <PowerOff class="w-4 h-4" />
-                  </button>
-                </div>
-              {/if}
+              <div class="flex gap-1.5 shrink-0">
+                <button onclick={() => openEdit(client)}
+                  class="p-1.5 text-ink-muted hover:text-ink-bright hover:bg-surface-card rounded transition-colors" title={m.developer_edit_btn()}>
+                  <Pencil class="w-4 h-4" />
+                </button>
+                <button onclick={() => (confirmAction = { clientId: client.client_id, action: "regenerate" })}
+                  class="p-1.5 text-ink-muted hover:text-ink-bright hover:bg-surface-card rounded transition-colors" title={m.developer_regenerate_title()}>
+                  <RefreshCw class="w-4 h-4" />
+                </button>
+                <button onclick={() => (confirmAction = { clientId: client.client_id, action: "deactivate" })}
+                  class="p-1.5 text-link hover:text-link-soft hover:bg-surface-card rounded transition-colors" title={m.developer_deactivate_title()}>
+                  <PowerOff class="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         {/each}
