@@ -745,6 +745,7 @@ export interface TournamentListItem {
   rank: TournamentRank;
   online: boolean;
   start: string | null;
+  finish: string | null;
   timezone: string;
   country: string | null;
   league_uid?: string | null;
@@ -764,6 +765,7 @@ function projectTournament(t: Tournament): TournamentListItem {
     rank: t.rank,
     online: t.online,
     start: t.start,
+    finish: t.finish,
     timezone: t.timezone,
     country: t.country,
     league_uid: t.league_uid,
@@ -1009,7 +1011,7 @@ export async function getUnfinishedOrganized(userUid: string): Promise<Tournamen
   const index = await getTournamentIndex();
   const before = dayCutoff(1);
   return [...index.values()]
-    .filter(t => t.played && t.state !== 'Finished' && t.organizers_uids?.includes(userUid) && tournamentDate(t) < before)
+    .filter(t => t.played && t.state !== 'Finished' && t.organizers_uids?.includes(userUid) && (t.finish ?? tournamentDate(t)) < before)
     .sort((a, b) => tournamentDate(a).localeCompare(tournamentDate(b)));
 }
 

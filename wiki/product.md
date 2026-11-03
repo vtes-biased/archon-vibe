@@ -73,9 +73,9 @@ VP entry with oust-order validation, automatic GW/TP, judge override, standings,
 finals qualification and toss, seating edits, round and tournament reopen/cancel,
 delete, roster CSV export carrying each player's name, VEKN id, country and
 region. The tournaments page leads, for an organizer, with a warning listing their
-events dated two or more days ago with rounds played and never finished, each
-linking to the event to finish it; a scored final left open finishes by itself a
-week later. Details: [tournaments](tournaments.md).
+events with rounds played and never finished whose declared Finish, or Start when
+none is declared, is two or more days ago, each linking to the event to finish it;
+a scored final left open finishes by itself a week later. Details: [tournaments](tournaments.md).
 
 **Open rounds** — a non-VEKN house format gaining traction online: each player
 plays up to `max_rounds` rounds of a continuously-run pool, so the event may run
