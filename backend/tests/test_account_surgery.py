@@ -478,6 +478,47 @@ async def test_abandon_allowed_without_active_suspension(test_client):
         assert body["user"]["vekn_id"] is None
 
 
+@pytest.mark.asyncio
+async def test_link_refuses_to_displace_same_address_holder(test_client):
+    ic = User(
+        uid=str(uuid7()),
+        modified=datetime.now(UTC),
+        name="IC",
+        vekn_id="9000005",
+        roles=[Role.IC],
+    )
+    holder = User(
+        uid=str(uuid7()), modified=datetime.now(UTC), name="Holder", vekn_id="9000006"
+    )
+    duplicate = User(
+        uid=str(uuid7()),
+        modified=datetime.now(UTC),
+        name="Duplicate",
+        contact_email="Same@Example.com",
+    )
+    for u in (ic, holder, duplicate):
+        await db.save_user(u)
+
+    async with _cleanup_surgery():
+        await db.insert_auth_method(_auth(holder.uid, "same@example.com"))
+        await db.insert_auth_method(_auth(duplicate.uid, "other@example.com"))
+
+        resp = await test_client.post(
+            "/vekn/link",
+            json={"vekn_id": "9000006", "user_uid": duplicate.uid},
+            headers=make_auth_header(ic.uid),
+        )
+        assert resp.status_code == 409
+        assert resp.json()["code"] == "vekn.link_same_person"
+        assert (await db.get_user_by_vekn_id("9000006")).uid == holder.uid
+        assert [
+            m.identifier for m in await db.get_auth_methods_for_user(holder.uid)
+        ] == ["same@example.com"]
+        assert [
+            m.identifier for m in await db.get_auth_methods_for_user(duplicate.uid)
+        ] == ["other@example.com"]
+
+
 # An unclassified personal/login field leaks onto the abandoned VEKN record for
 # the next claimant; an unclassified uid-keyed one hands the personal account
 # standing, stock or reach it holds none of.

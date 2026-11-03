@@ -401,7 +401,9 @@ participation ([domain](domain/tournament-rules.md#eligibility-and-materials)).
 A uid carrying a `vekn_id` is **never re-keyed and never soft-deleted** — the
 immovable-uid invariant, which `soft_delete_user` enforces by refusing. Claim,
 sponsor, link, abandon, force-abandon, merge and detach are all
-[architecture](architecture.md#account-surgery).
+[architecture](architecture.md#account-surgery). A link that would displace a
+holder sharing an address with the target is refused and sent to an IC merge, so
+an NC's Link VEKN ID never moves one person's logins between their own accounts.
 
 ## Deployment gate
 

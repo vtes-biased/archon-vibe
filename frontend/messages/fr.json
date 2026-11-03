@@ -1865,6 +1865,7 @@
   "err_tournament_archival_results_winner_not_listed": "Le vainqueur doit faire partie des joueurs listés",
   "err_tournament_archival_results_count_below_roster": "Le nombre de joueurs {reported} est inférieur aux {listed} joueurs listés",
   "err_user_email_exists": "Un membre avec cet email existe déjà",
+  "err_vekn_link_same_person": "Le titulaire de cet ID VEKN partage une adresse email avec ce compte : c'est la même personne. Demandez plutôt à un IC de fusionner les deux comptes.",
   "err_deck_no_cards": "Aucune carte trouvée dans la liste du deck",
   "err_seating_min_players": "Au moins 4 joueurs sont requis",
   "err_seating_min_rounds": "Au moins 1 ronde est requise",

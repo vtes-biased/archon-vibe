@@ -131,8 +131,9 @@ const ENGINE_MESSAGES: Record<string, (p: Record<string, string>) => string> = {
   'tournament.archival_results_vekn_linked': () => m.err_tournament_archival_results_vekn_linked(),
   'tournament.archival_results_winner_not_listed': () => m.err_tournament_archival_results_winner_not_listed(),
   'tournament.archival_results_count_below_roster': (p) => m.err_tournament_archival_results_count_below_roster({ reported: p.reported ?? '', listed: p.listed ?? '' }),
-  // Backend-origin (not an engine/error.rs code): create_user's dup-email 409.
+  // Backend-origin (not engine/error.rs codes).
   'user.email_exists': () => m.err_user_email_exists(),
+  'vekn.link_same_person': () => m.err_vekn_link_same_person(),
   'deck.no_cards': () => m.err_deck_no_cards(),
   'seating.min_players': () => m.err_seating_min_players(),
   'seating.min_rounds': () => m.err_seating_min_rounds(),

@@ -1144,6 +1144,10 @@ and personal/contact PII only. Callers are **self-abandon** (blocked while an
 active suspension or probation is held — the sanction stays with the VEKN record;
 admin force-abandon is exempt) and **admin displace**, which frees a VEKN ID
 before re-linking it, the new owner then being merged into the freed record.
+Displace is refused when the holder and the target share an address — an email
+login's or the address of record, case-folded — because they are then the same
+person's two accounts and only an IC merge joins them: displacing would hand the
+VEKN record the target's logins and swap them back on the next link.
 
 Reassigning object references during merge or detach must return `BroadcastData`
 and broadcast, or other clients stay stale until the next snapshot resync.

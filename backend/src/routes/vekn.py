@@ -24,7 +24,7 @@ from ..db import (
     is_vekn_id_claimed,
 )
 from ..middleware.auth import get_current_user
-from ..models import User
+from ..models import AuthMethodType, User
 from ..vekn_push import push_member_background
 from .auth import create_access_token, create_refresh_token
 
@@ -210,6 +210,17 @@ async def sponsor_new_member(request: Request, data: SponsorRequest) -> Response
     )
 
 
+async def _addresses(user: User) -> set[str]:
+    found = {
+        m.identifier.lower()
+        for m in await get_auth_methods_for_user(user.uid)
+        if m.method_type == AuthMethodType.EMAIL
+    }
+    if user.contact_email and user.contact_email.strip():
+        found.add(user.contact_email.strip().lower())
+    return found
+
+
 @post("/link")
 async def link_vekn_to_user(request: Request, data: LinkRequest) -> Response:
     """Link a VEKN ID to a user account: merges directly if unclaimed, else
@@ -242,6 +253,18 @@ async def link_vekn_to_user(request: Request, data: LinkRequest) -> Response:
     message = f"Linked VEKN ID {data.vekn_id}"
 
     if await is_vekn_id_claimed(data.vekn_id):
+        if vekn_user.uid != target.uid and (
+            await _addresses(vekn_user) & await _addresses(target)
+        ):
+            return Response(
+                {
+                    "detail": "This VEKN ID's holder shares an email address with "
+                    "this account: ask an IC to merge the two accounts",
+                    "code": "vekn.link_same_person",
+                    "params": {},
+                },
+                status_code=409,
+            )
         result = await detach_user_from_vekn(vekn_user.uid)
         if result:
             displaced_user, _vekn_record, displace_bds = result
