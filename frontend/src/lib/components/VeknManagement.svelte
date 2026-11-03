@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
   import { dialogPanel } from "$lib/actions/dialog";
   import type { User } from "$lib/types";
   import type { UserListItem } from "$lib/db";
@@ -88,7 +89,8 @@
       const result = await linkVeknId(linkVeknIdInput.trim(), user.uid);
       showLinkModal = false;
       linkVeknIdInput = "";
-      onaction(result.user);
+      if (result.user.uid !== user.uid) await goto(`/users/${result.user.uid}`);
+      else onaction(result.user);
     } catch {
       // Error toast shown by apiRequest
     } finally {
@@ -170,8 +172,7 @@
       const result = await mergeUsers(mergeKeep.uid, mergeDrop.uid);
       showMergeModal = false;
       mergeTarget = null;
-      // A swapped merge soft-deletes the profile we are standing on.
-      if (swapped) ondelete?.();
+      if (swapped) await goto(`/users/${result.user.uid}`);
       else onaction(result.user);
     } catch {
       // Error toast shown by apiRequest

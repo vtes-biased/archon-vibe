@@ -50,6 +50,8 @@
   }
 
   let user = $state<User | undefined>();
+  let loaded = $state(false);
+  let synced = $state(syncManager.isSynced);
   let sponsorName = $state<string | undefined>();
   let isOnline = $state(navigator.onLine);
 
@@ -161,6 +163,7 @@
   async function loadData() {
     if (!uid) return;
     user = await getUser(uid);
+    loaded = true;
     // coopted_by is full-projection only, so its presence is the permission gate.
     // Resolve the sponsor's name from local IndexedDB; absence falls back gracefully.
     sponsorName = user?.coopted_by ? (await getUser(user.coopted_by))?.name : undefined;
@@ -190,6 +193,7 @@
 
     const handleSync = (event: { type: string; data?: any }) => {
       if (event.type === "sync_complete") {
+        synced = true;
         scheduleRefresh();
       } else if (event.type === "user" && event.data?.uid === uid) {
         scheduleRefresh();
@@ -225,7 +229,11 @@
     </a>
   {/if}
 
-  {#if !user}
+  {#if !user && loaded && (synced || !isOnline)}
+    <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4">
+      <p class="text-link-soft">{m.user_detail_not_found()}</p>
+    </div>
+  {:else if !user}
     <div class="text-center text-ink-muted py-8">
       <Loader2 class="w-6 h-6 animate-spin inline-block" />
       <span class="ml-2">{m.common_loading()}</span>

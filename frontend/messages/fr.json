@@ -1080,6 +1080,7 @@
   "config_saved": "Toutes les modifications enregistrées",
   "config_error_save": "Échec de l'enregistrement",
   "user_detail_fallback_title": "Utilisateur",
+  "user_detail_not_found": "Membre introuvable",
   "user_detail_vekn": "VEKN #{id}",
   "user_detail_ratings": "Classements",
   "user_detail_col_tournament": "Tournoi",

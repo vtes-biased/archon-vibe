@@ -1080,6 +1080,7 @@
   "config_saved": "All changes saved",
   "config_error_save": "Failed to save",
   "user_detail_fallback_title": "User",
+  "user_detail_not_found": "Member not found",
   "user_detail_vekn": "VEKN #{id}",
   "user_detail_ratings": "Ratings",
   "user_detail_col_tournament": "Tournament",
