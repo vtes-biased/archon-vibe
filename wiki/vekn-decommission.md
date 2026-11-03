@@ -8,7 +8,7 @@ pass; a fired trigger sends its item back through `/intake` as an ordinary board
 line.
 
 The first two triggers are the retirement stages in [vekn](vekn.md#decommission),
-which is where what retires and in what order is settled. The third is a fix on
+which is where what retires and in what order is settled. The third is a correction on
 vekn.net's own side that our push waits on.
 
 While the tournament and member syncs are upstreams, anything deleted or diverged
@@ -549,39 +549,58 @@ _29 members._
 
 _36 members._
 
-## Trigger: vekn.net's results upload accepts the rounds actually played
+## Trigger: the VEKN admins correct the calendar entries
 
 ### Push the results stuck on the calendar's round count
 
 vekn.net refuses a results upload whose round count differs from the calendar
-event's `rounds`: *"The provided number of rounds (N) do not match the expected
-number of rounds (M) from the calendar"*. The two numbers count different things —
-the archondata header counts preliminaries plus the final, the calendar's `rounds`
-leaves the final to its own `final` flag — so every event with a final disagrees
-by one. And an event created with no round cap is filed with the VEKN minimum of 2
-(or vekn.net holds 0), so an event that then plays three rounds disagrees further.
-Only vekn.net can reconcile them: its API offers no update to a calendar event's
-`rounds`, and the upload must report the games actually played.
+entry's: *"The provided number of rounds (N) do not match the expected number of
+rounds (M) from the calendar"*, where expected is `rounds + final`. From June to
+November 2026 the push filed every event created before its final with the flag
+unset, `NR` instead of `NR+F`, so each one that went on to play a final was
+refused at provided = expected + 1. The push now files the final
+([vekn](vekn.md#push-constraints)), which repairs nothing already filed: the API
+offers no update to a calendar entry, so each one is corrected on vekn.net.
+13565 (`2R+F`, refused 2 / 3) shows the comparison counts the flag.
 
-Stuck on prod on 2026-09-26, each retried by the hourly batch:
+Read live on 2026-11-01 through beta's VEKN client:
 
-| Tournament | vekn event | our `max_rounds` | rounds played | vekn.net: provided / expected |
-|---|---|---|---|---|
-| `019f1a1a-d496-738d-886f-14fc81c59f69` Twilight Camp 4': Hyper Champion Edition Plus | 13085 | 0 | 3 + final | 4 / 0 |
-| `019ff7e8-5715-7319-bc10-5dbcb2a422d5` Bleed À gosto | 13487 | 3 | 3 + final | 4 / 3 |
-| `019ff9eb-0619-76c7-b5c8-fedbf02baa3b` Crusade: Budapest VII. Forduló | 13488 | 2 | 2 + final | 3 / 2 |
-| `01a00503-1fbb-73e6-b7ca-3d3f10006224` Army of Rats (Dunakeszi) | 13495 | 2 | 2 + final | 3 / 2 |
-| `01a04be5-f71e-713b-861d-9133647c261d` "Pangil sa Pangil" | 13517 | 3 | 3 + final | 4 / 3 |
-| `01a068f7-6659-76b0-9453-889f254c4585` TCG Webshop Vampire League 2026 Round VII. | 13544 | 3 | 3 + final | 4 / 3 |
-| `01a06971-b39a-7643-b765-c5ee02acc1ad` 1ª Jornada Liga Anarcogaditana | 13546 | 2 | 2 + final | 3 / 2 |
-| `01a08d31-8f63-74fd-b6ca-7d0481ab345b` Mensal Itaocara 09 | 13565 | 2 | 2 + final | **2 / 3** |
-| `05b849ee-e63f-444f-8951-3afcd43b3b11` Summer End 2026 | 13455 | 0 | 3 + final | 4 / 2 |
-| `725ec964-3812-4f9f-a05f-11551401abc8` Old Friends 2 | 13450 | 0 | 2 + final | 3 / 2 |
-| `cfa5205e-144f-4f71-a22a-300c016732a2` Will of the Council 2 | 13449 | 0 | 3 + final | 4 / 2 |
+- **Add the final** (37, finished): 13450, 13487, 13488, 13495, 13517, 13524,
+  13534, 13544, 13546, 13555, 13560, 13561, 13567, 13574, 13576, 13577, 13587,
+  13599, 13610, 13612, 13615, 13617, 13618, 13620, 13622, 13626, 13634, 13635,
+  13644, 13645, 13646, 13648, 13652, 13662, 13668, 13675, 13686.
+- **Fix the rounds** (7, finished): 13085 0R→3R+F, 13110 4R+F→3R+F, 13359
+  4R+F→3R+F, 13367 4R+F→3R+F, 13449 2R→3R+F, 13455 2R→3R+F, 13572 2R+F→3R+F. An
+  event created with no round cap is filed with the VEKN minimum of 2, or vekn.net
+  holds 0.
+- **Add the final** (59, upcoming, filed before the fix): 13452, 13624, 13628,
+  13674, 13690, 13470, 13654, 13673, 13682, 13692, 13621, 13676, 13680, 13685,
+  13619, 13661, 13665, 13669, 13670, 13679, 13681, 13613, 13623, 13656, 13647,
+  13659, 13671, 13545, 13687, 13650, 13598, 13636, 13651, 13677, 13600, 13601,
+  13614, 13625, 13642, 13678, 13683, 13691, 13518, 13519, 13640, 13688, 13520,
+  13657, 13689, 13663, 13547, 13649, 13629, 13630, 13631, 13632, 13633, 13643,
+  13548.
+- **On hold** (2): 13552 and 13565, where vekn.net reports 2 provided against an
+  archon file of 3 — check our upload before asking for a correction.
+- **Stamped by the migration** (3): 12498, 12555, 12959 — refused on the round
+  count in August, held out of the batch by their `vekn_pushed_at`. 12555 is named
+  *Pendiente de borrado* on our side: confirm with its organizer whether it is to
+  be deleted rather than corrected.
+- 13495 calendars as *Ricsiszulinap* where our record says *Army of Rats
+  (Dunakeszi)*: confirm it is the same event before correcting it.
 
-`Mensal Itaocara 09` is the outlier: its archondata says 3, yet vekn.net reports
-2 provided against 3 expected — worth raising with the VEKN API admins separately.
+The flag cuts both ways: an event filed with it that ends without a final is
+refused at provided = expected − 1. Its rate is unmeasured.
 
-**Trigger:** the VEKN API admins report the round check fixed, or an update of a
-calendar event's `rounds` opened to us. **Done when** the first hourly batch after
-it pushes all eleven and none of them logs the round-count refusal again.
+**Trigger:** the VEKN admins report the entries corrected. **Run**, per stamped
+event once its entry is fixed, reading the report before writing:
+
+```sh
+… /opt/archon/backend/scripts/fix_stuck_vekn_push.py --vekn <id>
+… fix_stuck_vekn_push.py --vekn <id> --apply
+```
+
+**Done when** the first hourly batch after it pushes every finished entry above,
+the unstamped ones on their own and the stamped ones once cleared, and none logs
+the round-count refusal again. It is **approval that publishes**, so expect them
+pending on vekn.net until an official works the queue.

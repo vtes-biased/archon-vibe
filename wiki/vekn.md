@@ -147,6 +147,11 @@ Standard/CC 6, Limited/Basic 3, V5/Basic 16, Storyline/Basic 9.
   sync, and a substring match can name a different person. The failure line carries
   the registry's id, and an IC reconciles the two accounts by hand.
 - Open-rounds events are never pushed.
+- **A calendar entry is filed with its final** (`NR+F`) unless the event has
+  already finished without one. vekn.net checks the results upload against
+  `rounds + final` and the API cannot amend an entry, so an event created before
+  its outcome is known bets on the final most events play; one that ends without
+  it is refused, and an official corrects the entry on vekn.net.
 
 ### Outage resilience
 
@@ -227,27 +232,17 @@ separate.
 
 Seven of the 28 are genuinely refused, on the round count: 12498, 12555, 12959,
 13495, 13487, 13500, 13473. vekn.net computes `nrounds + final` and compares it to
-the archon file's, so *Göcsej Under Siege* — ours 4 against a calendar `3R` —
-draws `provided 4, expected 3` on every attempt. Only three of the seven are still
-being retried; the other four carry a `vekn_pushed_at` from the legacy-archon
-migration, which stamps without uploading, so nothing tries them at all.
-
-**When the calendar entries are corrected, the retry is not automatic.** Three of
-the seven are unstamped, so the hourly batch picks them up on its own. The other
-four carry a `vekn_pushed_at` from the migration, and nothing on this side clears
-it — `UNPUSHED_RESULTS_QUERY` filters on it, the manual push-vekn route skips the
-results push on a stamped row too, and a raw SQL clear would strand the member
-projection on the old value. **Deferred, with a trigger**: when vekn.net reports
-the entries fixed, run per event and check the report before writing.
-
-```sh
-… /opt/archon/backend/scripts/fix_stuck_vekn_push.py --vekn <id>
-… fix_stuck_vekn_push.py --vekn <id> --apply
-```
-
-Then the next hourly batch uploads to the existing calendar event. It is
-**approval that publishes**, so expect the audit to read them as pending, not as
-placed, until an official works the queue.
+the archon file's, so *Göcsej Under Siege* (13500) — ours 4 against a calendar
+`3R` — drew `provided 4, expected 3`. An entry filed without its final flag falls
+one short, which is most of what keeps the entries in
+[vekn-decommission](vekn-decommission.md#push-the-results-stuck-on-the-calendars-round-count)
+refused. Production read on 2026-11-03: 13500 and 13473 carry a push stamp (2
+September, 7 August), while 12498, 12555 and 12959 carry the legacy-archon
+migration's (30 June), which stamps without uploading, so nothing retries them:
+`UNPUSHED_RESULTS_QUERY` filters on the stamp, the manual push-vekn route skips
+the results push on a stamped row too, and a raw SQL clear would strand the member
+projection on the old value. `fix_stuck_vekn_push.py` clears it, and that
+deferred item says when.
 
 Comparing those counts means reading the calendar field as the string it is:
 `event.php` returns `CONCAT(rounds, "R", IF(final > 0, "+F", ""))`, so `3R+F` is

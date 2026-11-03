@@ -233,9 +233,12 @@ async def push_tournament_event(
     if not end_time:
         end_time = start_time  # VEKN requires a non-empty endtime
 
-    # Derived from an actual finals object — max_rounds is a per-player cap,
-    # not a finals signal.
-    has_finals = 1 if tournament.finals else 0
+    # Not `tournament.finals`: the entry is filed before the final and cannot be
+    # amended, and vekn.net refuses an upload whose final the entry lacks.
+    finished_without_final = (
+        tournament.state == TournamentState.FINISHED and not tournament.finals
+    )
+    has_finals = 0 if finished_without_final else 1
 
     try:
         event_id = await client.create_event(
