@@ -93,6 +93,11 @@ Revisit if a Grand Prix ever acquires real structural differences. The list's
 "League events and above" filter step — any league event, or any NC or CC — is
 how a Grand Prix is found, and it also takes in casual club leagues.
 
+**No Qualifier rank either.** National, Continental and Mini Qualifiers are
+ordinary events under rules §9.8, with no rating coefficient bonus (A.2.1) and no
+prohibition the app models (the §2.9 Multi-Judge bar is unmodelled), so they run as
+Standard and the VEKN sync maps them there.
+
 **Card-set restrictions (§6.1.1) and the Restricted format (§7.9) are not
 modelled.** Such an event is entered as Limited, which is close enough in practice
 and already skips the construction minimums and the group rule. The cost is that
