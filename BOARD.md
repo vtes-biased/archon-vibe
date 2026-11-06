@@ -25,4 +25,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 
 Board changes ride the commit that earns them.
 
-- Make the personal iCal feed read only the member's own finished events, and the league and country feeds filter in SQL instead of in memory — **Done when** an `EXPLAIN (ANALYZE, BUFFERS)` of each feed on the dev database at production size shows the finished half served by index conditions, its reads scaling with the member's own events rather than every event of the last 90 days; the league and country feeds use their existing indexes as index conditions; the calendar tests pass; the new index reaches production without blocking boot or writes; and the Calendar and Indexes sections of `wiki/architecture.md` say so. Context in [`board/calendar-feed-reads.md`](board/calendar-feed-reads.md).

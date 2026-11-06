@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import os
+import re
 import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -16,6 +17,7 @@ from typing import NamedTuple
 import msgspec
 import psycopg
 from archon_engine import PyEngine
+from psycopg import sql
 from psycopg_pool import AsyncConnectionPool
 
 from .access_levels import (
@@ -109,6 +111,38 @@ async def init_db() -> None:
     )
     async with _pool.connection() as conn:
         await conn.execute(schema_sql)
+
+
+async def build_concurrent_indexes() -> None:
+    text = (resources.files(__package__) / "schema_concurrent.sql").read_text(
+        encoding="utf-8"
+    )
+    statements = [
+        s.strip() for s in re.sub(r"--[^\n]*", "", text).split(";") if s.strip()
+    ]
+    async with await psycopg.AsyncConnection.connect(
+        DB_URL,
+        autocommit=True,
+        application_name="archon-backend-indexes",
+        options="-c statement_timeout=0 -c lock_timeout=0",
+    ) as conn:
+        for statement in statements:
+            created = re.match(
+                r"CREATE INDEX CONCURRENTLY IF NOT EXISTS (\w+)", statement
+            )
+            if created:
+                result = await conn.execute(
+                    "SELECT indisvalid FROM pg_index WHERE indexrelid = to_regclass(%s)",
+                    (created[1],),
+                )
+                row = await result.fetchone()
+                if row and not row[0]:
+                    await conn.execute(
+                        sql.SQL("DROP INDEX CONCURRENTLY {}").format(
+                            sql.Identifier(created[1])
+                        )
+                    )
+            await conn.execute(statement)
 
 
 async def close_db() -> None:

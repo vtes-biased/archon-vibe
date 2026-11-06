@@ -91,9 +91,9 @@ all connections via their locks, any further acquire blocks and deadlocks.
 ### Indexes
 
 `objects` and `auth_methods` grow with membership, so every query on them is
-served by an index in `schema.sql` unless it is named on the scan list below. A
-change that adds or alters a `WHERE` on either table lands the index in the same
-diff, with a one-line comment naming the reader it serves. Served means the JSONB
+served by an index in `schema.sql` or `schema_concurrent.sql` unless it is named
+on the scan list below. A change that adds or alters a `WHERE` on either table
+lands the index in the same diff, with a one-line comment naming the reader it serves. Served means the JSONB
 expression sits in the plan's `Index Cond` (or a bitmap scan's `Recheck Cond`),
 not its `Filter`: `idx_objects_type` puts an index scan under any `WHERE type =
 'x'` while still reading the whole type. The check runs against the dev database
@@ -110,7 +110,9 @@ A predicate on a JSONB field with no statistics is guessed near-universal, which
 can price a partial index out of its own query — hence `objects_state_stats`.
 A timestamp cast is not immutable, so a date window is bounded on the stored ISO
 text by its date prefix and decided by the cast. Replacing an index follows
-[hazards](hazards.md) — a new name and an explicit drop of the old.
+[hazards](hazards.md) — a new name and an explicit drop of the old — and one whose
+build reads the tournament corpus lives in `schema_concurrent.sql`, built after
+serving starts.
 
 The scans that stay, each deliberate:
 
@@ -1003,6 +1005,16 @@ Personal feeds keep recently-finished own events for 90 days keyed on `finish`:
 subscribed calendars reconcile on every poll, so an event leaving the feed is
 *deleted* from the subscriber's calendar, and history must not vanish at finish.
 Country, global and league feeds stay upcoming-only.
+
+Every feed reads only what it can keep. A personal feed's finished half is
+narrowed in SQL to the member's organized and played events and `agenda_added`, a
+superset of what the engine keeps: the SQL must never drop a row `agenda.rs` would
+keep. `idx_objects_tournament_finished_mine` serves both member arms with the finish
+window in the same GIN scan — the project's one use of `btree_gin`, because a
+players-only index left the window a `Filter` and a veteran's feed read every result
+of their career. The league feed filters `league_uid` on its index; the country feed filters
+its countries, online events let through, on the upcoming-index scan, which is
+narrower than the country index over every event those countries ever held.
 
 **Anonymous feeds render venue and address into LOCATION**, which takes no special
 casing — both are public-projection fields. That is consistent with the `.ics`

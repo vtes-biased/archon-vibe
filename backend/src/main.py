@@ -41,6 +41,7 @@ from .broadcast import (
 from .card_data import cards_json_bytes
 from .db import (
     base_data_level,
+    build_concurrent_indexes,
     cleanup_expired_tokens,
     close_db,
     compute_access_version,
@@ -367,6 +368,13 @@ async def _stamp_missing_event_codes(booted_at: datetime) -> None:
         logger.exception("Failed to stamp missing event codes")
 
 
+async def _build_concurrent_indexes() -> None:
+    try:
+        await build_concurrent_indexes()
+    except Exception:
+        logger.exception("Failed to build concurrent indexes")
+
+
 @asynccontextmanager
 async def lifespan(app: Litestar) -> AsyncIterator[None]:
     global _scheduler, _sync_service, _shutdown_event
@@ -387,6 +395,7 @@ async def lifespan(app: Litestar) -> AsyncIterator[None]:
     await init_db()
     await run_migrations()
 
+    asyncio.create_task(_build_concurrent_indexes())
     asyncio.create_task(_stamp_missing_event_codes(booted_at))
     asyncio.create_task(register_metadata())
 

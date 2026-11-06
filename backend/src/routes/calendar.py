@@ -218,6 +218,12 @@ async def tournament_calendar(
           ))
     """
     params: tuple = (cutoff[:10], cutoff)
+    if league:
+        query += """ AND "full"->>'league_uid' = %s"""
+        params += (league,)
+    elif countries and user is None:
+        query += """ AND ("full"->>'country' = ANY(%s) OR "full"->>'online' = 'true')"""
+        params += (sorted(countries),)
     if user is not None:
         query += """
         UNION ALL
@@ -227,42 +233,44 @@ async def tournament_calendar(
           AND COALESCE("full"->>'finish', "full"->>'start', "full"->>'modified') >= %s
           AND COALESCE("full"->>'finish', "full"->>'start', "full"->>'modified')::timestamp
               >= %s::timestamp
+          AND ("full"->'organizers_uids' @> jsonb_build_array(%s::text)
+            OR "full"->'players' @> jsonb_build_array(jsonb_build_object('user_uid', %s::text))
+            OR uid = ANY(%s))
         """
-        params += (finished_cutoff[:10], finished_cutoff)
+        params += (
+            finished_cutoff[:10],
+            finished_cutoff,
+            user.uid,
+            user.uid,
+            user.agenda_added or [],
+        )
     async with get_connection() as conn:
         result = await conn.execute(query + " ORDER BY 2 ASC", params)
         rows = await result.fetchall()
 
     tournaments = [decode_json(row[0], Tournament) for row in rows]
 
-    if league:
-        tournaments = [t for t in tournaments if t.league_uid == league]
-    else:
+    if not league:
         tournaments = [
             t
             for t in tournaments
             if (not format or t.format == format)
             and _engine.meets_rank_floor(t.rank, bool(t.league_uid), rank or "all")
         ]
-        if user and user.country:
+        if user:
             # Finished events arrive only within FINISHED_WINDOW_DAYS (bounded by
             # the SQL above), so the engine's own-event branches need no date check.
             tournaments = _agenda_filter(
                 tournaments,
                 user.uid,
                 user.country,
-                get_countries_on_continent(user.country),
+                get_countries_on_continent(user.country) if user.country else [],
                 include_online,
                 user.agenda_hidden or [],
                 user.agenda_added or [],
             )
         else:
-            tournaments = [
-                t
-                for t in tournaments
-                if (not countries or t.country in countries or t.online)
-                and (include_online or not t.online)
-            ]
+            tournaments = [t for t in tournaments if include_online or not t.online]
         if only_online:
             tournaments = [t for t in tournaments if t.online]
 

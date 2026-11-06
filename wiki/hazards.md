@@ -740,6 +740,17 @@ in production for as long as it took a member to run the Discord bot on a second
 event. Give the replacement a **new name** so the drop is a one-time no-op and
 the create stays idempotent rather than rebuilding the index on every start.
 
+**An index whose build reads the tournament corpus never goes in `schema.sql`.**
+The schema load runs before serving, under the database's 15 s `statement_timeout`,
+and a plain `CREATE INDEX` blocks writes to `objects` while it builds. The cold
+read of the 25 MB finished-tournament corpus alone took 6.4 s on an idle disk in
+November 2026, and a disk spell multiplies that. Such an index goes in
+`schema_concurrent.sql`, which a boot task applies after serving starts, statement
+by statement, `CONCURRENTLY` and untimed; the reader runs without it until it lands.
+A concurrent build cut short — a restart mid-build — leaves an invalid index that
+`IF NOT EXISTS` would skip forever, so the task drops an invalid one of the same
+name first. `just index-drift` applies both files.
+
 **A backend-first deploy is safe by design**: an unknown snapshot type is counted
 toward the `eof` total and ignored. Do not "fix" that by counting only recognised
 types ([sync](sync.md#adding-a-new-object-type)).

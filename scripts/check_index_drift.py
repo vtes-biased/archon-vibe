@@ -5,6 +5,7 @@ Run: just index-drift
 """
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +16,7 @@ from psycopg.conninfo import make_conninfo
 
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = "backend/src/schema.sql"
+CONCURRENT = "backend/src/schema_concurrent.sql"
 
 ADMIN_URL = os.environ.get(
     "INDEX_DRIFT_DATABASE_URL",
@@ -45,11 +47,26 @@ def drop(name: str) -> None:
         conn.execute(sql.SQL("DROP DATABASE IF EXISTS {}").format(sql.Identifier(name)))
 
 
-def indexes(name: str, *schemas: str) -> dict[str, str]:
+def at_release(tag: str, path: str) -> str:
+    try:
+        return git("show", f"{tag}:{path}")
+    except subprocess.CalledProcessError:
+        return ""
+
+
+def statements(concurrent: str) -> list[str]:
+    return [
+        s.strip() for s in re.sub(r"--[^\n]*", "", concurrent).split(";") if s.strip()
+    ]
+
+
+def indexes(name: str, *schemas: tuple[str, str]) -> dict[str, str]:
     url = make_conninfo(ADMIN_URL, dbname=name)
     with psycopg.connect(url, autocommit=True) as conn:
-        for schema in schemas:
+        for schema, concurrent in schemas:
             conn.execute(schema)  # ty: ignore[no-matching-overload]
+            for statement in statements(concurrent):
+                conn.execute(statement)  # ty: ignore[no-matching-overload]
         rows = conn.execute(
             "SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = 'public'"
         ).fetchall()
@@ -58,8 +75,11 @@ def indexes(name: str, *schemas: str) -> dict[str, str]:
 
 def main() -> int:
     tag = previous_release()
-    old = git("show", f"{tag}:{SCHEMA}")
-    new = (ROOT / SCHEMA).read_text(encoding="utf-8")
+    old = (git("show", f"{tag}:{SCHEMA}"), at_release(tag, CONCURRENT))
+    new = (
+        (ROOT / SCHEMA).read_text(encoding="utf-8"),
+        (ROOT / CONCURRENT).read_text(encoding="utf-8"),
+    )
     try:
         recreate(UPGRADED)
         recreate(FRESH)
@@ -86,7 +106,7 @@ def main() -> int:
 
     if violations:
         print(
-            f"Index drift: {SCHEMA} applied over {tag} does not match a fresh "
+            f"Index drift: {SCHEMA} and {CONCURRENT} applied over {tag} does not match a fresh "
             "database. Give a changed index a new name and DROP INDEX IF EXISTS "
             "the old one (wiki/hazards.md).\n" + "\n".join(violations)
         )
