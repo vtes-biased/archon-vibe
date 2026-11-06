@@ -95,6 +95,11 @@ check against that page. The ones that bite most often:
   (beta, `https://codexofthedamned.grafana.net`) and `GRAFANA_TOKEN_VTESBIASED`
   (production, `https://vtesbiased.grafana.net`) for `curl -H "Authorization:
   Bearer $GRAFANA_TOKEN_…"`. Reference the variable, never its value.
+- **Production public API** (`https://api.archon.vekn.net/v1`, read-only, yours to
+  query): mint a daemon token from `.env`'s `PUBLIC_API_CLIENT_ID` /
+  `PUBLIC_API_CLIENT_SECRET` inside one subshell — `set -a; . ./.env; set +a`, then
+  `POST /oauth/token` with `grant_type=client_credentials&scope=api:read` — and use
+  it as a Bearer without echoing it. Never `cat` the `.env`.
 
 ## Human inflexion points
 
