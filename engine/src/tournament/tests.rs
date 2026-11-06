@@ -2229,6 +2229,36 @@ fn test_finish_tournament_preserves_dq() {
 }
 
 #[test]
+fn test_cancel_round_from_waiting_removes_only_the_last_round() {
+    let mut t = make_tournament();
+    t["state"] = "Waiting".into();
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p3", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p4", state: "Checked-in", payment_status: "Pending", toss: 0 },
+    ];
+    let finished_round = json::array![ { seating: [
+        { player_uid: "p1", result: { gw: 1, vp: 4.0, tp: 60 } },
+        { player_uid: "p2", result: { gw: 0, vp: 0.0, tp: 24 } },
+        { player_uid: "p3", result: { gw: 0, vp: 0.0, tp: 24 } },
+        { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 24 } },
+    ], state: "Finished" } ];
+    t["rounds"] = json::array![finished_round.clone(), finished_round];
+    let org = make_organizer();
+
+    assert!(run_event(&t, &json::object! { type: "CancelRound", round: 0 }, &org).is_err());
+
+    let out = json::parse(
+        &run_event(&t, &json::object! { type: "CancelRound", round: 1 }, &org).expect("cancel"),
+    )
+    .unwrap();
+    assert_eq!(out["state"].as_str(), Some("Waiting"));
+    assert_eq!(out["rounds"].len(), 1);
+    assert_eq!(out["rounds"][0][0]["state"].as_str(), Some("Finished"));
+}
+
+#[test]
 fn test_reopen_tournament_without_finals() {
     // No final to return to: back to check-in, and the winner an archival import
     // set without one survives.
@@ -2251,6 +2281,42 @@ fn test_reopen_tournament_without_finals() {
         Some("Disqualified")
     ); // preserved
     assert_eq!(updated["winner"].as_str(), Some("p1"));
+}
+
+#[test]
+fn test_reopen_tournament_over_a_live_round_returns_to_playing() {
+    let mut t = make_tournament();
+    t["state"] = "Finished".into();
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Finished", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Finished", payment_status: "Pending", toss: 0 },
+        { user_uid: "p3", state: "Finished", payment_status: "Pending", toss: 0 },
+        { user_uid: "p4", state: "Finished", payment_status: "Pending", toss: 0 },
+        { user_uid: "p5", state: "Finished", payment_status: "Pending", toss: 0 },
+    ];
+    t["rounds"] = json::array![[ { seating: [
+        { player_uid: "p1", result: { gw: 0, vp: 0.0, tp: 0 } },
+        { player_uid: "p2", result: { gw: 0, vp: 0.0, tp: 0 } },
+        { player_uid: "p3", result: { gw: 0, vp: 0.0, tp: 0 } },
+        { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 0 } },
+    ], state: "In Progress" } ]];
+    let org = make_organizer();
+    let out = json::parse(
+        &run_event(&t, &json::object! { type: "ReopenTournament" }, &org).expect("reopen"),
+    )
+    .unwrap();
+    assert_eq!(out["state"].as_str(), Some("Playing"));
+    for i in 0..4 {
+        assert_eq!(out["players"][i]["state"].as_str(), Some("Playing"));
+    }
+    assert_eq!(out["players"][4]["state"].as_str(), Some("Checked-in"));
+
+    let cancelled = json::parse(
+        &run_event(&out, &json::object! { type: "CancelRound" }, &org).expect("cancel"),
+    )
+    .unwrap();
+    assert_eq!(cancelled["state"].as_str(), Some("Waiting"));
+    assert_eq!(cancelled["rounds"].len(), 0);
 }
 
 /// A tournament finished on a played final: p1-p5 the finalists, p6 at the

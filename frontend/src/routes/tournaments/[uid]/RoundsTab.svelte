@@ -395,12 +395,13 @@
     doAction("CancelRound", { round: roundIdx });
   }
 
-  // Cancellable while Playing (no finals) and not already fully cancelled; the
-  // engine soft-cancels non-last rounds and hard-removes the last.
   function isRoundCancellable(roundIdx: number): boolean {
-    if (tournament.state !== "Playing" || tournament.finals) return false;
-    const round = tournament.rounds?.[roundIdx];
-    return !!round && round.some(t => t.state !== "Cancelled");
+    const rounds = tournament.rounds ?? [];
+    const round = rounds[roundIdx];
+    if (!round || tournament.finals) return false;
+    const isLast = roundIdx === rounds.length - 1;
+    if (tournament.state !== "Playing" && !(tournament.state === "Waiting" && isLast)) return false;
+    return round.some(t => t.state !== "Cancelled");
   }
 
   // Mirrors the engine's all-or-nothing restore rule (dropped/Finished,

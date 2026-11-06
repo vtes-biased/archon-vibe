@@ -249,7 +249,7 @@ pub(super) fn demote_unseated_players(
     unseated: &std::collections::HashSet<String>,
     round_idx: usize,
 ) {
-    let still_playing = players_in_other_active_rounds(tournament, round_idx);
+    let still_playing = players_in_other_active_rounds(tournament, Some(round_idx));
     let players = &mut tournament[tournament::PLAYERS];
     for i in 0..players.len() {
         let uid = players[i][player::USER_UID].as_str().map(String::from);
@@ -266,12 +266,12 @@ pub(super) fn demote_unseated_players(
 
 pub(super) fn players_in_other_active_rounds(
     tournament: &JsonValue,
-    exclude_round: usize,
+    exclude_round: Option<usize>,
 ) -> std::collections::HashSet<String> {
     tournament[tournament::ROUNDS]
         .members()
         .enumerate()
-        .filter(|(i, _)| *i != exclude_round)
+        .filter(|(i, _)| Some(*i) != exclude_round)
         .flat_map(|(_, round)| round.members())
         .filter(|table| {
             !matches!(

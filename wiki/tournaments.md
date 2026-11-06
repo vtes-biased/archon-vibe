@@ -172,8 +172,8 @@ Planned ──open──> Registration ──close──> Waiting ⇄ Playing �
 |---|---|---|
 | `Planned` | initial | OpenRegistration |
 | `Registration` | players register/unregister | Register, AddPlayer, CloseRegistration, CancelRegistration |
-| `Waiting` | between rounds, check-in active | CheckIn, CheckInAll, StartRound, StartFinals, FinishTournament, ReopenRegistration until the first round, Register on open rounds |
-| `Playing` | round in progress | SetScore, Override, FinishRound, CancelRound, seating edits, Register on open rounds before the finals |
+| `Waiting` | between rounds, check-in active | CheckIn, CheckInAll, StartRound, StartFinals, FinishTournament, CancelRound on the last round, ReopenRegistration until the first round, Register on open rounds |
+| `Playing` | round in progress | SetScore, Override, FinishRound, CancelRound, FinishTournament, seating edits, Register on open rounds before the finals |
 | `Finished` | complete | ReopenTournament, organizer SetScore/Override, owner deck corrections |
 
 **`ReopenTournament` destroys nothing.** An event finished on a played final
@@ -183,8 +183,10 @@ and re-runs `FinishFinals` when done; `CancelFinals` is the one path that discar
 a final, reachable from there, and it takes the winner with it — a winner standing
 over a null `finals` is the archival shape `compute_final_standings` ranks first.
 An event finished without one returns to `Waiting`, having no final to come back
-to, and keeps the winner an archival import may have set. Players released from
-`Finished` return to `Playing` if they were finalists, else to `Completed` when
+to, and keeps the winner an archival import may have set — unless it was
+force-finished over a live round, which returns it to `Playing` so that round can
+still be finished or cancelled. Players released from `Finished` return to
+`Playing` if they were finalists or are seated at a live table, else to `Completed` when
 they are at the per-player `max_rounds` cap and `Checked-in` otherwise. Decklists
 unpublish, since publication is derived from the finished state by the post-finish
 pass.
@@ -653,7 +655,7 @@ player back to `Registered`), `CheckInAll`, `ResetCheckIn`, `SetPaymentStatus`,
 |---|---|
 | `StartRound` | optional `seating` for deterministic forwarding |
 | `FinishRound` | any round, any order |
-| `CancelRound` | the last round is hard-removed and unrecoverable, and takes the run of fully-cancelled rounds trailing behind it; any earlier round is soft-cancelled — tables set to `Cancelled`, the slot preserved, players released, restorable until the last round is cancelled |
+| `CancelRound` | the last round is hard-removed and unrecoverable, and takes the run of fully-cancelled rounds trailing behind it — the one cancel `Waiting` accepts, to undo a round finished by mistake; any earlier round is soft-cancelled, only while `Playing` — tables set to `Cancelled`, the slot preserved, players released, restorable until the last round is cancelled |
 | `RestoreRound` | un-voids a soft-cancelled non-last round: re-derives each table's state from retained scores and re-arms seated players. **All-or-nothing** — if any seated player can no longer be reinstated as saved (dropped, disqualified, or already at their cap via other rounds) the whole restore is rejected rather than silently dropping them |
 | `SelfOrganizeRound` | player-authorized, not organizer-gated |
 | `SwapSeats` | swap two players within a table |
@@ -692,8 +694,8 @@ A round slot is never removed mid-array, because `standings_adjustment.round_num
 and `deck.round` are both index-tagged and would be corrupted. Removal from the
 tail is safe, which is why cancelling the last round sweeps the cancelled rounds
 behind it: their restore is worth less than ending at zero rounds whichever order
-the cancels came in, since cancel is offered only while `Playing` and a cancelled
-slot left stranded in `Waiting` can never be reached again. The next round started
+the cancels came in, since a soft-cancel is offered only while `Playing` and a
+cancelled slot left stranded in `Waiting` can never be reached again. The next round started
 reuses the indices a tail removal popped, so the removal releases the decks
 stamped there.
 

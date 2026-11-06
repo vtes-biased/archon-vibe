@@ -476,7 +476,13 @@ fn apply_event(
             require_organizer(actor)?;
             require_state(state, TournamentState::Finished)?;
             let has_finals = !tournament[tournament::FINALS].is_null();
-            tournament[tournament::STATE] = if has_finals { "Playing" } else { "Waiting" }.into();
+            let live_seats = players_in_other_active_rounds(tournament, None);
+            tournament[tournament::STATE] = if has_finals || !live_seats.is_empty() {
+                "Playing"
+            } else {
+                "Waiting"
+            }
+            .into();
 
             let max_rounds = tournament[tournament::MAX_ROUNDS].as_usize().unwrap_or(0);
             let capped: std::collections::HashSet<String> = if max_rounds > 0 {
@@ -498,14 +504,15 @@ fn apply_event(
                     .unwrap_or("")
                     .to_string();
                 let finalist = players[i][player::FINALIST].as_bool().unwrap_or(false);
-                players[i][player::STATE] = if has_finals && finalist {
-                    "Playing"
-                } else if capped.contains(&uid) {
-                    "Completed"
-                } else {
-                    "Checked-in"
-                }
-                .into();
+                players[i][player::STATE] =
+                    if (has_finals && finalist) || live_seats.contains(&uid) {
+                        "Playing"
+                    } else if capped.contains(&uid) {
+                        "Completed"
+                    } else {
+                        "Checked-in"
+                    }
+                    .into();
             }
             update_standings(tournament, sanctions);
             Ok(())
@@ -1300,7 +1307,7 @@ fn apply_event(
             } else {
                 "Checked-in"
             };
-            let still_playing = players_in_other_active_rounds(tournament, target_round_idx);
+            let still_playing = players_in_other_active_rounds(tournament, Some(target_round_idx));
             // A player who just reached their per-player cap retires to Completed
             // instead of being re-armed as Checked-in.
             let max_rounds = tournament[tournament::MAX_ROUNDS].as_usize().unwrap_or(0);
@@ -1339,7 +1346,9 @@ fn apply_event(
 
         TournamentEvent::CancelRound { round } => {
             require_organizer(actor)?;
-            require_state_or_finished(state, TournamentState::Playing)?;
+            if state != TournamentState::Waiting {
+                require_state_or_finished(state, TournamentState::Playing)?;
+            }
 
             let len = tournament[tournament::ROUNDS].len();
             if len == 0 {
@@ -1348,6 +1357,12 @@ fn apply_event(
             let target_idx = round.unwrap_or(len - 1);
             if target_idx >= len {
                 return Err(EngineError::InvalidRound);
+            }
+            if state == TournamentState::Waiting && target_idx != len - 1 {
+                return Err(EngineError::WrongState {
+                    expected: TournamentState::Playing.as_str().to_string(),
+                    current: state.as_str().to_string(),
+                });
             }
 
             if target_idx == len - 1 {
@@ -1392,7 +1407,7 @@ fn apply_event(
             } else {
                 "Checked-in"
             };
-            let still_playing = players_in_other_active_rounds(tournament, target_idx);
+            let still_playing = players_in_other_active_rounds(tournament, Some(target_idx));
             // Cancelling a round lowers per-player counts; re-arm any Completed (capped)
             // player now back under their cap so they aren't stranded.
             let max_rounds = tournament[tournament::MAX_ROUNDS].as_usize().unwrap_or(0);

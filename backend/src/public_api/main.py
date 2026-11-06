@@ -240,7 +240,7 @@ _ACTION_STATES: dict[str, tuple[tuple[str, ...], str]] = {
     "StartRound": (("Waiting", "Finished"), "Playing"),
     "SelfOrganizeRound": (("Waiting", "Playing"), "Playing"),
     "FinishRound": (("Playing", "Finished"), "Waiting"),
-    "CancelRound": (("Playing", "Finished"), "Waiting"),
+    "CancelRound": (("Waiting", "Playing", "Finished"), "Waiting"),
     "RestoreRound": (("Waiting", "Playing"), "Playing"),
     "SwapSeats": (("Playing", "Finished"), ""),
     "AlterSeating": (("Waiting", "Playing", "Finished"), ""),
@@ -782,7 +782,8 @@ _ACTIONS: dict[str, tuple[str, tuple[str, ...], tuple[str, ...]]] = {
         ("round",),
     ),
     "CancelRound": (
-        "Throw a round away. Omit `round` for the current one.",
+        "Throw a round away. Omit `round` for the current one. Between rounds, only"
+        " the last round can go.",
         (),
         ("round",),
     ),
