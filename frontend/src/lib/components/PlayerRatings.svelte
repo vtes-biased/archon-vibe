@@ -1,10 +1,10 @@
 <script lang="ts">
-  import type { User, RatingCategory, CategoryRating, TournamentRatingEntry } from "$lib/types";
-  import FoldableSection from "$lib/components/FoldableSection.svelte";
-  import RankCell from "$lib/components/RankCell.svelte";
-  import { RATING_CATEGORIES, ratingCategoryLabel } from "$lib/tournament-utils";
-  import { getLocale } from '$lib/paraglide/runtime.js';
-  import * as m from '$lib/paraglide/messages.js';
+  import type { User, RatingCategory, CategoryRating, TournamentRatingEntry } from "#lib/types.ts";
+  import FoldableSection from "#lib/components/FoldableSection.svelte";
+  import RankCell from "#lib/components/RankCell.svelte";
+  import { RATING_CATEGORIES, ratingCategoryLabel } from "#lib/tournament-utils.ts";
+  import { getLocale } from '#lib/paraglide/runtime.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   // showHeading=false when the parent supplies its own section header (profile).
   let { user, showHeading = true }: { user: User | undefined; showHeading?: boolean } = $props();

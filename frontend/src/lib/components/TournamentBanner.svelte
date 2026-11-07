@@ -1,10 +1,10 @@
 <script lang="ts">
   import { untrack, onDestroy } from 'svelte';
   import { Upload, Trash2 } from '@lucide/svelte';
-  import * as m from '$lib/paraglide/messages.js';
-  import { uploadTournamentBanner, deleteTournamentBanner } from '$lib/api';
-  import BannerCropper from '$lib/components/BannerCropper.svelte';
-  import ConfirmActionModal from '$lib/components/ConfirmActionModal.svelte';
+  import * as m from '#lib/paraglide/messages.js';
+  import { uploadTournamentBanner, deleteTournamentBanner } from '#lib/api.ts';
+  import BannerCropper from '#lib/components/BannerCropper.svelte';
+  import ConfirmActionModal from '#lib/components/ConfirmActionModal.svelte';
 
   interface Props {
     tournamentUid: string;

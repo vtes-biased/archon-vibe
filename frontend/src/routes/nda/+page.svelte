@@ -1,14 +1,14 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { getAuthState, initAuth } from "$lib/stores/auth.svelte";
-  import { getNdaStatus, getNdaDocument, signNda, downloadNdaPdf, type NdaStatus } from "$lib/api";
-  import { deobfuscateContact } from "$lib/contact";
-  import { renderMarkdown } from "$lib/markdown";
-  import Button from "$lib/components/Button.svelte";
-  import InlineNotice from "$lib/components/InlineNotice.svelte";
-  import ConfirmActionModal from "$lib/components/ConfirmActionModal.svelte";
+  import { getAuthState, initAuth } from "#lib/stores/auth.svelte.ts";
+  import { getNdaStatus, getNdaDocument, signNda, downloadNdaPdf, type NdaStatus } from "#lib/api.ts";
+  import { deobfuscateContact } from "#lib/contact.ts";
+  import { renderMarkdown } from "#lib/markdown.ts";
+  import Button from "#lib/components/Button.svelte";
+  import InlineNotice from "#lib/components/InlineNotice.svelte";
+  import ConfirmActionModal from "#lib/components/ConfirmActionModal.svelte";
   import { Loader2, FileSignature, CircleCheck } from "@lucide/svelte";
-  import * as m from "$lib/paraglide/messages.js";
+  import * as m from "#lib/paraglide/messages.js";
 
   const auth = $derived(getAuthState());
 

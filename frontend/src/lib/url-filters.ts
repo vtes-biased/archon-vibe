@@ -1,18 +1,23 @@
-// Read from window.location, never the `page` store: replaceState is shallow routing, so a Back into
-// a filtered entry hands the store the pre-filter URL while location holds the real one.
+import { goto } from '$app/navigation';
+import { rememberView } from '#lib/last-view.ts';
 
-import { replaceState } from '$app/navigation';
-import { rememberView } from '$lib/last-view';
+// A shallow goto writes the address bar after an await: a second sync in the same tick (a tab and the
+// list inside it) must build on the first, or it drops the first's params.
+let pending: string | null = null;
+
+function addressBar(): URL {
+    return new URL(pending ?? window.location.href);
+}
 
 /** Query params of the URL actually in the address bar. */
 export function currentParams(): URLSearchParams {
-    return new URL(window.location.href).searchParams;
+    return addressBar().searchParams;
 }
 
 /** History-neutral (Back must leave the list, not step through every filter change) and drops null/
  * empty params for a clean default URL. Feeds last-view's memory before the no-op check, so a view arrived at via shared link is remembered too. */
 export function syncQueryParams(params: Record<string, string | null>): void {
-    const current = new URL(window.location.href);
+    const current = addressBar();
     const next = new URL(current);
     for (const [key, value] of Object.entries(params)) {
         if (value === null || value === '') next.searchParams.delete(key);
@@ -20,7 +25,11 @@ export function syncQueryParams(params: Record<string, string | null>): void {
     }
     rememberView(next.pathname, next.search);
     if (next.search === current.search) return;
-    replaceState(next.pathname + next.search + next.hash, {});
+    const href = next.href;
+    pending = href;
+    void goto(next.pathname + next.search + next.hash, { shallow: true, replace: true }).finally(() => {
+        if (pending === href) pending = null;
+    });
 }
 
 /** Read the human-facing 1-based `page` param as a 0-based index. */

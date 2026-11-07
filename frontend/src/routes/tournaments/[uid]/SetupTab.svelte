@@ -1,10 +1,10 @@
 <script lang="ts">
-  import type { Tournament } from "$lib/types";
-  import { addTournamentOrganizer, removeTournamentOrganizer } from "$lib/api";
+  import type { Tournament } from "#lib/types.ts";
+  import { addTournamentOrganizer, removeTournamentOrganizer } from "#lib/api.ts";
   import TournamentDetailsForm from "./TournamentDetailsForm.svelte";
-  import FoldableSection from "$lib/components/FoldableSection.svelte";
-  import OrganizerManager from "$lib/components/OrganizerManager.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import FoldableSection from "#lib/components/FoldableSection.svelte";
+  import OrganizerManager from "#lib/components/OrganizerManager.svelte";
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     tournament = $bindable(),

@@ -1,23 +1,23 @@
 <script lang="ts">
-  import { goto, replaceState } from "$app/navigation";
+  import { goto } from "$app/navigation";
   import { onMount, onDestroy } from "svelte";
   import {
     getAuthState,
     storeTokensFromCallback,
     requestMagicLink,
     login,
-  } from "$lib/stores/auth.svelte";
+  } from "#lib/stores/auth.svelte.ts";
   import {
     isPasskeySupported,
     createAccountWithPasskey,
     loginWithPasskey,
     startConditionalUI,
     stopConditionalUI,
-  } from "$lib/stores/passkeys.svelte";
+  } from "#lib/stores/passkeys.svelte.ts";
   import { Mail, KeyRound } from '@lucide/svelte';
-  import DiscordIcon from "$lib/components/DiscordIcon.svelte";
-  import Button from '$lib/components/Button.svelte';
-  import * as m from '$lib/paraglide/messages.js';
+  import DiscordIcon from "#lib/components/DiscordIcon.svelte";
+  import Button from '#lib/components/Button.svelte';
+  import * as m from '#lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -132,15 +132,15 @@
         discord_error: m.login_error_discord(),
       };
       oauthError = errorMessages[error] || m.login_error_auth({ error });
-      replaceState("/login", {});
+      goto("/login", { shallow: true, replace: true });
       return;
     }
 
     if (token && refresh) {
       await storeTokensFromCallback(token, refresh);
-      // Single replacing navigation: a separate replaceState would strip the
+      // Single replacing navigation: a separate shallow replace would strip the
       // query before the auth $effect below re-reads it and re-routes to "/".
-      goto(successTarget(), { replaceState: true });
+      goto(successTarget(), { replace: true });
       return;
     }
 

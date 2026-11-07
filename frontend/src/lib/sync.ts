@@ -1,4 +1,4 @@
-import type { User, Sanction, Tournament, DeckObject, League, Promo } from '$lib/types';
+import type { User, Sanction, Tournament, DeckObject, League, Promo } from '#lib/types.ts';
 import {
   saveUser,
   saveUsersBatch,
@@ -46,10 +46,10 @@ import {
   getOfflineDeckUids,
   getDeviceId,
 } from './db';
-import { getAccessToken, ensureSyncToken, refreshTokens } from '$lib/stores/auth.svelte';
-import { isOffline, getOfflineTournamentUids, lostOfflineLock, handleOfflineLockLost } from '$lib/stores/offline.svelte';
-import { IMAGE_CACHE, isPromoImage, pruneImages } from '$lib/image-cache';
-import { promoImageUrl } from '$lib/promo-utils';
+import { getAccessToken, ensureSyncToken, refreshTokens } from '#lib/stores/auth.svelte.ts';
+import { isOffline, getOfflineTournamentUids, lostOfflineLock, handleOfflineLockLost } from '#lib/stores/offline.svelte.ts';
+import { IMAGE_CACHE, isPromoImage, pruneImages } from '#lib/image-cache.ts';
+import { promoImageUrl } from '#lib/promo-utils.ts';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 

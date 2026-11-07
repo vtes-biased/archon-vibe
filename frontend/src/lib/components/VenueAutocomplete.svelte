@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { getVenuesByCountry, type VenueInfo } from "$lib/db";
-    import { normalizeSearch } from "$lib/utils";
-    import * as m from '$lib/paraglide/messages.js';
+    import { getVenuesByCountry, type VenueInfo } from "#lib/db.ts";
+    import { normalizeSearch } from "#lib/utils.ts";
+    import * as m from '#lib/paraglide/messages.js';
 
     let {
         value = $bindable(""),

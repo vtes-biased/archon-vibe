@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { renderMarkdown } from "$lib/markdown";
-  import * as m from "$lib/paraglide/messages.js";
-  import raw from "$lib/legal-content/privacy.md?raw";
+  import { renderMarkdown } from "#lib/markdown.ts";
+  import * as m from "#lib/paraglide/messages.js";
+  import raw from "#lib/legal-content/privacy.md?raw";
 
   const html = renderMarkdown(raw);
 </script>

@@ -2,10 +2,10 @@
   // Single-select user typeahead: IndexedDB search, min 2 chars, keyboard
   // nav, flag + #vekn_id rows. The one search box — organizers, promos, …
   import { onMount } from "svelte";
-  import type { UserListItem } from "$lib/db";
-  import { getFilteredUsers, warmUserIndex } from "$lib/db";
-  import { getCountryFlag } from "$lib/geonames";
-  import * as m from '$lib/paraglide/messages.js';
+  import type { UserListItem } from "#lib/db.ts";
+  import { getFilteredUsers, warmUserIndex } from "#lib/db.ts";
+  import { getCountryFlag } from "#lib/geonames.ts";
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     onselect,

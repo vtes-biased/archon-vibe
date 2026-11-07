@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Download, RefreshCw, TriangleAlert } from '@lucide/svelte';
-  import FoldableSection from "$lib/components/FoldableSection.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import FoldableSection from "#lib/components/FoldableSection.svelte";
+  import * as m from '#lib/paraglide/messages.js';
   import {
     syncVeknMembers,
     syncVeknTournaments,
@@ -11,9 +11,9 @@
     downloadDataExport,
     type AdminSyncResult,
     type VeknStatusResponse,
-  } from '$lib/api';
-  import ConfirmActionModal from '$lib/components/ConfirmActionModal.svelte';
-  import Button from '$lib/components/Button.svelte';
+  } from '#lib/api.ts';
+  import ConfirmActionModal from '#lib/components/ConfirmActionModal.svelte';
+  import Button from '#lib/components/Button.svelte';
 
   let expanded = $state(false);
 

@@ -1,13 +1,13 @@
-import { renderDocument } from "$lib/markdown";
-import * as m from "$lib/paraglide/messages.js";
-import { getLocale } from "$lib/paraglide/runtime.js";
+import { renderDocument } from "#lib/markdown.ts";
+import * as m from "#lib/paraglide/messages.js";
+import { getLocale } from "#lib/paraglide/runtime.js";
 
 // Import markdown files as raw strings (bundled into JS, works offline)
-import vtesRulesRaw from "$lib/help-content/vtes-rules.md?raw";
-import tournamentRulesRaw from "$lib/help-content/tournament-rules.md?raw";
-import judgesGuideRaw from "$lib/help-content/judges-guide.md?raw";
-import judgesGuideEsRaw from "$lib/help-content/judges-guide.es.md?raw";
-import codeOfEthicsRaw from "$lib/help-content/code-of-ethics.md?raw";
+import vtesRulesRaw from "#lib/help-content/vtes-rules.md?raw";
+import tournamentRulesRaw from "#lib/help-content/tournament-rules.md?raw";
+import judgesGuideRaw from "#lib/help-content/judges-guide.md?raw";
+import judgesGuideEsRaw from "#lib/help-content/judges-guide.es.md?raw";
+import codeOfEthicsRaw from "#lib/help-content/code-of-ethics.md?raw";
 
 // Translated reference docs, by slug then locale. A static import (not a dynamic one) on purpose:
 // the service worker precaches every built chunk at install, so splitting these out would still download them.

@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { toUserMessage } from '$lib/errors';
-  import type { Tournament } from "$lib/types";
-  import { tournamentAction } from "$lib/tournament-actions";
-  import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
+  import { toUserMessage } from '#lib/errors.ts';
+  import type { Tournament } from "#lib/types.ts";
+  import { tournamentAction } from "#lib/tournament-actions.ts";
+  import TournamentFields, { type TournamentFieldValues } from "#lib/components/TournamentFields.svelte";
   import TableRoomsEditor from "./TableRoomsEditor.svelte";
   import { RefreshCw, Check } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
-  import { OFFICIAL_DISCORD_INVITE, OFFICIAL_DISCORD_VENUE } from "$lib/tournament-utils";
+  import * as m from '#lib/paraglide/messages.js';
+  import { OFFICIAL_DISCORD_INVITE, OFFICIAL_DISCORD_VENUE } from "#lib/tournament-utils.ts";
 
   let {
     tournament = $bindable(),

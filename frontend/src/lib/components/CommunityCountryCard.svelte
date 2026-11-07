@@ -1,15 +1,15 @@
 <script lang="ts">
-  import Badge from "$lib/components/Badge.svelte";
+  import Badge from "#lib/components/Badge.svelte";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
   import DiscordContact from "./DiscordContact.svelte";
-  import { deobfuscateContact } from "$lib/contact";
-  import { getCountryFlag } from "$lib/geonames";
-  import { getRoleTone } from "$lib/roles";
-  import type { CommunityLink } from "$lib/types";
-  import type { UserListItem } from "$lib/db";
+  import { deobfuscateContact } from "#lib/contact.ts";
+  import { getCountryFlag } from "#lib/geonames.ts";
+  import { getRoleTone } from "#lib/roles.ts";
+  import type { CommunityLink } from "#lib/types.ts";
+  import type { UserListItem } from "#lib/db.ts";
   import { ChevronDown, ChevronRight, Pencil } from "@lucide/svelte";
-  import FoldableSection from "$lib/components/FoldableSection.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import FoldableSection from "#lib/components/FoldableSection.svelte";
+  import * as m from '#lib/paraglide/messages.js';
 
   interface LinkEntry { user: UserListItem; link: CommunityLink }
 

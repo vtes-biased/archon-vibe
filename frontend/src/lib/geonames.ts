@@ -1,8 +1,8 @@
-import type { Country, City } from '$lib/types';
+import type { Country, City } from '#lib/types.ts';
 import { normalizeSearch } from './utils';
 
 // Countries are small (~32KB), load eagerly.
-import countriesData from '$lib/data/geonames/countries.json';
+import countriesData from '#lib/data/geonames/countries.json';
 
 let citiesCache: City[] | null = null;
 let citiesLoadingPromise: Promise<City[]> | null = null;
@@ -61,7 +61,7 @@ export async function loadCities(): Promise<City[]> {
         return citiesLoadingPromise;
     }
 
-    citiesLoadingPromise = import('$lib/data/geonames/cities.json')
+    citiesLoadingPromise = import('#lib/data/geonames/cities.json')
         .then((module) => {
             citiesCache = module.default as City[];
             citiesLoadingPromise = null;

@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { dialogPanel } from "$lib/actions/dialog";
-  import type { Tournament, SanctionLevel, SanctionCategory, SanctionSubcategory, Sanction } from "$lib/types";
-  import { getSanctionReference } from "$lib/engine";
-  import { issueTournamentSanction } from "$lib/sanction-actions";
-  import { getPlayerSanctionsInTournament } from "$lib/db";
+  import { dialogPanel } from "#lib/actions/dialog.ts";
+  import type { Tournament, SanctionLevel, SanctionCategory, SanctionSubcategory, Sanction } from "#lib/types.ts";
+  import { getSanctionReference } from "#lib/engine.ts";
+  import { issueTournamentSanction } from "#lib/sanction-actions.ts";
+  import { getPlayerSanctionsInTournament } from "#lib/db.ts";
   import { TriangleAlert, CircleArrowDown } from "@lucide/svelte";
-  import Button from '$lib/components/Button.svelte';
-  import * as m from '$lib/paraglide/messages.js';
+  import Button from '#lib/components/Button.svelte';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     tournament,

@@ -1,5 +1,5 @@
-import { getUserByVekn } from '$lib/db';
-import type { DeckAttribution } from '$lib/types';
+import { getUserByVekn } from '#lib/db.ts';
+import type { DeckAttribution } from '#lib/types.ts';
 
 /** The designer's name to show beside a decklist, or '' when the credit names
  * nobody. */

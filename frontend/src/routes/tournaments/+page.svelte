@@ -1,23 +1,23 @@
 <script lang="ts">
-  import { toUserMessage } from '$lib/errors';
+  import { toUserMessage } from '#lib/errors.ts';
   import { untrack } from "svelte";
-  import { getFilteredTournaments, getAgendaTournaments, getMemberPlaying, getUnfinishedOrganized, getLeague, type OnlineFilter, type RankFloor, type TournamentListItem, type TournamentTab } from "$lib/db";
-  import { agendaViewer, filterAgenda, agendaToggleEntry } from "$lib/agenda";
-  import { syncManager } from "$lib/sync";
-  import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
-  import { getAuthState, generateCalendarToken, setAgendaEntry } from "$lib/stores/auth.svelte";
-  import { canCreateTournament } from "$lib/engine";
-  import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
-  import type { TournamentFormat } from "$lib/types";
-  import { getStateTone, translateTournamentState } from "$lib/tournament-utils";
-  import Badge from "$lib/components/Badge.svelte";
-  import InlineNotice from "$lib/components/InlineNotice.svelte";
-  import { zonedDate } from "$lib/utils";
-  import { syncQueryParams, currentParams, readPageParam, pageParam } from "$lib/url-filters";
+  import { getFilteredTournaments, getAgendaTournaments, getMemberPlaying, getUnfinishedOrganized, getLeague, type OnlineFilter, type RankFloor, type TournamentListItem, type TournamentTab } from "#lib/db.ts";
+  import { agendaViewer, filterAgenda, agendaToggleEntry } from "#lib/agenda.ts";
+  import { syncManager } from "#lib/sync.ts";
+  import { getCountries, getSortedCountries, getCountryFlag } from "#lib/geonames.ts";
+  import { getAuthState, generateCalendarToken, setAgendaEntry } from "#lib/stores/auth.svelte.ts";
+  import { canCreateTournament } from "#lib/engine.ts";
+  import { isBrowserOnline } from "#lib/stores/connectivity.svelte.ts";
+  import type { TournamentFormat } from "#lib/types.ts";
+  import { getStateTone, translateTournamentState } from "#lib/tournament-utils.ts";
+  import Badge from "#lib/components/Badge.svelte";
+  import InlineNotice from "#lib/components/InlineNotice.svelte";
+  import { zonedDate } from "#lib/utils.ts";
+  import { syncQueryParams, currentParams, readPageParam, pageParam } from "#lib/url-filters.ts";
   import { Loader2, Trophy, Calendar, BookmarkPlus, BookmarkMinus, Copy, Check, Plus, SlidersHorizontal, X } from "@lucide/svelte";
-  import Button from '$lib/components/Button.svelte';
-  import * as m from '$lib/paraglide/messages.js';
-  import { getLocale } from '$lib/paraglide/runtime.js';
+  import Button from '#lib/components/Button.svelte';
+  import * as m from '#lib/paraglide/messages.js';
+  import { getLocale } from '#lib/paraglide/runtime.js';
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
   // Subscription URLs get pasted into external calendar apps, so they must be
@@ -44,7 +44,7 @@
   });
   let error = $state<string | null>(null);
 
-  // Filters and page live in the query string ($lib/url-filters): returning
+  // Filters and page live in the query string (#lib/url-filters.ts): returning
   // from a tournament remounts this component, discarding anything held only
   // in local state.
   const urlParams = currentParams();

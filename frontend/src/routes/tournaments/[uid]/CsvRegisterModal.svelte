@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { apiRequest } from "$lib/api";
-  import { toUserMessage } from "$lib/errors";
-  import Button from "$lib/components/Button.svelte";
+  import { apiRequest } from "#lib/api.ts";
+  import { toUserMessage } from "#lib/errors.ts";
+  import Button from "#lib/components/Button.svelte";
   import { Upload, X, TriangleAlert, CircleCheck } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
-  import { dialogPanel } from "$lib/actions/dialog";
+  import * as m from '#lib/paraglide/messages.js';
+  import { dialogPanel } from "#lib/actions/dialog.ts";
 
   let {
     show = $bindable(),

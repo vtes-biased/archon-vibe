@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import type { JudgeCallData } from "$lib/sync";
+  import type { JudgeCallData } from "#lib/sync.ts";
   import { X, Gavel } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     tournamentUid,

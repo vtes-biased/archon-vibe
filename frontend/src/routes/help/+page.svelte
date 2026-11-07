@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { helpDocs, referenceDocs, userGuides } from "$lib/help-docs";
+  import { helpDocs, referenceDocs, userGuides } from "#lib/help-docs.ts";
   import { BookOpen, Trophy, Scale, Shield, UserRound, ClipboardList, ShieldCheck, FileText, MessageSquarePlus } from "@lucide/svelte";
   import { ArrowLeft } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
-  import Button from "$lib/components/Button.svelte";
-  import FeedbackModal from "$lib/components/FeedbackModal.svelte";
-  import { getAuthState } from "$lib/stores/auth.svelte";
+  import * as m from '#lib/paraglide/messages.js';
+  import Button from "#lib/components/Button.svelte";
+  import FeedbackModal from "#lib/components/FeedbackModal.svelte";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
   import { afterNavigate } from "$app/navigation";
 
   let showFeedback = $state(false);

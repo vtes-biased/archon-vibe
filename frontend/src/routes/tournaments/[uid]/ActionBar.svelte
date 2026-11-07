@@ -1,16 +1,16 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import type { Tournament, TournamentState, DeckObject } from "$lib/types";
-  import { finalsQualification, type TournamentEventType } from "$lib/engine";
-  import Button from "$lib/components/Button.svelte";
-  import ActionMenu from "$lib/components/ActionMenu.svelte";
-  import QrCheckinDisplay from "$lib/components/QrCheckinDisplay.svelte";
+  import type { Tournament, TournamentState, DeckObject } from "#lib/types.ts";
+  import { finalsQualification, type TournamentEventType } from "#lib/engine.ts";
+  import Button from "#lib/components/Button.svelte";
+  import ActionMenu from "#lib/components/ActionMenu.svelte";
+  import QrCheckinDisplay from "#lib/components/QrCheckinDisplay.svelte";
   import FinishedResults from "./FinishedResults.svelte";
-  import InlineNotice from "$lib/components/InlineNotice.svelte";
-  import Badge from "$lib/components/Badge.svelte";
+  import InlineNotice from "#lib/components/InlineNotice.svelte";
+  import Badge from "#lib/components/Badge.svelte";
   import { Undo2, CheckCheck, Banknote, RotateCcw, Upload, TriangleAlert, CloudOff, CloudAlert } from "@lucide/svelte";
-  import { translateTournamentState, seatDisplay, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
-  import * as m from '$lib/paraglide/messages.js';
+  import { translateTournamentState, seatDisplay, type StandingEntry, type PlayerInfoMap } from "#lib/tournament-utils.ts";
+  import * as m from '#lib/paraglide/messages.js';
 
 
   let {

@@ -1,21 +1,21 @@
 <script lang="ts">
-  import type { Tournament, DeckObject, Table, VtesCard } from "$lib/types";
-  import type { PlayerInfoMap } from "$lib/tournament-utils";
-  import { seatDisplay } from "$lib/tournament-utils";
-  import { roundsPlayedByPlayer } from "$lib/engine";
-  import { getDecksByTournamentGrouped } from "$lib/db";
-  import DeckUpload from "$lib/components/DeckUpload.svelte";
-  import DeckDisplay from "$lib/components/DeckDisplay.svelte";
-  import DeckViews from "$lib/components/DeckViews.svelte";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { tournamentAction } from "$lib/tournament-actions";
-  import { toUserMessage } from "$lib/errors";
-  import { getCards } from "$lib/cards";
+  import type { Tournament, DeckObject, Table, VtesCard } from "#lib/types.ts";
+  import type { PlayerInfoMap } from "#lib/tournament-utils.ts";
+  import { seatDisplay } from "#lib/tournament-utils.ts";
+  import { roundsPlayedByPlayer } from "#lib/engine.ts";
+  import { getDecksByTournamentGrouped } from "#lib/db.ts";
+  import DeckUpload from "#lib/components/DeckUpload.svelte";
+  import DeckDisplay from "#lib/components/DeckDisplay.svelte";
+  import DeckViews from "#lib/components/DeckViews.svelte";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { tournamentAction } from "#lib/tournament-actions.ts";
+  import { toUserMessage } from "#lib/errors.ts";
+  import { getCards } from "#lib/cards.ts";
   import { ChevronDown, ChevronRight, CircleCheck, Lock, Trash2, Trophy } from "@lucide/svelte";
   import { slide } from "svelte/transition";
-  import FoldableSection from "$lib/components/FoldableSection.svelte";
-  import Button from '$lib/components/Button.svelte';
-  import * as m from '$lib/paraglide/messages.js';
+  import FoldableSection from "#lib/components/FoldableSection.svelte";
+  import Button from '#lib/components/Button.svelte';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     tournament,

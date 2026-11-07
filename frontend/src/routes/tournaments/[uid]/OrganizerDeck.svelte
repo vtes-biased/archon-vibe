@@ -1,7 +1,7 @@
 <script module lang="ts">
   import { SvelteSet } from "svelte/reactivity";
-  import type { Tournament, DeckObject } from "$lib/types";
-  import { getAuthState } from "$lib/stores/auth.svelte";
+  import type { Tournament, DeckObject } from "#lib/types.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
 
   const revealedDecks = new SvelteSet<string>();
 
@@ -14,12 +14,12 @@
 </script>
 
 <script lang="ts">
-  import type { TournamentEventType } from "$lib/engine";
-  import DeckDisplay from "$lib/components/DeckDisplay.svelte";
-  import DeckViews from "$lib/components/DeckViews.svelte";
-  import Button from "$lib/components/Button.svelte";
+  import type { TournamentEventType } from "#lib/engine.ts";
+  import DeckDisplay from "#lib/components/DeckDisplay.svelte";
+  import DeckViews from "#lib/components/DeckViews.svelte";
+  import Button from "#lib/components/Button.svelte";
   import { Eye } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     deck,

@@ -1,12 +1,12 @@
 <script lang="ts">
-  import type { User } from "$lib/types";
-  import type { UserListItem } from "$lib/db";
-  import { getUser } from "$lib/db";
-  import { getCountryFlag } from "$lib/geonames";
-  import { showToast } from "$lib/stores/toast.svelte";
-  import UserPicker from "$lib/components/UserPicker.svelte";
+  import type { User } from "#lib/types.ts";
+  import type { UserListItem } from "#lib/db.ts";
+  import { getUser } from "#lib/db.ts";
+  import { getCountryFlag } from "#lib/geonames.ts";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
+  import UserPicker from "#lib/components/UserPicker.svelte";
   import { X } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     organizerUids,

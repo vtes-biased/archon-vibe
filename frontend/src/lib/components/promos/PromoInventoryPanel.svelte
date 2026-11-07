@@ -1,18 +1,18 @@
 <script lang="ts">
-  import type { Promo } from "$lib/types";
-  import { getUser } from "$lib/db";
-  import { getPromoLedger } from "$lib/api";
-  import { holdingRows } from "$lib/promo-utils";
-  import { buildCsv } from "$lib/csv";
-  import { downloadBlob } from "$lib/utils";
-  import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
-  import { syncQueryParams, currentParams } from "$lib/url-filters";
-  import Button from "$lib/components/Button.svelte";
+  import type { Promo } from "#lib/types.ts";
+  import { getUser } from "#lib/db.ts";
+  import { getPromoLedger } from "#lib/api.ts";
+  import { holdingRows } from "#lib/promo-utils.ts";
+  import { buildCsv } from "#lib/csv.ts";
+  import { downloadBlob } from "#lib/utils.ts";
+  import { isBrowserOnline } from "#lib/stores/connectivity.svelte.ts";
+  import { syncQueryParams, currentParams } from "#lib/url-filters.ts";
+  import Button from "#lib/components/Button.svelte";
   import PromoLedgerList from "./PromoLedgerList.svelte";
   import RecordMovementModal from "./RecordMovementModal.svelte";
   import { Boxes, Download } from "@lucide/svelte";
-  import FoldableSection from "$lib/components/FoldableSection.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import FoldableSection from "#lib/components/FoldableSection.svelte";
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     promos,

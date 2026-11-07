@@ -1,12 +1,12 @@
 <script lang="ts">
-  import type { User } from "$lib/types";
-  import type { NdaStatus } from "$lib/api";
-  import { requestNdaSignature, uploadNdaScan, downloadNdaPdf } from "$lib/api";
-  import Button from "$lib/components/Button.svelte";
-  import Badge from "$lib/components/Badge.svelte";
-  import InlineNotice from "$lib/components/InlineNotice.svelte";
+  import type { User } from "#lib/types.ts";
+  import type { NdaStatus } from "#lib/api.ts";
+  import { requestNdaSignature, uploadNdaScan, downloadNdaPdf } from "#lib/api.ts";
+  import Button from "#lib/components/Button.svelte";
+  import Badge from "#lib/components/Badge.svelte";
+  import InlineNotice from "#lib/components/InlineNotice.svelte";
   import { Download, FileSignature, TriangleAlert, Upload } from "@lucide/svelte";
-  import * as m from "$lib/paraglide/messages.js";
+  import * as m from "#lib/paraglide/messages.js";
 
   let {
     user,

@@ -1,24 +1,24 @@
 <script lang="ts">
   import { tick } from "svelte";
-  import { toUserMessage } from '$lib/errors';
-  import type { Tournament, Table, Sanction, DeckObject } from "$lib/types";
-  import { tournamentAction } from "$lib/tournament-actions";
-  import { timerAddTime } from "$lib/api";
-  import { scoreSeatingSync, computePlayerIssuesSync, previewScoresSync, checkTableVpsSync, roundsPlayedByPlayer, tableLabel, type TournamentEventType } from "$lib/engine";
-  import { vpIssueText } from "$lib/vpIssue";
-  import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
-  import SeatingSortable from "$lib/components/SeatingSortable.svelte";
-  import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
-  import SanctionListModal from "$lib/components/SanctionListModal.svelte";
-  import Button from '$lib/components/Button.svelte';
+  import { toUserMessage } from '#lib/errors.ts';
+  import type { Tournament, Table, Sanction, DeckObject } from "#lib/types.ts";
+  import { tournamentAction } from "#lib/tournament-actions.ts";
+  import { timerAddTime } from "#lib/api.ts";
+  import { scoreSeatingSync, computePlayerIssuesSync, previewScoresSync, checkTableVpsSync, roundsPlayedByPlayer, tableLabel, type TournamentEventType } from "#lib/engine.ts";
+  import { vpIssueText } from "#lib/vpIssue.ts";
+  import SanctionIndicator from "#lib/components/SanctionIndicator.svelte";
+  import SeatingSortable from "#lib/components/SeatingSortable.svelte";
+  import TournamentSanctionModal from "#lib/components/TournamentSanctionModal.svelte";
+  import SanctionListModal from "#lib/components/SanctionListModal.svelte";
+  import Button from '#lib/components/Button.svelte';
   import { ChevronDown, ChevronRight, SquarePlus, ArrowRightLeft, X, UserMinus, TriangleAlert, ShieldCheck, Plus, Printer, Lock, Ban, RotateCcw, Users, Settings2, Search, Eye } from "@lucide/svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
   import SeatDeckModal from "./SeatDeckModal.svelte";
-  import VpInput from "$lib/components/VpInput.svelte";
-  import { seatDisplay as seatDisplayUtil, seatDisplayParts, vpOptions, translateTableState, translatePlayerState, type PlayerInfoMap } from "$lib/tournament-utils";
-  import * as m from '$lib/paraglide/messages.js';
-  import { showToast } from "$lib/stores/toast.svelte";
-  import { searchTokens, matchesAllTerms, formatScore, formatGwTp } from "$lib/utils";
+  import VpInput from "#lib/components/VpInput.svelte";
+  import { seatDisplay as seatDisplayUtil, seatDisplayParts, vpOptions, translateTableState, translatePlayerState, type PlayerInfoMap } from "#lib/tournament-utils.ts";
+  import * as m from '#lib/paraglide/messages.js';
+  import { showToast } from "#lib/stores/toast.svelte.ts";
+  import { searchTokens, matchesAllTerms, formatScore, formatGwTp } from "#lib/utils.ts";
 
   let {
     tournament = $bindable(),

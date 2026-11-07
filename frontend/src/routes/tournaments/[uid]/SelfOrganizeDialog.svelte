@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { dialogPanel } from "$lib/actions/dialog";
-  import Button from '$lib/components/Button.svelte';
+  import { dialogPanel } from "#lib/actions/dialog.ts";
+  import Button from '#lib/components/Button.svelte';
   import { Check, Users } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     selfName,

@@ -1,22 +1,22 @@
 <script lang="ts">
   import '../app.css';
-  import { page } from '$app/stores';
-  import { openLastView } from '$lib/last-view';
-  import { syncManager } from '$lib/sync';
-  import { initAuth, getAuthState, hasStoredSession } from '$lib/stores/auth.svelte';
-  import { initEngine } from '$lib/engine-instance';
-  import { initServiceWorker, getUpdateAvailable, applyUpdate, reloadOnStaleChunk } from '$lib/stores/sw.svelte';
-  import { initOfflineState, getOfflineTournamentUids } from '$lib/stores/offline.svelte';
-  import { reconcilePush } from '$lib/stores/push.svelte';
+  import { page } from '$app/state';
+  import { openLastView } from '#lib/last-view.ts';
+  import { syncManager } from '#lib/sync.ts';
+  import { initAuth, getAuthState, hasStoredSession } from '#lib/stores/auth.svelte.ts';
+  import { initEngine } from '#lib/engine-instance.ts';
+  import { initServiceWorker, getUpdateAvailable, applyUpdate, reloadOnStaleChunk } from '#lib/stores/sw.svelte.ts';
+  import { initOfflineState, getOfflineTournamentUids } from '#lib/stores/offline.svelte.ts';
+  import { reconcilePush } from '#lib/stores/push.svelte.ts';
   import { onMount } from 'svelte';
   import { Wifi, WifiOff, RefreshCw, Download, TriangleAlert, Trophy, FlagTriangleRight, ListOrdered, Users, CircleUser, LogIn, BookOpen, MessageSquarePlus } from '@lucide/svelte';
-  import Badge from '$lib/components/Badge.svelte';
-  import Toast from '$lib/components/Toast.svelte';
-  import WhatsNewModal from '$lib/components/WhatsNewModal.svelte';
-  import FeedbackModal from '$lib/components/FeedbackModal.svelte';
-  import * as m from '$lib/paraglide/messages.js';
-  import { getLocale } from '$lib/paraglide/runtime.js';
-  import { initTheme } from '$lib/stores/theme.svelte';
+  import Badge from '#lib/components/Badge.svelte';
+  import Toast from '#lib/components/Toast.svelte';
+  import WhatsNewModal from '#lib/components/WhatsNewModal.svelte';
+  import FeedbackModal from '#lib/components/FeedbackModal.svelte';
+  import * as m from '#lib/paraglide/messages.js';
+  import { getLocale } from '#lib/paraglide/runtime.js';
+  import { initTheme } from '#lib/stores/theme.svelte.ts';
 
   let { children } = $props();
 
@@ -182,7 +182,7 @@
   <nav class="fixed bottom-0 left-0 right-0 z-40 h-navbar pb-safe-b transform-gpu bg-surface-card border-t border-line sm:hidden">
     <div class="flex h-full justify-around">
       {#each navItems as item}
-        {@const active = isActive(item.href, $page.url.pathname)}
+        {@const active = isActive(item.href, page.url.pathname)}
         {@const Icon = item.icon}
         <a
           href={item.href}
@@ -211,7 +211,7 @@
 
     <div class="flex-1 flex flex-col gap-2 w-full">
       {#each navItems as item}
-        {@const active = isActive(item.href, $page.url.pathname)}
+        {@const active = isActive(item.href, page.url.pathname)}
         {@const Icon = item.icon}
         <a
           href={item.href}
@@ -226,9 +226,9 @@
     </div>
 
     <div class="mt-auto pt-4 flex flex-col items-center gap-4 w-full">
-      {#if getAuthState().user?.vekn_id && $page.url.pathname !== '/help'}
+      {#if getAuthState().user?.vekn_id && page.url.pathname !== '/help'}
         <button
-          onclick={() => (feedbackRoute = $page.url.pathname)}
+          onclick={() => (feedbackRoute = page.url.pathname)}
           class="flex flex-col items-center w-full py-3 px-2 rounded-lg transition-colors text-ink-muted hover:text-ink-bright hover:bg-surface-hover/50"
           title={m.feedback_open_button()}
         >

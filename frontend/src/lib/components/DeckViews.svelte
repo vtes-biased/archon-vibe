@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { DeckView } from "$lib/types";
-  import { getUser } from "$lib/db";
+  import type { DeckView } from "#lib/types.ts";
+  import { getUser } from "#lib/db.ts";
   import { Eye } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let { views, roundCount }: { views: DeckView[]; roundCount: number } = $props();
 

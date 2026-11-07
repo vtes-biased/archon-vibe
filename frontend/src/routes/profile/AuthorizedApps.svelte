@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { apiRequest } from "$lib/api";
+  import { apiRequest } from "#lib/api.ts";
   import { Loader2, AppWindow, TriangleAlert } from "@lucide/svelte";
-  import FoldableSection from "$lib/components/FoldableSection.svelte";
-  import Button from "$lib/components/Button.svelte";
-  import * as m from '$lib/paraglide/messages.js';
-  import { dialogPanel } from "$lib/actions/dialog";
+  import FoldableSection from "#lib/components/FoldableSection.svelte";
+  import Button from "#lib/components/Button.svelte";
+  import * as m from '#lib/paraglide/messages.js';
+  import { dialogPanel } from "#lib/actions/dialog.ts";
 
   interface Consent {
     client_id: string;

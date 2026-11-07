@@ -1,7 +1,7 @@
 /** Pure HTTP transport lives in api.ts, which this module builds on one-way. */
 
-import * as m from '$lib/paraglide/messages.js';
-import type { Tournament, DeckAttribution, DeckObject } from '$lib/types';
+import * as m from '#lib/paraglide/messages.js';
+import type { Tournament, DeckAttribution, DeckObject } from '#lib/types.ts';
 import {
   getUser,
   getTournament,
@@ -25,9 +25,9 @@ import {
   type TournamentEvent,
   type TournamentEventType,
 } from './engine';
-import { showToast } from '$lib/stores/toast.svelte';
-import { getAuthState } from '$lib/stores/auth.svelte';
-import { isOffline, scheduleSyncOffline } from '$lib/stores/offline.svelte';
+import { showToast } from '#lib/stores/toast.svelte.ts';
+import { getAuthState } from '#lib/stores/auth.svelte.ts';
+import { isOffline, scheduleSyncOffline } from '#lib/stores/offline.svelte.ts';
 import { apiRequest, ApiError, requireOnline, isOnline } from './api';
 import { syncManager } from './sync';
 import { EngineError } from './error-codes';

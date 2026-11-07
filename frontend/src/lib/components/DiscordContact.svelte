@@ -1,8 +1,8 @@
 <script lang="ts">
   import { Check, Copy, ExternalLink } from "@lucide/svelte";
   import DiscordIcon from "./DiscordIcon.svelte";
-  import { showToast } from "$lib/stores/toast.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import { showToast } from "#lib/stores/toast.svelte.ts";
+  import * as m from '#lib/paraglide/messages.js';
 
   // Discord's Add Friend flow is username-based with no public deep link, so the primary action
   // copies the username for pasting into Discord; the profile link is a secondary affordance.

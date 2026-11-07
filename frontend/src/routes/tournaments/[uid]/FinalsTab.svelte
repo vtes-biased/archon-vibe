@@ -1,18 +1,18 @@
 <script lang="ts">
-  import { previewScoresSync, checkTableVpsSync, finalsQualification, type TournamentEventType } from "$lib/engine";
-  import { vpIssueText } from "$lib/vpIssue";
-  import { toUserMessage } from '$lib/errors';
-  import type { Tournament, Sanction } from "$lib/types";
-  import { formatScore, formatGwTp } from "$lib/utils";
-  import { tournamentAction } from "$lib/tournament-actions";
-  import SeatingSortable from "$lib/components/SeatingSortable.svelte";
-  import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
-  import VpInput from "$lib/components/VpInput.svelte";
+  import { previewScoresSync, checkTableVpsSync, finalsQualification, type TournamentEventType } from "#lib/engine.ts";
+  import { vpIssueText } from "#lib/vpIssue.ts";
+  import { toUserMessage } from '#lib/errors.ts';
+  import type { Tournament, Sanction } from "#lib/types.ts";
+  import { formatScore, formatGwTp } from "#lib/utils.ts";
+  import { tournamentAction } from "#lib/tournament-actions.ts";
+  import SeatingSortable from "#lib/components/SeatingSortable.svelte";
+  import TournamentSanctionModal from "#lib/components/TournamentSanctionModal.svelte";
+  import VpInput from "#lib/components/VpInput.svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
-  import Button from '$lib/components/Button.svelte';
+  import Button from '#lib/components/Button.svelte';
   import { ArrowRightLeft, ShieldCheck, Lock, TriangleAlert } from "@lucide/svelte";
-  import { seatDisplay as seatDisplayUtil, vpOptions, translateTableState, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
-  import * as m from '$lib/paraglide/messages.js';
+  import { seatDisplay as seatDisplayUtil, vpOptions, translateTableState, type StandingEntry, type PlayerInfoMap } from "#lib/tournament-utils.ts";
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     tournament = $bindable(),

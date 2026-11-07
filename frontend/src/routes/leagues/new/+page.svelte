@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { toUserMessage } from '$lib/errors';
+  import { toUserMessage } from '#lib/errors.ts';
   import { goto } from "$app/navigation";
-  import { createLeague } from "$lib/api";
-  import { saveLeague, getAllLeagues } from "$lib/db";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canManageLeagues } from "$lib/engine";
-  import { getSortedCountries, getCountryFlag } from "$lib/geonames";
-  import type { League, LeagueKind, LeagueStandingsMode } from "$lib/types";
-  import Button from '$lib/components/Button.svelte';
+  import { createLeague } from "#lib/api.ts";
+  import { saveLeague, getAllLeagues } from "#lib/db.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { canManageLeagues } from "#lib/engine.ts";
+  import { getSortedCountries, getCountryFlag } from "#lib/geonames.ts";
+  import type { League, LeagueKind, LeagueStandingsMode } from "#lib/types.ts";
+  import Button from '#lib/components/Button.svelte';
   import { ArrowLeft } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   const auth = $derived(getAuthState());
   const canCreate = $derived(canManageLeagues(auth.user).allowed);

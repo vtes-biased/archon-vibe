@@ -1,10 +1,10 @@
 <script lang="ts">
   // Online-only ledger read — a sanctioned carve-out from offline-first — with simple client-side
   // filters. Rendered inside the inventory panel.
-  import type { Promo, PromoLedgerEntry, PromoLedgerKind } from "$lib/types";
-  import { getPromoLedger } from "$lib/api";
-  import { getUser } from "$lib/db";
-  import * as m from '$lib/paraglide/messages.js';
+  import type { Promo, PromoLedgerEntry, PromoLedgerKind } from "#lib/types.ts";
+  import { getPromoLedger } from "#lib/api.ts";
+  import { getUser } from "#lib/db.ts";
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     promos,

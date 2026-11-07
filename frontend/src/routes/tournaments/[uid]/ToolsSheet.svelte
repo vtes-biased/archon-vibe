@@ -3,23 +3,23 @@
   // Groups run in fixed event chronology — setup, door, wrap up — only which
   // group starts open follows tournament state.
   import type { Component } from "svelte";
-  import type { Sanction, Tournament } from "$lib/types";
+  import type { Sanction, Tournament } from "#lib/types.ts";
   import PromosDistributedEditor from "./PromosDistributedEditor.svelte";
   import ArchivalResultsEditor from "./ArchivalResultsEditor.svelte";
-  import QrCheckinDisplay from "$lib/components/QrCheckinDisplay.svelte";
+  import QrCheckinDisplay from "#lib/components/QrCheckinDisplay.svelte";
   import RaffleSection from "./RaffleSection.svelte";
   import ReopenConfirmModal from "./ReopenConfirmModal.svelte";
-  import Button from "$lib/components/Button.svelte";
-  import { copyResults, downloadResults } from "$lib/copy-results";
-  import { buildCsv } from "$lib/csv";
-  import { downloadBlob } from "$lib/utils";
-  import { getCountry } from "$lib/geonames";
-  import { playedPlayerUids, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
-  import { canSetArchivalResults } from "$lib/engine";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import type { TournamentEventType } from "$lib/engine";
+  import Button from "#lib/components/Button.svelte";
+  import { copyResults, downloadResults } from "#lib/copy-results.ts";
+  import { buildCsv } from "#lib/csv.ts";
+  import { downloadBlob } from "#lib/utils.ts";
+  import { getCountry } from "#lib/geonames.ts";
+  import { playedPlayerUids, type StandingEntry, type PlayerInfoMap } from "#lib/tournament-utils.ts";
+  import { canSetArchivalResults } from "#lib/engine.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import type { TournamentEventType } from "#lib/engine.ts";
   import { ChevronDown, ChevronRight, X, Upload, CloudUpload, QrCode, Gift, Ticket, ClipboardCopy, Download, Undo2, Trash2, Image, TriangleAlert, ScrollText } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   type ActionItem = { label: string; icon?: Component<any>; onclick: () => void; disabled?: boolean };
   type GroupId = "setup" | "door" | "wrapup";

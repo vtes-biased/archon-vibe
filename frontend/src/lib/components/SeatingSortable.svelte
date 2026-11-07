@@ -1,8 +1,8 @@
 <script lang="ts">
   import { OctagonX, TriangleAlert, Info, ArrowRightLeft, X, RotateCcw, UserMinus, Plus } from "@lucide/svelte";
-  import { seatDisplay as seatDisplayUtil } from "$lib/tournament-utils";
-  import { tableLabel as tableLabelUtil, type TableNumbering } from "$lib/engine";
-  import * as m from '$lib/paraglide/messages.js';
+  import { seatDisplay as seatDisplayUtil } from "#lib/tournament-utils.ts";
+  import { tableLabel as tableLabelUtil, type TableNumbering } from "#lib/engine.ts";
+  import * as m from '#lib/paraglide/messages.js';
   import { tick } from 'svelte';
 
   let {

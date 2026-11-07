@@ -1,14 +1,14 @@
-import type { Tournament, DeckObject, VtesCard } from "$lib/types";
-import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
-import { eventUrl, seatDisplay } from "$lib/tournament-utils";
-import { formatScore } from "$lib/utils";
-import { getCountry } from "$lib/geonames";
-import { getCards } from "$lib/cards";
-import { getLibraryTypeOrder } from "$lib/engine";
-import { getDecksByTournamentGrouped } from "$lib/db";
-import { creditName } from "$lib/deck-credit";
-import { getLocale } from "$lib/paraglide/runtime.js";
-import * as m from "$lib/paraglide/messages.js";
+import type { Tournament, DeckObject, VtesCard } from "#lib/types.ts";
+import type { StandingEntry, PlayerInfoMap } from "#lib/tournament-utils.ts";
+import { eventUrl, seatDisplay } from "#lib/tournament-utils.ts";
+import { formatScore } from "#lib/utils.ts";
+import { getCountry } from "#lib/geonames.ts";
+import { getCards } from "#lib/cards.ts";
+import { getLibraryTypeOrder } from "#lib/engine.ts";
+import { getDecksByTournamentGrouped } from "#lib/db.ts";
+import { creditName } from "#lib/deck-credit.ts";
+import { getLocale } from "#lib/paraglide/runtime.js";
+import * as m from "#lib/paraglide/messages.js";
 
 interface CardEntry { name: string; count: number; type: string; capacity: number }
 

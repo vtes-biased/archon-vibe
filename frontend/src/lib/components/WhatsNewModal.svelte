@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { dialogPanel } from "$lib/actions/dialog";
-  import { renderMarkdown } from "$lib/markdown";
-  import { unseenEntries, markSeen, type ChangelogEntry } from "$lib/changelog";
-  import { getLocale } from "$lib/paraglide/runtime.js";
-  import * as m from "$lib/paraglide/messages.js";
-  import Button from "$lib/components/Button.svelte";
+  import { dialogPanel } from "#lib/actions/dialog.ts";
+  import { renderMarkdown } from "#lib/markdown.ts";
+  import { unseenEntries, markSeen, type ChangelogEntry } from "#lib/changelog.ts";
+  import { getLocale } from "#lib/paraglide/runtime.js";
+  import * as m from "#lib/paraglide/messages.js";
+  import Button from "#lib/components/Button.svelte";
 
   let pending = $state<ChangelogEntry[]>([]);
 

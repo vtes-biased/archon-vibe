@@ -1,13 +1,13 @@
 <script lang="ts">
   import { User, Camera, Unlink, Share2, Check, CloudOff } from "@lucide/svelte";
-  import { getSortedCountries, getCountryFlag } from "$lib/geonames";
-  import CityAutocomplete from "$lib/components/CityAutocomplete.svelte";
-  import Button from "$lib/components/Button.svelte";
-  import { updateProfile } from "$lib/stores/auth.svelte";
-  import { showToast } from "$lib/stores/toast.svelte";
-  import { canChangeCountry } from "$lib/engine";
-  import Badge from "$lib/components/Badge.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import { getSortedCountries, getCountryFlag } from "#lib/geonames.ts";
+  import CityAutocomplete from "#lib/components/CityAutocomplete.svelte";
+  import Button from "#lib/components/Button.svelte";
+  import { updateProfile } from "#lib/stores/auth.svelte.ts";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
+  import { canChangeCountry } from "#lib/engine.ts";
+  import Badge from "#lib/components/Badge.svelte";
+  import * as m from '#lib/paraglide/messages.js';
 
   interface Props {
     user: any;

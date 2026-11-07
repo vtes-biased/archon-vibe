@@ -1,16 +1,15 @@
-/// <reference no-default-lib="true"/>
-/// <reference lib="esnext" />
-/// <reference lib="webworker" />
-/// <reference types="@sveltejs/kit" />
+import { version } from '$app/env';
+import { assets, immutable } from '$app/manifest';
+import { self as sw } from '$app/service-worker';
+import routes from '../../../deploy/routes.json';
+import { IMAGE_CACHE, isCardImage, isPromoImage } from '#lib/image-cache.ts';
 
-import { build, files, version } from '$service-worker';
-import routes from '../../deploy/routes.json';
-import { IMAGE_CACHE, isCardImage, isPromoImage } from '$lib/image-cache';
-
-const sw = globalThis.self as unknown as ServiceWorkerGlobalScope;
 const CACHE = `cache-${version}`;
-const ASSETS = [...build.filter((path) => !/\/cards\.[^/]+\.json$/.test(path)), ...files];
-// adapter-static writes the fallback after the build, so `build` never lists it;
+const ASSETS = [
+  ...immutable.map((f) => '/' + f.path).filter((path) => !/\/cards\.[^/]+\.json$/.test(path)),
+  ...assets.map((f) => '/' + f.path),
+];
+// adapter-static writes the fallback after the build, so the manifest never lists it;
 // vite dev serves no such file, and one 404 fails the whole install.
 const SHELL = '/200.html';
 const BACKEND_PREFIXES = [...routes.backend_paths, routes.sse_path];
@@ -108,7 +107,7 @@ sw.addEventListener('message', (event) => {
   }
 });
 
-const beta = self.location.hostname === 'archon.krcg.org';
+const beta = sw.location.hostname === 'archon.krcg.org';
 
 // Backend payload: { title, body, url, tag }. iOS revokes permission if a push
 // doesn't show a notification, so this always calls showNotification.
@@ -119,16 +118,18 @@ sw.addEventListener('push', (event) => {
   } catch {
     data = { body: event.data?.text() ?? '' };
   }
+  // `renotify` is real in browsers but missing from TypeScript's WebWorker lib.
+  const options: NotificationOptions & { renotify: boolean } = {
+    body: data.body || '',
+    icon: beta ? '/icon-192-beta.png' : '/icon-192.png',
+    badge: beta ? '/icon-192-beta.png' : '/icon-192.png',
+    tag: data.tag, // collapse repeats (e.g. same round re-started)
+    // re-alert (sound/vibrate) on a collapsed tag — judge calls set this
+    renotify: data.renotify === true,
+    data: { url: data.url || '/' },
+  };
   event.waitUntil(
-    sw.registration.showNotification(data.title || (beta ? 'Archon Beta' : 'Archon'), {
-      body: data.body || '',
-      icon: beta ? '/icon-192-beta.png' : '/icon-192.png',
-      badge: beta ? '/icon-192-beta.png' : '/icon-192.png',
-      tag: data.tag, // collapse repeats (e.g. same round re-started)
-      // re-alert (sound/vibrate) on a collapsed tag — judge calls set this
-      renotify: data.renotify === true,
-      data: { url: data.url || '/' },
-    })
+    sw.registration.showNotification(data.title || (beta ? 'Archon Beta' : 'Archon'), options)
   );
 });
 

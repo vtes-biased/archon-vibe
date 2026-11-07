@@ -1,11 +1,11 @@
 <script lang="ts">
-  import type { Tournament } from "$lib/types";
-  import { timerStart, timerPause, timerReset, timerAddTime } from "$lib/api";
-  import { activateClock, getClockOffset, getClockSkewAdvisory } from "$lib/stores/clock.svelte";
+  import type { Tournament } from "#lib/types.ts";
+  import { timerStart, timerPause, timerReset, timerAddTime } from "#lib/api.ts";
+  import { activateClock, getClockOffset, getClockSkewAdvisory } from "#lib/stores/clock.svelte.ts";
   import { Play, Pause, RotateCcw, Clock, TriangleAlert } from "@lucide/svelte";
-  import Button from '$lib/components/Button.svelte';
-  import ConfirmActionModal from '$lib/components/ConfirmActionModal.svelte';
-  import * as m from '$lib/paraglide/messages.js';
+  import Button from '#lib/components/Button.svelte';
+  import ConfirmActionModal from '#lib/components/ConfirmActionModal.svelte';
+  import * as m from '#lib/paraglide/messages.js';
 
   // VEKN sets no cap on judge-granted extra time; 30 min is a sanity bound,
   // not a rules limit. Mirrored server-side (timer/add-time).

@@ -1,12 +1,12 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import type { Tournament } from "$lib/types";
-  import type { UserListItem } from "$lib/db";
-  import { getFilteredUsers, getRegistrationBarredUids, warmUserIndex } from "$lib/db";
-  import { getCountryFlag } from "$lib/geonames";
+  import type { Tournament } from "#lib/types.ts";
+  import type { UserListItem } from "#lib/db.ts";
+  import { getFilteredUsers, getRegistrationBarredUids, warmUserIndex } from "#lib/db.ts";
+  import { getCountryFlag } from "#lib/geonames.ts";
   import { Ban, TriangleAlert, Flower2, UserCheck } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
-  import { dialogPanel } from "$lib/actions/dialog";
+  import * as m from '#lib/paraglide/messages.js';
+  import { dialogPanel } from "#lib/actions/dialog.ts";
 
   let {
     tournament,

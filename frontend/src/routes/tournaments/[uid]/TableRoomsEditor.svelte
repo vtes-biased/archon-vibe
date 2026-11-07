@@ -1,10 +1,10 @@
 <script lang="ts">
-  import type { Tournament } from "$lib/types";
-  import type { TableNumbering } from "$lib/engine";
-  import { tournamentAction } from "$lib/tournament-actions";
-  import { showToast } from "$lib/stores/toast.svelte";
+  import type { Tournament } from "#lib/types.ts";
+  import type { TableNumbering } from "#lib/engine.ts";
+  import { tournamentAction } from "#lib/tournament-actions.ts";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
   import { Plus, X, ChevronUp, ChevronDown } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     tournamentUid,

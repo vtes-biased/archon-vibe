@@ -1,7 +1,7 @@
-import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, League, Promo, PromoKind, PromoLedgerEntry, PromoLedgerKind, TournamentRank } from '$lib/types';
+import type { User, Sanction, SanctionLevel, SanctionCategory, SanctionSubcategory, Tournament, League, Promo, PromoKind, PromoLedgerEntry, PromoLedgerKind, TournamentRank } from '#lib/types.ts';
 import { saveTournament, saveLeague } from './db';
-import { showToast } from '$lib/stores/toast.svelte';
-import { authorizedFetch, ensureSyncToken, getAuthState } from '$lib/stores/auth.svelte';
+import { showToast } from '#lib/stores/toast.svelte.ts';
+import { authorizedFetch, ensureSyncToken, getAuthState } from '#lib/stores/auth.svelte.ts';
 import { NetworkError, errorCodeToMessage } from './error-codes';
 import { downloadBlob } from './utils';
 import * as m from './paraglide/messages.js';
@@ -479,7 +479,7 @@ export async function createTournament(data: CreateTournamentData, opts?: { supp
 
 /** Create a tournament locally when offline. Saved to IndexedDB, reconciled on go-online. */
 export async function createTournamentOffline(data: CreateTournamentData): Promise<Tournament> {
-  const { markOffline } = await import('$lib/stores/offline.svelte');
+  const { markOffline } = await import('#lib/stores/offline.svelte.ts');
   const { getDeviceId } = await import('./db');
   const { createTournamentWithEngine } = await import('./engine');
   const user = getAuthState().user;
@@ -533,7 +533,7 @@ export async function deleteTournamentApi(uid: string, opts?: { suppressErrorToa
   const { deleteTournament } = await import('./db');
   await deleteTournament(uid);
   // Drop any offline lock/metadata (no-op for ordinary online tournaments)
-  const { clearOfflineState } = await import('$lib/stores/offline.svelte');
+  const { clearOfflineState } = await import('#lib/stores/offline.svelte.ts');
   await clearOfflineState(uid);
   return result;
 }

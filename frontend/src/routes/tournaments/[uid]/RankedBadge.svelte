@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { Tournament } from "$lib/types";
-  import { rankedStatus } from "$lib/tournament-utils";
-  import InlineNotice from "$lib/components/InlineNotice.svelte";
-  import Badge from "$lib/components/Badge.svelte";
-  import * as m from "$lib/paraglide/messages.js";
+  import type { Tournament } from "#lib/types.ts";
+  import { rankedStatus } from "#lib/tournament-utils.ts";
+  import InlineNotice from "#lib/components/InlineNotice.svelte";
+  import Badge from "#lib/components/Badge.svelte";
+  import * as m from "#lib/paraglide/messages.js";
 
   // chip: one word in the header row. note: the reason, unranked only, where
   // touch can read it — title= cannot be reached without a pointer.

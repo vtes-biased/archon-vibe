@@ -1,12 +1,12 @@
 <script lang="ts">
   import { KeyRound, Mail } from "@lucide/svelte";
-  import { isPasskeySupported } from "$lib/stores/passkeys.svelte";
-  import DiscordIcon from "$lib/components/DiscordIcon.svelte";
-  import GithubIcon from "$lib/components/GithubIcon.svelte";
-  import Button from "$lib/components/Button.svelte";
-  import ConfirmActionModal from "$lib/components/ConfirmActionModal.svelte";
-  import type { AuthMethod } from "$lib/stores/auth.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import { isPasskeySupported } from "#lib/stores/passkeys.svelte.ts";
+  import DiscordIcon from "#lib/components/DiscordIcon.svelte";
+  import GithubIcon from "#lib/components/GithubIcon.svelte";
+  import Button from "#lib/components/Button.svelte";
+  import ConfirmActionModal from "#lib/components/ConfirmActionModal.svelte";
+  import type { AuthMethod } from "#lib/stores/auth.svelte.ts";
+  import * as m from '#lib/paraglide/messages.js';
 
   interface Props {
     hasEmail: boolean;

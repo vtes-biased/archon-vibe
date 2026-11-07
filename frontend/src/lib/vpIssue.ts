@@ -1,5 +1,5 @@
-import * as m from "$lib/paraglide/messages.js";
-import type { VpIssue } from "$lib/engine";
+import * as m from "#lib/paraglide/messages.js";
+import type { VpIssue } from "#lib/engine.ts";
 
 /** Shared by the rounds and finals scoring views so both name the same cause the same way.
  * `incomplete` is deliberately absent: it means "still being typed in", which the table's own In Progress state already says. */

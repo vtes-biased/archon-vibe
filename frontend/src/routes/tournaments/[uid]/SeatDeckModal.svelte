@@ -1,10 +1,10 @@
 <script lang="ts">
-  import type { Tournament, DeckObject } from "$lib/types";
-  import type { TournamentEventType } from "$lib/engine";
-  import { dialogPanel } from "$lib/actions/dialog";
-  import Button from "$lib/components/Button.svelte";
+  import type { Tournament, DeckObject } from "#lib/types.ts";
+  import type { TournamentEventType } from "#lib/engine.ts";
+  import { dialogPanel } from "#lib/actions/dialog.ts";
+  import Button from "#lib/components/Button.svelte";
   import OrganizerDeck from "./OrganizerDeck.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     deck,

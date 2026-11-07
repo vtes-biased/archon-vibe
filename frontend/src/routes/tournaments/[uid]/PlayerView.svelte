@@ -1,29 +1,29 @@
 <script lang="ts">
-  import type { Tournament, Player, Sanction, DeckObject } from "$lib/types";
-  import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
-  import { seatDisplay as seatDisplayUtil, vpOptions, translatePlayerState, translateTableState, translateStandingsMode, getRatingPts, ratingContext } from "$lib/tournament-utils";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { formatScore, formatGwTp } from "$lib/utils";
-  import { previewScoresSync, roundsPlayedByPlayer, tableLabel, type ValidationError, type TournamentEventType } from "$lib/engine";
+  import type { Tournament, Player, Sanction, DeckObject } from "#lib/types.ts";
+  import type { StandingEntry, PlayerInfoMap } from "#lib/tournament-utils.ts";
+  import { seatDisplay as seatDisplayUtil, vpOptions, translatePlayerState, translateTableState, translateStandingsMode, getRatingPts, ratingContext } from "#lib/tournament-utils.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { formatScore, formatGwTp } from "#lib/utils.ts";
+  import { previewScoresSync, roundsPlayedByPlayer, tableLabel, type ValidationError, type TournamentEventType } from "#lib/engine.ts";
   import { TriangleAlert, QrCode, Gavel, Ban, Trash2, ExternalLink, Users, Lock, ShieldCheck, Undo2 } from "@lucide/svelte";
-  import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
+  import SanctionIndicator from "#lib/components/SanctionIndicator.svelte";
   import SelfOrganizeDialog from "./SelfOrganizeDialog.svelte";
-  import RankCell from "$lib/components/RankCell.svelte";
-  import ScoreLegend from "$lib/components/ScoreLegend.svelte";
+  import RankCell from "#lib/components/RankCell.svelte";
+  import ScoreLegend from "#lib/components/ScoreLegend.svelte";
   import RankedBadge from "./RankedBadge.svelte";
   import CopyResultsButton from "./CopyResultsButton.svelte";
-  import QrCheckinScanner from "$lib/components/QrCheckinScanner.svelte";
-  import Button from '$lib/components/Button.svelte';
-  import ConfirmActionModal from "$lib/components/ConfirmActionModal.svelte";
+  import QrCheckinScanner from "#lib/components/QrCheckinScanner.svelte";
+  import Button from '#lib/components/Button.svelte';
+  import ConfirmActionModal from "#lib/components/ConfirmActionModal.svelte";
   import TimerDisplay from "./TimerDisplay.svelte";
-  import VpInput from "$lib/components/VpInput.svelte";
-  import FoldableSection from "$lib/components/FoldableSection.svelte";
+  import VpInput from "#lib/components/VpInput.svelte";
+  import FoldableSection from "#lib/components/FoldableSection.svelte";
   import PlayerDecksSection from "./PlayerDecksSection.svelte";
   import RaffleSection from "./RaffleSection.svelte";
-  import { callJudge } from "$lib/api";
-  import { isOnline } from "$lib/api";
-  import { isUserCurrentlySanctioned } from "$lib/db";
-  import * as m from '$lib/paraglide/messages.js';
+  import { callJudge } from "#lib/api.ts";
+  import { isOnline } from "#lib/api.ts";
+  import { isUserCurrentlySanctioned } from "#lib/db.ts";
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     tournament,

@@ -5,9 +5,13 @@ business logic on the frontend (WASM) and backend (PyO3). Works online or offlin
 
 ## Stack
 
-- **Frontend** — Svelte 5 (runes) + SvelteKit with `adapter-static` (SPA), Vite,
+- **Frontend** — Svelte 5 (runes) + SvelteKit 3 with `adapter-static` (SPA), Vite,
   TypeScript, Tailwind v4, IndexedDB, PWA service workers. `idb`,
-  `lucide-svelte`, `marked` + `dompurify`, Paraglide for i18n.
+  `lucide-svelte`, `marked` + `dompurify`, Paraglide for i18n. Kit's configuration
+  is the `sveltekit({...})` call in `vite.config.ts`; there is no `svelte.config.js`.
+  `src/lib` is imported as `#lib/<file>.<ext>`, a subpath import declared in
+  `package.json`. The service worker lives in `src/service-worker/` as its own
+  TypeScript project, registered as a module.
 - **Backend** — Litestar on uvicorn, Python 3.14, PostgreSQL 17 with JSONB, psycopg3 async
   and no ORM, msgspec JSON. Tooling `uv` / `ruff` / `ty`.
 - **Discord bot** — a separate process (`bot/`): hikari + lightbulb + miru +

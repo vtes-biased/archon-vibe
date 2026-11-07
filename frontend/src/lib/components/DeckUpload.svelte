@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { toUserMessage } from '$lib/errors';
+  import { toUserMessage } from '#lib/errors.ts';
   import { onDestroy } from 'svelte';
-  import { getTournament } from '$lib/db';
-  import { validateDeck, type ValidationError } from '$lib/engine';
-  import type { DeckAttribution } from '$lib/types';
-  import { isSettableCredit } from '$lib/deck-credit';
+  import { getTournament } from '#lib/db.ts';
+  import { validateDeck, type ValidationError } from '#lib/engine.ts';
+  import type { DeckAttribution } from '#lib/types.ts';
+  import { isSettableCredit } from '#lib/deck-credit.ts';
   import { CircleX, TriangleAlert } from '@lucide/svelte';
-  import AttributionPicker from '$lib/components/AttributionPicker.svelte';
-  import Button from '$lib/components/Button.svelte';
-  import * as m from '$lib/paraglide/messages.js';
+  import AttributionPicker from '#lib/components/AttributionPicker.svelte';
+  import Button from '#lib/components/Button.svelte';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     tournamentUid,
@@ -112,9 +112,9 @@
     success = false;
 
     try {
-      const { tournamentAction } = await import('$lib/tournament-actions');
-      const { fetchDeckFromUrl, parseDeckText } = await import('$lib/deck-fetch');
-      const { getCards } = await import('$lib/cards');
+      const { tournamentAction } = await import('#lib/tournament-actions.ts');
+      const { fetchDeckFromUrl, parseDeckText } = await import('#lib/deck-fetch.ts');
+      const { getCards } = await import('#lib/cards.ts');
 
       let deck: { name: string; comments: string; cards: Record<string, number>; warnings?: string[] };
       if (mode === 'text') {
@@ -148,7 +148,7 @@
       };
       if (round !== undefined) deckData.round = round;
 
-      const targetUid = playerUid || (await import('$lib/stores/auth.svelte')).getAuthState().user?.uid;
+      const targetUid = playerUid || (await import('#lib/stores/auth.svelte.ts')).getAuthState().user?.uid;
       await tournamentAction(tournamentUid, 'UpsertDeck', {
         player_uid: targetUid,
         deck: deckData,
@@ -173,7 +173,7 @@
       deckName = '';
       onuploaded?.();
     } catch (e: any) {
-      const { DeckFetchError } = await import('$lib/deck-fetch');
+      const { DeckFetchError } = await import('#lib/deck-fetch.ts');
       error = e instanceof DeckFetchError ? e.message : toUserMessage(e, m.deck_error_upload());
     } finally {
       loading = false;

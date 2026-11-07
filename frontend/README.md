@@ -50,11 +50,8 @@ src/
 
 ## Configuration
 
-- `vite.config.ts`: Vite and plugin configuration
-- `svelte.config.js`: Svelte preprocessing
+- `vite.config.ts`: Vite, SvelteKit (adapter, prerender, paths) and plugin configuration
 - `tsconfig.json`: TypeScript configuration
-- `tailwind.config.js`: Tailwind CSS configuration
-- `postcss.config.js`: PostCSS with Tailwind and Autoprefixer
 
 ## Type Synchronization
 

@@ -1,4 +1,4 @@
-import type { User, Role } from '$lib/types';
+import type { User, Role } from '#lib/types.ts';
 import type { UserListItem } from './db';
 import { expandRolesForFilter } from './roles';
 import { normalizeSearch } from './utils';

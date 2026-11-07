@@ -1,18 +1,18 @@
 <script lang="ts">
-  import type { User, Tournament, DeckObject, RatingCategory } from "$lib/types";
-  import type { TournamentListItem } from "$lib/db";
-  import { getTournamentListItems, getDecksByUser, getTournament, getTournamentsNaming, getSanctionsForTournament } from "$lib/db";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { getCountryFlag } from "$lib/geonames";
-  import { computeStandings, eighteenMonthsAgo, playedPlayerUids, getStateTone, translateTournamentState, RATING_CATEGORIES, ratingCategoryLabel } from "$lib/tournament-utils";
-  import { attestedPlayerCount, playerGameRecord, ratingCategory } from "$lib/engine";
-  import type { PlayerGameRecord } from "$lib/engine";
-  import DeckDisplay from "$lib/components/DeckDisplay.svelte";
-  import RankCell from "$lib/components/RankCell.svelte";
-  import Badge from "$lib/components/Badge.svelte";
+  import type { User, Tournament, DeckObject, RatingCategory } from "#lib/types.ts";
+  import type { TournamentListItem } from "#lib/db.ts";
+  import { getTournamentListItems, getDecksByUser, getTournament, getTournamentsNaming, getSanctionsForTournament } from "#lib/db.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { getCountryFlag } from "#lib/geonames.ts";
+  import { computeStandings, eighteenMonthsAgo, playedPlayerUids, getStateTone, translateTournamentState, RATING_CATEGORIES, ratingCategoryLabel } from "#lib/tournament-utils.ts";
+  import { attestedPlayerCount, playerGameRecord, ratingCategory } from "#lib/engine.ts";
+  import type { PlayerGameRecord } from "#lib/engine.ts";
+  import DeckDisplay from "#lib/components/DeckDisplay.svelte";
+  import RankCell from "#lib/components/RankCell.svelte";
+  import Badge from "#lib/components/Badge.svelte";
   import { TriangleAlert, ChevronDown, ChevronRight } from "@lucide/svelte";
-  import { getLocale } from '$lib/paraglide/runtime.js';
-  import * as m from '$lib/paraglide/messages.js';
+  import { getLocale } from '#lib/paraglide/runtime.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let { user }: { user: User | undefined } = $props();
 

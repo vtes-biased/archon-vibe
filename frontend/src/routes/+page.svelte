@@ -1,14 +1,14 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { hasStoredSession } from '$lib/stores/auth.svelte';
-  import Button from '$lib/components/Button.svelte';
-  import * as m from '$lib/paraglide/messages.js';
+  import { hasStoredSession } from '#lib/stores/auth.svelte.ts';
+  import Button from '#lib/components/Button.svelte';
+  import * as m from '#lib/paraglide/messages.js';
 
   const signedIn = hasStoredSession();
 
   onMount(() => {
-    if (signedIn) goto('/tournaments', { replaceState: true });
+    if (signedIn) goto('/tournaments', { replace: true });
   });
 
   const point = (deg: number, r: number) => {

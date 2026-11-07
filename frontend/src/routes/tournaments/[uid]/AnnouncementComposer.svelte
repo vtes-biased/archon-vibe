@@ -1,10 +1,10 @@
 <script lang="ts">
-  import type { Tournament } from "$lib/types";
-  import { postAnnouncement, deleteAnnouncement } from "$lib/api";
+  import type { Tournament } from "#lib/types.ts";
+  import { postAnnouncement, deleteAnnouncement } from "#lib/api.ts";
   import { Trash2, Send } from "@lucide/svelte";
-  import FoldableSection from "$lib/components/FoldableSection.svelte";
-  import Button from "$lib/components/Button.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import FoldableSection from "#lib/components/FoldableSection.svelte";
+  import Button from "#lib/components/Button.svelte";
+  import * as m from '#lib/paraglide/messages.js';
 
   let { tournament }: { tournament: Tournament } = $props();
 

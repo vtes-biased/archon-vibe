@@ -1,37 +1,37 @@
 <script lang="ts">
-  import { page } from "$app/stores";
-  import { goto, replaceState } from "$app/navigation";
+  import { page } from "$app/state";
+  import { goto } from "$app/navigation";
   import { untrack } from "svelte";
-  import { deleteTournamentApi, syncTournamentVekn, qrCheckin } from "$lib/api";
-  import { tournamentAction, setTableScore } from "$lib/tournament-actions";
-  import { getCountries, getCountryFlag } from "$lib/geonames";
-  import { getAuthState, setAgendaEntry } from "$lib/stores/auth.svelte";
-  import { agendaViewer, filterAgenda, agendaToggleEntry } from "$lib/agenda";
-  import { canTakeTournamentOffline, canForceUnlockTournament } from "$lib/engine";
-  import { syncManager, storesWhole } from "$lib/sync";
-  import { getUser, getTournament, getTournamentContextSanctions, getDeviceId, getDecksByTournamentGrouped, getLeague, saveTournament } from "$lib/db";
-  import type { Tournament, TournamentState, User, Sanction, DeckObject } from "$lib/types";
-  import { attestedPlayerCount, finalsQualification, rankingEligibility, validateDeck, isOrganizer as engineIsOrganizer, type TournamentEventType, type ValidationError } from "$lib/engine";
-  import { getStateTone, translateTournamentState, rankBadgeLabel, computeStandings, eventUrl, type PlayerInfoMap } from "$lib/tournament-utils";
-  import { zonedDate } from "$lib/utils";
-  import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime, OfflineLockLostError } from "$lib/stores/offline.svelte";
-  import { isBrowserOnline } from "$lib/stores/connectivity.svelte";
-  import { openLastView } from "$lib/last-view";
+  import { deleteTournamentApi, syncTournamentVekn, qrCheckin } from "#lib/api.ts";
+  import { tournamentAction, setTableScore } from "#lib/tournament-actions.ts";
+  import { getCountries, getCountryFlag } from "#lib/geonames.ts";
+  import { getAuthState, setAgendaEntry } from "#lib/stores/auth.svelte.ts";
+  import { agendaViewer, filterAgenda, agendaToggleEntry } from "#lib/agenda.ts";
+  import { canTakeTournamentOffline, canForceUnlockTournament } from "#lib/engine.ts";
+  import { syncManager, storesWhole } from "#lib/sync.ts";
+  import { getUser, getTournament, getTournamentContextSanctions, getDeviceId, getDecksByTournamentGrouped, getLeague, saveTournament } from "#lib/db.ts";
+  import type { Tournament, TournamentState, User, Sanction, DeckObject } from "#lib/types.ts";
+  import { attestedPlayerCount, finalsQualification, rankingEligibility, validateDeck, isOrganizer as engineIsOrganizer, type TournamentEventType, type ValidationError } from "#lib/engine.ts";
+  import { getStateTone, translateTournamentState, rankBadgeLabel, computeStandings, eventUrl, type PlayerInfoMap } from "#lib/tournament-utils.ts";
+  import { zonedDate } from "#lib/utils.ts";
+  import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime, OfflineLockLostError } from "#lib/stores/offline.svelte.ts";
+  import { isBrowserOnline } from "#lib/stores/connectivity.svelte.ts";
+  import { openLastView } from "#lib/last-view.ts";
   import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Wrench, Settings2, ExternalLink, MapPin, Upload, CloudUpload, Share2, CalendarPlus, BookmarkPlus, BookmarkMinus } from "@lucide/svelte";
-  import FoldableSection from "$lib/components/FoldableSection.svelte";
-  import { renderMarkdown, stripLeadingTitle } from "$lib/markdown";
-  import Button from "$lib/components/Button.svelte";
-  import TournamentBanner from "$lib/components/TournamentBanner.svelte";
-  import Badge from "$lib/components/Badge.svelte";
-  import { showToast } from "$lib/stores/toast.svelte";
-  import * as m from '$lib/paraglide/messages.js';
-  import { getLocale } from '$lib/paraglide/runtime.js';
+  import FoldableSection from "#lib/components/FoldableSection.svelte";
+  import { renderMarkdown, stripLeadingTitle } from "#lib/markdown.ts";
+  import Button from "#lib/components/Button.svelte";
+  import TournamentBanner from "#lib/components/TournamentBanner.svelte";
+  import Badge from "#lib/components/Badge.svelte";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
+  import * as m from '#lib/paraglide/messages.js';
+  import { getLocale } from '#lib/paraglide/runtime.js';
 
   // null = validation unavailable for player's own deck, treated as no blocking errors — never gates
   let myDeckErrors = $state<ValidationError[] | null>([]);
 
   import ActionBar from "./ActionBar.svelte";
-  import TabStrip from "$lib/components/TabStrip.svelte";
+  import TabStrip from "#lib/components/TabStrip.svelte";
   import ArchonImportModal from "./ArchonImportModal.svelte";
   import CsvRegisterModal from "./CsvRegisterModal.svelte";
   import FinishConfirmModal from "./FinishConfirmModal.svelte";
@@ -40,16 +40,16 @@
   import FinalsTab from "./FinalsTab.svelte";
   import ToolsSheet from "./ToolsSheet.svelte";
 import SetupTab from "./SetupTab.svelte";
-import { toUserMessage } from '$lib/errors';
+import { toUserMessage } from '#lib/errors.ts';
 import TournamentModals from "./TournamentModals.svelte";
   import PlayerView from "./PlayerView.svelte";
   import JudgeCallBanner from "./JudgeCallBanner.svelte";
   import AnnouncementBanner from "./AnnouncementBanner.svelte";
   import PushOptIn from "./PushOptIn.svelte";
   import AnnouncementComposer from "./AnnouncementComposer.svelte";
-  import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
+  import SanctionIndicator from "#lib/components/SanctionIndicator.svelte";
   import RankedBadge from "./RankedBadge.svelte";
-  import type { JudgeCallData } from "$lib/sync";
+  import type { JudgeCallData } from "#lib/sync.ts";
 
   const countries = getCountries();
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -63,7 +63,7 @@ import TournamentModals from "./TournamentModals.svelte";
   let actionLoading = $state(false);
 
   const auth = $derived(getAuthState());
-  const uid = $derived($page.params.uid as string);
+  const uid = $derived(page.params.uid as string);
   const agenda = $derived(auth.isAuthenticated ? agendaViewer(auth.user) : null);
   const playingHere = $derived(new Set(agenda && tournament?.players?.some(p => p.user_uid === agenda.uid) ? [tournament.uid] : []));
   const onMyAgenda = $derived(!!agenda && !!tournament && filterAgenda([tournament], agenda, playingHere).length === 1);
@@ -607,12 +607,12 @@ import TournamentModals from "./TournamentModals.svelte";
   // anonymous visitor's stash is consumed on login-return.
   const QR_STASH_KEY = "archon-qr-checkin";
   $effect(() => {
-    const code = $page.url.searchParams.get("checkin");
+    const code = page.url.searchParams.get("checkin");
     if (!code) return;
     try {
       sessionStorage.setItem(QR_STASH_KEY, JSON.stringify({ uid, code }));
     } catch { /* storage unavailable — the in-app scanner still works */ }
-    replaceState(`/tournaments/${uid}`, {});
+    goto(`/tournaments/${uid}`, { shallow: true, replace: true });
   });
 
   let qrCheckinFired = false; // one-shot per page life; stash removal is the durable guard

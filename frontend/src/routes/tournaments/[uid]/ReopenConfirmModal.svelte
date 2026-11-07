@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { dialogPanel } from "$lib/actions/dialog";
-  import type { Tournament } from "$lib/types";
-  import type { TournamentEventType } from "$lib/engine";
+  import { dialogPanel } from "#lib/actions/dialog.ts";
+  import type { Tournament } from "#lib/types.ts";
+  import type { TournamentEventType } from "#lib/engine.ts";
   import { TriangleAlert } from "@lucide/svelte";
-  import Button from "$lib/components/Button.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import Button from "#lib/components/Button.svelte";
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     tournament,

@@ -387,7 +387,7 @@ can be baked at build time. It is resolved at **runtime from the hostname** —
 that each need it independently, because none can read another's answer: the
 `app.html` head script (which resolves before first paint, since the manifest is
 read at install time, and publishes the answer as `documentElement.dataset.env`
-for the app to read), `service-worker.ts` off `self.location.hostname`, and
+for the app to read), `src/service-worker/index.ts` off its own `location.hostname`, and
 `og.py` off the host the crawler reached. Anywhere else, read `dataset.env`
 rather than re-deriving. The feedback route is the exception: it reads the
 backend's `ENVIRONMENT`, which the deploy sets per host, to mark a beta issue with

@@ -1,20 +1,20 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { toUserMessage } from '$lib/errors';
-  import type { User, Role } from "$lib/types";
-  import { createUser, updateUser, uploadAvatar } from "$lib/api";
-  import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
-  import { getRoleTone } from "$lib/roles";
-  import Badge, { badgeToneClass } from "$lib/components/Badge.svelte";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canChangeRole as engineCanChangeRole, canChangeCountry, isOfficial } from "$lib/engine";
+  import { toUserMessage } from '#lib/errors.ts';
+  import type { User, Role } from "#lib/types.ts";
+  import { createUser, updateUser, uploadAvatar } from "#lib/api.ts";
+  import { getCountries, getSortedCountries, getCountryFlag } from "#lib/geonames.ts";
+  import { getRoleTone } from "#lib/roles.ts";
+  import Badge, { badgeToneClass } from "#lib/components/Badge.svelte";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { canChangeRole as engineCanChangeRole, canChangeCountry, isOfficial } from "#lib/engine.ts";
   import CityAutocomplete from "./CityAutocomplete.svelte";
   import AvatarCropper from "./AvatarCropper.svelte";
   import SanctionsManager from "./SanctionsManager.svelte";
-  import Button from '$lib/components/Button.svelte';
+  import Button from '#lib/components/Button.svelte';
   import { Loader2, X, User as UserIcon, Camera, SquarePen } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
-  import { dialogPanel } from "$lib/actions/dialog";
+  import * as m from '#lib/paraglide/messages.js';
+  import { dialogPanel } from "#lib/actions/dialog.ts";
 
   let {
     user,

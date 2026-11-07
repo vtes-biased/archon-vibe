@@ -1,17 +1,17 @@
 <script lang="ts">
-  import { toUserMessage } from '$lib/errors';
-  import { goto, replaceState } from "$app/navigation";
-  import { currentParams } from "$lib/url-filters";
-  import { createTournament, createTournamentOffline, isOnline } from "$lib/api";
-  import { saveTournament } from "$lib/db";
-  import TournamentFields, { type TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
+  import { toUserMessage } from '#lib/errors.ts';
+  import { goto } from "$app/navigation";
+  import { currentParams } from "#lib/url-filters.ts";
+  import { createTournament, createTournamentOffline, isOnline } from "#lib/api.ts";
+  import { saveTournament } from "#lib/db.ts";
+  import TournamentFields, { type TournamentFieldValues } from "#lib/components/TournamentFields.svelte";
   import CreationWizard, { type WizardAnswers } from "./CreationWizard.svelte";
   import CreationGuidance from "./CreationGuidance.svelte";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canCreateTournament } from "$lib/engine";
-  import Button from '$lib/components/Button.svelte';
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { canCreateTournament } from "#lib/engine.ts";
+  import Button from '#lib/components/Button.svelte';
   import { ArrowLeft, WifiOff } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   const auth = $derived(getAuthState());
   const canCreate = $derived(canCreateTournament(auth.user).allowed);
@@ -176,7 +176,7 @@
           showForm = true;
           const url = new URL(window.location.href);
           url.searchParams.set("form", "");
-          replaceState(url.pathname + url.search, {});
+          goto(url.pathname + url.search, { shallow: true, replace: true });
         }}
       />
     {:else}

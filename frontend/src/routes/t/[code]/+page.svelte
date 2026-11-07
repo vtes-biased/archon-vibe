@@ -1,19 +1,19 @@
 <script lang="ts">
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import { goto } from "$app/navigation";
-  import { getTournamentByCode } from "$lib/db";
-  import { syncManager } from "$lib/sync";
-  import * as m from "$lib/paraglide/messages.js";
+  import { getTournamentByCode } from "#lib/db.ts";
+  import { syncManager } from "#lib/sync.ts";
+  import * as m from "#lib/paraglide/messages.js";
 
-  const code = $derived($page.params.code as string);
+  const code = $derived(page.params.code as string);
   let missing = $state(false);
 
   async function resolve(c: string) {
     const t = await getTournamentByCode(c);
     if (t) {
-      // replaceState: the short link is a handle, not a step in the history a
+      // replace: the short link is a handle, not a step in the history a
       // back button should walk through.
-      await goto(`/tournaments/${t.uid}`, { replaceState: true });
+      await goto(`/tournaments/${t.uid}`, { replace: true });
       return;
     }
     missing = true;

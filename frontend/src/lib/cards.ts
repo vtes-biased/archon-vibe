@@ -1,4 +1,4 @@
-import type { VtesCard } from '$lib/types';
+import type { VtesCard } from '#lib/types.ts';
 import cardsUrl from '../../../engine/data/cards.json?url';
 import { getDB } from './db';
 import { callEngine, initEngine } from './engine-instance';

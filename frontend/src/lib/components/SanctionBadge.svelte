@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { Sanction, SanctionLevel } from "$lib/types";
+  import type { Sanction, SanctionLevel } from "#lib/types.ts";
   import { Ban, Check, Clock } from "@lucide/svelte";
-  import Badge, { type BadgeTone } from "$lib/components/Badge.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import Badge, { type BadgeTone } from "#lib/components/Badge.svelte";
+  import * as m from '#lib/paraglide/messages.js';
 
   let { sanction, showReason }: { sanction: Sanction; showReason: boolean } = $props();
 

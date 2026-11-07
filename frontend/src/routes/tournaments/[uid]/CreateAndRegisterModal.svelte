@@ -1,18 +1,18 @@
 <script lang="ts">
-  import type { Tournament } from "$lib/types";
-  import type { UserListItem } from "$lib/db";
-  import { getFilteredUsers, getUserListItem, getRegistrationBarredUids } from "$lib/db";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { isOffline, addOfflinePlayer } from "$lib/stores/offline.svelte";
-  import { getCountryFlag } from "$lib/geonames";
-  import Button from "$lib/components/Button.svelte";
+  import type { Tournament } from "#lib/types.ts";
+  import type { UserListItem } from "#lib/db.ts";
+  import { getFilteredUsers, getUserListItem, getRegistrationBarredUids } from "#lib/db.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { isOffline, addOfflinePlayer } from "#lib/stores/offline.svelte.ts";
+  import { getCountryFlag } from "#lib/geonames.ts";
+  import Button from "#lib/components/Button.svelte";
   import { TriangleAlert, Flower2, Ban, UserCheck } from "@lucide/svelte";
-  import { sponsorVeknMember, createUser, ApiError } from "$lib/api";
-  import { showToast } from "$lib/stores/toast.svelte";
-  import { toUserMessage } from "$lib/errors";
-  import { canSponsorMember, type TournamentEventType } from "$lib/engine";
-  import { dialogPanel } from "$lib/actions/dialog";
-  import * as m from '$lib/paraglide/messages.js';
+  import { sponsorVeknMember, createUser, ApiError } from "#lib/api.ts";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
+  import { toUserMessage } from "#lib/errors.ts";
+  import { canSponsorMember, type TournamentEventType } from "#lib/engine.ts";
+  import { dialogPanel } from "#lib/actions/dialog.ts";
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     tournament,

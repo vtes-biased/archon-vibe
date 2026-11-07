@@ -18,7 +18,7 @@ export type Role =
 export type CommunityLinkType = "discord" | "telegram" | "whatsapp" | "forum" | "facebook" | "website" | "twitch" | "youtube" | "reddit" | "instagram" | "blog" | "spotify" | "x" | "bluesky" | "other";
 
 // Placement and media come from engine/src/community.rs — read them at runtime
-// via getCommunityLinkReference() in $lib/engine.
+// via getCommunityLinkReference() in #lib/engine.ts.
 export type LinkPlacement = "channel" | "content";
 export type LinkMedia = "video" | "podcast" | "text" | "social";
 
@@ -41,7 +41,7 @@ export type SanctionCategory =
   | "unsportsmanlike_conduct";
 
 // Category/subcategory vocabulary mirrors engine/src/sanctions.rs, which owns the Judges-Guide
-// tables — read them at runtime via getSanctionReference() in $lib/engine.
+// tables — read them at runtime via getSanctionReference() in #lib/engine.ts.
 export type SanctionSubcategory =
   // Procedural Errors
   | "missed_mandatory_effect"

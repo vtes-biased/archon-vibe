@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { dialogPanel } from "$lib/actions/dialog";
-  import type { Sanction } from "$lib/types";
-  import { removeTournamentSanction } from "$lib/sanction-actions";
-  import { getTournamentListItems, type TournamentListItem } from "$lib/db";
-  import { canViewSanctionReason } from "$lib/engine";
-  import { getAuthState } from "$lib/stores/auth.svelte";
+  import { dialogPanel } from "#lib/actions/dialog.ts";
+  import type { Sanction } from "#lib/types.ts";
+  import { removeTournamentSanction } from "#lib/sanction-actions.ts";
+  import { getTournamentListItems, type TournamentListItem } from "#lib/db.ts";
+  import { canViewSanctionReason } from "#lib/engine.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
   import SanctionBadge from "./SanctionBadge.svelte";
-  import Button from '$lib/components/Button.svelte';
+  import Button from '#lib/components/Button.svelte';
   import { Trash2 } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     playerName,

@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { apiRequest } from "$lib/api";
-  import { showToast } from "$lib/stores/toast.svelte";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { apiRequest } from "#lib/api.ts";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
   import { Plus, TriangleAlert, Copy, Loader2, Code2, RefreshCw, PowerOff, Pencil } from "@lucide/svelte";
-  import FoldableSection from "$lib/components/FoldableSection.svelte";
-  import Button from "$lib/components/Button.svelte";
-  import * as m from '$lib/paraglide/messages.js';
-  import { dialogPanel } from "$lib/actions/dialog";
+  import FoldableSection from "#lib/components/FoldableSection.svelte";
+  import Button from "#lib/components/Button.svelte";
+  import * as m from '#lib/paraglide/messages.js';
+  import { dialogPanel } from "#lib/actions/dialog.ts";
 
   const auth = $derived(getAuthState());
 

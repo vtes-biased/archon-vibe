@@ -1,8 +1,8 @@
 <script lang="ts">
-  import * as m from '$lib/paraglide/messages.js';
-  import Button from '$lib/components/Button.svelte';
+  import * as m from '#lib/paraglide/messages.js';
+  import Button from '#lib/components/Button.svelte';
   import { Trash2, TriangleAlert } from "@lucide/svelte";
-  import { dialogPanel } from "$lib/actions/dialog";
+  import { dialogPanel } from "#lib/actions/dialog.ts";
 
   let {
     showDeleteConfirm = $bindable(false),

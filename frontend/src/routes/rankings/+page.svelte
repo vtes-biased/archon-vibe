@@ -1,17 +1,17 @@
 <script lang="ts">
-  import { getUserListItems, getSuspendedUserUids, type UserListItem } from "$lib/db";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { syncManager } from "$lib/sync";
-  import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
-  import DeceasedIcon from "$lib/components/DeceasedIcon.svelte";
-  import Button from "$lib/components/Button.svelte";
-  import type { RatingCategory } from "$lib/types";
-  import { HOF_MIN_WINS, ratingCategoryLabel } from "$lib/tournament-utils";
+  import { getUserListItems, getSuspendedUserUids, type UserListItem } from "#lib/db.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { syncManager } from "#lib/sync.ts";
+  import { getCountries, getSortedCountries, getCountryFlag } from "#lib/geonames.ts";
+  import DeceasedIcon from "#lib/components/DeceasedIcon.svelte";
+  import Button from "#lib/components/Button.svelte";
+  import type { RatingCategory } from "#lib/types.ts";
+  import { HOF_MIN_WINS, ratingCategoryLabel } from "#lib/tournament-utils.ts";
   import { Trophy, Loader2, ChevronLeft, ChevronRight } from "@lucide/svelte";
   import { goto } from "$app/navigation";
   import { untrack } from "svelte";
-  import { syncQueryParams, currentParams, readPageParam, pageParam } from "$lib/url-filters";
-  import * as m from '$lib/paraglide/messages.js';
+  import { syncQueryParams, currentParams, readPageParam, pageParam } from "#lib/url-filters.ts";
+  import * as m from '#lib/paraglide/messages.js';
 
   type Tab = RatingCategory | "halloffame";
   const TAB_VALUES: Tab[] = ["constructed_offline", "constructed_online", "limited_offline", "limited_online", "halloffame"];

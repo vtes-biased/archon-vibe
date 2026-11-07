@@ -1,14 +1,14 @@
 <script lang="ts">
-  import type { Tournament } from "$lib/types";
-  import type { UserListItem } from "$lib/db";
-  import { tournamentAction } from "$lib/tournament-actions";
-  import { toUserMessage } from "$lib/errors";
-  import { showToast } from "$lib/stores/toast.svelte";
-  import { seatDisplay, type PlayerInfoMap } from "$lib/tournament-utils";
-  import UserPicker from "$lib/components/UserPicker.svelte";
-  import Button from "$lib/components/Button.svelte";
+  import type { Tournament } from "#lib/types.ts";
+  import type { UserListItem } from "#lib/db.ts";
+  import { tournamentAction } from "#lib/tournament-actions.ts";
+  import { toUserMessage } from "#lib/errors.ts";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
+  import { seatDisplay, type PlayerInfoMap } from "#lib/tournament-utils.ts";
+  import UserPicker from "#lib/components/UserPicker.svelte";
+  import Button from "#lib/components/Button.svelte";
   import { Crown, X } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     tournament,

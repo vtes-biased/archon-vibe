@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import type { UserListItem } from "$lib/db";
-  import { getFilteredUsers, warmUserIndex } from "$lib/db";
-  import { getCountryFlag } from "$lib/geonames";
-  import type { DeckAttribution } from "$lib/types";
-  import * as m from '$lib/paraglide/messages.js';
+  import type { UserListItem } from "#lib/db.ts";
+  import { getFilteredUsers, warmUserIndex } from "#lib/db.ts";
+  import { getCountryFlag } from "#lib/geonames.ts";
+  import type { DeckAttribution } from "#lib/types.ts";
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     attribution = $bindable(),

@@ -1,21 +1,21 @@
 <script lang="ts">
-  import { toUserMessage } from '$lib/errors';
-  import type { DeckAttribution, DeckListsMode, DeckObject, VtesCard } from "$lib/types";
-  import { creditName, isSettableCredit } from "$lib/deck-credit";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { getCards } from "$lib/cards";
-  import { formatDeckText } from "$lib/social-text";
-  import { showToast } from "$lib/stores/toast.svelte";
-  import { normalizeSearch } from "$lib/utils";
-  import { disciplineIcon, typeIcon } from "$lib/vtes-icons";
+  import { toUserMessage } from '#lib/errors.ts';
+  import type { DeckAttribution, DeckListsMode, DeckObject, VtesCard } from "#lib/types.ts";
+  import { creditName, isSettableCredit } from "#lib/deck-credit.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { getCards } from "#lib/cards.ts";
+  import { formatDeckText } from "#lib/social-text.ts";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
+  import { normalizeSearch } from "#lib/utils.ts";
+  import { disciplineIcon, typeIcon } from "#lib/vtes-icons.ts";
   import AttributionPicker from "./AttributionPicker.svelte";
-  import { getLibraryTypeOrder, validateDeck, type ValidationError } from "$lib/engine";
+  import { getLibraryTypeOrder, validateDeck, type ValidationError } from "#lib/engine.ts";
   import CardSearch from "./CardSearch.svelte";
   import CardName from "./CardName.svelte";
   import { CircleX, Copy, TriangleAlert } from "@lucide/svelte";
-  import Button from '$lib/components/Button.svelte';
-  import * as m from '$lib/paraglide/messages.js';
-  import { dialogPanel } from "$lib/actions/dialog";
+  import Button from '#lib/components/Button.svelte';
+  import * as m from '#lib/paraglide/messages.js';
+  import { dialogPanel } from "#lib/actions/dialog.ts";
 
   let {
     deck,
@@ -101,7 +101,7 @@
   async function saveCredit() {
     creditError = null;
     try {
-      const { tournamentAction } = await import('$lib/tournament-actions');
+      const { tournamentAction } = await import('#lib/tournament-actions.ts');
       await tournamentAction(tournamentUid, 'SetDeckAttribution', {
         player_uid: deck.user_uid,
         round: deck.round,
@@ -118,7 +118,7 @@
     const box = e.currentTarget as HTMLInputElement;
     privacyError = null;
     try {
-      const { tournamentAction } = await import('$lib/tournament-actions');
+      const { tournamentAction } = await import('#lib/tournament-actions.ts');
       await tournamentAction(tournamentUid, 'SetDeckPrivate', {
         player_uid: deck.user_uid,
         round: deck.round,
@@ -167,7 +167,7 @@
     saving = true;
     saveError = null;
     try {
-      const { tournamentAction } = await import('$lib/tournament-actions');
+      const { tournamentAction } = await import('#lib/tournament-actions.ts');
       const targetUid = deck.user_uid;
 
       const deckData: Record<string, unknown> = {

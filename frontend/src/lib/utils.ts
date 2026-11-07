@@ -1,5 +1,5 @@
-import type { Sanction } from "$lib/types";
-import { getEngine } from "$lib/engine-instance";
+import type { Sanction } from "#lib/types.ts";
+import { getEngine } from "#lib/engine-instance.ts";
 
 /** Normalize a string for accent-insensitive search ("Pawel" finds "Pawe\u0142"). */
 export function normalizeSearch(s: string): string {

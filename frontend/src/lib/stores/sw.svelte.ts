@@ -1,6 +1,5 @@
-import { dev } from '$app/environment';
 import { navigating } from '$app/state';
-import { getMetadataByPrefix } from '$lib/db';
+import { getMetadataByPrefix } from '#lib/db.ts';
 
 let updateAvailable = $state(false);
 let waitingWorker: ServiceWorker | null = null;
@@ -61,7 +60,7 @@ export function initServiceWorker(): void {
   initAt = Date.now();
 
   navigator.serviceWorker
-    .register('/service-worker.js', { type: dev ? 'module' : 'classic' })
+    .register('/service-worker.js', { type: 'module' })
     .then((registration) => {
       if (registration.waiting) {
         waitingWorker = registration.waiting;

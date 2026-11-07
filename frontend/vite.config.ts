@@ -1,3 +1,5 @@
+import adapter from '@sveltejs/adapter-static';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { paraglideVitePlugin } from '@inlang/paraglide-js';
@@ -17,7 +19,23 @@ export default defineConfig({
 			outdir: './src/lib/paraglide',
 			strategy: ['cookie', 'preferredLanguage', 'baseLocale'],
 		}),
-		sveltekit(),
+		sveltekit({
+			preprocess: vitePreprocess(),
+			adapter: adapter({
+				pages: 'build',
+				assets: 'build',
+				fallback: '200.html',
+				precompress: false,
+				strict: true
+			}),
+			prerender: { handleHttpError: 'warn', handleUnseenRoutes: 'warn' },
+			paths: {
+				// Keep default true: false makes Vite 8 emit "./_app/immutable/..."
+				// preload deps resolved against the entry chunk, doubling the path → 404.
+				// The 200.html fallback uses absolute asset paths regardless of this.
+				relative: true
+			}
+		})
 	],
 	server: {
 		watch: {
@@ -38,18 +56,23 @@ export default defineConfig({
 	},
 	build: {
 		target: 'esnext',
-		sourcemap: true,
-		// Enable code splitting for large JSON imports
-		rollupOptions: {
-			output: {
-				manualChunks(id) {
-					// Split large cities.json into separate chunk
-					if (id.includes('cities.json')) {
-						return 'geonames-cities';
-					}
-					// Bundle help/reference docs separately to avoid bloating main chunk
-					if (id.includes('judges-guide') || id.includes('tournament-rules') || id.includes('vtes-rules') || id.includes('code-of-ethics') || id.includes('help-content') || id.includes('help-docs')) {
-						return 'help-docs';
+		sourcemap: true
+	},
+	environments: {
+		// Client only: the service worker environment inherits top-level build options and
+		// must stay a single chunk.
+		client: {
+			build: {
+				rolldownOptions: {
+					output: {
+						manualChunks(id) {
+							if (id.includes('cities.json')) {
+								return 'geonames-cities';
+							}
+							if (id.includes('judges-guide') || id.includes('tournament-rules') || id.includes('vtes-rules') || id.includes('code-of-ethics') || id.includes('help-content') || id.includes('help-docs')) {
+								return 'help-docs';
+							}
+						}
 					}
 				}
 			}

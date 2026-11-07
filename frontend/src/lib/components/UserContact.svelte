@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { User } from "$lib/types";
-  import { deobfuscateContact } from "$lib/contact";
-  import DiscordContact from "$lib/components/DiscordContact.svelte";
-  import CommunityLinkPills from "$lib/components/CommunityLinkPills.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import type { User } from "#lib/types.ts";
+  import { deobfuscateContact } from "#lib/contact.ts";
+  import DiscordContact from "#lib/components/DiscordContact.svelte";
+  import CommunityLinkPills from "#lib/components/CommunityLinkPills.svelte";
+  import * as m from '#lib/paraglide/messages.js';
 
   let { user }: { user: User } = $props();
 

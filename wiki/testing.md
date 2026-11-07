@@ -27,7 +27,9 @@ and a built engine. Override the target with `TEST_DATABASE_URL`. Pure-unit suit
 
 **Rust** — `cd engine && cargo test --lib`. `cargo` may not be on the default PATH.
 
-**Frontend type check** — `npx svelte-check --tsconfig ./tsconfig.json`.
+**Frontend type check** — `npm run check`: codegen, `svelte-kit sync`, `tsc` on the
+service worker's own project, then `svelte-check` on the rest. The worker is excluded
+from the root `tsconfig.json`, so `svelte-check` alone never sees it.
 
 **E2E** — `just test-e2e` spins up a **fully isolated** stack on the compose `test`
 profile and tears it down, never touching the dev `db`, `backend` or the
@@ -66,7 +68,9 @@ A fresh worktree has empty venvs, no `node_modules` and no generated artifacts.
   set at import; run pytest from `bot/`.
 - **Frontend**: `npm ci`, `npx svelte-kit sync`, then compile paraglide — skipping
   that yields ~75 phantom errors. The only expected remaining `svelte-check` errors
-  are the missing generated artifacts. Prettier is not project tooling.
+  are the missing generated artifacts. Prettier is not project tooling. `npm ls`
+  lists `$app@ extraneous`: that is `svelte-kit sync`'s generated
+  `node_modules/$app`, the target of the tsconfig `extends`, not a stray package.
 
 ## E2E infrastructure
 

@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { Promo } from "$lib/types";
+  import type { Promo } from "#lib/types.ts";
   import PromoCard from "./PromoCard.svelte";
-  import Button from "$lib/components/Button.svelte";
+  import Button from "#lib/components/Button.svelte";
   import { Gift, Plus } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     promos,

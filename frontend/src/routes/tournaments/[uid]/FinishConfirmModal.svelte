@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { dialogPanel } from "$lib/actions/dialog";
-  import type { Tournament, DeckObject } from "$lib/types";
-  import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
-  import Button from "$lib/components/Button.svelte";
+  import { dialogPanel } from "#lib/actions/dialog.ts";
+  import type { Tournament, DeckObject } from "#lib/types.ts";
+  import type { StandingEntry, PlayerInfoMap } from "#lib/tournament-utils.ts";
+  import Button from "#lib/components/Button.svelte";
   import { TriangleAlert } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   // FinishTournament computes the winner, writes ratings, publishes decklists
   // and triggers the write-once VEKN push; warnings here never block finishing.

@@ -1,9 +1,9 @@
 <script lang="ts">
   import { ArrowLeft } from "@lucide/svelte";
-  import type { TournamentFieldValues } from "$lib/components/TournamentFields.svelte";
-  import { OFFICIAL_DISCORD_INVITE, OFFICIAL_DISCORD_VENUE } from "$lib/tournament-utils";
-  import Button from "$lib/components/Button.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import type { TournamentFieldValues } from "#lib/components/TournamentFields.svelte";
+  import { OFFICIAL_DISCORD_INVITE, OFFICIAL_DISCORD_VENUE } from "#lib/tournament-utils.ts";
+  import Button from "#lib/components/Button.svelte";
+  import * as m from '#lib/paraglide/messages.js';
 
   export interface WizardAnswers {
     setting: "" | "irl" | "online";

@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { toUserMessage } from '$lib/errors';
-  import { importArchonFile, type ArchonImportResult } from "$lib/api";
+  import { toUserMessage } from '#lib/errors.ts';
+  import { importArchonFile, type ArchonImportResult } from "#lib/api.ts";
   import { Upload, Download, X } from "@lucide/svelte";
-  import Button from "$lib/components/Button.svelte";
-  import * as m from '$lib/paraglide/messages.js';
-  import { dialogPanel } from "$lib/actions/dialog";
+  import Button from "#lib/components/Button.svelte";
+  import * as m from '#lib/paraglide/messages.js';
+  import { dialogPanel } from "#lib/actions/dialog.ts";
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "";
 

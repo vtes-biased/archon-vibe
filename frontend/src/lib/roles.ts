@@ -1,5 +1,5 @@
-import type { Role } from '$lib/types';
-import type { BadgeTone } from '$lib/components/Badge.svelte';
+import type { Role } from '#lib/types.ts';
+import type { BadgeTone } from '#lib/components/Badge.svelte';
 
 // A role is an IDENTITY badge whose hue IS the label — the colour groups the role family, it does
 // not rank or warn. Gothic-jewel families: governance = crimson · judiciary = amethyst · playtest = blue · ethics = fuchsia · dev = slate.

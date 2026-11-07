@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { downloadNdaPdf, type NdaRecord } from "$lib/api";
-  import Button from "$lib/components/Button.svelte";
+  import { downloadNdaPdf, type NdaRecord } from "#lib/api.ts";
+  import Button from "#lib/components/Button.svelte";
   import { Download } from "@lucide/svelte";
-  import * as m from "$lib/paraglide/messages.js";
+  import * as m from "#lib/paraglide/messages.js";
 
   let { userUid, records }: { userUid: string; records: NdaRecord[] } = $props();
 

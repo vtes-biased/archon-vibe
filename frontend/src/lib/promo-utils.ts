@@ -1,5 +1,5 @@
-import type { Promo, PromoKind } from '$lib/types';
-import * as m from '$lib/paraglide/messages.js';
+import type { Promo, PromoKind } from '#lib/types.ts';
+import * as m from '#lib/paraglide/messages.js';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 

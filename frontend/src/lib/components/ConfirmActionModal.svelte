@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { toUserMessage } from '$lib/errors';
-  import * as m from '$lib/paraglide/messages.js';
-  import { dialogPanel } from "$lib/actions/dialog";
+  import { toUserMessage } from '#lib/errors.ts';
+  import * as m from '#lib/paraglide/messages.js';
+  import { dialogPanel } from "#lib/actions/dialog.ts";
   import { CircleCheck, TriangleAlert } from '@lucide/svelte';
-  import Button from '$lib/components/Button.svelte';
+  import Button from '#lib/components/Button.svelte';
 
   let {
     title,

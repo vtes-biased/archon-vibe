@@ -1,13 +1,13 @@
 <script lang="ts">
-  import * as m from '$lib/paraglide/messages.js';
-  import { dialogPanel } from "$lib/actions/dialog";
-  import { getLocale } from '$lib/paraglide/runtime.js';
+  import * as m from '#lib/paraglide/messages.js';
+  import { dialogPanel } from "#lib/actions/dialog.ts";
+  import { getLocale } from '#lib/paraglide/runtime.js';
   import { CircleCheck, TriangleAlert } from '@lucide/svelte';
-  import GithubIcon from '$lib/components/GithubIcon.svelte';
-  import Button from '$lib/components/Button.svelte';
-  import { submitFeedback, ApiError } from '$lib/api';
-  import { getAuthState, getAccessToken, FEEDBACK_DRAFT_KEY } from '$lib/stores/auth.svelte';
-  import { toUserMessage } from '$lib/errors';
+  import GithubIcon from '#lib/components/GithubIcon.svelte';
+  import Button from '#lib/components/Button.svelte';
+  import { submitFeedback, ApiError } from '#lib/api.ts';
+  import { getAuthState, getAccessToken, FEEDBACK_DRAFT_KEY } from '#lib/stores/auth.svelte.ts';
+  import { toUserMessage } from '#lib/errors.ts';
 
   const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 

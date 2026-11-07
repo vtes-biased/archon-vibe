@@ -1,23 +1,23 @@
 <script lang="ts">
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import { goto } from "$app/navigation";
-  import { getUser } from "$lib/db";
-  import { syncManager } from "$lib/sync";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canEditUser, canManageVekn, canMarkDeceased, canDeleteMember, canAnonymizeMember, canSponsorMember, canMergeAccounts, canIssueRestrictedSanction, canManageNda } from "$lib/engine";
-  import type { User } from "$lib/types";
-  import { getNdaStatus, type NdaStatus } from "$lib/api";
-  import UserComponent from "$lib/components/User.svelte";
-  import VeknManagement from "$lib/components/VeknManagement.svelte";
-  import NdaSection from "$lib/components/NdaSection.svelte";
-  import SanctionsManager from "$lib/components/SanctionsManager.svelte";
-  import PlayerRatings from "$lib/components/PlayerRatings.svelte";
-  import PlayerRecord from "$lib/components/PlayerRecord.svelte";
-  import UserContact from "$lib/components/UserContact.svelte";
-  import TabStrip from "$lib/components/TabStrip.svelte";
-  import { lastView, openLastView } from "$lib/last-view";
+  import { getUser } from "#lib/db.ts";
+  import { syncManager } from "#lib/sync.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { canEditUser, canManageVekn, canMarkDeceased, canDeleteMember, canAnonymizeMember, canSponsorMember, canMergeAccounts, canIssueRestrictedSanction, canManageNda } from "#lib/engine.ts";
+  import type { User } from "#lib/types.ts";
+  import { getNdaStatus, type NdaStatus } from "#lib/api.ts";
+  import UserComponent from "#lib/components/User.svelte";
+  import VeknManagement from "#lib/components/VeknManagement.svelte";
+  import NdaSection from "#lib/components/NdaSection.svelte";
+  import SanctionsManager from "#lib/components/SanctionsManager.svelte";
+  import PlayerRatings from "#lib/components/PlayerRatings.svelte";
+  import PlayerRecord from "#lib/components/PlayerRecord.svelte";
+  import UserContact from "#lib/components/UserContact.svelte";
+  import TabStrip from "#lib/components/TabStrip.svelte";
+  import { lastView, openLastView } from "#lib/last-view.ts";
   import { ArrowLeft, Loader2, Share2, Check, IdCard, Swords } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let copied = $state(false);
 
@@ -55,7 +55,7 @@
   let sponsorName = $state<string | undefined>();
   let isOnline = $state(navigator.onLine);
 
-  const uid = $derived($page.params.uid);
+  const uid = $derived(page.params.uid);
   const auth = $derived(getAuthState());
 
   const canEdit = $derived.by(() => {

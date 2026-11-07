@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { Sanction, SanctionLevel } from "$lib/types";
-  import * as m from '$lib/paraglide/messages.js';
+  import type { Sanction, SanctionLevel } from "#lib/types.ts";
+  import * as m from '#lib/paraglide/messages.js';
 
   let { sanctions, onclick }: { sanctions: Sanction[]; onclick?: () => void } = $props();
 

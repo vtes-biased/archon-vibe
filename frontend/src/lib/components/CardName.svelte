@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { ADVANCED_ICON, groupCircle } from '$lib/vtes-icons';
-  import type { VtesCard } from '$lib/types';
+  import { ADVANCED_ICON, groupCircle } from '#lib/vtes-icons.ts';
+  import type { VtesCard } from '#lib/types.ts';
 
   let { card, class: cls = '' }: {
     card: Pick<VtesCard, 'printed_name' | 'full_name' | 'group' | 'adv'>;

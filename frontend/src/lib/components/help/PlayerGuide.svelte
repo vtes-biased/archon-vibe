@@ -1,16 +1,16 @@
 <script lang="ts">
-  import { renderGuideSection } from "$lib/markdown";
-  import * as m from "$lib/paraglide/messages.js";
-  import { formatScore, formatGwTp } from "$lib/utils";
-  import { getRoleTone } from "$lib/roles";
+  import { renderGuideSection } from "#lib/markdown.ts";
+  import * as m from "#lib/paraglide/messages.js";
+  import { formatScore, formatGwTp } from "#lib/utils.ts";
+  import { getRoleTone } from "#lib/roles.ts";
   import ExampleBox from "./ExampleBox.svelte";
-  import Button from "$lib/components/Button.svelte";
-  import Badge from "$lib/components/Badge.svelte";
-  import VpInput from "$lib/components/VpInput.svelte";
-  import CommunityLinkPills from "$lib/components/CommunityLinkPills.svelte";
+  import Button from "#lib/components/Button.svelte";
+  import Badge from "#lib/components/Badge.svelte";
+  import VpInput from "#lib/components/VpInput.svelte";
+  import CommunityLinkPills from "#lib/components/CommunityLinkPills.svelte";
   import { KeyRound, Mail, UserPlus, Link, Unlink, QrCode, Gavel, Calendar, Copy, RefreshCw, Trophy, Lock, Monitor, Sun, Moon, Bell, Users, ChevronDown } from "@lucide/svelte";
-  import DiscordIcon from "$lib/components/DiscordIcon.svelte";
-  import GithubIcon from "$lib/components/GithubIcon.svelte";
+  import DiscordIcon from "#lib/components/DiscordIcon.svelte";
+  import GithubIcon from "#lib/components/GithubIcon.svelte";
 
   const linkClass = "text-link hover:text-link-soft focus-visible:text-link-soft underline";
   const consentHtml = m.login_consent_html({

@@ -1,21 +1,21 @@
 <script lang="ts">
   // Progressive disclosure: anyone sees the gallery (public, offline-capable), signed-in holders see
   // their own stock, officials get the inventory panel, IC additionally mints/edits catalog entries.
-  import type { Promo } from "$lib/types";
-  import { getAllPromos, getUser } from "$lib/db";
-  import { syncManager } from "$lib/sync";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { ApiError, updatePromo, deletePromoCatalogEntry } from "$lib/api";
-  import { showToast } from "$lib/stores/toast.svelte";
-  import { toUserMessage } from "$lib/errors";
-  import Button from "$lib/components/Button.svelte";
+  import type { Promo } from "#lib/types.ts";
+  import { getAllPromos, getUser } from "#lib/db.ts";
+  import { syncManager } from "#lib/sync.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { ApiError, updatePromo, deletePromoCatalogEntry } from "#lib/api.ts";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
+  import { toUserMessage } from "#lib/errors.ts";
+  import Button from "#lib/components/Button.svelte";
   import PromoGallery from "./PromoGallery.svelte";
   import PromoEditModal from "./PromoEditModal.svelte";
   import PromoInventoryPanel from "./PromoInventoryPanel.svelte";
   import OwnStockCard from "./OwnStockCard.svelte";
   import { Plus } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
-  import { canManagePromos, canViewFullPromoLedger } from "$lib/engine";
+  import * as m from '#lib/paraglide/messages.js';
+  import { canManagePromos, canViewFullPromoLedger } from "#lib/engine.ts";
 
   const auth = $derived(getAuthState());
   const canManagePromo = $derived(canManagePromos(auth.user).allowed);

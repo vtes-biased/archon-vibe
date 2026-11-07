@@ -1,6 +1,6 @@
-import * as m from '$lib/paraglide/messages.js';
-import { toUserMessage } from '$lib/errors';
-import { fetchOrNetworkError } from '$lib/error-codes';
+import * as m from '#lib/paraglide/messages.js';
+import { toUserMessage } from '#lib/errors.ts';
+import { fetchOrNetworkError } from '#lib/error-codes.ts';
 import { authorizedFetch, getAuthState, setAuthState, storeTokens, fetchCurrentUser } from './auth.svelte';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";

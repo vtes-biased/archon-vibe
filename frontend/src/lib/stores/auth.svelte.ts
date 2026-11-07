@@ -1,10 +1,10 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
-import * as m from '$lib/paraglide/messages.js';
-import { toUserMessage } from '$lib/errors';
-import { fetchOrNetworkError } from '$lib/error-codes';
-import type { User } from "$lib/types";
-import { syncManager } from "$lib/sync";
-import { forgetViews } from "$lib/last-view";
+import * as m from '#lib/paraglide/messages.js';
+import { toUserMessage } from '#lib/errors.ts';
+import { fetchOrNetworkError } from '#lib/error-codes.ts';
+import type { User } from "#lib/types.ts";
+import { syncManager } from "#lib/sync.ts";
+import { forgetViews } from "#lib/last-view.ts";
 
 const ACCESS_TOKEN_KEY = "archon_access_token";
 const REFRESH_TOKEN_KEY = "archon_refresh_token";

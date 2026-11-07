@@ -122,7 +122,7 @@ jobs:
   # engine/pkg (the gitignored WASM build output), so the WASM engine must be built
   # first; then `npm run check` runs the frontend codegen (geonames copy + paraglide
   # compile + svelte-kit sync) before the type-check — all three emit gitignored
-  # sources svelte-check needs ($lib/paraglide, $lib/data/geonames, $types).
+  # sources svelte-check needs (src/lib/paraglide, src/lib/data/geonames, $types).
   frontend:
     name: Frontend type-check (svelte-check)
     runs-on: ubuntu-latest

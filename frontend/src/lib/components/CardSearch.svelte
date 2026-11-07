@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { VtesCard } from "$lib/types";
-  import { searchCards, getCards } from "$lib/cards";
-  import CardName from "$lib/components/CardName.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import type { VtesCard } from "#lib/types.ts";
+  import { searchCards, getCards } from "#lib/cards.ts";
+  import CardName from "#lib/components/CardName.svelte";
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     onselect,

@@ -1,12 +1,11 @@
 <script lang="ts">
-  import { toUserMessage } from '$lib/errors';
+  import { toUserMessage } from '#lib/errors.ts';
   import { goto } from "$app/navigation";
-  import { page } from "$app/stores";
   import { onMount } from "svelte";
-  import { authorizedFetch, getAuthState, initAuth } from "$lib/stores/auth.svelte";
+  import { authorizedFetch, getAuthState, initAuth } from "#lib/stores/auth.svelte.ts";
   import { Loader2, CircleAlert, ShieldCheck, CircleCheck } from '@lucide/svelte';
-  import Button from '$lib/components/Button.svelte';
-  import * as m from '$lib/paraglide/messages.js';
+  import Button from '#lib/components/Button.svelte';
+  import * as m from '#lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 

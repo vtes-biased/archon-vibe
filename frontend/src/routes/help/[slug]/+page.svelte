@@ -1,18 +1,17 @@
 <script lang="ts">
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
-  import { replaceState } from "$app/navigation";
-  import { helpDocs, extractToc } from "$lib/help-docs";
-  import type { TocEntry } from "$lib/help-docs";
-  import DocumentViewer from "$lib/components/DocumentViewer.svelte";
-  import TableOfContents from "$lib/components/TableOfContents.svelte";
-  import PlayerGuide from "$lib/components/help/PlayerGuide.svelte";
-  import OrganizerGuide from "$lib/components/help/OrganizerGuide.svelte";
+  import { helpDocs, extractToc } from "#lib/help-docs.ts";
+  import type { TocEntry } from "#lib/help-docs.ts";
+  import DocumentViewer from "#lib/components/DocumentViewer.svelte";
+  import TableOfContents from "#lib/components/TableOfContents.svelte";
+  import PlayerGuide from "#lib/components/help/PlayerGuide.svelte";
+  import OrganizerGuide from "#lib/components/help/OrganizerGuide.svelte";
   import { ArrowLeft } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
-  const slug = $derived($page.params.slug as string);
+  const slug = $derived(page.params.slug as string);
   const doc = $derived(helpDocs[slug]);
   const isComponent = $derived(doc?.isComponent ?? false);
 
@@ -51,7 +50,7 @@
         for (const entry of obsEntries) {
           if (entry.isIntersecting) {
             activeHeading = entry.target.id;
-            replaceState(`#${entry.target.id}`, {});
+            goto(`#${entry.target.id}`, { shallow: true, replace: true });
             break;
           }
         }

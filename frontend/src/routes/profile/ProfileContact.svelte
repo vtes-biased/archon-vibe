@@ -1,15 +1,15 @@
 <script lang="ts">
   import { Plus, Pencil } from "@lucide/svelte";
-  import CommunityLinkEditor from "$lib/components/CommunityLinkEditor.svelte";
-  import CommunityLinkPills from "$lib/components/CommunityLinkPills.svelte";
-  import InlineNotice from "$lib/components/InlineNotice.svelte";
-  import { updateProfile } from "$lib/stores/auth.svelte";
-  import { showToast } from "$lib/stores/toast.svelte";
-  import { isOfficial as engineIsOfficial, contactFloor, breaksContactFloor } from "$lib/engine";
-  import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
-  import { getLocale } from "$lib/paraglide/runtime.js";
-  import type { CommunityLink } from "$lib/types";
-  import * as m from '$lib/paraglide/messages.js';
+  import CommunityLinkEditor from "#lib/components/CommunityLinkEditor.svelte";
+  import CommunityLinkPills from "#lib/components/CommunityLinkPills.svelte";
+  import InlineNotice from "#lib/components/InlineNotice.svelte";
+  import { updateProfile } from "#lib/stores/auth.svelte.ts";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
+  import { isOfficial as engineIsOfficial, contactFloor, breaksContactFloor } from "#lib/engine.ts";
+  import { COUNTRY_LANGUAGE } from "#lib/data/country-language.ts";
+  import { getLocale } from "#lib/paraglide/runtime.js";
+  import type { CommunityLink } from "#lib/types.ts";
+  import * as m from '#lib/paraglide/messages.js';
 
   let { user }: { user: any } = $props();
 

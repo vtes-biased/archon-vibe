@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { dialogPanel } from "$lib/actions/dialog";
-  import type { User, Sanction, SanctionLevel, SanctionCategory } from "$lib/types";
-  import { createSanction, updateSanction, deleteSanctionApi } from "$lib/api";
-  import { getActiveSanctionsForUser, getTournamentListItems, type TournamentListItem } from "$lib/db";
-  import { canViewSanctionReason } from "$lib/engine";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { visibleSanctions } from "$lib/utils";
+  import { dialogPanel } from "#lib/actions/dialog.ts";
+  import type { User, Sanction, SanctionLevel, SanctionCategory } from "#lib/types.ts";
+  import { createSanction, updateSanction, deleteSanctionApi } from "#lib/api.ts";
+  import { getActiveSanctionsForUser, getTournamentListItems, type TournamentListItem } from "#lib/db.ts";
+  import { canViewSanctionReason } from "#lib/engine.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { visibleSanctions } from "#lib/utils.ts";
   import SanctionBadge from "./SanctionBadge.svelte";
   import { Pencil, TriangleAlert, CircleCheck, Trash2, RefreshCw } from "@lucide/svelte";
-  import Button from '$lib/components/Button.svelte';
-  import * as m from '$lib/paraglide/messages.js';
+  import Button from '#lib/components/Button.svelte';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     user,

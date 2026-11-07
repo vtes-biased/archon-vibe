@@ -1,6 +1,6 @@
 <script lang="ts">
   import { CircleHelp } from "@lucide/svelte";
-  import * as m from "$lib/paraglide/messages.js";
+  import * as m from "#lib/paraglide/messages.js";
 
   // showRtp: only where an RtP column is on screen (finished standings).
   // compact: icon only, for sitting inline beside a score.

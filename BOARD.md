@@ -24,5 +24,3 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
-
-- Move the frontend to SvelteKit 3 with adapter-static 4 — **Done when** the build config lives in the Vite plugin with the old config file gone, no `$lib` import or deprecated `pushState`/`replaceState` call remains, `npm ls` is clean and `npm run check` and the frontend tests pass, and on beta deep links load through the SPA fallback, a tab left open across a deploy still navigates, and an offline reload works; `wiki/architecture.md`, the frontend step of `wiki/testing.md` and the list-view rule in `wiki/design.md` say so. Context in [`board/sveltekit-3.md`](board/sveltekit-3.md).

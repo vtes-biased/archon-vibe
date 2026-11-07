@@ -1,18 +1,18 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import type { TournamentFormat, TournamentRank, StandingsMode, DeckListsMode, League } from "$lib/types";
-  import type { VenueInfo } from "$lib/db";
-  import { getSortedCountries, getCountryFlag } from "$lib/geonames";
-  import { getAllLeagues } from "$lib/db";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canLinkTournamentToLeague } from "$lib/engine";
-  import { OFFICIAL_DISCORD_INVITE, OFFICIAL_DISCORD_VENUE } from "$lib/tournament-utils";
-  import { localToday } from "$lib/utils";
+  import type { TournamentFormat, TournamentRank, StandingsMode, DeckListsMode, League } from "#lib/types.ts";
+  import type { VenueInfo } from "#lib/db.ts";
+  import { getSortedCountries, getCountryFlag } from "#lib/geonames.ts";
+  import { getAllLeagues } from "#lib/db.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { canLinkTournamentToLeague } from "#lib/engine.ts";
+  import { OFFICIAL_DISCORD_INVITE, OFFICIAL_DISCORD_VENUE } from "#lib/tournament-utils.ts";
+  import { localToday } from "#lib/utils.ts";
   import VenueAutocomplete from "./VenueAutocomplete.svelte";
   import CityAutocomplete from "./CityAutocomplete.svelte";
   import FoldableSection from "./FoldableSection.svelte";
   import { Info } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   export interface TournamentFieldValues {
     name: string;

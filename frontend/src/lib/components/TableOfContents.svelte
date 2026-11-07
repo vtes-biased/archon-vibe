@@ -1,9 +1,9 @@
 <script lang="ts">
   import { List, X } from "@lucide/svelte";
-  import { replaceState } from "$app/navigation";
-  import type { TocEntry } from "$lib/help-docs";
-  import * as m from '$lib/paraglide/messages.js';
-  import { dialogPanel } from "$lib/actions/dialog";
+  import { goto } from "$app/navigation";
+  import type { TocEntry } from "#lib/help-docs.ts";
+  import * as m from '#lib/paraglide/messages.js';
+  import { dialogPanel } from "#lib/actions/dialog.ts";
 
   interface Props {
     entries: TocEntry[];
@@ -18,7 +18,7 @@
     const el = document.getElementById(id);
     if (el) {
       el.scrollIntoView({ behavior: "smooth" });
-      replaceState(`#${id}`, {});
+      goto(`#${id}`, { shallow: true, replace: true });
     }
   }
 </script>

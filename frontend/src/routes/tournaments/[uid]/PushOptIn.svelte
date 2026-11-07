@@ -4,9 +4,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { Bell, Share } from "@lucide/svelte";
-  import * as m from "$lib/paraglide/messages.js";
-  import Button from "$lib/components/Button.svelte";
-  import { showToast } from "$lib/stores/toast.svelte";
+  import * as m from "#lib/paraglide/messages.js";
+  import Button from "#lib/components/Button.svelte";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
   import {
     pushSupported,
     isPushSubscribed,
@@ -17,7 +17,7 @@
     isIOSSafari,
     isStandalone,
     refreshPushState,
-  } from "$lib/stores/push.svelte";
+  } from "#lib/stores/push.svelte.ts";
 
   let {
     tournamentUid,

@@ -1,27 +1,27 @@
 <script lang="ts">
   import { tick } from "svelte";
-  import type { Tournament, User, Player, DeckObject, Sanction } from "$lib/types";
-  import type { UserListItem } from "$lib/db";
+  import type { Tournament, User, Player, DeckObject, Sanction } from "#lib/types.ts";
+  import type { UserListItem } from "#lib/db.ts";
   type DeckMap = Record<string, DeckObject[]>;
-  import { formatScore } from "$lib/utils";
-  import AddPlayerForm from "$lib/components/AddPlayerForm.svelte";
-  import DeckUpload from "$lib/components/DeckUpload.svelte";
-  import SanctionIndicator from "$lib/components/SanctionIndicator.svelte";
-  import RankCell from "$lib/components/RankCell.svelte";
-  import TournamentSanctionModal from "$lib/components/TournamentSanctionModal.svelte";
-  import SanctionListModal from "$lib/components/SanctionListModal.svelte";
-  import ConfirmActionModal from "$lib/components/ConfirmActionModal.svelte";
+  import { formatScore } from "#lib/utils.ts";
+  import AddPlayerForm from "#lib/components/AddPlayerForm.svelte";
+  import DeckUpload from "#lib/components/DeckUpload.svelte";
+  import SanctionIndicator from "#lib/components/SanctionIndicator.svelte";
+  import RankCell from "#lib/components/RankCell.svelte";
+  import TournamentSanctionModal from "#lib/components/TournamentSanctionModal.svelte";
+  import SanctionListModal from "#lib/components/SanctionListModal.svelte";
+  import ConfirmActionModal from "#lib/components/ConfirmActionModal.svelte";
   import { UserPlus, Dice3, CircleCheck, CircleHelp, TriangleAlert, CircleX, FileX, X, EyeOff, Trash2, Ellipsis, Dices, Printer, SlidersHorizontal, ChevronDown, ChevronRight, Banknote } from "@lucide/svelte";
-  import ActionMenu from "$lib/components/ActionMenu.svelte";
-  import FoldableSection from "$lib/components/FoldableSection.svelte";
+  import ActionMenu from "#lib/components/ActionMenu.svelte";
+  import FoldableSection from "#lib/components/FoldableSection.svelte";
   import CreateAndRegisterModal from "./CreateAndRegisterModal.svelte";
   import OrganizerDeck, { isDeckBehindViewLog } from "./OrganizerDeck.svelte";
-  import Button from "$lib/components/Button.svelte";
-  import Badge from "$lib/components/Badge.svelte";
-  import { validateDeck, finalsQualification, roundsPlayedByPlayer, type ValidationError, type TournamentEventType } from "$lib/engine";
-  import { translatePlayerState, seatDisplay, translateStandingsMode, getRatingPts, ratingContext, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import Button from "#lib/components/Button.svelte";
+  import Badge from "#lib/components/Badge.svelte";
+  import { validateDeck, finalsQualification, roundsPlayedByPlayer, type ValidationError, type TournamentEventType } from "#lib/engine.ts";
+  import { translatePlayerState, seatDisplay, translateStandingsMode, getRatingPts, ratingContext, type StandingEntry, type PlayerInfoMap } from "#lib/tournament-utils.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     tournament,

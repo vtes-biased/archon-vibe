@@ -1,7 +1,7 @@
 <script lang="ts">
   import { ChevronDown, ChevronRight } from "@lucide/svelte";
-  import { renderMarkdown, stripLeadingTitle, descriptionExcerpt } from "$lib/markdown";
-  import * as m from "$lib/paraglide/messages.js";
+  import { renderMarkdown, stripLeadingTitle, descriptionExcerpt } from "#lib/markdown.ts";
+  import * as m from "#lib/paraglide/messages.js";
 
   // `title`, when given, strips a leading "# <title>" heading from the body
   // (the rendered card already shows a "Description" header).

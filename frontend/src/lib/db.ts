@@ -1,6 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, type StoreNames } from 'idb';
 import type { User, Role, Sanction, SanctionLevel, Tournament, DeckObject, League, Promo, VtesCard, OfflinePlayer,
-  CommunityLink, RatingCategory, TournamentFormat, TournamentRank, TournamentState } from '$lib/types';
+  CommunityLink, RatingCategory, TournamentFormat, TournamentRank, TournamentState } from '#lib/types.ts';
 import type { TournamentEvent } from './engine';
 import { expandRolesForFilter } from './roles';
 import { normalizeSearch, searchTokens } from './utils';

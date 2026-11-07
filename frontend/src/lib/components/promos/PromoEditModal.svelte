@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { dialogPanel } from "$lib/actions/dialog";
+  import { dialogPanel } from "#lib/actions/dialog.ts";
   import { onDestroy } from 'svelte';
-  import type { League, Promo, PromoKind, TournamentRank } from "$lib/types";
-  import { getAllLeagues } from "$lib/db";
-  import { ApiError, createPromo, updatePromo, deletePromoCatalogEntry, uploadPromoImage, deletePromoImage, type PromoPayload } from "$lib/api";
-  import { promoImageUrl } from "$lib/promo-utils";
-  import { toUserMessage } from "$lib/errors";
-  import Button from "$lib/components/Button.svelte";
+  import type { League, Promo, PromoKind, TournamentRank } from "#lib/types.ts";
+  import { getAllLeagues } from "#lib/db.ts";
+  import { ApiError, createPromo, updatePromo, deletePromoCatalogEntry, uploadPromoImage, deletePromoImage, type PromoPayload } from "#lib/api.ts";
+  import { promoImageUrl } from "#lib/promo-utils.ts";
+  import { toUserMessage } from "#lib/errors.ts";
+  import Button from "#lib/components/Button.svelte";
   import { Trash2, TriangleAlert, X } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     promo = null,

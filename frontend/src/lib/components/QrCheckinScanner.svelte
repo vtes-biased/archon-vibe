@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { toUserMessage } from '$lib/errors';
+  import { toUserMessage } from '#lib/errors.ts';
   import { onDestroy } from 'svelte';
-  import { qrCheckin } from '$lib/api';
-  import { saveTournament } from '$lib/db';
+  import { qrCheckin } from '#lib/api.ts';
+  import { saveTournament } from '#lib/db.ts';
   import { X } from '@lucide/svelte';
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     tournamentUid,

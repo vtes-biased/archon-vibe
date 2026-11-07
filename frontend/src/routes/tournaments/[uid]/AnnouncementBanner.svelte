@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { Announcement } from "$lib/types";
+  import type { Announcement } from "#lib/types.ts";
   import { Megaphone, X } from "@lucide/svelte";
-  import FoldableSection from "$lib/components/FoldableSection.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import FoldableSection from "#lib/components/FoldableSection.svelte";
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     announcements = [],

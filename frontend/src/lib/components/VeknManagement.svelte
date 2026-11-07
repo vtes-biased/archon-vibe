@@ -1,16 +1,16 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { dialogPanel } from "$lib/actions/dialog";
-  import type { User } from "$lib/types";
-  import type { UserListItem } from "$lib/db";
-  import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased, setMemberSponsor, deleteMember, anonymizeMember } from "$lib/api";
-  import { showToast } from "$lib/stores/toast.svelte";
+  import { dialogPanel } from "#lib/actions/dialog.ts";
+  import type { User } from "#lib/types.ts";
+  import type { UserListItem } from "#lib/db.ts";
+  import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased, setMemberSponsor, deleteMember, anonymizeMember } from "#lib/api.ts";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
   import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2, Trash2, TriangleAlert, ArrowLeftRight, EyeOff, Handshake } from "@lucide/svelte";
-  import Button from '$lib/components/Button.svelte';
-  import UserPicker from '$lib/components/UserPicker.svelte';
-  import Badge from '$lib/components/Badge.svelte';
-  import { getCountryFlag } from "$lib/geonames";
-  import * as m from '$lib/paraglide/messages.js';
+  import Button from '#lib/components/Button.svelte';
+  import UserPicker from '#lib/components/UserPicker.svelte';
+  import Badge from '#lib/components/Badge.svelte';
+  import { getCountryFlag } from "#lib/geonames.ts";
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     user,

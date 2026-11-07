@@ -1,12 +1,12 @@
 <script lang="ts">
-  import type { TournamentEventType } from "$lib/engine";
-  import type { Tournament, RafflePool, Promo, Sanction } from "$lib/types";
-  import { buildSanctionsPayload, rafflePool } from "$lib/engine";
-  import { getAllPromos } from "$lib/db";
-  import { seatDisplay as seatDisplayUtil, type PlayerInfoMap } from "$lib/tournament-utils";
+  import type { TournamentEventType } from "#lib/engine.ts";
+  import type { Tournament, RafflePool, Promo, Sanction } from "#lib/types.ts";
+  import { buildSanctionsPayload, rafflePool } from "#lib/engine.ts";
+  import { getAllPromos } from "#lib/db.ts";
+  import { seatDisplay as seatDisplayUtil, type PlayerInfoMap } from "#lib/tournament-utils.ts";
   import { Dices, Gift, Undo2, Trash2 } from "@lucide/svelte";
-  import Button from '$lib/components/Button.svelte';
-  import * as m from '$lib/paraglide/messages.js';
+  import Button from '#lib/components/Button.svelte';
+  import * as m from '#lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "";
 

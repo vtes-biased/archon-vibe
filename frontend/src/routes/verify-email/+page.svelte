@@ -1,10 +1,10 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
-  import { getAuthState, verifyMagicLink, setPassword, type VerifyMagicLinkResult } from "$lib/stores/auth.svelte";
+  import { getAuthState, verifyMagicLink, setPassword, type VerifyMagicLinkResult } from "#lib/stores/auth.svelte.ts";
   import { Loader2, X } from '@lucide/svelte';
-  import Button from '$lib/components/Button.svelte';
-  import * as m from '$lib/paraglide/messages.js';
+  import Button from '#lib/components/Button.svelte';
+  import * as m from '#lib/paraglide/messages.js';
 
   const auth = $derived(getAuthState());
 

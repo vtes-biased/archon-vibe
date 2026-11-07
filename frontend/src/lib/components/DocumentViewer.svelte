@@ -1,9 +1,9 @@
 <script lang="ts">
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
   import { onMount } from "svelte";
-  import { replaceState } from "$app/navigation";
-  import { showToast } from "$lib/stores/toast.svelte";
-  import type { TocEntry } from "$lib/help-docs";
+  import { goto } from "$app/navigation";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
+  import type { TocEntry } from "#lib/help-docs.ts";
 
   interface Props {
     html: string;
@@ -36,7 +36,7 @@
         for (const entry of entries) {
           if (entry.isIntersecting) {
             onActiveHeadingChange(entry.target.id);
-            replaceState(`#${entry.target.id}`, {});
+            goto(`#${entry.target.id}`, { shallow: true, replace: true });
             break;
           }
         }
@@ -80,7 +80,7 @@
           }
           if (best) {
             onActiveHeadingChange(best);
-            replaceState(hash, {});
+            goto(hash, { shallow: true, replace: true });
           }
         });
       }

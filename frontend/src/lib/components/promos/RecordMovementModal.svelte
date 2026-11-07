@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { dialogPanel } from "$lib/actions/dialog";
-  import type { Promo, PromoLedgerKind } from "$lib/types";
-  import type { UserListItem } from "$lib/db";
-  import { createPromoLedgerEntries } from "$lib/api";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { getCountryFlag } from "$lib/geonames";
-  import Button from "$lib/components/Button.svelte";
-  import UserPicker from "$lib/components/UserPicker.svelte";
+  import { dialogPanel } from "#lib/actions/dialog.ts";
+  import type { Promo, PromoLedgerKind } from "#lib/types.ts";
+  import type { UserListItem } from "#lib/db.ts";
+  import { createPromoLedgerEntries } from "#lib/api.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { getCountryFlag } from "#lib/geonames.ts";
+  import Button from "#lib/components/Button.svelte";
+  import UserPicker from "#lib/components/UserPicker.svelte";
   import { Plus, X } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     promos,

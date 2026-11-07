@@ -1,4 +1,4 @@
-import type { Tournament, Sanction, DeckObject, OfflinePlayer } from '$lib/types';
+import type { Tournament, Sanction, DeckObject, OfflinePlayer } from '#lib/types.ts';
 import {
   getMetadata, setMetadata, deleteMetadata, getMetadataByPrefix,
   getDeviceId, getTournament, saveTournament,
@@ -6,10 +6,10 @@ import {
   setOfflinePlayers, getOfflineSanctionUids, addOfflineSanctionUid,
   getOfflineDeckUids, getDeck,
   getSanction, saveUser, deleteUser,
-} from '$lib/db';
-import { apiRequest, ApiError } from '$lib/api';
-import { showToast } from '$lib/stores/toast.svelte';
-import * as m from '$lib/paraglide/messages.js';
+} from '#lib/db.ts';
+import { apiRequest, ApiError } from '#lib/api.ts';
+import { showToast } from '#lib/stores/toast.svelte.ts';
+import * as m from '#lib/paraglide/messages.js';
 
 let offlineTournamentUids = $state<Set<string>>(new Set());
 

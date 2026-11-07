@@ -1,16 +1,16 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { getAllLeagues } from "$lib/db";
-  import { syncManager } from "$lib/sync";
-  import { getCountries, getSortedCountries, getCountryFlag } from "$lib/geonames";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { canManageLeagues } from "$lib/engine";
-  import { formatCalendarDate, localToday, normalizeSearch } from "$lib/utils";
-  import type { League, LeagueStandingsMode } from "$lib/types";
+  import { getAllLeagues } from "#lib/db.ts";
+  import { syncManager } from "#lib/sync.ts";
+  import { getCountries, getSortedCountries, getCountryFlag } from "#lib/geonames.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { canManageLeagues } from "#lib/engine.ts";
+  import { formatCalendarDate, localToday, normalizeSearch } from "#lib/utils.ts";
+  import type { League, LeagueStandingsMode } from "#lib/types.ts";
   import { Loader2, FlagTriangleRight, Plus } from "@lucide/svelte";
-  import Badge from "$lib/components/Badge.svelte";
-  import Button from "$lib/components/Button.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import Badge from "#lib/components/Badge.svelte";
+  import Button from "#lib/components/Button.svelte";
+  import * as m from '#lib/paraglide/messages.js';
 
   let leagues = $state<League[]>([]);
   let metaLeagueNames = $state<Record<string, string>>({});

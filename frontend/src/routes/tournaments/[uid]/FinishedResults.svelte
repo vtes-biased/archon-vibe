@@ -1,11 +1,11 @@
 <script lang="ts">
-  import type { Tournament } from "$lib/types";
-  import { seatDisplay as seatDisplayUtil, type StandingEntry, type PlayerInfoMap } from "$lib/tournament-utils";
+  import type { Tournament } from "#lib/types.ts";
+  import { seatDisplay as seatDisplayUtil, type StandingEntry, type PlayerInfoMap } from "#lib/tournament-utils.ts";
   import { Upload, TriangleAlert, BookMarked, ExternalLink } from "@lucide/svelte";
-  import InlineNotice from "$lib/components/InlineNotice.svelte";
-  import Button from "$lib/components/Button.svelte";
+  import InlineNotice from "#lib/components/InlineNotice.svelte";
+  import Button from "#lib/components/Button.svelte";
   import RankedBadge from "./RankedBadge.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   // Organizer-only Finished-state panel: winner, deck nudge, sync/TWDA outcome.
   let {

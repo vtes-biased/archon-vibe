@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { renderGuideSection } from "$lib/markdown";
-  import * as m from "$lib/paraglide/messages.js";
+  import { renderGuideSection } from "#lib/markdown.ts";
+  import * as m from "#lib/paraglide/messages.js";
   import ExampleBox from "./ExampleBox.svelte";
-  import Button from "$lib/components/Button.svelte";
-  import Badge from "$lib/components/Badge.svelte";
-  import InlineNotice from "$lib/components/InlineNotice.svelte";
-  import VpInput from "$lib/components/VpInput.svelte";
-  import FoldableSection from "$lib/components/FoldableSection.svelte";
-  import { formatScore, formatGwTp } from "$lib/utils";
+  import Button from "#lib/components/Button.svelte";
+  import Badge from "#lib/components/Badge.svelte";
+  import InlineNotice from "#lib/components/InlineNotice.svelte";
+  import VpInput from "#lib/components/VpInput.svelte";
+  import FoldableSection from "#lib/components/FoldableSection.svelte";
+  import { formatScore, formatGwTp } from "#lib/utils.ts";
   import {
     QrCode, WifiOff, Wifi, Share2, ClipboardCopy, Download, Dices, Dice3, Ticket, Gift, Undo2, Trash2,
     Pause, RotateCcw, ChevronDown, ChevronRight, Plus, SquarePlus, ArrowRightLeft,

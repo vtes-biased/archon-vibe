@@ -1,29 +1,29 @@
 <script lang="ts">
-  import { toUserMessage } from '$lib/errors';
-  import { goto, replaceState } from "$app/navigation";
+  import { toUserMessage } from '#lib/errors.ts';
+  import { goto } from "$app/navigation";
   import { onMount } from "svelte";
   import {
     authorizedFetch, getAuthState, getAccessToken, hasStoredSession, logout,
     initAuth, storeTokensFromCallback,
     requestMagicLink,
     changePassword,
-  } from "$lib/stores/auth.svelte";
-  import { breaksContactFloor, canManageOauthClients, canRunAdminSync } from "$lib/engine";
-  import { HOF_MIN_WINS } from "$lib/tournament-utils";
-  import { registerPasskey } from "$lib/stores/passkeys.svelte";
-  import { syncManager } from "$lib/sync";
-  import { apiRequest, claimVeknId, abandonVeknId, uploadAvatar, getNdaStatus, type NdaStatus } from "$lib/api";
-  import { showToast } from "$lib/stores/toast.svelte";
+  } from "#lib/stores/auth.svelte.ts";
+  import { breaksContactFloor, canManageOauthClients, canRunAdminSync } from "#lib/engine.ts";
+  import { HOF_MIN_WINS } from "#lib/tournament-utils.ts";
+  import { registerPasskey } from "#lib/stores/passkeys.svelte.ts";
+  import { syncManager } from "#lib/sync.ts";
+  import { apiRequest, claimVeknId, abandonVeknId, uploadAvatar, getNdaStatus, type NdaStatus } from "#lib/api.ts";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
 
   import { CircleUser, WifiOff, TriangleAlert, Trophy, FileSignature, IdCard, Swords, Settings } from "@lucide/svelte";
-  import InlineNotice from "$lib/components/InlineNotice.svelte";
-  import AvatarCropper from "$lib/components/AvatarCropper.svelte";
-  import PlayerRatings from "$lib/components/PlayerRatings.svelte";
-  import PlayerRecord from "$lib/components/PlayerRecord.svelte";
-  import Button from "$lib/components/Button.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import InlineNotice from "#lib/components/InlineNotice.svelte";
+  import AvatarCropper from "#lib/components/AvatarCropper.svelte";
+  import PlayerRatings from "#lib/components/PlayerRatings.svelte";
+  import PlayerRecord from "#lib/components/PlayerRecord.svelte";
+  import Button from "#lib/components/Button.svelte";
+  import * as m from '#lib/paraglide/messages.js';
 
-  import TabStrip from "$lib/components/TabStrip.svelte";
+  import TabStrip from "#lib/components/TabStrip.svelte";
   import ProfileIdentity from "./ProfileIdentity.svelte";
   import ProfileContact from "./ProfileContact.svelte";
   import LinkedAccounts from "./LinkedAccounts.svelte";
@@ -33,8 +33,8 @@
   import DeveloperSection from "./DeveloperSection.svelte";
   import AdminSection from "./AdminSection.svelte";
   import DataSection from "./DataSection.svelte";
-  import Badge from "$lib/components/Badge.svelte";
-  import { dialogPanel } from "$lib/actions/dialog";
+  import Badge from "#lib/components/Badge.svelte";
+  import { dialogPanel } from "#lib/actions/dialog.ts";
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -126,7 +126,7 @@
     if (discordLinked || error || githubLinked || githubErr) activeTab = 'account';
 
     if (discordLinked || error || githubLinked || githubErr || claim !== null) {
-      replaceState("/profile", {});
+      goto("/profile", { shallow: true, replace: true });
     }
   });
 

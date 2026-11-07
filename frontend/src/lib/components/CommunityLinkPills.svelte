@@ -1,5 +1,5 @@
 <script module lang="ts">
-  import type { CommunityLinkType } from "$lib/types";
+  import type { CommunityLinkType } from "#lib/types.ts";
 
   export const LABELS: Record<CommunityLinkType, string> = {
     discord: "Discord",
@@ -40,9 +40,9 @@
 </script>
 
 <script lang="ts">
-  import type { CommunityLink } from "$lib/types";
+  import type { CommunityLink } from "#lib/types.ts";
   import { ExternalLink, Globe, MessageSquare, BookOpen, Link, Pin } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let { links }: { links: CommunityLink[] } = $props();
 

@@ -1,9 +1,9 @@
-import type { Tournament } from "$lib/types";
-import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
-import { generateResultsText } from "$lib/social-text";
-import { showToast } from "$lib/stores/toast.svelte";
-import { downloadBlob } from "$lib/utils";
-import * as m from "$lib/paraglide/messages.js";
+import type { Tournament } from "#lib/types.ts";
+import type { StandingEntry, PlayerInfoMap } from "#lib/tournament-utils.ts";
+import { generateResultsText } from "#lib/social-text.ts";
+import { showToast } from "#lib/stores/toast.svelte.ts";
+import { downloadBlob } from "#lib/utils.ts";
+import * as m from "#lib/paraglide/messages.js";
 
 /** Two call sites reach for this — the Tools sheet and the finished player view — and the
  * clipboard-plus-toast handling is what must not drift between them. */

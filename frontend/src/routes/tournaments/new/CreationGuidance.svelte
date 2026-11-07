@@ -2,7 +2,7 @@
   import type { Component } from "svelte";
   import { Banknote, Bot, DoorOpen, Layers, LayoutGrid, MessageSquare, QrCode, Split, Ticket, Upload, Users, WifiOff } from "@lucide/svelte";
   import type { WizardAnswers } from "./CreationWizard.svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let { answers, decklistRequired }: { answers: WizardAnswers; decklistRequired: boolean } = $props();
 

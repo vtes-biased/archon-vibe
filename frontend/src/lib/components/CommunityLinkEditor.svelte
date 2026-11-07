@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { dialogPanel } from "$lib/actions/dialog";
-  import { apiRequest } from "$lib/api";
-  import Button from "$lib/components/Button.svelte";
-  import { LABELS } from "$lib/components/CommunityLinkPills.svelte";
-  import { LANGUAGES, LANGUAGE_NAMES } from "$lib/data/languages";
-  import { canModerateLink, canPromoteLinkGlobal, canPromoteLinkNational, getCommunityLinkReference } from "$lib/engine";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { getSortedCountries, getCountryFlag } from "$lib/geonames";
-  import type { CommunityLink, CommunityLinkType } from "$lib/types";
+  import { dialogPanel } from "#lib/actions/dialog.ts";
+  import { apiRequest } from "#lib/api.ts";
+  import Button from "#lib/components/Button.svelte";
+  import { LABELS } from "#lib/components/CommunityLinkPills.svelte";
+  import { LANGUAGES, LANGUAGE_NAMES } from "#lib/data/languages.ts";
+  import { canModerateLink, canPromoteLinkGlobal, canPromoteLinkNational, getCommunityLinkReference } from "#lib/engine.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { getSortedCountries, getCountryFlag } from "#lib/geonames.ts";
+  import type { CommunityLink, CommunityLinkType } from "#lib/types.ts";
   import { Loader2, Trash2, X } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   interface Props {
     link: CommunityLink | null;

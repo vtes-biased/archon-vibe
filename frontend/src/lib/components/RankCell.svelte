@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Trophy } from "@lucide/svelte";
-  import * as m from "$lib/paraglide/messages.js";
+  import * as m from "#lib/paraglide/messages.js";
 
   // Single-sources the tied-for-2nd "Finalist" pill presentation (VEKN §3.7.5) so it reads as a
   // deliberate band, not a glitch. `total` also forces the winner's NUMBER to render as "#1 / 43" — the trophy alone would leave a denominator with no numerator.

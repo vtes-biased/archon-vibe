@@ -1,21 +1,21 @@
 <script lang="ts">
-  import { getUserListItems, type UserListItem } from "$lib/db";
-  import { syncManager } from "$lib/sync";
-  import { getAuthState, updateProfile } from "$lib/stores/auth.svelte";
-  import { getCountries, getCountryFlag } from "$lib/geonames";
-  import { COUNTRY_LANGUAGE } from "$lib/data/country-language";
-  import { apiRequest } from "$lib/api";
-  import { toUserMessage } from "$lib/errors";
-  import { showToast } from "$lib/stores/toast.svelte";
-  import { canModerateLink, canPromoteLinkNational, getCommunityLinkReference } from "$lib/engine";
-  import { getLocale } from "$lib/paraglide/runtime.js";
-  import type { CommunityLink, LinkMedia } from "$lib/types";
+  import { getUserListItems, type UserListItem } from "#lib/db.ts";
+  import { syncManager } from "#lib/sync.ts";
+  import { getAuthState, updateProfile } from "#lib/stores/auth.svelte.ts";
+  import { getCountries, getCountryFlag } from "#lib/geonames.ts";
+  import { COUNTRY_LANGUAGE } from "#lib/data/country-language.ts";
+  import { apiRequest } from "#lib/api.ts";
+  import { toUserMessage } from "#lib/errors.ts";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
+  import { canModerateLink, canPromoteLinkNational, getCommunityLinkReference } from "#lib/engine.ts";
+  import { getLocale } from "#lib/paraglide/runtime.js";
+  import type { CommunityLink, LinkMedia } from "#lib/types.ts";
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
   import CommunityCountryCard from "./CommunityCountryCard.svelte";
   import CommunityContentPool from "./CommunityContentPool.svelte";
   import CommunityLinkEditor from "./CommunityLinkEditor.svelte";
   import { Globe, Pencil, Search, Users, Video } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   // Sponsor mode (?sponsor=1): the visitor came to find an official to sponsor them for a VEKN ID —
   // show only the officials, pre-filtered to their country, with an explicit contact CTA.

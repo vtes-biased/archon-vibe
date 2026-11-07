@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { page } from '$app/stores';
-  import UserList from '$lib/components/UserList.svelte';
-  import CommunityTab from '$lib/components/CommunityTab.svelte';
-  import PromosTab from '$lib/components/promos/PromosTab.svelte';
-  import Button from '$lib/components/Button.svelte';
+  import { page } from '$app/state';
+  import UserList from '#lib/components/UserList.svelte';
+  import CommunityTab from '#lib/components/CommunityTab.svelte';
+  import PromosTab from '#lib/components/promos/PromosTab.svelte';
+  import Button from '#lib/components/Button.svelte';
   import { Plus } from '@lucide/svelte';
-  import { getAuthState } from '$lib/stores/auth.svelte';
-  import { isOfficial } from '$lib/engine';
-  import { syncQueryParams, currentParams } from '$lib/url-filters';
-  import * as m from '$lib/paraglide/messages.js';
+  import { getAuthState } from '#lib/stores/auth.svelte.ts';
+  import { isOfficial } from '#lib/engine.ts';
+  import { syncQueryParams, currentParams } from '#lib/url-filters.ts';
+  import * as m from '#lib/paraglide/messages.js';
 
   const auth = $derived(getAuthState());
   let addingLink = $state(false);
@@ -22,7 +22,7 @@
   const TAB_VALUES: Tab[] = ['community', 'members', 'promos'];
 
   // Sponsor mode: arrived from a "get sponsored" pointer — focus the officials directory
-  const sponsorMode = $derived($page.url.searchParams.get('sponsor') !== null);
+  const sponsorMode = $derived(page.url.searchParams.get('sponsor') !== null);
 
   const urlTab = currentParams().get('tab') as Tab | null;
   let activeTab = $state<Tab>(urlTab && TAB_VALUES.includes(urlTab) ? urlTab : 'community');

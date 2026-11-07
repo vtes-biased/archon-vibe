@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { dialogPanel } from "$lib/actions/dialog";
-  import Button from '$lib/components/Button.svelte';
+  import { dialogPanel } from "#lib/actions/dialog.ts";
+  import Button from '#lib/components/Button.svelte';
   import { ImagePlus, ZoomOut, ZoomIn } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
-  import { showToast } from '$lib/stores/toast.svelte';
+  import * as m from '#lib/paraglide/messages.js';
+  import { showToast } from '#lib/stores/toast.svelte.ts';
 
   interface Props {
     onSave: (blob: Blob) => Promise<void>;

@@ -1,11 +1,11 @@
 <script lang="ts">
-  import type { Tournament, Promo, PromoDistribution } from "$lib/types";
-  import { getAllPromos, getUser } from "$lib/db";
-  import { tournamentAction } from "$lib/tournament-actions";
-  import { getAuthState } from "$lib/stores/auth.svelte";
-  import { showToast } from "$lib/stores/toast.svelte";
+  import type { Tournament, Promo, PromoDistribution } from "#lib/types.ts";
+  import { getAllPromos, getUser } from "#lib/db.ts";
+  import { tournamentAction } from "#lib/tournament-actions.ts";
+  import { getAuthState } from "#lib/stores/auth.svelte.ts";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
   import { Plus, X } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     tournament,

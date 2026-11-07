@@ -5,8 +5,8 @@ import {
   getVapidPublicKey,
   isOnline,
   registerPushSubscription,
-} from '$lib/api';
-import { getLocale } from '$lib/paraglide/runtime.js';
+} from '#lib/api.ts';
+import { getLocale } from '#lib/paraglide/runtime.js';
 
 let permission = $state<NotificationPermission>(
   typeof Notification !== 'undefined' ? Notification.permission : 'default'

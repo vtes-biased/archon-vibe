@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { getToasts, dismissToast, type Toast } from '$lib/stores/toast.svelte';
+  import { getToasts, dismissToast, type Toast } from '#lib/stores/toast.svelte.ts';
   import { CircleCheck, CircleX, TriangleAlert, Info, X } from '@lucide/svelte';
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   const toasts = $derived(getToasts());
 

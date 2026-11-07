@@ -366,9 +366,9 @@ it filters. `/tournaments` is the only list that follows it: `/leagues` and the
 three layers:
 
 - **URL query string** is canonical: every filter, the segmented-toggle tab and the
-  page number mirrored with `replaceState`, so Back restores the exact view and a
-  filtered list is shareable. Read `window.location`, never the page store —
-  shallow routing leaves the store behind. **A filter whose control only some
+  page number mirrored by a shallow, replacing `goto`, so Back restores the exact
+  view and a filtered list is shareable. Read `window.location`, never `page` —
+  shallow routing leaves `page.url` behind. **A filter whose control only some
   viewers can see is excluded**: a shared link would hand everyone else a filter
   they can neither see nor clear — unless those viewers ignore the parameter, as
   logged-out visitors ignore the tournament list's members-only `tab=past`. On `/users` that is the officials-only sponsor

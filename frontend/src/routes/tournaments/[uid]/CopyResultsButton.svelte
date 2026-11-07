@@ -1,10 +1,10 @@
 <script lang="ts">
-  import type { Tournament } from "$lib/types";
-  import type { StandingEntry, PlayerInfoMap } from "$lib/tournament-utils";
-  import { copyResults } from "$lib/copy-results";
+  import type { Tournament } from "#lib/types.ts";
+  import type { StandingEntry, PlayerInfoMap } from "#lib/tournament-utils.ts";
+  import { copyResults } from "#lib/copy-results.ts";
   import { ClipboardCopy } from "@lucide/svelte";
-  import Button from "$lib/components/Button.svelte";
-  import * as m from "$lib/paraglide/messages.js";
+  import Button from "#lib/components/Button.svelte";
+  import * as m from "#lib/paraglide/messages.js";
 
   // The tournament link itself renders a proper cover via backend/src/og.py's
   // per-tournament og:image. Organizers copy from the Tools sheet; this is the

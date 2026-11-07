@@ -1,11 +1,11 @@
 <script lang="ts">
   import { Monitor, Sun, Moon, Bell } from "@lucide/svelte";
   import { onMount } from "svelte";
-  import { getTheme, setTheme, type ThemePref } from "$lib/stores/theme.svelte";
-  import { getLocale, setLocale, locales } from '$lib/paraglide/runtime.js';
-  import * as m from '$lib/paraglide/messages.js';
-  import Button from "$lib/components/Button.svelte";
-  import { showToast } from "$lib/stores/toast.svelte";
+  import { getTheme, setTheme, type ThemePref } from "#lib/stores/theme.svelte.ts";
+  import { getLocale, setLocale, locales } from '#lib/paraglide/runtime.js';
+  import * as m from '#lib/paraglide/messages.js';
+  import Button from "#lib/components/Button.svelte";
+  import { showToast } from "#lib/stores/toast.svelte.ts";
   import {
     pushSupported,
     getPushPermission,
@@ -14,7 +14,7 @@
     enablePush,
     disablePush,
     refreshPushState,
-  } from "$lib/stores/push.svelte";
+  } from "#lib/stores/push.svelte.ts";
 
   onMount(refreshPushState);
 

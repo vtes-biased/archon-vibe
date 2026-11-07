@@ -1,8 +1,8 @@
 <script lang="ts">
   // View-only list of the viewer's own promo_stock (server-computed remaining).
-  import type { Promo } from "$lib/types";
+  import type { Promo } from "#lib/types.ts";
   import { Layers } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   let {
     stock,

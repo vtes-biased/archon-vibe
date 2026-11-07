@@ -1,10 +1,10 @@
 <script lang="ts">
   import CommunityLinkPills from "./CommunityLinkPills.svelte";
-  import { LANGUAGE_NAMES } from "$lib/data/languages";
-  import type { CommunityLink, LinkMedia } from "$lib/types";
-  import type { UserListItem } from "$lib/db";
+  import { LANGUAGE_NAMES } from "#lib/data/languages.ts";
+  import type { CommunityLink, LinkMedia } from "#lib/types.ts";
+  import type { UserListItem } from "#lib/db.ts";
   import { Pencil, X } from "@lucide/svelte";
-  import * as m from '$lib/paraglide/messages.js';
+  import * as m from '#lib/paraglide/messages.js';
 
   interface LinkEntry { user: UserListItem; link: CommunityLink }
 
