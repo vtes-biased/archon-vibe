@@ -10,6 +10,10 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- Organizers can now cancel a round finished by mistake, and a reopened tournament returns to the round it was playing.
+
 ## v1.3.9 — 2026-11-04
 
 - The menu now shows Sign In when you are signed out, and going offline no longer signs you out.
