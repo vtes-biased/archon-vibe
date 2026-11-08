@@ -1,6 +1,6 @@
-# Dogmas
+# Principles
 
-Human-chosen paradigms. Ingress checks a new ask against this page; egress checks
+Human-chosen paradigms. Intake checks a new ask against this page; review checks
 a change against it. Overturning one of these is valid work — violating one
 silently is not.
 
@@ -85,15 +85,15 @@ config. A typo in a value we author fails loudly at deploy; a pre-flight over it
 is machinery without safety. Assert on user input, remote responses, secrets that
 a flag requires, and resources a step consumes.
 
-**Comments are for traps only.** The wiki holds the why, the code shows the how.
+**Comments are for traps only.** The docs hold the why, the code shows the how.
 A comment is justified only by a subtle non-local constraint invisible at the
 point of reading. No narration, no changelogs, no TODOs — discovered work goes
-through ingress or gets done now. A comment past ~2 lines is usually narrating,
+through intake or gets done now. A comment past ~2 lines is usually narrating,
 and a contiguous comment block over three fails `just lint` whatever token it is
 written in ([dev](dev.md#lint-gates)) —
-a rationale that needs more room is a wiki page in the wrong file. Code never
-references the wiki: a trap comment states its constraint and stands alone; the
-wiki points at code, never the reverse.
+a rationale that needs more room is a docs page in the wrong file. Code never
+references the docs: a trap comment states its constraint and stands alone; the
+docs point at code, never the reverse.
 
 **Component splitting.** A Svelte page past ~1000 lines gets its sections
 extracted into child components: props down, state ownership stays in the parent.
@@ -111,8 +111,8 @@ non-local ones. Unit tests of internals calcify implementation and tax every
 change; integration and non-regression tests catch what matters and survive
 refactors.
 
-- Every test traces to a behavior declared in this wiki. A test nobody can map to
-  a wiki claim is evicted.
+- Every test traces to a behavior declared in these docs. A test nobody can map to
+  a docs claim is evicted.
 - **Mocks are banned by default** — a mock that mirrors the code tests the code
   against itself. Use real dependencies (containers, temp files) or don't test
   that path. The one carve-out is a system the test context cannot run — Discord,
@@ -131,15 +131,15 @@ Mechanics, layers and known fixture traps: [testing](testing.md).
 
 ## Review
 
-**Every review finding is addressed.** Egress classifies a finding blocking or
+**Every review finding is addressed.** Review classifies a finding blocking or
 advisory; advisory means it does not stop the landing, never that it may be
 dropped — it is fixed in the same change, or becomes a board line through
-ingress. The counterweight is a reviewer with no quota: "looks good" is a common
+intake. The counterweight is a reviewer with no quota: "looks good" is a common
 verdict, and report-everything must not become find-something.
 
 A named **comment pass** runs over every diff that touches code, deleting any
-comment the wiki, another comment, or the code itself already states — first by
-the author before egress, then by the reviewer. The three-line ceiling above
+comment the docs, another comment, or the code itself already states — first by
+the author before review, then by the reviewer. The three-line ceiling above
 catches the bulk; the pass catches the duplication.
 
 ## Product
@@ -217,7 +217,7 @@ to an env-pointed runtime path, with an untracked dev copy and graceful absence.
 
 ## Git
 
-Commit the wiki edit and the board line deletion with the code change that earns
+Commit the docs edit and the board line deletion with the code change that earns
 them — one unit of work, one change.
 
 **Reference GitHub issues, never close them from a commit.** `#N` in a commit

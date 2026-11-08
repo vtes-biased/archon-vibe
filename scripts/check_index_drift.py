@@ -108,7 +108,7 @@ def main() -> int:
         print(
             f"Index drift: {SCHEMA} and {CONCURRENT} applied over {tag} does not match a fresh "
             "database. Give a changed index a new name and DROP INDEX IF EXISTS "
-            "the old one (wiki/hazards.md).\n" + "\n".join(violations)
+            "the old one (docs/hazards.md).\n" + "\n".join(violations)
         )
         return 1
     print(f"index-drift: ok ({len(fresh)} indexes, over {tag})")

@@ -8,7 +8,7 @@ empty page is the normal state.
 `/post-deploy` runs them, ahead of the feedback issues it closes. Unlike the work
 deferred in [vekn-decommission](vekn-decommission.md), a fired trigger here does
 **not** go back through `/intake`: that trigger fires every release, and an item
-reaches this page only after passing egress review, so the one decision left is
+reaches this page only after passing review, so the one decision left is
 the owner's go/no-go.
 
 **An item belongs here only if `/post-deploy` could execute it with nothing but
@@ -28,4 +28,4 @@ commit. `just migration-pairing` fails on either half outliving the other.
 answers whether a given deploy has made it actionable — the same check
 `/post-deploy` already runs against a feedback issue's fix. An item states what
 gates it and why, what to run, what proves it worked, and what it owes afterwards:
-people to tell, and the wiki text that dies with it.
+people to tell, and the docs text that dies with it.

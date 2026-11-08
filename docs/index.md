@@ -1,4 +1,4 @@
-# Wiki
+# Docs
 
 What Archon is and what was decided. A manifesto of *what is*, not a journal of how
 it came to be. Every page is reachable from here.
@@ -10,7 +10,7 @@ completed is documentation and belongs on a page below.
 
 - [product](product.md) — scope, who it is for, what it does and deliberately does
   not do.
-- [dogmas](dogmas.md) — the human-chosen paradigms. Ingress and egress check
+- [principles](principles.md) — the human-chosen paradigms. Intake and review check
   against this page.
 - [glossary](glossary.md) — the vocabulary no generic tool knows, including the
   per-locale term table.

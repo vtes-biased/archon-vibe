@@ -1,15 +1,15 @@
 ---
 name: upkeep
-description: The maintenance loop — lint the wiki against the code and its sources, run oldest-first eviction verdicts on the board, and mine recurring review findings for harness amendments. Use every 20 completed board lines or monthly, or when asked to do a maintenance, cleanup or health-check pass.
+description: The maintenance loop — lint the docs against the code and its sources, run oldest-first eviction verdicts on the board, and mine recurring review findings for harness amendments. Use every 20 completed board lines or monthly, or when asked to do a maintenance, cleanup or health-check pass.
 ---
 
 # Upkeep
 
-A recurring pass over three surfaces. **A cycle is one completed board line**; this
-runs every 20 cycles, or monthly, whichever comes first. Anything untouched for 20
-cycles goes on trial at the next pass.
+A recurring pass over three surfaces. **The unit of time is a completed board
+line**; this runs every 20 completed lines, or monthly, whichever comes first.
+Anything untouched for 20 completed lines goes on trial at the next pass.
 
-Count cycles from history — there is no counter file:
+Count completed lines from history — there is no counter file:
 
 ```sh
 git log --oneline -S'- ' -- BOARD.md | head -40      # commits touching board lines
@@ -19,11 +19,11 @@ git log -1 --format=%ci -- BOARD.md                  # last board movement
 Work the three surfaces in order. Everything this pass proposes goes through
 `/intake` like any other ask — **it does not write to the board directly**.
 
-## 1. Wiki lint
+## 1. Docs lint
 
 **Contradictions** — two pages asserting different things. Cross-check the pairs
 that overlap by construction: `tournaments.md` against `domain/tournament-rules.md`
-and `domain/judging.md`; `sync.md` against `access.md`; `dogmas.md` against
+and `domain/judging.md`; `sync.md` against `access.md`; `principles.md` against
 whatever cites it.
 
 **Claims stale against code** — sample the load-bearing ones and verify. Symbol
@@ -32,7 +32,7 @@ checklist rot fastest. A steps-list that mentions a manual registration the code
 now derives automatically is the classic case.
 
 ```sh
-grep -oE '`[a-z_]+\.(py|ts|rs|svelte)`' wiki/*.md wiki/domain/*.md | sort -u
+grep -oE '`[a-z_]+\.(py|ts|rs|svelte)`' docs/*.md docs/domain/*.md | sort -u
 ```
 
 **Domain claims have no code to lint against.** Check their **sources** instead:
@@ -41,12 +41,12 @@ still right? Flag any interview-sourced claim carrying a date older than a year 
 re-interview — those are the ones that silently go stale, because nothing in the
 repo contradicts them.
 
-**Orphan pages** — anything not reachable from `wiki/index.md`, and any page
-nothing has cited or touched in 20 cycles. Reachability:
+**Orphan pages** — anything not reachable from `docs/index.md`, and any page
+nothing has cited or touched in 20 completed lines. Reachability:
 
 ```sh
-grep -oE '\]\(([a-z/-]+)\.md' wiki/index.md | sort -u
-ls wiki/*.md wiki/domain/*.md
+grep -oE '\]\(([a-z/-]+)\.md' docs/index.md | sort -u
+ls docs/*.md docs/domain/*.md
 ```
 
 **Eviction candidates** — a page that has become a summary of a summary, or one
@@ -70,14 +70,14 @@ line gets one of four verdicts, and no line is skipped twice:
 
 - **do** — it is still right and still wanted; leave it, reordering if the ranking
   rules now place it differently;
-- **date** — it is real but not now; it moves off the board to the wiki page that
+- **date** — it is real but not now; it moves off the board to the docs page that
   owns it as a deferred item with a named trigger, not a vague deferral;
-- **promote** — it turned out to be a subject, not an ask; it becomes wiki content
+- **promote** — it turned out to be a subject, not an ask; it becomes docs content
   and the line goes;
 - **drop** — it is no longer wanted; delete it.
 
-Then check the **deferred items** parked in the wiki (`wiki/vekn-decommission.md`,
-`wiki/post-deploy.md`, the Rules Director trigger on `wiki/tournaments.md`, plus
+Then check the **deferred items** parked in the docs (`docs/vekn-decommission.md`,
+`docs/post-deploy.md`, the Rules Director trigger on `docs/tournaments.md`, plus
 the deferred note on `dev.md`): has a trigger fired? A
 fired trigger sends the item through `/intake` as an ordinary line at its ranked
 position, which may push the list to its limit — resolve that here rather than at
@@ -90,25 +90,25 @@ one drop or promotion before any new line can land.
 A drop that was a promise to a person is something to **say**, not merely delete —
 if a GitHub feedback issue is tracking it, that issue needs a reply.
 
-`wiki/post-deploy.md` gets one extra check, because its items are verifiable rather
+`docs/post-deploy.md` gets one extra check, because its items are verifiable rather
 than judged: every item's gating sha must still resolve (`git cat-file -e`), and an
 item whose sha is in the deployed tag has been owed since that deploy — say so
 rather than letting it age quietly. An item that turns out to have already been run
 is a deletion, not a verdict.
 
-## 3. Harness ratchet
+## 3. Retrospective
 
-Mine the recent egress reviews and owner corrections. **Three occurrences of the
+Mine the recent reviews and owner corrections. **Three occurrences of the
 same class is a harness problem, not a code problem.**
 
 Look for: the same advisory finding recurring across unrelated diffs; the same
 owner correction given more than twice; the same rule being rediscovered by an
 agent that had no way to know it.
 
-Each qualifying class becomes a proposed amendment — a new dogma line, a charter
+Each qualifying class becomes a proposed amendment — a new principle line, a charter
 line for the reviewer, a lint rule, a hook, or an edit to one of these skills —
 filed through `/intake` as an ordinary board line. **The harness grows only through
-this ratchet.** Do not add a skill, an agent or a hook because it seems useful.
+this retrospective.** Do not add a skill, an agent or a hook because it seems useful.
 
 HitL effort goes here rather than into the code: a correction the owner has to give
 twice is a rule that should have been written down once.

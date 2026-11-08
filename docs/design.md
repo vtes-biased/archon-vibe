@@ -459,7 +459,7 @@ show or hide by object state.
 the VEKN-wide levels, while the tournament view offers the event-level ones.
 
 **Never render a figure we can't compute correctly** — the rule and its two
-corollaries are [dogmas](dogmas.md#product). Practically: if the client lacks an
+corollaries are [principles](principles.md#product). Practically: if the client lacks an
 input the server-side computation uses — the viewer can't see sanctions, the row
 isn't in scope, the engine binding isn't loaded — render an em dash and, where it
 helps, say why.

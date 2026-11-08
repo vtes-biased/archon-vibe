@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """PostToolUse(Write|Edit): refuse TODO/FIXME markers in code.
 
-Dogma: discovered work goes through /intake or gets done now — it is never parked
+Principle: discovered work goes through /intake or gets done now — it is never parked
 in a comment where nothing will ever read it again.
 """
 
@@ -32,7 +32,7 @@ def main() -> int:
     print(
         f"{path} introduces a parked-work marker:\n  "
         + "\n  ".join(hits[:5])
-        + "\n\nThis repo has no TODOs (CLAUDE.md, wiki/dogmas.md). Either do the work "
+        + "\n\nThis repo has no TODOs (CLAUDE.md, docs/principles.md). Either do the work "
         "now, or run /intake so it becomes a board line. Remove the marker.",
         file=sys.stderr,
     )

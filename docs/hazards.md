@@ -1,7 +1,7 @@
 # Hazards
 
 Non-local traps: behavior not evident from reading the code where it lives. These
-are what [KISS](dogmas.md#code) means here — read this before touching the
+are what [KISS](principles.md#code) means here — read this before touching the
 subsystems named.
 
 Hazards that belong to one subsystem are stated where that subsystem is
@@ -124,7 +124,7 @@ decision single-sourced in Rust. Frontend wrappers are UX-only and fail closed
 
 **A frontend figure the backend also computes must call the same Rust binding with
 the same inputs**, and must match the backend's *inclusion filter* as well as its
-formula ([dogmas](dogmas.md#product)).
+formula ([principles](principles.md#product)).
 
 **The bot's round-timer reminders duplicate the frontend countdown formula** —
 the schedule computation and `TimerDisplay.svelte` must stay in lockstep

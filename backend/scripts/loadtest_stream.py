@@ -1,4 +1,4 @@
-"""Drive N concurrent SSE clients through the EC-rehearsal phases (wiki/sync.md).
+"""Drive N concurrent SSE clients through the EC-rehearsal phases.
 
 Three phases, mirroring what a 200-player room does to the stream stack:
 

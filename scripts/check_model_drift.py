@@ -453,7 +453,7 @@ def main() -> int:
     for problem in problems:
         print(f"  {problem}")
     print(
-        "\nThe three are hand-synchronized (wiki/sync.md). Mirror the change, or — if the\n"
+        "\nThe three are hand-synchronized (docs/sync.md). Mirror the change, or — if the\n"
         f"shape genuinely belongs to one side — add it to PY_ONLY, TS_ONLY or\n"
         f"ENGINE_UNCHECKED in {Path(__file__).relative_to(ROOT)} with the reason."
     )

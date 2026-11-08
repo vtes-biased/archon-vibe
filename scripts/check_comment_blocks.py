@@ -101,7 +101,7 @@ def main() -> int:
         print(f"  {v}")
     print(
         "\nA comment states a trap: the non-local constraint that is invisible where\n"
-        "the code sits. Compress it to that. If it explains a decision, the wiki page\n"
+        "the code sits. Compress it to that. If it explains a decision, the docs page\n"
         "owning the subsystem already holds it — delete the comment instead."
     )
     return 1

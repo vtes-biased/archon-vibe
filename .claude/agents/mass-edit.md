@@ -14,7 +14,7 @@ rules, the file set you own, and the verification commands. Apply exactly that.
 - Never change code behavior. If a rule seems to require a behavioral change,
   leave the site untouched and list it in your report instead.
 - Touch only files in your assigned set. Never edit files outside it, and never
-  edit wiki pages unless the brief explicitly assigns them.
+  edit docs pages unless the brief explicitly assigns them.
 - Run the brief's verification commands before reporting; fix your own edits
   until they pass. Never report done over a failing check.
 - Your final message is data for the orchestrator, not prose for a human: the

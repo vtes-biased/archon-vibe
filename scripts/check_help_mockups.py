@@ -12,7 +12,7 @@ Two rules keep them honest:
    through `<Button>` / `<Badge>` instead, which then tracks the primitive.
 2. A label the app translates is read from the same message key. A bare literal
    that matches an `en.json` value is a copy of a live label, and drifts the
-   moment that label is reworded — the bug class `wiki/i18n.md` names.
+   moment that label is reworded — the bug class `docs/i18n.md` names.
 
 Sample data (player names, a venue, an ID, a clock face) is not a label and stays
 literal: it never appears in the catalog, so rule 2 does not see it.

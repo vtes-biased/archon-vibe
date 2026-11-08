@@ -29,7 +29,7 @@ that award is reduced to half a victory point
 
 Everything else — turn phases, combat, politics, disciplines, torpor, diablerie —
 is invisible to the app. It matters only in that the app must never claim to
-adjudicate it ([dogmas](../dogmas.md#product)).
+adjudicate it ([principles](../principles.md#product)).
 
 ## Deck structure
 

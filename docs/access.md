@@ -142,7 +142,7 @@ session is invalidated on purpose.
 **Password, passkey and Discord login honour `/login?redirect=<path>`** (magic
 link never returns to `/login` and drops it) — same-origin paths only
 (open-redirect guard), checked in the login page's `successTarget()` and
-again at the Discord authorize ingress, which carries the path through the
+again at the Discord authorize entry point, which carries the path through the
 OAuth state and back onto the callback's `/login` URL. The consent page sends
 its own path and query there, so a third-party OAuth login — the Discord bot's
 `login_hint=discord` links included — resumes the authorization after login.

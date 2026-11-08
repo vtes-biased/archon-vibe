@@ -60,7 +60,7 @@ API app reads directly — `modified_at` orders and batches its streams
 The `api` projection publishes **VEKN IDs, never names**. A tournament carries
 player, standing and winner *uids*; a non-member player holds no `api` user row,
 so the uid resolves to nothing and the person is never surfaced. That is the
-mechanism, not a filter applied per endpoint — [dogmas](dogmas.md#product).
+mechanism, not a filter applied per endpoint — [principles](principles.md#product).
 
 The tournament public projection is an **allowlist** (`_TOURNAMENT_PUBLIC_FIELDS`),
 with one conditional: on an online event `venue_url` is the *join* link rather than

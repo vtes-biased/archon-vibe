@@ -83,7 +83,7 @@ const updatedTournament = engine.processTournamentEvent(
 
 **Single source of truth for every authorization rule** — consumed by backend
 (PyO3), frontend (WASM) and, through `/oauth/userinfo`, the Discord bot. See
-`wiki/access.md` for the capability matrix and the rationale.
+`docs/access.md` for the capability matrix and the rationale.
 
 The rules are **data**, not functions:
 
@@ -93,7 +93,7 @@ The rules are **data**, not functions:
   user-facing denial. Deny by default.
 - `ROLE_APPOINTMENTS` — one row per role: who may grant or revoke it.
 
-A matrix change edits a row. The published matrix lives in wiki/access.md
+A matrix change edits a row. The published matrix lives in docs/access.md
 (Authorization); this file describes the mechanism.
 
 **Evaluating** — `check(capability, &Request)` is the single decision point.
@@ -116,7 +116,7 @@ offer without carrying their own copy of the matrix.
 
 ### Sanctions Reference (`src/sanctions.rs`)
 
-Single source for the VEKN Judges-Guide v2 penalty reference: category/subcategory taxonomy, English labels, baseline penalties, escalation ladder. `sanction_reference_json()` → WASM `sanctionReference()` / PyO3 `sanction_reference()`. Consumed by `backend/src/models.py` (derives `SUBCATEGORIES_BY_CATEGORY`/`BASELINE_PENALTIES` at import), the frontend's `getSanctionReference()` (`engine.ts`), and the Discord bot via the public `GET /sanctions/reference` endpoint. Distinct from `tournament/sanctions.rs` (SA effective-round resolution — see wiki/tournaments.md).
+Single source for the VEKN Judges-Guide v2 penalty reference: category/subcategory taxonomy, English labels, baseline penalties, escalation ladder. `sanction_reference_json()` → WASM `sanctionReference()` / PyO3 `sanction_reference()`. Consumed by `backend/src/models.py` (derives `SUBCATEGORIES_BY_CATEGORY`/`BASELINE_PENALTIES` at import), the frontend's `getSanctionReference()` (`engine.ts`), and the Discord bot via the public `GET /sanctions/reference` endpoint. Distinct from `tournament/sanctions.rs` (SA effective-round resolution — see docs/tournaments.md).
 
 Revision checklist — grouping/baselines/escalation propagate from here alone, but the *vocabulary and display* layers are still per-consumer: (1) the Python enums in `backend/src/models.py` (their constructors raise at backend boot on a key they don't know — loud); (2) the TS unions in `frontend/src/lib/types.ts` and the `subcategoryLabel` map in `TournamentSanctionModal.svelte` plus the 5 locale files (an unknown key renders as its raw key — quiet, so check these); (3) the bot caches the reference per process — restart it after a backend deploy that revises the tables.
 
@@ -139,7 +139,7 @@ Entry points:
 
 Tournament state machine and event processing for offline-first tournament management.
 
-See [../wiki/tournaments.md](../wiki/tournaments.md) for the behavioral reference (state machine, full event catalog, scoring/oust-order, permissions, privacy projections). This README covers the engine's build, bindings, and entry-point signatures.
+See [../docs/tournaments.md](../docs/tournaments.md) for the behavioral reference (state machine, full event catalog, scoring/oust-order, permissions, privacy projections). This README covers the engine's build, bindings, and entry-point signatures.
 
 Features:
 - **State machine**: Planned → Registration → Waiting → Playing → Finished
@@ -154,7 +154,7 @@ Entry points:
 - `display_standings(tournament, sanctions)` - Rank a tournament's stored result sheet for display, final placement included. Exposed as WASM `displayStandings`; `sanctions` must be scoped to this tournament.
 - `table_label(tournament, table_idx)` - `{label, number}`: the room-aware table label (null when no room covers the index) and the number a plain "Table N" reads, from `table_rooms`, `first_table_number` and `continue_room_numbering`. WASM `tableLabel`, PyO3 `table_label`.
 
-The event enum lives in `tournament/types.rs`; the full catalog (with required state and permissions) is documented in [../wiki/tournaments.md](../wiki/tournaments.md).
+The event enum lives in `tournament/types.rs`; the full catalog (with required state and permissions) is documented in [../docs/tournaments.md](../docs/tournaments.md).
 
 ## Design
 

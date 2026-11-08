@@ -1284,7 +1284,7 @@ async def find_same_event_tournaments(
     same day is a different event); candidates or callers without a country
     declared stay in, since most legacy imports have none. Both sides go through
     `country_key` because some rows hold the country NAME in that field — comparing
-    raw drops them as if they disagreed ([hazards](../../wiki/hazards.md)) — and a
+    raw drops them as if they disagreed — and a
     value that resolves to nothing still compares as itself, so an unrecognised
     spelling narrows the candidates rather than disabling the filter.
     """

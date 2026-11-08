@@ -593,7 +593,7 @@ ordered by the organizer rather than tossed.
 *Asked 2026-08. The interim stance above is owner-approved and shipped; what is
 left is out of our hands, so it waits here rather than on the board.*
 
-**Deferred ask** — record the answers in `wiki/domain/` (§3.1.6's reading in
+**Deferred ask** — record the answers in `docs/domain/` (§3.1.6's reading in
 [tournament rules](domain/tournament-rules.md), the A.2/A.2.1 credit in
 [VEKN](domain/vekn.md)), then either change the engine or leave the stance above
 citing the ruling. The three writers that must end up saying the same thing are

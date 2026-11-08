@@ -1,7 +1,7 @@
 # Testing
 
-The policy — few tests, at boundaries, no mocks, each traceable to a wiki claim —
-is [dogmas](dogmas.md#testing). This page is the layers, how to run them, and the
+The policy — few tests, at boundaries, no mocks, each traceable to a docs claim —
+is [principles](principles.md#testing). This page is the layers, how to run them, and the
 traps that have bitten.
 
 ## Layers
@@ -218,7 +218,7 @@ inclusive. Cancel a **non-last** round to obtain a `Cancelled` table.
 **A fake is legitimate only for a system the test context cannot run** — Discord,
 the VEKN registry, GitHub, our own backend seen from the bot's process — and only
 paired with a guard test pinning it to the real contract
-([dogmas](dogmas.md#testing)). `bot/tests/test_rest_fakes_match_hikari.py`
+([principles](principles.md#testing)). `bot/tests/test_rest_fakes_match_hikari.py`
 binds every REST call shape the bot uses against the real `RESTClientImpl` and
 against each fake, and `test_refresh_single_flight.py` proves its backend fake
 reproduces the bug it stands for. `test_discord_login_redirect.py` fakes Discord

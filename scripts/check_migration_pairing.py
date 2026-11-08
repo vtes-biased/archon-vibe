@@ -3,7 +3,7 @@
 
 A migration in `backend/src/migrations.py` rewrites rows the running code can no
 longer decode. Nothing in the tree records that it has been applied, so its proof
-lives in a `wiki/post-deploy.md` section carrying the queries that show it worked
+lives in a `docs/post-deploy.md` section carrying the queries that show it worked
 on every long-lived database. The entry dies in the commit that deletes that
 section — this gate is what makes the two moves one move.
 
@@ -25,7 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 MIGRATIONS = ROOT / "backend/src/migrations.py"
-POST_DEPLOY = ROOT / "wiki/post-deploy.md"
+POST_DEPLOY = ROOT / "docs/post-deploy.md"
 
 _MARKER = re.compile(r"^\*\*Migration\*\* `([a-z0-9-]+)`", re.MULTILINE)
 
@@ -56,12 +56,12 @@ def main() -> int:
 
     violations = [
         f"  {name}: declared in backend/src/migrations.py, no section in "
-        f"wiki/post-deploy.md"
+        f"docs/post-deploy.md"
         for name in declared
         if name not in proven
     ]
     violations += [
-        f"  {name}: proven in wiki/post-deploy.md, no entry in "
+        f"  {name}: proven in docs/post-deploy.md, no entry in "
         f"backend/src/migrations.py"
         for name in proven
         if name not in declared

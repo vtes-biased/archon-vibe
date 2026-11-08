@@ -1,6 +1,6 @@
 ---
 name: intake
-description: The ingress loop — challenge an incoming request, idea or discovery before it reaches BOARD.md, then either add a line, fold it into an existing one, promote it to the wiki, or refuse it. Use whenever new work is proposed, a discovery surfaces mid-task, or the user asks to add something to the board.
+description: The intake loop — challenge an incoming request, idea or discovery before it reaches BOARD.md, then either add a line, fold it into an existing one, promote it to the docs, or refuse it. Use whenever new work is proposed, a discovery surfaces mid-task, or the user asks to add something to the board.
 ---
 
 # Intake
@@ -8,7 +8,7 @@ description: The ingress loop — challenge an incoming request, idea or discove
 No work reaches the board unchallenged. Refusing a line is much cheaper than
 evicting one later.
 
-Ingress **proposes**; the owner accepts. Never write to `BOARD.md` before the owner
+Intake **proposes**; the owner accepts. Never write to `BOARD.md` before the owner
 has said yes.
 
 ## 1. Read the board first
@@ -24,26 +24,26 @@ rule. Everything below depends on them.
 
 Run all four. Any one of them can end the intake.
 
-**Conflict** — does this contradict a decision already recorded in the wiki, or
+**Conflict** — does this contradict a decision already recorded in the docs, or
 duplicate an existing line? Grep for it:
 
 ```sh
-grep -rin '<keyword>' wiki/ BOARD.md
+grep -rin '<keyword>' docs/ BOARD.md
 ```
 
-Changing a wiki decision is valid work; **silently violating one is not**. If it
+Changing a docs decision is valid work; **silently violating one is not**. If it
 conflicts, say so explicitly and make the decision change the ask, not a side
 effect. If it duplicates, fold it into the existing line rather than adding one.
 
 **Completability** — can you state "done" for it, machine-verifiably where
-possible? If not, it is a subject, not an ask: it belongs on a wiki page. "Keep an
-eye on X", "improve Y", "think about Z" all fail here. A subject that becomes wiki
+possible? If not, it is a subject, not an ask: it belongs on a docs page. "Keep an
+eye on X", "improve Y", "think about Z" all fail here. A subject that becomes docs
 content is a *successful* intake, not a rejection.
 
 Externally-gated work does not go on the board — the board holds no waiting state.
 If the ask is real and completable but waits on something outside our control,
-record it as a **deferred item** on the wiki page that owns the subject (the VEKN
-items live in `wiki/vekn-decommission.md`), stating the ask, its done-condition,
+record it as a **deferred item** on the docs page that owns the subject (the VEKN
+items live in `docs/vekn-decommission.md`), stating the ask, its done-condition,
 the evidence that cannot be reconstructed later, and a named trigger — a condition
 someone could observe firing, not "later". `/upkeep` watches the triggers; a fired
 one sends the item back through this loop as an ordinary line.
@@ -51,7 +51,7 @@ one sends the item back through this loop as an ordinary line.
 **Scope** — split only on real abstraction boundaries, so an agent can hold each
 part in context. **Never split to defer.** A large cohesive change is one line.
 
-**Doc-impact** — name the wiki pages this work will touch, before it starts. Egress
+**Doc-impact** — name the docs pages this work will touch, before it starts. Review
 checks that list. "None" is a legitimate answer and must be justified. Domain pages
 change only when the *domain* changed or a source was misread; a code change alone
 never edits a domain page.
@@ -82,8 +82,8 @@ for, a **Done when** clause, and where the context is. Bulky elaboration — sco
 hazards, plan, measured evidence — goes in `board/<slug>.md` and dies with the
 line.
 
-Record the **doc-impact durably**: name the wiki pages in the line's **Done when**
-("…and the index table in `wiki/sync.md` updated"), or in a `Doc-impact:` line at
+Record the **doc-impact durably**: name the docs pages in the line's **Done when**
+("…and the index table in `docs/sync.md` updated"), or in a `Doc-impact:` line at
 the top of `board/<slug>.md` when the line has one. `/ship` confirms the contract
 from what the line and its file say — a doc-impact that lives only in this
 conversation is lost on the next session.
@@ -107,5 +107,5 @@ Then, in the **next** turn, ask for accept / decline / edit, and only then write
   from the work in hand.
 - **`/feedback-triage`** — GitHub feedback issues. It terminates here for anything
   it accepts.
-- **`/upkeep`** — the wiki lint and the harness ratchet both propose work, and both
+- **`/upkeep`** — the docs lint and the retrospective both propose work, and both
   come through this loop.

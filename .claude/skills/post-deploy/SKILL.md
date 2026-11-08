@@ -1,6 +1,6 @@
 ---
 name: post-deploy
-description: Run after a successful production deploy — run the one-time actions the deploy just made safe (parked in wiki/post-deploy.md), then tell the people who reported the bugs it fixed and close their issues. Use when asked to follow up after a deploy, to run a pending production script or backfill, or to close the issues a deploy has now shipped.
+description: Run after a successful production deploy — run the one-time actions the deploy just made safe (parked in docs/post-deploy.md), then tell the people who reported the bugs it fixed and close their issues. Use when asked to follow up after a deploy, to run a pending production script or backfill, or to close the issues a deploy has now shipped.
 ---
 
 # Post-deploy
@@ -11,7 +11,7 @@ tag — `/changeset`.
 
 An issue closes when the fix **deploys** and the reporter can see it work, which
 is why commits carry a bare `Reported in #N.` and never a closing keyword
-(`wiki/dogmas.md`). This pass is what that backlink is for.
+(`docs/principles.md`). This pass is what that backlink is for.
 
 **Prod only.** Beta is our testbed; the reporter is on prod. On a beta deploy,
 close nothing.
@@ -25,7 +25,7 @@ up by the next run for free, because a still-open issue is still open.
 
 **The action half cannot.** A script that has to run once on production leaves no
 GitHub state and no repository state behind, so nothing later can derive that it
-is owed. Those are written down when they are written, in `wiki/post-deploy.md`,
+is owed. Those are written down when they are written, in `docs/post-deploy.md`,
 one `##` section each, and that page is the only register — never a subsystem
 page's prose, which is where they used to get lost.
 
@@ -45,7 +45,7 @@ it isn't.
 
 ## 2. Run what the deploy unlocked
 
-Read `wiki/post-deploy.md`. An empty page is the normal state; skip to step 3.
+Read `docs/post-deploy.md`. An empty page is the normal state; skip to step 3.
 
 Each item names the commit that gates it. It is actionable when that commit is in
 the deployed tag — the same check the issue pass uses:
@@ -60,7 +60,7 @@ you are about to run and wait** — these write to production, and several repor
 default precisely so the counts get reviewed before `--apply`.
 
 Then finish the item, all of it: the verification it names, the people it owes a
-message, and the wiki text it says dies with it. **Delete the item.** Completion is
+message, and the docs text it says dies with it. **Delete the item.** Completion is
 deletion here exactly as it is on the board; a run left on the page reads as still
 owed and gets run twice.
 

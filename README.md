@@ -75,9 +75,9 @@ Archon is designed to work seamlessly online or offline, crucial for tournament 
 - Event-driven architecture with business logic in Rust
 - Offline mode with primary device ownership (tournament locked to one device)
 
-See the [wiki](wiki/index.md) for the full technical and product reference —
-[architecture](wiki/architecture.md), [sync](wiki/sync.md),
-[tournaments](wiki/tournaments.md), and the [VEKN domain](wiki/domain/tournament-rules.md)
+See the [docs](docs/index.md) for the full technical and product reference —
+[architecture](docs/architecture.md), [sync](docs/sync.md),
+[tournaments](docs/tournaments.md), and the [VEKN domain](docs/domain/tournament-rules.md)
 the app implements.
 
 ## Development

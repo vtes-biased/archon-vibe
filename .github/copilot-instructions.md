@@ -4,8 +4,8 @@ Every artifact has exactly one. Anything you cannot assign a lifespan to is nois
 delete it.
 
 - **Code** — permanent. The source of truth for *how*.
-- **Wiki** (`wiki/`) — standing. The source of truth for *what is* and *what was
-  decided*. Start at `wiki/index.md`.
+- **Docs** (`docs/`) — standing. The source of truth for *what is* and *what was
+  decided*. Start at `docs/index.md`.
 - **Task context** — ephemeral. Plans and findings die when the task completes.
 
 There is no third place: no TODO file, no plan document, no in-chat checklist.
@@ -21,15 +21,15 @@ the line.
 
 ## Working rules
 
-The paradigms are `wiki/dogmas.md`. The ones that bite most often:
+The paradigms are `docs/principles.md`. The ones that bite most often:
 
 - **Comments are for traps only** — a subtle non-local constraint invisible at the
   point of reading. No narration, no changelogs, **no TODOs**.
 - **Locality over DRY.** Explicit greppable local code over clever wrappers. Facts
   live in one place; similar-looking but causally unrelated code stays repeated.
 - **Tests default to zero.** Add one only for a real regression, at an interface,
-  traceable to a wiki claim. Mocks are banned by default.
+  traceable to a docs claim. Mocks are banned by default.
 - **No red builds.**
-- Read `wiki/hazards.md` before touching the subsystems it names.
-- A change lands as one unit: code, the wiki pages it affects, and the board line
+- Read `docs/hazards.md` before touching the subsystems it names.
+- A change lands as one unit: code, the docs pages it affects, and the board line
   deleted.

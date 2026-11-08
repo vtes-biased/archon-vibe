@@ -1,12 +1,12 @@
 ---
 name: ship
-description: Take a line off BOARD.md and land it as one change — code, wiki, and the deleted board line — then send the diff to a fresh-context egress reviewer. Use when asked to work the board, pick up the next thing, or implement a specific board line.
+description: Take a line off BOARD.md and land it as one change — code, docs, and the deleted board line — then send the diff to a fresh-context reviewer. Use when asked to work the board, pick up the next thing, or implement a specific board line.
 ---
 
 # Ship
 
-One line in, one change out. The unit of work is the **trinity**: code changed,
-doc-impact wiki pages updated, board line deleted — in one commit.
+One line in, one change out. The unit of work is **one change**: code changed,
+doc-impact docs pages updated, board line deleted — in one commit.
 
 ## You are not alone in the tree
 
@@ -38,8 +38,8 @@ cat BOARD.md
 
 Take the **top** line unless the owner named a different one.
 
-Read its `board/<slug>.md` if it has one. Read the wiki pages the line touches, and
-`wiki/hazards.md` if it names any subsystem you are about to change.
+Read its `board/<slug>.md` if it has one. Read the docs pages the line touches, and
+`docs/hazards.md` if it names any subsystem you are about to change.
 
 **`git status` is how you find a sibling.** Read it when you claim the line and
 again before every commit. Foreign paths mean someone is mid-line. Say in chat which
@@ -53,7 +53,7 @@ rides along under your message.
 Explicit paths still commit the **worktree** content of those paths, so a file you
 share with a sibling carries their half-finished hunks under your message — and if
 their half is what your half depends on, the commit does not run. **`BOARD.md` and
-`wiki/` are shared by construction** — every board agent edits them — so diff them
+`docs/` are shared by construction** — every board agent edits them — so diff them
 by name and confirm every hunk is yours, however clean the code paths came back.
 When one is not, stage that file as HEAD-plus-your-edits instead: reconstruct it
 from `git show HEAD:<path>`, write it with `git hash-object -w`, and place it with
@@ -91,7 +91,7 @@ misattribution. Leave it, and say so in the report.
 Before writing code, state — to yourself, and to the owner if anything moved:
 
 - the **done-condition**, from the line;
-- the **doc-impact**: which wiki pages change, or why none do — intake recorded it
+- the **doc-impact**: which docs pages change, or why none do — intake recorded it
   in the line's **Done when** or a `Doc-impact:` line in its `board/<slug>.md`;
 - anything the line assumed that turns out to be false.
 
@@ -110,15 +110,15 @@ longer than you found it, minus the line you completed.
 
 ### How to write the code
 
-The full statement is `wiki/dogmas.md`; these are the rules that decide most
+The full statement is `docs/principles.md`; these are the rules that decide most
 diffs, and the reviewer checks every one of them.
 
-**Comments are for traps only.** The wiki holds the why, the code shows the how. A
+**Comments are for traps only.** The docs hold the why, the code shows the how. A
 comment is justified only by a subtle **non-local** constraint invisible at the
 point of reading — "this must fire post-commit or it deadlocks", "server wins here
 because the device's copy is stale". Never restate the code, never narrate what
 changed, never leave a changelog. If an inline comment runs past ~2 lines it is
-narrating: cut it, or move the detail to the wiki page that owns the subsystem.
+narrating: cut it, or move the detail to the docs page that owns the subsystem.
 **No TODOs** — a discovered task is done now or goes through `/intake`.
 
 **Locality over DRY.** Co-locate what changes together. Prefer explicit, greppable
@@ -136,12 +136,12 @@ near-identical lines.
 **KISS means avoiding hazard, not avoiding work.** A big rewrite is cheap; a
 non-local interdependency is not. Prefer the design a fresh agent can understand
 from the files in front of it. Before touching a subsystem named in
-`wiki/hazards.md`, read that entry — those are the traps that have already bitten.
+`docs/hazards.md`, read that entry — those are the traps that have already bitten.
 
 **A query on a growing table lands with its index.** A `WHERE` you add or change on
 `objects` or `auth_methods` ships with the `schema.sql` index that serves it — same
 expression, partial predicate written verbatim, `type` as a literal — or joins the
-scan list in `wiki/architecture.md#indexes` with its reason. Re-plan it with that
+scan list in `docs/architecture.md#indexes` with its reason. Re-plan it with that
 page's recipe: the expression must sit in `Index Cond`, not `Filter`. The reviewer
 blocks on anything else.
 
@@ -150,22 +150,22 @@ consequences, asserted at an interface, against the shipped artifact, one per
 invariant. Import shared constants rather than copying them. **Mocks are banned by
 default** — a mock that mirrors the code tests the code against itself; use a real
 dependency or don't test that path. Never encode an engine-impossible state. Every
-test must trace to a claim in the wiki; if you cannot name the claim, the test does
+test must trace to a claim in the docs; if you cannot name the claim, the test does
 not belong. Weakening or deleting an existing test is a rejection unless a
-wiki-declared behavior changed in the same diff.
+docs-declared behavior changed in the same diff.
 
 **Delete as you go.** A compatibility shim for a case that no longer exists, a dead
 branch, a defensive check the caller already excludes — remove it in the change
 that made it dead rather than leaving it for the reviewer to demand.
 
-## 4. Land the trinity
+## 4. Land it as one change
 
 **Code.** Run the gates that cover what you touched and confirm green — there are
 no red builds. `just test`, `just lint-check`, or the narrower target for the stack you
-changed (`wiki/testing.md`).
+changed (`docs/testing.md`).
 
-**Wiki.** Update the pages named at ingress in the same change. Pivots are edits:
-when a decision is overturned the wiki changes now, and it never preserves the
+**Docs.** Update the pages named at intake in the same change. Pivots are edits:
+when a decision is overturned the docs change now, and it never preserves the
 deprecated fact — git holds the history. A standing decision gets **one line** of
 rationale, and only when the rejected alternative is attractive enough that a
 future agent would plausibly redo it. No reasoning journeys, no ADRs, no
@@ -178,9 +178,9 @@ page, that is a divergence to record on the implementation page, not a domain ed
 **Board.** Delete the line. Delete its `board/<slug>.md` too. Deletion is the
 completion gesture — there is no closed state to move it to.
 
-**A production step is part of the trinity, not a note to yourself.** When the work
+**A production step is part of the change, not a note to yourself.** When the work
 leaves something that must be run or set on production once the commit is live — a
-one-time re-save, a backfill, a console setting — it goes in `wiki/post-deploy.md`
+one-time re-save, a backfill, a console setting — it goes in `docs/post-deploy.md`
 in this same commit, naming the gating commit and why running it earlier is wrong.
 Never into a subsystem page's prose: that is where such items got lost, and the
 subsystem page holds the standing fact, not the runbook. If the remaining work
@@ -189,7 +189,7 @@ is a board line with a production step, not a post-deploy item.
 
 **Run the comment pass yourself before committing.** Read every comment line the
 diff adds or leaves beside changed code — `git diff | grep -E '^\+.*(#|//|<!--)'`
-is a start — and delete any that states what the wiki (including the page this
+is a start — and delete any that states what the docs (including the page this
 change edits), another comment or the code already says. The reviewer runs the
 same pass by name; a comment it has to trim is a review round you could have
 skipped.
@@ -198,10 +198,10 @@ skipped.
 `Reported in #N.` when the work fixes a user-reported one; never a closing keyword,
 and never a board reference.
 
-## 5. Egress
+## 5. Review
 
-**Only a change that touches code gets a review.** A doc-only change — a wiki
-edit, a board eviction, a decision written down, a line promoted to a wiki page —
+**Only a change that touches code gets a review.** A doc-only change — a docs
+edit, a board eviction, a decision written down, a line promoted to a docs page —
 lands on the commit and is reported to the owner directly. The reviewer guards
 code the owner is not reading line by line; prose the owner *is* reading does not
 need a second reader, and spawning one spends tokens and wall-clock to tell them
@@ -211,7 +211,7 @@ Otherwise, spawn the `reviewer` subagent, which has **not** seen this
 conversation. Give it exactly three things and nothing else:
 
 - the diff (`git diff <base>..HEAD`, or the staged diff);
-- the wiki, by pointing it at `wiki/`;
+- the docs, by pointing it at `docs/`;
 - the board line's text and done-condition, verbatim.
 
 Do not include your reasoning, your plan, or a summary of what you meant to do. The
@@ -239,5 +239,5 @@ exceptional; if it happens, that is an escalation, not a third round.
 
 ## 6. Report
 
-Tell the owner what shipped, which wiki pages moved, which line is gone, and what
+Tell the owner what shipped, which docs pages moved, which line is gone, and what
 became of each finding — fixed here, or a new board line. Short.

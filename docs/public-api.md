@@ -11,7 +11,7 @@ contact or avatar, and a player without a VEKN ID has no row at all. **A city
 only for officials**: an IC, NC, Prince, Rulemonger, Judge or Sheriff, so an
 organizer can find the judges and organizers near an event. That is a property
 of the column, not a filter this app applies
-([dogmas](dogmas.md#product)). Card data stays krcg's.
+([principles](principles.md#product)). Card data stays krcg's.
 
 **Sanctions are absent from the column, with one exception outside it**: the
 member lookup answers an app token a member's suspensions and probations in
@@ -58,7 +58,7 @@ carries the snapshot format `version` a PWA client refuses a file on; here the
 connection advances a cursor on every event, and a stream here has no cursor to
 advance at all.
 
-**No pagination** ([dogmas](dogmas.md#architecture)): a consumer reads as far as
+**No pagination** ([principles](principles.md#architecture)): a consumer reads as far as
 it wants and closes the connection. That is the whole answer to "give me the ten
 most recent" — every stream is ordered, so read ten lines and hang up. Handlers
 batch
@@ -367,12 +367,12 @@ window.
 
 | Limit | Value | Sized by |
 |---|---|---|
-| app, per client, on the six streaming routes | `20r/m burst=10`, nginx's `nodelay` semantics | egress: a whole refresh is five streams and ~7 MB gzipped (tournaments 5.3, users 1.1, decks 0.6, the rest rounding error), so 20r/m is four refreshes a minute, ~28 MB/min or 3.7 Mbit/s sustained per client. The burst must clear a whole refresh or a legitimate one breaks halfway; ten leaves room for two |
+| app, per client, on the six streaming routes | `20r/m burst=10`, nginx's `nodelay` semantics | outbound traffic: a whole refresh is five streams and ~7 MB gzipped (tournaments 5.3, users 1.1, decks 0.6, the rest rounding error), so 20r/m is four refreshes a minute, ~28 MB/min or 3.7 Mbit/s sustained per client. The burst must clear a whole refresh or a legitimate one breaks halfway; ten leaves room for two |
 | app, per client, on every `/v1` route | `600r/m burst=100` | single-row lookups; a client resolving a page of event codes bursts legitimately. A stream spends from it too, which is noise at this rate |
 | nginx `limit_req` per address on `/v1/` | `rate=3000r/m burst=500 nodelay` | a ceiling on traffic that reaches no budget above — a 401 still costs an Ed25519 verify. Five clients' lookup budgets, so clients sharing an address are not throttled as one |
 | nginx `limit_req` per address on `/docs`, `/openapi.json` and the banner | `rate=600r/m burst=100 nodelay` | no token; generous because a page of banners bursts legitimately |
 | nginx `limit_conn` per address | 16 | a suspended stream holds one buffered batch (~1.8 MB) and **no** connection, so concurrency queues on the pool rather than exhausting it. Sixteen is ~29 MB and an eight-deep queue |
-| nginx `limit_req` per address on the proxied `/oauth/token` and `/oauth/revoke` | `rate=30r/m burst=5 nodelay` | each runs an Argon2 verify of the client secret, so the cost is CPU on the app's box rather than egress here, and a client mints one token an hour. The generous read zone would let an address spend 600 Argon2 verifies a minute guessing a secret |
+| nginx `limit_req` per address on the proxied `/oauth/token` and `/oauth/revoke` | `rate=30r/m burst=5 nodelay` | each runs an Argon2 verify of the client secret, so the cost is CPU on the app's box rather than outbound traffic here, and a client mints one token an hour. The generous read zone would let an address spend 600 Argon2 verifies a minute guessing a secret |
 | status | 429, with `Retry-After` from the app | nginx defaults to 503, which reads as "outage, retry" rather than "slow down"; `limit_req_status` and `limit_conn_status` set it |
 
 The app's budgets are in-process memory, so a restart resets them and the process
@@ -391,13 +391,13 @@ when any of them moves.
 The zones are `limit_req_zone`/`limit_conn_zone` and so live in a `conf.d` file —
 they are http-context directives and cannot go in the server block. The vhost
 also sets `gzip_types application/x-ndjson` with `gzip_proxied any` — the streams
-are the bulk of the egress and nginx skips proxied responses by default; the list
+are the bulk of the outbound traffic and nginx skips proxied responses by default; the list
 carries `application/vnd.oai.openapi+json`, Litestar's type for `/openapi.json` — and
 `proxy_buffering off`, or a reader taking the first N lines waits for the whole
 corpus, which is the documented top-N idiom.
 
 The figures are sized against the corpus of the day they were set (8249
-tournaments at ~7 KB): substantial growth moves the egress budget, and the rate
+tournaments at ~7 KB): substantial growth moves the outbound-traffic budget, and the rate
 should be re-derived rather than inherited.
 
 ## Isolation

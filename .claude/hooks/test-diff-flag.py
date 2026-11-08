@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """PostToolUse(Write|Edit): flag a touched test file for reviewer attention.
 
-Weakening or deleting a test is a rejection unless the wiki-declared behavior
+Weakening or deleting a test is a rejection unless the docs-declared behavior
 changed — so the change has to be able to say which claim moved.
 """
 
@@ -36,9 +36,9 @@ def main() -> int:
                     "hookEventName": "PostToolUse",
                     "additionalContext": (
                         f"Test file touched: {path}. Before shipping, be able to name "
-                        "the wiki claim this test traces to. If the change weakens or "
+                        "the docs claim this test traces to. If the change weakens or "
                         "removes an assertion, the reviewer treats that as blocking "
-                        "unless a wiki-declared behavior changed in the same diff."
+                        "unless a docs-declared behavior changed in the same diff."
                     ),
                 }
             }

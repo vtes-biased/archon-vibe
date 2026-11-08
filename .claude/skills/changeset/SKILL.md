@@ -36,7 +36,7 @@ contributor.
 |---|---|
 | New capability | Refactors, dead-code removal, renames |
 | Behaviour a user would notice changing | Docs, CI, deps, tests, formatting |
-| A bug someone actually hit | Board and wiki bookkeeping |
+| A bug someone actually hit | Board and docs bookkeeping |
 | Notable speed or UX change | Chrome: spacing, copy tweaks, icon swaps |
 | — | Silent fixes (see below) |
 
@@ -109,7 +109,7 @@ the reader came for.
 If nothing user-facing shipped, say exactly that — do not pad it out.
 
 **Entries stay English.** The modal's shell is translated, the entries are not
-(`wiki/i18n.md`) — do not write a translated variant.
+(`docs/i18n.md`) — do not write a translated variant.
 
 ## Write it
 

@@ -1,6 +1,6 @@
 ---
 name: feedback-triage
-description: Triage user-feedback GitHub issues on vtes-biased/archon-vibe — verify each report against the code and the wiki, validate the call with the owner, then either reply-and-close (won't do / already possible / needs info) or send it through /intake as a board line. Use when asked to look at, triage, answer, or handle GitHub issues, user feedback, or bug reports from users.
+description: Triage user-feedback GitHub issues on vtes-biased/archon-vibe — verify each report against the code and the docs, validate the call with the owner, then either reply-and-close (won't do / already possible / needs info) or send it through /intake as a board line. Use when asked to look at, triage, answer, or handle GitHub issues, user feedback, or bug reports from users.
 ---
 
 # Feedback triage
@@ -72,11 +72,11 @@ owner reviews — a verdict with no file reference is not ready to present.
 ## 2. Dedup against the board
 
 ```sh
-grep -in '<keyword>' BOARD.md wiki/
+grep -in '<keyword>' BOARD.md docs/
 ```
 
 The board holds no closed lines, so a *missing* line proves nothing — a fix may
-have shipped months ago. Check the wiki too: if the behavior the reporter wants is
+have shipped months ago. Check the docs too: if the behavior the reporter wants is
 already documented as a deliberate decision, that is the answer. And check whether
 they are simply on a stale build.
 
@@ -85,11 +85,11 @@ label or close accordingly, file nothing new.
 
 ## 3. Verdict
 
-Decide against the wiki, which is where product scope and the domain now live:
-`wiki/product.md` for what the app does and deliberately does not do,
-`wiki/domain/` for what the VEKN rules actually require, `wiki/dogmas.md` for the
+Decide against the docs, which is where product scope and the domain now live:
+`docs/product.md` for what the app does and deliberately does not do,
+`docs/domain/` for what the VEKN rules actually require, `docs/principles.md` for the
 paradigms a request might contradict. A request that would violate a rule in
-`wiki/domain/` is a decline with a citation, not a judgement call.
+`docs/domain/` is a decline with a citation, not a judgement call.
 
 Ask: is this real; who benefits and how often; what is the minimal viable fix; or
 what is the reason to decline. Every ask lands in exactly one bucket:
@@ -102,7 +102,7 @@ what is the reason to decline. Every ask lands in exactly one bucket:
 | **Ops / data** | no code change — a role grant, data fix, migration | do the ops action, or `/intake` it; reply |
 | **Duplicate** | already on the board or another issue | reply with the tracking |
 | **Needs info** | not actionable without a repro | reply naming exactly what is missing, close, invite a re-file |
-| **Won't do** | out of scope, against the VEKN rules, contradicts a wiki decision, or cost ≫ value | reply with the reason, close as not planned |
+| **Won't do** | out of scope, against the VEKN rules, contradicts a docs decision, or cost ≫ value | reply with the reason, close as not planned |
 
 **Every issue leaves triage either closed or filed** (`tracked` plus a board line).
 Nothing stays open and untriaged — an issue we cannot act on gets a reply and a
@@ -123,7 +123,7 @@ Present as **plain text that ends the turn**:
 
 1. The report, in one line.
 2. What you verified, with `file:line` — including anything that contradicts the report.
-3. The verdict, with the wiki page or rule section it rests on.
+3. The verdict, with the docs page or rule section it rests on.
 4. Your recommendation (one bucket from the table).
 5. The **draft reply, verbatim** — the exact text that would be posted publicly.
 6. The **draft board line**, if any, with its Done-when clause and proposed position.

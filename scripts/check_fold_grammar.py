@@ -12,7 +12,7 @@ Two rules:
    no allowlist: a fold points right closed and down open.
 2. A disclosure drawn outside `FoldableSection.svelte` must be listed below with its
    reason, and two kinds land there. A **fold** that cannot be a section is also
-   stated as an exception in `wiki/design.md`'s fold grammar rule, and the two
+   stated as an exception in `docs/design.md`'s fold grammar rule, and the two
    move together. An affordance that is **not a fold** — a pagination arrow, a
    reorder control, a mockup drawing one — is listed here only: the page states
    the grammar for folds, and these are not folds.
@@ -126,7 +126,7 @@ def main() -> int:
             print(f"  {rel}:{lineno}")
         print(
             "\nFold it through `FoldableSection`. A fold that structurally cannot be a\n"
-            "section goes in ALLOW here *and* in the exception list in wiki/design.md's\n"
+            "section goes in ALLOW here *and* in the exception list in docs/design.md's\n"
             "fold grammar rule. Something that is not a fold — an arrow, a mockup —\n"
             "goes in ALLOW here only.\n"
         )
@@ -134,7 +134,7 @@ def main() -> int:
         print("Allowed but no longer drawing a chevron:\n")
         for rel in stale:
             print(f"  {rel}")
-        print("\nDrop the entry here, and its line in wiki/design.md if it has one.")
+        print("\nDrop the entry here, and its line in docs/design.md if it has one.")
     return 1
 
 

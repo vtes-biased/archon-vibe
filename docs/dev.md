@@ -56,7 +56,7 @@ the same eleven gates:
   capability table.
 - `just comment-blocks` — a contiguous comment block over three lines, in every
   tracked `.py`, `.rs`, `.ts`, `.svelte`, `.html`, `.css` and `.j2` file
-  ([dogmas](dogmas.md#code)).
+  ([principles](principles.md#code)).
   `#`, `//`, `///`, `/* … */` and `<!-- … -->` all count, so the ceiling is not a
   question of which one the narration is written in. Two things it does not see:
   TypeScript's `/// <reference>`, which is compiler input rather than prose, and
@@ -200,7 +200,7 @@ use. The memory-stall alert is what watches for a regression.
 
 Because the backend ships as an installed wheel, **bundled data files must load
 through `importlib.resources`**, never `Path(__file__)`
-([dogmas](dogmas.md#dependencies-and-data)).
+([principles](principles.md#dependencies-and-data)).
 
 **Beta runs on frankfurt, a server-setup box**: that repo's inventory owns
 its system (packages, postgres cluster, backups, Alloy, nginx's default
@@ -512,7 +512,7 @@ rights on a fork it cannot see, so the default is refused with a 422. With any o
 the five unset the feature is silently skipped.
 
 Secrets and PII never enter the repository — the repo is public and CI publishes
-wheels as release assets ([dogmas](dogmas.md#dependencies-and-data)).
+wheels as release assets ([principles](principles.md#dependencies-and-data)).
 
 ## Library documentation
 
@@ -544,7 +544,7 @@ bot/        Discord tournament bot (separate process)
 deploy/     pyinfra deploy (beta and production)
 reference/  official VEKN and VTES documents (external, not ours to edit)
 scripts/    build and data tooling
-wiki/       this wiki
+docs/       the docs
 board/      elaborated context for in-flight board lines
 ```
 

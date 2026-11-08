@@ -80,8 +80,7 @@ def normalize_country(value: str) -> str | None:
 
     `Tournament.country` is meant to hold the code but holds the name on some
     rows, and external corpora quote names — normalise both sides through here
-    before comparing, or the mismatches silently drop real matches
-    ([hazards](../../wiki/hazards.md)).
+    before comparing, or the mismatches silently drop real matches.
     """
     value = (value or "").strip()
     if not value:
