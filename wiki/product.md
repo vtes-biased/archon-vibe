@@ -120,8 +120,9 @@ picked, where tied members share a rank and the next rank skips past them (1, 2,
 2, 4, tied rows by name), and a Hall of Fame, ranked the same way, for five wins
 that would have made the TWDA with the winning deck on record
 ([the rule](tournaments.md#configuration)), stated on the page. A member profile
-lists every finished event the member played — newest first, whatever its age or
-rating eligibility, with date, country and final place, wins and finals marked and
+shows each rating total with the member's worldwide rank in that category — their
+row on the rankings page with no country filter — and lists every finished event
+the member played — newest first, whatever its age or rating eligibility, with date, country and final place, wins and finals marked and
 counted, and the wins behind the Hall of Fame count flagged — each folding open to
 its decklist on record. A decklist reaches a profile
 only once its tournament is Finished, and to anyone but its owner only once that

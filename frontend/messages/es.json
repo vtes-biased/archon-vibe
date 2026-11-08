@@ -1088,6 +1088,7 @@
   "user_detail_not_found": "Miembro no encontrado",
   "user_detail_vekn": "VEKN #{id}",
   "user_detail_ratings": "Calificaciones",
+  "user_detail_world_rank": "n.º {rank} mundial",
   "user_detail_col_tournament": "Torneo",
   "user_detail_col_vp": "VP",
   "user_detail_col_gw": "GW",

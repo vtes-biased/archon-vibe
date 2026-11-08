@@ -2,6 +2,7 @@ import type { RatingCategory, Sanction, Tournament, TournamentState, TournamentR
 import type { BadgeTone } from "./components/Badge.svelte";
 import { attestedPlayerCount, buildSanctionsPayload, computeRatingPoints, computeRatingVpGw, displayStandings, rankingEligibility } from "./engine";
 import { formatScore } from "./utils";
+import type { UserListItem } from "./db";
 import * as m from './paraglide/messages.js';
 
 export const OFFICIAL_DISCORD_VENUE = "VEKN Discord";
@@ -174,6 +175,32 @@ export function playedPlayerUids(tournament: Tournament): Set<string> {
 /** Wins that make a Hall of Fame member. The list itself is server-computed
  * (`user.wins`, member-level) — only the cutoff is applied here. */
 export const HOF_MIN_WINS = 5;
+
+export type RankingBoard = RatingCategory | "halloffame";
+
+export function boardScore(u: UserListItem, board: RankingBoard): number {
+  return board === "halloffame" ? u.win_count : u.ratings[board];
+}
+
+export function rankMembers(
+  users: UserListItem[],
+  board: RankingBoard,
+  suspended: Set<string>,
+  inPlace: (u: UserListItem) => boolean = () => true,
+): { user: UserListItem; rank: number }[] {
+  const listed = users.filter(u => {
+    if (suspended.has(u.uid)) return false;
+    if (board === "halloffame" ? u.win_count < HOF_MIN_WINS : u.ratings[board] <= 0) return false;
+    return inPlace(u);
+  });
+  listed.sort((a, b) => boardScore(b, board) - boardScore(a, board) || a.name.localeCompare(b.name));
+  const ranked: { user: UserListItem; rank: number }[] = [];
+  listed.forEach((user, i) => {
+    const prev = ranked[i - 1];
+    ranked.push({ user, rank: prev && boardScore(prev.user, board) === boardScore(user, board) ? prev.rank : i + 1 });
+  });
+  return ranked;
+}
 
 /** Outward-facing link to an event. The uid form stays valid forever, so it is
  * the fallback for the window before the code is stamped — never a wait. */

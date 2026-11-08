@@ -2,7 +2,9 @@
   import type { User, RatingCategory, CategoryRating, TournamentRatingEntry } from "#lib/types.ts";
   import FoldableSection from "#lib/components/FoldableSection.svelte";
   import RankCell from "#lib/components/RankCell.svelte";
-  import { RATING_CATEGORIES, ratingCategoryLabel } from "#lib/tournament-utils.ts";
+  import { RATING_CATEGORIES, rankMembers, ratingCategoryLabel } from "#lib/tournament-utils.ts";
+  import { getUserListItems, getSuspendedUserUids } from "#lib/db.ts";
+  import { syncManager } from "#lib/sync.ts";
   import { getLocale } from '#lib/paraglide/runtime.js';
   import * as m from '#lib/paraglide/messages.js';
 
@@ -14,6 +16,29 @@
   let availableCategories = $derived(
     RATING_CATEGORIES.filter(c => user?.[c] && (user[c] as CategoryRating).total > 0)
   );
+
+  let worldRanks = $state<Partial<Record<RatingCategory, number>>>({});
+
+  async function loadWorldRanks(uid: string) {
+    const [users, suspended] = await Promise.all([getUserListItems(), getSuspendedUserUids()]);
+    const next: Partial<Record<RatingCategory, number>> = {};
+    for (const cat of RATING_CATEGORIES) {
+      const rank = rankMembers(users, cat, suspended).find(r => r.user.uid === uid)?.rank;
+      if (rank) next[cat] = rank;
+    }
+    if (user?.uid === uid) worldRanks = next;
+  }
+
+  $effect(() => {
+    if (!user) return;
+    const uid = user.uid;
+    loadWorldRanks(uid);
+    const onSync = (event: { type: string }) => {
+      if (event.type === "user" || event.type === "sanction" || event.type === "sync_complete") loadWorldRanks(uid);
+    };
+    syncManager.addEventListener(onSync);
+    return () => syncManager.removeEventListener(onSync);
+  });
 
   function sortedByDate(entries: TournamentRatingEntry[]): TournamentRatingEntry[] {
     return [...entries].sort((a, b) => b.date.localeCompare(a.date));
@@ -52,7 +77,12 @@
         ontoggle={() => toggleCategory(cat)}
       >
         {#snippet header()}
-          <span class="ml-auto text-lg font-bold text-link">{catRating.total}</span>
+          <span class="ml-auto flex items-baseline gap-3">
+            {#if worldRanks[cat]}
+              <span class="text-sm text-ink-muted">{m.user_detail_world_rank({ rank: String(worldRanks[cat]) })}</span>
+            {/if}
+            <span class="text-lg font-bold text-link">{catRating.total}</span>
+          </span>
         {/snippet}
         {@const sorted = sortedByDate(catRating.tournaments)}
         {@const topUids = top8Uids(catRating.tournaments)}

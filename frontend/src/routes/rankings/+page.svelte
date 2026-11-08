@@ -5,16 +5,14 @@
   import { getCountries, getSortedCountries, getCountryFlag } from "#lib/geonames.ts";
   import DeceasedIcon from "#lib/components/DeceasedIcon.svelte";
   import Button from "#lib/components/Button.svelte";
-  import type { RatingCategory } from "#lib/types.ts";
-  import { HOF_MIN_WINS, ratingCategoryLabel } from "#lib/tournament-utils.ts";
+  import { HOF_MIN_WINS, boardScore, rankMembers, ratingCategoryLabel, type RankingBoard } from "#lib/tournament-utils.ts";
   import { Trophy, Loader2, ChevronLeft, ChevronRight } from "@lucide/svelte";
   import { goto } from "$app/navigation";
   import { untrack } from "svelte";
   import { syncQueryParams, currentParams, readPageParam, pageParam } from "#lib/url-filters.ts";
   import * as m from '#lib/paraglide/messages.js';
 
-  type Tab = RatingCategory | "halloffame";
-  const TAB_VALUES: Tab[] = ["constructed_offline", "constructed_online", "limited_offline", "limited_online", "halloffame"];
+  const TAB_VALUES: RankingBoard[] = ["constructed_offline", "constructed_online", "limited_offline", "limited_online", "halloffame"];
 
   // Single exclusion policy: straight suspensions are hidden from every tab; probations stay visible.
   let users = $state<UserListItem[]>([]);
@@ -24,8 +22,8 @@
   // Filters. Tab is deep-linkable (?tab=halloffame — the guide and the profile
   // HoF chip land there); country, city and page ride along so Back restores the view.
   const urlParams = currentParams();
-  const urlTab = urlParams.get("tab") as Tab | null;
-  let activeTab = $state<Tab>(urlTab && TAB_VALUES.includes(urlTab) ? urlTab : "constructed_offline");
+  const urlTab = urlParams.get("tab") as RankingBoard | null;
+  let activeTab = $state<RankingBoard>(urlTab && TAB_VALUES.includes(urlTab) ? urlTab : "constructed_offline");
   let selectedCountry = $state<string>(urlParams.get("country") ?? "all");
   let selectedCity = $state<string>(urlParams.get("city") ?? "all");
   let page = $state(readPageParam());
@@ -37,7 +35,7 @@
   const isHof = $derived(activeTab === "halloffame");
   const pageSize = $derived(isHof ? 100 : 50);
 
-  const tabs: { value: Tab; labelFn: () => string; captionFn: () => string }[] = [
+  const tabs: { value: RankingBoard; labelFn: () => string; captionFn: () => string }[] = [
     { value: "constructed_offline", labelFn: () => ratingCategoryLabel("constructed_offline"), captionFn: () => m.rankings_cat_constructed_desc() },
     { value: "constructed_online", labelFn: () => ratingCategoryLabel("constructed_online"), captionFn: () => m.rankings_cat_constructed_online_desc() },
     { value: "limited_offline", labelFn: () => ratingCategoryLabel("limited_offline"), captionFn: () => m.rankings_cat_limited_desc() },
@@ -66,31 +64,10 @@
     return true;
   }
 
-  function score(u: UserListItem): number {
-    return isHof ? u.win_count : u.ratings[activeTab as RatingCategory];
-  }
+  let ranked = $derived(rankMembers(users, activeTab, suspendedUids, inPlace));
 
-  let filtered = $derived.by(() => {
-    const result = users.filter(u => {
-      if (suspendedUids.has(u.uid)) return false;
-      if (isHof ? u.win_count < HOF_MIN_WINS : score(u) <= 0) return false;
-      return inPlace(u);
-    });
-    result.sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
-    return result;
-  });
-
-  let ranks = $derived.by(() => {
-    const r: number[] = [];
-    filtered.forEach((u, i) => {
-      const prev = filtered[i - 1];
-      r.push(prev && score(prev) === score(u) ? r[i - 1]! : i + 1);
-    });
-    return r;
-  });
-
-  let totalPages = $derived(Math.ceil(filtered.length / pageSize));
-  let paged = $derived(filtered.slice(page * pageSize, (page + 1) * pageSize));
+  let totalPages = $derived(Math.ceil(ranked.length / pageSize));
+  let paged = $derived(ranked.slice(page * pageSize, (page + 1) * pageSize));
 
   async function loadData() {
     const [allUsers, suspended] = await Promise.all([
@@ -205,7 +182,7 @@
         <Loader2 class="w-6 h-6 animate-spin inline-block" />
         <span class="ml-2">{isHof ? m.hof_loading() : m.rankings_loading()}</span>
       </div>
-    {:else if filtered.length === 0}
+    {:else if ranked.length === 0}
       <div class="text-center text-ink-faint py-8">
         {isHof ? m.hof_no_results() : m.rankings_no_results()}
         <!-- The country filter can come back with the view the nav menu restored,
@@ -232,9 +209,8 @@
             </tr>
           </thead>
           <tbody>
-            {#each paged as user, i}
-              {@const rank = ranks[page * pageSize + i]}
-              {@const value = score(user)}
+            {#each paged as { user, rank }}
+              {@const value = boardScore(user, activeTab)}
               <!-- Whole row navigates; the name <a> keeps keyboard focus + cmd-click new-tab,
                    so the row onclick is a mouse-only enhancement (skips clicks on the link). -->
               <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
@@ -265,7 +241,7 @@
       </div>
 
       <div class="mt-4 flex items-center justify-between text-sm text-ink-muted">
-        <span>{m.rankings_total_count({ count: String(filtered.length) })}</span>
+        <span>{m.rankings_total_count({ count: String(ranked.length) })}</span>
         {#if totalPages > 1}
           <div class="flex items-center gap-2">
             <button
