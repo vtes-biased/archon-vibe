@@ -24,3 +24,5 @@ the wiki; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
+
+- Show a member's worldwide rank next to each rating total on their profile and public member page, through one ranking function the rankings page also uses — its sort, tie and threshold logic (`rankings/+page.svelte:73-90`) moves to `tournament-utils.ts` rather than being copied into `PlayerRatings.svelte`; players currently scroll the rankings to find themselves (gh-87) — **Done when** a rated member's profile shows the same rank as their row on the rankings page with no country filter, ties included, the rankings page ranks through the same function, and the profile description in `wiki/product.md` mentions the rank.
