@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.4.0 — 2026-11-08
 
 - Organizers can now cancel a round finished by mistake, and a reopened tournament returns to the round it was playing.
 
