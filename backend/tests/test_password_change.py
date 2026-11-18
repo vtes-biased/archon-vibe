@@ -4,26 +4,40 @@ from datetime import UTC, datetime
 from uuid import uuid7
 
 import pytest
+from argon2 import PasswordHasher
 from httpx import AsyncClient
 from src import db
 from src.accounts import reassign_auth_methods
-from src.models import User
+from src.models import AuthMethod, AuthMethodType, User
 
 from tests.conftest import make_auth_header
 
 
+async def _password_user(email: str, password: str) -> str:
+    now = datetime.now(UTC)
+    user = User(uid=str(uuid7()), modified=now, name="Password")
+    await db.save_user(user)
+    await db.insert_auth_method(
+        AuthMethod(
+            uid=str(uuid7()),
+            modified=now,
+            user_uid=user.uid,
+            method_type=AuthMethodType.EMAIL,
+            identifier=email,
+            credential_hash=PasswordHasher().hash(password),
+            verified=True,
+            created_at=now,
+            last_used_at=now,
+        )
+    )
+    return user.uid
+
+
 @pytest.mark.asyncio
 async def test_changed_password_is_what_login_reads(test_client: AsyncClient, test_db):
-    registered = await test_client.post(
-        "/auth/register",
-        json={
-            "email": "Rotate@example.com",
-            "password": "original-secret",
-            "name": "Rotator",
-        },
+    session = make_auth_header(
+        await _password_user("rotate@example.com", "original-secret")
     )
-    assert registered.status_code == 201
-    session = {"Authorization": f"Bearer {registered.json()['access_token']}"}
 
     changed = await test_client.post(
         "/auth/me/password",
@@ -62,24 +76,14 @@ async def test_no_email_credential_is_refused(test_client: AsyncClient, test_db)
 async def test_every_email_login_a_merge_left_behind_is_rewritten(
     test_client: AsyncClient, test_db
 ):
-    async def _register(email: str, password: str) -> tuple[str, dict[str, str]]:
-        response = await test_client.post(
-            "/auth/register",
-            json={"email": email, "password": password, "name": "Merged"},
-        )
-        assert response.status_code == 201
-        session = {"Authorization": f"Bearer {response.json()['access_token']}"}
-        me = await test_client.get("/auth/me", headers=session)
-        return me.json()["user"]["uid"], session
-
-    survivor_uid, survivor_session = await _register("keep@example.com", "keep-secret")
-    absorbed_uid, _ = await _register("absorbed@example.com", "absorbed-secret")
+    survivor_uid = await _password_user("keep@example.com", "keep-secret")
+    absorbed_uid = await _password_user("absorbed@example.com", "absorbed-secret")
     assert await reassign_auth_methods(absorbed_uid, survivor_uid) == 1
 
     changed = await test_client.post(
         "/auth/me/password",
         json={"password": "merged-secret"},
-        headers=survivor_session,
+        headers=make_auth_header(survivor_uid),
     )
     assert changed.status_code == 204
 

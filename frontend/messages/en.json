@@ -1760,7 +1760,6 @@
   "tournament_error_create": "Couldn't create the tournament.",
   "common_error_unknown": "Unknown error",
   "auth_error_fetch_user": "Couldn't load your account. Please try again.",
-  "auth_error_registration": "Registration failed.",
   "auth_error_login": "Login failed.",
   "auth_error_not_authenticated": "You're not signed in.",
   "auth_error_session_expired": "Your session has expired. Please sign in again.",

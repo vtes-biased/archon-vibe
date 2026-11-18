@@ -1760,7 +1760,6 @@
   "tournament_error_create": "Impossibile creare il torneo.",
   "common_error_unknown": "Errore sconosciuto",
   "auth_error_fetch_user": "Impossibile caricare il tuo account. Riprova.",
-  "auth_error_registration": "Registrazione fallita.",
   "auth_error_login": "Accesso fallito.",
   "auth_error_not_authenticated": "Non hai effettuato l'accesso.",
   "auth_error_session_expired": "La tua sessione è scaduta. Accedi di nuovo.",

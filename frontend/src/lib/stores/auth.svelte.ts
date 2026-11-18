@@ -364,47 +364,6 @@ export async function initAuth(): Promise<void> {
   }
 }
 
-export async function register(
-  email: string,
-  password: string,
-  name: string
-): Promise<boolean> {
-  setAuthState({ isLoading: true, error: null });
-
-  try {
-    const response = await fetchOrNetworkError(`${API_BASE}/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, name }),
-    });
-
-    if (!response.ok) {
-      const data = await response.json();
-      setAuthState({ isLoading: false, error: data.detail || m.auth_error_registration() });
-      return false;
-    }
-
-    const tokens: TokenResponse = await response.json();
-    storeTokens(tokens);
-
-    const result = await fetchCurrentUser();
-    if (result) {
-      setAuthState({ user: result.user, authMethods: result.auth_methods, isAuthenticated: true, isLoading: false, error: null });
-      syncManager.refresh();
-      return true;
-    }
-
-    setAuthState({ isLoading: false, error: m.auth_error_fetch_user() });
-    return false;
-  } catch (e) {
-    setAuthState({
-      isLoading: false,
-      error: toUserMessage(e, m.auth_error_registration()),
-    });
-    return false;
-  }
-}
-
 export async function login(email: string, password: string): Promise<boolean> {
   setAuthState({ isLoading: true, error: null });
 

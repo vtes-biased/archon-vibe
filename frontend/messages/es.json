@@ -1760,7 +1760,6 @@
   "tournament_error_create": "No se pudo crear el torneo.",
   "common_error_unknown": "Error desconocido",
   "auth_error_fetch_user": "No se pudo cargar su cuenta. Por favor, intente de nuevo.",
-  "auth_error_registration": "Registro fallido.",
   "auth_error_login": "Inicio de sesión fallido.",
   "auth_error_not_authenticated": "No ha iniciado sesión.",
   "auth_error_session_expired": "Su sesión ha expirado. Por favor, inicie sesión de nuevo.",

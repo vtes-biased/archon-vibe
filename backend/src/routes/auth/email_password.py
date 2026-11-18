@@ -1,8 +1,7 @@
-"""Email/password register and login endpoints."""
+"""Email/password login endpoint."""
 
 from datetime import UTC, datetime
 from typing import Annotated
-from uuid import uuid7
 
 import msgspec
 from argon2 import PasswordHasher
@@ -12,11 +11,9 @@ from litestar.exceptions import HTTPException
 
 from ...db import (
     get_auth_method_by_identifier,
-    insert_auth_method,
-    save_user,
     update_auth_method,
 )
-from ...models import AuthMethod, AuthMethodType, User
+from ...models import AuthMethod
 from ._tokens import (
     TokenResponse,
     assert_account_active,
@@ -30,57 +27,9 @@ ph = PasswordHasher()
 EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
 
 
-class RegisterRequest(msgspec.Struct):
-    email: Annotated[str, msgspec.Meta(pattern=EMAIL_PATTERN)]
-    password: str
-    name: str
-
-
 class LoginRequest(msgspec.Struct):
     email: Annotated[str, msgspec.Meta(pattern=EMAIL_PATTERN)]
     password: str
-
-
-@post("/register")
-async def register(data: RegisterRequest) -> Response:
-    existing = await get_auth_method_by_identifier("email", data.email)
-    if existing:
-        raise HTTPException(status_code=409, detail="Email already registered")
-
-    now = datetime.now(UTC)
-    user = User(
-        uid=str(uuid7()),
-        modified=now,
-        name=data.name,
-    )
-    await save_user(user)
-
-    password_hash = ph.hash(data.password)
-    auth_method = AuthMethod(
-        uid=str(uuid7()),
-        modified=now,
-        user_uid=user.uid,
-        method_type=AuthMethodType.EMAIL,
-        identifier=data.email.lower(),
-        credential_hash=password_hash,
-        verified=False,
-        created_at=now,
-        last_used_at=now,
-    )
-    await insert_auth_method(auth_method)
-
-    access_token, expires_in = create_access_token(user.uid)
-    refresh_token = create_refresh_token(user.uid)
-
-    response = TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        expires_in=expires_in,
-    )
-    return Response(
-        content=encoder.encode(response),
-        media_type="application/json",
-    )
 
 
 @post("/login")
@@ -140,4 +89,4 @@ async def login(data: LoginRequest) -> Response:
     )
 
 
-handlers = [register, login]
+handlers = [login]

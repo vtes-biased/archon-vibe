@@ -1760,7 +1760,6 @@
   "tournament_error_create": "Impossible de créer le tournoi.",
   "common_error_unknown": "Erreur inconnue",
   "auth_error_fetch_user": "Impossible de charger votre compte. Veuillez réessayer.",
-  "auth_error_registration": "Inscription échouée.",
   "auth_error_login": "Connexion échouée.",
   "auth_error_not_authenticated": "Vous n'êtes pas connecté.",
   "auth_error_session_expired": "Votre session a expiré. Veuillez vous reconnecter.",

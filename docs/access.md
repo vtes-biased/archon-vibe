@@ -133,7 +133,7 @@ session is invalidated on purpose.
 
 | Method | Notes | Key files |
 |---|---|---|
-| Email + password | register, login, and change from the profile — `POST /auth/me/password` rewrites the credential on the session alone | `routes/auth/email_password.py`, `routes/auth/profile.py` |
+| Email + password | login, and change from the profile — `POST /auth/me/password` rewrites the credential on the session alone; no route creates the credential but the magic link, so every new email login proves its address | `routes/auth/email_password.py`, `routes/auth/profile.py` |
 | Magic link | signup, password reset, invite; the link stays valid until the password is actually set, not merely verified | `email_service.py` |
 | WebAuthn / passkeys | FIDO2; four endpoints — `register/{options,verify}` to add to an existing authenticated account, and `create/{options,verify}` unauthenticated to create a new user | `passkeys.svelte.ts` |
 | Discord OAuth | `GET /auth/discord/authorize` (`?link=true` attaches the Discord ID to the authenticated user) → callback; login matches by Discord ID, then by the Discord email when verified (see [the email of record](#the-email-of-record)), or creates a user; every sign-in stores that verified email and the Discord username on the Discord auth method | `routes/auth/discord.py` |
@@ -233,6 +233,11 @@ registration import or door-dedup with the same address. A deleted account match
 none of them. The address of record is self-editable and never verified, so
 letting it claim an activated account would hand a stranger's first login to
 whoever typed their address into a profile.
+
+**The email-login match still trusts `verified=false`.** Only the retired
+password signup wrote such a row, so one left on production holds an address
+nobody proved and catches that address's later Discord or magic-link sign-in.
+Whether the lookup skips them is decided on the production count of those rows.
 
 A `+tag` subaddress is deliberately not canonicalized: this is the address we
 actually send to and hand to the VEKN registry, so folding `a+vtes@x.com` to
