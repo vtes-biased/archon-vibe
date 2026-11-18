@@ -61,12 +61,14 @@ class LeagueUpdate(msgspec.Struct):
 
 @post("/")
 async def create_league(request: Request, data: LeagueCreate) -> Response:
-    """Create a new league. NC/IC only."""
+    """Create a new league."""
     user = await get_optional_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     if not permissions.can_manage_leagues(user):
-        raise HTTPException(status_code=403, detail="Only NC and IC can create leagues")
+        raise HTTPException(
+            status_code=403, detail="Only IC, NC or Prince can create leagues"
+        )
 
     if data.parent_uid:
         parent = await get_league_by_uid(data.parent_uid)
@@ -77,6 +79,10 @@ async def create_league(request: Request, data: LeagueCreate) -> Response:
         if parent.parent_uid:
             raise HTTPException(
                 status_code=400, detail="Cannot nest more than 2 levels"
+            )
+        if not permissions.can_edit_league(user, parent):
+            raise HTTPException(
+                status_code=403, detail="Not authorized to edit the parent Meta-League"
             )
 
     if data.kind == LeagueKind.META and data.parent_uid:
@@ -146,7 +152,7 @@ async def update_league_endpoint(
             raise HTTPException(
                 status_code=400, detail="Meta-League cannot have a parent"
             )
-        if new_parent:
+        if new_parent and new_parent != league.parent_uid:
             if new_parent == uid:
                 raise HTTPException(
                     status_code=400, detail="League cannot be its own parent"
@@ -161,6 +167,11 @@ async def update_league_endpoint(
             if parent.parent_uid:
                 raise HTTPException(
                     status_code=400, detail="Cannot nest more than 2 levels"
+                )
+            if not permissions.can_edit_league(user, parent):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Not authorized to edit the parent Meta-League",
                 )
 
     for field, value in updates.items():

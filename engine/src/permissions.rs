@@ -385,11 +385,11 @@ pub const CAPABILITIES: &[Rule] = &[
     Rule {
         capability: Capability::ManageLeagues,
         name: "manage_leagues",
-        global: &[IC, NC],
+        global: &[IC, NC, Prince],
         same_country: &[],
         self_service: false,
         organizer: false,
-        deny: "Only IC or NC can manage leagues",
+        deny: "Only IC, NC or Prince can create leagues",
         deny_scope: None,
         countryless_target: false,
     },
@@ -1328,11 +1328,11 @@ mod tests {
     }
 
     #[test]
-    fn test_manage_leagues_excludes_prince() {
+    fn test_manage_leagues_includes_prince() {
         let cap = Capability::ManageLeagues;
         assert!(over_country(cap, &ctx(vec![IC], Some("US")), None));
         assert!(over_country(cap, &ctx(vec![NC], Some("FR")), None));
-        assert!(!over_country(cap, &ctx(vec![Prince], Some("FR")), None));
+        assert!(over_country(cap, &ctx(vec![Prince], Some("FR")), None));
         assert!(!over_country(cap, &ctx(vec![], Some("FR")), None));
     }
 

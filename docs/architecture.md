@@ -581,6 +581,10 @@ Princes attach their own tournaments without becoming organizers (attach-only,
 inert on a worldwide league), and `final` — the league final's seeds, seating,
 per-seat result and winner, scored server-side.
 
+Creating one takes `manage_leagues` and makes the creator its organizer; setting
+`parent_uid`, on create or edit, also takes `edit_league` on the Meta-League, so
+nobody grafts a league into a circuit they do not run ([access](access.md)).
+
 Standings are computed at read time through the engine on both sides; the league
 SSE payload is **config only**, with standings derived client-side from IndexedDB
 tournaments. GP and RTP modes use `compute_final_standings` to derive placement.

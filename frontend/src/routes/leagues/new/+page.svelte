@@ -4,7 +4,7 @@
   import { createLeague } from "#lib/api.ts";
   import { saveLeague, getAllLeagues } from "#lib/db.ts";
   import { getAuthState } from "#lib/stores/auth.svelte.ts";
-  import { canManageLeagues } from "#lib/engine.ts";
+  import { canEditLeague, canManageLeagues } from "#lib/engine.ts";
   import { getSortedCountries, getCountryFlag } from "#lib/geonames.ts";
   import type { League, LeagueKind, LeagueStandingsMode } from "#lib/types.ts";
   import Button from '#lib/components/Button.svelte';
@@ -29,8 +29,9 @@
   let metaLeagues = $state<League[]>([]);
 
   $effect(() => {
+    const user = auth.user;
     getAllLeagues().then(all => {
-      metaLeagues = all.filter(l => l.kind === "Meta-League" && !l.deleted_at);
+      metaLeagues = all.filter(l => l.kind === "Meta-League" && !l.deleted_at && canEditLeague(user, l));
     });
   });
 

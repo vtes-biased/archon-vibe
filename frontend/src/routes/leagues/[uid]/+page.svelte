@@ -230,7 +230,7 @@
         .filter(cl => cl.parent_uid === uid && !cl.deleted_at)
         .sort((a, b) => (a.name).localeCompare(b.name));
       orphanLeagues = allLeagues
-        .filter(cl => cl.kind === "League" && !cl.parent_uid && !cl.deleted_at && cl.uid !== uid)
+        .filter(cl => cl.kind === "League" && !cl.parent_uid && !cl.deleted_at && cl.uid !== uid && canEditLeague(auth.user, cl))
         .sort((a, b) => (a.name).localeCompare(b.name));
       const childUids = childLeagues.map(cl => cl.uid);
       const childTournaments = allTournaments.filter(

@@ -29,8 +29,8 @@ omitted from the rows below.
 | `merge_accounts`, `delete_member`, `anonymize_member`, `force_unlock_tournament`, `manage_promos`, `run_admin_sync`, `promote_link_global`, `set_archival_results` | nobody |
 | `moderate_link`, `promote_link_national` | NC — own country |
 | `organize_tournament` | NC — own country; explicit organizer |
-| `manage_leagues` | NC — global |
-| `edit_league` | NC — own country; league organizer |
+| `manage_leagues` | NC, Prince — global (create a league; the creator is its organizer) |
+| `edit_league` | NC — own country; league organizer (needed on a Meta-League too, to nest a league under it) |
 | `issue_restricted_sanction`, `lift_restricted_sanction`, `modify_sanction`, `delete_any_sanction` | Ethics — global |
 | `issue_tournament_sanction` | Ethics — global; tournament organizer |
 | `lift_tournament_sanction` | Rulemonger — global; NC — the tournament's country |
