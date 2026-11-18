@@ -29,3 +29,17 @@ answers whether a given deploy has made it actionable — the same check
 `/post-deploy` already runs against a feedback issue's fix. An item states what
 gates it and why, what to run, what proves it worked, and what it owes afterwards:
 people to tell, and the docs text that dies with it.
+
+## Count the unverified email logins
+
+**Gated on 3e16c1d1**, which removed the password signup, the only writer of a
+`verified=false` email login. Counted earlier, the number can still grow.
+
+Run against the production database:
+
+    docker compose exec -T db psql -U archon -d archon -c "SELECT count(*) FROM auth_methods WHERE data->>'method_type' = 'email' AND data->>'verified' = 'false'"
+
+The count is the whole output. **Owes afterwards**: take the number through
+`/intake` to decide whether `get_user_by_email` stops matching unverified email
+logins, then shorten the `verified=false` paragraph in
+[access](access.md#the-email-of-record) to whatever was decided.
