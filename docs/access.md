@@ -237,7 +237,9 @@ whoever typed their address into a profile.
 **The email-login match still trusts `verified=false`.** Only the retired
 password signup wrote such a row, so one left on production holds an address
 nobody proved and catches that address's later Discord or magic-link sign-in.
-Whether the lookup skips them is decided on the production count of those rows.
+Whether the lookup skips them returns through `/intake` once the owner reports
+the production count: `SELECT count(*) FROM auth_methods WHERE
+data->>'method_type' = 'email' AND data->>'verified' = 'false'`.
 
 A `+tag` subaddress is deliberately not canonicalized: this is the address we
 actually send to and hand to the VEKN registry, so folding `a+vtes@x.com` to
