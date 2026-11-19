@@ -658,7 +658,7 @@ is already a player the two are exchanged instead. The registration's Discord
 `display_name` follows the person, not the seat. A new entrant needs a `vekn_id` and
 is refused under DQ or suspension, as for `AddPlayer`; an exchange checks neither,
 both being in already. The event's decks move owner through a `reassign` deck op,
-its own sanctions move server-side after the commit, and the rating and wins of
+its own sanctions move server-side in the same transaction, and the rating and wins of
 both members are recomputed. The app offers it online only, since the sanction move
 has no offline path.
 

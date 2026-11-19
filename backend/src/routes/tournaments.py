@@ -51,7 +51,6 @@ from ..db import (
     resolve_event_code,
     save_object,
     save_object_from_model,
-    save_sanction,
     save_tournament,
     save_user,
     tournament_transaction,
@@ -1544,17 +1543,25 @@ async def tournament_action(
         updated, deck_ops, tournament_bd = await _process_event(
             tournament, event_data, actor_data, tx_conn
         )
+        sanction_bds = []
+        for sanction in (
+            await get_sanctions_for_tournament(uid, conn=tx_conn) if uid_map else []
+        ):
+            if sanction.user_uid in uid_map:
+                moved = msgspec.structs.replace(
+                    sanction, user_uid=uid_map[sanction.user_uid]
+                )
+                sanction_bds.append(
+                    await save_object_from_model(
+                        ObjectType.SANCTION, moved, conn=tx_conn
+                    )
+                )
 
     # Below runs unlocked — the tournament row's FOR UPDATE lock was released.
     logger.info(f"Tournament {uid} action {data.type} by {current_user.uid}")
 
-    # Before _after_event: the rating recompute reads these sanctions.
-    for sanction in await get_sanctions_for_tournament(uid) if uid_map else []:
-        if sanction.user_uid in uid_map:
-            moved = msgspec.structs.replace(
-                sanction, user_uid=uid_map[sanction.user_uid]
-            )
-            broadcast_precomputed(await save_sanction(moved))
+    for bd in sanction_bds:
+        broadcast_precomputed(bd)
 
     await _after_event(data.type, tournament, updated, deck_ops, tournament_bd)
 

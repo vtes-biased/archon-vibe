@@ -101,8 +101,6 @@ pub enum TournamentEvent {
     RemovePlayer {
         user_uid: String,
     },
-    /// A mistaken identity: `new_uid` takes everything `player_uid` holds in the
-    /// event, and the two are exchanged when `new_uid` is already a player.
     ReplacePlayer {
         player_uid: String,
         new_uid: String,
