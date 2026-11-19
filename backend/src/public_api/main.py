@@ -228,6 +228,7 @@ _ACTION_STATES: dict[str, tuple[tuple[str, ...], str]] = {
     "Unregister": (("Registration",), ""),
     "AddPlayer": (_ANY_STATE, ""),
     "RemovePlayer": (("Planned", "Registration", "Waiting", "Finished"), ""),
+    "ReplacePlayer": (_ANY_STATE, ""),
     "DropOut": (("Waiting", "Playing"), ""),
     "CheckIn": (("Waiting", "Playing", "Finished"), ""),
     "CheckOut": (("Waiting", "Finished"), ""),
@@ -602,6 +603,10 @@ _ACTION_FIELDS: dict[str, dict] = {
         **_STR,
         "description": "The player — the same member uid: a roster seat carries no id of its own.",
     },
+    "new_uid": {
+        **_STR,
+        "description": "The member who actually played, as `/v1/users/{uid}` knows them.",
+    },
     "display_name": {
         **_STR,
         "maxLength": 32,
@@ -756,6 +761,13 @@ _ACTIONS: dict[str, tuple[str, tuple[str, ...], tuple[str, ...]]] = {
         ("display_name",),
     ),
     "RemovePlayer": ("Take a player off the roster.", ("user_uid",), ()),
+    "ReplacePlayer": (
+        "Correct a mistaken identity: `new_uid` takes every seat, score, deck, finals"
+        " place and in-event sanction `player_uid` holds, and the two are exchanged"
+        " when `new_uid` is already a player. Same VEKN ID rule as `Register`.",
+        ("player_uid", "new_uid"),
+        (),
+    ),
     "DropOut": ("Withdraw a player from an event under way.", ("player_uid",), ()),
     "CheckIn": ("Arm a player for the next round.", ("player_uid",), ("display_name",)),
     "CheckOut": ("Undo a check-in.", ("player_uid",), ()),

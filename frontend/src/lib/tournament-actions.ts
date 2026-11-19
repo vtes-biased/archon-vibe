@@ -170,6 +170,9 @@ export async function tournamentAction(uid: string, action: TournamentEventType,
         await checkPlayerBarred(data.player_uid as string);
       } else if ((action === 'Register' || action === 'AddPlayer') && data?.user_uid) {
         await checkPlayerBarred(data.user_uid as string);
+      } else if (action === 'ReplacePlayer' && data?.new_uid
+          && !current.players?.some(p => p.user_uid === data.new_uid)) {
+        await checkPlayerBarred(data.new_uid as string);
       }
       const actor = await buildActorContext(getAuthState().user ?? null, current, action);
       // Widened with the players' VEKN suspensions, needed for CheckInAll etc.;
@@ -325,6 +328,15 @@ export async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, exi
         } else {
           await deleteDeck(d.uid);
         }
+      }
+    } else if (op.op === 'reassign' && op.uids) {
+      for (const d of existingDecks) {
+        const to = d.user_uid && op.uids[d.user_uid];
+        if (!to) continue;
+        d.user_uid = to;
+        d.modified = new Date().toISOString();
+        await saveDeck(d);
+        affectedUids.push(d.uid);
       }
     } else if (op.op === 'set_round' && op.deck_uid) {
       const target = existingDecks.find(d => d.uid === op.deck_uid);

@@ -51,6 +51,7 @@ from ..db import (
     resolve_event_code,
     save_object,
     save_object_from_model,
+    save_sanction,
     save_tournament,
     save_user,
     tournament_transaction,
@@ -1188,6 +1189,7 @@ class TournamentActionRequest(msgspec.Struct):
     type: str  # Event type: OpenRegistration, Register, CheckIn, StartRound, etc.
     user_uid: str | None = None  # For Register, AddPlayer, RemovePlayer
     player_uid: str | None = None  # For CheckIn
+    new_uid: str | None = None  # For ReplacePlayer
     # Discord guild nickname, display-only, never identity — vekn_id comes only
     # from the resolved user. max_length=32 mirrors Discord's own ceiling.
     display_name: Annotated[str, msgspec.Meta(max_length=32)] | None = None
@@ -1226,12 +1228,13 @@ class TournamentActionRequest(msgspec.Struct):
 
 
 # Every other field reaches the engine whenever it is not null — including the
-# empty string, which is how `winner` clears. These eleven are the exceptions: an
+# empty string, which is how `winner` clears. These twelve are the exceptions: an
 # empty value means "not part of this action", so it must not reach the engine.
 _ACTION_TRUTHY_ONLY = frozenset(
     {
         "user_uid",
         "player_uid",
+        "new_uid",
         "display_name",
         "scores",
         "comment",
@@ -1371,7 +1374,10 @@ async def _after_event(
     results_may_change = is_finished and event_type not in _RATING_IRRELEVANT_ACTIONS
     if state_changed or results_may_change:
         try:
-            player_uids = {p.user_uid for p in updated.players if p.user_uid}
+            # The old roster too: a member taken off it still holds the entry.
+            player_uids = {
+                p.user_uid for t in (tournament, updated) for p in t.players
+            } - {None, ""}
             category = rating_category_for_tournament(updated)
             results = await recompute_ratings_for_players(player_uids, category)
             results += await recompute_wins(player_uids)
@@ -1513,6 +1519,8 @@ async def tournament_action(
             target_uid = data.user_uid
         elif data.type == "CheckIn":
             target_uid = data.player_uid
+        elif data.type == "ReplacePlayer":
+            target_uid = data.new_uid
         if target_uid:
             target_user = await get_user_by_uid(target_uid, conn=tx_conn)
             if not target_user:
@@ -1525,6 +1533,13 @@ async def tournament_action(
             player_uid = data.player_uid or data.user_uid
             if player_uid:
                 await _check_player_barred(player_uid, conn=tx_conn)
+        uid_map: dict[str, str] = {}
+        if data.type == "ReplacePlayer" and data.player_uid and data.new_uid:
+            uid_map = {data.player_uid: data.new_uid}
+            if any(p.user_uid == data.new_uid for p in tournament.players):
+                uid_map[data.new_uid] = data.player_uid
+            else:
+                await _check_player_barred(data.new_uid, conn=tx_conn)
 
         updated, deck_ops, tournament_bd = await _process_event(
             tournament, event_data, actor_data, tx_conn
@@ -1532,6 +1547,14 @@ async def tournament_action(
 
     # Below runs unlocked — the tournament row's FOR UPDATE lock was released.
     logger.info(f"Tournament {uid} action {data.type} by {current_user.uid}")
+
+    # Before _after_event: the rating recompute reads these sanctions.
+    for sanction in await get_sanctions_for_tournament(uid) if uid_map else []:
+        if sanction.user_uid in uid_map:
+            moved = msgspec.structs.replace(
+                sanction, user_uid=uid_map[sanction.user_uid]
+            )
+            broadcast_precomputed(await save_sanction(moved))
 
     await _after_event(data.type, tournament, updated, deck_ops, tournament_bd)
 

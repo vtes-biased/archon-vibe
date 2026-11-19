@@ -757,7 +757,8 @@ RFC 8291 payload encryption and RFC 8292 VAPID signing; we own only the transpor
 | `POST /{uid}/call-judge` | the tournament's organizers except the caller |
 | the daily stale-finals finish | the tournament's organizers |
 
-`RestoreRound` is excluded — it re-seats no one. Seating and judge-call bodies
+`RestoreRound` is excluded — it re-seats no one, and so is `ReplacePlayer`, a
+record correction. Seating and judge-call bodies
 resolve table-room labels so a push says "Main Hall 3" exactly like the app and
 the wall signs, each locale carrying its own "Table N" for an unroomed table, and a
 re-seat push reuses the round's tag to replace the player's stale assignment
@@ -1169,8 +1170,9 @@ login's or the address of record, case-folded — because they are then the same
 person's two accounts and only an IC merge joins them: displacing would hand the
 VEKN record the target's logins and swap them back on the next link.
 
-Reassigning object references during merge or detach must return `BroadcastData`
-and broadcast, or other clients stay stale until the next snapshot resync.
+Reassigning object references during merge, detach or a tournament's
+`ReplacePlayer` must return `BroadcastData` and broadcast, or other clients stay
+stale until the next snapshot resync.
 
 ### Archon Excel import
 

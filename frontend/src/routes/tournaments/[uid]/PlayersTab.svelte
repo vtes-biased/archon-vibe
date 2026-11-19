@@ -11,7 +11,8 @@
   import TournamentSanctionModal from "#lib/components/TournamentSanctionModal.svelte";
   import SanctionListModal from "#lib/components/SanctionListModal.svelte";
   import ConfirmActionModal from "#lib/components/ConfirmActionModal.svelte";
-  import { UserPlus, Dice3, CircleCheck, CircleHelp, TriangleAlert, CircleX, FileX, X, EyeOff, Trash2, Ellipsis, Dices, Printer, SlidersHorizontal, ChevronDown, ChevronRight, Banknote } from "@lucide/svelte";
+  import UserPicker from "#lib/components/UserPicker.svelte";
+  import { UserPlus, Dice3, CircleCheck, CircleHelp, TriangleAlert, CircleX, FileX, X, EyeOff, Trash2, Ellipsis, Replace, Dices, Printer, SlidersHorizontal, ChevronDown, ChevronRight, Banknote } from "@lucide/svelte";
   import ActionMenu from "#lib/components/ActionMenu.svelte";
   import FoldableSection from "#lib/components/FoldableSection.svelte";
   import CreateAndRegisterModal from "./CreateAndRegisterModal.svelte";
@@ -360,6 +361,25 @@
     else await doAction("RemovePlayer", { user_uid: t.uid });
   }
 
+  let replacingUid = $state<string | null>(null);
+  let replaceTarget = $state<{ from: string; fromName: string; to: UserListItem; swap: boolean } | null>(null);
+
+  function chooseReplacement(from: string, to: UserListItem) {
+    replacingUid = null;
+    replaceTarget = {
+      from,
+      fromName: playerInfo[from]?.name ?? m.rankings_unknown_player(),
+      to,
+      swap: !!tournament.players?.some(p => p.user_uid === to.uid),
+    };
+  }
+
+  async function runReplace() {
+    const t = replaceTarget;
+    if (!t) return;
+    await doAction("ReplacePlayer", { player_uid: t.from, new_uid: t.to.uid, vekn_id: t.to.vekn_id });
+  }
+
   function enterTossEdit() {
     editingToss = true;
     const edits: Record<string, string> = {};
@@ -446,7 +466,18 @@
             {m.players_view_sanctions()}
           </Button>
         {/if}
+        {#if puid && !isOfflineMode}
+          <Button variant="secondary" size="sm" onclick={() => replacingUid = replacingUid === puid ? null : puid} aria-expanded={replacingUid === puid}>
+            <Replace class="w-4 h-4" aria-hidden="true" />{m.players_replace_btn()}
+          </Button>
+        {/if}
       </div>
+      {#if replacingUid === puid}
+        <div class="space-y-1.5">
+          <p class="text-xs text-ink-muted">{m.players_replace_hint()}</p>
+          <UserPicker onselect={(u) => chooseReplacement(puid, u)} excludeUids={[puid]} />
+        </div>
+      {/if}
       <!-- Waitlist: the cap verdict, reversible in one tap. -->
       {#if !archivalUids.has(puid)}
         <div class="pt-2 border-t border-dashed border-line">
@@ -1073,6 +1104,18 @@
     action={runRemoval}
     reportResult={false}
     onClose={() => removalTarget = null}
+  />
+{/if}
+
+{#if replaceTarget}
+  {@const names = { from: replaceTarget.fromName, to: replaceTarget.to.name || m.rankings_unknown_player() }}
+  <ConfirmActionModal
+    title={replaceTarget.swap ? m.players_swap_confirm_title(names) : m.players_replace_confirm_title(names)}
+    body={replaceTarget.swap ? m.players_swap_confirm_body(names) : m.players_replace_confirm_body(names)}
+    confirmLabel={replaceTarget.swap ? m.players_swap_confirm() : m.players_replace_confirm()}
+    action={runReplace}
+    reportResult={false}
+    onClose={() => replaceTarget = null}
   />
 {/if}
 

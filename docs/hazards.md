@@ -171,12 +171,14 @@ in.
 
 ## Renames and references
 
-**Reassigning object references** — sanctions, decks, cooptation on merge or detach
-— **must return `BroadcastData` and broadcast**, or other clients stay stale until
+**Reassigning object references** — sanctions, decks, cooptation on merge or
+detach, or a tournament's `ReplacePlayer` — **must return `BroadcastData` and broadcast**, or other clients stay stale until
 their next snapshot resync. Preserve that in any new merge-like flow.
 
 **`finals.seed_order` holds player user_uids**, easily missed in a per-player UID
-remap.
+remap. `remap_player_uids` in the engine is the one list of where an event names a
+player: a new player-uid field lands there, or `ReplacePlayer` leaves the wrong
+member behind in it.
 
 **Svelte 5 `$props()`**: props must be listed in the destructure, not merely in the
 type annotation.

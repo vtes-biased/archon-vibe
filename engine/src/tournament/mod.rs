@@ -1,6 +1,6 @@
 use crate::model::{
-    arg, deck_object, finals_table, player, raffle_draw, room, score, score_override, seat,
-    standing, table, tournament, tournament_config,
+    arg, deck_object, finals_table, player, raffle_draw, room, sanction, score, score_override,
+    seat, standing, table, tournament, tournament_config,
 };
 use json::JsonValue;
 
@@ -30,8 +30,8 @@ use helpers::{
     all_rounds_finished, collect_previous_rounds, compute_deck_public, compute_deck_winner,
     count_played_rounds, count_player_rounds_played, delete_player_decks, demote_unseated_players,
     find_player_index, past_registration_cap, player_exists, players_in_other_active_rounds,
-    recompute_deck_publication, release_stamped_decks, require_can_edit_results, require_organizer,
-    require_state, require_state_or_finished, stamp_round_decks, validate_enum,
+    recompute_deck_publication, release_stamped_decks, remap_player_uids, require_can_edit_results,
+    require_organizer, require_state, require_state_or_finished, stamp_round_decks, validate_enum,
 };
 use sanctions::{has_active_suspension, has_dq_sanction};
 use scoring::score_table;
@@ -692,6 +692,74 @@ fn apply_event(
             let idx = find_player_index(players, user_uid).ok_or(EngineError::PlayerNotFound)?;
             players.array_remove(idx);
             delete_player_decks(tournament, decks, deck_ops, user_uid);
+            Ok(())
+        }
+
+        TournamentEvent::ReplacePlayer {
+            player_uid,
+            new_uid,
+            vekn_id,
+        } => {
+            require_organizer(actor)?;
+            let players = &tournament[tournament::PLAYERS];
+            let from_idx =
+                find_player_index(players, player_uid).ok_or(EngineError::PlayerNotFound)?;
+            if player_uid == new_uid {
+                return Ok(());
+            }
+            let swap_idx = find_player_index(players, new_uid);
+            if swap_idx.is_none() {
+                if vekn_id.as_ref().is_none_or(|v| v.is_empty()) {
+                    return Err(EngineError::VeknIdRequired);
+                }
+                if has_dq_sanction(sanctions, new_uid) {
+                    return Err(EngineError::PlayerDisqualified);
+                }
+                if has_active_suspension(sanctions, new_uid, &actor.now) {
+                    return Err(EngineError::PlayerSuspended);
+                }
+            }
+
+            let mut uid_map = std::collections::HashMap::new();
+            uid_map.insert(player_uid.clone(), new_uid.clone());
+            if swap_idx.is_some() {
+                uid_map.insert(new_uid.clone(), player_uid.clone());
+            }
+            remap_player_uids(tournament, &uid_map);
+
+            let from_name = tournament[tournament::PLAYERS][from_idx].remove(player::DISPLAY_NAME);
+            if let Some(idx) = swap_idx {
+                let to_name = tournament[tournament::PLAYERS][idx].remove(player::DISPLAY_NAME);
+                if !to_name.is_null() {
+                    tournament[tournament::PLAYERS][from_idx][player::DISPLAY_NAME] = to_name;
+                }
+                if !from_name.is_null() {
+                    tournament[tournament::PLAYERS][idx][player::DISPLAY_NAME] = from_name;
+                }
+            }
+
+            if decks.members().any(|d| {
+                d[deck_object::USER_UID]
+                    .as_str()
+                    .is_some_and(|u| uid_map.contains_key(u))
+            }) {
+                let mut uids = JsonValue::new_object();
+                for (from, to) in &uid_map {
+                    uids[from.as_str()] = to.as_str().into();
+                }
+                deck_ops.push(json::object! { arg::OP => "reassign", arg::UIDS => uids })?;
+            }
+
+            let mut moved_sanctions = sanctions.clone();
+            for i in 0..moved_sanctions.len() {
+                if let Some(to) = moved_sanctions[i][sanction::USER_UID]
+                    .as_str()
+                    .and_then(|u| uid_map.get(u))
+                {
+                    moved_sanctions[i][sanction::USER_UID] = to.as_str().into();
+                }
+            }
+            update_standings(tournament, &moved_sanctions);
             Ok(())
         }
 

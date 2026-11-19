@@ -62,6 +62,7 @@ pub mod arg {
     pub const MULTIDECK: &str = "multideck";
     pub const NAME: &str = "name";
     pub const NAME_VARIANTS: &str = "name_variants";
+    pub const NEW_UID: &str = "new_uid";
     pub const NON_COMPETING: &str = "non_competing";
     pub const NOW: &str = "now";
     pub const OP: &str = "op";
@@ -125,6 +126,7 @@ pub mod arg {
     pub const TYPE: &str = "type";
     pub const TYPES: &str = "types";
     pub const UID: &str = "uid";
+    pub const UIDS: &str = "uids";
     pub const UNIQUE_NAME: &str = "unique_name";
     pub const UNRECOGNIZED_LINES: &str = "unrecognized_lines";
     pub const USER_UID: &str = "user_uid";

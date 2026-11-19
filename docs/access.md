@@ -51,6 +51,10 @@ their own card, which is the one cross-country reach the grant gives
 applies to have no real organizer: a TWDA reconstruction has none at all, and an
 import's is whatever upstream claimed. Invalidation authority is IC's anyway (9.4).
 
+Correcting a mistaken identity in an event (`ReplacePlayer`) is the organizer's,
+not IC's like a merge: it moves only what the organizer can already re-enter by
+hand on a Finished event, and it never touches either member's account.
+
 `list_non_member` is a display rule, not a sync one: every user still reaches
 every member, and a non-member's profile link and the organizer's add-player search
 stay open, so an official sponsoring abroad still finds them. The members directory

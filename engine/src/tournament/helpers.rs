@@ -1,4 +1,6 @@
-use crate::model::{arg, deck_object, finals_table, player, seat, table, tournament};
+use crate::model::{
+    arg, deck_object, finals_table, player, raffle_draw, seat, standing, table, tournament,
+};
 use json::JsonValue;
 
 use super::types::{ActorContext, TournamentState};
@@ -19,6 +21,44 @@ pub(super) fn count_player_rounds_played(tournament: &JsonValue, user_uid: &str)
             })
         })
         .count()
+}
+
+pub(super) fn remap_player_uids(
+    tournament: &mut JsonValue,
+    uid_map: &std::collections::HashMap<String, String>,
+) {
+    fn remap(value: &mut JsonValue, uid_map: &std::collections::HashMap<String, String>) {
+        if let Some(to) = value.as_str().and_then(|u| uid_map.get(u)) {
+            *value = to.as_str().into();
+        }
+    }
+    for p in tournament[tournament::PLAYERS].members_mut() {
+        remap(&mut p[player::USER_UID], uid_map);
+    }
+    for round in tournament[tournament::ROUNDS].members_mut() {
+        for t in round.members_mut() {
+            remap(&mut t[table::ORGANIZED_BY], uid_map);
+            for s in t[table::SEATING].members_mut() {
+                remap(&mut s[seat::PLAYER_UID], uid_map);
+            }
+        }
+    }
+    let finals = &mut tournament[tournament::FINALS];
+    for s in finals[finals_table::SEATING].members_mut() {
+        remap(&mut s[seat::PLAYER_UID], uid_map);
+    }
+    for uid in finals[finals_table::SEED_ORDER].members_mut() {
+        remap(uid, uid_map);
+    }
+    remap(&mut tournament[tournament::WINNER], uid_map);
+    for s in tournament[tournament::STANDINGS].members_mut() {
+        remap(&mut s[standing::USER_UID], uid_map);
+    }
+    for draw in tournament[tournament::RAFFLES].members_mut() {
+        for uid in draw[raffle_draw::WINNERS].members_mut() {
+            remap(uid, uid_map);
+        }
+    }
 }
 
 pub fn rounds_played_by_player(tournament: &JsonValue) -> JsonValue {
@@ -342,7 +382,12 @@ pub(super) fn recompute_deck_publication(
         .members()
         .filter(|d| !touched(d))
         .filter_map(|d| {
-            let user_uid = d[deck_object::USER_UID].as_str().unwrap_or("");
+            let stored_uid = d[deck_object::USER_UID].as_str().unwrap_or("");
+            let user_uid = deck_ops
+                .members()
+                .find(|op| op[arg::OP].as_str() == Some("reassign"))
+                .and_then(|op| op[arg::UIDS][stored_uid].as_str())
+                .unwrap_or(stored_uid);
             let deck_uid = d[deck_object::UID].as_str().unwrap_or("");
             if user_uid.is_empty() || deck_uid.is_empty() {
                 return None;

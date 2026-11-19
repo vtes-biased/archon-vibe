@@ -94,6 +94,7 @@ export type TournamentEventType =
   | 'Unregister'
   | 'AddPlayer'
   | 'RemovePlayer'
+  | 'ReplacePlayer'
   | 'DropOut'
   | 'CheckIn'
   | 'CheckOut'
@@ -138,6 +139,7 @@ export interface TournamentEvent {
   type: TournamentEventType;
   user_uid?: string;
   player_uid?: string;
+  new_uid?: string; // ReplacePlayer: the member who actually played
   display_name?: string; // Register/AddPlayer/CheckIn: offline name-only player
   round?: number;
   table?: number;
@@ -203,7 +205,7 @@ export function buildSanctionsPayload(sanctions: Sanction[], tournamentUid: stri
 }
 
 export interface DeckOp {
-  op: 'upsert' | 'delete' | 'set_round' | 'set_publication' | 'set_attribution' | 'set_private' | 'log_view';
+  op: 'upsert' | 'delete' | 'set_round' | 'set_publication' | 'set_attribution' | 'set_private' | 'log_view' | 'reassign';
   player_uid?: string;
   deck?: { name: string; comments: string; cards: Record<string, number>; round?: number | null; public?: boolean; winner?: boolean; private?: boolean; attribution?: DeckAttribution };
   deck_uid?: string;
@@ -215,6 +217,7 @@ export interface DeckOp {
   winner?: boolean;
   attribution?: DeckAttribution;
   private?: boolean;
+  uids?: Record<string, string>; // reassign: old owner uid → new owner uid
 }
 
 export interface EngineResult {

@@ -108,6 +108,14 @@ async def process_deck_ops(
                     d.modified = datetime.now(UTC)
                     affected.append(await save(d))
 
+        elif op_type == "reassign":
+            uids = op.get("uids", {})
+            for d in existing_decks:
+                if d.user_uid in uids:
+                    d.user_uid = uids[d.user_uid]
+                    d.modified = datetime.now(UTC)
+                    affected.append(await save(d))
+
         elif op_type == "set_round":
             deck_uid = op.get("deck_uid")
             target = next((d for d in existing_decks if d.uid == deck_uid), None)

@@ -71,6 +71,17 @@ impl TournamentEvent {
                     .ok_or("user_uid required")?
                     .to_string(),
             }),
+            "ReplacePlayer" => Ok(Self::ReplacePlayer {
+                player_uid: value[arg::PLAYER_UID]
+                    .as_str()
+                    .ok_or("player_uid required")?
+                    .to_string(),
+                new_uid: value[arg::NEW_UID]
+                    .as_str()
+                    .ok_or("new_uid required")?
+                    .to_string(),
+                vekn_id: value[arg::VEKN_ID].as_str().map(|s| s.to_string()),
+            }),
             "DropOut" => Ok(Self::DropOut {
                 player_uid: value[arg::PLAYER_UID]
                     .as_str()

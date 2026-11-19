@@ -2518,6 +2518,37 @@ fn test_finish_finals_publishes_the_winner_deck() {
     assert_eq!(published, vec!["d1"]); // decklists_mode Winner
 }
 
+#[test]
+fn test_replace_player_leaves_no_trace_of_the_wrong_member() {
+    let tournament = finished_with_finals();
+    let decks = json::array![
+        { uid: "d1", user_uid: "p1", tournament_uid: "test-tournament", round: 3, public: true, winner: true, private: false },
+    ];
+    let event = json::object! { type: "ReplacePlayer", player_uid: "p1", new_uid: "x1", vekn_id: "1000001" };
+    let (replaced, deck_ops) =
+        run_event_with_decks(&tournament, &event, &make_organizer(), &decks.dump()).unwrap();
+    assert!(!replaced.contains("\"p1\""), "{replaced}");
+    let replaced = json::parse(&replaced).unwrap();
+    assert_eq!(replaced["winner"].as_str(), Some("x1"));
+    assert_eq!(deck_ops.len(), 1, "{deck_ops}");
+    assert_eq!(deck_ops[0]["op"].as_str(), Some("reassign"));
+    assert_eq!(deck_ops[0]["uids"]["p1"].as_str(), Some("x1"));
+
+    let swap = json::object! { type: "ReplacePlayer", player_uid: "p2", new_uid: "p7" };
+    let swapped = json::parse(&run_event(&replaced, &swap, &make_organizer()).unwrap()).unwrap();
+    let finalist = |uid: &str| {
+        swapped["players"]
+            .members()
+            .find(|p| p["user_uid"].as_str() == Some(uid))
+            .map(|p| p["finalist"].as_bool().unwrap_or(false))
+    };
+    assert_eq!((finalist("p7"), finalist("p2")), (Some(true), Some(false)));
+    assert_eq!(
+        swapped["finals"]["seating"][1]["player_uid"].as_str(),
+        Some("p7")
+    );
+}
+
 /// Build a tournament in Playing state with one round of 2 tables of 4
 fn player_state(tournament: &JsonValue, uid: &str) -> String {
     tournament["players"]
