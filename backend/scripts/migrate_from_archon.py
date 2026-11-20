@@ -211,7 +211,6 @@ ARCHON_USER_FIELDS = (
     "discord_id",
     "contact_phone",
     "phone_is_whatsapp",
-    "coopted_by",
 )
 
 # Deterministic deck identity: one deck per (tournament, user, round) — reruns
@@ -452,7 +451,6 @@ def build_user(row: dict, stats: Stats) -> tuple[db.User, dict]:
         discord_id=nz(discord.get("id")),
         contact_phone=whatsapp,
         phone_is_whatsapp=bool(whatsapp),
-        coopted_by=nz(d.get("sponsor")),
         vekn_prefix=nz(d.get("prefix")),
         # Imported members owe no VEKN push: they already exist on vekn.net or
         # predate it. Default False would make batch_push re-register ~19k members.
@@ -588,11 +586,6 @@ async def merge_member(user: db.User, discord: dict, stats: Stats) -> str:
     for field in ARCHON_USER_FIELDS:
         if field in live.local_modifications:
             continue
-        # coopted_by is written EXCLUSIVELY by remap_coopted_by, once the full
-        # member_uid_map is known: an un-remapped old-archon sponsor uid here
-        # flip-flops daily against that remap.
-        if field == "coopted_by":
-            continue
         value = getattr(user, field)
         # Officials' contact_email is injected by the VEKN member sync from the
         # scraped vekn.net lists — writing old archon's address here would
@@ -635,7 +628,7 @@ async def migrate_members(
         await cur.execute(q)
         async for row in cur:
             user, discord = build_user(row, stats)
-            old_sponsor, user.coopted_by = user.coopted_by, None
+            old_sponsor = nz((row["data"] or {}).get("sponsor"))
             # #216: allocation deferred to the post-loop pass for a stable id
             # space. A non-participant falls through to the normal path.
             if not user.vekn_id:

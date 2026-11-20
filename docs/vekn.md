@@ -268,7 +268,8 @@ four in the archon file's terms and the `+F` must be added back —
   user row, as the legacy import left behind — and not in
   `local_modifications`. A member goes to the official with the **longest**
   matching `vekn_prefix`, so a Prince whose prefix extends their NC's keeps their
-  own members.
+  own members — an undated sponsor holding a shorter matching prefix is taken
+  back, since only inference leaves `coopted_at` unset.
 - Non-destructive: fields recorded in `local_modifications` by the profile and user
   edit routes are never overwritten.
 

@@ -864,20 +864,20 @@ async def get_users_with_vekn_prefix() -> list[User]:
         return [decode_json(row[0], User) for row in rows]
 
 
-async def get_users_without_coopted_by() -> list[User]:
-    """A sponsor naming no user row counts as unset."""
+async def get_sponsor_inference_candidates() -> list[tuple[User, bool]]:
+    """Members whose sponsor is undated, unset or names no user row, each with
+    whether that sponsor resolves to a user."""
     async with batch_read_connection() as conn:
         result = await conn.execute(
-            """SELECT "full" FROM objects o
-            WHERE type = 'user'
-              AND ("full"->>'coopted_by' IS NULL
-                   OR NOT EXISTS (SELECT 1 FROM objects s
-                                  WHERE s.uid = o."full"->>'coopted_by'))
-              AND "full"->>'vekn_id' IS NOT NULL
-              AND "full"->>'vekn_id' != ''"""
+            """SELECT o."full", s.uid IS NOT NULL FROM objects o
+            LEFT JOIN objects s ON s.uid = o."full"->>'coopted_by'
+            WHERE o.type = 'user'
+              AND (o."full"->>'coopted_at' IS NULL OR s.uid IS NULL)
+              AND o."full"->>'vekn_id' IS NOT NULL
+              AND o."full"->>'vekn_id' != ''"""
         )
         rows = await result.fetchall()
-        return [decode_json(row[0], User) for row in rows]
+        return [(decode_json(row[0], User), row[1]) for row in rows]
 
 
 async def allocate_next_vekn_id() -> str:
