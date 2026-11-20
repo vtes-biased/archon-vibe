@@ -4,7 +4,10 @@
 
 [mise](https://mise.jdx.dev) and Docker or OrbStack: `mise install` sets up every
 tool `mise.toml` names, at the versions `mise.lock` records; `just update` moves
-both. Python comes from `.python-version`, which deploy and CI read too, and stays
+both. CI jobs install their tools with `jdx/mise-action` from the same `mise.lock`,
+each only the ones it needs; two builds bring their own toolchain instead, the
+engine wheel (`PyO3/maturin-action`'s stable Rust) and the e2e stack
+(`frontend/Dockerfile.test`'s `rust:slim` and `node:24-slim` images). Python comes from `.python-version`, which deploy reads too, and stays
 at the version the servers' distro ships by default, not the newest release;
 deploy installs that version through uv, never the distro's own interpreter. Two places
 cannot read the file and repeat the version: `backend/Dockerfile`'s base image and

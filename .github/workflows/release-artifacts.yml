@@ -74,12 +74,9 @@ jobs:
         with:
           fetch-depth: 0   # hatch-vcs needs full history + tags to stamp the version
 
-      - uses: actions/setup-python@v6
+      - uses: jdx/mise-action@v5
         with:
-          python-version-file: '.python-version'
-
-      - name: Install uv
-        run: pip install uv
+          install_args: python uv
 
       - name: Build backend wheel + export pinned requirements
         run: |
@@ -114,12 +111,9 @@ jobs:
         with:
           fetch-depth: 0   # hatch-vcs needs full history + tags to stamp the version
 
-      - uses: actions/setup-python@v6
+      - uses: jdx/mise-action@v5
         with:
-          python-version-file: '.python-version'
-
-      - name: Install uv
-        run: pip install uv
+          install_args: python uv
 
       - name: Build bot wheel + export pinned requirements
         working-directory: bot
@@ -153,22 +147,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: jdx/mise-action@v5
         with:
-          targets: wasm32-unknown-unknown
-
-      - name: Install wasm-pack
-        uses: taiki-e/install-action@v2   # prebuilt binary (~3s) vs ~80s source compile
-        with:
-          tool: wasm-pack
+          install_args: rust aqua:wasm-bindgen/wasm-pack node
 
       - name: Build WASM engine
         working-directory: engine
         run: wasm-pack build --target web --release -- --features wasm
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24'
 
       - name: Build frontend (paraglide + vite, adapter-static → build/)
         working-directory: frontend
