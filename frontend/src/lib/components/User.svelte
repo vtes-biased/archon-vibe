@@ -13,6 +13,7 @@
   import SanctionsManager from "./SanctionsManager.svelte";
   import Button from '#lib/components/Button.svelte';
   import { Loader2, X, User as UserIcon, Camera, SquarePen } from "@lucide/svelte";
+  import { looksLikeEmail } from "#lib/utils.ts";
   import * as m from '#lib/paraglide/messages.js';
   import { dialogPanel } from "#lib/actions/dialog.ts";
 
@@ -261,6 +262,10 @@
       error = m.user_error_name_country_required();
       return;
     }
+    if (mode === "create" && editEmail.trim() && !looksLikeEmail(editEmail)) {
+      error = m.form_error_email_invalid();
+      return;
+    }
 
     try {
       saving = true;
@@ -304,6 +309,7 @@
   {#if isEditing}
     <div role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
       <form
+        novalidate
         onsubmit={(e) => {
           e.preventDefault();
           if (mode === "create") saveEdit();
@@ -466,7 +472,7 @@
       </fieldset>
 
       {#if error}
-        <div class="text-sm text-link">
+        <div role="alert" class="text-sm text-link">
           {error}
         </div>
       {/if}

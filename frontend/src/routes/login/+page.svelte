@@ -17,6 +17,7 @@
   import { Mail, KeyRound } from '@lucide/svelte';
   import DiscordIcon from "#lib/components/DiscordIcon.svelte";
   import Button from '#lib/components/Button.svelte';
+  import { looksLikeEmail } from "#lib/utils.ts";
   import * as m from '#lib/paraglide/messages.js';
 
   const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -26,6 +27,7 @@
 
   let mode = $state<"login" | "signup">("login");
   let oauthError = $state<string | null>(null);
+  let formError = $state<string | null>(null);
 
   let email = $state("");
   let password = $state("");
@@ -72,7 +74,12 @@
   }
 
   async function handleEmailLogin() {
+    formError = null;
     if (!email.trim() || !password) return;
+    if (!looksLikeEmail(email)) {
+      formError = m.form_error_email_invalid();
+      return;
+    }
     const success = await login(email.trim(), password);
     if (success) {
       goto(successTarget());
@@ -84,7 +91,12 @@
   }
 
   async function handleSignupMagicLink() {
+    formError = null;
     if (!email.trim() || !consentChecked) return;
+    if (!looksLikeEmail(email)) {
+      formError = m.form_error_email_invalid();
+      return;
+    }
     const success = await requestMagicLink(email.trim(), "signup");
     if (success) {
       magicLinkSent = true;
@@ -94,7 +106,12 @@
   }
 
   async function handleForgotPassword() {
+    formError = null;
     if (!email.trim()) return;
+    if (!looksLikeEmail(email)) {
+      formError = m.form_error_email_invalid();
+      return;
+    }
     const success = await requestMagicLink(email.trim(), "reset");
     if (success) {
       resetEmailSent = true;
@@ -192,9 +209,9 @@
         </div>
       {/if}
 
-      {#if auth.error || oauthError}
-        <div class="mb-4 p-3 banner-error border rounded-lg text-sm">
-          {auth.error || oauthError}
+      {#if formError || auth.error || oauthError}
+        <div role="alert" class="mb-4 p-3 banner-error border rounded-lg text-sm">
+          {formError || auth.error || oauthError}
         </div>
       {/if}
 
@@ -249,7 +266,7 @@
             {recoverMode ? m.login_recover_instructions() : m.login_reset_instructions()}
           </p>
 
-          <form onsubmit={(e) => { e.preventDefault(); handleForgotPassword(); }} class="space-y-4">
+          <form novalidate onsubmit={(e) => { e.preventDefault(); handleForgotPassword(); }} class="space-y-4">
             <div>
               <label for="reset-email" class="block text-sm text-ink-muted mb-1">{m.common_email()}</label>
               <input
@@ -289,7 +306,7 @@
             {m.login_welcome_back()}
           </p>
 
-          <form onsubmit={(e) => { e.preventDefault(); handleEmailLogin(); }} class="space-y-4">
+          <form novalidate onsubmit={(e) => { e.preventDefault(); handleEmailLogin(); }} class="space-y-4">
             <div>
               <label for="login-email" class="block text-sm text-ink-muted mb-1">{m.common_email()}</label>
               <input
@@ -421,7 +438,7 @@
             </div>
           </div>
 
-          <form onsubmit={(e) => { e.preventDefault(); handleSignupMagicLink(); }} class="space-y-3">
+          <form novalidate onsubmit={(e) => { e.preventDefault(); handleSignupMagicLink(); }} class="space-y-3">
             <label for="signup-email" class="sr-only">{m.common_email()}</label>
             <input
               type="email"

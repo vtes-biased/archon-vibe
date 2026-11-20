@@ -60,6 +60,10 @@ export function localToday(): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
+export function looksLikeEmail(s: string): boolean {
+  return /^[^\s@]+@[^\s@]+$/.test(s.trim());
+}
+
 /** A `YYYY-MM-DD` calendar date: `new Date` reads it as UTC midnight, so it is formatted in UTC to keep its day. */
 export function formatCalendarDate(d: string): string {
   return new Date(d).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });

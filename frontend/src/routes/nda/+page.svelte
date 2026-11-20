@@ -8,6 +8,7 @@
   import InlineNotice from "#lib/components/InlineNotice.svelte";
   import ConfirmActionModal from "#lib/components/ConfirmActionModal.svelte";
   import { Loader2, FileSignature, CircleCheck } from "@lucide/svelte";
+  import { looksLikeEmail } from "#lib/utils.ts";
   import * as m from "#lib/paraglide/messages.js";
 
   const auth = $derived(getAuthState());
@@ -20,6 +21,7 @@
   let address = $state("");
   let phone = $state("");
   let showConfirm = $state(false);
+  let formError = $state<string | null>(null);
   let signedRecordUid = $state<string | null>(null);
 
   const onRecord = $derived(status?.records.find((r) => r.status !== "pending") ?? null);
@@ -121,9 +123,16 @@
       </article>
 
       <form
+        novalidate
         class="mt-6 bg-surface-card border border-line rounded-lg p-6 space-y-4"
         onsubmit={(e) => {
           e.preventDefault();
+          formError = null;
+          if (!name.trim()) return;
+          if (email.trim() && !looksLikeEmail(email)) {
+            formError = m.form_error_email_invalid();
+            return;
+          }
           showConfirm = true;
         }}
       >
@@ -147,6 +156,9 @@
           <input id="nda-phone" type="tel" bind:value={phone}
             class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent" />
         </div>
+        {#if formError}
+          <div role="alert" class="p-3 banner-error border rounded-lg text-sm">{formError}</div>
+        {/if}
         <Button type="submit" variant="primary" size="lg" disabled={!name.trim()}>
           <FileSignature class="inline w-4 h-4 mr-1" aria-hidden="true" />
           {m.nda_sign_btn()}

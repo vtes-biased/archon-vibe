@@ -123,7 +123,7 @@
             </div>
           {/if}
 
-          <form onsubmit={(e) => { e.preventDefault(); handleSetPassword(); }} class="space-y-4">
+          <form novalidate onsubmit={(e) => { e.preventDefault(); handleSetPassword(); }} class="space-y-4">
             <div>
               <label for="email" class="block text-sm text-ink-muted mb-1">{m.common_email()}</label>
               <input

@@ -4,6 +4,7 @@
   import DiscordIcon from "#lib/components/DiscordIcon.svelte";
   import GithubIcon from "#lib/components/GithubIcon.svelte";
   import Button from "#lib/components/Button.svelte";
+  import { looksLikeEmail } from "#lib/utils.ts";
   import ConfirmActionModal from "#lib/components/ConfirmActionModal.svelte";
   import type { AuthMethod } from "#lib/stores/auth.svelte.ts";
   import * as m from '#lib/paraglide/messages.js';
@@ -87,9 +88,12 @@
   }
 
   async function handleSendEmailLink() {
-    if (!emailInput.trim()) return;
-    sendingEmailLink = true;
     emailError = "";
+    if (!looksLikeEmail(emailInput)) {
+      emailError = m.form_error_email_invalid();
+      return;
+    }
+    sendingEmailLink = true;
     const success = await onLinkEmail(emailInput.trim());
     sendingEmailLink = false;
     if (success) {
@@ -133,7 +137,7 @@
     {/if}
   </div>
   {#if hasEmail && showPasswordChange}
-    <form onsubmit={(e) => { e.preventDefault(); handleChangePassword(); }}
+    <form novalidate onsubmit={(e) => { e.preventDefault(); handleChangePassword(); }}
       class="ml-8 flex gap-2">
       <input type="password" bind:value={newPassword} autocomplete="new-password" minlength="8" required
         placeholder={m.auth_verify_password_placeholder()}
@@ -160,7 +164,7 @@
         <p class="text-xs text-ink-faint">{m.profile_email_verify_hint()}</p>
       </div>
     {:else}
-      <form onsubmit={(e) => { e.preventDefault(); handleSendEmailLink(); }}
+      <form novalidate onsubmit={(e) => { e.preventDefault(); handleSendEmailLink(); }}
         class="ml-8 flex gap-2">
         <input type="email" bind:value={emailInput} required
           placeholder={m.login_placeholder_email()}

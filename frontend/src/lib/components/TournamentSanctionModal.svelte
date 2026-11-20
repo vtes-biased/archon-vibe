@@ -221,6 +221,7 @@
     </div>
 
     <form
+      novalidate
       onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}
       class="p-6 space-y-4"
     >

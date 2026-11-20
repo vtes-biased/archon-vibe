@@ -41,6 +41,10 @@
 
   let isSubmitting = $state(false);
   let error = $state<string | null>(null);
+  let errorBanner = $state<HTMLElement | null>(null);
+  $effect(() => {
+    if (error) errorBanner?.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
 
   async function handleSubmit() {
     if (!name.trim()) {
@@ -96,12 +100,12 @@
       </div>
     {:else}
       {#if error}
-        <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4 mb-6">
+        <div bind:this={errorBanner} role="alert" class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-4 mb-6">
           <p class="text-link-soft">{error}</p>
         </div>
       {/if}
 
-      <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-6">
+      <form novalidate onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-6">
         <div class="bg-surface-card rounded-lg shadow p-6 border border-line space-y-4">
           <div>
             <label for="name" class="block text-sm text-ink-muted mb-1">{m.tfield_name_label()} <span class="text-link text-xs">({m.common_required()})</span></label>

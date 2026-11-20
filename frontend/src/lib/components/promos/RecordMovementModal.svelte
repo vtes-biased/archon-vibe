@@ -160,7 +160,7 @@
       <h2 id="promo-movement-title" class="text-xl font-medium text-ink-strong">{m.promo_movement_title()}</h2>
     </div>
 
-    <form onsubmit={(e) => { e.preventDefault(); submit(); }} class="p-6 space-y-4">
+    <form novalidate onsubmit={(e) => { e.preventDefault(); submit(); }} class="p-6 space-y-4">
       <div class="grid grid-cols-3 bg-surface-muted rounded-lg border border-line p-1">
         {#each kinds as k (k)}
           <button

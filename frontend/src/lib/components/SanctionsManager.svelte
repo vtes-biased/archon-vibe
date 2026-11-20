@@ -5,7 +5,7 @@
   import { getActiveSanctionsForUser, getTournamentListItems, type TournamentListItem } from "#lib/db.ts";
   import { canViewSanctionReason } from "#lib/engine.ts";
   import { getAuthState } from "#lib/stores/auth.svelte.ts";
-  import { visibleSanctions } from "#lib/utils.ts";
+  import { localToday, visibleSanctions } from "#lib/utils.ts";
   import SanctionBadge from "./SanctionBadge.svelte";
   import { Pencil, TriangleAlert, CircleCheck, Trash2, RefreshCw } from "@lucide/svelte";
   import Button from '#lib/components/Button.svelte';
@@ -38,6 +38,7 @@
   let editSanctionExpiresAt = $state("");
   let processingSanctionAction = $state(false);
   let savingSanction = $state(false);
+  let createError = $state<string | null>(null);
 
   $effect(() => {
     getActiveSanctionsForUser(user.uid).then((sanctions) => {
@@ -89,6 +90,7 @@
     sanctionCategory = "unsportsmanlike_conduct";
     sanctionDescription = "";
     sanctionExpiresAt = "";
+    createError = null;
     showSanctionModal = true;
   }
 
@@ -116,7 +118,13 @@
   }
 
   async function handleCreateSanction() {
+    createError = null;
     if (!sanctionTargetUser || !sanctionDescription.trim()) return;
+    if (expiryRequired && !sanctionExpiresAt) return;
+    if (expiryAllowed && sanctionExpiresAt && sanctionExpiresAt < localToday()) {
+      createError = m.sanction_mgr_error_expiry_past();
+      return;
+    }
     creatingSanction = true;
     const targetUid = sanctionTargetUser.uid;
     try {
@@ -305,6 +313,7 @@
         </p>
       </div>
       <form
+        novalidate
         onsubmit={(e) => {
           e.preventDefault();
           handleCreateSanction();
@@ -370,13 +379,17 @@
               type="date"
               bind:value={sanctionExpiresAt}
               required={expiryRequired}
-              min={new Date().toISOString().split("T")[0]}
+              min={localToday()}
               class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent"
             />
             <p class="mt-1 text-xs text-ink-faint">
               {m.sanction_mgr_max_expiry()}
             </p>
           </div>
+        {/if}
+
+        {#if createError}
+          <div role="alert" class="p-3 banner-error border rounded-lg text-sm">{createError}</div>
         {/if}
 
         <div class="flex gap-2 pt-2">
@@ -503,7 +516,7 @@
               onchange={handleExpiryChange}
               disabled={!!editingSanction.lifted_at}
               required={editExpiryRequired}
-              min={new Date().toISOString().split("T")[0]}
+              min={localToday()}
               class="w-full px-3 py-2 border border-line-strong rounded bg-surface-card text-ink-bright focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-50"
             />
             {#if editSanctionLevel === "suspension"}

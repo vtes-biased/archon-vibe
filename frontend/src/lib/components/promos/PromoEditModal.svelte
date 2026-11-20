@@ -205,7 +205,7 @@
       </h2>
     </div>
 
-    <form onsubmit={(e) => { e.preventDefault(); save(); }} class="p-6 space-y-4">
+    <form novalidate onsubmit={(e) => { e.preventDefault(); save(); }} class="p-6 space-y-4">
       <div>
         <label for="promo-name" class="block text-sm text-ink-muted mb-1">{m.common_name()} *</label>
         <input id="promo-name" type="text" bind:value={name} maxlength="200" required class={inputClass} />
