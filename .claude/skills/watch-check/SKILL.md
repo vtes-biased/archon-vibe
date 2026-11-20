@@ -1,6 +1,6 @@
 ---
 name: watch-check
-description: Read WATCH.md and check every item's trigger — dated checks, recurring checks and externally-gated asks — then send each fired one through /intake as a board line and leave the rest. Use when asked to check the watch list, see whether anything waiting has become actionable, or run the watch check; also before /upkeep and after a production release.
+description: Read WATCH.md and check every item's trigger — dated checks, recurring checks and externally-gated asks — then send each fired one through /intake as a board line and leave the rest. Use when asked to check the watch list, see whether anything waiting has become actionable, or run the watch check. /upkeep runs it first and /post-deploy runs it after every production deploy.
 ---
 
 # Watch check

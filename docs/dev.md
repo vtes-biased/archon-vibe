@@ -539,6 +539,9 @@ memory. Chosen for the best combination of snippet count and benchmark score:
 | wasm-bindgen | `/rustwasm/wasm-bindgen` |
 | MDN (IndexedDB, Service Workers, Web APIs) | `/mdn/content` |
 
+Claude Code's own features — skills, agents, hooks, settings — are documented at
+`https://code.claude.com/docs`.
+
 ## Repository layout
 
 ```

@@ -5,7 +5,8 @@ outside our hands. The board holds no waiting state, so it waits here. The evide
 each item needs stays on the docs page that owns the subject; this file holds only
 the ask, its trigger and what to do when it fires.
 
-`/watch-check` reads it. Each item names:
+`/watch-check` reads it, as the first step of `/upkeep` and after every production
+deploy in `/post-deploy`. Each item names:
 
 - **When** — a date, a recurrence, or a condition someone could observe firing.
   Never "later".
@@ -128,26 +129,6 @@ are not here: they wait on a release, not a trigger, in
 - **Fired**: through `/intake` — run 1v1 events, scoped by
   [what it takes](docs/tournaments.md#the-two-player-format-not-yet-official).
   An announcement without event rules has not fired it.
-
-## A member asks to keep their win out of the TWDA
-
-- **When**: a member asks to keep their name or their winning deck out of the
-  TWDA. A private deck covers every other deck; the winner's publishes regardless.
-- **Check**: open `feedback` issues and the owner's mail.
-- **Fired**: through `/intake` — a TWD opt-out for a winner.
-
-## A consumer asks for league standings in the public API
-
-- **When**: a public-API consumer asks for league standings.
-- **Check**: open issues.
-- **Fired**: through `/intake` — they need engine compute, or a
-  promo-stock-style cross-object reprojection on tournament save.
-
-## The owner wants a krcg entry point to the bulk export
-
-- **When**: the owner asks for a static mirror of `/v1/export` on
-  `static.krcg.org`.
-- **Fired**: through `/intake`.
 
 ## SvelteKit and svelte-check ship TypeScript 7 support
 

@@ -111,5 +111,5 @@ Report as a short list, blocking first, each finding one or two sentences with t
 If nothing survives, say "looks good" and name what you checked.
 
 You get at most **two rounds**. If the disagreement survives a second round, stop
-and say so — the author escalates to the owner with the inflexion point, and a
+and say so — the author escalates to the owner with that one disagreement, and a
 third round is not yours to open.

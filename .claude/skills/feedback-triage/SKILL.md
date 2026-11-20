@@ -121,12 +121,11 @@ the owner signs off. One issue per round.
 
 Present as **plain text that ends the turn**:
 
-1. The report, in one line.
+1. Your recommendation (one bucket from the table), and the report in one line.
 2. What you verified, with `file:line` — including anything that contradicts the report.
 3. The verdict, with the docs page or rule section it rests on.
-4. Your recommendation (one bucket from the table).
-5. The **draft reply, verbatim** — the exact text that would be posted publicly.
-6. The **draft board line**, if any, with its Done-when clause and proposed position.
+4. The **draft reply, verbatim** — the exact text that would be posted publicly.
+5. The **draft board line**, if any, with its Done-when clause and proposed position.
 
 Then, in the **next** turn, use `AskUserQuestion` for accept / decline / edit.
 Text emitted before a tool call in the same turn is not rendered in Claude Code, so

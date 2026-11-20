@@ -11,7 +11,7 @@ doc-impact docs pages updated, board line deleted — in one commit.
 ## You are not alone in the tree
 
 Other agents work this checkout at the same time, on their own lines, and nothing
-announces them. Collisions are usually harmless. Read the tree, the index and HEAD
+announces them unless you ask. Collisions are usually harmless. Read the tree, the index and HEAD
 as state that may have moved since you last looked, never as yours alone:
 
 - **A change you did not make is a sibling's work in progress, not debris.** Never
@@ -23,6 +23,11 @@ as state that may have moved since you last looked, never as yours alone:
 - **A red gate is yours to fix, whoever broke it.** "Not my change" is never a
   reason to leave a build, test or lint failure standing. Fix it forward, even
   inside a sibling's files, and name the fix in the report.
+- **Ask a sibling rather than guess.** Where the tooling lets agents message each
+  other (`ListAgents`, `SendMessage`), use it to learn who holds a path before
+  inferring it from the tree.
+- **No separate worktree by default.** Take one only when two lines overlap
+  heavily, and come back to the main checkout after.
 - **Tree-wide mutators run on your paths only.** `just lint` reformats everything
   (`ruff --fix .`, `ruff format .`, `cargo fmt`): use `just lint-check`, or run the
   formatter on your own files. The same goes for `dev-reset`, `clean` and lockfile
@@ -145,9 +150,10 @@ scan list in `docs/architecture.md#indexes` with its reason. Re-plan it with tha
 page's recipe: the expression must sit in `Index Cond`, not `Filter`. The reviewer
 blocks on anything else.
 
-**Tests: the default is zero.** Add one only for a real regression with
-consequences, asserted at an interface, against the shipped artifact, one per
-invariant. Import shared constants rather than copying them. **Mocks are banned by
+**Tests: few, on the main nominal workflows.** Cover the main path and the failure
+modes that matter, asserted at an interface, against the shipped artifact, one per
+invariant. A niche feature may carry none, unless it regressed: a regression earns
+its non-regression test. Import shared constants rather than copying them. **Mocks are banned by
 default** — a mock that mirrors the code tests the code against itself; use a real
 dependency or don't test that path. Never encode an engine-impossible state. Every
 test must trace to a claim in the docs; if you cannot name the claim, the test does
@@ -225,12 +231,13 @@ landing, never that it may be dropped.
 - Advisory findings are fixed in this same change, unless the fix is genuinely
   separable — then it goes through `/intake` and rides this commit as a board
   line. Nothing leaves this loop unresolved.
-- A finding you believe is wrong is escalated to the owner, not dropped.
+- A finding you believe is wrong is argued to the reviewer in the next round, not
+  dropped; it reaches the owner only through the two-round deadlock below.
 - Expect **"looks good"** to be a common verdict. It is not the reviewer's job to
   find something, and report-everything must not become find-something.
 
 **After two rejection rounds, stop and escalate to the owner**, compressed to the
-inflexion point: the one disagreement the rounds turn on, each side in a sentence,
+one decision: the one disagreement the rounds turn on, each side in a sentence,
 and your recommendation. Do not open a third round.
 
 First-review scope growth — the reviewer demanding the refactor now rather than a

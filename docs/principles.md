@@ -106,7 +106,10 @@ green.
 
 Few tests, high coverage of behavior. Test what the product does at its
 boundaries — API, CLI, end-to-end nominal paths, and the failure modes that
-matter — never how it does it. Agents don't make local mistakes; they make
+matter — never how it does it. A niche feature may carry no test at all, unless it
+regressed: a regression earns its non-regression test. A minimal suite on the main
+nominal workflows stays useful, and keeps agents' context free of tests that
+describe nothing that matters. Agents don't make local mistakes; they make
 non-local ones. Unit tests of internals calcify implementation and tax every
 change; integration and non-regression tests catch what matters and survive
 refactors.

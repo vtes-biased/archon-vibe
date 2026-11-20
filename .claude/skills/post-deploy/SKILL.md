@@ -112,8 +112,13 @@ One close per issue even when several commits reference it.
 > This is fixed and deployed — the rating on a tournament page and the one on your
 > profile are the same number now.
 
-## 5. Report
+## 5. Check the watch list
+
+Run `/watch-check`: a release is what fires several of its triggers.
+
+## 6. Report
 
 To the owner: which post-deploy actions ran and what they changed, which are still
 gated on an undeployed commit, then which issues were closed, which are fixed but
-waiting on a deploy, and which carry no referencing commit and need a decision.
+waiting on a deploy, which carry no referencing commit and need a decision, and
+what the watch check fired.

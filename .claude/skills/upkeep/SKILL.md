@@ -1,13 +1,14 @@
 ---
 name: upkeep
-description: The maintenance loop — lint the docs against the code and its sources, run oldest-first eviction verdicts on the board, and mine recurring review findings for harness amendments. Use every 20 completed board lines or monthly, or when asked to do a maintenance, cleanup or health-check pass.
+model: fable
+description: The maintenance loop — lint the docs against the code and its sources, run oldest-first eviction verdicts on the board, and turn recurring review findings and owner corrections into standing rules. Use every 20 completed board lines or monthly, or when asked to do a maintenance, cleanup or health-check pass.
 ---
 
 # Upkeep
 
 A recurring pass over three surfaces. **The unit of time is a completed board
 line**; this runs every 20 completed lines, or monthly, whichever comes first.
-Anything untouched for 20 completed lines goes on trial at the next pass.
+Anything untouched for 20 completed lines gets a verdict at the next pass.
 
 Count completed lines from history — there is no counter file:
 
@@ -16,7 +17,8 @@ git log --oneline -S'- ' -- BOARD.md | head -40      # commits touching board li
 git log -1 --format=%ci -- BOARD.md                  # last board movement
 ```
 
-Work the three surfaces in order. Everything this pass proposes goes through
+Run `/watch-check` first: a fired trigger may add a line this pass then ranks. Then
+work the three surfaces in order. Everything this pass proposes goes through
 `/intake` like any other ask — **it does not write to the board directly**.
 
 ## 1. Docs lint
@@ -70,15 +72,14 @@ line gets one of four verdicts, and no line is skipped twice:
 
 - **do** — it is still right and still wanted; leave it, reordering if the ranking
   rules now place it differently;
-- **date** — it is real but not now; it moves off the board into `WATCH.md` with a
+- **watch** — it is real but not now; it moves off the board into `WATCH.md` with a
   named trigger, not a vague deferral;
 - **promote** — it turned out to be a subject, not an ask; it becomes docs content
   and the line goes;
 - **drop** — it is no longer wanted; delete it.
 
-Triggers are not this pass's job: `/watch-check` reads `WATCH.md`. Give each of its
-items the same verdict as a line, though — still wanted, or dropped — since waiting
-is not exemption from eviction.
+Give each `WATCH.md` item the same verdict as a line — still wanted, or dropped —
+since waiting is not exemption from eviction.
 
 Check the hard limit. If the list is at 15, the pass must produce at least
 one drop or promotion before any new line can land.
@@ -94,11 +95,11 @@ is a deletion, not a verdict.
 
 ## 3. Retrospective
 
-Mine the recent reviews and owner corrections. **Three occurrences of the
-same class is a harness problem, not a code problem.**
+Mine the recent reviews and owner corrections. **Two occurrences of the same
+class is a harness problem, not a code problem.**
 
 Look for: the same advisory finding recurring across unrelated diffs; the same
-owner correction given more than twice; the same rule being rediscovered by an
+owner correction given twice; the same rule being rediscovered by an
 agent that had no way to know it.
 
 Each qualifying class becomes a proposed amendment — a new principle line, a charter
@@ -106,7 +107,7 @@ line for the reviewer, a lint rule, a hook, or an edit to one of these skills �
 filed through `/intake` as an ordinary board line. **The harness grows only through
 this retrospective.** Do not add a skill, an agent or a hook because it seems useful.
 
-HitL effort goes here rather than into the code: a correction the owner has to give
+The owner's effort goes here rather than into the code: a correction the owner has to give
 twice is a rule that should have been written down once.
 
 ## 4. Report

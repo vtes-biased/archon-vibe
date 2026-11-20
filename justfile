@@ -45,7 +45,7 @@ dev-stop:
     docker compose stop db 2>/dev/null || true
     rm -f backend.log frontend.log public-api.log
 
-# Start the public read-only API against the dev database (docs/public-api.md).
+# Start the public read-only API against the dev database.
 # Its own process by design — `just dev` does not start it.
 dev-api:
     #!/usr/bin/env bash
@@ -186,7 +186,7 @@ dark-variant:
     uv run python3 scripts/check_dark_variant.py
 
 # Fail when a disclosure is drawn outside `FoldableSection` — the app's one fold
-# grammar, whose exceptions are listed in the script and in docs/design.md.
+# grammar, whose exceptions are listed in the script.
 fold-grammar:
     uv run python3 scripts/check_fold_grammar.py
 
@@ -281,7 +281,7 @@ dev-reset:
     just dev-stop
     docker compose down -v
 
-# Create the fixed dev IC account (docs/dev.md) — idempotent, dev database only
+# Create the fixed dev IC account — idempotent, dev database only
 dev-ic-account:
     uv run python backend/scripts/dev_ic_account.py
 

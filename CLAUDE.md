@@ -62,10 +62,14 @@ check against that page. The ones that bite most often:
 - **Locality over DRY.** Explicit greppable local code over clever wrappers.
   Similar-looking but causally unrelated code stays repeated.
 - **No red builds.** Never report done over a failing build, test or lint.
+- **Look it up.** Before using a library, a tool or Claude Code's own features,
+  read its current documentation; never answer from memory. The sources are in
+  [`docs/dev.md`](docs/dev.md#library-documentation).
 - **Read [`docs/hazards.md`](docs/hazards.md)** before touching the subsystems it
   names. Non-local traps are the expensive kind of mistake here.
-- **Tests**: default to none. Add one only for a real regression, at an interface,
-  against the shipped artifact, one per invariant. Mocks are banned by default.
+- **Tests: few, on the main nominal workflows** and the failure modes that matter,
+  at boundaries, one per invariant. A niche feature may have none unless it
+  regressed. Mocks are banned by default.
 - **Never put a board reference in a commit message or a comment.** `#N` in a
   commit means a **GitHub issue**, and a fix for a user-reported one carries
   `Reported in #N.` — never a closing keyword, which would auto-close on push when
@@ -103,13 +107,15 @@ check against that page. The ones that bite most often:
   `POST /oauth/token` with `grant_type=client_credentials&scope=api:read` — and use
   it as a Bearer without echoing it. Never `cat` the `.env`.
 
-## Human inflexion points
+## Talking to the owner
 
 Built for a professional owner: decisions, not narration. Interrupt only for principle
 and paradigm choices (short option sets with a recommendation), irreversible or
 outward-facing actions, genuine changes to product scope, and a review deadlock
 after two rounds. Everything else proceeds.
 
+- **One decision per message, recommendation first.** Number the questions and
+  include every excerpt the owner needs to answer without opening a file.
 - **A decision write-up ends its turn.** Text before a tool call is not shown in
   the console, so a write-up followed by `AskUserQuestion` reaches the owner as bare
   chips. Paste the code extracts, walk the failure, give the options, stop; the

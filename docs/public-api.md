@@ -41,6 +41,10 @@ reaches consumers with no code change here.
 | `/v1/community-links` | stream, one line per link |
 | `/v1/export` | the whole corpus as the generated `api.jsonl.gz` snapshot, rebuilt within 15 minutes of any change |
 
+Two extensions wait until someone asks. League standings need engine compute, or a
+promo-stock-style reprojection of the league on tournament save. A static mirror of
+the export on `static.krcg.org` would give the krcg ecosystem an entry point.
+
 ## The stream
 
 ```

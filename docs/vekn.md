@@ -656,7 +656,8 @@ one to fall back to. The winner's name appearing regardless is intentional — t
 TWDA is the public win registry, which is also why anonymity never withholds the
 winner's own `user_uid` ([tournaments](tournaments.md#engine-event-catalog)). Privacy never
 reaches the submission either: the winner's deck publishes whatever its owner
-chose, and the TWDA holds no other.
+chose, and the TWDA holds no other. A winner has no opt-out, and none is built until
+a member asks for one.
 
 ### Inbound
 
