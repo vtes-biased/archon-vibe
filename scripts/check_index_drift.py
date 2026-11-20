@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fail the build when an upgraded database would hold different indexes than a fresh one.
 
-Run: just index-drift
+Run: mise run index-drift
 """
 
 import os

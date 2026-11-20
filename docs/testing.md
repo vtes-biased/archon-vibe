@@ -17,7 +17,7 @@ There is **no frontend unit-test framework** — Playwright E2E only.
 
 ## Running them
 
-**Backend** — `just test-backend` is canonical: it builds the PyO3 engine into the
+**Backend** — `mise run test-backend` is canonical: it builds the PyO3 engine into the
 venv, brings the `db` container up if needed, runs pytest, then the index-drift
 check ([hazards](hazards.md)), then stops the DB.
 `conftest.py` points at a separate `archon_test` database on `:5433` and
@@ -31,7 +31,7 @@ and a built engine. Override the target with `TEST_DATABASE_URL`. Pure-unit suit
 service worker's own project, then `svelte-check` on the rest. The worker is excluded
 from the root `tsconfig.json`, so `svelte-check` alone never sees it.
 
-**E2E** — `just test-e2e` spins up a **fully isolated** stack on the compose `test`
+**E2E** — `mise run test-e2e` spins up a **fully isolated** stack on the compose `test`
 profile and tears it down, never touching the dev `db`, `backend` or the
 `postgres_data` volume: a throwaway Postgres whose data lives in tmpfs, a backend
 bound to it with VEKN sync off, a seed job, and a frontend container that builds
@@ -43,11 +43,11 @@ the WASM engine, serves Vite, runs Playwright and writes the report.
 
 > `docker compose down -v` is **project-scoped, not profile-scoped** — it removes
 > every named volume in the file regardless of `--profile`, so an ad-hoc teardown
-> can wipe the dev `postgres_data`. `just test-e2e` is safe because its data is
+> can wipe the dev `postgres_data`. `mise run test-e2e` is safe because its data is
 > tmpfs, but a hand-run stack must get its own project name (`docker compose -p
 > archon-vibe-e2e …`) so `down -v` can only touch test volumes — and must be
 > stopped with `docker compose -p <proj> down`, never by killing the CLI child,
-> which lets the parent recipe fire its `down -v` exit trap.
+> which lets the parent task fire its `down -v` exit trap.
 
 For a manual run, point everything at a throwaway database: create it, run a
 backend against it on a separate port with `VEKN_SYNC_ENABLED=false`, seed it and
@@ -61,7 +61,7 @@ A fresh worktree has empty venvs, no `node_modules` and no generated artifacts.
 
 - **Backend**: build the engine with `uv run maturin develop --manifest-path
   engine/Cargo.toml`, then `uv run python -m pytest backend/tests/` against
-  Postgres on `:5433`. **Do not use `just test-backend` from a worktree** — its
+  Postgres on `:5433`. **Do not use `mise run test-backend` from a worktree** — its
   compose-project check won't match and it tries to bring up `db` on a clashing
   port.
 - **Bot**: needs `DISCORD_BOT_TOKEN`, `OAUTH_CLIENT_ID` and `OAUTH_CLIENT_SECRET`
@@ -181,7 +181,7 @@ officials — also engine-impossible — and produced a flaky test.
 
 **Card data is a pinned two-card fixture** (`backend/tests/fixtures/cards.json`,
 wired by `CARDS_JSON_PATH` in `conftest.py`). `engine/data/cards.json` is generated
-by `just cards` and CI never downloads it, so a test that reads the dev tree's copy
+by `mise run cards` and CI never downloads it, so a test that reads the dev tree's copy
 passes locally and fails in CI — which is what once justified mocking the loader.
 
 **A fixture must not derive anything from a uid prefix**: `uuid7` is time-ordered,

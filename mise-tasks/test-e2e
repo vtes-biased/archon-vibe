@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+#MISE description="Run E2E tests (Docker, isolated compose project — teardown can't touch dev DB)"
+# Own compose project so volumes are project-name-prefixed: `down -v` here
+# only removes archon-vibe-e2e_* — never archon-vibe_postgres_data (dev DB).
+cleanup() {
+    docker compose -p archon-vibe-e2e --profile test down -v >/dev/null 2>&1
+    echo "Test report: playwright-report/index.html"
+}
+trap cleanup EXIT
+docker compose -p archon-vibe-e2e --profile test up --build \
+    --abort-on-container-exit --exit-code-from frontend-test frontend-test

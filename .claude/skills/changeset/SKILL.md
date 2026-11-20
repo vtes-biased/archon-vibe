@@ -1,12 +1,12 @@
 ---
 name: changeset
-description: Write the changelog entry for what is about to ship, before `just release` cuts the tag. Use when asked to write release notes, prepare a changelog entry, or say what is going out in the next release.
+description: Write the changelog entry for what is about to ship, before `mise run release` cuts the tag. Use when asked to write release notes, prepare a changelog entry, or say what is going out in the next release.
 ---
 
 # Changeset
 
-One job: **say what is about to ship**. Runs *before* `just release`, never after a
-deploy — the recipe stamps the entry with the tag it cuts, so the tag carries its
+One job: **say what is about to ship**. Runs *before* `mise run release`, never after a
+deploy — the task stamps the entry with the tag it cuts, so the tag carries its
 own notes, and the frontend bundle CI builds from that tag is what shows them in
 the app's "what's new" modal. Written afterwards, an entry is one release late.
 
@@ -114,7 +114,7 @@ If nothing user-facing shipped, say exactly that — do not pad it out.
 ## Write it
 
 To `CHANGELOG.md` at the repo root, directly under the marker comment, headed
-`## Unreleased` — no version, no date, because `just release` supplies both from
+`## Unreleased` — no version, no date, because `mise run release` supplies both from
 the tag it is cutting:
 
 ```markdown

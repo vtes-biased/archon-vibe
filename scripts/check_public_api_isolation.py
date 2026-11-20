@@ -9,7 +9,7 @@ client is ever given. Three lines hold it apart, and only the first is structura
    own pool — only the four modules below, which are data shapes and pure config;
 3. the app never imports the API package.
 
-Run: just public-api-isolation
+Run: mise run public-api-isolation
 """
 
 import re

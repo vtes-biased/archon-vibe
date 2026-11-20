@@ -8,7 +8,7 @@ field added on one side alone is invisible until it reaches a user.
 Compares field names and enum values, not types: `datetime` is `string` over the
 wire and every optional spelling differs, so types would be noise.
 
-Run: just model-drift
+Run: mise run model-drift
 """
 
 import ast

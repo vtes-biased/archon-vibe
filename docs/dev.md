@@ -3,7 +3,7 @@
 ## Prerequisites
 
 [mise](https://mise.jdx.dev) and Docker or OrbStack: `mise install` sets up every
-tool `mise.toml` names, at the versions `mise.lock` records; `just update` moves
+tool `mise.toml` names, at the versions `mise.lock` records; `mise run update` moves
 both. CI jobs install their tools with `jdx/mise-action` from the same `mise.lock`,
 each only the ones it needs; two builds bring their own toolchain instead, the
 engine wheel (`PyO3/maturin-action`'s stable Rust) and the e2e stack
@@ -14,23 +14,39 @@ cannot read the file and repeat the version: `backend/Dockerfile`'s base image a
 the `-i` of the wheel build in `.github/workflows/release-artifacts.yml`.
 
 ```bash
-just update    # upgrade the mise tools and every dependency, build the engine
-just dev       # database + backend + frontend
-just dev-stop
+mise run update    # upgrade the mise tools and every dependency, build the engine
+mise run dev       # database + backend + frontend
+mise run dev-stop
 ```
 
 Frontend on `:5173`, backend on `:8000`, PostgreSQL on `:5433`.
 
-```bash
-just           # list all recipes
-just test      # engine + backend + frontend
-just lint      # lint and auto-fix
-just dev-reset # reset the dev database
-```
+## Tasks
+
+Every repo command is a mise task: one-liners in `mise.toml`, scripts under
+`mise-tasks/`. `mise tasks` lists them with their descriptions; arguments after
+the task name reach the task (`mise run test-backend -k sanctions`).
+
+| Task | Does |
+|---|---|
+| `dev`, `dev-stop`, `dev-reset` | start, stop, wipe the local stack |
+| `dev-api` | the public API on `:8001`, which `dev` does not start |
+| `dev-ic-account` | the fixed dev IC account (below) |
+| `test` | engine tests, `lint-check`, `test-backend`, frontend type check |
+| `test-backend` | pytest against the dev `db`, then `index-drift` ([testing](testing.md)) |
+| `test-e2e`, `test-smoke` | the isolated Playwright stack, the production-build smoke test |
+| `lint`, `lint-check`, `gates` | auto-fix then gates, check then gates, the gates alone ([below](#lint-gates)) |
+| `update`, `deps-check` | upgrade tools and dependencies, report what would move |
+| `hooks` | install the pre-commit hook |
+| `cards`, `build-geonames` | refresh card data, rebuild the GeoNames tables |
+| `jwt-keys`, `vapid-keys` | generate a per-environment keypair ([configuration](#configuration)) |
+| `release` | stamp the changelog and push a tag ([release order](#the-release-order)) |
+| `deploy-beta`, `deploy-prod`, `setup-prod`, `reboot-prod`, `add-admin-prod` | pyinfra runs ([deployment](#deployment)) |
+| `clean` | remove build artifacts |
 
 ## The dev IC account
 
-`just dev-ic-account` creates one fixed account in the dev database —
+`mise run dev-ic-account` creates one fixed account in the dev database —
 `dev-ic@example.com` / `DevIC!2026`, VEKN ID `9998001`, role IC — so members
 management can be exercised signed in. The dev dump carries the owner's own login
 and nothing else, so without it there is no second way in. It is idempotent by
@@ -53,13 +69,13 @@ sits at `9998001` deliberately — outside the e2e cleanup's reach
 
 ## Lint gates
 
-`just lint` auto-fixes formatting, then runs the checks nothing can fix for you;
-`just lint-check` is the read-only half and is what `just test` calls. Both end on
-the same eleven gates:
+`mise run lint` auto-fixes formatting, then runs the checks nothing can fix for you;
+`mise run lint-check` is the read-only half and is what `mise run test` calls. Both end on
+`mise run gates`, the eleven checks:
 
-- `just permission-drift` — a role literal used to gate outside the engine's
+- `mise run permission-drift` — a role literal used to gate outside the engine's
   capability table.
-- `just comment-blocks` — a contiguous comment block over three lines, in every
+- `mise run comment-blocks` — a contiguous comment block over three lines, in every
   tracked `.py`, `.rs`, `.ts`, `.svelte`, `.html`, `.css` and `.j2` file
   ([principles](principles.md#code)).
   `#`, `//`, `///`, `/* … */` and `<!-- … -->` all count, so the ceiling is not a
@@ -67,11 +83,11 @@ the same eleven gates:
   TypeScript's `/// <reference>`, which is compiler input rather than prose, and
   Python docstrings, which are strings. Nor does it see a block split by a blank
   line. Those are the reviewer's comment pass to delete, not the gate's.
-- `just dark-variant` — Tailwind's `dark:` variant anywhere under `frontend/`,
+- `mise run dark-variant` — Tailwind's `dark:` variant anywhere under `frontend/`,
   which tracks the OS preference rather than the app's theme
   ([design](design.md#palette)). A `dark:` followed by a space is an object key
   or a type annotation and passes.
-- `just fold-grammar` — a chevron or a native `<details>` drawn outside
+- `mise run fold-grammar` — a chevron or a native `<details>` drawn outside
   `FoldableSection`, the app's one disclosure shell ([design](design.md#patterns)).
   A rotating chevron fails outright: it was the second idiom and has no exception.
   Every other file that draws one is listed in the script with its reason, and the
@@ -80,19 +96,19 @@ the same eleven gates:
   guide mockup** is not a fold and is listed in the script alone. The gate also
   fails on a listed file that has stopped drawing one, so the list cannot outlive
   what it excuses.
-- `just locale-parity` — a message catalog whose keys disagree with the base
+- `mise run locale-parity` — a message catalog whose keys disagree with the base
   locale's, in either direction ([i18n](i18n.md)). Paraglide resolves a missing
   key by falling back to the base locale, so an untranslated string ships as
   English with nothing failing; a key outliving its base entry is the same drift
   reversed. The locale list comes from the inlang project settings, so a sixth
   locale is covered without touching the gate.
-- `just public-api-isolation` — the app naming the public API, or the API
+- `mise run public-api-isolation` — the app naming the public API, or the API
   importing the app's machinery ([public-api](public-api.md#isolation)). It runs
   in CI too, unlike the three gates above it.
-- `just event-run-coverage` — the public API's Member API section and the app's
+- `mise run event-run-coverage` — the public API's Member API section and the app's
   `event:run` allowlist disagreeing ([public-api](public-api.md#documentation)).
   It imports both apps, so it runs locally only.
-- `just migration-pairing` — a stored-value migration with no proof section in
+- `mise run migration-pairing` — a stored-value migration with no proof section in
   [post-deploy](post-deploy.md), or a section proving an entry that no longer
   exists ([architecture](architecture.md#stored-value-migrations)). Nothing in
   the tree records that an entry ran, so the section is the only proof it reached
@@ -101,7 +117,7 @@ the same eleven gates:
   importing would pull in the engine — and fails when that parse stops matching,
   which is what keeps an empty result from passing everything in silence. It runs
   in CI, on the lint job.
-- `just model-drift` — `models.py`, `types.ts` and the engine disagreeing on a
+- `mise run model-drift` — `models.py`, `types.ts` and the engine disagreeing on a
   field name or an enum value ([sync](sync.md#adding-a-new-object-type)). Nothing
   generates one from another. It compares names and values, not types: `datetime`
   is `string` over the wire and every optional spelling differs, so types would be
@@ -124,7 +140,7 @@ the same eleven gates:
   it rides the backend job, not the lint one: `models.py` instantiates `PyEngine`
   at import, so it needs the built engine.
 
-- `just help-mockups` — a help-guide "screenshot" that hand-rolls a `Button` or
+- `mise run help-mockups` — a help-guide "screenshot" that hand-rolls a `Button` or
   `Badge`, or hard-codes a live UI label ([i18n](i18n.md#guide-mockups)). The
   guides draw the console in miniature so the prose can point at it; nothing
   recomputes those drawings when the real screen moves. It bans the class
@@ -135,7 +151,7 @@ the same eleven gates:
   see it; the few that collide are listed in the script with their reason. The
   label rule also covers the creation wizard's guidance panel, which draws no
   console but names the same live controls.
-- `just function-imports` — an import inside a function body anywhere under
+- `mise run function-imports` — an import inside a function body anywhere under
   `backend/`. It hides a reference from module load, so a rename breaks only when
   the function runs, often inside a try/except that swallows it; an import cycle is
   resolved by moving the shared code instead. The only exceptions are libraries
@@ -145,7 +161,7 @@ the same eleven gates:
 
 In dev only the **database** runs in Docker; backend and frontend run natively. The
 compose file is **not** production-hardened — uvicorn reload, a default password.
-Its `test` profile backs `just test-e2e` ([testing](testing.md)).
+Its `test` profile backs `mise run test-e2e` ([testing](testing.md)).
 
 ## Deployment
 
@@ -154,7 +170,7 @@ Real deployment is **wheels plus systemd**, both environments deployed with
 24 GB disk, which is why the connection pool is small and bulk table loads are
 forbidden ([architecture](architecture.md#database-access)).
 
-Production's system is `deploy/setup.py` (`just setup-prod`), which calls
+Production's system is `deploy/setup.py` (`mise run setup-prod`), which calls
 [server-setup](https://github.com/lionel-panhaleux/server-setup)'s library with
 the box's own parameters: PostgreSQL 17 from PGDG, the journal capped at 256 MB
 and **one month**, the privacy policy's promise that server logs are kept only
@@ -211,8 +227,8 @@ through `importlib.resources`**, never `Path(__file__)`
 its system (packages, postgres cluster, backups, Alloy, nginx's default
 server). Production stays out of that inventory — it is commissioned work for
 BCP, with its own keys, backup bucket and healthchecks. `deploy/` imports
-`server_setup` (the `deploy` dependency group, pinned to a tag). `just
-deploy-beta` and `just deploy-prod` show every change, then ask; `--dry` only shows, `RELEASE_TAG`
+`server_setup` (the `deploy` dependency group, pinned to a tag). `mise run
+deploy-beta` and `mise run deploy-prod` show every change, then ask; `--dry` only shows, `RELEASE_TAG`
 pins a release and `BUILD_DIR` deploys a local build (a `frontend-dist/`
 directory there is packed in place of the release tarball). `deploy/deploy.py`
 derives every path, unit and database from the environment's `name` in
@@ -347,13 +363,13 @@ panels and logs are scoped to the `new-archon-*` units, nginx and PostgreSQL, th
 box's other tenants left out.
 
 **Production access is per developer.** Each has their own sudo account
-(`just add-admin-prod <name> <pubkey> <an existing admin>`) and a
+(`mise run add-admin-prod <name> <pubkey> <an existing admin>`) and a
 `Host archon.vekn.net` block with their `User` and `IdentityFile` in
 `~/.ssh/config`, which pyinfra reads — the inventory names no user. The owner's
 is `lpanhaleux`, beside the `deploy` account; `ubuntu`, the image's, takes no key
 of ours. Kernel reboots are never
 automatic: tournaments run in every timezone, so `setup-prod` warns when one is
-pending and a person picks the moment to run `just reboot-prod`.
+pending and a person picks the moment to run `mise run reboot-prod`.
 
 Three services and three vhosts per environment: the app, the Discord bot, and the
 **public read API**, which installs nothing of its own — it runs a second uvicorn
@@ -443,7 +459,7 @@ journald warning for manual deletion.
 ### The release order
 
 The changeset is written **before** the tag, not after the deploy. `/changeset`
-appends a `## Unreleased` block to `CHANGELOG.md`; `just release` rewrites that
+appends a `## Unreleased` block to `CHANGELOG.md`; `mise run release` rewrites that
 heading to the tag it is cutting plus today's date, commits it, pushes the branch
 and only then tags. The tag therefore contains its own entry, so the frontend
 bundle CI builds from it carries the notes for the version it *is* — that is the
@@ -469,7 +485,7 @@ crawler UA list ([architecture](architecture.md#reports-and-social-sharing)).
 Copy `.env.example` to `.env`. **Local dev works with no `.env` at all** — every
 variable has a sensible default. Production requires explicit configuration.
 
-**Core** — `DATABASE_URL`; `JWT_PRIVATE_KEY` and `JWT_PUBLIC_KEYS` (`just
+**Core** — `DATABASE_URL`; `JWT_PRIVATE_KEY` and `JWT_PUBLIC_KEYS` (`mise run
 jwt-keys`, one pair per environment, both deploy secrets —
 [access](access.md#authentication)); `ENVIRONMENT`, which anything but
 `development` makes those two mandatory, and whose `beta` marks feedback issues;
@@ -492,7 +508,7 @@ needs `DISCORD_CLIENTID`, `DISCORD_SECRET` and `DISCORD_REDIRECT_URI`, plus
 `TWDA_SYNC_ENABLED` and `JUDGE_SYNC_ENABLED` ([vekn](vekn.md#feature-flags)).
 
 **Web Push** — `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`; generate
-with `just vapid-keys`. The private key is a deploy secret. The
+with `mise run vapid-keys`. The private key is a deploy secret. The
 public key is served at runtime, never baked into the build
 ([architecture](architecture.md#web-push)).
 

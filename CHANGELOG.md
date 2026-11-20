@@ -4,7 +4,7 @@ What changed in Archon, from a player's point of view — one line per change.
 Internals, refactors and chrome are left out on purpose.
 
 Written by the `changeset` skill before a release is cut, newest first, and
-headed `## Unreleased` until `just release` stamps it with the tag and the date.
+headed `## Unreleased` until `mise run release` stamps it with the tag and the date.
 The app bundles this file and shows each reader the entries they have not seen, so
 these are player-facing lines, not developer notes.
 

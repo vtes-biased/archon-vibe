@@ -34,7 +34,7 @@ page's prose, which is where they used to get lost.
 Nothing auto-deploys and there is no public version endpoint, so **do not sniff
 the app for a version** — ask, or take it from the invocation.
 
-- Which environment (prod or beta) and which tag (`RELEASE_TAG=… just deploy-prod`,
+- Which environment (prod or beta) and which tag (`RELEASE_TAG=… mise run deploy-prod`,
   blank = latest release).
 - Confirm the tag is a real release: `gh release view <tag>`.
 - Sanity-check the site is up: `curl -s -m 10 https://archon.vekn.net/api/time`.

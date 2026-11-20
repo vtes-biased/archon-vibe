@@ -89,7 +89,7 @@ a flag requires, and resources a step consumes.
 A comment is justified only by a subtle non-local constraint invisible at the
 point of reading. No narration, no changelogs, no TODOs — discovered work goes
 through intake or gets done now. A comment past ~2 lines is usually narrating,
-and a contiguous comment block over three fails `just lint` whatever token it is
+and a contiguous comment block over three fails `mise run lint` whatever token it is
 written in ([dev](dev.md#lint-gates)) —
 a rationale that needs more room is a docs page in the wrong file. Code never
 references the docs: a trap comment states its constraint and stands alone; the
@@ -99,7 +99,7 @@ docs point at code, never the reverse.
 extracted into child components: props down, state ownership stays in the parent.
 
 **No red builds.** Never report done over a failing build, test or lint. When
-touching build/packaging/test config, run the affected `just` target and confirm
+touching build/packaging/test config, run the affected mise task and confirm
 green.
 
 ## Testing

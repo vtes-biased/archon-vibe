@@ -8,7 +8,7 @@ The palette is `light-dark()` role tokens; rendered markdown takes `doc-prose`.
 A `dark:` followed by a space is an object key or a type annotation, not a
 variant, and is left alone.
 
-Run: just dark-variant
+Run: mise run dark-variant
 """
 
 import re

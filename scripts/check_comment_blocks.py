@@ -4,7 +4,7 @@
 Every comment token counts, so the ceiling is not a question of which one you
 write in. Python docstrings are strings rather than comments, and are exempt.
 
-Run: just comment-blocks
+Run: mise run comment-blocks
 """
 
 import subprocess

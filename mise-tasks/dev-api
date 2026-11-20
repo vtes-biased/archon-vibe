@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#MISE description="Start the public read-only API against the dev database (mise run dev does not)"
+set -e
+DATABASE_URL=postgresql://archon:archon_dev_password@localhost:5433/archon \
+PYTHONUNBUFFERED=1 \
+nohup uv run uvicorn backend.src.public_api.main:app --reload --reload-dir backend/src/public_api --host :: --port 8001 > public-api.log 2>&1 &
+echo "Public API started (PID: $!) on http://localhost:8001/docs. Logs: public-api.log"

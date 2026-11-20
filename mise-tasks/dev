@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+#MISE description="Start full dev environment (db + backend + frontend), rebuilding engine first"
+set -e
+mise run dev-stop
+echo "Building engine..."
+(cd engine && wasm-pack build --target web --release -- --features wasm)
+uv run maturin develop --release --manifest-path engine/Cargo.toml
+echo "Starting PostgreSQL database in Docker..."
+docker compose up -d db
+echo "Waiting for database to be ready..."
+for i in {1..30}; do
+    docker compose exec -T db pg_isready -U archon > /dev/null 2>&1 && break
+    sleep 1
+done
+echo "Database ready!"
+ENGINE_PKG=$(uv run python3 -c "import pathlib, archon_engine; print(pathlib.Path(archon_engine.__file__).parent)")
+DATABASE_URL=postgresql://archon:archon_dev_password@localhost:5433/archon \
+PYTHONUNBUFFERED=1 \
+nohup uv run uvicorn backend.src.main:app --reload --reload-dir backend --reload-dir "$ENGINE_PKG" --reload-delay 2 --host :: --port 8000 --timeout-graceful-shutdown 1 > backend.log 2>&1 &
+echo "Backend started (PID: $!). Logs: backend.log"
+(cd frontend && nohup npm run dev > ../frontend.log 2>&1 &)
+echo "Frontend started. Logs: frontend.log"
+echo ""
+echo "  Database:  Docker on port 5433"
+echo "  Backend:   http://localhost:8000 (logs: backend.log)"
+echo "  Frontend:  http://localhost:5173 (logs: frontend.log)"
+echo "  Stop:      mise run dev-stop"

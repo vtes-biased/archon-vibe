@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+#MISE description="Cut a release: patch, minor, major or an explicit vX.Y.Z (e2e-gated)"
+#MISE interactive=true
+set -euo pipefail
+bump="${1:-}"
+latest=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+case "$bump" in
+    patch|minor|major)
+        IFS=. read -r ma mi pa <<<"${latest:-v0.0.0}"; ma=${ma#v}
+        case "$bump" in
+            patch) pa=$((pa + 1)) ;;
+            minor) mi=$((mi + 1)); pa=0 ;;
+            major) ma=$((ma + 1)); mi=0; pa=0 ;;
+        esac
+        tag="v${ma}.${mi}.${pa}"
+        ;;
+    v*.*.*) tag="$bump" ;;
+    *) echo "usage: mise run release <patch|minor|major|vX.Y.Z>"; exit 1 ;;
+esac
+git rev-parse "$tag" >/dev/null 2>&1 && { echo "tag $tag already exists"; exit 1; }
+[ -z "$(git status --porcelain)" ] || { echo "working tree not clean — commit or stash first"; exit 1; }
+# Nudges: discourage (but don't block) releasing on stale deps or with no notes
+# written. `if` keeps set -e from aborting.
+anyway=""
+if ! mise run deps-check 2>/dev/null; then   # 2>/dev/null: drop mise's task-failed line
+    echo "⚠ Dependencies are out of date — prefer 'mise run update' before cutting a release."
+    anyway=" anyway"
+fi
+if ! grep -q '^## Unreleased$' CHANGELOG.md; then
+    echo "⚠ No '## Unreleased' section in CHANGELOG.md — run /changeset first, or this release ships unannounced."
+    anyway=" anyway"
+fi
+read -r -p "Release $tag${anyway} (latest is ${latest:-none})? [y/N] " ans
+[ "$ans" = y ] || [ "$ans" = Y ] || { echo "aborted"; exit 1; }
+if grep -q '^## Unreleased$' CHANGELOG.md; then
+    stamp="## $tag — $(date +%F)"
+    # Must match ENTRY_HEADING in frontend/src/lib/changelog.ts, or the app skips the
+    # entry and shows nothing, silently — reachable via a pre-release tag like v1.2.3-rc1.
+    printf '%s' "$stamp" | grep -qE '^## v[0-9]+\.[0-9]+\.[0-9]+ — [0-9]{4}-[0-9]{2}-[0-9]{2}$' \
+        || { echo "$tag would stamp a heading the app cannot parse"; exit 1; }
+    uv run python3 -c "import pathlib, re, sys; p = pathlib.Path('CHANGELOG.md'); p.write_text(re.sub(r'(?m)^## Unreleased$', lambda m: sys.argv[1], p.read_text(), count=1))" "$stamp"
+    git add CHANGELOG.md
+    git commit -m "Stamp $tag in the changelog"
+    git push origin HEAD
+fi
+git tag "$tag"
+git push origin "$tag"
+echo "Pushed $tag. CI: e2e → (green) create release → artifacts. Watch the Actions tab."

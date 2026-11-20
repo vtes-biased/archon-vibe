@@ -10,7 +10,7 @@ other direction.
 The locale list comes from the inlang project settings, so adding a sixth locale
 extends this gate without touching it.
 
-Run: just locale-parity
+Run: mise run locale-parity
 """
 
 import json

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#MISE description="Install git hooks (pre-commit: ruff auto-format of staged Python)"
+set -euo pipefail
+src="$(git rev-parse --show-toplevel)/.githooks/pre-commit"
+dst="$(git rev-parse --git-path hooks)/pre-commit"   # worktree-safe, not hard-coded .git/hooks
+ln -sf "$src" "$dst"
+echo "Installed $dst -> $src"

@@ -73,7 +73,7 @@ every `dark:` utility on the wrong side — most visibly `dark:prose-invert`, wh
 renders dark body text on a dark card and is invisible to anyone whose OS already
 agrees with their theme. Rendered markdown takes **`doc-prose`** instead, which
 maps the `--tw-prose-*` variables onto the role tokens and so follows
-`color-scheme` like everything else. `just dark-variant` holds the ban
+`color-scheme` like everything else. `mise run dark-variant` holds the ban
 ([dev](dev.md#lint-gates)).
 
 ### Semantic classes
@@ -424,7 +424,7 @@ Planned or in Registration with no round or final ever played — reopening
 registration between rounds does not reopen it, except for an anonymous visitor,
 whose projection carries no rounds to tell a reopened registration from a fresh one. A chevron points **right closed
 and down open** everywhere — a rotating one is not an alternative and has no
-exception. `just fold-grammar` ([dev](dev.md#lint-gates)) holds both halves.
+exception. `mise run fold-grammar` ([dev](dev.md#lint-gates)) holds both halves.
 
 Eight surfaces fold outside the shell, for a structural reason and not a visual
 preference:

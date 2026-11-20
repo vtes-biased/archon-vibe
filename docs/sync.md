@@ -1034,12 +1034,12 @@ state.
    broadcasting after its write. No registration step for the stream: its types
    derive from `list(ObjectType)` and snapshot generation reads whatever the
    single corpus scan returns, so both pick up the new type automatically.
-6. **Frontend type** in `types.ts` — `just model-drift` fails until it exists.
+6. **Frontend type** in `types.ts` — `mise run model-drift` fails until it exists.
 7. **IndexedDB store** in `db.ts` — bump the version, which triggers a full clear.
 8. **Add to `SPECS`** in `sync.ts`.
 
 A field the engine reads or writes is declared once more, in `engine/src/model.rs`,
-under the module named for its model; `just model-drift` fails on a field name
+under the module named for its model; `mise run model-drift` fails on a field name
 written any other way outside the engine's test modules ([dev](dev.md#lint-gates)).
 
 A backend-first deploy is safe: a snapshot line whose type isn't in `SPECS` yet is

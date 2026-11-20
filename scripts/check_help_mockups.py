@@ -17,7 +17,7 @@ Two rules keep them honest:
 Sample data (player names, a venue, an ID, a clock face) is not a label and stays
 literal: it never appears in the catalog, so rule 2 does not see it.
 
-Run: just help-mockups
+Run: mise run help-mockups
 """
 
 import json

@@ -451,6 +451,6 @@ def _load_engine_cards() -> None:
         return
     text = cards_json_text()
     if text is None:
-        raise RuntimeError("Cards data not available. Run: just cards")
+        raise RuntimeError("Cards data not available. Run: mise run cards")
     _engine.load_cards(text)
     _engine_cards_loaded = True

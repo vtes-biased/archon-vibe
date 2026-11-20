@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+#MISE description="Report whether mise run update would pull newer deps; non-zero when it would"
+set -uo pipefail   # not -e: run all three probes, then aggregate
+stale=0
+echo "Dependency freshness (read-only; per-ecosystem deps, not the tools themselves):"
+# The dry run reports only reachable upgrades, unlike `uv tree --outdated`,
+# which flags transitive deps their parents pin.
+if out=$(uv lock --upgrade --dry-run 2>&1); then
+    if printf '%s\n' "$out" | grep -q 'No lockfile changes detected'; then
+        echo "  python deps (uv)     current"
+    else
+        stale=1; echo "  python deps (uv)     updates available:"
+        printf '%s\n' "$out" | grep -vE '^[[:space:]]*$|Resolved ' | sed 's/^/      /'
+    fi
+else echo "  python deps (uv)     (could not check)"; fi
+# Only current != wanted gates; a semver-major beyond wanted is reported
+# for information, since it is a manual bump or blocked upstream.
+npmrep=$(cd frontend && npm outdated --json 2>/dev/null | node -e '
+    let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+      const o=s.trim()?JSON.parse(s):{};
+      for(const [k,v] of Object.entries(o)){
+        if(v.current!==v.wanted)console.log(`TAKE ${k} ${v.current} -> ${v.wanted}`);
+        else if(v.wanted!==v.latest)console.log(`INFO ${k} ${v.current} (latest ${v.latest}: semver-major, manual bump)`);
+      }});') || true
+if printf '%s\n' "$npmrep" | grep -q '^TAKE '; then
+    stale=1; echo "  frontend deps (npm)  updates available:"
+    printf '%s\n' "$npmrep" | grep '^TAKE ' | sed 's/^TAKE /      /'
+else
+    echo "  frontend deps (npm)  current (within ranges)"
+fi
+printf '%s\n' "$npmrep" | grep '^INFO ' | sed 's/^INFO /      /' || true
+# Engine/cargo: `cargo update --dry-run` prints "name vX -> vY" without writing.
+if out=$(cd engine && cargo update --dry-run 2>&1); then
+    if printf '%s\n' "$out" | grep -q ' -> '; then
+        stale=1; echo "  engine deps (cargo)  updates available:"
+        printf '%s\n' "$out" | grep ' -> ' | sed 's/^/      /'
+    else echo "  engine deps (cargo)  current"; fi
+else echo "  engine deps (cargo)  (could not check)"; fi
+exit "$stale"

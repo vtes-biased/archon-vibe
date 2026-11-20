@@ -1,4 +1,4 @@
-//! Every stored field name the engine reads, named once. `just model-drift`
+//! Every stored field name the engine reads, named once. `mise run model-drift`
 //! checks each module against the model it is named for.
 
 /// Keys on argument envelopes the caller builds for one call — not stored

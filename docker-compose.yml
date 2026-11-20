@@ -37,7 +37,7 @@ services:
 
   # ── Test services (profile: test) ────────────────────────────────────
   # Fully isolated from the dev stack: a throwaway tmpfs-backed Postgres and
-  # its own backend. `just test-e2e` never starts `db`/`backend` and never
+  # its own backend. `mise run test-e2e` never starts `db`/`backend` and never
   # writes the `postgres_data` volume, so it can't touch dev data.
 
   # Ephemeral test DB — data lives in RAM (tmpfs) and is destroyed with the

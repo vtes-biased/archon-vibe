@@ -889,7 +889,7 @@ _ACTIONS: dict[str, tuple[str, tuple[str, ...], tuple[str, ...]]] = {
     ),
 }
 
-# Engine actions this endpoint does not document, and why. `just event-run-coverage`
+# Engine actions this endpoint does not document, and why. `mise run event-run-coverage`
 # reads it: an action the engine grows lands in `_ACTIONS` or here, never nowhere.
 _UNDOCUMENTED_ACTIONS: dict[str, str] = {
     "UploadDeck": "spelling of UpsertDeck",

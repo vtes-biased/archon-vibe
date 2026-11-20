@@ -22,7 +22,7 @@ proof of an entry in `backend/src/migrations.py`
 run — the entry rewrote the rows before the process served — but its queries are
 the only record that the rewrite reached a given database, so it is deleted only
 once **every** long-lived one answers 0, and the entry it names dies in the same
-commit. `just migration-pairing` fails on either half outliving the other.
+commit. `mise run migration-pairing` fails on either half outliving the other.
 
 **Every item names the commit that gates it**, so `git tag --contains <sha>`
 answers whether a given deploy has made it actionable — the same check

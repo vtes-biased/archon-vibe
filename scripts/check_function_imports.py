@@ -10,7 +10,7 @@ import) and needed rarely (under once a week), listed below with its measurement
 A listed module that no longer imports in-function also fails, so the list
 cannot outlive what it excuses.
 
-Run: just function-imports
+Run: mise run function-imports
 """
 
 import ast

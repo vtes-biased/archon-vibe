@@ -178,7 +178,7 @@ projections.
 
 Nothing in the tree records that an entry has run, so its proof is a section in
 [post-deploy](post-deploy.md) and the two die in one commit —
-`just migration-pairing` ([dev](dev.md#lint-gates)) fails on either half
+`mise run migration-pairing` ([dev](dev.md#lint-gates)) fails on either half
 outliving the other. That death condition is what an entry is for and what keeps
 the per-boot guard queries near zero. `_stamp_missing_event_codes`, the boot
 sweep started behind serving, is deliberately not an entry: it mints a missing value rather than
@@ -388,7 +388,7 @@ rejection surfaces as an error toast.
 
 ## The Rust engine
 
-The engine defines the canonical object schemas and business logic. `just dev`
+The engine defines the canonical object schemas and business logic. `mise run dev`
 rebuilds both targets; build one directly with `wasm-pack` or `maturin develop`
 (see `engine/README.md` for commands, bindings and entry-point signatures).
 
@@ -735,7 +735,7 @@ credentials, never display data. Pruned on owner hard-delete and lazily on a
 send-time 404/410.
 
 Three env vars: `VAPID_PRIVATE_KEY` (raw base64url scalar), `VAPID_PUBLIC_KEY`,
-`VAPID_SUBJECT`; generate with `just vapid-keys`. **The public key is delivered at
+`VAPID_SUBJECT`; generate with `mise run vapid-keys`. **The public key is delivered at
 runtime** (`GET /api/push/vapid-key`), not baked into the frontend build — the
 frontend ships as one release artifact across environments, and a baked key would
 force beta and prod to share a keypair.
@@ -797,7 +797,7 @@ Entries stay English inside a translated shell ([i18n](i18n.md#the-changelog)).
 
 The upgrade itself needs no hook. The service worker already auto-applies a waiting
 worker at boot and reloads, so a newer bundle simply arrives carrying entries the
-device has not seen; the notes reach the build they describe because `just release`
+device has not seen; the notes reach the build they describe because `mise run release`
 stamps them into the commit it tags ([dev](dev.md#the-release-order)).
 
 ### Binary assets

@@ -57,7 +57,7 @@ check against that page. The ones that bite most often:
 
 - **Comments are for traps only.** The docs hold the why, the code shows the how.
   No narration, no changelogs, **no TODOs** — discovered work goes through intake
-  or gets done now. Code never references the docs. `just lint` fails on a
+  or gets done now. Code never references the docs. `mise run lint` fails on a
   comment block over three lines, and review deletes what the docs already say.
 - **Locality over DRY.** Explicit greppable local code over clever wrappers.
   Similar-looking but causally unrelated code stays repeated.

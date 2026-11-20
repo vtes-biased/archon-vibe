@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#MISE description="Stop all local dev services"
+for port in 8000 8001 5173; do
+    pid=$(lsof -ti :$port 2>/dev/null) && kill -9 $pid 2>/dev/null && echo "Killed process on port $port" || true
+done
+docker compose stop db 2>/dev/null || true
+rm -f backend.log frontend.log public-api.log

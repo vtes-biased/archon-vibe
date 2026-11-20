@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#MISE description="Smoke-test the production frontend build (mirrors CI's frontend-build job)"
+set -e
+(cd engine && wasm-pack build --target web --release -- --features wasm)
+cd frontend
+VITE_API_URL="" npm run build
+npm run test:smoke

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#MISE description="Reset dev database (clears all data)"
+mise run dev-stop
+docker compose down -v

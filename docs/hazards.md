@@ -500,7 +500,7 @@ written: `soft_delete_user` refuses a VEKN-bearing member.
 signed-in user's row arrives over SSE like anyone else's, and every other surface
 reads that synced copy — so auth adopts it wholesale rather than merging field by
 field, and carries the owner-only fields forward because no projection holds them
-(`just model-drift` pins that list to `access_levels`), then re-reads `/auth/me` —
+(`mise run model-drift` pins that list to `access_levels`), then re-reads `/auth/me` —
 on **any** bump of the own row, a rating recompute or VEKN sync as much as an
 agenda edit, since only the re-read brings in a change made on another device.
 
@@ -692,7 +692,7 @@ created in the wrong cluster. The play that rebooted the box reported `failed=0`
 Two rules follow: **`pg_dropcluster` a superseded cluster** rather than trusting it
 to stay stopped, since only removal survives a reboot; and never read a 200 from
 `/` as proof the database is up — nginx serves the SPA shell without touching it.
-`just reboot-prod` waits for `systemctl is-system-running` after the reboot and
+`mise run reboot-prod` waits for `systemctl is-system-running` after the reboot and
 fails listing the units that did not come back, which is what turns this shape
 into a red run.
 
@@ -733,11 +733,11 @@ would fail startup rather than slow it.
 EXISTS` of the old name.** The file is applied at every startup with `CREATE …
 IF NOT EXISTS`, which is a no-op for any name a live database already holds: the
 edited definition takes effect on fresh databases only while production keeps
-the old one. **`just index-drift`** catches it: it applies the previous release's
+the old one. **`mise run index-drift`** catches it: it applies the previous release's
 schema then the current one to a scratch database, the current one alone to
 another, and fails on any index the two disagree on — an edit without its drop, or
 a removed index left behind. It runs in CI on the backend job and in
-`just test-backend`. The consent index stayed keyed on (user, client)
+`mise run test-backend`. The consent index stayed keyed on (user, client)
 in production for as long as it took a member to run the Discord bot on a second
 event. Give the replacement a **new name** so the drop is a one-time no-op and
 the create stays idempotent rather than rebuilding the index on every start.
@@ -751,7 +751,7 @@ November 2026, and a disk spell multiplies that. Such an index goes in
 by statement, `CONCURRENTLY` and untimed; the reader runs without it until it lands.
 A concurrent build cut short — a restart mid-build — leaves an invalid index that
 `IF NOT EXISTS` would skip forever, so the task drops an invalid one of the same
-name first. `just index-drift` applies both files.
+name first. `mise run index-drift` applies both files.
 
 **A backend-first deploy is safe by design**: an unknown snapshot type is counted
 toward the `eof` total and ignored. Do not "fix" that by counting only recognised

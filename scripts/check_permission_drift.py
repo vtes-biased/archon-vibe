@@ -3,7 +3,7 @@
 
 Authorization is a table in engine/src/permissions.rs; everything else asks it.
 
-Run: just permission-drift
+Run: mise run permission-drift
 """
 
 import re

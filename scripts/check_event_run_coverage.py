@@ -9,7 +9,7 @@ that lies is worse than none. Three authorities, each asserted in both direction
 the allowlist in `middleware/auth.py` for routes, `TournamentEvent::from_json` for
 which actions exist, and the app's request models for which fields reach one.
 
-Run: just event-run-coverage
+Run: mise run event-run-coverage
 """
 
 import re

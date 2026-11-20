@@ -79,7 +79,7 @@ def assert_production_keys(*, signing: bool) -> None:
     if _kid(_dev_key().public_key()) in _verification_keys():
         raise RuntimeError(
             "Refusing to boot on the development signing key. Generate a keypair "
-            "with `just jwt-keys`, then set JWT_PRIVATE_KEY (the app) and "
+            "with `mise run jwt-keys`, then set JWT_PRIVATE_KEY (the app) and "
             "JWT_PUBLIC_KEYS (every verifier)."
         )
     if signing and not _configured_private():

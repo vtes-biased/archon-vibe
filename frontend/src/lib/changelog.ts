@@ -8,7 +8,7 @@ export interface ChangelogEntry {
   body: string;
 }
 
-// `just release` stamps `## Unreleased` into exactly this shape; it verifies its own
+// `mise run release` stamps `## Unreleased` into exactly this shape; it verifies its own
 // write against the same pattern.
 const ENTRY_HEADING = /^## v(\d+\.\d+\.\d+) — (\d{4}-\d{2}-\d{2})\s*$/gm;
 

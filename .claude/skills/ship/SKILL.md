@@ -28,8 +28,8 @@ as state that may have moved since you last looked, never as yours alone:
   inferring it from the tree.
 - **No separate worktree by default.** Take one only when two lines overlap
   heavily, and come back to the main checkout after.
-- **Tree-wide mutators run on your paths only.** `just lint` reformats everything
-  (`ruff --fix .`, `ruff format .`, `cargo fmt`): use `just lint-check`, or run the
+- **Tree-wide mutators run on your paths only.** `mise run lint` reformats everything
+  (`ruff --fix .`, `ruff format .`, `cargo fmt`): use `mise run lint-check`, or run the
   formatter on your own files. The same goes for `dev-reset`, `clean` and lockfile
   refreshes, which pull shared state out from under a sibling.
 
@@ -167,7 +167,7 @@ that made it dead rather than leaving it for the reviewer to demand.
 ## 4. Land it as one change
 
 **Code.** Run the gates that cover what you touched and confirm green — there are
-no red builds. `just test`, `just lint-check`, or the narrower target for the stack you
+no red builds. `mise run test`, `mise run lint-check`, or the narrower target for the stack you
 changed (`docs/testing.md`).
 
 **Docs.** Update the pages named at intake in the same change. Pivots are edits:

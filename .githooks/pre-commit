@@ -1,9 +1,9 @@
 #!/bin/sh
-# Shared pre-commit hook. Tracked in-repo; install (or re-install) with `just hooks`,
+# Shared pre-commit hook. Tracked in-repo; install (or re-install) with `mise run hooks`,
 # which symlinks .git/hooks/pre-commit -> ../../.githooks/pre-commit.
 #
 #   ruff: auto-format/-fix staged Python and re-stage it, so formatting never
-#   reaches CI red. Mirrors `just lint` over the staged set.
+#   reaches CI red. Mirrors `mise run lint` over the staged set.
 set -eu
 
 repo_root="$(git rev-parse --show-toplevel)"
@@ -39,5 +39,5 @@ if uv run ruff check -- $staged && uv run ruff format --check -- $staged; then
     exit 0
 fi
 echo "ruff: staged Python has issues left above (likely a partially-staged file)." >&2
-echo "      Run 'just lint', re-stage, and commit again." >&2
+echo "      Run 'mise run lint', re-stage, and commit again." >&2
 exit 1

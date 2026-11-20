@@ -14,7 +14,7 @@ The section marks itself with a line naming the entry:
 A post-deploy item with no such line is a plain script and is not this gate's
 business.
 
-Run: just migration-pairing
+Run: mise run migration-pairing
 """
 
 import ast

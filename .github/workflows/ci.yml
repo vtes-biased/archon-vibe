@@ -1,8 +1,8 @@
 name: CI
 
 # Fast pre-merge gate — the high-signal, deterministic checks that run in minutes,
-# complementing the slow full-stack E2E suite (the e2e job in release.yml). Mirrors `just test` /
-# `just lint-check`, split into independent parallel jobs so each layer fails and
+# complementing the slow full-stack E2E suite (the e2e job in release.yml). Mirrors `mise run test` /
+# `mise run lint-check`, split into independent parallel jobs so each layer fails and
 # reports on its own: python lint, the Rust engine, backend pytest, frontend types,
 # bot pytest.
 on:
@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # `just lint-check` (python half): ruff lint + format check. No engine needed —
+  # `mise run lint-check` (python half): ruff lint + format check. No engine needed —
   # ruff never imports the code, so this is the cheapest job.
   lint:
     name: Python lint (ruff)
@@ -46,7 +46,7 @@ jobs:
       - name: function imports (an import inside a function body)
         run: uv run python3 scripts/check_function_imports.py
 
-  # `just lint-check` (rust half) + engine unit tests. fmt/clippy/test share one
+  # `mise run lint-check` (rust half) + engine unit tests. fmt/clippy/test share one
   # toolchain + cache, so they live together rather than fanning out further.
   engine:
     name: Rust engine (fmt + clippy + test)
@@ -67,7 +67,7 @@ jobs:
       - run: cargo clippy --all-targets --all-features -- -D warnings
       - run: cargo test
 
-  # `just test-backend`: build the PyO3 engine into the venv, then pytest against a
+  # `mise run test-backend`: build the PyO3 engine into the venv, then pytest against a
   # throwaway Postgres. conftest auto-creates the archon_test DB and the schema, so
   # no migration step — just point TEST_DATABASE_URL at the service.
   backend:
@@ -113,7 +113,7 @@ jobs:
           INDEX_DRIFT_DATABASE_URL: postgresql://archon:archon_dev_password@localhost:5432/postgres
         run: uv run python3 scripts/check_index_drift.py
 
-  # `just test` (frontend half): svelte-check. It resolves engine types from
+  # `mise run test` (frontend half): svelte-check. It resolves engine types from
   # engine/pkg (the gitignored WASM build output), so the WASM engine must be built
   # first; then `npm run check` runs the frontend codegen (geonames copy + paraglide
   # compile + svelte-kit sync) before the type-check — all three emit gitignored

@@ -84,7 +84,7 @@ the app implements.
 
 ### Prerequisites
 
-Install [mise](https://mise.jdx.dev) and a container runtime ([Docker Desktop](https://www.docker.com/) or [OrbStack](https://orbstack.dev/)) for the dev database and deployment. mise installs every other tool the repo's `mise.toml` names: Rust, Node, uv, just, wasm-pack and Python.
+Install [mise](https://mise.jdx.dev) and a container runtime ([Docker Desktop](https://www.docker.com/) or [OrbStack](https://orbstack.dev/)) for the dev database and deployment. mise installs every other tool the repo's `mise.toml` names: Rust, Node, uv, wasm-pack and Python.
 
 ### Setup
 
@@ -94,17 +94,17 @@ cd archon-vibe
 mise install
 
 # Install all dependencies and build the engine
-just update
+mise run update
 ```
 
 ### Running
 
 ```bash
 # Start everything (database + backend + frontend)
-just dev
+mise run dev
 
 # Stop all services
-just dev-stop
+mise run dev-stop
 ```
 
 - **Frontend**: http://localhost:5173
@@ -114,15 +114,15 @@ just dev-stop
 ### Useful Commands
 
 ```bash
-just              # List all commands
-just test         # Run all tests (engine + backend + frontend)
-just lint         # Lint and auto-fix
-just dev-reset    # Reset dev database
+mise tasks            # List all commands
+mise run test         # Run all tests (engine + backend + frontend)
+mise run lint         # Lint and auto-fix
+mise run dev-reset    # Reset dev database
 ```
 
 ### Deployment
 
-In dev, only the **database** runs in Docker (`localhost:5433`); the backend and frontend run natively (`just dev`). Real deployment is wheels + systemd: beta and production with pyinfra under `deploy/` — there is no Docker production path. The compose backend image self-builds the engine (`backend/Dockerfile` runs `maturin build --release`); the `test` profile services back `just test-e2e`.
+In dev, only the **database** runs in Docker (`localhost:5433`); the backend and frontend run natively (`mise run dev`). Real deployment is wheels + systemd: beta and production with pyinfra under `deploy/` — there is no Docker production path. The compose backend image self-builds the engine (`backend/Dockerfile` runs `maturin build --release`); the `test` profile services back `mise run test-e2e`.
 
 | Service | Host port | |
 |---|---|---|
@@ -140,7 +140,7 @@ Copy `.env.example` to `.env` and configure as needed. **Local dev works without
 | Variable | Default (dev) | Description |
 |----------|---------------|-------------|
 | `DATABASE_URL` | `postgresql://archon:archon_dev_password@localhost:5433/archon` | PostgreSQL connection string |
-| `JWT_PRIVATE_KEY` | derived dev key | Ed25519 signing seed, the app's alone. **Outside development**, generate with `just jwt-keys` |
+| `JWT_PRIVATE_KEY` | derived dev key | Ed25519 signing seed, the app's alone. **Outside development**, generate with `mise run jwt-keys` |
 | `JWT_PUBLIC_KEYS` | derived dev key | Space-separated public keys every verifier holds, the public API included |
 | `ENVIRONMENT` | `development` | Set to `production` in prod (enforces JWT validation) |
 | `FRONTEND_URL` | `http://localhost:5173` | Public frontend origin. Used for OAuth redirects, calendar links, error pages |

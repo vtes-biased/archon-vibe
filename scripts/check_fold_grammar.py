@@ -17,7 +17,7 @@ Two rules:
    reorder control, a mockup drawing one — is listed here only: the page states
    the grammar for folds, and these are not folds.
 
-Run: just fold-grammar
+Run: mise run fold-grammar
 """
 
 import re

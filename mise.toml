@@ -6,5 +6,157 @@ idiomatic_version_file_enable_tools = ["python"]
 rust = { version = "latest", targets = "wasm32-unknown-unknown", components = "rustfmt,clippy" }
 node = "24"
 uv = "latest"
-just = "latest"
 "aqua:wasm-bindgen/wasm-pack" = "latest"
+
+[tasks.test]
+description = "Run all tests (engine + lint-check + backend + frontend)"
+run = [
+  "cd engine && cargo test",
+  { task = "lint-check" },
+  { task = "test-backend" },
+  "cd frontend && npm run check -- --threshold error",
+]
+
+[tasks.lint-check]
+description = "Check linting (no changes)"
+run = [
+  "uv run ruff check .",
+  "uv run ruff format --check .",
+  "cd engine && cargo fmt --check && cargo clippy --all-targets --all-features -- -D warnings",
+  { task = "gates" },
+]
+
+[tasks.lint]
+description = "Lint and auto-fix all code"
+run = [
+  "uv run ruff check --fix . && uv run ruff format .",
+  "cd engine && cargo fmt && cargo clippy --all-targets --all-features -- -D warnings",
+  { task = "gates" },
+]
+
+[tasks.gates]
+description = "Run every lint gate nothing can auto-fix"
+run = [
+  { task = "permission-drift" },
+  { task = "comment-blocks" },
+  { task = "dark-variant" },
+  { task = "fold-grammar" },
+  { task = "locale-parity" },
+  { task = "public-api-isolation" },
+  { task = "event-run-coverage" },
+  { task = "model-drift" },
+  { task = "migration-pairing" },
+  { task = "help-mockups" },
+  { task = "function-imports" },
+]
+
+[tasks.permission-drift]
+description = "Fail when a role literal gates outside the engine's capability table"
+run = "uv run python3 scripts/check_permission_drift.py"
+
+[tasks.comment-blocks]
+description = "Fail on a contiguous inline comment block over three lines"
+run = "uv run python3 scripts/check_comment_blocks.py"
+
+[tasks.dark-variant]
+description = "Fail on Tailwind's dark: variant, which follows the OS rather than the app theme"
+run = "uv run python3 scripts/check_dark_variant.py"
+
+[tasks.fold-grammar]
+description = "Fail when a disclosure is drawn outside FoldableSection"
+run = "uv run python3 scripts/check_fold_grammar.py"
+
+[tasks.locale-parity]
+description = "Fail when a locale's message catalog disagrees with the base one"
+run = "uv run python3 scripts/check_locale_parity.py"
+
+[tasks.public-api-isolation]
+description = "Fail when the app names the public API, or the API imports the app's machinery"
+run = "uv run python3 scripts/check_public_api_isolation.py"
+
+[tasks.event-run-coverage]
+description = "Fail when the public API's Member API section and the event:run allowlist disagree"
+run = "uv run python3 scripts/check_event_run_coverage.py"
+
+[tasks.model-drift]
+description = "Fail when models.py, types.ts and the engine disagree on a field name or enum value"
+run = "uv run python3 scripts/check_model_drift.py"
+
+[tasks.migration-pairing]
+description = "Fail when a stored-value migration and its docs/post-deploy.md proof section disagree"
+run = "uv run python3 scripts/check_migration_pairing.py"
+
+[tasks.help-mockups]
+description = "Fail when a help-guide mockup hand-rolls a Button/Badge or hard-codes a live label"
+run = "uv run python3 scripts/check_help_mockups.py"
+
+[tasks.function-imports]
+description = "Fail on an import inside a function under backend/"
+run = "uv run python3 scripts/check_function_imports.py"
+
+[tasks.index-drift]
+description = "Fail when schema.sql over the previous release's leaves different indexes than a fresh database (needs the dev db; test-backend runs it)"
+run = "uv run python3 scripts/check_index_drift.py"
+
+[tasks.cards]
+description = "Update VTES card data (krcg.org -> engine/data/cards.json)"
+run = "uv run python scripts/update_cards.py"
+
+[tasks.build-geonames]
+description = "Build GeoNames data (countries and cities)"
+run = "uv run python backend/scripts/build_geonames.py"
+
+[tasks.vapid-keys]
+description = "Generate a VAPID keypair for Web Push, one per env (rotating invalidates every subscription)"
+run = "uv run python backend/scripts/gen_vapid_keys.py"
+
+[tasks.jwt-keys]
+description = "Generate the Ed25519 JWT signing keypair, one per env"
+run = "uv run python backend/scripts/gen_jwt_keys.py"
+
+[tasks.dev-ic-account]
+description = "Create the fixed dev IC account (idempotent, dev database only)"
+run = "uv run python backend/scripts/dev_ic_account.py"
+
+[tasks.deploy-beta]
+description = "Deploy beta with pyinfra: shows every change, then asks (--dry only shows; RELEASE_TAG=vX.Y.Z pins a release, BUILD_DIR=<dir under deploy/> a local build)"
+dir = "deploy"
+interactive = true
+run = "uv run --group deploy pyinfra inventory.py deploy.py --limit beta --diff"
+
+[tasks.deploy-prod]
+description = "Deploy production with pyinfra: shows every change, then asks (same flags as deploy-beta)"
+dir = "deploy"
+interactive = true
+run = "uv run --group deploy pyinfra inventory.py deploy.py --limit prod --diff"
+
+[tasks.setup-prod]
+description = "System setup of the production box (packages, nginx, ssh, firewall, postgres, backups): shows, then asks"
+dir = "deploy"
+interactive = true
+run = "uv run --group deploy pyinfra inventory.py setup.py --limit prod --diff"
+
+[tasks.reboot-prod]
+description = "Reboot production if an update needs it (FORCE=1 reboots anyway), then check every unit came back"
+dir = "deploy"
+interactive = true
+run = "uv run --group deploy pyinfra inventory.py reboot.py --limit prod -y"
+
+[tasks.add-admin-prod]
+description = "Give a developer a sudo account on production, logged in as an existing admin"
+dir = "deploy"
+interactive = true
+usage = '''
+arg "<name>"
+arg "<pubkey>"
+arg "<as_user>" help="an existing admin to log in as"
+'''
+run = "ADMIN=\"$usage_name\" ADMIN_KEY=\"$usage_pubkey\" uv run --group deploy pyinfra inventory.py add_admin.py --limit prod --ssh-user \"$usage_as_user\" -y"
+
+[tasks.clean]
+description = "Clean all build artifacts"
+run = [
+  "cd engine && cargo clean",
+  "rm -rf frontend/dist frontend/node_modules engine/target",
+  "find backend -type d -name __pycache__ -exec rm -rf {} +",
+]

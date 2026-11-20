@@ -415,8 +415,8 @@ The app never calls the API, and the API never runs the app. Three layers:
    slot of two. Every query is index-backed, and even a broad date bound answers a
    batch in about 100 ms, so the timeout only ever cuts off a regression.
    The frontend has no environment variable pointing at it.
-2. **`scripts/check_public_api_isolation.py`**, wired into `just lint`,
-   `just lint-check` **and** `ci.yml` — nothing under `frontend/` may name the API,
+2. **`scripts/check_public_api_isolation.py`**, wired into `mise run lint`,
+   `mise run lint-check` **and** `ci.yml` — nothing under `frontend/` may name the API,
    nothing under `backend/src/` outside the package may import it, and the package
    may import only `models`, `access_levels`, `jwt_config`, `snapshots` and
    `request_log` (log masking and the request ID) from the app. `..db` is excluded on purpose: its pool is a global the app's `init_db()`
@@ -432,7 +432,7 @@ that is what the lint holds.
 ## Running it
 
 ```bash
-just dev-api    # :8001, against the dev database; just dev-stop stops it too
+mise run dev-api    # :8001, against the dev database; mise run dev-stop stops it too
 ```
 
 `/v1/export` serves the `api.jsonl.gz` the app's snapshot generator writes, so the
