@@ -164,8 +164,6 @@
     if (!uid) return;
     user = await getUser(uid);
     loaded = true;
-    // coopted_by is full-projection only, so its presence is the permission gate.
-    // Resolve the sponsor's name from local IndexedDB; absence falls back gracefully.
     sponsorName = user?.coopted_by ? (await getUser(user.coopted_by))?.name : undefined;
   }
 
@@ -272,7 +270,9 @@
       {#if user.coopted_by}
         {@const date = user.coopted_at ? new Date(user.coopted_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—"}
         <p class="mt-2 px-4 text-xs text-ink-faint">
-          {#if sponsorName}
+          {#if sponsorName && !user.coopted_at}
+            {m.user_sponsored_by_undated({ name: sponsorName })}
+          {:else if sponsorName}
             {m.user_sponsored_by({ name: sponsorName, date })}
           {:else}
             {m.user_sponsored_unknown({ date })}

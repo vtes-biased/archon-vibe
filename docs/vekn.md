@@ -264,8 +264,11 @@ four in the archon file's terms and the `+F` must be added back —
   legacy ETL ran keeps only its bootstrap seed, and the ETL's richer role data
   never lands for that member. This is the intended end state: roles are
   app-managed and archon is the system of record for them.
-- Infers `coopted_by` relationships, only where the field is unset and not in
-  `local_modifications`.
+- Infers `coopted_by` relationships, only where the field is unset — or names no
+  user row, as the legacy import left behind — and not in
+  `local_modifications`. A member goes to the official with the **longest**
+  matching `vekn_prefix`, so a Prince whose prefix extends their NC's keeps their
+  own members.
 - Non-destructive: fields recorded in `local_modifications` by the profile and user
   edit routes are never overwritten.
 
@@ -915,6 +918,10 @@ live VEKN member or clears it (`PATCH /users/{uid}/sponsor`), and the field join
 sponsor stays cleared instead of being re-inferred. Setting keeps `coopted_at` —
 the official corrects who, not when; clearing drops it. An account merge takes
 the sponsor from whichever side is pinned, the survivor first.
+
+`coopted_by` is member-visible, `coopted_at` full-only: who sponsored a member is
+already public through the id prefix and vekn.net's registry, and it is what the
+members directory's Mine filter matches against the viewing official.
 
 **Tournament matching** in merge mode, at most one live tournament per vekn event
 id: by uid → idempotent update; else by `external_ids.archon` or

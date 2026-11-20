@@ -309,6 +309,7 @@
   "user_edit": "Editar usuário",
   "user_last_modified": "Última modificação: {date}",
   "user_sponsored_by": "Apadrinhado por {name} em {date}",
+  "user_sponsored_by_undated": "Apadrinhado por {name}",
   "user_sponsored_unknown": "Apadrinhado em {date}",
   "sponsor_edit_label": "Padrinho: {name}",
   "sponsor_edit_unresolved": "membro desconhecido",

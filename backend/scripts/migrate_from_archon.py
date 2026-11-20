@@ -635,6 +635,7 @@ async def migrate_members(
         await cur.execute(q)
         async for row in cur:
             user, discord = build_user(row, stats)
+            old_sponsor, user.coopted_by = user.coopted_by, None
             # #216: allocation deferred to the post-loop pass for a stable id
             # space. A non-participant falls through to the normal path.
             if not user.vekn_id:
@@ -660,8 +661,8 @@ async def migrate_members(
                 await ensure_discord_auth(user.uid, discord, stats)
                 live_uid = user.uid
             member_uid_map[user.uid] = live_uid
-            if user.coopted_by:
-                coopted_pending.append((live_uid, user.coopted_by))
+            if old_sponsor:
+                coopted_pending.append((live_uid, old_sponsor))
             stats.bump("users")
             if stats["users"] % 2000 == 0:
                 print(f"  …{stats['users']} users")

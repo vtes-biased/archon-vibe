@@ -850,17 +850,6 @@ async def is_vekn_id_claimed(vekn_id: str) -> bool:
     return len(auth_methods) > 0
 
 
-async def get_users_by_vekn_prefix(prefix: str) -> list[User]:
-    async with batch_read_connection() as conn:
-        result = await conn.execute(
-            """SELECT "full" FROM objects
-            WHERE type = 'user' AND "full"->>'vekn_id' LIKE %s || '%%'""",
-            (prefix,),
-        )
-        rows = await result.fetchall()
-        return [decode_json(row[0], User) for row in rows]
-
-
 async def get_users_with_vekn_prefix() -> list[User]:
     """Get all users with a non-empty vekn_prefix (in practice Princes and NCs,
     but the query filters on the prefix alone — no role predicate)."""
@@ -876,11 +865,14 @@ async def get_users_with_vekn_prefix() -> list[User]:
 
 
 async def get_users_without_coopted_by() -> list[User]:
+    """A sponsor naming no user row counts as unset."""
     async with batch_read_connection() as conn:
         result = await conn.execute(
-            """SELECT "full" FROM objects
+            """SELECT "full" FROM objects o
             WHERE type = 'user'
-              AND "full"->>'coopted_by' IS NULL
+              AND ("full"->>'coopted_by' IS NULL
+                   OR NOT EXISTS (SELECT 1 FROM objects s
+                                  WHERE s.uid = o."full"->>'coopted_by'))
               AND "full"->>'vekn_id' IS NOT NULL
               AND "full"->>'vekn_id' != ''"""
         )

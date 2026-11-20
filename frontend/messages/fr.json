@@ -309,6 +309,7 @@
   "user_edit": "Modifier l'utilisateur",
   "user_last_modified": "Dernière modification : {date}",
   "user_sponsored_by": "Parrainé par {name} le {date}",
+  "user_sponsored_by_undated": "Parrainé par {name}",
   "user_sponsored_unknown": "Parrainé le {date}",
   "sponsor_edit_label": "Parrain : {name}",
   "sponsor_edit_unresolved": "membre inconnu",

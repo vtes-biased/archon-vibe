@@ -52,6 +52,7 @@ _USER_MEMBER_FIELDS = (
     _USER_PUBLIC_FIELDS
     | {"vekn_id", "city", "city_geoname_id", "state", "nickname", "avatar_path"}
     | {"deceased_at", "anonymized_at"}
+    | {"coopted_by"}
     # Not contact info: the bot's judges-channel sync maps organizers through
     # this id, and organizers need no NC/Prince role.
     | {"discord_id"}

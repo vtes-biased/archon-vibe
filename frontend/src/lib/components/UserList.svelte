@@ -203,7 +203,6 @@
         users = sanctionChecks.filter(({ passes }) => passes).map(({ user }) => user);
       }
 
-      // Sponsor filters (officials only — coopted_by is full-projection).
       if (sponsor === "mine") {
         const myUid = getAuthState().user?.uid;
         users = users.filter((u) => !!myUid && u.coopted_by === myUid);

@@ -309,6 +309,7 @@
   "user_edit": "Editar usuario",
   "user_last_modified": "Última modificación: {date}",
   "user_sponsored_by": "Avalado por {name} el {date}",
+  "user_sponsored_by_undated": "Avalado por {name}",
   "user_sponsored_unknown": "Avalado el {date}",
   "sponsor_edit_label": "Avalista: {name}",
   "sponsor_edit_unresolved": "miembro desconocido",

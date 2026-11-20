@@ -309,6 +309,7 @@
   "user_edit": "Edit user",
   "user_last_modified": "Last modified: {date}",
   "user_sponsored_by": "Sponsored by {name} on {date}",
+  "user_sponsored_by_undated": "Sponsored by {name}",
   "user_sponsored_unknown": "Sponsored on {date}",
   "sponsor_edit_label": "Sponsor: {name}",
   "sponsor_edit_unresolved": "unknown member",

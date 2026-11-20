@@ -212,11 +212,15 @@ class TestUserMember:
         assert "contact_discord" not in result
         assert "contact_phone" not in result
 
+    def test_includes_sponsor_for_the_mine_filter(self):
+        result = compute_member(ObjectType.USER, _make_user())
+        assert result is not None
+        assert result["coopted_by"] == "u-prince"
+
     def test_excludes_internal_fields(self):
         user = _make_user()
         result = compute_member(ObjectType.USER, user)
         assert result is not None
-        assert "coopted_by" not in result
         assert "coopted_at" not in result
         assert "vekn_synced" not in result
         assert "local_modifications" not in result
