@@ -135,16 +135,11 @@ why the Hall of Fame predicate and the TWDA skip name Storyline explicitly inste
 of resting on "a Storyline event has no winning deck" — a switched event has one,
 and so does an imported type-9 event that arrived with one.
 
-### Trigger: the two-player format becomes official
+### The two-player format, not yet official
 
 *Asked 2026-11 in gh-83. Black Chantry is still
-[testing the format](domain/tournament-rules.md#two-player-format-in-testing), so it
-waits here rather than on the board.*
-
-**Deferred ask** — run 1v1 events, once the format is official **and** its rules say
-how an event is run. **Trigger**: Black Chantry or VEKN publish it as an official
-format, with those rules. The playtest has no deadline, and a passing test is not
-guaranteed.
+[testing the format](domain/tournament-rules.md#two-player-format-in-testing), so
+running 1v1 events waits on it being published as official, with event rules.*
 
 A label on Limited is not this. Limited already takes these decks, and a tag would
 sit on an event the app cannot run: seating, the VP sheet and TP all stop at tables
@@ -157,8 +152,8 @@ of 4–5. The real work is:
 - ratings, the VEKN event type, and whether the TWDA takes its winners.
 
 The playtest rules only recommend pairings and the playoff, and say nothing on
-scoring, ratings or the event type, which is why the trigger needs the event rules
-and not only the announcement.
+scoring, ratings or the event type, which is why an announcement alone is not
+enough to start.
 
 ## State machine
 
@@ -564,7 +559,7 @@ format. The stance bites only where **nothing** is flagged: `vekn_tournament_syn
 stamps `finalist` on positions 1–5 whether or not a final was played, because the
 upstream record does not say, so a VEKN import keeps vekn.net's answer and only a
 locally crowned seat loses the credit. The question is with the Rules Director —
-see the deferred section below.
+see the open question below.
 
 **A no-final finish is allowed at any size, deliberately.** §3.1.6 permits omitting
 the final only below 8 players, but force majeure cuts real events short — a venue
@@ -573,7 +568,7 @@ what actually happened rather than refuse it. The §3.1.6 constraint on admittin
 players between rounds is likewise not enforced.
 
 Whether such an event should then count toward rankings is the genuinely open
-question, and it is the second one deferred below.
+question, and it is the second one put below.
 
 The pre-finals panel deliberately carries no Start Finals button: the action bar
 owns every state transition and the toss-needed warning, and finishing without a
@@ -588,16 +583,10 @@ event's own top five — so `PUT /api/leagues/{uid}/final` runs `check_table_vps
 sanctions and no override. Seeds are the league top five in rank order, ties
 ordered by the organizer rather than tossed.
 
-### Trigger: the Rules Director answers on no-final rating credit
+### No-final rating credit, open with the Rules Director
 
-*Asked 2026-08. The interim stance above is owner-approved and shipped; what is
-left is out of our hands, so it waits here rather than on the board.*
-
-**Deferred ask** — record the answers in `docs/domain/` (§3.1.6's reading in
-[tournament rules](domain/tournament-rules.md), the A.2/A.2.1 credit in
-[VEKN](domain/vekn.md)), then either change the engine or leave the stance above
-citing the ruling. The three writers that must end up saying the same thing are
-`FinishTournament`, `vekn_tournament_sync` and `archon_import.py`.
+*Asked 2026-08. The interim stance above is owner-approved and shipped; the answer
+is out of our hands.*
 
 The questions put:
 

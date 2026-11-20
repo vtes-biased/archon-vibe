@@ -28,7 +28,7 @@ Run all four. Any one of them can end the intake.
 duplicate an existing line? Grep for it:
 
 ```sh
-grep -rin '<keyword>' docs/ BOARD.md
+grep -rin '<keyword>' docs/ BOARD.md WATCH.md
 ```
 
 Changing a docs decision is valid work; **silently violating one is not**. If it
@@ -40,13 +40,14 @@ possible? If not, it is a subject, not an ask: it belongs on a docs page. "Keep 
 eye on X", "improve Y", "think about Z" all fail here. A subject that becomes docs
 content is a *successful* intake, not a rejection.
 
-Externally-gated work does not go on the board — the board holds no waiting state.
-If the ask is real and completable but waits on something outside our control,
-record it as a **deferred item** on the docs page that owns the subject (the VEKN
-items live in `docs/vekn-decommission.md`), stating the ask, its done-condition,
-the evidence that cannot be reconstructed later, and a named trigger — a condition
-someone could observe firing, not "later". `/upkeep` watches the triggers; a fired
-one sends the item back through this loop as an ordinary line.
+Waiting work does not go on the board — the board holds no waiting state. If the
+ask is real and completable but waits on a date, recurs, or waits on something
+outside our control, it becomes an item in `WATCH.md`: its **When** (a named trigger
+— a condition someone could observe firing, not "later"), how to **Check** it, and
+what happens when it has **Fired** — the ask with its done-condition. Evidence that
+cannot be reconstructed later goes on the docs page that owns the subject, and the
+item links to it. `/watch-check` reads the file; a fired item comes back through
+this loop as an ordinary line.
 
 **Scope** — split only on real abstraction boundaries, so an agent can hold each
 part in context. **Never split to defer.** A large cohesive change is one line.
@@ -109,3 +110,4 @@ Then, in the **next** turn, ask for accept / decline / edit, and only then write
   it accepts.
 - **`/upkeep`** — the docs lint and the retrospective both propose work, and both
   come through this loop.
+- **`/watch-check`** — a `WATCH.md` item whose trigger fired.

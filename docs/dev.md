@@ -13,9 +13,6 @@ deploy installs that version through uv, never the distro's own interpreter. Two
 cannot read the file and repeat the version: `backend/Dockerfile`'s base image and
 the `-i` of the wheel build in `.github/workflows/release-artifacts.yml`.
 
-Deferred, on the trigger "SvelteKit and svelte-check ship TS 7 support": bump
-TypeScript 6 → 7 — done when `npm ls` is clean and `svelte-check` passes on TS 7.
-
 ```bash
 just update    # upgrade the mise tools and every dependency, build the engine
 just dev       # database + backend + frontend
@@ -555,6 +552,11 @@ scripts/    build and data tooling
 docs/       the docs
 board/      elaborated context for in-flight board lines
 ```
+
+`BOARD.md` holds the work owed now. `WATCH.md` beside it holds the work that waits:
+dated checks, recurring checks and externally gated asks, each with its trigger,
+how to check it and what each outcome does. `/watch-check` reads it, and a fired
+item goes through `/intake`.
 
 `README.md` is the public front door and `CHANGELOG.md` the human record of what
 shipped; both stay at the repository root. `CHANGELOG.md` is also shipped content —

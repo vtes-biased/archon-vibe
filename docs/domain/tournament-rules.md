@@ -227,7 +227,7 @@ example of events where decklists are not used (`reference/judges-guide-v2.md`
 
 **This is an open playtest, not an official format.** Nothing here is part of the
 tournament rules above, and the app does not implement it
-([deferred](../tournaments.md#trigger-the-two-player-format-becomes-official)).
+([deferred](../tournaments.md#the-two-player-format-not-yet-official)).
 Black Chantry opened the test to every player with no set deadline, and the rules
 keep moving: the page below as read on 2026-11-02, last updated 2026-10-03. Its
 [update log](https://www.vekn.net/two-player-format/675-two-player-format-updates)

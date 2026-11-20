@@ -3,7 +3,8 @@
 What Archon is and what was decided. A manifesto of *what is*, not a journal of how
 it came to be. Every page is reachable from here.
 
-Work owed lives in [`BOARD.md`](../BOARD.md), not here. A line that cannot be
+Work owed lives in [`BOARD.md`](../BOARD.md), not here, and work that waits on a
+date or an outside trigger in [`WATCH.md`](../WATCH.md). A line that cannot be
 completed is documentation and belongs on a page below.
 
 ## Start here
@@ -42,8 +43,8 @@ no code to lint against: check their sources instead.
 - [public-api](public-api.md) — the read-only `/v1` API for third parties: its
   endpoints, its JSON Lines streams, and the lint that keeps it apart from the app.
 - [vekn](vekn.md) — push, pull, TWDA, and the legacy archon sync.
-- [vekn-decommission](vekn-decommission.md) — work deferred until the VEKN syncs
-  retire, with the evidence that cannot be reconstructed afterwards.
+- [vekn-decommission](vekn-decommission.md) — the evidence for the work waiting on
+  the VEKN syncs to retire, which cannot be reconstructed afterwards.
 - [post-deploy](post-deploy.md) — the actions a production deploy unlocks, each
   gated on the commit that makes it safe. Empty is the normal state.
 - [discord](discord.md) — Linked Roles and the tournament bot.

@@ -151,7 +151,7 @@ vekn 10320 (14 players, 2 rounds) — winner +1 GW + `round(90·0.949)` = 85, ra
 2–5 +28. Finals events decompose identically with `vpf=0`, so the winner and
 finalist bonuses go to the top-5 **standings positions** without checking that a
 final was played. Read literally A.2 and A.2.1 credit neither — the tension is
-[with the Rules Director](../tournaments.md#trigger-the-rules-director-answers-on-no-final-rating-credit).
+[with the Rules Director](../tournaments.md#no-final-rating-credit-open-with-the-rules-director).
 
 ### Never chase vekn.net's stored RtP
 

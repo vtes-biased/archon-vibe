@@ -14,9 +14,8 @@ lines compete:
 5. new capability
 
 **Hard limit: 15 lines.** Adding a sixteenth forces a drop or a promotion to the
-docs. **No waiting state**: externally-gated work is deferred on the docs page
-that owns it — see [docs/vekn-decommission.md](docs/vekn-decommission.md) — with a
-named trigger, and returns through `/intake` when the trigger fires.
+docs. **No waiting state**: work that waits on a date or an outside trigger is in
+[WATCH.md](WATCH.md), and returns through `/intake` when its trigger fires.
 
 **Every line must be completable** — if "done" cannot be stated, it is a subject:
 promote it to a [docs](docs/index.md) page and delete the line. Context lives in
@@ -25,7 +24,6 @@ the docs; asks live here. Bulky context for an in-flight line goes in
 
 Board changes ride the commit that earns them.
 
-- Adopt a `WATCH.md` beside the board for dated checks, recurring checks and externally-gated work: move the deferred asks out of `vekn-decommission.md` (its evidence stays as docs) and the Rules Director trigger off `tournaments.md`, leave the post-release journal where it is since it waits on a release rather than a date, add a watch-check skill that reads the file and sends fired items through intake, and stop upkeep watching triggers. Done when no docs page carries a triggered ask except the post-release journal, `WATCH.md` holds the moved items with when, what to check and what each outcome does, the intake and upkeep skills name the file, and `index.md` and `dev.md` describe it.
 - Run the retrospective as published: ship writes a friction trailer on each commit (owner corrections, review rounds, surprises, failing checks); upkeep reads the trailers and recent session transcripts through a cheap-model subagent, proposes a rule at two occurrences with its evidence and a one-line reason, and removes rules whose reason has lapsed. Done when the ship skill names the trailer format, the upkeep skill names the mining step and the removal verdict, `principles.md` carries the trailer in its Git section, and one upkeep pass has run it.
 - Replace the justfile with mise tasks, per the owner's rule that a repo's commands live in mise: every recipe becomes a mise task under the same name (in `mise.toml` or `mise-tasks/`), the justfile and the `just` tool go away, and the pre-commit hook, the check scripts' messages, `CLAUDE.md`, the skills, the reviewer agent, the README and every docs page name `mise run …` instead. **Done when** no `just <recipe>` call remains in those sources, `mise run test` and `mise run lint-check` pass, and `docs/dev.md` lists the tasks.
 - Bring the remaining forms under `docs/design.md`'s handler-validation rule: the sanctions forms (SanctionsManager, TournamentSanctionModal — a date `min` tied to today), the auth forms (login, verify-email, LinkedAccounts — `type="email"`, `minlength`), User, nda, leagues/new and the two promo modals still let a browser constraint bubble gate their submit. **Done when** each such `<form>` carries `novalidate` and its submit handler checks every constraint the submit actually depends on (the rest of the attributes stay input hints), showing the message in the form's own error banner; no docs page changes beyond the rule already stated.

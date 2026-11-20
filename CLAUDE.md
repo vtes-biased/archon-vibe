@@ -24,8 +24,9 @@ goes in this file, a skill or an agent. Claude Code's auto-memory is off here
 
 [`BOARD.md`](BOARD.md) is a list designed to shrink. One line per ask, completion
 is deletion, position is priority, hard limit 15 lines, no waiting state —
-externally-gated work is deferred on the docs page that owns it, with a named
-trigger. Its own header carries the ranking rules. Read it before starting
+work that waits on a date, recurs or is externally gated sits in
+[`WATCH.md`](WATCH.md) with a named trigger, its evidence on the docs page that
+owns the subject. Its own header carries the ranking rules. Read it before starting
 anything.
 
 ## The loops
@@ -35,9 +36,10 @@ anything.
 - **`/ship`** — take the top line, execute, land it as one change, spawn the reviewer.
 - **`/upkeep`** — the maintenance pass: docs lint, board eviction, retrospective.
 
-Three named procedures feed them: **`/feedback-triage`** for GitHub feedback
-issues, **`/changeset`** for what is about to ship, before the tag is cut, and
-**`/post-deploy`** for the actions a deploy unlocks and the issues it made live.
+Four named procedures feed them: **`/feedback-triage`** for GitHub feedback
+issues, **`/changeset`** for what is about to ship, before the tag is cut,
+**`/post-deploy`** for the actions a deploy unlocks and the issues it made live,
+and **`/watch-check`** for the `WATCH.md` items whose trigger fired.
 
 **A unit of work lands as one change**: code changed, the docs pages named at
 intake updated (or their absence justified), the board line deleted. Docs currency

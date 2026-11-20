@@ -2,7 +2,7 @@
 
 How the app talks to vekn.net, to the TWDA, and to the legacy archon database. The
 organization and its rules are [domain](domain/vekn.md); this is the plumbing. What
-retiring these syncs means is [below](#decommission); the work waiting on it is
+retiring these syncs means is [below](#decommission); the evidence for the work waiting on it is
 [vekn-decommission](vekn-decommission.md).
 
 ## Feature flags
@@ -212,12 +212,9 @@ five we do and differs only in which sits at row 1, which is that order's exact
 signature and is why our side is the right one.
 
 The results upload is write-once, so the list went to the VEKN API maintainers on
-2026-08-24 rather than being corrected row by row. **Deferred here, not on the
-board**: the fix is theirs. **Trigger** — the maintainers answer, or a re-run of
-the audit shows the 15 agreeing. What is owed then is the rating check a day
-later, since whether upstream re-derives points from a corrected `pos` is
-[unestablished](domain/vekn.md#never-chase-veknnets-stored-rtp); if they do not
-follow, the winner holds the loser's rating and that is its own board line.
+2026-08-24 rather than being corrected row by row: the fix is theirs. Whether
+upstream re-derives points from a corrected `pos` is
+[unestablished](domain/vekn.md#never-chase-veknnets-stored-rtp).
 
 ### Events awaiting approval on vekn.net
 
@@ -241,8 +238,8 @@ September, 7 August), while 12498, 12555 and 12959 carry the legacy-archon
 migration's (30 June), which stamps without uploading, so nothing retries them:
 `UNPUSHED_RESULTS_QUERY` filters on the stamp, the manual push-vekn route skips
 the results push on a stamped row too, and a raw SQL clear would strand the member
-projection on the old value. `fix_stuck_vekn_push.py` clears it, and that
-deferred item says when.
+projection on the old value. `fix_stuck_vekn_push.py` clears it once the entry
+is corrected on vekn.net.
 
 Comparing those counts means reading the calendar field as the string it is:
 `event.php` returns `CONCAT(rounds, "R", IF(final > 0, "+F", ""))`, so `3R+F` is
@@ -491,8 +488,8 @@ instant rather than being restamped each run.
 `DELETE /tournaments/{uid}` refuses a VEKN footprint unless the flag is set. It is
 organizer-projection only, and a header badge on the tournament says the upstream
 record is gone. Giving ICs a blanket cleanup capability for events that *do* still
-exist upstream is separate, and deferred
-([vekn-decommission](vekn-decommission.md)).
+exist upstream is separate, and waits on stage 1
+([vekn-decommission](vekn-decommission.md#ic-record-curation--events-to-delete)).
 
 A false positive costs a duplicate, not data: the soft-deleted row keeps its vekn
 id, `get_tournament_by_external_id` skips tombstones, and the next sync re-creates
@@ -955,10 +952,10 @@ waiting on it names a real condition.
 The end state is **archon as the system of record** for members, events and results,
 with vekn.net frozen as a historical archive.
 
-One question deferred elsewhere gates the cutover: whether vekn.net recomputes a
+One open question gates the cutover: whether vekn.net recomputes a
 pushed `rtp` or stores it verbatim, and whether a results re-upload replaces or
 appends — Q5 of the
-[no-final rating questions](tournaments.md#trigger-the-rules-director-answers-on-no-final-rating-credit).
+[no-final rating questions](tournaments.md#no-final-rating-credit-open-with-the-rules-director).
 It decides whether our no-final stance is a display difference or a divergence into
 the system of record, and it must be answered while the API still responds.
 
@@ -979,7 +976,7 @@ along the tournament/member seam is the work of stage 1.
 hourly batch keeps running for members until stage 2. The app keeps computing its
 own ratings, which it already does.
 
-This stage is what unblocks the backlog. Every item deferred against it is
+This stage is what unblocks the backlog. Every item waiting on it is
 unfixable today for one reason — the sync's full-rebuild branch re-creates anything
 deleted locally and wipes anything corrected — so they all become ordinary local
 work the moment it stops.

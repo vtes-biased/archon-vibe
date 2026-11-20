@@ -6,7 +6,7 @@ they park here: one `##` section per item, **completion is deletion**, and an
 empty page is the normal state.
 
 `/post-deploy` runs them, ahead of the feedback issues it closes. Unlike the work
-deferred in [vekn-decommission](vekn-decommission.md), a fired trigger here does
+waiting in [`WATCH.md`](../WATCH.md), a fired trigger here does
 **not** go back through `/intake`: that trigger fires every release, and an item
 reaches this page only after passing review, so the one decision left is
 the owner's go/no-go.

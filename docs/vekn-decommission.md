@@ -1,13 +1,10 @@
-# VEKN decommission — deferred work
+# VEKN decommission — evidence
 
-Work that becomes possible only when the VEKN syncs retire, held here with the
-evidence that cannot be reconstructed afterwards. The board holds no waiting
-state: each item below is a real, completable ask parked on a named trigger — a
-condition someone could observe firing. `/upkeep` re-checks the triggers each
-pass; a fired trigger sends its item back through `/intake` as an ordinary board
-line.
+The evidence for the work that waits on the VEKN syncs retiring, kept because it
+cannot be reconstructed afterwards. The asks themselves, their triggers and what
+each one owes are in [`WATCH.md`](../WATCH.md).
 
-The first two triggers are the retirement stages in [vekn](vekn.md#decommission),
+The first two stages are the retirement stages in [vekn](vekn.md#decommission),
 which is where what retires and in what order is settled. The third is a correction on
 vekn.net's own side that our push waits on.
 
@@ -15,13 +12,9 @@ While the tournament and member syncs are upstreams, anything deleted or diverge
 locally is re-created on their next run — that is what makes each of these
 unfixable today.
 
-## Trigger: stage 1 — the tournament calendar sync retires
+## Stage 1 — the tournament calendar sync retires
 
 ### Duplicate tournament cleanup
-
-**Deferred ask** — clean up the remaining all-live duplicate tournaments: one
-real event entered twice on vekn.net with both vekn ids live. Soft-delete plus
-vekn-id transplant is the recipe. Done when each group below has one live copy.
 
 Data gathered 2026-08-08 from `dedup_tournaments.py --probe-vekn` on prod, plus
 direct vekn.net reads for the PennyBridge pair, and re-confirmed by the
@@ -164,16 +157,11 @@ module docstring does not exist — that reference is stale.
 
 ### IC record curation — events to delete
 
-**Deferred ask** — give ICs a cleanup capability that can delete or withdraw a
-tournament that **still exists** on vekn.net. Origin gh-6, a Prince asking how to
-remove an event created by mistake; the half of that question about an event
-vekn.net no longer has is answered — the organizer deletes it on the scan's
-absence flag ([vekn](vekn.md#the-event-veknnet-no-longer-has)), which is why
-organizers need no further deletion right here. **Do not re-derive the rejected
-probe-at-delete approach** — it was fully built and reverted. Done when an IC
-can remove a mistaken event, every entry below is gone, and the frontend no
-longer offers Delete on an offline-locked tournament, which the API refuses
-today.
+Origin gh-6, a Prince asking how to remove an event created by mistake; the half
+of that question about an event vekn.net no longer has is answered — the organizer
+deletes it on the scan's absence flag ([vekn](vekn.md#the-event-veknnet-no-longer-has)).
+**Do not re-derive the rejected probe-at-delete approach** — it was fully built and
+reverted.
 
 Running list of tournaments that **should not be in the record**, waiting on the
 IC cleanup capability. Distinct from its two sibling populations:
@@ -258,7 +246,7 @@ names say outright that they were never events:
 | `dde82ba8-6936-4ec4-94fc-130523c02cf7` | 2026-01-01 | `13235` | Brazil | `ND` |
 
 All three carry `external_ids['vekn']`, so deletion is refused today and the
-calendar sync would re-create them anyway — they wait on this section's trigger,
+calendar sync would re-create them anyway — they wait on stage 1,
 not on an organizer.
 
 `delete me` is the costly one: a TWDA entry submitted under event `12797` points
@@ -286,30 +274,23 @@ Found 2026-08-16 while deciding the Hall of Fame reconciliation queue.
 
 ### Lift the vekn-linked refusal on archival correction
 
-**Deferred ask** — delete the `ArchivalResultsVeknLinked` guard in
-`engine/src/tournament/`. Done when an IC can correct a rounds-less row carrying
-`external_ids['vekn']` and the correction survives a full sync run.
-
-The guard exists only because `vekn_tournament_sync.py`'s full-rebuild branch fires
+The `ArchivalResultsVeknLinked` guard in `engine/src/tournament/` exists only because `vekn_tournament_sync.py`'s full-rebuild branch fires
 whenever `not existing.rounds and tournament.players`, so a correction to such a
 row is wiped on the next nightly run — silently, and permanently. It is one refusal
 in one match arm, and it is what keeps the two disagreeing rows below parked. The
 alternative considered and rejected: a `results_corrected_at` marker the sync
 respects, which is a second persisted field for a capability that expires with this
-trigger.
+stage.
 
 ### IC record curation — rows that disagree with the archive about who won
-
-**Deferred ask** — settle the winner on the rows below and correct whichever
-side is wrong. Done when each row's `winner` matches the record the IC accepts.
 
 The first two came to us through their vekn event id, so the disagreement is between the
 vekn.net result and the winning deck the TWDA holds for the same event. The third
 has no archive entry: its legacy vekn.net sheet is visibly mis-entered (a 1 GW 4 VP
 player at `pos` 6 below a 1 GW 3.5 VP finalist) and the player it names as winner
 disputes it. One side
-is wrong and neither is ours to decide unilaterally. They wait on this section's
-trigger because the correction path — the `SetArchivalResults` engine event
+is wrong and neither is ours to decide unilaterally. They wait on stage 1
+because the correction path — the `SetArchivalResults` engine event
 ([tournaments](tournaments.md#engine-event-catalog)) — deliberately refuses any row
 carrying `external_ids['vekn']` while the calendar sync is live: the sync's
 full-rebuild branch would wipe the correction on its next run.
@@ -336,12 +317,6 @@ Fortaleza and Campina Grande — is a real homonym and needs nothing.
 ### Archive reconstructions of an event we already hold
 
 [archive reconstructions]: #archive-reconstructions-of-an-event-we-already-hold
-
-**Deferred ask** — settle the eight pairs below: where the reconstruction is the
-same event, soft-delete it and transplant its archive key onto the survivor as
-`external_ids.twda_entry`; where it is a distinct event, leave both live and
-record which. Done when no pair below is ambiguous and the mixed-vekn class of
-`dedup_tournaments.py` reports only pairs it can propose.
 
 **The archive backfill creates this class.** `reconcile_twda.py` reconstructs an
 entry when no held copy answers for it, and a held copy whose standings yield no
@@ -414,12 +389,6 @@ Reconstructions: `01a028a7-1cf7-72e2-840c-fb514352ede1`,
 
 ### Stamp the event code at creation and drop the boot sweep
 
-**Deferred ask** — make `POST /api/tournaments` stamp its event code inline like
-every other creation path, and delete `_stamp_missing_event_codes` with its
-query. Done when a tournament created through the route carries a code in the
-same save, and [architecture](architecture.md#the-short-event-code) no longer
-describes a boot sweep.
-
 The route waits for the calendar push today because a successful push supplies
 the vekn id the code should be. The push runs as an in-memory task, so a restart
 while it is in flight leaves the row with no code. The hourly batch push can't
@@ -429,25 +398,16 @@ push gone there is nothing to wait for, and the sweep has nothing left to catch.
 
 ### Retire the daily TWDA sync
 
-**Deferred ask** — delete the scheduled `run_twda_sync` and its row in
-[architecture](architecture.md#scheduled-background-tasks), keeping `backfill_twda.py` as the
-manual reconciliation. Done when no scheduled job fetches the archive.
-
 It downloads and parses the whole 12 MB archive every day, on a box with no
 memory to spare, to pick up entries that arrived by routes other than ours. Once
 vekn.net no longer takes events, the app's own pull request on finish should be
 the only clean way a decklist reaches the TWDA, and syncing the archive back
-into the corpus it came from buys nothing. Re-check at the trigger that no other
+into the corpus it came from buys nothing. Re-check at stage 1 that no other
 submission route survived before deleting.
 
-## Trigger: stage 2 — the member roster sync retires
+## Stage 2 — the member roster sync retires
 
 ### Prince / NC divergence — legacy archon vs the app
-
-**Deferred ask** — review the divergence and record the outcome: each divergent
-name below gets a verdict from someone who knows the appointments, and the roles
-match it. A blind union would republish superseded officials' contact details
-publicly and seat two coordinators in two countries.
 
 Captured on production **2026-08-09**, while the legacy `archondb` was still
 live on the box. Recorded here deliberately: the final archive dump retires that
@@ -549,7 +509,7 @@ _29 members._
 
 _36 members._
 
-## Trigger: the VEKN admins correct the calendar entries
+## Waiting on the VEKN admins to correct the calendar entries
 
 ### Push the results stuck on the calendar's round count
 
@@ -591,16 +551,3 @@ Read live on 2026-11-01 through beta's VEKN client:
 
 The flag cuts both ways: an event filed with it that ends without a final is
 refused at provided = expected − 1. Its rate is unmeasured.
-
-**Trigger:** the VEKN admins report the entries corrected. **Run**, per stamped
-event once its entry is fixed, reading the report before writing:
-
-```sh
-… /opt/archon/backend/scripts/fix_stuck_vekn_push.py --vekn <id>
-… fix_stuck_vekn_push.py --vekn <id> --apply
-```
-
-**Done when** the first hourly batch after it pushes every finished entry above,
-the unstamped ones on their own and the stamped ones once cleared, and none logs
-the round-count refusal again. It is **approval that publishes**, so expect them
-pending on vekn.net until an official works the queue.

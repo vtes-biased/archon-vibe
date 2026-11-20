@@ -70,19 +70,15 @@ line gets one of four verdicts, and no line is skipped twice:
 
 - **do** — it is still right and still wanted; leave it, reordering if the ranking
   rules now place it differently;
-- **date** — it is real but not now; it moves off the board to the docs page that
-  owns it as a deferred item with a named trigger, not a vague deferral;
+- **date** — it is real but not now; it moves off the board into `WATCH.md` with a
+  named trigger, not a vague deferral;
 - **promote** — it turned out to be a subject, not an ask; it becomes docs content
   and the line goes;
 - **drop** — it is no longer wanted; delete it.
 
-Then check the **deferred items** parked in the docs (`docs/vekn-decommission.md`,
-`docs/post-deploy.md`, the Rules Director trigger on `docs/tournaments.md`, plus
-the deferred note on `dev.md`): has a trigger fired? A
-fired trigger sends the item through `/intake` as an ordinary line at its ranked
-position, which may push the list to its limit — resolve that here rather than at
-the next intake. And give each deferred item the same verdict as a line: still
-wanted, or dropped — deferral is not exemption from eviction.
+Triggers are not this pass's job: `/watch-check` reads `WATCH.md`. Give each of its
+items the same verdict as a line, though — still wanted, or dropped — since waiting
+is not exemption from eviction.
 
 Check the hard limit. If the list is at 15, the pass must produce at least
 one drop or promotion before any new line can land.

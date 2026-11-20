@@ -108,19 +108,6 @@ and the check-in-open posts carry the neutral reminder.
 **Status: pre-production.** Deployed and running, not yet live on production
 guilds and not yet tested end to end.
 
-**Deferred ask** — run Portal setup above against the production application
-`1495034668469194864`, then install the bot on the production guild(s); which
-servers count as production is part of the ask. Step 1 is believed already
-done — the journal's `pushed metadata for user` lines can only come from a
-working redirect — so confirm it rather than re-adding it. **Done when** Server
-Settings → Roles → Links → Add requirement lists Archon with its three metadata
-fields, and `/setup <tournament url>` in a production guild creates the category
-with its announcement, lobby and judges channels.
-
-**Trigger: the next production release** — and *by* it, not after it. That
-release carries the organizer guide's install link, which is inert until step 4
-is saved, so a release landing first hands every organizer a dead link.
-
 **Commands** — `/setup <url>` probes the tournament's scoped SSE stream before
 creating anything, so a bad or inaccessible uid, or a `Finished` tournament,
 creates nothing; on success it names the category from the real tournament name and
