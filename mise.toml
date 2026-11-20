@@ -3,7 +3,7 @@ lockfile = true
 idiomatic_version_file_enable_tools = ["python"]
 
 [tools]
-rust = { version = "latest", targets = "wasm32-unknown-unknown" }
+rust = { version = "latest", targets = "wasm32-unknown-unknown", components = "rustfmt,clippy" }
 node = "24"
 uv = "latest"
 just = "latest"

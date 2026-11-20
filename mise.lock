@@ -175,6 +175,7 @@ backend = "core:rust"
 specifiers = ["latest"]
 
 [tools.rust.options]
+components = "clippy,rustfmt"
 targets = "wasm32-unknown-unknown"
 
 [[tools.uv]]
