@@ -268,8 +268,8 @@ four in the archon file's terms and the `+F` must be added back —
   user row, as the legacy import left behind — and not in
   `local_modifications`. A member goes to the official with the **longest**
   matching `vekn_prefix`, so a Prince whose prefix extends their NC's keeps their
-  own members — an undated sponsor holding a shorter matching prefix is taken
-  back, since only inference leaves `coopted_at` unset.
+  own members. A sponsor already recorded is never replaced by a prefix guess:
+  the legacy record wins.
 - Non-destructive: fields recorded in `local_modifications` by the profile and user
   edit routes are never overwritten.
 
@@ -900,7 +900,7 @@ syncs:
 |---|---|
 | identity — name, country, city, state | VEKN sync |
 | contact, nickname, discord, community links | archon sync |
-| `coopted_by` | archon sync, VEKN sync inference (fill-only), an official's edit |
+| `coopted_by` | archon sync, VEKN sync inference (fills an unset or dangling sponsor), an official's edit |
 | roles | nobody — seeded once by whichever creates the row first, app-managed thereafter |
 | sanctions, leagues | archon sync, upsert by source uid |
 | rich play data — rounds, seatings, decks, finals | archon sync |

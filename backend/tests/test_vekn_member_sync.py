@@ -1,9 +1,8 @@
 """VEKN member sync role seeding (vekn_sync.sync_player): CREATE seeds derived
 roles (Prince/NC/IC); UPDATE never writes roles, so app-managed roles survive
 re-sync — the contract restored after 364a7ec's removal of it. Its coopted_by
-inference skips a sponsor an official pinned, replaces one naming no user, and
-gives a member to the longest matching prefix — taking back an undated one a
-shorter prefix holds. Runs end-to-end against the real
+inference skips a sponsor an official pinned, replaces one naming no user and
+gives a member to the longest matching prefix. Runs end-to-end against the real
 DB, no mocks.
 """
 
@@ -105,11 +104,9 @@ async def test_inference_gives_a_member_to_the_longest_matching_prefix(test_db):
     princes_member = await seed(1000915, coopted_by=None)
     ncs_member = await seed(1000925, coopted_by=None)
     dangling = await seed(1000916, coopted_by="old-archon-uid")
-    misinferred = await seed(1000917, coopted_by=nc.uid, coopted_at=None)
 
     await VEKNSyncService()._infer_coopted_by()
 
     assert (await get_user_by_uid(princes_member.uid)).coopted_by == prince.uid
     assert (await get_user_by_uid(ncs_member.uid)).coopted_by == nc.uid
     assert (await get_user_by_uid(dangling.uid)).coopted_by == prince.uid
-    assert (await get_user_by_uid(misinferred.uid)).coopted_by == prince.uid

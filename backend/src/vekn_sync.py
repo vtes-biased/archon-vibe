@@ -15,7 +15,7 @@ from .data.vekn_roster import ADMINS
 from .db import (
     decode_json,
     get_connection,
-    get_sponsor_inference_candidates,
+    get_users_needing_sponsor,
     get_users_with_vekn_prefix,
     save_user,
 )
@@ -694,15 +694,17 @@ class VEKNSyncService:
         return stats
 
     async def _infer_coopted_by(self) -> int:
-        officials = [s for s in await get_users_with_vekn_prefix() if s.vekn_prefix]
-        by_prefix = {s.vekn_prefix: s.uid for s in officials}
-        prefix_of = {s.uid: s.vekn_prefix for s in officials}
+        by_prefix = {
+            s.vekn_prefix: s.uid
+            for s in await get_users_with_vekn_prefix()
+            if s.vekn_prefix
+        }
         if not by_prefix:
             return 0
 
         count = 0
         now = datetime.now(UTC)
-        for user, sponsor_live in await get_sponsor_inference_candidates():
+        for user in await get_users_needing_sponsor():
             if "coopted_by" in user.local_modifications or not user.vekn_id:
                 continue
             for n in range(len(user.vekn_id), 0, -1):
@@ -711,10 +713,6 @@ class VEKNSyncService:
                     break
             else:
                 continue
-            if sponsor_live:
-                held = prefix_of.get(user.coopted_by or "")
-                if not held or not user.vekn_id.startswith(held) or len(held) >= n:
-                    continue
             # Mutate in place — a from-scratch User(...) would drop new fields.
             user.coopted_by = sponsor_uid
             user.coopted_at = None
@@ -731,8 +729,8 @@ class VEKNSyncService:
         sponsors = await get_users_with_vekn_prefix()
         orphans = [
             u
-            for u, sponsor_live in await get_sponsor_inference_candidates()
-            if not sponsor_live and "coopted_by" not in u.local_modifications
+            for u in await get_users_needing_sponsor()
+            if "coopted_by" not in u.local_modifications
         ]
         if not sponsors or not orphans:
             return 0

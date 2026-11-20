@@ -56,15 +56,5 @@ Run against production, from the deployed tree:
     ssh archon.vekn.net "sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
       /opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/reproject_public.py --apply'"
 
-The next VEKN member sync replaces every sponsor that names no user row. After
-it, this answers 0:
-
-    ssh archon.vekn.net 'sudo -u postgres psql -d archon' <<'SQL'
-    SET statement_timeout = 0;
-    SELECT count(*) FROM objects m
-    WHERE type = 'user' AND deleted_at IS NULL AND m."full"->>'coopted_by' IS NOT NULL
-      AND NOT EXISTS (SELECT 1 FROM objects s WHERE s.uid = m."full"->>'coopted_by');
-    SQL
-
-It worked when that count is 0 and a Prince's members directory, Mine filter on,
+It worked when a Prince's members directory, Mine filter on,
 lists the members issued under their prefix. **Owes afterwards**: nothing.
