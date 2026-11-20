@@ -306,7 +306,12 @@ Design for touch first, then enhance for desktop.
 - **Forms**: large inputs, no complex multi-column layouts on mobile. A form
   reveals invalid state only once the user has touched it — a pristine form that
   opens already flagging its own empty required fields reads as an error the
-  user caused.
+  user caused. A form validates in its own submit handler and shows
+  the message in its error banner, never through a browser constraint bubble: the
+  form carries `novalidate`, and attributes like `required` or `min` stay only as
+  input hints. The banner scrolls into view when it fills, since the submit
+  button sits below a long form. A constraint bubble can fail to show (a `datetime-local` `min` on
+  iPad swallowed the tap with no message), and the submit then dies silently.
 - **A repeated row beats a row per candidate.** Where a form takes a quantity
   against several catalogue items, add rows on demand — a picker plus a
   quantity plus a remove control, options excluding what other rows took — and

@@ -55,6 +55,10 @@
 
   let isSubmitting = $state(false);
   let error = $state<string | null>(null);
+  let errorBanner = $state<HTMLElement | null>(null);
+  $effect(() => {
+    if (error) errorBanner?.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
 
   // Required-path fields still empty — names the reason the create button is
   // disabled instead of leaving it silently grey.
@@ -87,6 +91,10 @@
     }
     if (!values.start) {
       error = m.tournament_new_error_start_required();
+      return;
+    }
+    if (values.finish && values.finish < values.start) {
+      error = m.err_tournament_finish_before_start();
       return;
     }
     if (!values.online && !values.country) {
@@ -180,7 +188,7 @@
         }}
       />
     {:else}
-      <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-6">
+      <form novalidate onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="space-y-6">
         {#if answered}
           <div class="bg-surface-card rounded-lg shadow p-6 border border-line space-y-2">
             <h2 class="text-xl font-medium text-ink-strong">{m.tournament_wiz_ready_title()}</h2>
@@ -203,7 +211,7 @@
             </div>
           {/if}
           {#if error}
-            <div class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3">
+            <div bind:this={errorBanner} role="alert" class="bg-accent-soft/20 border border-accent-soft-border rounded-lg p-3">
               <p class="text-link-soft text-sm">{error}</p>
             </div>
           {/if}
