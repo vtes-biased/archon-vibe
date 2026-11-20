@@ -204,6 +204,25 @@ skipped.
 `Reported in #N.` when the work fixes a user-reported one; never a closing keyword,
 and never a board reference.
 
+**Record the friction in a trailer.** One `Friction:` trailer per event, in the
+trailer block beside `Co-Authored-By`, so `/upkeep` can mine it with
+`git log --format='%(trailers:key=Friction)'`:
+
+```
+Friction: correction — the owner reversed the Python bump: prod's distro sets the version
+Friction: review — advisory, a comment restating its docs page (round 1)
+Friction: surprise — the line assumed Princes receive coopted_by; only IC and NCs do
+Friction: check — lint-check failed on a sibling's unformatted file
+```
+
+The four kinds are **correction** (the owner corrected the approach or an
+output), **review** (a finding, its class and round), **surprise** (an assumption,
+the line's or yours, that turned out false) and **check** (a gate that went red,
+and why). Name the class, not the instance, so two occurrences can be
+recognized as one. A change that met none carries `Friction: none`. Review rounds
+land after the first commit: their trailers go on the commit that carries the
+fixes, or are added when amending.
+
 ## 5. Review
 
 **Only a change that touches code gets a review.** A doc-only change — a docs

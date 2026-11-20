@@ -223,6 +223,11 @@ to an env-pointed runtime path, with an untracked dev copy and graceful absence.
 Commit the docs edit and the board line deletion with the code change that earns
 them — one unit of work, one change.
 
+**Every commit records its friction** in `Friction:` trailers — owner
+corrections, review rounds, surprises, failing checks, or `none` — in the format
+the ship skill names. They are what the upkeep retrospective mines: the same kind
+of friction seen twice becomes a proposed rule.
+
 **Reference GitHub issues, never close them from a commit.** `#N` in a commit
 message means a GitHub issue, and a fix for a user-reported one carries
 `Reported in #N.` — that backlink is how a release works out which issues it

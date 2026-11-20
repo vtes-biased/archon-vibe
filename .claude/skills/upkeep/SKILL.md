@@ -95,17 +95,42 @@ is a deletion, not a verdict.
 
 ## 3. Retrospective
 
-Mine the recent reviews and owner corrections. **Two occurrences of the same
-class is a harness problem, not a code problem.**
+The only way the harness changes. **Two occurrences of the same class is a
+harness problem, not a code problem.**
 
-Look for: the same advisory finding recurring across unrelated diffs; the same
-owner correction given twice; the same rule being rediscovered by an
-agent that had no way to know it.
+**Mine.** Spawn the `miner` agent — a cheap model, read-only — over the last 30
+days. Overlap with the previous pass is harmless: evidence carries a sha or a
+session id, so an occurrence counted twice is visible. Its brief names the two
+sources:
 
-Each qualifying class becomes a proposed amendment — a new principle line, a charter
-line for the reviewer, a lint rule, a hook, or an edit to one of these skills —
-filed through `/intake` as an ordinary board line. **The harness grows only through
-this retrospective.** Do not add a skill, an agent or a hook because it seems useful.
+```sh
+git log --since=30.days --format='%h %s%n%(trailers:key=Friction,valueonly)'
+find ~/.claude/projects/"$(pwd | tr / -)" -maxdepth 1 -name '*.jsonl' -mtime -30
+```
+
+The trailers are what ship recorded; the transcripts hold what it missed — the
+owner's own words, and the reviewer's findings as they came back. A commit
+without trailers predates them, or forgot them: that absence is itself a class.
+
+**Judge.** The miner returns classes; you decide which are one class. Look for the
+same finding recurring across unrelated diffs, the same owner correction given
+twice, the same rule rediscovered by an agent that had no way to know it. Each
+class seen twice becomes a proposed amendment with **its evidence** (the shas or
+sessions) and **a one-line reason** — the friction it prevents. The amendment is a
+principle line, a reviewer charter line, a lint rule or an edit to a skill; **a
+correction the owner has had to give twice becomes a hook**, since written
+instructions already failed to hold it. The rule lands with its reason beside it:
+a rule without a reason cannot safely be removed.
+
+**Remove.** Walk the standing rules — `CLAUDE.md`, the skills, the agents, the
+hooks, `principles.md` — and give each a verdict: **keep**, or **lapsed** when its
+reason no longer holds: the subsystem it guards is gone, a hook or lint now
+enforces it mechanically, or the owner reversed the preference it encodes. A rule
+that merely has not fired lately is working, not lapsed. A rule with no reason
+gets one written, or is proposed for removal.
+
+Every amendment and removal is filed through `/intake` as an ordinary board line.
+**Nothing joins the harness because it seems useful.**
 
 The owner's effort goes here rather than into the code: a correction the owner has to give
 twice is a rule that should have been written down once.
@@ -113,6 +138,7 @@ twice is a rule that should have been written down once.
 ## 4. Report
 
 One short report to the owner: what the lint found, the eviction verdicts, whether
-the board is trending down, and any proposed amendments. Then a slower question,
+the board is trending down, the friction classes mined, and the
+proposed amendments and removals. Then a slower question,
 worth asking on a monthly pass: are the ranking rules still true, and is the board
 actually shrinking?
