@@ -11,10 +11,6 @@ default:
 dev:
     #!/usr/bin/env bash
     set -e
-    # wasm-pack shells out to whatever `cargo`/`rustc` is first on PATH. If a
-    # Homebrew rust is ahead of rustup's, it has no wasm32 target and the build
-    # fails — so force rustup's toolchain (which has wasm32) to the front.
-    export PATH="$HOME/.cargo/bin:$PATH"
     just dev-stop
     echo "Building engine..."
     (cd engine && wasm-pack build --target web --release -- --features wasm)
@@ -66,12 +62,7 @@ update:
     #!/usr/bin/env bash
     set -euo pipefail
     # Toolchains first: deps can only be as fresh as the tools resolving them.
-    rustup update
-    # uv: brew-managed here (`uv self update` refuses on brew installs); try
-    # brew first, fall back to the standalone self-updater.
-    brew upgrade uv 2>/dev/null || uv self update 2>/dev/null || true
-    npm install -g npm >/dev/null 2>&1 || echo "npm self-update failed (non-fatal)"
-    cargo install wasm-pack
+    mise upgrade
     uv lock --upgrade && uv sync
     (cd frontend && npm update)
     (cd engine && cargo update)

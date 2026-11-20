@@ -19,17 +19,12 @@ uv pip install target/wheels/*.whl
 
 ### For WebAssembly (Frontend)
 ```bash
-# Install wasm-pack
-cargo install wasm-pack
-
 # Build WASM module (--no-opt to avoid wasm-opt compatibility issues)
 cd engine
 wasm-pack build --no-opt --target web --release --features wasm
 
 # Output will be in pkg/ directory
 ```
-
-> `wasm-pack` needs the **rustup** toolchain (it has the `wasm32-unknown-unknown` target); a Homebrew `cargo` lacks it. The `just dev` recipe already prepends `~/.cargo/bin`, but a standalone `wasm-pack`/`cargo` invocation needs `PATH="$HOME/.cargo/bin:$PATH"`. (The PyO3 `maturin develop` build is fine with either toolchain.)
 
 ### Run Tests
 ```bash
@@ -166,9 +161,8 @@ The event enum lives in `tournament/types.rs`; the full catalog (with required s
 
 ## Dependencies
 
-- `json` (0.12) - Lightweight JSON library
-- `rand` (0.8) - Random number generation (seating shuffles, deterministic toss/raffle LCGs)
-- `rand_chacha` (0.3) - Value-stable `ChaCha8Rng` for seeded, reproducible seating across WASM/PyO3
-- `getrandom` (0.2, with `js` feature) - Entropy source for WASM
-- `wasm-bindgen` (0.2) - WASM bindings (optional, `--features wasm`)
-- `pyo3` (0.27) - Python bindings (optional, `--features python`)
+- `json` - Lightweight JSON library
+- `rand` - Random number generation for the seating annealer
+- `rand_chacha` - Value-stable `ChaCha8Rng` for seeded, reproducible seating across WASM/PyO3
+- `wasm-bindgen` - WASM bindings (optional, `--features wasm`)
+- `pyo3` - Python bindings (optional, `--features python`)

@@ -25,7 +25,7 @@ check ([hazards](hazards.md)), then stops the DB.
 and a built engine. Override the target with `TEST_DATABASE_URL`. Pure-unit suites
 — SSE filters, organizer access, access levels — need no DB at all.
 
-**Rust** — `cd engine && cargo test --lib`. `cargo` may not be on the default PATH.
+**Rust** — `cd engine && cargo test --lib`.
 
 **Frontend type check** — `npm run check`: codegen, `svelte-kit sync`, `tsc` on the
 service worker's own project, then `svelte-check` on the rest. The worker is excluded

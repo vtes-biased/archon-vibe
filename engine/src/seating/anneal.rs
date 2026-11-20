@@ -135,7 +135,7 @@ pub(crate) fn optimize_sa(
         let progress = step as f64 / iterations as f64;
         let base_temperature = temp_max * (temp_factor * progress).exp();
 
-        let round_idx = rng.gen_range(fixed_rounds..rounds_count);
+        let round_idx = rng.random_range(fixed_rounds..rounds_count);
         let positions = &round_positions[round_idx];
         let player_count = positions.len();
 
@@ -143,8 +143,8 @@ pub(crate) fn optimize_sa(
             continue;
         }
 
-        let pos1 = rng.gen_range(0..player_count);
-        let pos2 = rng.gen_range(0..player_count);
+        let pos1 = rng.random_range(0..player_count);
+        let pos2 = rng.random_range(0..player_count);
         if pos1 == pos2 {
             continue;
         }
@@ -177,7 +177,7 @@ pub(crate) fn optimize_sa(
                 if let Some((rule_idx, diff)) = new_score.first_diff_rule(&current_score) {
                     let rule_temp = base_temperature / (10.0_f64.powi(rule_idx as i32));
                     let accept_prob = (-diff.abs() / rule_temp).exp();
-                    rng.gen::<f64>() < accept_prob
+                    rng.random::<f64>() < accept_prob
                 } else {
                     true
                 }

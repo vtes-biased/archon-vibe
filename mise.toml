@@ -1,0 +1,10 @@
+[settings]
+lockfile = true
+idiomatic_version_file_enable_tools = ["python"]
+
+[tools]
+rust = { version = "latest", targets = "wasm32-unknown-unknown" }
+node = "24"
+uv = "latest"
+just = "latest"
+"aqua:wasm-bindgen/wasm-pack" = "latest"

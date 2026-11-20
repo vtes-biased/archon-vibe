@@ -84,23 +84,16 @@ the app implements.
 
 ### Prerequisites
 
-Install these tools before setting up the project:
-
-| Tool | Install | Purpose |
-|------|---------|---------|
-| **Rust** | [rustup.rs](https://rustup.rs/) | Shared engine (business logic) |
-| **Node.js** 24+ | [nvm](https://github.com/nvm-sh/nvm) or [nodejs.org](https://nodejs.org/) | Frontend tooling |
-| **uv** | [docs.astral.sh/uv](https://docs.astral.sh/uv/) | Python package manager (auto-installs Python) |
-| **just** | [github.com/casey/just](https://github.com/casey/just#installation) | Task runner |
-| **Docker** | [Docker Desktop](https://www.docker.com/) or [OrbStack](https://orbstack.dev/) | Database (dev) and deployment |
+Install [mise](https://mise.jdx.dev) and a container runtime ([Docker Desktop](https://www.docker.com/) or [OrbStack](https://orbstack.dev/)) for the dev database and deployment. mise installs every other tool the repo's `mise.toml` names: Rust, Node, uv, just, wasm-pack and Python.
 
 ### Setup
 
 ```bash
 git clone https://github.com/vtes-biased/archon-vibe.git
 cd archon-vibe
+mise install
 
-# Install all dependencies (Python, Node, Rust, wasm-pack) and build the engine
+# Install all dependencies and build the engine
 just update
 ```
 

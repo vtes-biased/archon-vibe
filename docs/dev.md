@@ -2,14 +2,19 @@
 
 ## Prerequisites
 
-Rust (rustup), Node 24+, `uv`, `just`, and Docker or OrbStack. `uv` auto-installs
-Python.
+[mise](https://mise.jdx.dev) and Docker or OrbStack: `mise install` sets up every
+tool `mise.toml` names, at the versions `mise.lock` records; `just update` moves
+both. Python comes from `.python-version`, which deploy and CI read too, and stays
+at the version the servers' distro ships by default, not the newest release;
+deploy installs that version through uv, never the distro's own interpreter. Two places
+cannot read the file and repeat the version: `backend/Dockerfile`'s base image and
+the `-i` of the wheel build in `.github/workflows/release-artifacts.yml`.
 
 Deferred, on the trigger "SvelteKit and svelte-check ship TS 7 support": bump
 TypeScript 6 → 7 — done when `npm ls` is clean and `svelte-check` passes on TS 7.
 
 ```bash
-just update    # install Python, Node, Rust and wasm-pack deps, build the engine
+just update    # upgrade the mise tools and every dependency, build the engine
 just dev       # database + backend + frontend
 just dev-stop
 ```
