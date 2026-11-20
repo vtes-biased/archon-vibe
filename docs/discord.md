@@ -105,9 +105,6 @@ Archon profile to link one, then back. On an event that requires a decklist,
 `/checkin` warns only a player whose check-in found none on record; `/register`
 and the check-in-open posts carry the neutral reminder.
 
-**Status: pre-production.** Deployed and running, not yet live on production
-guilds and not yet tested end to end.
-
 **Commands** — `/setup <url>` probes the tournament's scoped SSE stream before
 creating anything, so a bad or inaccessible uid, or a `Finished` tournament,
 creates nothing; on success it names the category from the real tournament name and

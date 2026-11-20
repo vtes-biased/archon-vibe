@@ -532,7 +532,7 @@ than a suffixed name string.
 engine sets the last two: `public` from `decklists_mode` plus tournament state (Winner /
 Finalists / All), and `winner` from whether the owner won — a fact the deck row
 cannot otherwise reach, and which the projections need to spare the winner from
-anonymity ([tournaments](tournaments.md#decks)). `private` is the owner's or an
+anonymity ([tournaments](tournaments.md#engine-event-catalog)). `private` is the owner's or an
 organizer's, and forces `public` off for anyone but the winner.
 
 **`attribution` is a typed credit**, one `kind` of `Anonymous`, `Owner`, `Member`

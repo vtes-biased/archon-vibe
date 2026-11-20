@@ -129,33 +129,6 @@ are not here: they wait on a release, not a trigger, in
   [what it takes](docs/tournaments.md#the-two-player-format-not-yet-official).
   An announcement without event rules has not fired it.
 
-## Discord bot on production, by the next production release
-
-- **When**: before the next production release, not after: that release carries
-  the organizer guide's install link, which is inert until Portal step 4 is saved.
-  Written 2026-08-30; releases have shipped since, so the first check settles
-  whether it was done.
-- **Check**: whether Server Settings → Roles → Links → Add requirement lists
-  Archon in a production guild.
-- **Fired**: through `/intake` at the top — run
-  [Portal setup](docs/discord.md#linked-roles) against the production application
-  `1495034668469194864`, then install the bot on the production guild(s); which
-  servers count as production is part of the ask. Step 1 is believed already done,
-  since the journal's `pushed metadata for user` lines can only come from a working
-  redirect: confirm it rather than re-adding it. Done when the Linked Roles
-  requirement lists Archon with its three metadata fields, and `/setup <tournament
-  url>` in a production guild creates the category with its announcement, lobby
-  and judges channels.
-
-## Public API on production
-
-- **When**: the first `just deploy-prod` with `public_api = True`, which issues the
-  `api.archon.vekn.net` certificate and starts `archon-public-api` on port 7007.
-  Written 2026-09-25; releases have shipped since.
-- **Check**: `curl -s https://api.archon.vekn.net/v1/` answers.
-- **Fired**: through `/intake` — exercise a registered `api:read` client's daemon
-  token, the throttle, and the app's rejection of that token on production.
-
 ## A member asks to keep their win out of the TWDA
 
 - **When**: a member asks to keep their name or their winning deck out of the
