@@ -1,0 +1,7 @@
+{
+  "name": "archon-grafana",
+  "displayName": "Archon Grafana (vtesbiased)",
+  "version": "1.0.0",
+  "description": "Read-only Grafana Cloud MCP server for Archon production logs and metrics (requires GRAFANA_TOKEN_VTESBIASED).",
+  "disabled": true
+}

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "grafana-vtesbiased": {
+      "command": "zsh",
+      "args": [
+        "-c",
+        "GRAFANA_SERVICE_ACCOUNT_TOKEN=\"$GRAFANA_TOKEN_VTESBIASED\" exec uvx mcp-grafana --disable-write"
+      ],
+      "env": {
+        "GRAFANA_URL": "https://vtesbiased.grafana.net"
+      }
+    }
+  }
+}

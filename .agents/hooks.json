@@ -1,0 +1,37 @@
+{
+  "todo-lint": {
+    "PreToolUse": [
+      {
+        "matcher": "write_file|edit_file|write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/todo-lint.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "test-diff-flag": {
+    "PostToolUse": [
+      {
+        "matcher": "write_file|edit_file|write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/test-diff-flag.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostInvocation": [
+      {
+        "type": "command",
+        "command": "./hooks/test-diff-flag.py",
+        "timeout": 10
+      }
+    ]
+  }
+}
