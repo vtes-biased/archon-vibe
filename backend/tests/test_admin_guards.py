@@ -22,7 +22,6 @@ from tests.conftest import make_auth_header
 
 ADMIN_SYNC_PATHS = [
     "/admin/sync-vekn",
-    "/admin/sync-vekn-tournaments",
     "/admin/sync-twda-decks",
 ]
 # Any path uid works: the IC gate fires before the tournament is ever loaded.

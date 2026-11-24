@@ -16,14 +16,12 @@
   const auth = $derived(getAuthState());
   const canCreate = $derived(canCreateTournament(auth.user).allowed);
 
-  const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
-
   let values = $state<TournamentFieldValues>({
     name: "",
     format: "Standard",
     rank: "",
     open_rounds: false,
-    max_rounds: veknPush ? 3 : 0,
+    max_rounds: 0,
     max_players: 0,
     self_organized_rounds: false,
     online: false,
@@ -103,10 +101,6 @@
     }
     if (!values.online && !values.city_geoname_id) {
       error = m.tournament_new_error_city_required();
-      return;
-    }
-    if (veknPush && !values.open_rounds && (values.max_rounds < 2 || values.max_rounds > 4)) {
-      error = m.tournament_new_error_max_rounds();
       return;
     }
 

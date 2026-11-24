@@ -1,17 +1,14 @@
 <script lang="ts">
   import { dialogPanel } from "#lib/actions/dialog.ts";
   import type { Tournament, DeckObject } from "#lib/types.ts";
-  import type { StandingEntry, PlayerInfoMap } from "#lib/tournament-utils.ts";
+  import type { StandingEntry } from "#lib/tournament-utils.ts";
   import Button from "#lib/components/Button.svelte";
   import { TriangleAlert } from "@lucide/svelte";
   import * as m from '#lib/paraglide/messages.js';
 
-  // FinishTournament computes the winner, writes ratings, publishes decklists
-  // and triggers the write-once VEKN push; warnings here never block finishing.
   let {
     tournament,
     standings,
-    playerInfo,
     decksByUser,
     actionLoading,
     onConfirm,
@@ -19,16 +16,12 @@
   }: {
     tournament: Tournament;
     standings: StandingEntry[];
-    playerInfo: PlayerInfoMap;
     decksByUser: Record<string, DeckObject[]>;
     actionLoading: boolean;
     onConfirm: () => void;
     onClose: () => void;
   } = $props();
 
-  const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
-  // Mirrors batch_push's guard: only tournaments with in-app play data are pushed.
-  const willPushVekn = $derived(veknPush && (tournament.rounds?.length ?? 0) > 0);
   const hasDecks = $derived(Object.values(decksByUser).some(d => d.length > 0));
 
   const unscoredTables = $derived.by(() => {
@@ -41,9 +34,6 @@
     }
     return count;
   });
-  const missingVeknIds = $derived(
-    standings.filter(e => !playerInfo[e.user_uid]?.vekn).length
-  );
   const missingDecks = $derived(
     tournament.decklist_required
       ? standings.filter(e => !decksByUser[e.user_uid]?.length).length
@@ -51,7 +41,6 @@
   );
   const warnings = $derived([
     ...(unscoredTables > 0 ? [m.finish_confirm_warn_tables({ count: String(unscoredTables) })] : []),
-    ...(willPushVekn && missingVeknIds > 0 ? [m.finish_confirm_warn_vekn_ids({ count: String(missingVeknIds) })] : []),
     ...(missingDecks > 0 ? [m.finish_confirm_warn_decks({ count: String(missingDecks) })] : []),
   ]);
 </script>
@@ -80,9 +69,6 @@
       <p class="text-ink mb-3">{m.finish_confirm_intro()}</p>
       <ul class="space-y-1.5 text-sm text-ink list-disc pl-5 mb-4">
         <li>{m.finish_confirm_players({ count: String(standings.length) })}</li>
-        {#if willPushVekn}
-          <li>{m.finish_confirm_vekn()}</li>
-        {/if}
         {#if tournament.decklists_mode && hasDecks}
           <li>
             {#if tournament.decklists_mode === "Winner"}{m.finish_confirm_decks_winner()}

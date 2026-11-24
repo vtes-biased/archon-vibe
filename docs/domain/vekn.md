@@ -190,15 +190,11 @@ a rank the app cannot represent, so the coefficient bonus is missed.
 
 ## External systems
 
-**vekn.net** holds the member roster, the event calendar and the tournament
-record. Its API is what the app pushes to and pulls from
-([vekn integration](../vekn.md)). Constraints that come from their side, not ours:
-the API has **no delete-event and no update-event endpoint**, so the surface is
-create-event, upload-results, create-member, fetch-venue, fetch-event,
-fetch-all-events, search-players, fetch-all-members. **Every upstream correction is
-therefore a human action on vekn.net**, and a calendar entry, once created, cannot
-be edited through the API — an in-app edit to an already-pushed event never reaches
-vekn.net.
+**vekn.net** holds the member roster; BCP removed its legacy event calendar,
+event creation and event management pages, so Archon is the system of record for
+events and results. Its API surface is now member-only — `create-member`,
+`search-players`, `fetch-all-members` ([vekn integration](../vekn.md)) — until
+vekn.net registration closes.
 
 **The TWDA** — the Tournament Winning Deck Archive — is the public registry of
 winning decklists, hosted at `GiottoVerducci/TWD` on GitHub and mirrored as JSON

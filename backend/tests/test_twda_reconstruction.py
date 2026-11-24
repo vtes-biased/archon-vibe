@@ -39,10 +39,6 @@ def test_reconstruction_shape():
     # standings are prelim-only by contract. The size comes from the count.
     assert (t.standings[0].gw, t.standings[0].vp, t.standings[0].tp) == (0.0, 0.0, 0)
     assert t.reported_player_count == 42
-
-    # Never vekn_pushed_at — it would mean results were exchanged with vekn.net,
-    # and it trips the delete guard, permanently blocking cleanup of a bad row.
-    assert t.vekn_pushed_at is None
     assert t.external_ids == {"twda": "2007krakow"}
     # A one-row standings in a league would earn league points off a zero field.
     assert t.league_uid is None

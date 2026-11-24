@@ -37,7 +37,6 @@ from .ratings import (
     recompute_wins,
 )
 from .twda import maybe_submit_twda
-from .vekn_push import maybe_push_results
 
 logger = logging.getLogger(__name__)
 
@@ -356,11 +355,8 @@ async def apply_archon_import(
     broadcast_tournament_event=None,
     broadcast_user_event=None,
 ) -> ImportResult:
-    """Apply parsed+validated archon data to an existing tournament.
-
-    Builds tournament state directly (like vekn_tournament_sync.py) rather
-    than replaying events.
-    """
+    """Apply parsed+validated archon data to an existing tournament, building
+    state directly rather than replaying events."""
     user_by_number: dict[int, User] = {}
     unmatched: list[str] = []
 
@@ -535,7 +531,7 @@ async def apply_archon_import(
         )
 
     # Post-effects run outside the transaction — must not hold the row locked
-    # while pushing to VEKN or recomputing ratings.
+    # while recomputing ratings or submitting to TWDA.
     logger.info(
         f"Archon import completed for tournament {tournament_uid}: "
         f"{len(players_list)} players, {len(built_rounds)} rounds, "
@@ -563,7 +559,6 @@ async def apply_archon_import(
 
     try:
         await maybe_submit_twda(tournament)
-        await maybe_push_results(tournament)
     except Exception:
         logger.exception(f"Error in post-import effects for {tournament_uid}")
 

@@ -41,7 +41,13 @@ async def run(args: argparse.Namespace) -> int:
     os.environ["DATABASE_URL"] = args.dsn
     await db.init_db()
     try:
-        uids = await db.tournament_uids_without_event_code(datetime.now(UTC))
+        async with db.batch_read_connection() as conn:
+            result = await conn.execute(
+                """SELECT uid FROM objects
+                WHERE type = 'tournament' AND deleted_at IS NULL
+                  AND coalesce("full"->>'event_code', '') = ''"""
+            )
+            uids = [row[0] for row in await result.fetchall()]
         print(f"{len(uids)} tournaments without an event code")
         if not args.apply:
             async with db.get_connection() as conn:

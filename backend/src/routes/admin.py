@@ -73,29 +73,10 @@ async def trigger_vekn_sync(request: Request) -> dict:
     return _dispatch("member_sync", runner)
 
 
-@post("/sync-vekn-tournaments")
-async def trigger_vekn_tournament_sync(request: Request) -> dict:
-    """Returns immediately; the outcome lands in /admin/vekn-status under
-    tournament_sync.
-    """
-    manager = await get_current_user(request)
-    if not permissions.can_run_admin_sync(manager):
-        raise HTTPException(status_code=403, detail="Only IC can trigger sync")
-
-    runner = _runners.get("tournament_sync")
-    if not runner:
-        raise HTTPException(
-            status_code=503, detail="VEKN sync service is not available"
-        )
-
-    logger.info("Manual VEKN tournament sync dispatched via admin endpoint")
-    return _dispatch("tournament_sync", runner)
-
-
 @get("/vekn-status")
 async def vekn_status(request: Request) -> dict:
     """State is in-process (resets on restart); keys: member_sync,
-    tournament_sync, twda_sync, judge_sync, batch_push.
+    twda_sync, judge_sync, batch_push.
     """
     manager = await get_current_user(request)
     if not permissions.can_run_admin_sync(manager):
@@ -107,7 +88,7 @@ async def vekn_status(request: Request) -> dict:
 @post("/sync-twda-decks")
 async def trigger_twda_deck_import(request: Request) -> dict:
     """Returns immediately; the outcome lands on the vekn-status panel as
-    `twda_sync`, same as the two VEKN syncs.
+    `twda_sync`, same as the VEKN member sync.
     """
     manager = await get_current_user(request)
     if not permissions.can_run_admin_sync(manager):
@@ -186,7 +167,6 @@ router = Router(
     "/admin",
     route_handlers=[
         trigger_vekn_sync,
-        trigger_vekn_tournament_sync,
         vekn_status,
         trigger_twda_deck_import,
         trigger_judge_sync,

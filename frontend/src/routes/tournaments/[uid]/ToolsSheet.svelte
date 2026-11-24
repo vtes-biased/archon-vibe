@@ -18,7 +18,7 @@
   import { canSetArchivalResults } from "#lib/engine.ts";
   import { getAuthState } from "#lib/stores/auth.svelte.ts";
   import type { TournamentEventType } from "#lib/engine.ts";
-  import { ChevronDown, ChevronRight, X, Upload, CloudUpload, QrCode, Gift, Ticket, ClipboardCopy, Download, Undo2, Trash2, Image, TriangleAlert, ScrollText } from "@lucide/svelte";
+  import { ChevronDown, ChevronRight, X, Upload, QrCode, Gift, Ticket, ClipboardCopy, Download, Undo2, Trash2, Image, TriangleAlert, ScrollText } from "@lucide/svelte";
   import * as m from '#lib/paraglide/messages.js';
 
   type ActionItem = { label: string; icon?: Component<any>; onclick: () => void; disabled?: boolean };
@@ -41,7 +41,6 @@
     bannerItem,
     csvImportItem,
     archonImportItem,
-    syncVeknItem,
     canDelete,
     onFinishTournament,
     onDelete,
@@ -58,9 +57,6 @@
     bannerItem: ActionItem;
     csvImportItem: ActionItem;
     archonImportItem: ActionItem;
-    /** Carries its own group: the same row is "add to calendar" during Set up
-        and "report results" during Wrap up. */
-    syncVeknItem: (ActionItem & { group: GroupId }) | null;
     canDelete: boolean;
     onFinishTournament: () => void;
     onDelete: () => void;
@@ -75,12 +71,10 @@
   const raffleAvailable = $derived(
     tournament.state === "Waiting" || tournament.state === "Playing" || isFinished
   );
-  // Same shape the engine gates on: nothing played, and no vekn.net row whose
-  // nightly sync would overwrite the correction.
+  // Same shape the engine gates on: finished with no recorded play.
   const archivalCorrectable = $derived(
     isFinished
     && playedPlayerUids(tournament).size === 0
-    && !tournament.external_ids?.vekn
     && canSetArchivalResults(getAuthState().user).allowed
   );
 
@@ -255,7 +249,6 @@
           {#if hasRoster}
             {@render actionRow({ label: m.tools_export_players(), onclick: exportPlayers }, Download)}
           {/if}
-          {#if syncVeknItem?.group === "setup"}{@render actionRow(syncVeknItem, CloudUpload)}{/if}
         {/if}
 
         {@render groupHeader("door", m.tools_group_door())}
@@ -283,7 +276,6 @@
           {#if eventSanctions.length > 0}
             {@render actionRow({ label: m.tools_download_sanctions(), onclick: downloadSanctions }, Download)}
           {/if}
-          {#if syncVeknItem?.group === "wrapup"}{@render actionRow(syncVeknItem, CloudUpload)}{/if}
           {#if canFinishEarly}
             {@render actionRow({ label: m.overview_finish_tournament(), onclick: onFinishTournament, disabled: actionLoading }, TriangleAlert)}
           {/if}
@@ -325,7 +317,6 @@
 
 {#if showReopenConfirm}
   <ReopenConfirmModal
-    {tournament}
     {actionLoading}
     {doAction}
     onClose={() => (showReopenConfirm = false)}

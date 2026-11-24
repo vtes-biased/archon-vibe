@@ -623,8 +623,8 @@ class TournamentConfig(TournamentMinimal, kw_only=True):
     max_players: Annotated[
         int, msgspec.Meta(description="Soft cap on registrations. 0 means none.")
     ] = 0
-    # House (non-VEKN) event: per-player cap from a shared pool, never pushed to
-    # VEKN/ratings/RTP. Decoupled from max_rounds, which VEKN-push forces to 2-4.
+    # House (non-VEKN) event: per-player cap from a shared pool, excluded from
+    # ratings/RTP; decoupled from max_rounds, which standard events can also set.
     open_rounds: bool = False
     self_organized_rounds: bool = (
         False  # open rounds: registered players may seat their own pod
@@ -916,7 +916,7 @@ class Tournament(TournamentConfig, kw_only=True):
         str,
         msgspec.Meta(description="Uid of the winning member. Empty while undecided."),
     ] = ""
-    # engine-computed or VEKN-sync-populated; not cleared when rounds are empty.
+    # engine-computed or archival-import-populated; not cleared when rounds are empty.
     standings: list[Standing] = msgspec.field(default_factory=list)
     # Never `player_count`: league scoring already reads that key off a
     # synthesized summary object.
@@ -937,23 +937,6 @@ class Tournament(TournamentConfig, kw_only=True):
             description="Uid of the holder the event's promos are drawn from."
         ),
     ] = ""
-    vekn_pushed_at: Annotated[
-        datetime | None,
-        msgspec.Meta(
-            description="UTC instant the results were pushed to vekn.net. Null if "
-            "never pushed."
-        ),
-    ] = None
-    # sticky: results changed after vekn_pushed_at. The push is write-once, so
-    # only a manual admin fix clears it.
-    vekn_results_stale: bool = False
-    vekn_event_absent_at: Annotated[
-        datetime | None,
-        msgspec.Meta(
-            description="UTC instant the calendar scan last confirmed vekn.net "
-            "holds no event at this id. Null while the event still answers."
-        ),
-    ] = None
     twda_status: TwdaStatus | None = None  # organizer projection only
     offline_mode: bool = False
     offline_device_id: str = ""

@@ -46,9 +46,11 @@ from .models import (
     TournamentState,
 )
 from .ratings import recompute_wins
-from .vekn_api import LEGACY_PLACEHOLDER_SINCE
 
 logger = logging.getLogger(__name__)
+
+# Legacy archon filed events against GoblinTrader Mallorca from 2025 on.
+LEGACY_PLACEHOLDER_SINCE = "2025-01-01"
 
 TWDA_URL = "https://static.krcg.org/data/twda.json"
 # The scheduled task handles a delta: more than this many unsettled entries means
@@ -244,9 +246,7 @@ def reconstructed_tournament(
         city_geoname_id=city["geoname_id"] if city else None,
         state=TournamentState.FINISHED,
         max_rounds=int(rounds.group(1)) if rounds else 0,
-        # The archive's own file key. Never `vekn`: these have no vekn.net row,
-        # and never `vekn_pushed_at`, which would mean "we exchanged results with
-        # vekn.net" and would permanently block deleting a bad reconstruction.
+        # The archive's own file key — never `vekn`, since these have no vekn.net row.
         external_ids={"twda": entry.id},
         players=[
             Player(user_uid=winner_uid, state=PlayerState.FINISHED, finalist=True)

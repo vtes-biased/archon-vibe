@@ -3499,8 +3499,8 @@ fn test_update_config_rank_forbids_proxies() {
 
 #[test]
 fn test_update_config_v5_forbids_championship_rank() {
-    // No V5 championship type on vekn.net — reject from either side of the merged
-    // view; Limited championships stay legal.
+    // Only Standard and Limited can be championships (VEKN policy); reject from
+    // either side of the merged view.
     let actor = make_organizer();
     let ranked = |cfg: json::JsonValue| json::object! { type: "UpdateConfig", config: cfg };
 
@@ -3544,39 +3544,6 @@ fn test_update_config_finish_before_start() {
     assert_eq!(err.code(), "tournament.finish_before_start");
     assert!(run_event(&tournament, &patch("2026-06-01T10:00"), &actor).is_ok());
     assert!(run_event(&tournament, &patch("2026-06-01T18:00"), &actor).is_ok());
-}
-
-#[test]
-fn test_update_config_vekn_frozen_identity() {
-    // After VEKN publication rank/format/start are frozen; same-value writes
-    // and non-identity fields stay editable.
-    let mut tournament = make_tournament();
-    tournament["external_ids"] = json::object! { vekn: "12345" };
-    let event = json::object! {
-        type: "UpdateConfig",
-        config: { format: "V5" },
-    };
-    let actor = make_organizer();
-    let result = run_event(&tournament, &event, &actor);
-    assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("published to VEKN"));
-
-    // Same value + venue edit passes
-    let format = tournament["format"]
-        .as_str()
-        .unwrap_or("Standard")
-        .to_string();
-    let event = json::object! {
-        type: "UpdateConfig",
-        config: { format: format, venue: "New Venue" },
-    };
-    let result = run_event(&tournament, &event, &actor);
-    assert!(result.is_ok());
-    let updated = json::parse(&result.unwrap()).unwrap();
-    assert_eq!(updated["venue"].as_str(), Some("New Venue"));
 }
 
 #[test]
@@ -4513,10 +4480,7 @@ fn test_set_archival_results() {
 
     let mut linked = tournament.clone();
     linked["external_ids"] = json::object! { vekn: "12794" };
-    assert_eq!(
-        run_event(&linked, &event, &ic).unwrap_err(),
-        EngineError::ArchivalResultsVeknLinked
-    );
+    assert!(run_event(&linked, &event, &ic).is_ok());
 
     let short = json::object! {
         type: "SetArchivalResults",

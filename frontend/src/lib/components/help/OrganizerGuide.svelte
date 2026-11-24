@@ -24,7 +24,6 @@
     { q: m.og_faq_q_wrong_scores(), a: m.og_faq_a_wrong_scores() },
     { q: m.og_faq_q_need_finals(), a: m.og_faq_a_need_finals() },
     { q: m.og_faq_q_staggered(), a: m.og_faq_a_staggered() },
-    { q: m.og_faq_q_vekn_push(), a: m.og_faq_a_vekn_push() },
     { q: m.og_faq_q_delete(), a: m.og_faq_a_delete() },
     { q: m.og_faq_q_remove_vs_drop(), a: m.og_faq_a_remove_vs_drop() },
     { q: m.og_faq_q_dq(), a: m.og_faq_a_dq() },

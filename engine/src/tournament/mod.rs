@@ -2855,29 +2855,6 @@ fn apply_event(
 
             validate_config_fields(config)?;
 
-            // rank/format/start freeze once VEKN-published: calendar create and results
-            // push are both write-once, so a later edit would silently diverge from vekn.net.
-            let vekn_id = tournament[tournament::EXTERNAL_IDS][arg::VEKN]
-                .as_str()
-                .unwrap_or("");
-            if !vekn_id.is_empty() {
-                for field in [
-                    tournament_config::RANK,
-                    tournament_config::FORMAT,
-                    tournament_config::START,
-                ] {
-                    // String compare with null ≡ "" (the form posts "" for "no rank")
-                    if config.has_key(field)
-                        && config[field].as_str().unwrap_or("")
-                            != tournament[field].as_str().unwrap_or("")
-                    {
-                        return Err(EngineError::VeknFrozenField {
-                            field: field.to_string(),
-                        });
-                    }
-                }
-            }
-
             // Only when the edit touches one of the four keys, on the merged view — an
             // already-illegal stored combo (legacy import) must not block unrelated edits.
             if config.has_key(tournament_config::RANK)
@@ -2996,15 +2973,6 @@ fn apply_event(
             // must never overwrite one.
             if crate::ratings::players_with_rounds(tournament) != 0 {
                 return Err(EngineError::ArchivalResultsHasPlay);
-            }
-            // The nightly calendar sync rebuilds any rounds-less vekn-linked row
-            // from upstream, so the correction would vanish on its next run.
-            if !tournament[tournament::EXTERNAL_IDS][arg::VEKN]
-                .as_str()
-                .unwrap_or("")
-                .is_empty()
-            {
-                return Err(EngineError::ArchivalResultsVeknLinked);
             }
             if !players.iter().any(|p| p == winner) {
                 return Err(EngineError::ArchivalResultsWinnerNotListed);

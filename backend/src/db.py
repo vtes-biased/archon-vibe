@@ -1230,29 +1230,6 @@ async def resolve_event_code(
     raise RuntimeError("event code space exhausted")
 
 
-async def ensure_event_code(uid: str) -> BroadcastData | None:
-    """Stamp the handle on a row that has none. Returns None when it already had
-    one — the code is written once, so this can never overwrite."""
-    async with tournament_transaction(uid) as (fresh, tx_conn):
-        if not fresh or fresh.event_code:
-            return None
-        fresh.event_code = await resolve_event_code(fresh, tx_conn)
-        fresh.modified = datetime.now(UTC)
-        return await save_tournament(fresh, conn=tx_conn)
-
-
-async def tournament_uids_without_event_code(before: datetime) -> list[str]:
-    async with batch_read_connection() as conn:
-        result = await conn.execute(
-            """SELECT uid FROM objects
-            WHERE type = 'tournament' AND deleted_at IS NULL
-              AND coalesce("full"->>'event_code', '') = ''
-              AND modified_at < %s""",
-            (before,),
-        )
-        return [row[0] for row in await result.fetchall()]
-
-
 # Same-event matcher for two import paths with no shared key. Name+day is NOT
 # an identity key alone — legacy placeholder names collide, so a hit is candidate evidence only.
 SAME_EVENT_QUERY = """
@@ -1293,22 +1270,6 @@ async def find_same_event_tournaments(
     return found
 
 
-VEKN_ABSENCE_CANDIDATES_QUERY = """
-    SELECT "full" FROM objects
-    WHERE type = 'tournament'
-      AND deleted_at IS NULL
-      AND ("full"->'external_ids'->>'vekn' = ANY(%s::text[])
-           OR "full"->>'vekn_event_absent_at' IS NOT NULL)
-"""
-
-
-async def find_vekn_absence_candidates(absent_ids: list[str]) -> list[Tournament]:
-    """Live tournaments holding one of `absent_ids`, plus every flagged row."""
-    async with get_connection() as conn:
-        result = await conn.execute(VEKN_ABSENCE_CANDIDATES_QUERY, (absent_ids,))
-        return [decode_json(row[0], Tournament) for row in await result.fetchall()]
-
-
 # Live copies of one event where only SOME hold a vekn id. The mixed-vekn filter
 # is load-bearing — without it, legacy placeholder names flood every result.
 DUPLICATE_GROUPS_QUERY = """
@@ -1338,39 +1299,6 @@ async def find_duplicate_tournament_groups() -> list[dict]:
         result = await conn.execute(DUPLICATE_GROUPS_QUERY)
         return [
             {"name": row[2], "day": row[1], "uids": row[3], "with_vekn": row[4]}
-            for row in await result.fetchall()
-        ]
-
-
-# Same-name/same-day groups where EVERY copy holds a different vekn id — usually
-# distinct events sharing a placeholder name; feeds the dedup script, never the sync's logging.
-BOTH_VEKN_GROUPS_QUERY = """
-    WITH t AS (
-        SELECT uid,
-               btrim("full"->>'name') AS name,
-               ("full"->>'start')::timestamptz AS start,
-               "full"->'external_ids'->>'vekn' AS vekn
-        FROM objects
-        WHERE type = 'tournament'
-          AND deleted_at IS NULL
-          AND "full"->>'start' IS NOT NULL
-    )
-    SELECT lower(name) AS key, (start AT TIME ZONE 'UTC')::date AS day,
-           min(name) AS name, array_agg(uid ORDER BY uid) AS uids
-    FROM t
-    GROUP BY 1, 2
-    HAVING count(*) > 1
-       AND count(vekn) = count(*)
-       AND count(DISTINCT vekn) > 1
-"""
-
-
-async def find_both_vekn_tournament_groups() -> list[dict]:
-    """Live same-event copies that all hold different vekn ids (see query comment)."""
-    async with get_connection() as conn:
-        result = await conn.execute(BOTH_VEKN_GROUPS_QUERY)
-        return [
-            {"name": row[2], "day": row[1], "uids": row[3]}
             for row in await result.fetchall()
         ]
 

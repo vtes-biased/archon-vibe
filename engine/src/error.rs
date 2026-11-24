@@ -90,7 +90,6 @@ pub enum EngineError {
     MultideckLockedRounds,
     FormatForbidsRank,
     FormatForbidsDecks,
-    VeknFrozenField { field: String },
     DeckNoCards,
     SeatingMinPlayers,
     SeatingMinRounds,
@@ -100,7 +99,6 @@ pub enum EngineError {
     SelfOrganizeIneligible { player: String },
     ArchivalResultsForbidden,
     ArchivalResultsHasPlay,
-    ArchivalResultsVeknLinked,
     ArchivalResultsWinnerNotListed,
     ArchivalResultsCountBelowRoster { reported: usize, listed: usize },
     Internal { detail: String },
@@ -201,7 +199,6 @@ impl EngineError {
             MultideckLockedRounds => "tournament.multideck_locked_rounds",
             FormatForbidsRank => "tournament.format_forbids_rank",
             FormatForbidsDecks => "tournament.format_forbids_decks",
-            VeknFrozenField { .. } => "tournament.vekn_frozen_field",
             DeckNoCards => "deck.no_cards",
             SeatingMinPlayers => "seating.min_players",
             SeatingMinRounds => "seating.min_rounds",
@@ -211,7 +208,6 @@ impl EngineError {
             SelfOrganizeIneligible { .. } => "tournament.self_organize_ineligible",
             ArchivalResultsForbidden => "tournament.archival_results_forbidden",
             ArchivalResultsHasPlay => "tournament.archival_results_has_play",
-            ArchivalResultsVeknLinked => "tournament.archival_results_vekn_linked",
             ArchivalResultsWinnerNotListed => "tournament.archival_results_winner_not_listed",
             ArchivalResultsCountBelowRoster { .. } => {
                 "tournament.archival_results_count_below_roster"
@@ -237,7 +233,6 @@ impl EngineError {
                 ("max", max.to_string()),
                 ("completed", completed.to_string()),
             ],
-            VeknFrozenField { field } => vec![("field", field.clone())],
             ArchivalResultsCountBelowRoster { reported, listed } => vec![
                 ("reported", reported.to_string()),
                 ("listed", listed.to_string()),
@@ -419,19 +414,12 @@ impl fmt::Display for EngineError {
             }
             FormatForbidsRank => write!(
                 f,
-                "Only Standard and Limited events can be National or Continental \
-                 championships: vekn.net has no championship event type for the \
-                 other formats, so the results could never be reported"
+                "Only Standard and Limited events can be National or Continental championships"
             ),
             FormatForbidsDecks => write!(
                 f,
                 "Storyline events take no decklist: they run under per-storyline \
                  special rules and custom cards no decklist can express"
-            ),
-            VeknFrozenField { field } => write!(
-                f,
-                "Cannot change {} after the event is published to VEKN",
-                field
             ),
             DeckNoCards => write!(f, "No cards found in deck list"),
             SeatingMinPlayers => write!(f, "At least 4 players required"),
@@ -458,10 +446,6 @@ impl fmt::Display for EngineError {
             ArchivalResultsHasPlay => write!(
                 f,
                 "This event has recorded results — correct them through the rounds and finals"
-            ),
-            ArchivalResultsVeknLinked => write!(
-                f,
-                "This event is linked to vekn.net, which would overwrite the correction on its next sync"
             ),
             ArchivalResultsWinnerNotListed => {
                 write!(f, "The winner must be one of the listed players")

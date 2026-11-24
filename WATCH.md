@@ -22,28 +22,21 @@ dropped, and waiting is not exemption from that verdict. Actions a deploy unlock
 are not here: they wait on a release, not a trigger, in
 [post-deploy](docs/post-deploy.md).
 
-## VEKN stage 1 — the tournament calendar sync retires
+## VEKN stage 1 — post-deploy curation and TWDA retirement
 
-- **When**: VEKN greenlights it and `sync_all_tournaments` stops
-  ([vekn](docs/vekn.md#stage-1--the-tournament-calendar-retires-on-the-greenlight)).
-  Until then the sync's full rebuild re-creates anything deleted locally and wipes
-  anything corrected, which is what makes each ask unfixable today.
-- **Check**: whether the stage-1 split has landed and the calendar sync no longer
-  runs on production.
+- **When**: Stage 1 (tournament calendar sync retirement) is deployed on
+  production ([vekn](docs/vekn.md#decommission)). Until then the live production
+  sync can still re-create deleted rows or overwrite archival corrections.
+- **Check**: whether the Stage 1 commit is deployed on production.
 - **Fired**: each ask below goes through `/intake` as its own line, with its
   evidence section in [vekn-decommission](docs/vekn-decommission.md).
   - Clean up the all-live duplicate tournaments by soft-delete plus vekn-id
     transplant. Done when each group in
     [duplicate tournament cleanup](docs/vekn-decommission.md#duplicate-tournament-cleanup)
     has one live copy.
-  - Give ICs a capability to delete or withdraw a tournament that still exists on
-    vekn.net (gh-6). Done when an IC can remove a mistaken event, every entry in
+  - Delete the mistaken historical rows in
     [events to delete](docs/vekn-decommission.md#ic-record-curation--events-to-delete)
-    is gone, and the frontend no longer offers Delete on an offline-locked
-    tournament, which the API refuses today.
-  - Delete the `ArchivalResultsVeknLinked` guard in `engine/src/tournament/`. Done
-    when an IC can correct a rounds-less row carrying `external_ids['vekn']` and the
-    correction survives a full sync run.
+    now that ICs can delete any event. Done when every listed entry is gone.
   - Settle the winner on the rows in
     [disagree about who won](docs/vekn-decommission.md#ic-record-curation--rows-that-disagree-with-the-archive-about-who-won)
     and correct whichever side is wrong. Done when each row's `winner` matches the
@@ -54,11 +47,6 @@ are not here: they wait on a release, not a trigger, in
     survivor as `external_ids.twda_entry`; a distinct event stays live and is
     recorded as such. Done when no pair is ambiguous and the mixed-vekn class of
     `dedup_tournaments.py` reports only pairs it can propose.
-  - Make `POST /api/tournaments` stamp its event code inline like every other
-    creation path, and delete `_stamp_missing_event_codes` with its query. Done when
-    a tournament created through the route carries a code in the same save, and
-    [architecture](docs/architecture.md#the-short-event-code) no longer describes a
-    boot sweep.
   - Delete the scheduled `run_twda_sync` and its row in
     [architecture](docs/architecture.md#scheduled-background-tasks), keeping
     `backfill_twda.py` as the manual reconciliation. Done when no scheduled job
@@ -75,38 +63,6 @@ are not here: they wait on a release, not a trigger, in
   the roles match it. Never a blind union, which would republish superseded
   officials' contact details and seat two coordinators in two countries.
 
-## The VEKN admins correct the calendar entries
-
-- **When**: the VEKN admins report the entries in
-  [the results stuck on the round count](docs/vekn-decommission.md#push-the-results-stuck-on-the-calendars-round-count)
-  corrected.
-- **Check**: their answer, or a live read of a few listed entries through beta's
-  VEKN client.
-- **Fired**: through `/intake`, as a line with a production step. Per stamped event
-  whose entry is fixed, read the report before writing:
-
-  ```sh
-  … /opt/archon/backend/scripts/fix_stuck_vekn_push.py --vekn <id>
-  … fix_stuck_vekn_push.py --vekn <id> --apply
-  ```
-
-  Done when the first hourly batch after it pushes every finished entry listed,
-  the unstamped ones on their own and the stamped ones once cleared, and none logs
-  the round-count refusal again. Approval publishes, so expect them pending on
-  vekn.net until an official works the queue.
-
-## The VEKN API maintainers answer on the 15 placements
-
-- **When**: the maintainers answer the 2026-08-24 report of
-  [15 events placed in the old push order](docs/vekn.md#placements-handed-to-the-vekn-api-maintainers),
-  or a re-run of `backend/scripts/audit_vekn_placement.py` shows the 15 agreeing.
-- **Check**: the re-run of the audit.
-- **Fired**: check the ratings a day later, since whether upstream re-derives
-  points from a corrected `pos` is
-  [unestablished](docs/domain/vekn.md#never-chase-veknnets-stored-rtp). If the
-  ratings did not follow, the winner holds the loser's rating, and that goes
-  through `/intake` as its own line.
-
 ## The Rules Director answers on no-final rating credit
 
 - **When**: the Rules Director answers the
@@ -115,9 +71,8 @@ are not here: they wait on a release, not a trigger, in
 - **Fired**: through `/intake` — record the answers in `docs/domain/` (§3.1.6's
   reading in [tournament rules](docs/domain/tournament-rules.md), the A.2/A.2.1
   credit in [VEKN](docs/domain/vekn.md)), then change the engine or keep the
-  shipped stance, citing the ruling. `FinishTournament`, `vekn_tournament_sync` and
-  `archon_import.py` must end up saying the same thing. Q5, on push encoding, must
-  be answered while the vekn.net API still responds.
+  shipped stance, citing the ruling. `FinishTournament` and `archon_import.py`
+  must end up saying the same thing.
 
 ## The two-player format becomes official
 

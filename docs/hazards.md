@@ -188,8 +188,8 @@ type annotation.
 **The DQ signal is two signals** — `player.state == "Disqualified"` **or** an active
 disqualification sanction. Audit every consumer for the combined signal, and make
 any DQ create, lift or delete recompute standings. A **producer** owes both halves:
-the VEKN sync writes an imported `dq` onto the standings row *and* the player state,
-because the rating path reads the state and the placement path reads the row. The
+historical VEKN imports carry an imported `dq` on the standings row *and* the player
+state, because the rating path reads the state and the placement path reads the row. The
 sanction half is **scoped to its own event**, and only the payload's producer can
 scope it: the engine matches a DQ on user and level alone, so any list handed to it
 that carries another tournament's DQ zeroes that player here too.
@@ -209,11 +209,11 @@ and `level` labels, all set in the Fluent Bit config and the loop. Five of the s
 rules treat no data as fine, so a rename on the Fluent Bit side silences them
 rather than firing — only the silent-host rule notices, and only a change to
 `instance`. A rename there lands with the same rename in `deploy/grafana.py`,
-re-applied. The **VEKN push** tables also parse the backend's own `VEKN push
-failed:` line shape, and a drift there reads as "Nothing failing", an all-clear.
+re-applied. The **VEKN push** table also parses the backend's own `VEKN push
+failed: member=` line shape, and a drift there reads as "Nothing failing", an all-clear.
 
 **Proxy players are excluded-but-not-zeroed**, the inverse of DQ. Consumers
-iterating standings unfiltered — league scoring and the VEKN push among them —
+iterating standings unfiltered — league scoring among them —
 leak proxy scores. Filter on `disqualified || non_competing`.
 
 **No-show is the third excluded class, and it is derived, not stored.**
@@ -222,10 +222,8 @@ sheet, so a consumer filtering `disqualified || non_competing` over stored rows
 never sees it. Every consumer of a **placement** must take all three:
 `_final_positions` in `ratings.py`, `final_place` in `league.rs` — where a tail rank
 *is* GP points, so league scoring skips the class outright alongside DQ and proxy —
-the frontend, which derives them once as `StandingEntry.unplaced` in
-`computeStandings`, and the VEKN push, whose placement field takes the archive's own
-`DQ`/`WD` flag for the first two and drops the proxy
-([vekn](vekn.md#archondata-format)). A rank rendered off the raw flags puts a number
+and the frontend, which derives them once as `StandingEntry.unplaced` in
+`computeStandings`. A rank rendered off the raw flags puts a number
 on a no-show.
 The atom has two readings and they are **not** interchangeable. `players_with_rounds`'
 round-less branch in `engine/src/ratings.rs` answers *was this row in the field that
@@ -336,11 +334,10 @@ whole historic corpus. Measuring `len(rounds)` and reading it as a count has
 already produced one confidently wrong conclusion about the archive.
 
 **`external_ids['twda']` means *reconstructed from the archive*, not *linked to
-it*.** Eight unrelated decisions read it that way, from the VEKN adopt carve-out to
-the TWDA submitter's skip, so an event we already held that the archive also
-describes carries `twda_entry` instead — [vekn](vekn.md#inbound) enumerates them,
-with the tournament sync's legacy-sheet fill, the one reader that takes either key
-alike.
+it*.** Six unrelated decisions read it that way, from the Hall of Fame's
+no-attestation grandfather to the TWDA submitter's skip, so an event we already held
+that the archive also describes carries `twda_entry` instead —
+[vekn](vekn.md#inbound) enumerates them.
 
 **The legacy merge recognises a deck only by its own uid.** `migrate_from_archon.py
 --merge` derives a deck's uid from the tournament, the old player and the round,

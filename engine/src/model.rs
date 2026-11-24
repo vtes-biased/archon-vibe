@@ -131,7 +131,6 @@ pub mod arg {
     pub const UNRECOGNIZED_LINES: &str = "unrecognized_lines";
     pub const USER_UID: &str = "user_uid";
     pub const V5: &str = "v5";
-    pub const VEKN: &str = "vekn";
     pub const VEKN_ID: &str = "vekn_id";
     pub const VP: &str = "vp";
     pub const VPS: &str = "vps";
@@ -258,7 +257,6 @@ pub mod tournament {
     pub const DECKLIST_REQUIRED: &str = "decklist_required";
     pub const DECKLISTS_MODE: &str = "decklists_mode";
     pub const DESCRIPTION: &str = "description";
-    pub const EXTERNAL_IDS: &str = "external_ids";
     pub const FINALS: &str = "finals";
     pub const FINALS_TIME: &str = "finals_time";
     pub const FINISH: &str = "finish";

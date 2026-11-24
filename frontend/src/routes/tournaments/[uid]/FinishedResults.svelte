@@ -95,16 +95,6 @@
        bonus reads as a rule, not a bug -->
   <RankedBadge {tournament} variant="note" />
 
-  <!-- Out-of-sync explanation inline (the header badge's title= is hover-only,
-       unreadable on touch — the organizer at the venue is exactly who needs it) -->
-  {#if tournament.vekn_results_stale}
-    <InlineNotice tone="warn" icon={TriangleAlert}>{m.vekn_out_of_sync_hint()}</InlineNotice>
-  {/if}
-
-  {#if tournament.vekn_event_absent_at}
-    <InlineNotice tone="warn" icon={TriangleAlert}>{m.vekn_event_absent_hint()}</InlineNotice>
-  {/if}
-
   <!-- TWDA outcome: the auto-submission is otherwise invisible — tell the
        organizer what happened to the winner's deck (and why, when skipped) -->
   {#if tournament.twda_status}

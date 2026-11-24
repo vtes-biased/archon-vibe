@@ -4,7 +4,6 @@
   import * as m from '#lib/paraglide/messages.js';
   import {
     syncVeknMembers,
-    syncVeknTournaments,
     syncTwdaDecks,
     syncJudges,
     getVeknStatus,
@@ -25,7 +24,6 @@
 
   const statusJobs: { key: string; label: () => string }[] = [
     { key: 'member_sync', label: m.admin_status_member_sync },
-    { key: 'tournament_sync', label: m.admin_status_tournament_sync },
     { key: 'twda_sync', label: m.admin_status_twda_sync },
     { key: 'judge_sync', label: m.admin_status_judge_sync },
     { key: 'batch_push', label: m.admin_status_batch_push },
@@ -76,13 +74,6 @@
       desc: m.admin_sync_vekn_desc(),
       confirmBody: m.admin_sync_vekn_confirm(),
       run: syncVeknMembers,
-    },
-    {
-      key: 'vekn-tournaments',
-      label: m.admin_sync_vekn_tournaments_label(),
-      desc: m.admin_sync_vekn_tournaments_desc(),
-      confirmBody: m.admin_sync_vekn_tournaments_confirm(),
-      run: syncVeknTournaments,
     },
     {
       key: 'twda',

@@ -71,7 +71,6 @@
   const countries = getSortedCountries();
   const timezones = Intl.supportedValuesOf("timeZone");
   const auth = $derived(getAuthState());
-  const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
 
   let allActiveLeagues = $state<League[]>([]);
   $effect(() => {
@@ -99,8 +98,6 @@
   const creating = mode === "create";
   let basicsOpen = $state(creating);
   let locationOpen = $state(creating);
-  // Open at creation unlike the other optional sections: these fields freeze on
-  // the VEKN push, which fires at creation.
   let roundsOpen = $state(creating);
   let visibilityOpen = $state(false);
   let descriptionOpen = $state(false);
@@ -130,12 +127,7 @@
 
   function handleOpenRoundsToggle(checked: boolean) {
     if (!checked) {
-      // Back to a standard tournament: self-organize is open-rounds-only. The VEKN
-      // build needs a valid 2–4 round count; house tournaments accept any cap, keep it.
       values.self_organized_rounds = false;
-      if (veknPush && !(values.max_rounds >= 2 && values.max_rounds <= 4)) {
-        values.max_rounds = 3;
-      }
     }
     // Persist open_rounds last so the parent can read the coerced sibling fields.
     handleInput("open_rounds", checked);
@@ -187,9 +179,7 @@
         disabled={disabled || disabledFields.has("format")}
         onchange={(e) => {
           const format = (e.target as HTMLSelectElement).value;
-          // vekn.net has a championship event type for Standard and Limited only
-          // (engine-enforced). Clear locally only — persistence is the parent's,
-          // same as the rank clears below.
+          // Clear locally only — persistence is the parent's, same as the rank clears below.
           if (format === "V5" || format === "Storyline") values.rank = "";
           handleInput("format", format);
         }}
@@ -200,9 +190,7 @@
         <option value="Limited">Limited</option>
         <option value="Storyline">Storyline</option>
       </select>
-      {#if disabledFields.has("format")}
-        <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
-      {:else if values.format === "Storyline"}
+      {#if values.format === "Storyline"}
         <p class="text-xs text-ink-faint mt-1">{m.tfield_format_storyline_hint()}</p>
       {/if}
     </div>
@@ -228,9 +216,7 @@
         <option value="National Championship">National Championship</option>
         <option value="Continental Championship">Continental Championship</option>
       </select>
-      {#if disabledFields.has("rank")}
-        <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
-      {:else if values.format === "V5"}
+      {#if values.format === "V5"}
         <p class="text-xs text-ink-faint mt-1">{m.tfield_rank_v5_hint()}</p>
       {:else if values.format === "Storyline"}
         <p class="text-xs text-ink-faint mt-1">{m.tfield_rank_storyline_hint()}</p>
@@ -276,9 +262,6 @@
         onchange={(e) => handleInput("start", (e.target as HTMLInputElement).value)}
         class="w-full px-3 py-2 text-sm bg-surface-card border rounded-lg text-ink-bright focus:outline-none {values.start ? 'border-line-strong focus:border-line-strong' : 'border-accent-strong/50 focus:border-accent'}"
       />
-      {#if disabledFields.has("start")}
-        <p class="text-xs text-ink-faint mt-1">{m.tfield_vekn_locked_hint()}</p>
-      {/if}
     </div>
     <div>
       <label class="block text-sm text-ink-muted mb-1" for={id("finish")}>{m.tfield_finish()}</label>
@@ -324,8 +307,6 @@
       </label>
       {#if values.rank}
         <p class="text-xs text-ink-faint ml-8 -mt-2">{m.tfield_ranked_no_proxies_hint()}</p>
-      {:else if disabledFields.has("proxies")}
-        <p class="text-xs text-ink-faint ml-8 -mt-2">{m.tfield_vekn_locked_hint()}</p>
       {/if}
     {/if}
     <label class="flex items-center gap-3 {disabled || values.rank ? '' : 'cursor-pointer'}">
@@ -527,18 +508,12 @@
         onchange={(e) => handleInput("max_rounds", parseInt((e.target as HTMLSelectElement).value))}
         class="w-full px-3 py-2 min-h-[44px] text-sm bg-surface-card border border-line-strong rounded-lg text-ink-bright"
       >
-        {#if !values.open_rounds && veknPush}
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-        {:else}
-          <option value="0">{m.tfield_max_rounds_no_limit()}</option>
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5">5</option>
-        {/if}
+        <option value="0">{m.tfield_max_rounds_no_limit()}</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
       </select>
       <p class="text-xs text-ink-faint mt-1">{m.tfield_rounds_prelim_hint()}</p>
       {#if disabledFields.has("max_rounds")}

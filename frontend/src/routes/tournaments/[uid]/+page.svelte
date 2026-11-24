@@ -2,14 +2,14 @@
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
   import { untrack } from "svelte";
-  import { deleteTournamentApi, syncTournamentVekn, qrCheckin } from "#lib/api.ts";
+  import { deleteTournamentApi, qrCheckin } from "#lib/api.ts";
   import { tournamentAction, setTableScore } from "#lib/tournament-actions.ts";
   import { getCountries, getCountryFlag } from "#lib/geonames.ts";
   import { getAuthState, setAgendaEntry } from "#lib/stores/auth.svelte.ts";
   import { agendaViewer, filterAgenda, agendaToggleEntry } from "#lib/agenda.ts";
-  import { canTakeTournamentOffline, canForceUnlockTournament } from "#lib/engine.ts";
+  import { canTakeTournamentOffline, canForceUnlockTournament, canDeleteFinishedTournament } from "#lib/engine.ts";
   import { syncManager, storesWhole } from "#lib/sync.ts";
-  import { getUser, getTournament, getTournamentContextSanctions, getDeviceId, getDecksByTournamentGrouped, getLeague, saveTournament } from "#lib/db.ts";
+  import { getUser, getTournament, saveTournament, getTournamentContextSanctions, getDeviceId, getDecksByTournamentGrouped, getLeague } from "#lib/db.ts";
   import type { Tournament, TournamentState, User, Sanction, DeckObject } from "#lib/types.ts";
   import { attestedPlayerCount, finalsQualification, rankingEligibility, validateDeck, isOrganizer as engineIsOrganizer, type TournamentEventType, type ValidationError } from "#lib/engine.ts";
   import { getStateTone, translateTournamentState, rankBadgeLabel, computeStandings, eventUrl, type PlayerInfoMap } from "#lib/tournament-utils.ts";
@@ -17,7 +17,7 @@
   import { isOffline, goOffline, goOnline, forceTakeover, forceUnlock, getLastSyncTime, OfflineLockLostError } from "#lib/stores/offline.svelte.ts";
   import { isBrowserOnline } from "#lib/stores/connectivity.svelte.ts";
   import { openLastView } from "#lib/last-view.ts";
-  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Wrench, Settings2, ExternalLink, MapPin, Upload, CloudUpload, Share2, CalendarPlus, BookmarkPlus, BookmarkMinus } from "@lucide/svelte";
+  import { ArrowLeft, Loader2, WifiOff, Wifi, Lock, Shield, User as UserIcon, TriangleAlert, Users, Swords, Trophy, Wrench, Settings2, ExternalLink, MapPin, Upload, Share2, CalendarPlus, BookmarkPlus, BookmarkMinus } from "@lucide/svelte";
   import FoldableSection from "#lib/components/FoldableSection.svelte";
   import { renderMarkdown, stripLeadingTitle } from "#lib/markdown.ts";
   import Button from "#lib/components/Button.svelte";
@@ -70,13 +70,11 @@ import TournamentModals from "./TournamentModals.svelte";
   const isOrganizer = $derived(
     tournament ? engineIsOrganizer(auth.user, tournament) : false
   );
-  const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
-  // Once external_ids.vekn or vekn_pushed_at exist, deleting here would orphan
-  // the vekn.net record — unless the scan confirmed that record is gone.
-  // Mirrors the server gate in tournaments.py.
   const canDelete = $derived(
-    (!tournament?.external_ids?.vekn && !tournament?.vekn_pushed_at)
-      || !!tournament?.vekn_event_absent_at
+    !!tournament
+      && isOrganizer
+      && !tournament.offline_mode
+      && (tournament.state !== "Finished" || canDeleteFinishedTournament(auth.user).allowed)
   );
   const deleteHasResults = $derived((tournament?.rounds?.length ?? 0) > 0);
   const currentPlayerEntry = $derived(
@@ -134,9 +132,9 @@ import TournamentModals from "./TournamentModals.svelte";
   // roster holds the winner alone and whose field size is whatever the source
   // attested. Same predicate that gates `SetArchivalResults` on the write side.
   const noPlayData = $derived(!!tournament && rankingEligibility(tournament) === "no_results");
-  // The badge speaks for the archive specifically, and the `twda` key survives
-  // adoption — `_adopt_same_event` overwrites such a row with the full VEKN result
-  // set and keeps the key — so the key alone does not make a row archival.
+  // The badge speaks for the archive specifically, and historical adoption kept
+  // the `twda` key when overwriting a reconstruction with a full VEKN sheet, so
+  // the key alone does not make a row archival.
   const archival = $derived(!!tournament?.external_ids?.twda && noPlayData);
 
   let leagueName = $state<string | null>(null);
@@ -333,48 +331,6 @@ import TournamentModals from "./TournamentModals.svelte";
   // Archon import lives in the action-bar More menu across every organizer state.
   const archonImportItem = $derived({ label: m.archon_import_title(), icon: Upload, onclick: () => (showArchonImport = true) });
   const csvImportItem = $derived({ label: m.csv_import_title(), icon: Upload, onclick: () => (showCsvImport = true) });
-
-  let syncingVekn = $state(false);
-  // VEKN needs a round count to register an event: require it configured (a
-  // running/finished event already has rounds; a Planned one needs max_rounds).
-  const roundsConfigured = $derived(
-    (tournament?.rounds?.length ?? 0) > 0 || (tournament?.max_rounds ?? 0) > 0
-  );
-  async function doSyncVekn() {
-    if (!tournament || syncingVekn) return; // guard double-click: avoids a duplicate VEKN event
-    if (!roundsConfigured) {
-      // Stay visible + explain rather than silently disappear (mobile has no hover).
-      showToast({ type: 'error', message: m.vekn_sync_rounds_required() });
-      return;
-    }
-    syncingVekn = true;
-    try {
-      const updated = await syncTournamentVekn(tournament.uid);
-      await saveTournament(updated);
-      showToast({ type: 'success', message: m.vekn_sync_success() });
-    } catch (e) {
-      showToast({ type: 'error', message: toUserMessage(e, m.vekn_sync_error()) });
-    } finally {
-      syncingVekn = false;
-    }
-  }
-  // One endpoint, two jobs: register the calendar event, then (once finished)
-  // push results + the winner's TWDA deck. Label and Tools group are decided
-  // together, so the row can never contradict what it calls itself.
-  const syncVeknItem = $derived.by(() => {
-    if (!veknPush || tournament?.open_rounds || tournament?.self_organized_rounds) return null;
-    const onCalendar = !!tournament?.external_ids?.vekn;
-    // Nothing left to publish once the calendar entry exists and results are in.
-    if (onCalendar && !(tournament?.state === "Finished" && !tournament?.vekn_pushed_at)) return null;
-    return {
-      label: onCalendar ? m.vekn_report_results() : m.vekn_add_to_calendar(),
-      group: (onCalendar ? "wrapup" : "setup") as "setup" | "wrapup",
-      icon: CloudUpload,
-      onclick: () => doSyncVekn(),
-      disabled: actionLoading || syncingVekn,
-    };
-  });
-
 
   function playerUidsOf(t: Tournament | null | undefined): string[] {
     return (t?.players ?? []).map(p => p.user_uid).filter((u): u is string => !!u);
@@ -814,13 +770,6 @@ import TournamentModals from "./TournamentModals.svelte";
               {#if archival}
                 <Badge title={m.tournament_archival_hint()}>{m.tournament_archival()}</Badge>
               {/if}
-              {#if tournament.external_ids?.vekn}
-                <Badge kind="link" external
-                       href="https://www.vekn.net/event-calendar/event/{tournament.external_ids.vekn}"
-                       title={m.tournament_vekn_link_title()}>
-                  VEKN <ExternalLink class="w-3 h-3" aria-hidden="true" />
-                </Badge>
-              {/if}
               {#if tournament.league_uid && leagueName}
                 <Badge kind="link" tone="blue" truncate href="/leagues/{tournament.league_uid}">
                   {leagueName}
@@ -856,8 +805,6 @@ import TournamentModals from "./TournamentModals.svelte";
                 {#if tournament.event_code}
                   <div class="text-ink-bright font-mono">{tournament.event_code}</div>
                 {:else}
-                  <!-- Assigned once the VEKN push resolves, so this can linger for a
-                       minute when vekn.net is slow. Nothing waits on it. -->
                   <div class="text-ink-faint italic">{m.tournament_info_code_pending()}</div>
                 {/if}
               </div>
@@ -1081,7 +1028,6 @@ import TournamentModals from "./TournamentModals.svelte";
     {bannerItem}
     {csvImportItem}
     {archonImportItem}
-    {syncVeknItem}
     {canDelete}
     onFinishTournament={() => (showFinishConfirm = true)}
     onDelete={() => (showDeleteConfirm = true)}
@@ -1095,7 +1041,6 @@ import TournamentModals from "./TournamentModals.svelte";
   <FinishConfirmModal
     {tournament}
     {standings}
-    {playerInfo}
     {decksByUser}
     {actionLoading}
     onConfirm={async () => { await doAction("FinishTournament"); showFinishConfirm = false; showTools = false; }}

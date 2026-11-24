@@ -46,7 +46,6 @@ from .db import (
     close_db,
     compute_access_version,
     delete_sanction_hard,
-    ensure_event_code,
     get_connection,
     get_expired_sanctions,
     get_league_public_projection,
@@ -59,7 +58,6 @@ from .db import (
     purge_deleted_objects,
     save_sanction,
     stream_objects_new,
-    tournament_uids_without_event_code,
 )
 from .db_oauth import cleanup_expired_oauth_codes, cleanup_expired_oauth_tokens
 from .engine_errors import EngineRejection
@@ -104,7 +102,6 @@ from .twda_import import run_twda_sync as sync_twda
 from .vekn_push import batch_push, vekn_push_client
 from .vekn_status import record_error, record_success
 from .vekn_sync import VEKNSyncService
-from .vekn_tournament_sync import sync_all_tournaments
 from .version import __version__
 
 configure_logging()
@@ -112,8 +109,6 @@ logger = logging.getLogger(__name__)
 
 _scheduler: AsyncIOScheduler | None = None
 _sync_service: VEKNSyncService | None = None
-
-_corpus_write_lock = asyncio.Lock()
 
 _shutdown_event: asyncio.Event | None = None
 
@@ -172,38 +167,11 @@ async def run_member_sync() -> None:
         record_error("member_sync", str(e))
 
 
-async def run_tournament_sync() -> None:
-    """VEKN tournament sync with status recording (vekn_status).
-
-    Shared by the scheduled run and the admin 'Run now' endpoint.
-    """
-    if not _sync_service:
-        return
-
-    try:
-        async with _corpus_write_lock:
-            stats = await sync_all_tournaments(_sync_service.client)
-        record_success("tournament_sync", stats if isinstance(stats, dict) else None)
-    except TimeoutError:
-        logger.error("VEKN tournament sync timed out")
-        record_error("tournament_sync", "timed out")
-    except Exception as e:
-        logger.error(f"Error during VEKN tournament sync: {e}", exc_info=True)
-        record_error("tournament_sync", str(e))
-
-
 async def run_twda_sync() -> None:
-    """TWDA reconciliation with status recording (vekn_status).
-
-    Its own job under its own flag, deliberately not chained inside the VEKN
-    sync: static.krcg.org is a different upstream, needs no VEKN credentials, and
-    outlives the VEKN API — chained, it would be deleted along with the chain and
-    take the historic Hall of Fame's only source with it.
-    """
+    """TWDA reconciliation with status recording (vekn_status)."""
     try:
         logger.info("Starting TWDA sync")
-        async with _corpus_write_lock:
-            stats = await sync_twda()
+        stats = await sync_twda()
         record_success("twda_sync", stats)
     except TimeoutError:
         logger.error("TWDA sync timed out")
@@ -226,18 +194,11 @@ async def run_judge_sync() -> None:
 
 
 async def run_vekn_sync() -> None:
-    """Full scheduled chain: members → tournaments → ratings → snapshot.
-
-    The TWDA sync is deliberately not in it — see `run_twda_sync`."""
+    """Scheduled member sync followed by snapshot refresh."""
     if not _sync_service:
         return
 
     await run_member_sync()
-    # Tournament sync runs after member sync (needs user UIDs).
-    await run_tournament_sync()
-
-    # Ratings and snapshot both need tournaments up to date, hence run last.
-    await run_rating_recompute()
     await run_snapshot_generation()
 
 
@@ -344,30 +305,6 @@ async def run_oauth_cleanup() -> None:
         logger.error(f"Error during cleanup: {e}", exc_info=True)
 
 
-_MAX_EVENT_CODE_STAMPS = 100
-
-
-async def _stamp_missing_event_codes(booted_at: datetime) -> None:
-    try:
-        uids = await tournament_uids_without_event_code(booted_at)
-        if not uids:
-            return
-        if len(uids) > _MAX_EVENT_CODE_STAMPS:
-            logger.warning(
-                f"{len(uids)} tournaments have no event code — over the "
-                f"{_MAX_EVENT_CODE_STAMPS} startup cap. Run "
-                "backend/scripts/backfill_event_codes.py"
-            )
-            return
-        for uid in uids:
-            bd = await ensure_event_code(uid)
-            if bd:
-                broadcast_precomputed(bd)
-        logger.info(f"Stamped event codes on {len(uids)} tournaments")
-    except Exception:
-        logger.exception("Failed to stamp missing event codes")
-
-
 async def _build_concurrent_indexes() -> None:
     try:
         await build_concurrent_indexes()
@@ -391,12 +328,10 @@ async def lifespan(app: Litestar) -> AsyncIterator[None]:
 
     _shutdown_event = asyncio.Event()
     _install_fast_shutdown_signals()
-    booted_at = datetime.now(UTC)
     await init_db()
     await run_migrations()
 
     asyncio.create_task(_build_concurrent_indexes())
-    asyncio.create_task(_stamp_missing_event_codes(booted_at))
     asyncio.create_task(register_metadata())
 
     _scheduler = AsyncIOScheduler()
@@ -409,9 +344,7 @@ async def lifespan(app: Litestar) -> AsyncIterator[None]:
         admin.set_sync_service(_sync_service)
         # Recorded runners the admin 'Run now' dispatches in the background
         # (instead of awaiting the multi-minute sync inline in the request).
-        admin.set_sync_runners(
-            member_sync=run_member_sync, tournament_sync=run_tournament_sync
-        )
+        admin.set_sync_runners(member_sync=run_member_sync)
 
         sync_interval_hours = int(os.getenv("VEKN_SYNC_INTERVAL_HOURS", "6"))
         _scheduler.add_job(

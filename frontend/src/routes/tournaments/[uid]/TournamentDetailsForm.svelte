@@ -130,15 +130,10 @@
   const started = $derived(
     tournament.state === "Waiting" || tournament.state === "Playing" || tournament.state === "Finished"
   );
-  const pushedToVekn = $derived(!!tournament.external_ids?.vekn);
   const disabledFields = $derived.by(() => {
     const s = new Set<string>();
-    if (started || pushedToVekn) { s.add("open_rounds"); s.add("max_rounds"); }
+    if (started) { s.add("open_rounds"); s.add("max_rounds"); }
     if ((tournament.rounds?.length ?? 0) > 0 || tournament.finals) s.add("multideck");
-    // VEKN identity freeze: post-push edits to these silently diverge from
-    // vekn.net (engine rejects them too); proxies joins them because the sync
-    // reads it back, so a local change would revert rather than diverge.
-    if (pushedToVekn) { s.add("rank"); s.add("format"); s.add("start"); s.add("proxies"); }
     return s;
   });
 

@@ -568,16 +568,6 @@ LAYOUT = [
     (row("VEKN push"), 24, 1),
     (
         push_failures(
-            "Failing tournaments",
-            "tournament",
-            r"tournament=(?P<tournament>\S+) vekn_event=(?P<vekn_event>\S+) reason=(?P<reason>.*)",
-            "tournament, vekn_event, reason",
-        ),
-        24,
-        8,
-    ),
-    (
-        push_failures(
             "Failing members",
             "member",
             r"member=(?P<member>\S+) reason=(?P<reason>.*)",
@@ -605,8 +595,7 @@ if not PROD:
     LAYOUT = [
         entry
         for entry in LAYOUT
-        if entry[0]["title"]
-        not in ("VEKN push", "Failing tournaments", "Failing members")
+        if entry[0]["title"] not in ("VEKN push", "Failing members")
     ]
 
 

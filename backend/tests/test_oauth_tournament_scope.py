@@ -128,7 +128,6 @@ async def test_scoped_token_reaches_its_event_and_nothing_else(
             ),
             ("PUT", "/sanctions/some-sanction-uid", {}),
             ("DELETE", "/sanctions/some-sanction-uid", {}),
-            ("POST", f"/api/tournaments/{GRANTED}/push-vekn", {}),
             ("POST", f"/api/tournaments/{GRANTED}/organizers", {"user_uid": "x"}),
             ("POST", f"/api/tournaments/{GRANTED}/go-offline", {"device_id": "d"}),
             ("POST", f"/api/tournaments/{GRANTED}/qr-checkin", {"code": "x"}),

@@ -171,6 +171,11 @@ def is_organizer(user: User, tournament: Tournament) -> bool:
     return _check("organize_tournament", user, resource=tournament)
 
 
+def can_delete_finished_tournament(user: User) -> bool:
+    """Delete a finished tournament."""
+    return _check("delete_finished_tournament", user)
+
+
 def can_take_tournament_offline(user: User, tournament: Tournament) -> bool:
     """Take a tournament offline, or force-take its lock: run the event AND hold
     the member-creation power the lock carries."""

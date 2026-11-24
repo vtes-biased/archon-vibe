@@ -58,3 +58,17 @@ Run against production, from the deployed tree:
 
 It worked when a Prince's members directory, Mine filter on,
 lists the members issued under their prefix. **Owes afterwards**: nothing.
+
+## Re-apply the production Grafana dashboard without Failing tournaments
+
+**Gated on the commit that added this section** (`git log -1 --format=%h
+-S'Re-apply the production Grafana dashboard' -- docs/post-deploy.md`), which
+retired tournament push and removed the `Failing tournaments` panel from
+`deploy/grafana.py`.
+
+Run locally with the production Grafana token:
+
+    GRAFANA_TOKEN=$GRAFANA_TOKEN_VTESBIASED uv run python deploy/grafana.py prod
+
+It worked when the **Archon production** dashboard's **VEKN push** row shows only
+`Failing members`. **Owes afterwards**: nothing.

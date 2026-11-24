@@ -26,7 +26,7 @@ omitted from the rows below.
 | `edit_member_profile`, `manage_vekn`, `mark_deceased` | NC — own country |
 | `list_non_member` | NC, Prince — own country (the user's country; a countryless one, any NC or Prince) |
 | `export_members` | NC, Prince — global |
-| `merge_accounts`, `delete_member`, `anonymize_member`, `force_unlock_tournament`, `manage_promos`, `run_admin_sync`, `promote_link_global`, `set_archival_results` | nobody |
+| `merge_accounts`, `delete_member`, `anonymize_member`, `delete_finished_tournament`, `force_unlock_tournament`, `manage_promos`, `run_admin_sync`, `promote_link_global`, `set_archival_results` | nobody |
 | `moderate_link`, `promote_link_national` | NC — own country |
 | `organize_tournament` | NC — own country; explicit organizer |
 | `manage_leagues` | NC, Prince — global (create a league; the creator is its organizer) |
@@ -376,7 +376,7 @@ token pair for the merged uid, so reaching it turns a delegated grant into a
 full session.
 
 **Barred inside the token's own tournament**, whatever the user may do: delete,
-`organizers` add/remove, `push-vekn`, the offline-lock family (`go-offline`,
+`organizers` add/remove, the offline-lock family (`go-offline`,
 `go-online`, `force-takeover`, `force-unlock`, `sync-offline`), and the two bulk
 door routes `qr-checkin` and `archon-import`. These are the infrastructure of
 owning an event, not of running one — and the door routes admit a roster wholesale

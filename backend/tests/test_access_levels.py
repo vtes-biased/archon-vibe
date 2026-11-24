@@ -297,7 +297,6 @@ def _make_tournament(**overrides) -> dict:
         "winner": "",
         "standings": [],
         "raffles": [],
-        "vekn_pushed_at": "2026-02-01T00:00:00",
         "offline_mode": False,
         "offline_device_id": "",
         "offline_user_uid": "",
@@ -328,7 +327,6 @@ class TestTournamentPublic:
         assert "players" not in result
         assert "rounds" not in result
         assert "decks" not in result
-        assert "vekn_pushed_at" not in result
 
     def test_includes_attend_decision_fields(self):
         # Booleans are always present: omitting one would make the UI assert its
@@ -372,19 +370,12 @@ class TestTournamentMember:
         assert result is not None
         assert "checkin_code" not in result
 
-    def test_excludes_vekn_pushed_at(self):
-        t = _make_tournament(vekn_pushed_at="2026-02-01T00:00:00")
-        result = compute_member(ObjectType.TOURNAMENT, t)
-        assert result is not None
-        assert "vekn_pushed_at" not in result
-
 
 class TestTournamentFull:
     def test_includes_everything(self):
         t = _make_tournament()
         result = compute_full(ObjectType.TOURNAMENT, t)
         assert result["checkin_code"] == "secret_checkin"
-        assert result["vekn_pushed_at"] == "2026-02-01T00:00:00"
         assert result["organizers_uids"] == ["u-org1"]
 
 

@@ -80,7 +80,7 @@ a scored final left open finishes by itself a week later. Details: [tournaments]
 **Open rounds** — a non-VEKN house format gaining traction online: each player
 plays up to `max_rounds` rounds of a continuously-run pool, so the event may run
 more total rounds than any player plays. Optionally self-organized, where players
-seat their own 4–5 pod. Never pushed to VEKN, never rated.
+seat their own 4–5 pod. Never rated.
 
 **Decks** — the card database in IndexedDB; upload by paste (local, offline),
 deckbuilder URL (VDB / VTESDecks / Amaranth, backend-proxied, online only) or QR;

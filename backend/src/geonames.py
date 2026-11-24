@@ -95,8 +95,8 @@ def stored_country(value: str | None) -> str | None:
     """The shape our own rows hold: an ISO code, or nothing.
 
     Clients still send country *names* — an offline snapshot of a legacy row
-    echoes one straight back. `XX` is the one non-ISO value that survives: it is
-    vekn.net's unknown-venue code, re-supplied by every tournament sync.
+    echoes one straight back. `XX` is the one non-ISO value that survives:
+    vekn.net's unknown-venue code, held by historical imports.
     """
     value = (value or "").strip()
     if value.upper() == "XX":

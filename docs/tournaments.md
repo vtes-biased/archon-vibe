@@ -17,7 +17,7 @@ server (PyO3) behave identically.
 | Multideck | yes/no | Standard rank only; frozen once a round exists, since the flag re-keys every deck read |
 | Decklist required | yes/no | organizer choice |
 | Online | yes/no | the venue URL is the meeting place |
-| `city`, `city_geoname_id` | a GeoNames city of the event's country | **required unless online**: the backend refuses a create, or a config edit, that leaves an in-person event without one — so the first edit of an older event asks for it — and names the city itself from the id; online clears it. The VEKN and TWDA syncs fill an empty one and never rewrite it ([vekn](vekn.md#tournaments)) |
+| `city`, `city_geoname_id` | a GeoNames city of the event's country | **required unless online**: the backend refuses a create, or a config edit, that leaves an in-person event without one — so the first edit of an older event asks for it — and names the city itself from the id; online clears it. The TWDA sync fills an empty one and never rewrites it ([vekn](vekn.md#inbound)) |
 | `registration_url` | URL, empty = none | the external page taking the sign-ups; setting it closes Archon's own sign-up — the engine refuses `Register` and self-`Unregister`, below — points the player's Register button at that page, and surfaces the paid-registrations CSV import in the action bar |
 | `max_rounds` | int, 0 = uncapped | per-player round cap |
 | `max_players` | int, 0 = none | venue capacity: the engine never blocks a registration, it waitlists it — below |
@@ -80,9 +80,7 @@ result be invalidated and a stamped badge would outlive the correction.
 
 `UpdateConfig` is available in **any** state — mid-event typo fixes matter — with
 targeted locks instead of a state gate: `open_rounds`/`max_rounds` lock once rounds
-exist, and `rank`/`format`/`start` freeze once the event is published to VEKN,
-because the calendar create is write-once and an edit would silently diverge from
-vekn.net ([vekn](vekn.md)).
+exist (and `multideck` locks once a round exists).
 
 **No Grand Prix rank, deliberately.** A Grand Prix runs as a **league** — with or
 without GP scoring — because outside the multideck and proxy prohibitions
@@ -96,15 +94,15 @@ how a Grand Prix is found, and it also takes in casual club leagues.
 **No Qualifier rank either.** National, Continental and Mini Qualifiers are
 ordinary events under rules §9.8, with no rating coefficient bonus (A.2.1) and no
 prohibition the app models (the §2.9 Multi-Judge bar is unmodelled), so they run as
-Standard and the VEKN sync maps them there.
+Standard.
 
 **Card-set restrictions (§6.1.1) and the Restricted format (§7.9) are not
 modelled.** Such an event is entered as Limited, which is close enough in practice
 and already skips the construction minimums and the group rule. The cost is that
 the rules' exclusion of set-restricted results from ratings is not applied
 automatically. **Storyline is the exception** and is modelled, because it earns
-more than a label: no decklist at all, no rating, no ranked badge, no Hall of Fame
-count, and a faithful round-trip to VEKN event type 9.
+more than a label: no decklist at all, no rating, no ranked badge, and no Hall of
+Fame count.
 
 **Storyline removes the decklist rather than loosening validation**, the Judge's
 Guide naming storyline events as its case of events where decklists are not used
@@ -114,10 +112,7 @@ player, the organizer and the public API. `decklist_required` is forced false by
 the engine on create and on every `UpdateConfig` apply, the latter also clearing
 the `missing_decklist` stamps: the flag reaches the engine from the public API as
 well as the form, and left true on a format that accepts no deck it strands
-check-in behind a warning nothing can clear. **The VEKN sync carries the same
-coercion**, because reclassifying an existing row writes `format` without the
-engine — `msgspec.structs.replace` over the stored event would otherwise forward
-an Archon-created event's flag and stamps into a format that refuses every deck.
+check-in behind a warning nothing can clear.
 
 Storyline is Basic-only, `validate_rank_legality` already admitting Standard and
 Limited alone. `ranking_eligibility` returns `storyline`, which is what withholds
@@ -189,7 +184,7 @@ pass.
 **A scored final left open finishes by itself.** A daily job runs `FinishFinals`
 on a `Playing` event whose final table is `Finished` and which nobody has written
 for 7 days, through the action route's own path — ratings, wins, deck
-publication, the vekn.net push and the TWDA pull request all follow — and tells
+publication and the TWDA pull request all follow — and tells
 its organizers by Web Push — an organizer without a subscription hears nothing,
 the event simply leaving their warning. The engine credits nobody until that finish. An event
 held offline is skipped: its device holds the copy that counts. An event stuck
@@ -200,12 +195,11 @@ ended.
 `UpdateConfig`, `ReportPromos` and Delete are available in any state.
 `SetScore`/`Override`/`Unoverride` are open to players only during `Playing`, and
 to organizers whenever rounds exist — Waiting, Playing or Finished — with standings
-recomputed after every edit. Delete is plain REST, not an engine event, gated on
-the VEKN footprint: blocked once `external_ids.vekn` or `vekn_pushed_at` is set,
-since deleting would orphan the vekn.net record — unless the calendar scan has
-confirmed that record is gone
-([vekn](vekn.md#the-event-veknnet-no-longer-has)). Deleting a `Finished` tournament
-triggers a ratings recompute for its players.
+recomputed after every edit. Delete is plain REST, not an engine event: an organizer
+may delete any non-`Finished` tournament they organize, while deleting a `Finished`
+tournament is IC-only (`delete_finished_tournament`). Offline-locked tournaments
+cannot be deleted until unlocked. Deleting a `Finished` tournament triggers a ratings
+and wins recompute for its players.
 
 ## Player states
 
@@ -441,11 +435,10 @@ VEKN import**, which carries a result sheet and no round detail, and which the
 tell such an import from a tournament that just lost its last round, so
 `CancelRound` clears the standings itself when its hard-remove empties the array —
 otherwise the deleted rounds' sheet outlives them, and `players_with_rounds` reads
-it as a full field that played. Keeping that one case to imports is what makes the
-VEKN `rounds > 0` push guard safe.
+it as a full field that played.
 
-`compute_rating_vp_gw` is the single source for the backend rating and VEKN-push
-paths. It applies the same `Finished`-only rule and additionally includes finals
+`compute_rating_vp_gw` is the single source for the backend rating path. It applies
+the same `Finished`-only rule and additionally includes finals
 VP/GW; prelim
 comes from the rounds when present, else from the prelim-only standings row for
 round-less VEKN imports; when no `finals` object recorded the win it credits the
@@ -475,8 +468,7 @@ winner and the finalists are exempt, having sat by definition, and a DQ'd row is
 stored zeroed so its own flag decides first. The flag is **derived at placement, not
 stored**: `compute_preliminary_standings` only ever sees players who sat at a
 finished table, so the class exists solely in an imported sheet. An imported
-withdrawal is not in it — it kept a score, and this app ranks a player who dropped
-([vekn](vekn.md#tournaments)).
+withdrawal is not in it — it kept a score, and this app ranks a player who dropped.
 
 **An imported sheet arrives in the engine's own order.** Both importers sort with
 `sort_standings`, the one place the six-key rule lives — excluded rows last, then
@@ -493,8 +485,7 @@ combined signals, zeroes the DQ'd, sorts the cascade and calls
 `compute_final_standings`. A final places only once the tournament is `Finished`:
 until then the winner is dropped and the display stays on the preliminary ranking,
 and each finalist row then carries its finals `{gw, vp, tp}` for display — a
-round-less VEKN import included, whose finals table the sync rebuilds from `vpf`
-([vekn](vekn.md#tournaments)). Toss and finalist are sourced apart: toss off the
+round-less VEKN import included, whose finals table was rebuilt from `vpf`. Toss and finalist are sourced apart: toss off the
 roster when rounds exist and off the sheet row when they do not, finalist off the
 finals seating when rounds exist and off the sheet row (roster flag as fallback)
 when they do not, so a round-less finals table shows scores but never re-places.
@@ -555,9 +546,9 @@ where a file or a summary names a winner but flags no finalist, every
 decline the bonus alike, and the +1 tournament-win GW goes with it — winner credit
 for a game never played is the same invention. A finals-less league weights
 participation over winners by design, so crediting one there cuts against the
-format. The stance bites only where **nothing** is flagged: `vekn_tournament_sync`
-stamps `finalist` on positions 1–5 whether or not a final was played, because the
-upstream record does not say, so a VEKN import keeps vekn.net's answer and only a
+format. The stance bites only where **nothing** is flagged: historical VEKN imports
+stamped `finalist` on positions 1–5 whether or not a final was played, because the
+upstream record did not say, so a VEKN import keeps vekn.net's answer and only a
 locally crowned seat loses the credit. The question is with the Rules Director —
 see the open question below.
 
@@ -604,20 +595,13 @@ The questions put:
    all tied players credited?
 4. **Winner determination** — the standings leader under GW > VP > TP, taking the
    same +1 GW a finals winner gets?
-5. **Push encoding** — does vekn.net recompute `rtp` from positions/GW/VP or store
-   the pushed per-player value verbatim? Riders: does a results re-upload replace
-   or append, and is the Hall of Fame convention IRL-only wins? (Ours counts
-   online wins.) This one must resolve before the
-   [decommission cutover](vekn-decommission.md) whatever the rules answer is,
-   because it decides whether the difference is display-only or a real divergence
-   into the system of record.
 
 Q1 and Q2 decide the engine. If the answer credits no-final events, three traps
 come with implementing it: the Q2 gate has to distinguish a deliberate §3.1.6
 finish from a truncated event or half-finished tournaments get credited, likely
 wanting its own action or flag rather than overloading `FinishTournament`; the
-`finalist` flag means "played the final table" to every UI surface, so rating and
-push derivation need a distinct standings-finalist concept rather than a widened
+`finalist` flag means "played the final table" to every UI surface, so rating
+derivation needs a distinct standings-finalist concept rather than a widened
 meaning; and a credited no-final event with ≥8 players is then **ranked**, so the
 ranked/unranked badge has to be reconciled.
 
@@ -840,9 +824,7 @@ are typically entered post-finish and re-entered on correction.
 IC only. Replaces the roster and the winner wholesale on a Finished event we hold
 no play data for, and stamps the attested field size. The gate is the data shape,
 not a stored mode: it refuses whenever `players_with_rounds` is non-zero, so it can
-never overwrite a real result sheet. It also refuses a row carrying a vekn.net id,
-whose nightly sync would rebuild the row and silently drop the correction —
-lift that once the calendar sync retires ([vekn-decommission](vekn-decommission.md)).
+never overwrite a real result sheet.
 No `standings` payload: they are prelim-only by contract and an archival record has
 no prelim, so the rows stay zeroed.
 
@@ -884,11 +866,11 @@ representation worth building.
 ## Open rounds
 
 `open_rounds` marks the tournament as the non-VEKN **house format**: such events
-are never pushed to VEKN and never counted toward ratings or RtP, enforced in the
-push queries, the `push_tournament_event` guard and the ratings recompute filters.
+are never counted toward ratings or RtP, enforced in `ranking_eligibility` and the
+ratings recompute filters.
 
-The flag is **decoupled from `max_rounds`** on purpose: the VEKN-push build forces
-`max_rounds` to 2–4 on every standard tournament, so `max_rounds > 0` alone cannot
+The flag is **decoupled from `max_rounds`** on purpose: a standard tournament can
+also set a per-player round cap (`max_rounds > 0`), so `max_rounds > 0` alone cannot
 distinguish a house open-rounds event from a standard one.
 
 The per-player cap mechanics are driven by `max_rounds > 0`, independent of the
@@ -927,7 +909,7 @@ accepted, this being a non-VEKN house format outside the rules' seating
 requirements. The engine computes single-table seating (best-effort predator-prey
 on round 1, using prior rounds thereafter), moves seated players to `Playing`,
 leaves unseated `Registered` players untouched, and stamps the table
-`organized_by: <initiator_uid>` for audit. Never for finals, never VEKN-pushed.
+`organized_by: <initiator_uid>` for audit. Never for finals.
 
 Organizer oversight is unchanged: `FinishRound` closes any round in any order,
 `CancelRound`/`RestoreRound` void and un-void, `Override` voids a table result.

@@ -1,4 +1,4 @@
-"""Tests for implicit organizer access and VEKN sync organizer mapping."""
+"""Tests for implicit organizer access."""
 
 from datetime import UTC, datetime
 
@@ -7,11 +7,9 @@ from src.models import (
     League,
     Role,
     Tournament,
-    TournamentState,
     User,
 )
 from src.routes.tournaments import _build_actor_context
-from src.vekn_tournament_sync import _map_vekn_to_tournament
 
 NOW = datetime.now(UTC)
 
@@ -118,95 +116,3 @@ class TestCanLinkTournamentToLeague:
         assert not permissions.can_link_tournament_to_league(
             prince, _league(country="France")
         )
-
-
-class TestVeknOrganizerMapping:
-    def _users_by_vekn(self):
-        return {
-            "1000001": "uid-org",
-            "2000001": "uid-player1",
-            "3000001": "uid-player2",
-        }
-
-    def test_organizer_mapped_from_veknid(self):
-        data = {
-            "event_id": 999,
-            "event_name": "Test Event",
-            "eventtype_id": 2,
-            "event_startdate": "2025-06-01",
-            "event_enddate": "2025-06-01",
-            "organizer_veknid": "1000001",
-            "players": [
-                {
-                    "veknid": "2000001",
-                    "pos": "1",
-                    "gw": 2,
-                    "vp": 5.0,
-                    "tp": 36,
-                    "tie": 0,
-                    "vpf": 1.0,
-                },
-                {
-                    "veknid": "3000001",
-                    "pos": "2",
-                    "gw": 1,
-                    "vp": 3.0,
-                    "tp": 24,
-                    "tie": 0,
-                    "vpf": 0.5,
-                },
-            ],
-        }
-        t = _map_vekn_to_tournament(data, self._users_by_vekn())
-        assert t is not None
-        assert t.organizers_uids == ["uid-org"]
-
-    def test_unknown_organizer_veknid_gives_empty(self):
-        data = {
-            "event_id": 999,
-            "event_name": "Test Event",
-            "eventtype_id": 2,
-            "event_startdate": "2025-06-01",
-            "organizer_veknid": "9999999",
-            "players": [
-                {
-                    "veknid": "2000001",
-                    "pos": "1",
-                    "gw": 1,
-                    "vp": 3.0,
-                    "tp": 24,
-                    "tie": 0,
-                    "vpf": 0,
-                },
-            ],
-        }
-        t = _map_vekn_to_tournament(data, self._users_by_vekn())
-        assert t is not None
-        assert t.organizers_uids == []
-
-    def test_no_organizer_veknid_gives_empty(self):
-        data = {
-            "event_id": 999,
-            "event_name": "Test Event",
-            "eventtype_id": 2,
-            "event_startdate": "2025-06-01",
-            "players": [],
-        }
-        t = _map_vekn_to_tournament(data, self._users_by_vekn())
-        assert t is not None
-        assert t.organizers_uids == []
-        assert t.state == TournamentState.PLANNED
-
-    def test_planned_tournament_gets_organizer(self):
-        data = {
-            "event_id": 999,
-            "event_name": "Future Event",
-            "eventtype_id": 2,
-            "event_startdate": "2026-06-01",
-            "organizer_veknid": "1000001",
-            "players": [],
-        }
-        t = _map_vekn_to_tournament(data, self._users_by_vekn())
-        assert t is not None
-        assert t.organizers_uids == ["uid-org"]
-        assert t.state == TournamentState.PLANNED

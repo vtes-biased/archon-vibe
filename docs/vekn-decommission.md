@@ -1,43 +1,28 @@
 # VEKN decommission — evidence
 
-The evidence for the work that waits on the VEKN syncs retiring, kept because it
-cannot be reconstructed afterwards. The asks themselves, their triggers and what
-each one owes are in [`WATCH.md`](../WATCH.md).
+The evidence for the work tied to retiring the VEKN syncs, kept because it cannot be
+reconstructed afterwards. The asks themselves, their triggers and what each one owes
+are in [`WATCH.md`](../WATCH.md).
 
-The first two stages are the retirement stages in [vekn](vekn.md#decommission),
-which is where what retires and in what order is settled. The third is a correction on
-vekn.net's own side that our push waits on.
+The two stages are the retirement stages in [vekn](vekn.md#decommission), which is
+where what retires and in what order is settled. Stage 1 (tournament calendar sync)
+retired on 2026-11-24; once deployed, the Stage 1 corpus curation below is locally
+actionable without upstream re-creating deleted rows or overwriting corrections.
 
-While the tournament and member syncs are upstreams, anything deleted or diverged
-locally is re-created on their next run — that is what makes each of these
-unfixable today.
-
-## Stage 1 — the tournament calendar sync retires
+## Stage 1 — post-retirement tournament corpus curation
 
 ### Duplicate tournament cleanup
 
-Data gathered 2026-08-08 from `dedup_tournaments.py --probe-vekn` on prod, plus
+Data gathered 2026-08-08 from the retired `--probe-vekn` pass on prod, plus
 direct vekn.net reads for the PennyBridge pair, and re-confirmed by the
 2026-08-28 run — same set, one addition.
 
-**Why this is blocked.** These are pairs where one real event was entered twice
-on vekn.net and **both** event ids are still live. The standard recipe
-(soft-delete the loser copy, transplant its `external_ids.vekn` onto the
-survivor) does not work while the VEKN tournament sync is an upstream: the
-surviving id is fine, but the dead copy's id still exists on vekn.net, so the
-next sync re-creates the copy we just deleted. That is why this class is
-excluded from the dedup script's proposals — see the `--probe-vekn` docstring in
-`backend/scripts/dedup_tournaments.py`.
-
-Two exits, either one sufficient:
-
-1. **Officials delete the duplicate event on vekn.net** — then the id is dead,
-   the sync can no longer re-create it, and the pair drops into the ordinary
-   resolvable class (`--probe-vekn` proposes it automatically on the next run).
-   The list below is drafted for exactly this hand-off.
-2. **The VEKN API is decommissioned** (archon becomes system of record) —
-   nothing re-creates anything, and every pair below becomes locally fixable
-   with the standard soft-delete + transplant, no officials in the loop.
+**Why this waited on Stage 1.** These are pairs where one real event was entered
+twice on vekn.net and **both** event ids were live upstream, so the tournament sync
+would have re-created any deleted copy on its next run. Now that Stage 1 has retired
+the tournament sync, every pair below is locally fixable with the standard
+soft-delete + transplant (`backend/scripts/dedup_tournaments.py`), no officials in
+the loop.
 
 **Prior art (already done, do not redo).** On 2026-08-08 an `--apply` run
 resolved 7 groups where exactly one id was live — AMICI NOCTIS, Alexandre Koch,
@@ -106,10 +91,10 @@ pulled yet.
 
 #### The day-boundary detection blind spot
 
-`DUPLICATE_GROUPS_QUERY` and `BOTH_VEKN_GROUPS_QUERY` (`backend/src/db.py:1222`
-and `:1257`) both group on `lower(name)` + **exact UTC start day**. A duplicate
-pair whose copies straddle midnight is therefore invisible to both. PennyBridge
-is the known member: `2026-05-22T00:00:10` vs `2026-05-23T00:00:10`.
+`DUPLICATE_GROUPS_QUERY` (`backend/src/db.py`) groups on `lower(name)` + **exact
+UTC start day**. A duplicate pair whose copies straddle midnight is therefore
+invisible to it. PennyBridge is the known member: `2026-05-22T00:00:10` vs
+`2026-05-23T00:00:10`.
 
 Naively widening the grouping to ±1 day is wrong — it would flag genuine
 consecutive-day convention events. A ±1-day scan over prod returned 9 pairs, and
@@ -130,57 +115,25 @@ RUMO AO BR 2026 ETAPA 2     12699 2025-09-29  / 12689 2025-09-28
 `Origins 9am` on two consecutive days and `Czech Championship 2007` day-1/day-2
 are almost certainly real distinct events.
 
-**Proposed fix:** widen only the *candidate* set to ±1 day and let the existing
-VEKN API probe adjudicate. Both ids live → "no local action" (Origins 9am stays
-correctly quiet); exactly one id dead → a resolvable pair we currently cannot
-see at all. Cost is a handful of extra authenticated API reads. Worth doing
-before the cleanup so it covers the day-straddling pairs too.
-
 #### Re-deriving this on prod
 
-```sh
-# the probe (read-only; needs VEKN creds, which the service env carries)
-ssh archon.vekn.net "sudo -u archon bash -c 'set -a; . /etc/archon/archon-backend.env; set +a; \
-  /opt/archon/backend/.venv/bin/python /opt/archon/backend/scripts/dedup_tournaments.py --probe-vekn'"
-```
-
-For anything that does not need the VEKN creds, export just what you need:
+Export `DATABASE_URL` from the backend env and run `dedup_tournaments.py`:
 
 ```sh
 export DATABASE_URL=$(grep -m1 ^DATABASE_URL= /etc/archon/archon-backend.env | cut -d= -f2- | tr -d "'")
 ```
 
-Ratings need no manual step after any cleanup here: `run_rating_recompute` is on
-a 24h timer and also runs at the tail of the nightly VEKN sync
-(`backend/src/main.py:198,411`). The admin route mentioned in the dedup script's
-module docstring does not exist — that reference is stale.
+Ratings need no manual step after any cleanup here: `run_rating_recompute` runs daily.
 
 ### IC record curation — events to delete
 
-Origin gh-6, a Prince asking how to remove an event created by mistake; the half
-of that question about an event vekn.net no longer has is answered — the organizer
-deletes it on the scan's absence flag ([vekn](vekn.md#the-event-veknnet-no-longer-has)).
-**Do not re-derive the rejected probe-at-delete approach** — it was fully built and
-reverted.
+Origin gh-6. Now that Stage 1 lifted the VEKN-footprint delete gate (organizers
+delete unfinished events; IC deletes `Finished` events via
+`delete_finished_tournament`), every row below can be deleted directly once Stage 1
+is deployed without the sync re-creating it.
 
-Running list of tournaments that **should not be in the record**, waiting on the
-IC cleanup capability. Distinct from its two sibling populations:
-
-- the duplicate groups above — one real event entered twice upstream;
-- events we hold that **no longer exist upstream** — the calendar scan confirms
-  these itself, every run, and flags them
-  ([vekn](vekn.md#the-event-veknnet-no-longer-has)); their organizer can already
-  delete them, so none of them wait here.
-
-This list is the third population: events that are simply **wrong** — created by
-mistake, mistyped, or never real — regardless of what vekn.net says.
-
-**Check before assuming any row must wait.** Deletion is refused today only when
-a tournament carries `external_ids['vekn']` or `vekn_pushed_at` and the scan has
-not flagged it absent. A row carrying neither footprint can be deleted **now** by
-its organizer and does not belong on this list at all. The
-public projection does not currently expose `external_ids`, so this has to be
-checked against the DB, not the snapshot.
+This list holds events that are simply **wrong** — created by mistake, mistyped, or
+never real — distinct from the duplicate groups above.
 
 #### 1. `Arraial da Vampirada` — mistyped year, stuck in Registration
 
@@ -191,7 +144,7 @@ checked against the DB, not the snapshot.
 | state | `Registration` |
 | where | Loja Homo Ludicus, Avenida Governador Gayoso e Almendra 443, São João, Teresina (Piauí), Brazil |
 | format | Standard, not online, no league |
-| vekn id | **unknown — check first** (see above) |
+| vekn id | **unknown** |
 
 Owner call 2026-08-15: delete it.
 
@@ -219,16 +172,9 @@ Anyone subscribed to the calendar feed is carrying it.
 
 **Second, independent defect on the same row**: `timezone` is `"UTC"` while the
 venue is in Teresina (UTC−3), so the wall-clock 10:00 is anchored to UTC and the
-feed advertises 07:00 local. `timezone` is left at its model default
-(`models.py:397`) rather than set from the venue. Worth checking whether other
-rows share it — if so that is its own ask, not a per-row fix.
-
-**Cheaper interim than waiting**: `start`, `finish` and `timezone` are all in
-the engine's `CONFIG_FIELDS` allowlist, so the
-organizer or an IC can correct the date in-app today with no code change and no
-deletion — which sidesteps the VEKN-footprint gate entirely. Deleting is the
-owner's call; correcting is available immediately if the row turns out to be
-blocked.
+feed advertises 07:00 local. `timezone` is left at its model default (`models.py`) rather than set from the
+venue. Worth checking whether other rows share it — if so that is its own ask, not a
+per-row fix.
 
 Found 2026-08-15 while measuring the tournament corpus for the Hall of Fame
 rebuild — a year histogram of all 8466 live tournaments put exactly one row in
@@ -245,9 +191,8 @@ names say outright that they were never events:
 | `abd7e330-8005-49d5-97ce-c650bc6edb68` | 2025-11-15 | `12797` | Portugal | `delete me` |
 | `dde82ba8-6936-4ec4-94fc-130523c02cf7` | 2026-01-01 | `13235` | Brazil | `ND` |
 
-All three carry `external_ids['vekn']`, so deletion is refused today and the
-calendar sync would re-create them anyway — they wait on stage 1,
-not on an organizer.
+All three carry `external_ids['vekn']`, which blocked deletion while the calendar
+sync was live; once Stage 1 is deployed an IC can delete them directly.
 
 `delete me` is the costly one: a TWDA entry submitted under event `12797` points
 at it while the real event, `Bloodshed in VdC`, holds `12794`. That is the single
@@ -258,10 +203,8 @@ the reconciler must treat a vekn event id as evidence rather than proof
 **Two further rows named `Test` are probably not this population** —
 `ebcfaea6-babb-4725-8fb4-4cc755bbfd9e` (2020-09-01, Croatia, 1 player) and
 `4218a3a4-0a2e-434a-be14-2d7135d10688` (2025-09-13, Portugal, **8 players**).
-Neither carries a vekn id, so per the check above both may already be deletable
-by their organizer and belong nowhere near this list. The 8-player one should not
-be deleted on the strength of its name alone — that is a plausible real roster.
-`vekn_pushed_at` is unread for both; check it before acting.
+The 8-player one should not be deleted on the strength of its name alone — that is a
+plausible real roster.
 
 **Five more placeholder-looking names are real events, not junk** — `LoB`
 (2006, US, 12 players), `QCF` twice (2006, 29 and 6 players), `NA` (2006, FR, 23
@@ -272,16 +215,6 @@ name synthesized from place and date — and must never be deleted.
 
 Found 2026-08-16 while deciding the Hall of Fame reconciliation queue.
 
-### Lift the vekn-linked refusal on archival correction
-
-The `ArchivalResultsVeknLinked` guard in `engine/src/tournament/` exists only because `vekn_tournament_sync.py`'s full-rebuild branch fires
-whenever `not existing.rounds and tournament.players`, so a correction to such a
-row is wiped on the next nightly run — silently, and permanently. It is one refusal
-in one match arm, and it is what keeps the two disagreeing rows below parked. The
-alternative considered and rejected: a `results_corrected_at` marker the sync
-respects, which is a second persisted field for a capability that expires with this
-stage.
-
 ### IC record curation — rows that disagree with the archive about who won
 
 The first two came to us through their vekn event id, so the disagreement is between the
@@ -289,11 +222,9 @@ vekn.net result and the winning deck the TWDA holds for the same event. The thir
 has no archive entry: its legacy vekn.net sheet is visibly mis-entered (a 1 GW 4 VP
 player at `pos` 6 below a 1 GW 3.5 VP finalist) and the player it names as winner
 disputes it. One side
-is wrong and neither is ours to decide unilaterally. They wait on stage 1
-because the correction path — the `SetArchivalResults` engine event
-([tournaments](tournaments.md#engine-event-catalog)) — deliberately refuses any row
-carrying `external_ids['vekn']` while the calendar sync is live: the sync's
-full-rebuild branch would wipe the correction on its next run.
+is wrong and neither is ours to decide unilaterally. Once Stage 1 is deployed,
+`SetArchivalResults` ([tournaments](tournaments.md#engine-event-catalog)) accepts
+vekn-linked rows directly, so only the editorial call remains.
 
 | uid | date | event | our winner | the archive's |
 |---|---|---|---|---|
@@ -386,15 +317,6 @@ Reconstructions: `01a028a7-1cf7-72e2-840c-fb514352ede1`,
 `01a028a7-1459-7269-bfc6-bef3725ae9aa`,
 `01a028a7-4f22-7589-8a2d-b5419892b1b3`,
 `01a028a5-fafe-71c6-8df4-974e6545d144`.
-
-### Stamp the event code at creation and drop the boot sweep
-
-The route waits for the calendar push today because a successful push supplies
-the vekn id the code should be. The push runs as an in-memory task, so a restart
-while it is in flight leaves the row with no code. The hourly batch push can't
-repair it, because its candidate query skips open-rounds, self-organized and
-TWDA-linked events, and it runs only where `VEKN_PUSH` is on. With the calendar
-push gone there is nothing to wait for, and the sweep has nothing left to catch.
 
 ### Retire the daily TWDA sync
 
@@ -508,46 +430,3 @@ _29 members._
 | 3090014 | Zsolt Varga | **Prince** | Prince |
 
 _36 members._
-
-## Waiting on the VEKN admins to correct the calendar entries
-
-### Push the results stuck on the calendar's round count
-
-vekn.net refuses a results upload whose round count differs from the calendar
-entry's: *"The provided number of rounds (N) do not match the expected number of
-rounds (M) from the calendar"*, where expected is `rounds + final`. From June to
-November 2026 the push filed every event created before its final with the flag
-unset, `NR` instead of `NR+F`, so each one that went on to play a final was
-refused at provided = expected + 1. The push now files the final
-([vekn](vekn.md#push-constraints)), which repairs nothing already filed: the API
-offers no update to a calendar entry, so each one is corrected on vekn.net.
-13565 (`2R+F`, refused 2 / 3) shows the comparison counts the flag.
-
-Read live on 2026-11-01 through beta's VEKN client:
-
-- **Add the final** (37, finished): 13450, 13487, 13488, 13495, 13517, 13524,
-  13534, 13544, 13546, 13555, 13560, 13561, 13567, 13574, 13576, 13577, 13587,
-  13599, 13610, 13612, 13615, 13617, 13618, 13620, 13622, 13626, 13634, 13635,
-  13644, 13645, 13646, 13648, 13652, 13662, 13668, 13675, 13686.
-- **Fix the rounds** (7, finished): 13085 0R→3R+F, 13110 4R+F→3R+F, 13359
-  4R+F→3R+F, 13367 4R+F→3R+F, 13449 2R→3R+F, 13455 2R→3R+F, 13572 2R+F→3R+F. An
-  event created with no round cap is filed with the VEKN minimum of 2, or vekn.net
-  holds 0.
-- **Add the final** (59, upcoming, filed before the fix): 13452, 13624, 13628,
-  13674, 13690, 13470, 13654, 13673, 13682, 13692, 13621, 13676, 13680, 13685,
-  13619, 13661, 13665, 13669, 13670, 13679, 13681, 13613, 13623, 13656, 13647,
-  13659, 13671, 13545, 13687, 13650, 13598, 13636, 13651, 13677, 13600, 13601,
-  13614, 13625, 13642, 13678, 13683, 13691, 13518, 13519, 13640, 13688, 13520,
-  13657, 13689, 13663, 13547, 13649, 13629, 13630, 13631, 13632, 13633, 13643,
-  13548.
-- **On hold** (2): 13552 and 13565, where vekn.net reports 2 provided against an
-  archon file of 3 — check our upload before asking for a correction.
-- **Stamped by the migration** (3): 12498, 12555, 12959 — refused on the round
-  count in August, held out of the batch by their `vekn_pushed_at`. 12555 is named
-  *Pendiente de borrado* on our side: confirm with its organizer whether it is to
-  be deleted rather than corrected.
-- 13495 calendars as *Ricsiszulinap* where our record says *Army of Rats
-  (Dunakeszi)*: confirm it is the same event before correcting it.
-
-The flag cuts both ways: an event filed with it that ends without a final is
-refused at provided = expected − 1. Its rate is unmeasured.

@@ -1,6 +1,4 @@
-"""Country/city → IANA timezone reference data, consumed by
-vekn_tournament_sync._guess_timezone.
-"""
+"""Country/city → IANA timezone reference data, consumed by twda_import."""
 
 COUNTRY_TIMEZONE: dict[str, str] = {
     "AR": "America/Argentina/Buenos_Aires",

@@ -504,6 +504,10 @@ export function canCreateTournament(actor: UserContext | null): PermissionResult
   return checkPermission('create_tournament', actor);
 }
 
+export function canDeleteFinishedTournament(actor: UserContext | null): PermissionResult {
+  return checkPermission('delete_finished_tournament', actor);
+}
+
 export function canManageLeagues(actor: UserContext | null): PermissionResult {
   return checkPermission('manage_leagues', actor);
 }

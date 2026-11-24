@@ -122,12 +122,11 @@ The scans that stay, each deliberate:
 
 - **Whole-corpus by design**: the `/snapshot` stream and the `/stream`
   catch-up ([sync](sync.md)), `purge_deleted_objects`.
-- **Scheduled jobs**, a scan per run rather than per request: the VEKN member and
-  tournament syncs (with `find_same_event_tournaments` per synced event), the
-  hourly VEKN push, the sanction cleanup, the full rating, Hall of Fame and promo
-  stock recomputes, the TWDA sync, the judge directory sync, the stale-finals
-  finish.
-- **Once per boot**: the migration guards and `_stamp_missing_event_codes`.
+- **Scheduled jobs**, a scan per run rather than per request: the VEKN member
+  sync, the hourly VEKN member push, the sanction cleanup, the full rating, Hall
+  of Fame and promo stock recomputes, the TWDA sync, the judge directory sync, the
+  stale-finals finish.
+- **Once per boot**: the migration guards.
 - **Small partitions**: `league` and `promo` rows, read whole through
   `idx_objects_type`.
 - **Rare official actions**: `count_promo_references` on an IC deleting a promo,
@@ -180,11 +179,7 @@ Nothing in the tree records that an entry has run, so its proof is a section in
 [post-deploy](post-deploy.md) and the two die in one commit —
 `mise run migration-pairing` ([dev](dev.md#lint-gates)) fails on either half
 outliving the other. That death condition is what an entry is for and what keeps
-the per-boot guard queries near zero. `_stamp_missing_event_codes`, the boot
-sweep started behind serving, is deliberately not an entry: it mints a missing value rather than
-repairing an unreadable one, nothing breaks while a code is absent, and it dies
-with the calendar push at [stage 1](vekn-decommission.md#stamp-the-event-code-at-creation-and-drop-the-boot-sweep)
-of the decommission rather than when a database answers 0.
+the per-boot guard queries near zero.
 
 The mechanism is for **bounded** row counts — tens to low thousands. A pre-serve
 migration extends deploy downtime by its own runtime, so a corpus-scale rewrite
@@ -197,10 +192,8 @@ Every backend call to Discord, VEKN, GitHub and the deck providers goes through
 one process-wide `aiohttp.ClientSession` — `http_client.session()`, created on
 first use and closed in the `lifespan` teardown. A session owns a connection pool
 and a TLS context, so a session per call meant a full handshake per request,
-worst on the login path a tournament morning hammers. Its default timeout is
-`total=20, connect=10, sock_read=15`, which must stay under nginx's 60s
-`proxy_read_timeout` because the manual push-vekn route runs its VEKN calls
-inline on the request; a caller needing longer passes `timeout=` per request, as
+worst on the login path a tournament morning hammers. Its default timeout is `total=20, connect=10, sock_read=15`, well under nginx's
+60s `proxy_read_timeout`; a caller needing longer passes `timeout=` per request, as
 the TWDA archive fetch (120s) and the TWDA PR flow (30s) do. The deck providers
 take the session default.
 
@@ -241,7 +234,7 @@ the one validator create and `UpdateConfig` share; written into the
 around it afterwards. The rank-legality and date-ordering checks sit outside it
 because `UpdateConfig` must pass the merged config-over-tournament view. The route
 keeps what the engine cannot decide: the REST authorization layer, country
-normalization, the league-link lookup and the `VEKN_PUSH` round bounds. The
+normalization and the league-link lookup. The
 editable set is `CONFIG_FIELDS`, which `UpdateConfig` applies and which
 `test_tournament_field_contracts.py` pins against `TournamentConfig`,
 `CreateTournamentRequest` and a real create through the engine — a field missing
@@ -1062,23 +1055,15 @@ file the TWDA publishes — then a minted 6-character Crockford base32 code, nev
 all digits so it cannot read as a vekn id. So the numbers and slugs already cited
 by 4538 archive entries keep resolving against us.
 
-**Never rewritten.** An event that mints its own code and later gains a vekn id
-keeps the minted one: rewriting would move a published TWDA branch and break every
-link already shared. Any path that rebuilds a tournament row must carry it over
-explicitly, exactly like `checkin_code` — the VEKN sync's rebuild does.
+**Never rewritten.** Once stamped, a tournament keeps its event code forever:
+rewriting would move a published TWDA branch and break every link already shared.
 
-Assignment waits on the VEKN calendar push that `POST /api/tournaments` already
-fires, since a successful push is what supplies the vekn id the event should carry
-(`_maybe_push_vekn_event`). Every other write path knows its answer at insert and
-stamps inline, go-online included — an event created offline has only the hourly
-batch push ahead of it, and that push stops entirely at the decommission, so it
-mints rather than waits. A row that reaches neither — a restart in between — is swept
-in the background at boot, capped at 100, over which it names
-`backfill_event_codes.py`. The sweep takes only rows last modified before the
-process started: one created since has its push in flight, and minting first
-would pre-empt the vekn id that push is about to supply. Uniqueness is a unique index on
-`lower(event_code)` spanning soft-deleted rows, so a code is never reissued and a
-mint collision is simply retried.
+Every creation path — `POST /api/tournaments`, go-online's offline-created insert,
+the TWDA importer and the legacy archon merge — stamps `event_code` inline at insert
+through `resolve_event_code`. `backfill_event_codes.py` fills any historical row
+missing one. Uniqueness is a unique index on `lower(event_code)` spanning
+soft-deleted rows, so a code is never reissued and a mint collision is simply
+retried.
 
 Resolution is case-insensitive and falls back to `external_ids['vekn']` on a miss,
 which covers an event whose vekn id arrived after its code was minted. The fallback
@@ -1138,8 +1123,7 @@ would recreate it with its PII. `models.is_active_account` refuses it alongside 
 deleted one at every sign-in and login-flow write — token minting, `/auth/refresh`,
 `get_current_user`, the `/stream` token, the Discord and GitHub callbacks — so live
 sessions die at their next request; profile edits, a VEKN claim or link onto it and a
-merge into it are refused, the hourly member push skips it, and a results push
-sends their row with blank names. Results, ratings, wins, sanctions, NDA records
+merge into it are refused, and the hourly member push skips it. Results, ratings, wins, sanctions, NDA records
 and past TWDA archive credits stay attached. What was already sent — Discord posts,
 TWDA pull requests, a passkey's display name on the member's authenticator — is out
 of reach, and a connected bot keeps the old name until it reconnects.
@@ -1193,11 +1177,11 @@ Override tab.
 
 | Job | Schedule | Module |
 |---|---|---|
-| Event-code sweep, Discord Linked Roles registration | once, at startup | `main.py`, `roles_hook` |
-| VEKN sync (members, tournaments) | every `VEKN_SYNC_INTERVAL_HOURS` from 04:00 UTC | `vekn_sync.py`, `vekn_tournament_sync.py` |
+| Discord Linked Roles registration | once, at startup | `roles_hook` |
+| VEKN sync (members) | every `VEKN_SYNC_INTERVAL_HOURS` from 04:00 UTC | `vekn_sync.py` |
 | Snapshot rebuild, only if the corpus moved | at startup, then checked every 15 min | `snapshots.py` |
 | OAuth cleanup | hourly | `db_oauth.py` |
-| VEKN push batch | hourly, configurable | `vekn_push.py` |
+| VEKN member push batch | hourly, configurable | `vekn_push.py` |
 | Stale-finals finish | daily, 00:30 UTC | `routes/tournaments.py` |
 | Sanction cleanup | daily, 01:00 UTC | `db.py` |
 | Deleted-objects purge | daily, 01:30 UTC | `db.py` |
@@ -1213,25 +1197,12 @@ guard fails them on a cold cache.
 
 **Every daily job is a `CronTrigger` at a pinned UTC hour, never an interval** —
 an interval job of a day or more can never fire here
-([hazards](hazards.md#deploy)). The VEKN chain is one too: its hours are spelled
+([hazards](hazards.md#deploy)). The VEKN sync is one too: its hours are spelled
 out from 04:00 UTC every `VEKN_SYNC_INTERVAL_HOURS` — 04:00 alone at the 24 both
 deployed environments set, clear of the 03:00 backup and ahead of the 05:00 TWDA
-sync. Not a startup kick: a kick makes every daily restart pay the chain's whole
+sync. Not a startup kick: a kick makes every daily restart pay the sync's whole
 memory peak, so a fresh install waits for the hour or for the admin page's *Run
 now*.
-
-The tournament sync and the TWDA sync hold one lock between them, so neither
-reads the corpus as lacking an event the other is halfway through creating. That
-is all it buys: **the two are not ordered, and the two orders are not
-symmetric.** A reconstruction landing first heals, because `_adopt_same_event`
-adopts a vekn-less same-day copy and carves out a reconstruction's winner-only
-roster explicitly. The vekn copy landing first does not: the archive sync matches
-only its own `twda` external id, so a decisions file that still reads `create`
-mints a second row, and the adoption's `taken` guard then refuses a copy already
-holding a vekn id. Regenerating the decisions file against the current corpus is
-what prevents that — never the schedule. The lock is also in-process only:
-`scripts/backfill_twda.py` and the legacy-archon merge write the same corpus from
-outside it.
 
 The purge hard-deletes soft-deleted objects older than 30 days and also drops
 orphaned `avatars` / `banners` / `push_subscriptions` side-table rows — there is no

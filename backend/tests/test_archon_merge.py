@@ -95,7 +95,6 @@ def _vekn_created(uid: str, event_id: str, *, rich: bool = False) -> Tournament:
         external_ids={"vekn": event_id},
         standings=[Standing(user_uid="p1", gw=1.0, vp=2.0, tp=12)],
         rounds=[[Table(seating=_seats(), state=TableState.FINISHED)]] if rich else [],
-        vekn_pushed_at=datetime(2025, 5, 2, tzinfo=UTC),
     )
 
 
@@ -153,7 +152,6 @@ async def test_rich_merge_into_vekn_copy_then_idempotent(test_db):
         assert merged is not None and merged.deleted_at is None
         assert merged.rounds, "rich payload merged into the vekn-created copy"
         assert merged.external_ids == {"vekn": "555", "archon": "o-1"}
-        assert merged.vekn_pushed_at is not None
         assert await db.get_tournament_by_uid("o-1") is None
         assert uid_map["o-1"] == "x-1"
         decks = await db.get_decks_for_tournament("x-1")

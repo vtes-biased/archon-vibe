@@ -367,7 +367,7 @@ export interface Tournament extends BaseObject {
   decklists_mode?: DeckListsMode;
   max_rounds?: number;
   max_players?: number; // soft registration cap (0 = none): warn-only, never blocks
-  open_rounds?: boolean; // non-VEKN house format: per-player cap, not pushed to VEKN, not ranked
+  open_rounds?: boolean; // non-VEKN house format: per-player cap, not ranked
   self_organized_rounds?: boolean; // open-rounds: let registered players seat their own pod (#274)
   table_rooms?: Room[];
   first_table_number?: number;
@@ -376,10 +376,6 @@ export interface Tournament extends BaseObject {
   // Full data (varies by level)
   external_ids?: Record<string, string>;
   event_code?: string;
-  vekn_pushed_at?: string | null;
-  vekn_results_stale?: boolean; // results diverged after the write-once VEKN push
-  // Instant the calendar scan confirmed vekn.net holds no event at this id.
-  vekn_event_absent_at?: string | null;
   // Last TWDA auto-submission outcome (organizer projection only)
   twda_status?: TwdaStatus | null;
   checkin_code?: string;

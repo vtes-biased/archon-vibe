@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import os
 from datetime import UTC, datetime, timedelta
 from importlib.resources import files
 from typing import Annotated, Any
@@ -35,7 +34,6 @@ from ..db import (
     allocate_next_vekn_id,
     compute_access_version,
     delete_banner,
-    ensure_event_code,
     get_all_leagues,
     get_banner,
     get_connection,
@@ -92,13 +90,6 @@ from ..ratings import (
     recompute_wins,
 )
 from ..twda import maybe_submit_twda
-from ..vekn_api import VEKNAPIConnectionError, VEKNAPIError
-from ..vekn_push import (
-    maybe_push_results,
-    push_tournament_event,
-    push_tournament_results,
-    vekn_push_client,
-)
 from .auth import send_invite_email
 from .sanctions import _apply_sanction_to_tournament
 
@@ -141,11 +132,6 @@ SERVER_OWNED_TOURNAMENT_FIELDS = frozenset(
         "external_ids",
         "checkin_code",
         "event_code",
-        "vekn_pushed_at",
-        "vekn_results_stale",
-        # Not bookkeeping: it unlocks the delete below, so a client that could
-        # write it could delete a live sanctioned event.
-        "vekn_event_absent_at",
         "twda_status",
     }
 )
@@ -248,23 +234,6 @@ async def _maybe_push_judge_call(
         await push_service.send_to_users([(uid, spec) for uid in uids])
     except Exception:
         logger.exception("Failed to send judge-call push for %s", tournament.uid)
-
-
-async def _maybe_push_vekn_event(tournament: Tournament) -> None:
-    try:
-        client = vekn_push_client()
-        if client is not None:
-            await push_tournament_event(client, tournament)
-    except Exception:
-        logger.exception("Failed to push VEKN event")
-    # After the attempt, never before: a successful push writes the vekn event id
-    # this event should carry as its handle, and the handle is written once.
-    try:
-        bd = await ensure_event_code(tournament.uid)
-        if bd is not None:
-            broadcast_precomputed(bd)
-    except Exception:
-        logger.exception("Failed to stamp event code")
 
 
 def _build_actor_context(
@@ -380,79 +349,6 @@ async def add_organizer(
         content=encoder.encode(tournament),
         media_type="application/json",
     )
-
-
-@post("/{uid:str}/push-vekn")
-async def push_vekn(
-    request: Request,
-    uid: FromPath[str],
-) -> Response:
-    """Registers the calendar event if missing; for a FINISHED tournament also
-    pushes results (once) and submits the TWDA deck, mirroring the hourly
-    batch_push immediately."""
-    current_user = await get_optional_user(request)
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    tournament = await get_tournament_by_uid(uid)
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-
-    if not permissions.is_organizer(current_user, tournament):
-        raise HTTPException(status_code=403, detail="Only organizers can sync to VEKN")
-
-    # Open-rounds / self-organized events are the non-VEKN house format — never pushed.
-    if tournament.open_rounds or tournament.self_organized_rounds:
-        raise HTTPException(
-            status_code=400, detail="Open-rounds events are not reported to VEKN"
-        )
-
-    try:
-        client = vekn_push_client()
-        if client is None:
-            raise HTTPException(status_code=400, detail="VEKN sync is not enabled")
-        if not tournament.external_ids.get("vekn"):
-            # push_tournament_event saves external_ids.vekn + broadcasts on success.
-            event_id = await push_tournament_event(
-                client, tournament, raise_api_errors=True
-            )
-            if not event_id:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        "VEKN sync failed — needs a name (≥3 chars), a start "
-                        "date, and an organizer with a VEKN ID"
-                    ),
-                )
-            tournament = await get_tournament_by_uid(uid) or tournament
-        if tournament.state == TournamentState.FINISHED:
-            if not tournament.vekn_pushed_at:
-                # A manual publish must report a real outcome — don't swallow a
-                # failed results push (e.g. a finalist with no VEKN ID) as success.
-                if not await push_tournament_results(
-                    client, tournament, raise_api_errors=True
-                ):
-                    raise HTTPException(
-                        status_code=400,
-                        detail=(
-                            "Results couldn't be published to VEKN — check that "
-                            "every player (including finalists) has a VEKN ID, "
-                            "then try again."
-                        ),
-                    )
-                tournament = await get_tournament_by_uid(uid) or tournament
-            await maybe_submit_twda(tournament)
-    except VEKNAPIConnectionError as e:
-        raise HTTPException(
-            status_code=502, detail="VEKN API is unavailable, try again later"
-        ) from e
-    # Order matters: VEKNAPIConnectionError subclasses VEKNAPIError. A data
-    # error carries VEKN's actual reason — show it instead of guessing.
-    except VEKNAPIError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-
-    updated = await get_tournament_by_uid(uid) or tournament
-    return Response(content=encoder.encode(updated), media_type="application/json")
 
 
 @delete("/{uid:str}/organizers/{organizer_uid:str}", status_code=200)
@@ -778,16 +674,6 @@ async def create_tournament(
             status_code=403, detail="Only IC, NC, or Prince can create tournaments"
         )
 
-    # VEKN_PUSH: standard tournaments need max_rounds 2-4. Open-rounds events are
-    # non-VEKN (not pushed), so max_rounds there is a free per-player cap (0 = no limit).
-    vekn_push = os.getenv("VEKN_PUSH", "").lower() == "true"
-    if vekn_push and not data.open_rounds:
-        if data.max_rounds < 2 or data.max_rounds > 4:
-            raise HTTPException(
-                status_code=400,
-                detail="max_rounds must be 2, 3, or 4 when VEKN push is enabled",
-            )
-
     country = stored_country(data.country)
     if data.country and country is None:
         raise HTTPException(status_code=422, detail=f"Invalid country: {data.country}")
@@ -824,14 +710,11 @@ async def create_tournament(
 
     # Fresh uuid7 — no existing row to lock, but save_tournament requires a conn.
     async with get_connection() as conn:
+        tournament.event_code = await resolve_event_code(tournament, conn)
         bd = await save_tournament(tournament, conn=conn)
     logger.info(f"Tournament {tournament.uid} created by {current_user.uid}")
 
     broadcast_precomputed(bd)
-
-    # VEKN push: create calendar event. Background task — the response must not
-    # wait on vekn.net (30-120s timeouts when it is down); batch_push retries.
-    asyncio.create_task(_maybe_push_vekn_event(tournament))
 
     return Response(
         content=encoder.encode(tournament),
@@ -896,7 +779,12 @@ async def delete_tournament_endpoint(
     if not tournament:
         raise HTTPException(status_code=404, detail="Tournament not found")
 
-    if not permissions.is_organizer(current_user, tournament):
+    if tournament.state == TournamentState.FINISHED:
+        if not permissions.can_delete_finished_tournament(current_user):
+            raise HTTPException(
+                status_code=403, detail="Only IC can delete a finished tournament"
+            )
+    elif not permissions.is_organizer(current_user, tournament):
         raise HTTPException(
             status_code=403, detail="Only organizers can delete this tournament"
         )
@@ -907,17 +795,6 @@ async def delete_tournament_endpoint(
         raise HTTPException(
             status_code=400,
             detail="Cannot delete a tournament locked for offline use; unlock it first",
-        )
-
-    # A VEKN footprint (external_ids.vekn or vekn_pushed_at) means deleting here
-    # orphans the vekn.net record — unless the scan confirmed that record is
-    # already gone, which is the only way a mistaken event ever leaves.
-    if (
-        tournament.external_ids.get("vekn") or tournament.vekn_pushed_at is not None
-    ) and tournament.vekn_event_absent_at is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot delete a tournament that has been pushed to VEKN",
         )
 
     was_finished = tournament.state == TournamentState.FINISHED
@@ -1307,17 +1184,6 @@ async def _process_event(
         updated.timer = TimerState()
         updated.table_extra_time = {}
 
-    # Detected by CONTENT diff, not event type, so any edit touching those
-    # fields after a VEKN push is caught; sticky, so this runs at most once.
-    if updated.vekn_pushed_at and not updated.vekn_results_stale:
-        if (
-            tournament.winner != updated.winner
-            or encoder.encode(tournament.standings) != encoder.encode(updated.standings)
-            or encoder.encode(tournament.finals) != encoder.encode(updated.finals)
-            or encoder.encode(tournament.rounds) != encoder.encode(updated.rounds)
-        ):
-            updated.vekn_results_stale = True
-
     bd = await save_object(
         ObjectType.TOURNAMENT,
         updated.uid,
@@ -1395,11 +1261,8 @@ async def _after_event(
                 f"Error recomputing ratings for {updated.uid}: {e}", exc_info=True
             )
 
-    # VEKN push backgrounds (vekn.net can take 30-120s or be down; batch_push
-    # retries) — TWDA submission runs inline since it's local/fast.
     if is_finished and not was_finished:
         await maybe_submit_twda(updated)
-        asyncio.create_task(maybe_push_results(updated))
     elif is_finished:
         # Publication and privacy ops carry no player_uid: the archive and the Hall
         # of Fame ask whether a deck exists, never whether it is visible. A credit
@@ -1462,26 +1325,6 @@ async def tournament_action(
     async with tournament_transaction(uid) as (tournament, tx_conn):
         if not tournament:
             raise HTTPException(status_code=404, detail="Tournament not found")
-
-        # VEKN_PUSH: max_rounds immutable once pushed to VEKN
-        if data.type == "UpdateConfig" and data.config and "max_rounds" in data.config:
-            if tournament.external_ids.get("vekn"):
-                if data.config["max_rounds"] != tournament.max_rounds:
-                    raise HTTPException(
-                        status_code=409,
-                        detail="max_rounds cannot be changed after tournament is pushed to VEKN",
-                    )
-            vekn_push = os.getenv("VEKN_PUSH", "").lower() == "true"
-            # 2-4 max_rounds applies only to standard (non-open-rounds) tournaments;
-            # open_rounds is the request's value if present, else the stored one.
-            open_rounds = data.config.get("open_rounds", tournament.open_rounds)
-            if vekn_push and not open_rounds and data.config["max_rounds"] is not None:
-                mr = data.config["max_rounds"]
-                if mr != 0 and (mr < 2 or mr > 4):
-                    raise HTTPException(
-                        status_code=400,
-                        detail="max_rounds must be 2, 3, or 4 when VEKN push is enabled",
-                    )
 
         if tournament.offline_mode:
             raise HTTPException(
@@ -2241,23 +2084,6 @@ async def go_online(
         # engine never stamps it) — use the sync time as the actual end time
         if updated.state == TournamentState.FINISHED and updated.finish is None:
             updated.finish = _wall_clock_now(updated.timezone)
-        # Same vekn_results_stale compare as /action, against the locked pre-image —
-        # the restore above only carries the flag over, not what the offline session changed.
-        if (
-            tournament
-            and tournament.vekn_pushed_at
-            and not updated.vekn_results_stale
-            and (
-                tournament.winner != updated.winner
-                or encoder.encode(tournament.standings)
-                != encoder.encode(updated.standings)
-                or encoder.encode(tournament.finals) != encoder.encode(updated.finals)
-                or encoder.encode(tournament.rounds) != encoder.encode(updated.rounds)
-            )
-        ):
-            updated.vekn_results_stale = True
-        # Mints rather than waiting: an offline-created event's VEKN push is the
-        # hourly batch's, which stops running entirely at the decommission.
         if not updated.event_code:
             updated.event_code = await resolve_event_code(updated, tx_conn)
         await scrub_anonymized_copies(updated)
@@ -2579,7 +2405,6 @@ router = Router(
     "/api/tournaments",
     route_handlers=[
         add_organizer,
-        push_vekn,
         remove_organizer,
         upload_banner,
         get_banner_image,

@@ -204,7 +204,7 @@ every scheduled job streams or holds a narrow projection: a `vekn_id → uid` ma
 rather than 19k decoded users, the archive decoded into only the fields the TWDA
 sync reads, rating tournaments by cursor and users in batches. Nothing large stays
 cached between passes either: the member sync builds the ~45 MB city index per
-run, and the tournament and TWDA syncs only on a run that has a city to fill (a
+run, and the TWDA sync only on a run that has a city to fill (a
 create or a location edit reads the city list once to name the city from its id),
 krcg's ~75 MB card DB is dropped once the Amaranth id map is read off it, and
 fpdf is imported on the first NDA render (idle, 34 MB). Measured on beta at
@@ -337,7 +337,7 @@ change the contact point. It lays out, in the stack's Archon folder, the **Archo
 production** dashboard — health at a glance, CPU, memory, network and disk with
 throughput, operations and stall per unit, units (Fluent Bit left out of every
 panel: only the alerts watch it),
-the tournaments and members the VEKN push currently fails on with the reason
+the members the VEKN push currently fails on with the reason
 ([vekn](vekn.md#outage-resilience)), and the logs filtered by unit, level and free
 text, where a user's uid finds their SSE connections and any error naming them —
 beside Node Exporter Full, and the

@@ -188,9 +188,9 @@ Setup: Create an app at [Discord Developer Portal](https://discord.com/developer
 | `VEKN_API_BASE_URL` | `https://www.vekn.net/api` | VEKN API endpoint |
 | `VEKN_API_USERNAME` | _(none)_ | Required when sync is enabled |
 | `VEKN_API_PASSWORD` | _(none)_ | Required when sync is enabled |
-| `VEKN_PUSH` | _(none)_ | Enable pushing tournament results to VEKN |
-| `VEKN_PUSH_INTERVAL_HOURS` | `1` | Hours between push batch jobs |
-| `VITE_VEKN_PUSH` | _(none)_ | Build-time feature flag. When `"true"`, tournament creation enforces VEKN-compatible settings (mandatory round count 2–4, open rounds default on). Leave unset for non-VEKN instances |
+| `VEKN_PUSH` | _(none)_ | Enable pushing newly created members to VEKN |
+| `VEKN_PUSH_INTERVAL_HOURS` | `1` | Hours between member push batch jobs |
+| `VITE_VEKN_PUSH` | _(none)_ | Build-time feature flag. When `"true"`, shows pending VEKN member-sync badges. Leave unset for non-VEKN instances |
 
 ### TWDA Auto-PR (Tournament Winning Deck Archive)
 
@@ -223,7 +223,7 @@ To set up your own GitHub App for TWDA:
 
 4. **Install the App twice**, noting each **Installation ID** from the URL after installation (`https://github.com/settings/installations/{INSTALLATION_ID}`): on your fork with Contents, and on `GiottoVerducci/TWD` (ask the repo owner) with Pull requests only — the archive never needs to approve write access.
 
-When all five variables are set, Archon will create a branch `archon/{vekn_event_id}` on the fork and open a PR with the winner's deck in TWDA format. If the decklist is updated later, the PR is automatically updated. If the variables are not set, this feature is silently skipped.
+When all five variables are set, Archon will create a branch `archon/{event_code}` on the fork and open a PR with the winner's deck in TWDA format. If the decklist is updated later, the PR is automatically updated. If the variables are not set, this feature is silently skipped.
 
 ## License
 

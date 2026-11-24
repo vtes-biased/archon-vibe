@@ -9,18 +9,18 @@ retiring these syncs means is [below](#decommission); the evidence for the work 
 
 | Flag | Scope | Effect |
 |---|---|---|
-| `VEKN_PUSH` | backend env | enables all outbound push |
-| `VITE_VEKN_PUSH` | frontend env | restricts the `max_rounds` UI to 2–4, shows the VEKN link badge and the amber pending-sync badges |
-| `VEKN_SYNC_ENABLED` | backend env | enables periodic inbound member and tournament sync |
+| `VEKN_PUSH` | backend env | enables outbound member creation push |
+| `VITE_VEKN_PUSH` | frontend env | shows the amber pending-sync badges on unsynced members |
+| `VEKN_SYNC_ENABLED` | backend env | enables periodic inbound member roster sync |
 | `VEKN_SYNC_INTERVAL_HOURS` | backend env | inbound period from 04:00 UTC, default 6h |
 | `TWDA_SYNC_ENABLED` | backend env | enables the archive sync — separate from `VEKN_SYNC_ENABLED`, because it must outlive the VEKN API |
 | `JUDGE_SYNC_ENABLED` | backend env | enables the daily [judge directory](#judge-directory) sync — a different upstream with no credentials |
-| `VEKN_PUSH_INTERVAL_HOURS` | backend env | outbound push period, default 1h |
+| `VEKN_PUSH_INTERVAL_HOURS` | backend env | outbound member push period, default 1h |
 
-All directions need `VEKN_API_BASE_URL`, `VEKN_API_USERNAME`,
+All VEKN member sync directions need `VEKN_API_BASE_URL`, `VEKN_API_USERNAME`,
 `VEKN_API_PASSWORD`.
 
-**Beta runs both inbound syncs and no outbound write, by design.** `VEKN_PUSH` is
+**Beta runs inbound member sync and no outbound write, by design.** `VEKN_PUSH` is
 false there, and the TWDA GitHub App credentials are left unset so `is_configured()`
 is false and every archive submission skips. Neither vekn.net nor the public
 archive may take a write from a rehearsal environment — that is what makes beta
@@ -30,90 +30,16 @@ rehearsed there have been applied there.
 
 ## Outbound push
 
-Real-time pushes are all `asyncio.create_task` and never block a user request. The
-object is saved with the flag unset before the task runs, failures are log-only,
-and the hourly batch retries off the unset flag. Each function SSE-broadcasts the
-updated object after saving so clients see the change without reconnecting.
+Real-time member pushes are `asyncio.create_task` and never block a user request. The
+member is saved with `vekn_synced = false` before the task runs, failures are log-only,
+and the hourly batch retries every member with `vekn_synced = false`. On success,
+`push_member` sets `vekn_synced = true` and SSE-broadcasts the updated member so clients
+see the change without reconnecting.
 
-| Trigger | Flag set on success |
-|---|---|
-| tournament create | `external_ids["vekn"]` |
-| tournament finish | `vekn_pushed_at` |
-| member sponsor / create | `vekn_synced = true` |
-
-**Batch retry**, hourly, catches every missed real-time push: members with
-`vekn_synced = false`; tournament events with no `external_ids.vekn`; tournament
-results with `vekn_pushed_at IS NULL` **and a non-empty `rounds` array**.
-
-The `rounds` guard excludes round-less VEKN imports — an import carries summary
-results only, and re-pushing the source of record is pointless. Rich ETL and
-archon-merged history does have rounds, so both importers stamp `vekn_pushed_at`
-on every finished tournament they write, old archon having already pushed those
-results. Standings with no rounds mean a round-less import and nothing else — a
-native tournament that loses its last round has its standings cleared with it, by
-`CancelRound` — so guarding on `rounds` excludes exactly the imports.
-
-A successful results push here also retries the TWDA submission for events that
-missed it at finish — finished offline, or whose VEKN event id only arrived in the
-same batch.
-
-### archondata format
-
-```
-{nrounds}¤{placement}§{first}§{last}§{city}§{vekn}§{gw}§{vp}§{vpf}§{tp}§{toss}§{rtp}§...
-```
-
-The first field is the **final placement** — `1 | 2 | [5..P] | DQ | WD`, never a
-row number. vekn.net stores it verbatim as `veknparticipant.pos` and reads position
-1 as the tournament winner. Its own uploader calls the `rtp` we send an estimate to
-be overwritten by a nightly batch (`vekn-api/doc/archon_upload.php:245`); what that
-batch actually leaves standing is
-[measured, not assumed](domain/vekn.md#never-chase-veknnets-stored-rtp). So the
-winner takes position 1 however low the seat they won the final from, and rows go
-out in placement order, finalists first, because vekn.net renders them in the order
-it receives them.
-
-The placement is the engine's `compute_final_standings`, the same rule the ratings
-and the standings screen read, with two departures the format forces:
-
-- **A player with no placement carries a flag, not a number** — `disqualified` →
-  `DQ`, the derived `no_show` → `WD`. A number would file them as a ranked
-  competitor and the rating batch would pay them for it. Proxies are dropped from
-  the push entirely.
-- **A no-final event numbers its rows 1..N by preliminary standing.** With no
-  final the engine names no winner and ties rows at rank 1, which would hand the
-  winner bonus to every one of them; the ordinal matches what vekn.net does with
-  such an event itself. What it *should* do is [open](tournaments.md).
-
-**A successful upload is not a published result.** `uploadArchon` validates and
-writes to `#__veknarchon`, then returns 200 — and that is all it does. The
-`#__veknparticipant` rows every reader sees, `pos` included, are inserted only by
-`archon_approve.php`, a manual page restricted to super users, the Ratings
-Coordinator and NCs. So between our push and a human approval an event legitimately
-carries **no players at all** on vekn.net: `attendance` 0, an empty `players` list,
-no placement, no rating. That is a queue, not a loss, and no API call clears it.
-
-A corollary worth stating, because it looks like a bug: reading an event back after
-a successful push and finding nothing there proves nothing about the push. The
-only failure it distinguishes is one that `uploadArchon` rejected outright, and
-those raise on the inner `code` at the time.
-
-**vekn.net's importer cross-contaminates a mixed tail.** `archon_approve.php` sets
-`dq` or `wd` in a `switch` that never clears the other, so a `WD` row following a
-`DQ` row is stored as disqualified too. Nothing we can send prevents it.
-
-GW is prelim-only, with the finals GW removed for the winner, and `vp` is prelim
-with `vpf` separate — see the double-count warning in
-[domain](domain/vekn.md#never-chase-veknnets-stored-rtp).
-
-Format and rank map to a VEKN event type id: Standard/Basic 2, Standard/NC 8,
-Standard/CC 6, Limited/Basic 3, V5/Basic 16, Storyline/Basic 9.
+Tournament calendar and results push retired at [Stage 1](#decommission).
 
 ### Push constraints
 
-- `max_rounds` is immutable once pushed, enforced backend and frontend.
-- VEKN requires a name of 3–120 characters, 2–4 rounds, and an organizer holding a
-  `vekn_id`.
 - **A `vekn_id` is required to *register*, not merely to push.** The engine refuses
   to seat a player without one (`Register`, `AddPlayer`, and the `CheckIn` walk-in
   path all reject an empty id), so an official sponsors or links the account before
@@ -122,12 +48,6 @@ Standard/CC 6, Limited/Basic 3, V5/Basic 16, Storyline/Basic 9.
   the exception: it mints local `TEMP-` ids, and go-online resolves each against a
   real account — by VEKN id, then by email — or creates a member. Which is why
   taking a tournament offline needs `sponsor_member` on top of organizer rights.
-- The organizer is impersonated via a `Vekn-Id` header on `create_event`, so the
-  calendar entry is filed under the **organizer's own** VEKN id.
-- VEKN requires a venue for an in-person event and its venue resource rejects
-  POST, so we file every one of them against the generic placeholder venue the
-  VEKN admins provisioned. It is not a location — see the inbound rule
-  [below](#tournaments).
 - **Member creation requires a city.** The registry refuses a create whose
   `firstname`, `lastname`, `email`, `country` or `city` is empty — `state` is the
   one optional field, per its own `createPlayer` in `vekn-api/vekn/registry.php`
@@ -146,12 +66,6 @@ Standard/CC 6, Limited/Basic 3, V5/Basic 16, Storyline/Basic 9.
   registry id onto our member, keeping our id under the registry's name is a false
   sync, and a substring match can name a different person. The failure line carries
   the registry's id, and an IC reconciles the two accounts by hand.
-- Open-rounds events are never pushed.
-- **A calendar entry is filed with its final** (`NR+F`) unless the event has
-  already finished without one. vekn.net checks the results upload against
-  `rounds + final` and the API cannot amend an entry, so an event created before
-  its outcome is known bets on the final most events play; one that ends without
-  it is refused, and an official corrects the entry on vekn.net.
 
 ### Outage resilience
 
@@ -161,90 +75,23 @@ hourly batch drains the backlog. On top of that:
 
 - **Fail-fast** — the batch aborts the whole run on the first
   `VEKNAPIConnectionError` (transport down, timeout, or auth failure) rather than
-  re-timing-out every pending item serially at 30–120s each; it reruns next cycle.
-  Per-item *data* errors still skip just that item. The client wraps aiohttp total
+  re-timing-out every pending member serially at 30–120s each; it reruns next cycle.
+  Per-member *data* errors still skip just that member. The client wraps aiohttp total
   timeouts into that exception, because **a `ClientTimeout` breach raises
   `asyncio.TimeoutError`, not an `aiohttp.ClientError`** — an
   `except aiohttp.ClientError` misses timeouts entirely.
-- **No lost updates** — push functions re-fetch the User or Tournament immediately
-  before writing back the vekn flags. The batch loads rows up front but may save
-  minutes later during outage-recovery backlog, so re-fetching narrows the clobber
-  window to microseconds and interim edits survive.
+- **No lost updates** — `push_member` re-fetches the User immediately before writing
+  back `vekn_synced`. The batch loads rows up front but may save minutes later during
+  outage-recovery backlog, so re-fetching narrows the clobber window to microseconds
+  and interim edits survive.
 - **Observability** — scheduled jobs record last success and error in process, and
-  `GET /admin/vekn-status` (IC-gated) exposes member sync, tournament sync and
+  `GET /admin/vekn-status` (IC-gated) exposes member sync, TWDA sync, judge sync and
   batch push, so a days-long outage is visible without grepping logs. It resets on
-  restart. The batch's `errors` counts every member, event or results push that did
-  not land, refused or skipped, so a stuck item reads as non-zero every hour. Every such
-  failure logs one line, `VEKN push failed: tournament=<uid> vekn_event=<id|->
-  reason=…` or `… member=<vekn id> reason=…`, which the production dashboard's
-  **VEKN push** tables group over the last two hours: the list to hand the VEKN API
-  admins when the refusal is theirs.
-
-### Post-push divergence
-
-The results push is **write-once**: once successfully pushed, vekn.net cannot be
-updated or corrected through the API, so a post-push correction never reaches it.
-Resolving that means a manual admin fix on vekn.net, out of band.
-
-`vekn_results_stale` is a sticky flag set when result-bearing content — `winner`,
-`standings`, `finals`, `rounds` — changes after `vekn_pushed_at`. It is detected by
-**content diff, not event type**, in both places results can change post-push: the
-tournament action handler (a reopen and rescore) diffs all four before and after,
-and the sanction handler (an SA- or DQ-driven recompute) diffs standings. Both skip
-the compare once already stale, so it fires at most once per pushed tournament.
-
-It is excluded from the member projection, re-stamped from the authoritative row at
-go-online, has no in-app clear path, and surfaces to organizers as an "Out of sync
-with vekn.net" header badge — shown regardless of `VITE_VEKN_PUSH`, unlike the
-amber pending-sync badges, which are flag-gated.
-
-### Placements handed to the VEKN API maintainers
-
-*(Measured 2026-08-24, `backend/scripts/audit_vekn_placement.py` over 322 events:
-279 agree, 15 disagree, 28 hold no placement, 2 resolve to no event.)*
-
-15 events carry a placement upstream that disagrees with ours, all of them from
-the preliminary-standings push order the placement fix replaced. 4 crown a
-different player at row 1 — 12997, 13379, 13506, 13436 — and 11 agree on the
-winner but not on the five: 12637, 12955, 12820, 12951, 12994, 12837, 13169,
-13226, 13004, 13497, 13413. In each of the four crowns upstream holds the same
-five we do and differs only in which sits at row 1, which is that order's exact
-signature and is why our side is the right one.
-
-The results upload is write-once, so the list went to the VEKN API maintainers on
-2026-08-24 rather than being corrected row by row: the fix is theirs. Whether
-upstream re-derives points from a corrected `pos` is
-[unestablished](domain/vekn.md#never-chase-veknnets-stored-rtp).
-
-### Events awaiting approval on vekn.net
-
-*(Measured 2026-08-24, `backend/scripts/audit_vekn_placement.py` over 322 events.)*
-
-28 finished events carry no participant rows upstream. That is the normal state of
-an archon file we uploaded and nobody has approved yet — participants exist only
-once `archon_approve.php` runs, above — so it is a **queue an official has to
-work**, not a defect of ours and nothing to hand the API maintainers. 12478
-(*"Prueba fallida to be deleted"*) and 12844 resolve to no event at all and are
-separate.
-
-Seven of the 28 are genuinely refused, on the round count: 12498, 12555, 12959,
-13495, 13487, 13500, 13473. vekn.net computes `nrounds + final` and compares it to
-the archon file's, so *Göcsej Under Siege* (13500) — ours 4 against a calendar
-`3R` — drew `provided 4, expected 3`. An entry filed without its final flag falls
-one short, which is most of what keeps the entries in
-[vekn-decommission](vekn-decommission.md#push-the-results-stuck-on-the-calendars-round-count)
-refused. Production read on 2026-11-03: 13500 and 13473 carry a push stamp (2
-September, 7 August), while 12498, 12555 and 12959 carry the legacy-archon
-migration's (30 June), which stamps without uploading, so nothing retries them:
-`UNPUSHED_RESULTS_QUERY` filters on the stamp, the manual push-vekn route skips
-the results push on a stamped row too, and a raw SQL clear would strand the member
-projection on the old value. `fix_stuck_vekn_push.py` clears it once the entry
-is corrected on vekn.net.
-
-Comparing those counts means reading the calendar field as the string it is:
-`event.php` returns `CONCAT(rounds, "R", IF(final > 0, "+F", ""))`, so `3R+F` is
-four in the archon file's terms and the `+F` must be added back —
-`_parse_rounds` drops it on purpose, because `max_rounds` is prelim-only.
+  restart. The batch's `errors` counts every member push that did not land, refused or
+  skipped, so a stuck item reads as non-zero every hour. Every such failure logs one
+  line, `VEKN push failed: member=<vekn id> reason=…`, which the production dashboard's
+  **VEKN push** table groups over the last two hours: the list to reconcile by hand
+  when the refusal is a registry collision.
 
 ## Inbound sync
 
@@ -275,275 +122,12 @@ four in the archon file's terms and the `+F` must be added back —
 
 Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
 
-### Tournaments
+Manual trigger: `POST /admin/sync-vekn` (members).
 
-`sync_all_tournaments()` imports historical events:
-
-- Standings are **prelim-only** — the project contract. When a final was played
-  (`sum(vpf) > 0`) it reconstructs a `finals` object — seats by placement, winner
-  GW 1, seat VP = `vpf` — so rating and league add finals on top, matching the
-  shape of a native or ETL-imported tournament. A summary-only winner with no
-  `vpf` instead gets the tournament-win GW from the engine's rating rule, with no
-  finals object.
-- **A sheet dated before 2011 with no `vpf` folds the final into its prelim
-  totals.** That is vekn.net's legacy format — no round count, the winner at
-  `pos` 1, the other finalists all at `pos` 2, everyone else at 6 — and it runs to
-  December 2010. The sync takes the winner's final GW back out, except where that
-  would leave the winner below an eliminated player's GW: a finalist qualified on
-  prelim GW, so such a sheet was never folded (about 7% of them). The other
-  finalists' folded VP stays, since these sheets carry no `vpf` to subtract. The `vpf`-bearing
-  sheets vekn.net's newer format filed from late 2008 are prelim-only, which is why
-  the rule keys on `vpf` and not on the date alone.
-- **A legacy sheet takes what it lacks from its archive entry** — the one settled
-  onto the row as `twda_entry` or `twda` ([below](#inbound)). The entry's `NR+F`
-  is the round count, and its `+Z in final` moves the winner's final VP out of the
-  prelim into a `finals` seat, together with the final GW, wherever the sheet reads
-  as folded — by the rule above, or by the winner sitting at exactly that round
-  count plus one ([below](#tournaments)). An `XGWY` beside it must then be exactly
-  the sheet minus that final, which alone also marks the sheet folded, or nothing
-  is split: the archive's own lines are sometimes the total (archon's submissions
-  wrote them so). The fill therefore
-  never changes a winner's total, only where it sits. The other finalists' seats
-  carry 0 VP, their final still folded into their prelim, and print that way on the
-  finals tab. Measured offline on 834 legacy sheets matched to an entry: 530 round
-  counts filled, 194 finals split.
-- **The sync fetches the archive itself, every cycle.** Anything the TWDA job
-  wrote onto a vekn import would be rebuilt away six hours later, so the fill sits
-  on the incoming side of the one writer. A failed fetch holds only the rows
-  carrying an archive key — rebuilt without it, a filled sheet would fold back and
-  flip forward on the next cycle — and the rest of the calendar syncs as usual, so
-  the archive's CDN never stalls a new event.
-- **A GW above the sheet's own round count is the winner's final, or a wrong
-  count.** A winner at exactly rounds + 1 with nobody else above it carries the
-  final GW, and loses it like a legacy winner (eight sheets, 2013–2025). Anyone
-  else above it means the round count is wrong — 7300, 8523, 9474, 9667, each a
-  `2R` with a 3-GW non-winner — and it imports as unknown (0) rather than as a
-  guess. That
-  winner's VP stays as filed: legacy archon pushed `vp` with the final folded in
-  ([domain](domain/vekn.md#never-chase-veknnets-stored-rtp)), so a folded VP is
-  common and no single sheet tells it from a real one.
-- **A member listed twice on one sheet keeps one row** — the better placed, the
-  first on a tie — and the sync logs the dropped one. vekn.net carries the
-  duplicate itself, sometimes with a second real score that belongs to nobody else.
-- **`dq` and `wd` say `pos` is not a placement.** Each participant carries both
-  beside `pos`, and vekn.net files a flagged row at `pos` = field size — so reading
-  it as a placement crowns that player a finalist in a field of five. Neither flag
-  may reach the finalist or winner test.
-- **A `dq` row is imported zeroed and disqualified on both halves of the signal**
-  ([hazards](hazards.md#consumers-that-must-move-together)) — the row flag for the
-  placement path and `Disqualified` for the rating path, or half the consumers stay
-  blind to it.
-- **A `wd` row is imported as an ordinary competitor**, keeping its score, its rank
-  and its rating. Withdrawing is not an excluded class in this app: a player who
-  drops mid-event stays ranked on what they earned and is barred only from the
-  final ([tournaments](tournaments.md#finals)). Excluding an imported withdrawal
-  would import a rule we do not have. Its flag is kept as `Standing.withdrawn` for
-  one reader: the play record's per-game figures, since a dropout's games are
-  unknown on a rounds-less sheet. A `wd` row that scored nothing is a no-show
-  by the ordinary derivation and needs no flag to become one — which is what makes
-  the round trip of our own push, where `no_show` goes out as `WD`, come back
-  unchanged.
-- Sorts the sheet with the engine's own rule, never a key of its own
-  ([tournaments](tournaments.md#standings)).
-- Re-sync compares the authoritative play data so a VEKN-side score correction, and
-  legacy folded imports, self-heal.
-- **Authority follows content.** VEKN is authoritative for a matched event only
-  where it has something to say: a local row *with* rounds, or an incoming event
-  with no players, gets a metadata-only refresh. That refresh also takes `rounds`
-  while the row has no local rounds and both sides hold a cap, since the app
-  locks the field and a format change made on vekn.net would otherwise never
-  arrive; an uncapped app event is not capped by the calendar's filed minimum.
-  Rebuilding a round-less row from
-  an empty calendar entry used to reset an in-app event still taking registrations
-  back to `Planned` and discard everyone registered — on every sync until its first
-  round started.
-- **Which side owns a field is decided by what a mismatch costs**, not by who
-  wrote it first. vekn.net owns a field and the app freezes it where the two
-  values *must* agree — the push mechanically depends on it (`rounds`), ranking
-  has to come out the same on both sides (`rank`, `format`), or a divergence
-  misleads players trying to join (`start`). The app owns `name`, `finish` and
-  `timezone`, where the two are free to differ and the app is plainly the truth:
-  the sync fills them when it creates the row and **never modifies them again**
-  — an adopted local copy keeps the values it already held — so an organizer's
-  edit survives the cycle. Freezing everything instead would be
-  simpler and is wrong — it hands a filed event's title to a system the organizer
-  cannot edit it on. An end date added on vekn.net after the app created the row
-  is therefore set in the app, not imported. `city` is app-owned too, but filled:
-  when a row has none, the sync takes the venue record's city, else the event's,
-  matched in GeoNames within the country, and never rewrites one it holds.
-  vekn.net venues have no state field: the segments of the venue address, ZIP
-  stripped, stand in as the state hint.
-  Everything else — `country`, `venue`, `address`, `venue_url`, `map_url` — stays a
-  vekn.net refresh, except that an empty or `XX` vekn.net country on an in-person
-  event keeps the app's: both mean unknown there, and taking them would orphan the
-  city.
-- **Event times are wall clock at the venue**, which is how `start`/`finish` are
-  stored: naive, paired with `timezone`. The sync writes VEKN's time verbatim
-  and, **at creation only**, fills `timezone` from a guess off the venue country
-  and city; online events with no venue keep the UTC default. Converting to UTC
-  here made every reader that anchors the naive value shift it twice.
-- **The placeholder venue is not authoritative for location.** An event we filed
-  ([above](#push-constraints)) reads back on venue 9999, "Check on Archon" in
-  `AQ`, which answers for no real place: the sync drops it and keeps whatever the
-  app holds for country, venue, venue url, address and map url — `timezone` needs
-  no entry here, being app-owned on every linked event. Taking it at face value
-  moved a Budapest national qualifier to Antarctica/UTC within the hour and undid
-  the organizer's re-entry on every run (gh-9). **Venue 3800, GoblinTrader Mallorca,
-  is the same stand-in from 2025 on**: legacy archon filed its events against that
-  real Palma shop, so Budapest, Seville, Osnabrück and Itaocara all read back as
-  Spain. It is a placeholder only by date — the events held there before 2025 were
-  held there — so the rule keys on venue *and* start date. The archive copied it
-  onto some of those events as `Palma de Mallorca, Spain`, so the TWDA import
-  reads no city from that place on an entry dated 2025 or later.
-- Carries `proxies_allowed` onto `proxies`, **except under a championship rank,
-  which forbids proxies by rule**. A few vekn.net championships do set the flag,
-  and importing that combination would block every later config edit on engine
-  legality. The sync reads the flag back, so a local edit would revert rather than
-  diverge — which puts it on vekn.net's side of the rule above: the sync refreshes
-  it like other descriptive metadata, and the app's field is frozen once a
-  tournament holds a vekn id.
-- Seeds venue autocomplete data.
-- Stamps `vekn_pushed_at = now` on finished imports so the batch never re-uploads
-  them.
-- Rebuilds changed tournaments field by field, so local-only bookkeeping
-  (`checkin_code`, `twda_status`, `vekn_event_absent_at`) and the three app-owned
-  fields must be **explicitly carried over** from the existing row or they reset
-  on every re-sync.
-
-Each phase — member, tournament, TWDA — is wrapped independently: an exception or
-timeout logs an error and skips that phase for the cycle without aborting the
-others.
-
-### Results across the three sources
-
-**Truth follows provenance.** An event with rounds here — run in the app, or
-merged from legacy archon — is Archon's, and vekn.net's sheet of it is a copy
-frozen at upload. A rounds-less vekn import is vekn.net's, read through the rules
-[above](#tournaments). An event vekn.net does not hold is the archive's
-reconstruction. No source corrects another outside those rules: the results
-upload is write-once, and the archive is not ours to edit.
-
-`backend/scripts/audit_results.py` compares every event more than one source
-describes — winner, finalists, prelim GW/VP, round count, field size — and prints
-each disagreement under its class. It reads a vekn.net sheet through the importer,
-so what the rules already correct does not show.
-
-*(Measured 2026-09-26 on production, 9,411 finished events against a full vekn.net
-scan of 8,304 and the archive's 4,538. The first sync applying the rules
-[above](#tournaments) left no GW above a known round count on a stored row.)*
-
-| Class | Found | What stands |
-|---|---|---|
-| Archon vs vekn.net: the sheet's prelim holds the final | 178 events | Archon — legacy archon's upload, frozen upstream |
-| Archon vs vekn.net: winner or finalists | 16 | Archon — the 15 [with the maintainers](#placements-handed-to-the-vekn-api-maintainers), plus 13388 |
-| Archon vs vekn.net: a no-final event's rows 1–5 (12642, 13471) | 2 | Archon — our own push numbers them by prelim standing |
-| Archon vs vekn.net: a prelim score the final does not explain | 8 | Archon |
-| Archon vs vekn.net: fewer rounds played than the calendar declares | 7 | Archon |
-| Archon vs vekn.net: field size | 29 | Archon — 27 sheets lack a player or two we hold, 12505 and 13529 carry rows we count as not played |
-| Archon vs archive: the winner's score line | 33 | Archon — archon's submissions wrote totals |
-| Archon vs archive: field size | 5 | Archon |
-| vekn.net vs archive: round count, field size, winner's score line | 36, 179, 94 | vekn.net |
-| vekn.net vs archive: the winner's name | 77 | vekn.net's winner, under the name Archon holds |
-| An archive reconstruction of an event vekn.net holds | 3 | two events each, below |
-| A GW above a known round count | 0 | — |
-
-**The winner's name is Archon's.** A member may change their name here, so an
-archive entry naming the winner differently is no disagreement about who won.
-Sixty of the 77 are spellings of one person, all but one on a merged event, which
-the audit compares through its transplanted archive key; the other 17 name someone
-else, four of them Vivica for Alexander Båskman (1776, 4126, 7343, 13120), and the
-archive's deck stays with vekn.net's winner there too.
-
-**A reconstruction of an event vekn.net holds was merged** on 2026-09-23, keeping
-the vekn.net copy — and its name — with the archive key transplanted, where the
-winner, the day and the field size agree (66), and on the owner's ruling for ten
-more whose field size or name drifted.
-Three stay two events: *Blood League part IV* against 11478 and *SuperHappyFunSlide
-Day 2* against 5581, each a different event won by the same player a day apart, and
-*GenCon NAC Qualifier* against 1380. The audit reports those three every run.
-
-### The event vekn.net no longer has
-
-An event created by mistake and deleted upstream would otherwise stay linked here
-forever, undeletable, and be re-pushed by the hourly batch into a 404 loop.
-`vekn_event_absent_at` is the record that it is gone: the instant the scan first
-confirmed it, null while the event still answers.
-
-**The verdict is per id, and it is not the scan's yield.** `fetch_all_events`
-fills a `probed` map — id to "does an event answer" — off `fetch_event`'s
-confirmed-no-event branch, which the API gives per id and free, since the scan
-already probes every id every run. What the scan *yields* is a different question:
-it drops past events with no players, which exist upstream and are the exact
-profile of an event entered by mistake. Diffing against the yield would therefore
-flag the whole population this serves.
-
-**Absence from the map is unknown, never gone.** An id the run failed on
-transiently (`fetch_event` raises rather than returning None precisely so these
-stay distinguishable) and every id above the run's stop on `empty_run_limit` is
-simply not in it, and moves nothing.
-
-`_record_vekn_absence` is the field's only writer. It runs once after the scan,
-stamps the live tournament holding a confirmed-gone id, and clears the flag when
-that id answers again — including when the event comes back as a past entry with
-no players, which the yield never sees. A row already flagged keeps its first
-instant rather than being restamped each run.
-
-**It unlocks the delete**, so it is server-owned and no client can write it:
-`DELETE /tournaments/{uid}` refuses a VEKN footprint unless the flag is set. It is
-organizer-projection only, and a header badge on the tournament says the upstream
-record is gone. Giving ICs a blanket cleanup capability for events that *do* still
-exist upstream is separate, and waits on stage 1
-([vekn-decommission](vekn-decommission.md#ic-record-curation--events-to-delete)).
-
-A false positive costs a duplicate, not data: the soft-deleted row keeps its vekn
-id, `get_tournament_by_external_id` skips tombstones, and the next sync re-creates
-a live copy.
-
-### Matching an incoming event
-
-The primary key is `external_ids.vekn`. The legacy archon merge imports old events
-that never carried a vekn id, though, and those are invisible to that key — each
-path used to insert its own copy of one real event. So on a miss the sync falls
-back to **name + start within 24 hours** and *adopts* the local copy, stamping the
-vekn id onto it rather than creating a second row. The two paths get their times
-from different humans and the observed skew reaches 9 hours. The legacy merge
-applies the same fallback as its last key.
-
-**Name + day is not an identity key.** Legacy imports share placeholder names —
-`Imported VTES Event` covers hundreds of distinct 2005 events, dozens on a single
-Saturday — and one convention runs several same-named events in a day. It is
-evidence of identity only where it is *unique in the corpus*, so both callers
-abandon the match when it isn't: the sync refuses if any other same-name,
-same-day copy already holds a vekn id (proof the key doesn't discriminate there),
-the merge refuses on more than one candidate, and a declared `country` that differs
-drops a candidate outright. The sync additionally refuses a candidate holding
-registered players but no rounds, because the round-less update path treats
-vekn.net as authoritative for players and adopting would wipe a live registration
-list — **except an archive reconstruction**, which has exactly that shape by
-construction. There, adopting is the point: a full VEKN result set is strictly
-richer than a one-player reconstruction, and refusing would mint a duplicate of
-an event we already hold. The carve-out reads `external_ids['twda']`, so the
-guard is keyed on where the row came from rather than on what it looks like.
-
-Duplicates that already exist are **reported, not repaired**: each run ends with
-one grouped query logging live copies of one event where **some but not all** hold
-a vekn id. That mixed condition is what makes the report mean anything — without
-it, every same-name, same-day cluster matches and the output is mostly distinct
-events. Copies that *all* hold different vekn ids are a separate class: one event
-entered twice on vekn.net, which is VEKN's record to reconcile, not ours.
-
-Resolve a reported group with `backend/scripts/dedup_tournaments.py`. It reports
-the play-data metrics the choice hangs on — the vekn-linked copy is often the
-*poorer* one — then soft-deletes the losers and **transplants the vekn id onto the
-survivor**. Without that transplant the next sync finds no live holder of the event
-id and re-creates the copy just deleted. A loser's archive key travels the same way
-and always as `twda_entry`: the survivor is the event that entry describes now,
-whatever the loser was. Ratings aggregate whatever is live, so a
-group with more than one rating-eligible copy was double-counted: recompute after
-applying.
-
-Manual triggers: `POST /admin/sync-vekn` (members and tournaments),
-`POST /admin/sync-vekn-tournaments`.
+Inbound tournament sync retired at [Stage 1](#decommission). Existing rounds-less VEKN
+imports stay in the corpus as imported; `backend/scripts/dedup_tournaments.py` resolves
+historical duplicate pairs by soft-deleting the loser and transplanting `external_ids.vekn`
+(and any archive key as `twda_entry`) onto the survivor.
 
 ## TWDA
 
@@ -565,8 +149,7 @@ corrections and a rescored final all reach the archive, the open pull request
 taking the new file and a merged one getting a fresh request; on a config edit
 of the Finished event that moves its country or online flag, the header's place,
 while its pull request is still open;
-on the manual organizer publish; on the batch after a successful results push, covering events
-finished offline or whose VEKN event id only just arrived; and on go-online for a
+and on go-online for a
 tournament finished offline. In a multideck event the archived deck is the one
 stamped at the finals index; none on record is `no_deck`.
 
@@ -666,18 +249,17 @@ a member asks for one.
 ### Inbound
 
 **The VEKN record outranks the archive.** Where both describe the same event, the
-VEKN result stands and the TWDA fills only what the record does not carry — on a
-legacy sheet the round count and the winner's final VP, written by the tournament
-sync ([above](#tournaments)), never by this job. The
+historical VEKN result stands and the TWDA sync fills only what the record does not
+carry (city and winning decklist). The
 concrete consequence is that `reported_player_count` is stamped **only where
 `players_with_rounds` is zero** — no rounds and no standings row carrying a score,
 which is the archival reconstructions and nothing else — and **never on a VEKN
-import**, even though the sync drops players whose VEKN id we do not hold and its
-`len(data["players"])` would be a truer field size than the roster that survived.
-Stamping those would move a live rating: the count feeds `compute_rating_points`'
-coefficient, the window is a rolling 18 months, and the winner and runner-up of
-every partial-roster import inside it would gain points. The archival rows cannot,
-being decades outside that window.
+import**, even though the retired sync dropped players whose VEKN id we did not hold
+and its `len(data["players"])` would be a truer field size than the roster that
+survived. Stamping those would move a live rating: the count feeds
+`compute_rating_points`' coefficient, the window is a rolling 18 months, and the
+winner and runner-up of every partial-roster import inside it would gain points. The
+archival rows cannot, being decades outside that window.
 
 The same predicate gates the write and the read — `attested_player_count` reaches
 the field only where nothing else answers — so the attestation can never contradict
@@ -694,19 +276,17 @@ a reconstruction only counts once its deck is on record
 too — it regenerates the snapshot immediately afterwards, and a win list computed
 later would miss it. It runs on `twda_sync`, **its own job under
 its own flag** and recorded on the vekn-status panel: a different upstream, no VEKN
-credentials, that has to outlive the VEKN API rather than be deleted along with the
-chain. Nothing sequences it against the tournament sync, so the two can both reach
-one event — what keeps that from becoming a duplicate is the `external_ids['twda']`
-carve-out in the adopt path above, and any pair that slips past it surfaces in the
-duplicate report, where an archive reconstruction is reported and never proposed
-for merging.
+credentials, that outlives the VEKN API.
 
 **The archive's place names the city.** A reconstruction takes its city from the
 entry's `place`, and settling an attach fills an empty one the same way: read right
 to left, since the archive writes `Venue, City (STATE), Country` as often as
 `City, Country`, each segment matched in GeoNames within the place's country. A
 name GeoNames splits by region, `Springfield (Illinois)`, takes the region the place
-names — the `(STATE)`, a US code spelled out — before the most populous.
+names — the `(STATE)`, a US code spelled out — before the most populous. On entries
+dated 2025 or later, `Palma de Mallorca, Spain` is ignored because legacy archon
+filed unrelated events against placeholder venue 3800 (*GoblinTrader Mallorca*) and
+the archive copied that place onto them.
 
 **The scheduled run only ever does a delta.** More than `MAX_CREATES_PER_RUN`
 unsettled entries pending means it is standing in for the initial backfill, so it
@@ -729,20 +309,14 @@ what made a target that moves under a dedup transplant or a re-migration stop
 attaching, silently and for good.
 
 **The two archive keys are not interchangeable.** `external_ids['twda']` means
-*reconstructed from the archive*, is written only by the reconstruction, and eight
-readers turn on it: the adopt carve-out [above](#matching-an-incoming-event), the
-calendar push's `UNCREATED_EVENTS_QUERY`, `resolve_event_code` and the event-code
-backfill, the Hall of Fame's no-attestation grandfather, the duplicate report's
-refusal to propose, the tournament page's archival badge, and the TWDA
-submitter's `reconstructed` skip. A settled attach
-carries `external_ids['twda_entry']` instead — *this event is the one that entry
-describes* — which gates nothing but the TWDA sync's own recognition and the
-tournament sync's legacy-sheet fill. That fill, and its hold on a failed archive
-fetch ([above](#tournaments)), read either key alike, as *the entry this row
-describes*, and are the one reader indifferent to which key it finds. Reusing
-`twda` would move all seven at once, most concretely admitting rounds-less imports
-to the Hall of Fame and handing them the archive's file key as their public event
-code.
+*reconstructed from the archive*, is written only by the reconstruction, and six
+readers turn on it: `resolve_event_code` and the event-code backfill, the Hall of
+Fame's no-attestation grandfather, the duplicate report's refusal to propose, the
+tournament page's archival badge, and the TWDA submitter's `reconstructed` skip. A
+settled attach carries `external_ids['twda_entry']` instead — *this event is the one
+that entry describes* — which gates only the TWDA sync's own recognition. Reusing
+`twda` would move all six at once, most concretely admitting rounds-less imports to
+the Hall of Fame and handing them the archive's file key as their public event code.
 
 **A stale-target warning names only a decision that never applied**, since one
 that did is on the corpus and never re-read. What remains points at a tournament
@@ -756,12 +330,9 @@ created, renamed, or claims a VEKN id — and a 304 would skip the reconciliatio
 forever, silently and permanently. A 12 MB fetch against a static CDN every cycle
 is the cheaper half of that trade.
 
-The reconstruction writes the same rounds-less archival shape the VEKN and archon
-imports already produce, plus the attested `reported_player_count`
-([tournaments](tournaments.md)), and deliberately **not** `vekn_pushed_at` — that
-would claim results were exchanged with vekn.net, and it trips the delete guard
-that a bad reconstruction needs open. `UNCREATED_EVENTS_QUERY` excludes them
-explicitly, or the push would create 2005 calendar entries on vekn.net.
+The reconstruction writes the same rounds-less archival shape the historical VEKN
+and archon imports produced, plus the attested `reported_player_count`
+([tournaments](tournaments.md)).
 
 **That key reaches only half the archive.** The TWDA began carrying vekn event
 links around 2013, so of 4538 entries 2211 are linked and 2327 are not — 2257 of
@@ -948,61 +519,38 @@ fresh VEKN id allocated and marked push-eligible so the batch push claims the
 number on vekn.net before a future vekn.net assignment can collide with it.
 
 Other invariants: deterministic deck uids (uuid5 of tournament + user + round); a
-pre-run `pg_dump` for recovery; merge writes are **not** live-broadcast over SSE,
-so clients catch up on their next reconnect; and `vekn_pushed_at` is stamped on
-merged finished tournaments so the batch never re-uploads them.
+pre-run `pg_dump` for recovery; and merge writes are **not** live-broadcast over SSE,
+so clients catch up on their next reconnect.
 
 ## Decommission
-
-**Not scheduled, and not ours to schedule** — VEKN greenlights it. Everything above
-runs as described until then. This is the settled shape, written down so the work
-waiting on it names a real condition.
 
 The end state is **archon as the system of record** for members, events and results,
 with vekn.net frozen as a historical archive.
 
-One open question gates the cutover: whether vekn.net recomputes a
-pushed `rtp` or stores it verbatim, and whether a results re-upload replaces or
-appends — Q5 of the
-[no-final rating questions](tournaments.md#no-final-rating-credit-open-with-the-rules-director).
-It decides whether our no-final stance is a display difference or a divergence into
-the system of record, and it must be answered while the API still responds.
-
 **Push is not a third direction to decide — it *is* API calls**, so each direction's
-push dies with the read it accompanies. There is no write-only period: the results
-push is write-once, so a transition that kept pushing would accumulate divergence
-into a system we no longer read, with no repair path and `vekn_results_stale` stuck
-on forever.
+push dies with the read it accompanies.
 
-**Neither stage is a config flip.** `VEKN_SYNC_ENABLED` gates both inbound syncs
-together and `VEKN_PUSH` gates all outbound push together, and `batch_push` is a
-single hourly job draining members, events and results in sequence. Splitting them
-along the tournament/member seam is the work of stage 1.
+### Stage 1 — the tournament calendar retired (2026-11-24)
 
-### Stage 1 — the tournament calendar retires, on the greenlight
+BCP removed the legacy `www.vekn.net` event calendar, event creation and event
+management pages. Inbound tournament sync (`sync_all_tournaments`) and outbound
+event/results push are retired; Archon is the system of record for events and
+results. The hourly batch keeps running for members until stage 2. The app computes
+its own ratings, and every tournament limitation the calendar sync imposed — 2–4
+round cap, post-push round immutability, frozen `rank`/`format`/`start`/`proxies`,
+the VEKN-footprint delete block, the vekn-linked guard on `SetArchivalResults`, and
+deferred `event_code` stamping — is lifted.
 
-`sync_all_tournaments` stops, and with it event creation and results upload. The
-hourly batch keeps running for members until stage 2. The app keeps computing its
-own ratings, which it already does.
-
-This stage is what unblocks the backlog. Every item waiting on it is
-unfixable today for one reason — the sync's full-rebuild branch re-creates anything
-deleted locally and wipes anything corrected — so they all become ordinary local
-work the moment it stops.
-
-`dedup_tournaments.py --probe-vekn` loses its upstream here and cannot be run
-afterwards — it is what tells a live vekn id from a dead one. The calendar scan's
-absence flag ([above](#the-event-veknnet-no-longer-has)) records that same
-distinction every run while the API still answers, so what it has already reached
-survives the cutover.
+The historical corpus curation unblocked by this stage sits in
+[vekn-decommission](vekn-decommission.md).
 
 ### Stage 2 — the member roster retires, when vekn.net registration closes
 
-`VEKNSyncService` stops, along with member creation push and `audit_cities.py`,
-which reads the roster. It is sequenced second because member identity is
-load-bearing in a way the calendar is not — the engine refuses to seat a player
-without a `vekn_id` — and because only the officials review waits on it, against a
-backlog that all waits on stage 1.
+`VEKNSyncService` stops, along with member creation push (`VEKN_PUSH` /
+`VITE_VEKN_PUSH`) and `audit_cities.py`, which reads the roster. It is sequenced
+second because member identity is load-bearing in a way the calendar is not — the
+engine refuses to seat a player without a `vekn_id` — and because only the officials
+review waits on it.
 
 **The precondition is a registry precondition, not a technical one.** We already
 allocate ids ourselves — `allocate_next_vekn_id` takes the first gap in *our own*
@@ -1016,6 +564,6 @@ allocator, for no gain once vekn.net is an archive.
 ### What survives
 
 The TWDA sync, on its own flag and its own schedule, with no VEKN credentials — it
-is a different upstream and becomes the sole external source of historic wins.
-Submission to the archive survives too, rekeyed away from the vekn event id and
-onto the short event code.
+is a different upstream and is the sole external source of historic wins (candidate
+for retirement once no non-Archon TWDA submission route remains). Submission to the
+archive survives on the short event code.

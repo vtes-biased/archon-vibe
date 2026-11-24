@@ -1,4 +1,4 @@
-_Last updated: 8 June 2026 — provided in English, which is the authoritative version._
+_Last updated: 24 November 2026 — provided in English, which is the authoritative version._
 
 Archon is a free, non-commercial tool for organising and recording Vampire: The Eternal Struggle (VTES) tournaments and leagues, run as part of the Vampire: Elder Kindred Network (VEKN) organised-play programme. The data controller responsible for your personal data is:
 
@@ -23,7 +23,7 @@ We do **not** collect special-category data, and we do **not** carry out any aut
 - **Run your account and authenticate you** — necessary to provide the service you asked for (Art. 6(1)(b)).
 - **Organise tournaments and leagues, compute rankings** — our legitimate interest in operating organised competitive play (Art. 6(1)(f)).
 - **Discord "Linked Roles"** — provided at your request when you link your account (Art. 6(1)(b)/(f)).
-- **Submit results and winning decklists to vekn.net** — our legitimate interest in maintaining the official competitive record (Art. 6(1)(f)).
+- **Contribute winning decklists to the public archive (TWDA)** — our legitimate interest in maintaining the official competitive record (Art. 6(1)(f)).
 - **Service messages** — where you have given us an email address, to send you messages about the service (Art. 6(1)(b)). We notify you primarily through in-app notices, so email is not required.
 
 ## Public competitive record
@@ -35,7 +35,7 @@ Tournament results, rankings and submitted decks — together with the player na
 We do not sell your data. We share it only with the services needed to run Archon:
 
 - **Discord** — for sign-in and Linked Roles.
-- **vekn.net** — for profile synchronisation and result submission.
+- **vekn.net** — for profile synchronisation.
 - **GitHub** — when a winning decklist is contributed to the public Tournament Winning Decks Archive (TWDA).
 - **Email (SMTP)** — to deliver service messages, where you have provided an email.
 - **The public / community tools** — for the competitive record described above.

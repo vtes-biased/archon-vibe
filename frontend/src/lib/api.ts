@@ -309,11 +309,6 @@ export async function syncVeknMembers(): Promise<AdminSyncResult> {
   return apiRequest<AdminSyncResult>('/admin/sync-vekn', { method: 'POST' }, { suppressErrorToast: true });
 }
 
-/** IC-only: dispatch a VEKN tournament sync in the background (also runs on a 6h schedule). */
-export async function syncVeknTournaments(): Promise<AdminSyncResult> {
-  return apiRequest<AdminSyncResult>('/admin/sync-vekn-tournaments', { method: 'POST' }, { suppressErrorToast: true });
-}
-
 /** IC-only: dispatch a TWDA decklist import in the background (also runs on a 24h schedule). */
 export async function syncTwdaDecks(): Promise<AdminSyncResult> {
   return apiRequest<AdminSyncResult>('/admin/sync-twda-decks', { method: 'POST' }, { suppressErrorToast: true });
@@ -536,13 +531,6 @@ export async function deleteTournamentApi(uid: string, opts?: { suppressErrorToa
   const { clearOfflineState } = await import('#lib/stores/offline.svelte.ts');
   await clearOfflineState(uid);
   return result;
-}
-
-/** Register a tournament with the VEKN calendar on demand (organizer action). */
-export async function syncTournamentVekn(uid: string, opts?: { suppressErrorToast?: boolean }): Promise<Tournament> {
-  return apiRequest<Tournament>(`/api/tournaments/${uid}/push-vekn`, {
-    method: 'POST',
-  }, opts);
 }
 
 /** Server-only, no optimistic path. */

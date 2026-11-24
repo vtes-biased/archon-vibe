@@ -25,7 +25,7 @@ through the separate API process ([public-api](public-api.md)).
 | Type | `public` | `member` | `full` | `api` |
 |---|---|---|---|---|
 | user | NC/Prince with contact + community links; IC without contact; any other user with non-empty community links as a minimal no-name row (country, roles, links) | all users — no contact except an NC's or Prince's published one, no `deceased_by_uid`/`anonymized_by_uid`, no `github_login`/`github_id`, no `coopted_at`; `deceased_at`, `anonymized_at` and `coopted_by` included ([vekn](vekn.md#legacy-archon-sync)); anyone with non-empty community links gets those included | everything except the owner-only `calendar_token`, `agenda_hidden` and `agenda_added` ([architecture](architecture.md#data-model)) | only users holding a `vekn_id`: uid, the id, country, roles, the four `CategoryRating` fields, `wins`, community links with their moderation value, and city with its GeoNames id for an IC, NC, Prince, Rulemonger, Judge or Sheriff — no name, nickname, contact or avatar |
-| tournament | the event-page fields — config, venue/address/map, city, description, rules flags, `banner_path`: everything an unauthenticated visitor needs to decide whether to attend | all except `checkin_code`, `vekn_pushed_at`, `vekn_results_stale`, `vekn_event_absent_at`, `twda_status` | everything | the member projection minus `announcements`, `raffles`, `promos_distributed`, `promo_stock_source_uid`, `offline_device_id`, and minus each player's `display_name`, `missing_decklist`, `payment_status` and `waitlisted` |
+| tournament | the event-page fields — config, venue/address/map, city, description, rules flags, `banner_path`: everything an unauthenticated visitor needs to decide whether to attend | all except `checkin_code`, `twda_status` | everything | the member projection minus `announcements`, `raffles`, `promos_distributed`, `promo_stock_source_uid`, `offline_device_id`, and minus each player's `display_name`, `missing_decklist`, `payment_status` and `waitlisted` |
 | sanction | none | full data | full data | none, permanently — the member lookup answers an app token the standing suspensions and probations off `full` ([public-api](public-api.md)) |
 | deck | none | full data when `public = true`, else none — **minus `user_uid`** where the credit is `Anonymous` and the deck is not the winner's, and always minus `private`, which on the one private deck published — the winner's — would publish the very wish it overrode, and minus `views`, the organizer view log | full data, so the view log reaches the event's organizers, the owner through the overlay, and IC alone | the member rule minus `public`, which the rule already pins to `true` and so carries no information at this level, and with the credit's free-text `name` dropped: this level carries member credits only |
 | league | full data **except `organizers_uids`** | full data | full data | full data, organizers included — the same call as a tournament's |
@@ -116,8 +116,7 @@ or a resync re-delivers the lower projection.
 
 Access is enforced per row, not per viewer, so the member projection of a
 tournament ships the **entire** object — all rounds, finals and per-player results
-— to **every** member, excluding only `checkin_code`, `vekn_pushed_at`,
-`vekn_results_stale`, `vekn_event_absent_at` and `twda_status`. During a live
+— to **every** member, excluding only `checkin_code` and `twda_status`. During a live
 event, full structural data
 sits in every member's IndexedDB.
 
@@ -130,7 +129,7 @@ Two real server-side boundaries exist inside the member level:
   spared by the personal overlay, which serves their own decks at `full` — the
   organizer view log included — and is
   drained **after** the member corpus, so their own row wins.
-- The five excluded tournament fields above.
+- The two excluded tournament fields above.
 
 Everything else is a **frontend display default**, not an access boundary:
 `standings_mode`, the "my tables" view, and the ongoing-event hiding of per-player
@@ -145,7 +144,7 @@ results are rendered client-side from data the client already holds.
 | Finals | no — shipped | hidden until finished |
 | My tables | no — all tables shipped | only the viewer's own |
 | Rounds | no — shipped | hidden |
-| `checkin_code`, `vekn_pushed_at`, `vekn_results_stale`, `vekn_event_absent_at`, `twda_status` | **yes** — stripped | — |
+| `checkin_code`, `twda_status` | **yes** — stripped | — |
 
 This is an accepted trade-off. Viewer-specific visibility cannot be expressed in
 pre-computed per-row columns, and frontend hiding suits the threat model — a local
@@ -898,12 +897,10 @@ force-unlock is reported once, through the status codes below, not twice.
 
 **Server-managed field re-pull** — before saving the device's offline snapshot, the
 server re-stamps a fixed set of fields from the authoritative locked row:
-`banner_path`, `external_ids`, `checkin_code`, `event_code`, `vekn_pushed_at`,
-`vekn_results_stale`, `vekn_event_absent_at`, `twda_status`. These are never written
-by the WASM engine and can change server-side during the offline window — VEKN sync
-writes `external_ids`, `vekn_pushed_at` and `vekn_event_absent_at`, a re-uploaded
-banner writes `banner_path`, another
-organizer's SA or DQ can flip `vekn_results_stale`. Trusting the device's stale values would
+`banner_path`, `external_ids`, `checkin_code`, `event_code`, `twda_status`. These are
+never written by the WASM engine and can change server-side during the offline window
+— a re-uploaded banner writes `banner_path`, TWDA sync writes `external_ids`, and a
+TWDA submission writes `twda_status`. Trusting the device's stale values would
 revert them. "Server wins" for non-engine fields, same as `organizers_uids`. The
 list is `SERVER_OWNED_TOURNAMENT_FIELDS`, and `test_go_online.py` classifies every
 `Tournament` field against it, so a new backend-only field fails a test instead of

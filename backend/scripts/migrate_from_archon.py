@@ -1087,11 +1087,6 @@ def build_tournament(
         finals=finals,
         winner=winner_uid,
         standings=standings,
-        # Migrated events owe new archon no VEKN push — legacy owns and pushes
-        # each event until finished there. Stamped on every non-Planned import,
-        # the inverse of batch_push's calendar/results gates, so both skip them.
-        vekn_pushed_at=(existing.vekn_pushed_at if existing else None)
-        or (datetime.now(UTC) if state != TournamentState.PLANNED else None),
     )
 
     for member_uid, slist in (d.get("sanctions") or {}).items():
@@ -1305,7 +1300,6 @@ async def process_tournament_row(
             finals=t.finals,
             winner=t.winner,
             standings=t.standings,
-            vekn_pushed_at=t.vekn_pushed_at,
             modified=t.modified,
         )
 

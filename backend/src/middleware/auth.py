@@ -12,7 +12,6 @@ from ..models import User, is_active_account
 _OAUTH_BARRED_SUBPATHS = frozenset(
     {
         "organizers",
-        "push-vekn",
         "go-offline",
         "go-online",
         "force-takeover",
