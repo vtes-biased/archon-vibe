@@ -1627,7 +1627,7 @@
   "og_faq_q_wrong_vp": "¿Qué ocurre si un jugador registra los VP incorrectos?",
   "og_faq_a_wrong_vp": "Las puntuaciones de VP se validan mediante simulación de orden de eliminación — las distribuciones imposibles se rechazan. Si se introduce una puntuación válida pero incorrecta, puede corregirla como organizador.",
   "og_faq_q_change_rounds": "¿Puedo cambiar el número de rondas durante el torneo?",
-  "og_faq_a_change_rounds": "Sí, hasta que comienza el check-in — abra la sección **Rondas y cronómetro** de la pestaña **Preparación**. Una vez que comienza el evento, el campo se bloquea.",
+  "og_faq_a_change_rounds": "No — puedes cambiarlo hasta que comienza el check-in en la sección **Rondas y cronómetro** de la pestaña **Preparación**. Una vez que comienza el evento, el campo se bloquea.",
   "og_faq_q_fewer_finals": "¿Puedo organizar finales con menos de 5 jugadores?",
   "og_faq_a_fewer_finals": "No. Las finales requieren exactamente 5 jugadores elegibles (no descalificados). Si un jugador descalificado está en el top 5, el jugador en 6.ª posición toma su lugar.",
   "og_faq_q_wrong_scores": "Finalicé el torneo pero las puntuaciones son incorrectas — ¿qué hago?",

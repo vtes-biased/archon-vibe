@@ -623,8 +623,6 @@ class TournamentConfig(TournamentMinimal, kw_only=True):
     max_players: Annotated[
         int, msgspec.Meta(description="Soft cap on registrations. 0 means none.")
     ] = 0
-    # House (non-VEKN) event: per-player cap from a shared pool, excluded from
-    # ratings/RTP; decoupled from max_rounds, which standard events can also set.
     open_rounds: bool = False
     self_organized_rounds: bool = (
         False  # open rounds: registered players may seat their own pod

@@ -174,8 +174,8 @@ has the same or more.
 
 **Reversibility over confirmation.** Prefer making an action cleanly undoable to
 adding a confirm dialog. Reserve explicit confirmation for the genuinely
-irreversible or externally visible — finishing a tournament (write-once VEKN
-push), removing your own organizer access, destructive deletes.
+irreversible or externally visible — finishing a tournament (decklist publication,
+ratings, TWDA submission), removing your own organizer access, destructive deletes.
 
 **Never render a figure we can't compute correctly.** Authoritative numbers
 (ratings, totals, standings) are blank rather than approximate. Compute through

@@ -1627,7 +1627,7 @@
   "og_faq_q_wrong_vp": "What happens if a player self-reports the wrong VP?",
   "og_faq_a_wrong_vp": "VP scores are validated against oust-order simulation — impossible distributions are rejected. If a valid but incorrect score is entered, you can correct it as organizer.",
   "og_faq_q_change_rounds": "Can I change the number of rounds mid-tournament?",
-  "og_faq_a_change_rounds": "Yes, until check-in starts — open the **Set up** tab's **Rounds & timer** section. Once the event starts, the field locks.",
+  "og_faq_a_change_rounds": "No — you can change it until check-in starts in the **Set up** tab's **Rounds & timer** section. Once the event starts, the field locks.",
   "og_faq_q_fewer_finals": "Can I run finals with fewer than 5 players?",
   "og_faq_a_fewer_finals": "No. Finals require exactly 5 eligible (non-DQ'd) players. If a DQ'd player is in the top 5, the 6th-place player takes their spot.",
   "og_faq_q_wrong_scores": "I finished the tournament but the scores are wrong — what now?",

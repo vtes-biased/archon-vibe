@@ -1627,7 +1627,7 @@
   "og_faq_q_wrong_vp": "Que se passe-t-il si un joueur saisit des VP incorrects ?",
   "og_faq_a_wrong_vp": "Les scores VP sont validés par simulation de l'ordre des éliminations — les distributions impossibles sont rejetées. Si un score valide mais incorrect est saisi, vous pouvez le corriger en tant qu'organisateur.",
   "og_faq_q_change_rounds": "Puis-je modifier le nombre de rondes en cours de tournoi ?",
-  "og_faq_a_change_rounds": "Oui, jusqu'au début du pointage — ouvrez la section **Rondes et chrono** de l'onglet **Préparation**. Une fois l'événement commencé, le champ se verrouille.",
+  "og_faq_a_change_rounds": "Non — vous pouvez le modifier jusqu'au début du pointage dans la section **Rondes et chrono** de l'onglet **Préparation**. Une fois l'événement commencé, le champ se verrouille.",
   "og_faq_q_fewer_finals": "Puis-je organiser une finale avec moins de 5 joueurs ?",
   "og_faq_a_fewer_finals": "Non. La finale nécessite exactement 5 joueurs éligibles (non disqualifiés). Si un joueur DQ'd est dans le top 5, le joueur en 6ème place prend sa place.",
   "og_faq_q_wrong_scores": "J'ai terminé le tournoi mais les scores sont incorrects — que faire ?",

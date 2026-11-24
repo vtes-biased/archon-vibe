@@ -71,7 +71,6 @@
   const raffleAvailable = $derived(
     tournament.state === "Waiting" || tournament.state === "Playing" || isFinished
   );
-  // Same shape the engine gates on: finished with no recorded play.
   const archivalCorrectable = $derived(
     isFinished
     && playedPlayerUids(tournament).size === 0

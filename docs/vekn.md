@@ -533,13 +533,9 @@ push dies with the read it accompanies.
 ### Stage 1 — the tournament calendar retired (2026-11-24)
 
 BCP removed the legacy `www.vekn.net` event calendar, event creation and event
-management pages. Inbound tournament sync (`sync_all_tournaments`) and outbound
-event/results push are retired; Archon is the system of record for events and
-results. The hourly batch keeps running for members until stage 2. The app computes
-its own ratings, and every tournament limitation the calendar sync imposed — 2–4
-round cap, post-push round immutability, frozen `rank`/`format`/`start`/`proxies`,
-the VEKN-footprint delete block, the vekn-linked guard on `SetArchivalResults`, and
-deferred `event_code` stamping — is lifted.
+management pages. Inbound tournament sync and outbound event/results push are
+retired; Archon is the system of record for events, results and ratings. The hourly
+batch keeps running for members until stage 2.
 
 The historical corpus curation unblocked by this stage sits in
 [vekn-decommission](vekn-decommission.md).
