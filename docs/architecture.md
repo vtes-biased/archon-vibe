@@ -1020,7 +1020,7 @@ narrower than the country index over every event those countries ever held.
 
 **Anonymous feeds render venue and address into LOCATION**, which takes no special
 casing — both are public-projection fields. That is consistent with the `.ics`
-being an advertising artifact mirroring vekn.net's public event calendar, where
+being an advertising artifact mirroring vekn.net's former public event calendar, where
 full addresses show anonymously; venue granularity is the organizer's data-entry
 choice. `venue_url` is the exception, withheld on an online event because there it
 is the join link rather than a venue website.

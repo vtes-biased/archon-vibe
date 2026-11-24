@@ -341,7 +341,7 @@ a confirm step — plus Drop Out, reversible but silently costly when mistapped
 **Success toasts** — none when the surface that fired the action, or the one it
 lands on, renders the outcome: the rendered change is the confirmation, and a toast
 restating it is noise. A success toast earns its place only where nothing on screen
-changes — a clipboard copy, a manual resync, a push to the VEKN calendar, a
+changes — a clipboard copy, a manual resync, a
 check-in fired by a QR redirect, a saved archival form — or where it carries what
 the screen does not, like the go-online summary's counts or where a force-abandoned
 member went.

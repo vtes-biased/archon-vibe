@@ -300,8 +300,8 @@ Reconstructions: `01a028a7-031b-72dd-92a4-a81b15c2e1eb`,
 #### The archive's winner is not in our roster
 
 Identity is unresolved, and two explanations fit the same evidence: a genuinely
-distinct event sharing a name and a day, or a member we never linked — the VEKN
-tournament sync drops players whose VEKN id we do not hold, so our roster is not
+distinct event sharing a name and a day, or a member we never linked — the retired
+VEKN tournament sync dropped players whose VEKN id we do not hold, so our roster is not
 proof of who played. `Urban Jungle: Vitoria` is the clearest warning against
 reading these as distinct events: our winner is recorded under the nickname
 `Mineirinho`, which is a member-identity gap, not a second tournament.

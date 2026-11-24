@@ -79,8 +79,9 @@ member-projected; no `hall_of_fame` flag is ever stored, because rule 9.4 lets a
 result be invalidated and a stamped badge would outlive the correction.
 
 `UpdateConfig` is available in **any** state — mid-event typo fixes matter — with
-targeted locks instead of a state gate: `open_rounds`/`max_rounds` lock once rounds
-exist (and `multideck` locks once a round exists).
+targeted locks instead of a state gate: the UI locks `open_rounds`/`max_rounds` once
+check-in starts (`Waiting`), and the engine refuses `max_rounds` below rounds already
+played and locks `multideck` once a round exists.
 
 **No Grand Prix rank, deliberately.** A Grand Prix runs as a **league** — with or
 without GP scoring — because outside the multideck and proxy prohibitions
