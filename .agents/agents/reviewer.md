@@ -5,7 +5,7 @@ description: >-
   and the board line only — never the implementation conversation. Guards
   parsimony and completeness, holds deletion and scope-growth power, and returns
   blocking or advisory findings.
-model: pro
+model: inherit
 subagent: true
 mainAgent: false
 tools:

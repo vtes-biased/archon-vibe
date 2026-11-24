@@ -10,7 +10,7 @@ and hooks under `.agents/`:
 - **Tool equivalents** for references in `CLAUDE.md` and `.claude/skills/*`:
   `AskUserQuestion` -> `ask_question`, `Agent` -> `invoke_subagent`,
   `ListAgents` / `SendMessage` -> `manage_subagents` / `send_message`.
-- **Subagents** (`.agents/agents/`): `reviewer` (`pro`, read-only + shell),
+- **Subagents** (`.agents/agents/`): `reviewer` (`inherit`, read-only + shell),
   `mass-edit` (`flash`, no subagent tools), and `miner` (`flash`, read-only).
   Use `mass-edit` for mechanical fan-out passes rather than spawning `self` or
   a `pro` subagent.
