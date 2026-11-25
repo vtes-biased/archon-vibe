@@ -410,6 +410,7 @@
           {m.common_city()}
         </label>
         <CityAutocomplete
+          id="edit-city"
           bind:value={editCity}
           bind:geonameId={editCityGeonameId}
           countryCode={editCountry}
@@ -421,6 +422,9 @@
             {m.user_city_hint()}
           </p>
         {/if}
+        <p class="mt-1 text-xs text-ink-faint">
+          {m.city_community_hint()}
+        </p>
       </div>
 
       <div>

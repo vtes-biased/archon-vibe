@@ -206,10 +206,11 @@
 
   <div>
     <label for="edit-city" class="block text-sm font-medium text-ink-muted mb-1">{m.common_city()}</label>
-    <CityAutocomplete bind:value={editCity} bind:geonameId={editCityGeonameId} countryCode={editCountry} disabled={!editCountry} onselect={handleCitySelect} />
+    <CityAutocomplete id="edit-city" bind:value={editCity} bind:geonameId={editCityGeonameId} countryCode={editCountry} disabled={!editCountry} onselect={handleCitySelect} />
     {#if !editCountry}
       <p class="mt-1 text-xs text-ink-faint">{m.city_select_country_first()}</p>
     {/if}
+    <p class="mt-1 text-xs text-ink-faint">{m.city_community_hint()}</p>
   </div>
 
   {#if user.roles.length > 0}

@@ -397,6 +397,7 @@
       {#if !values.country}
         <p class="mt-1 text-xs text-ink-faint">{m.city_select_country_first()}</p>
       {/if}
+      <p class="mt-1 text-xs text-ink-faint">{m.tfield_city_hint()}</p>
     </div>
   {/if}
 

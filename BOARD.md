@@ -23,5 +23,3 @@ the docs; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
-
-- Explain what the event and member city field means — the community it belongs to, usually the nearest large city, not the exact location — with a hint on the event form and the member profile in every locale, so organizers stop looking for their village (gh-89). **Done when** both forms carry that hint, the event hint points the exact location to Address, and `docs/tournaments.md` (city row) and `docs/product.md` state the field's purpose: community size and turnout for organizers and the IC, which is why only larger cities are offered.

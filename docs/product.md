@@ -228,6 +228,12 @@ VEKN id in parentheses. With no nickname the abbreviation is primary. The
 organizer roster keeps the full real name. In-person tournaments show real name
 and VEKN id only — the nickname is never shown.
 
+**City names a community, not a street address.** On both member profiles and
+in-person events, the city field identifies the local play community — usually
+the nearest large city — so organizers and the IC can gauge community size and
+turnout. That is why the picker offers only larger cities (GeoNames entries
+above 15,000 population); an event's exact location belongs in Address.
+
 **Visibility during an ongoing event** is organizer-set: standings Private /
 Cutoff / Top 10 / Public, decklists Winner / Finalists / All applied only after
 finish. These are display defaults, not access boundaries — see
