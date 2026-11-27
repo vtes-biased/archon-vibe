@@ -5,10 +5,9 @@
   import type { UserListItem } from "#lib/db.ts";
   import { sponsorVeknMember, linkVeknId, forceAbandonVeknId, mergeUsers, setMemberDeceased, setMemberSponsor, deleteMember, anonymizeMember } from "#lib/api.ts";
   import { showToast } from "#lib/stores/toast.svelte.ts";
-  import { UserPlus, Link, Unlink, GitMerge, CloudOff, Flower2, Trash2, TriangleAlert, ArrowLeftRight, EyeOff, Handshake } from "@lucide/svelte";
+  import { UserPlus, Link, Unlink, GitMerge, Flower2, Trash2, TriangleAlert, ArrowLeftRight, EyeOff, Handshake } from "@lucide/svelte";
   import Button from '#lib/components/Button.svelte';
   import UserPicker from '#lib/components/UserPicker.svelte';
-  import Badge from '#lib/components/Badge.svelte';
   import { getCountryFlag } from "#lib/geonames.ts";
   import * as m from '#lib/paraglide/messages.js';
 
@@ -38,12 +37,6 @@
 
   const isDeceased = $derived(!!user.deceased_at);
   const isAnonymized = $derived(!!user.anonymized_at);
-
-  const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
-  // Strict false: undefined means the viewer's projection omits the field
-  const veknSyncPending = $derived(
-    veknPush && !!user.vekn_id && user.vekn_synced === false
-  );
 
   let showLinkModal = $state(false);
   let showSponsorConfirm = $state(false);
@@ -188,19 +181,10 @@
     <p class="text-sm text-ink mb-3">
       {#if user.vekn_id}
         {m.vekn_id_display({ id: user.vekn_id })}
-        {#if veknSyncPending}
-          <span class="ml-2"><Badge kind="status" tone="pending">
-            <CloudOff class="w-3 h-3" aria-hidden="true" />
-            {m.vekn_sync_pending_member()}
-          </Badge></span>
-        {/if}
       {:else}
         {m.vekn_no_id()}
       {/if}
     </p>
-    {#if veknSyncPending}
-      <p class="text-xs text-ink-faint -mt-2 mb-3">{m.vekn_sync_pending_hint()}</p>
-    {/if}
     <div class="flex flex-wrap gap-2">
       {#if !user.vekn_id}
         <Button variant="primary" size="md" onclick={() => showSponsorConfirm = true} title={m.vekn_sponsor_title()}>

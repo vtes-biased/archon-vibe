@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from datetime import UTC, datetime
 from typing import Annotated
@@ -27,7 +26,6 @@ from ..db import user_has_nda as db_user_has_nda
 from ..geonames import stored_country
 from ..middleware.auth import get_current_user, get_optional_user
 from ..models import CONTENT_LINK_TYPES, Role, User
-from ..vekn_push import push_member_background
 from .auth import send_invite_email
 
 logger = logging.getLogger(__name__)
@@ -141,9 +139,6 @@ async def create_user(request: Request, data: CreateUserRequest) -> Response:
             logger.error(f"Failed to send invite email to {email}: {e}")
             # Don't fail the request, user is already created
 
-    # Fire-and-forget; batch_push catches failures.
-    asyncio.create_task(push_member_background(user))
-
     broadcast_precomputed(bd)
 
     return Response(
@@ -201,8 +196,6 @@ async def update_user(
             detail="You don't have permission to change this official's country",
         )
 
-    local_mods = set(user.local_modifications)
-
     validated_roles: list[Role] | None = None
     if roles is not None:
         validated_roles = []
@@ -239,8 +232,6 @@ async def update_user(
                 detail="User must have a VEKN ID to be assigned roles",
             )
 
-        local_mods.add("roles")
-
     if (
         name is not None
         or country is not None
@@ -250,21 +241,6 @@ async def update_user(
         or nickname is not None
         or validated_roles is not None
     ):
-        if name is not None:
-            local_mods.add("name")
-        if country is not None:
-            local_mods.add("country")
-        if city is not None:
-            local_mods.add("city")
-        if city_geoname_id is not None:
-            local_mods.add("city_geoname_id")
-        if state is not None:
-            local_mods.add("state")
-        # nickname is in the legacy merge's ARCHON_USER_FIELDS; untracked, it
-        # reverts at the next nightly merge (mirrors PATCH /auth/me).
-        if nickname is not None:
-            local_mods.add("nickname")
-
         user = msgspec.structs.replace(
             user,
             modified=datetime.now(UTC),
@@ -277,7 +253,6 @@ async def update_user(
             state=state if state is not None else user.state,
             nickname=nickname if nickname is not None else user.nickname,
             roles=validated_roles if validated_roles is not None else user.roles,
-            local_modifications=local_mods,
         )
 
     bd = await accounts.save_member(before, user)
@@ -511,16 +486,11 @@ async def set_deceased(
             detail="VEKN-less members cannot be marked deceased; delete them instead",
         )
 
-    # Deceased is archon-local and must always win over VEKN, set or cleared —
-    # so the field stays flagged local even on clear (append-only is intentional).
-    local_mods = set(target.local_modifications)
-    local_mods.add("deceased_at")
     target = msgspec.structs.replace(
         target,
         modified=datetime.now(UTC),
         deceased_at=datetime.now(UTC) if data.deceased else None,
         deceased_by_uid=current_user.uid if data.deceased else None,
-        local_modifications=local_mods,
     )
 
     bd = await db_save_user(target)
@@ -571,14 +541,11 @@ async def set_sponsor(
                 status_code=400, detail="The sponsor must be a VEKN member"
             )
 
-    local_mods = set(target.local_modifications)
-    local_mods.add("coopted_by")
     target = msgspec.structs.replace(
         target,
         modified=datetime.now(UTC),
         coopted_by=data.sponsor_uid,
         coopted_at=target.coopted_at if data.sponsor_uid else None,
-        local_modifications=local_mods,
     )
 
     bd = await db_save_user(target)

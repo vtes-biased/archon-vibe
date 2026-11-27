@@ -362,15 +362,6 @@ class User(BaseObject, kw_only=True):
     ] = None
     anonymized_by_uid: str | None = None
 
-    vekn_synced: bool = False
-    vekn_synced_at: Annotated[
-        datetime | None, msgspec.Meta(description="UTC instant of the last VEKN sync.")
-    ] = None
-    local_modifications: Annotated[
-        set[str],
-        msgspec.Meta(description="User field names never overwritten by VEKN sync."),
-    ] = msgspec.field(default_factory=set)
-
     vekn_prefix: Annotated[
         str | None,
         msgspec.Meta(

@@ -3,7 +3,6 @@
   import FoldableSection from "#lib/components/FoldableSection.svelte";
   import * as m from '#lib/paraglide/messages.js';
   import {
-    syncVeknMembers,
     syncTwdaDecks,
     syncJudges,
     getVeknStatus,
@@ -16,17 +15,15 @@
 
   let expanded = $state(false);
 
-  // Sync-job health: last success/error of the scheduled VEKN jobs.
+  // Sync-job health: last success/error of the scheduled sync jobs.
   // In-process server state, loaded on first expand (and after a manual run).
   let status = $state<VeknStatusResponse | null>(null);
   let statusLoading = $state(false);
   let statusFailed = $state(false);
 
   const statusJobs: { key: string; label: () => string }[] = [
-    { key: 'member_sync', label: m.admin_status_member_sync },
     { key: 'twda_sync', label: m.admin_status_twda_sync },
     { key: 'judge_sync', label: m.admin_status_judge_sync },
-    { key: 'batch_push', label: m.admin_status_batch_push },
   ];
 
   async function loadStatus() {
@@ -68,13 +65,6 @@
   }
 
   const ops: Op[] = [
-    {
-      key: 'vekn',
-      label: m.admin_sync_vekn_label(),
-      desc: m.admin_sync_vekn_desc(),
-      confirmBody: m.admin_sync_vekn_confirm(),
-      run: syncVeknMembers,
-    },
     {
       key: 'twda',
       label: m.admin_sync_twda_label(),

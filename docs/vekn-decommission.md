@@ -6,8 +6,9 @@ are in [`WATCH.md`](../WATCH.md).
 
 The two stages are the retirement stages in [vekn](vekn.md#decommission), which is
 where what retires and in what order is settled. Stage 1 (tournament calendar sync)
-retired on 2026-11-24; once deployed, the Stage 1 corpus curation below is locally
-actionable without upstream re-creating deleted rows or overwriting corrections.
+retired on 2026-11-24 and Stage 2 (member roster sync and push) retired on
+2026-11-27; once deployed, the curation items below are locally actionable without
+upstream re-creating deleted rows or overwriting corrections.
 
 ## Stage 1 — post-retirement tournament corpus curation
 
@@ -327,7 +328,7 @@ the only clean way a decklist reaches the TWDA, and syncing the archive back
 into the corpus it came from buys nothing. Re-check at stage 1 that no other
 submission route survived before deleting.
 
-## Stage 2 — the member roster sync retires
+## Stage 2 — post-retirement officials review
 
 ### Prince / NC divergence — legacy archon vs the app
 

@@ -117,10 +117,6 @@ export interface User extends BaseObject {
   anonymized_at?: string | null;
   anonymized_by_uid?: string | null;
 
-  vekn_synced?: boolean;
-  vekn_synced_at?: string | null;
-  local_modifications?: string[];
-
   // VEKN prefix (for Prince/NC users, extracted from princeid/coordinatorid)
   vekn_prefix?: string | null;
 

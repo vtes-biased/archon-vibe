@@ -39,9 +39,6 @@ def _make_user(**overrides) -> dict:
         ],
         "coopted_by": "u-prince",
         "coopted_at": "2025-01-01T00:00:00",
-        "vekn_synced": True,
-        "vekn_synced_at": "2025-06-01T00:00:00",
-        "local_modifications": [],
         "vekn_prefix": None,
         "calendar_token": "cal_secret_token",
         "deceased_at": "2026-05-01T00:00:00",
@@ -222,8 +219,6 @@ class TestUserMember:
         result = compute_member(ObjectType.USER, user)
         assert result is not None
         assert "coopted_at" not in result
-        assert "vekn_synced" not in result
-        assert "local_modifications" not in result
         assert "calendar_token" not in result
 
 
@@ -780,9 +775,6 @@ _USER_API_WITHHELD = {
     "deceased_by_uid",
     "anonymized_at",
     "anonymized_by_uid",
-    "vekn_synced",
-    "vekn_synced_at",
-    "local_modifications",
     "vekn_prefix",
     "calendar_token",
     "agenda_hidden",

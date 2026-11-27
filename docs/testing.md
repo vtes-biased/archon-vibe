@@ -34,7 +34,7 @@ from the root `tsconfig.json`, so `svelte-check` alone never sees it.
 **E2E** — `mise run test-e2e` spins up a **fully isolated** stack on the compose `test`
 profile and tears it down, never touching the dev `db`, `backend` or the
 `postgres_data` volume: a throwaway Postgres whose data lives in tmpfs, a backend
-bound to it with VEKN sync off, a seed job, and a frontend container that builds
+bound to it, a seed job, and a frontend container that builds
 the WASM engine, serves Vite, runs Playwright and writes the report.
 
 > The seed script opens with `DELETE FROM objects` and `DELETE FROM auth_methods`.
@@ -50,7 +50,7 @@ the WASM engine, serves Vite, runs Playwright and writes the report.
 > which lets the parent task fire its `down -v` exit trap.
 
 For a manual run, point everything at a throwaway database: create it, run a
-backend against it on a separate port with `VEKN_SYNC_ENABLED=false`, seed it and
+backend against it on a separate port, seed it and
 write the seed file Playwright reads, run a Vite dev server against that backend,
 and run the suite with `BASE_URL` set. `playwright.config.ts` skips its own
 `webServer` when `BASE_URL` is set.
@@ -216,7 +216,7 @@ is the discriminator, since `vp` doesn't move. The GW threshold is `>= 2.0`,
 inclusive. Cancel a **non-last** round to obtain a `Cancelled` table.
 
 **A fake is legitimate only for a system the test context cannot run** — Discord,
-the VEKN registry, GitHub, our own backend seen from the bot's process — and only
+GitHub, our own backend seen from the bot's process — and only
 paired with a guard test pinning it to the real contract
 ([principles](principles.md#testing)). `bot/tests/test_rest_fakes_match_hikari.py`
 binds every REST call shape the bot uses against the real `RESTClientImpl` and

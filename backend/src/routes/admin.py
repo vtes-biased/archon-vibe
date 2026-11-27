@@ -20,18 +20,11 @@ logger = logging.getLogger(__name__)
 
 encoder = msgspec.json.Encoder()
 
-# Will be set by main.py
-_sync_service = None
 # Recorded background runners injected by main.py.
 _runners: dict[str, Callable[[], Awaitable[None]]] = {}
 # In-flight admin-dispatched jobs, keyed by job name — keeps the task referenced
 # (so it isn't GC'd) and lets a re-trigger see a run is already going.
 _running_tasks: dict[str, asyncio.Task] = {}
-
-
-def set_sync_service(sync_service) -> None:
-    global _sync_service
-    _sync_service = sync_service
 
 
 def set_sync_runners(**runners: Callable[[], Awaitable[None]]) -> None:
@@ -54,33 +47,12 @@ class MergeRequest(msgspec.Struct):
     delete_uid: str
 
 
-@post("/sync-vekn")
-async def trigger_vekn_sync(request: Request) -> dict:
-    """Returns immediately ({"status": "started"} or "already_running"); the
-    outcome lands in /admin/vekn-status under member_sync.
-    """
-    manager = await get_current_user(request)
-    if not permissions.can_run_admin_sync(manager):
-        raise HTTPException(status_code=403, detail="Only IC can trigger sync")
-
-    runner = _runners.get("member_sync")
-    if not runner:
-        raise HTTPException(
-            status_code=503, detail="VEKN sync service is not available"
-        )
-
-    logger.info("Manual VEKN member sync dispatched via admin endpoint")
-    return _dispatch("member_sync", runner)
-
-
 @get("/vekn-status")
 async def vekn_status(request: Request) -> dict:
-    """State is in-process (resets on restart); keys: member_sync,
-    twda_sync, judge_sync, batch_push.
-    """
+    """State is in-process (resets on restart); keys: twda_sync, judge_sync."""
     manager = await get_current_user(request)
     if not permissions.can_run_admin_sync(manager):
-        raise HTTPException(status_code=403, detail="Only IC can view VEKN status")
+        raise HTTPException(status_code=403, detail="Only IC can view sync status")
 
     return {"jobs": get_status()}
 
@@ -88,7 +60,7 @@ async def vekn_status(request: Request) -> dict:
 @post("/sync-twda-decks")
 async def trigger_twda_deck_import(request: Request) -> dict:
     """Returns immediately; the outcome lands on the vekn-status panel as
-    `twda_sync`, same as the VEKN member sync.
+    `twda_sync`.
     """
     manager = await get_current_user(request)
     if not permissions.can_run_admin_sync(manager):
@@ -166,7 +138,6 @@ async def merge_user_accounts(request: Request, data: MergeRequest) -> Response:
 router = Router(
     "/admin",
     route_handlers=[
-        trigger_vekn_sync,
         vekn_status,
         trigger_twda_deck_import,
         trigger_judge_sync,

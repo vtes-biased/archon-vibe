@@ -1,4 +1,4 @@
-"""In-process status tracking for VEKN sync/push jobs; resets on restart by design."""
+"""In-process status tracking for scheduled sync jobs; resets on restart by design."""
 
 from datetime import UTC, datetime
 

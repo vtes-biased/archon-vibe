@@ -850,36 +850,6 @@ async def is_vekn_id_claimed(vekn_id: str) -> bool:
     return len(auth_methods) > 0
 
 
-async def get_users_with_vekn_prefix() -> list[User]:
-    """Get all users with a non-empty vekn_prefix (in practice Princes and NCs,
-    but the query filters on the prefix alone — no role predicate)."""
-    async with batch_read_connection() as conn:
-        result = await conn.execute(
-            """SELECT "full" FROM objects
-            WHERE type = 'user'
-              AND "full"->>'vekn_prefix' IS NOT NULL
-              AND "full"->>'vekn_prefix' != ''"""
-        )
-        rows = await result.fetchall()
-        return [decode_json(row[0], User) for row in rows]
-
-
-async def get_users_needing_sponsor() -> list[User]:
-    """Members whose sponsor is unset or names no user row."""
-    async with batch_read_connection() as conn:
-        result = await conn.execute(
-            """SELECT "full" FROM objects o
-            WHERE type = 'user'
-              AND ("full"->>'coopted_by' IS NULL
-                   OR NOT EXISTS (SELECT 1 FROM objects s
-                                  WHERE s.uid = o."full"->>'coopted_by'))
-              AND "full"->>'vekn_id' IS NOT NULL
-              AND "full"->>'vekn_id' != ''"""
-        )
-        rows = await result.fetchall()
-        return [decode_json(row[0], User) for row in rows]
-
-
 async def allocate_next_vekn_id() -> str:
     """Atomically allocate the next available VEKN ID: first gap starting at
     1000000, guarded by an advisory lock against concurrent requests.

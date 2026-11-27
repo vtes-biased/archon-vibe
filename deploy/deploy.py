@@ -343,14 +343,8 @@ backend_env = {
     "WEBAUTHN_RP_ID": domain,
     "WEBAUTHN_RP_NAME": d.app_name,
     "WEBAUTHN_ORIGIN": site,
-    "VEKN_SYNC_ENABLED": "true",
-    "VEKN_SYNC_INTERVAL_HOURS": 24,
     "TWDA_SYNC_ENABLED": "true",
     "JUDGE_SYNC_ENABLED": d.judge_sync,
-    "VEKN_API_BASE_URL": "https://www.vekn.net/api",
-    "VEKN_API_USERNAME": secrets["vekn_username"],
-    "VEKN_API_PASSWORD": secrets["vekn_password"],
-    "VEKN_PUSH": d.vekn_push,
     # Per-env keypair (beta and prod must NOT share). Rotating it invalidates
     # every existing browser subscription.
     "VAPID_PUBLIC_KEY": secrets["vapid_public_key"],
@@ -365,7 +359,6 @@ backend_env = {
     "GITHUB_OAUTH_CLIENT_ID": secrets["github_oauth_client_id"],
     "GITHUB_OAUTH_SECRET": secrets["github_oauth_secret"],
     "GITHUB_OAUTH_REDIRECT_URI": f"{site}/auth/github/callback",
-    "OFFICIALS_CONTACTS_FILE": f"{env_dir}/officials_contacts.json",
     **d.backend_env_extra,
 }
 # only production writes to the public archive: without these, every submission skips
@@ -386,7 +379,7 @@ backend.append(
         mode="640",
     )
 )
-secret_files = ["officials_contacts.json", "feedback_github_app.pem"]
+secret_files = ["feedback_github_app.pem"]
 if d.twda_push:
     secret_files.append("twda_github_app.pem")
 else:

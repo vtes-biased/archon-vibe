@@ -14,7 +14,6 @@ public_api = True
 
 environment = "beta"
 app_name = "Archon Beta"
-vekn_push = "false"
 twda_push = False
 judge_sync = "true"
 backend_env_extra = {}

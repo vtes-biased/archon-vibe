@@ -99,16 +99,13 @@ from .routes import (
 )
 from .snapshots import generate_snapshots, get_snapshot_path, snapshot_generated_at
 from .twda_import import run_twda_sync as sync_twda
-from .vekn_push import batch_push, vekn_push_client
 from .vekn_status import record_error, record_success
-from .vekn_sync import VEKNSyncService
 from .version import __version__
 
 configure_logging()
 logger = logging.getLogger(__name__)
 
 _scheduler: AsyncIOScheduler | None = None
-_sync_service: VEKNSyncService | None = None
 
 _shutdown_event: asyncio.Event | None = None
 
@@ -147,26 +144,6 @@ def _install_fast_shutdown_signals() -> None:
             pass
 
 
-async def run_member_sync() -> None:
-    """VEKN member sync with status recording (vekn_status).
-
-    Shared by the scheduled run and the admin 'Run now' endpoint, so both record
-    the same member_sync health and the manual trigger stays a quick dispatch.
-    """
-    if not _sync_service:
-        return
-
-    try:
-        stats = await _sync_service.sync_all_members()
-        record_success("member_sync", stats if isinstance(stats, dict) else None)
-    except TimeoutError:
-        logger.error("VEKN member sync timed out - the API may be slow or unreachable")
-        record_error("member_sync", "timed out — API slow or unreachable")
-    except Exception as e:
-        logger.error(f"Error during VEKN member sync: {e}", exc_info=True)
-        record_error("member_sync", str(e))
-
-
 async def run_twda_sync() -> None:
     """TWDA reconciliation with status recording (vekn_status)."""
     try:
@@ -191,15 +168,6 @@ async def run_judge_sync() -> None:
     except Exception as e:
         logger.error(f"Error during judge directory sync: {e}", exc_info=True)
         record_error("judge_sync", str(e))
-
-
-async def run_vekn_sync() -> None:
-    """Scheduled member sync followed by snapshot refresh."""
-    if not _sync_service:
-        return
-
-    await run_member_sync()
-    await run_snapshot_generation()
 
 
 async def run_sanction_cleanup() -> None:
@@ -254,23 +222,6 @@ async def run_rating_recompute() -> None:
         logger.error(f"Error during rating recompute: {e}", exc_info=True)
 
 
-async def run_vekn_push() -> None:
-    try:
-        client = vekn_push_client()
-        if client is None:
-            return
-        logger.info("Starting VEKN batch push")
-        stats = await batch_push(client)
-        logger.info(f"VEKN batch push complete: {stats}")
-        if stats.get("aborted"):
-            record_error("batch_push", "aborted — VEKN unreachable")
-        else:
-            record_success("batch_push", stats)
-    except Exception as e:
-        logger.error(f"Error during VEKN batch push: {e}", exc_info=True)
-        record_error("batch_push", str(e))
-
-
 async def run_snapshot_generation() -> None:
     """Rebuild the access-level snapshots if the corpus moved (checked every 15
     minutes)."""
@@ -314,7 +265,7 @@ async def _build_concurrent_indexes() -> None:
 
 @asynccontextmanager
 async def lifespan(app: Litestar) -> AsyncIterator[None]:
-    global _scheduler, _sync_service, _shutdown_event
+    global _scheduler, _shutdown_event
 
     logger.info(f"Archon backend starting (version {__version__})")
 
@@ -337,38 +288,8 @@ async def lifespan(app: Litestar) -> AsyncIterator[None]:
     _scheduler = AsyncIOScheduler()
     _scheduler.add_listener(_release_heap, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
 
-    sync_enabled = os.getenv("VEKN_SYNC_ENABLED", "false").lower() == "true"
-    if sync_enabled:
-        logger.info("VEKN sync is enabled")
-        _sync_service = VEKNSyncService()
-        admin.set_sync_service(_sync_service)
-        # Recorded runners the admin 'Run now' dispatches in the background
-        # (instead of awaiting the multi-minute sync inline in the request).
-        admin.set_sync_runners(member_sync=run_member_sync)
-
-        sync_interval_hours = int(os.getenv("VEKN_SYNC_INTERVAL_HOURS", "6"))
-        _scheduler.add_job(
-            run_vekn_sync,
-            trigger=CronTrigger(
-                hour=",".join(
-                    str((4 + h) % 24) for h in range(0, 24, sync_interval_hours)
-                ),
-                timezone="UTC",
-            ),
-            id="vekn_sync",
-            name="VEKN Member Sync",
-            replace_existing=True,
-        )
-        logger.info(
-            f"VEKN sync scheduled every {sync_interval_hours} hours from 04:00 UTC"
-        )
-    else:
-        logger.info("VEKN sync is disabled")
-
-    # Independent of VEKN_SYNC_ENABLED: a different upstream, no credentials, and
-    # it must outlive the VEKN API. Its runner is registered either way so the
-    # admin trigger works even with the schedule off.
-    admin.set_sync_runners(twda_sync=run_twda_sync)
+    # Registered either way so the admin trigger works even with the schedule off.
+    admin.set_sync_runners(twda_sync=run_twda_sync, judge_sync=run_judge_sync)
     if os.getenv("TWDA_SYNC_ENABLED", "false").lower() == "true":
         _scheduler.add_job(
             run_twda_sync,
@@ -381,7 +302,6 @@ async def lifespan(app: Litestar) -> AsyncIterator[None]:
     else:
         logger.info("TWDA sync is disabled")
 
-    admin.set_sync_runners(judge_sync=run_judge_sync)
     if os.getenv("JUDGE_SYNC_ENABLED", "false").lower() == "true":
         _scheduler.add_job(
             run_judge_sync,
@@ -420,17 +340,6 @@ async def lifespan(app: Litestar) -> AsyncIterator[None]:
         replace_existing=True,
     )
     logger.info("Promo stock recompute scheduled daily at 02:00 UTC")
-
-    if os.getenv("VEKN_PUSH", "").lower() == "true":
-        push_interval = int(os.getenv("VEKN_PUSH_INTERVAL_HOURS", "1"))
-        _scheduler.add_job(
-            run_vekn_push,
-            trigger=IntervalTrigger(hours=push_interval),
-            id="vekn_push",
-            name="VEKN Push",
-            replace_existing=True,
-        )
-        logger.info(f"VEKN push scheduled every {push_interval} hours")
 
     _scheduler.add_job(
         run_oauth_cleanup,

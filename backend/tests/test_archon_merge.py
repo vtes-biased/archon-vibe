@@ -7,8 +7,7 @@ Invariants guarded (one test each):
   event id (rich copy wins, round-less copy tombstoned);
 * a round-less incoming copy never overwrites a rich original (echo guard);
 * both-rich conflicts are skipped, not merged;
-* member merge writes only archon-owned fields, respecting local_modifications
-  (identity and roles untouched);
+* member merge writes only archon-owned fields (identity and roles untouched);
 * members are matched by VEKN id: the old-archon member merges INTO the live
   (possibly claimed) account and is NEVER tombstoned/detached;
 * every old-archon member-uid reference is remapped to the live uid, and a
@@ -19,11 +18,8 @@ Invariants guarded (one test each):
 * (#216) a KNOWN_REMAP source uid resolves to the LIVE uid of the account holding
   its target VEKN id (claimed → uuid7 ≠ source uid), so the throwaway's refs
   attribute to the real player rather than orphaning on the unseeded source;
-* (#216) a genuinely VEKN-less participant is allocated a real, push-eligible
-  VEKN id, idempotently, resurrecting any prior #169 shell.
-
-The VEKN member sync's own role contract (CREATE seeds derived roles, UPDATE
-never writes them) is covered in test_vekn_member_sync.py.
+* (#216) a genuinely VEKN-less participant is allocated a real VEKN id,
+  idempotently, resurrecting any prior #169 shell.
 """
 
 from contextlib import asynccontextmanager
@@ -323,7 +319,6 @@ async def test_member_merge_respects_field_ownership(test_db):
             nickname="App Nick",
             contact_email="app@example.com",
             roles=[Role.JUDGE],
-            local_modifications={"contact_email"},
         )
     )
     row = _old_member_row(
@@ -340,8 +335,8 @@ async def test_member_merge_respects_field_ownership(test_db):
     await merge_member(user, discord, stats)
 
     after = await db.get_user_by_uid("u-1")
-    assert after.name == "App Name", "identity is the VEKN sync's, not merged"
-    assert after.contact_email == "app@example.com", "local modification wins"
+    assert after.name == "App Name", "identity is not merged"
+    assert after.contact_email == "legacy@example.com", "archon-owned field merged"
     assert after.nickname == "Legacy Nick", "archon-owned field merged"
     assert after.roles == [Role.JUDGE], "roles are app-managed, never merged"
     assert stats["members.updated"] == 1
@@ -353,11 +348,10 @@ async def test_claimed_account_not_detached_by_merge(test_db):
     account (uuid7 ≠ old-archon uid), wiping its identity and community links."""
     await db.save_user(
         User(
-            uid="v-9",  # VEKN-sync uuid7, then claimed (≠ old-archon "o-9")
+            uid="v-9",  # app uuid7, then claimed (≠ old-archon "o-9")
             modified=datetime(2025, 6, 1, tzinfo=UTC),
             name="Claimed Account",
             vekn_id="1000009",
-            vekn_synced=True,
             community_links=[
                 CommunityLink(type=CommunityLinkType.WEBSITE, url="https://me.example")
             ],
@@ -547,7 +541,6 @@ async def test_veknless_participant_allocated_idempotent_and_resurrects_shell(te
     live = await db.get_user_by_uid("a-216")
     assert live is not None and live.deleted_at is None, "shell resurrected as live"
     assert live.vekn_id and live.vekn_id.isdigit(), "real VEKN id allocated"
-    assert live.vekn_synced is False, "push-eligible (batch_push registers the id)"
     assert stats["members.veknless_allocated"] == 1
 
     allocated = live.vekn_id

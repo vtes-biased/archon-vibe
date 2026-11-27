@@ -230,7 +230,7 @@ class TestRatingVpGw:
         vp, _ = _rating_vp_gw(t, "p1", sanctions)
         assert vp == -1.0
 
-    def test_vekn_synced_fallback(self):
+    def test_rounds_less_standings_fallback(self):
         """No rounds/finals: falls back to standings."""
         t = _make_tournament(
             standings=[
@@ -242,7 +242,7 @@ class TestRatingVpGw:
         assert vp == 7.5
         assert gw == 3
 
-    def test_vekn_synced_missing_player(self):
+    def test_rounds_less_standings_missing_player(self):
         """Standings fallback returns 0 for unknown player."""
         t = _make_tournament(
             standings=[{"user_uid": "p1", "vp": 5.0, "gw": 2.0, "tp": 24}],

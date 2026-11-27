@@ -110,18 +110,12 @@ async def update_current_user(
 ) -> Response:
     current_user = await get_current_user(request)
     user = current_user
-
-    # Self-edits must land in local_modifications, or the VEKN sync and the
-    # legacy-archon merge — both skip locally-modified fields — silently revert them.
-    local_mods = set(user.local_modifications)
     before = msgspec.structs.replace(user)
 
     if data.name is not None:
         user.name = data.name
-        local_mods.add("name")
     if data.nickname is not None:
         user.nickname = data.nickname if data.nickname else None
-        local_mods.add("nickname")
     if data.country is not None:
         new_country = stored_country(data.country)
         if data.country and new_country is None:
@@ -139,27 +133,20 @@ async def update_current_user(
                 "it must be changed by IC (or the country's NC for a Prince).",
             )
         user.country = new_country
-        local_mods.add("country")
     if data.city is not None:
         user.city = data.city if data.city else None
-        local_mods.add("city")
         if not data.city:
             user.city_geoname_id = None
-            local_mods.add("city_geoname_id")
     if data.city_geoname_id is not None:
         user.city_geoname_id = data.city_geoname_id if data.city_geoname_id else None
-        local_mods.add("city_geoname_id")
     if data.contact_email is not None:
         user.contact_email = data.contact_email if data.contact_email else None
-        local_mods.add("contact_email")
     if data.contact_phone is not None:
         user.contact_phone = data.contact_phone if data.contact_phone else None
-        local_mods.add("contact_phone")
     if permissions.breaks_contact_floor(before, user):
         raise HTTPException(status_code=422, detail=_UNREACHABLE)
     if data.phone_is_whatsapp is not None:
         user.phone_is_whatsapp = data.phone_is_whatsapp
-        local_mods.add("phone_is_whatsapp")
     if data.community_links is not None:
         if not user.vekn_id:
             raise HTTPException(
@@ -201,7 +188,6 @@ async def update_current_user(
         user.community_links = links
 
     user.modified = datetime.now(UTC)
-    user.local_modifications = local_mods
 
     bd = await save_user(user)
     broadcast_precomputed(bd)
@@ -289,15 +275,11 @@ async def remove_auth_method(method_uid: FromPath[str], request: Request) -> Non
         ),
         default=None,
     )
-    # Pinned: both are in the legacy merge's ARCHON_USER_FIELDS, which reverts
-    # untracked values nightly — a bare clear would resurrect the removed Discord.
     user = msgspec.structs.replace(
         current_user,
         modified=datetime.now(UTC),
         discord_id=successor.identifier if successor else None,
         contact_discord=successor.username if successor else None,
-        local_modifications=set(current_user.local_modifications)
-        | {"discord_id", "contact_discord"},
     )
     broadcast_precomputed(await save_user(user))
 

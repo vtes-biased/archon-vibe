@@ -190,11 +190,9 @@ a rank the app cannot represent, so the coefficient bonus is missed.
 
 ## External systems
 
-**vekn.net** holds the member roster; BCP removed its legacy event calendar,
-event creation and event management pages, so Archon is the system of record for
-events and results. Its API surface is now member-only — `create-member`,
-`search-players`, `fetch-all-members` ([vekn integration](../vekn.md)) — until
-vekn.net registration closes.
+**vekn.net** is frozen as a historical archive: BCP removed its legacy event
+calendar and closed member registration, so Archon is the system of record for
+members, events, results and ratings ([vekn integration](../vekn.md)).
 
 **The TWDA** — the Tournament Winning Deck Archive — is the public registry of
 winning decklists, hosted at `GiottoVerducci/TWD` on GitHub and mirrored as JSON

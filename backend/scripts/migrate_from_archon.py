@@ -89,7 +89,6 @@ from backend.src.models import (
     TournamentRank,
     TournamentState,
 )
-from backend.src.vekn_sync import OFFICIALS_EMAILS
 
 # Wider than db.batch_read_connection's 120s: this is a whole daily job with a
 # 24h window, not a pooled read inside a live server. Still capped, not disabled.
@@ -202,8 +201,7 @@ STANDINGS_MODE_MAP: dict[str, StandingsMode] = {
     "Public": StandingsMode.PUBLIC,
 }
 
-# This sync's field set in merge mode — identity is the VEKN sync's, roles are
-# app-managed, local_modifications fields are never overwritten either way.
+# This sync's field set in merge mode — roles are app-managed.
 ARCHON_USER_FIELDS = (
     "nickname",
     "contact_email",
@@ -452,9 +450,6 @@ def build_user(row: dict, stats: Stats) -> tuple[db.User, dict]:
         contact_phone=whatsapp,
         phone_is_whatsapp=bool(whatsapp),
         vekn_prefix=nz(d.get("prefix")),
-        # Imported members owe no VEKN push: they already exist on vekn.net or
-        # predate it. Default False would make batch_push re-register ~19k members.
-        vekn_synced=True,
     )
     return user, discord
 
@@ -522,14 +517,13 @@ async def collect_tournament_participant_uids(old: psycopg.AsyncConnection) -> s
 async def allocate_veknless_participant(
     user: db.User, discord: dict, stats: Stats
 ) -> None:
-    """A genuinely VEKN-less participant (#216): allocate a real VEKN id and mark it
-    push-eligible so batch_push claims it before a future vekn.net assignment can
-    collide (#184-class). Must run after the full member pass."""
+    """A genuinely VEKN-less participant (#216): allocate a real VEKN id.
+    Must run after the full member pass."""
     existing = await db.get_user_by_uid(user.uid)
     if existing is not None and not existing.deleted_at and existing.vekn_id:
         return
     vekn_id = await db.allocate_next_vekn_id()
-    live = msgspec.structs.replace(user, vekn_id=vekn_id, vekn_synced=False)
+    live = msgspec.structs.replace(user, vekn_id=vekn_id)
     await db.save_user(live)
     await ensure_discord_auth(user.uid, discord, stats)
     stats.bump("members.veknless_allocated")
@@ -584,14 +578,7 @@ async def merge_member(user: db.User, discord: dict, stats: Stats) -> str:
 
     changed = False
     for field in ARCHON_USER_FIELDS:
-        if field in live.local_modifications:
-            continue
         value = getattr(user, field)
-        # Officials' contact_email is injected by the VEKN member sync from the
-        # scraped vekn.net lists — writing old archon's address here would
-        # flip-flop daily with that injection.
-        if field == "contact_email" and live.vekn_id in OFFICIALS_EMAILS:
-            continue
         if getattr(live, field) != value:
             setattr(live, field, value)
             changed = True
@@ -601,8 +588,7 @@ async def merge_member(user: db.User, discord: dict, stats: Stats) -> str:
         stats.bump("members.updated")
     else:
         stats.bump("members.unchanged")
-    if "discord_id" not in live.local_modifications:
-        await ensure_discord_auth(live.uid, discord, stats)
+    await ensure_discord_auth(live.uid, discord, stats)
     return live.uid
 
 
@@ -682,7 +668,7 @@ async def remap_coopted_by(
             stats.bump("members.coopted_sponsor_unresolved")
             continue
         u = await db.get_user_by_uid(live_uid)
-        if u is None or u.deleted_at or "coopted_by" in u.local_modifications:
+        if u is None or u.deleted_at:
             continue
         if u.coopted_by == desired:
             continue

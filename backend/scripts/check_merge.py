@@ -37,7 +37,6 @@ METRICS = {
     "tournaments_with_vekn_event_id": "SELECT count(*) FROM objects WHERE type='tournament' AND \"full\"->'external_ids'->>'vekn' IS NOT NULL",
     "discord_auth": "SELECT count(*) FROM auth_methods WHERE data->>'method_type'='discord'",
     "users_with_protected_role": f"SELECT count(*) FROM objects WHERE type='user' AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(\"full\"->'roles') r WHERE r IN {PROTECTED_ROLES})",
-    "vekn_synced": "SELECT count(*) FROM objects WHERE type='user' AND (\"full\"->>'vekn_synced')::bool",
 }
 
 
@@ -111,7 +110,6 @@ async def main(args) -> int:
     print(
         f"  tournaments {base.get('tournaments')} → {m['tournaments']} (+{m['tournaments'] - base.get('tournaments', 0)})"
     )
-    print(f"  vekn_synced users: {m['vekn_synced']}")
 
     print(f"\n{'PASSED' if fails == 0 else 'FAILED'} — {fails} hard failure(s)")
     return 1 if fails else 0

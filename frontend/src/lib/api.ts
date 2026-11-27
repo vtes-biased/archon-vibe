@@ -299,14 +299,8 @@ export async function mergeUsers(keep_uid: string, delete_uid: string): Promise<
 export interface AdminSyncResult {
   /** "started" / "already_running" for background-dispatched syncs. */
   status: string;
-  /** Only present for synchronous ops; the VEKN/TWDA syncs run in the background. */
+  /** Only present for synchronous ops; the TWDA/judge syncs run in the background. */
   stats?: Record<string, unknown>;
-}
-
-/** IC-only: dispatch a VEKN member sync in the background (also runs on a 6h schedule). */
-export async function syncVeknMembers(): Promise<AdminSyncResult> {
-  // Errors surface inline in ConfirmActionModal — suppress the duplicate toast.
-  return apiRequest<AdminSyncResult>('/admin/sync-vekn', { method: 'POST' }, { suppressErrorToast: true });
 }
 
 /** IC-only: dispatch a TWDA decklist import in the background (also runs on a 24h schedule). */

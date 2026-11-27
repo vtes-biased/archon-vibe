@@ -203,9 +203,9 @@ a quarter-hour's lag for a peak outside the scheduler, such as a deck import —
 every scheduled job streams or holds a narrow projection: a `vekn_id → uid` map
 rather than 19k decoded users, the archive decoded into only the fields the TWDA
 sync reads, rating tournaments by cursor and users in batches. Nothing large stays
-cached between passes either: the member sync builds the ~45 MB city index per
-run, and the TWDA sync only on a run that has a city to fill (a
-create or a location edit reads the city list once to name the city from its id),
+cached between passes either: the TWDA sync builds the ~45 MB city index only on
+a run that has a city to fill (a create or a location edit reads the city list
+once to name the city from its id),
 krcg's ~75 MB card DB is dropped once the Amaranth id map is read off it, and
 fpdf is imported on the first NDA render (idle, 34 MB). Measured on beta at
 production corpus size (36.7k objects): imports 103 MB, the rating recompute
@@ -336,9 +336,7 @@ service-account token (Editor) as `GRAFANA_TOKEN`, and `DISCORD_WEBHOOK` only to
 change the contact point. It lays out, in the stack's Archon folder, the **Archon
 production** dashboard — health at a glance, CPU, memory, network and disk with
 throughput, operations and stall per unit, units (Fluent Bit left out of every
-panel: only the alerts watch it),
-the members the VEKN push currently fails on with the reason
-([vekn](vekn.md#outage-resilience)), and the logs filtered by unit, level and free
+panel: only the alerts watch it), and the logs filtered by unit, level and free
 text, where a user's uid finds their SSE connections and any error naming them —
 beside Node Exporter Full, and the
 alert rules sent to the `archon-discord` contact point: a unit failed or inactive
@@ -357,10 +355,9 @@ the personal stack's Archon Beta folder, with `GRAFANA_TOKEN=$GRAFANA_TOKEN_CODE
 `prod` is the other argument. Beta's box is `frankfurt` in the shared server-setup
 fleet, whose Alloy ships the systemd collector and, from a textfile loop, the
 per-unit cgroup usage as `systemd_unit_*` — the names server-setup owns, where
-production's loop writes `archon_unit_*`. Beta never pushes to VEKN, so the VEKN
-push tables are left out there, along with the alerts and Node Exporter Full. Its
-panels and logs are scoped to the `new-archon-*` units, nginx and PostgreSQL, the
-box's other tenants left out.
+production's loop writes `archon_unit_*`. The alerts and Node Exporter Full are
+left out there. Its panels and logs are scoped to the `new-archon-*` units, nginx
+and PostgreSQL, the box's other tenants left out.
 
 **Production access is per developer.** Each has their own sudo account
 (`mise run add-admin-prod <name> <pubkey> <an existing admin>`) and a
@@ -502,10 +499,8 @@ needs `DISCORD_CLIENTID`, `DISCORD_SECRET` and `DISCORD_REDIRECT_URI`, plus
 `DISCORD_BOT_TOKEN` from the **same application** for Linked Roles
 ([discord](discord.md)). Magic links need the `MAIL_*` SMTP set.
 
-**VEKN** — `VEKN_SYNC_ENABLED`, `VEKN_SYNC_INTERVAL_HOURS`, `VEKN_API_BASE_URL`,
-`VEKN_API_USERNAME`, `VEKN_API_PASSWORD`, `VEKN_PUSH`,
-`VEKN_PUSH_INTERVAL_HOURS`, `VITE_VEKN_PUSH`, and the separately-flagged
-`TWDA_SYNC_ENABLED` and `JUDGE_SYNC_ENABLED` ([vekn](vekn.md#feature-flags)).
+**External syncs** — `TWDA_SYNC_ENABLED` and `JUDGE_SYNC_ENABLED`
+([vekn](vekn.md#feature-flags)).
 
 **Web Push** — `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`; generate
 with `mise run vapid-keys`. The private key is a deploy secret. The

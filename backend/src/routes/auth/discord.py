@@ -268,8 +268,6 @@ async def _record_discord_sign_in(
     user = await get_user_by_uid(user_uid)
     if not user:
         return
-    # Pinned: these are in the legacy merge's ARCHON_USER_FIELDS, which reverts
-    # untracked values nightly.
     fields = {"discord_id": discord_id, "contact_discord": username or None}
     if not user.nickname and global_name:
         fields["nickname"] = global_name
@@ -278,7 +276,6 @@ async def _record_discord_sign_in(
     updated = msgspec.structs.replace(
         user,
         modified=now,
-        local_modifications=set(user.local_modifications) | fields.keys(),
         **fields,
     )
     broadcast_precomputed(await save_user(updated))

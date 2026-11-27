@@ -8,7 +8,6 @@ public_api = True
 
 environment = "production"
 app_name = "Archon"
-vekn_push = "true"
 twda_push = True
 judge_sync = "true"
 backend_env_extra = {"DB_POOL_MAX_SIZE": 8}

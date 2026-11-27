@@ -1,12 +1,11 @@
 <script lang="ts">
-  import { User, Camera, Unlink, Share2, Check, CloudOff } from "@lucide/svelte";
+  import { User, Camera, Unlink, Share2, Check } from "@lucide/svelte";
   import { getSortedCountries, getCountryFlag } from "#lib/geonames.ts";
   import CityAutocomplete from "#lib/components/CityAutocomplete.svelte";
   import Button from "#lib/components/Button.svelte";
   import { updateProfile } from "#lib/stores/auth.svelte.ts";
   import { showToast } from "#lib/stores/toast.svelte.ts";
   import { canChangeCountry } from "#lib/engine.ts";
-  import Badge from "#lib/components/Badge.svelte";
   import * as m from '#lib/paraglide/messages.js';
 
   interface Props {
@@ -16,12 +15,6 @@
     onClaimVekn: () => void;
   }
   let { user, onAvatarClick, onAbandonVekn, onClaimVekn }: Props = $props();
-
-  const veknPush = import.meta.env.VITE_VEKN_PUSH === "true";
-  // Strict false: undefined means the viewer's projection omits the field
-  const veknSyncPending = $derived(
-    veknPush && !!user.vekn_id && user.vekn_synced === false
-  );
 
   const sortedCountries = getSortedCountries();
   let copied = $state(false);
@@ -157,12 +150,6 @@
     <div class="flex justify-between items-center">
       <span class="text-ink-muted">{m.add_player_vekn_id_label()}</span>
       <div class="flex items-center gap-2">
-        {#if veknSyncPending}
-          <Badge kind="status" tone="pending" title={m.vekn_sync_pending_hint()}>
-            <CloudOff class="w-3 h-3" aria-hidden="true" />
-            {m.vekn_sync_pending_member()}
-          </Badge>
-        {/if}
         <span class="text-ink-strong font-mono">{user.vekn_id}</span>
         <button
           onclick={onAbandonVekn}

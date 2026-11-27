@@ -1,4 +1,4 @@
-_Last updated: 24 November 2026 — provided in English, which is the authoritative version._
+_Last updated: 27 November 2026 — provided in English, which is the authoritative version._
 
 Archon is a free, non-commercial tool for organising and recording Vampire: The Eternal Struggle (VTES) tournaments and leagues, run as part of the Vampire: Elder Kindred Network (VEKN) organised-play programme. The data controller responsible for your personal data is:
 
@@ -11,7 +11,7 @@ This policy explains what we process, why, and the rights you have under the UK 
 ## What we collect
 
 - **Account & sign-in** — depending on how you sign in: your email address, a password or passkey credential, and/or your Discord account ID, the email address Discord reports for it, and the token Discord issues. Some sign-in methods don't require an email at all.
-- **VEKN profile** — your VEKN ID, name and profile details, synchronised from vekn.net.
+- **VEKN profile** — your VEKN ID, name and profile details.
 - **Tournament activity** — the events and leagues you join, your results and rankings, decks you submit, and any sanctions recorded against you.
 - **Location** — the city and time-zone you set for events (resolved against the GeoNames database).
 - **Technical logs** — IP addresses and request metadata kept briefly in server logs for security and debugging.
@@ -35,7 +35,6 @@ Tournament results, rankings and submitted decks — together with the player na
 We do not sell your data. We share it only with the services needed to run Archon:
 
 - **Discord** — for sign-in and Linked Roles.
-- **vekn.net** — for profile synchronisation.
 - **GitHub** — when a winning decklist is contributed to the public Tournament Winning Decks Archive (TWDA).
 - **Email (SMTP)** — to deliver service messages, where you have provided an email.
 - **The public / community tools** — for the competitive record described above.

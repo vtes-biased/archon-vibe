@@ -18,7 +18,6 @@ _TEST_DB_URL = os.getenv(
     "postgresql://archon:archon_dev_password@localhost:5433/archon_test",
 )
 os.environ["DATABASE_URL"] = _TEST_DB_URL
-os.environ["VEKN_SYNC_ENABLED"] = "false"
 # A two-card subset of the real card database: engine/data/cards.json is a
 # generated artifact that CI never downloads, so tests pin their own.
 os.environ["CARDS_JSON_PATH"] = str(Path(__file__).parent / "fixtures" / "cards.json")
@@ -49,18 +48,40 @@ _ensure_test_db_exists()
 # Alias both names to one module object, or the script's db calls miss test_db()'s init_db().
 import importlib
 import types
+from datetime import UTC, datetime, timedelta
+from uuid import uuid7
 
 from src import db, http_client
 from src.main import app
+from src.models import Role, User
 from src.routes.auth import create_access_token
 
 sys.modules.setdefault("backend", types.ModuleType("backend"))
 sys.modules["backend"].src = sys.modules["src"]
 sys.modules["backend.src"] = sys.modules["src"]
-for _mod in ("db", "models", "vekn_sync"):
+for _mod in ("db", "models"):
     sys.modules[f"backend.src.{_mod}"] = importlib.import_module(f"src.{_mod}")
 
-from tests.mock_vekn_data import generate_mock_users
+
+def _generate_test_users(count: int = 400) -> list[User]:
+    countries = ("US", "FR", "DE", "ES", "BR", "SE", "PL", "FI")
+    role_cycle: list[list[Role]] = [[Role.IC], [Role.NC], [Role.PRINCE], []]
+    base_time = datetime.now(UTC)
+    users = []
+    for i in range(count):
+        roles = role_cycle[i] if i < len(role_cycle) else []
+        vekn_id = str(1000000 + i) if (roles or i % 5 != 0) else None
+        users.append(
+            User(
+                uid=str(uuid7()),
+                modified=base_time - timedelta(minutes=i),
+                name=f"Player {i}",
+                country=countries[i % len(countries)],
+                vekn_id=vekn_id,
+                roles=roles,
+            )
+        )
+    return users
 
 
 def make_auth_header(user_uid: str) -> dict[str, str]:
@@ -104,7 +125,7 @@ async def test_client(test_db) -> AsyncIterator[AsyncClient]:
 
 @pytest_asyncio.fixture
 async def populated_db(test_db) -> list:
-    users = generate_mock_users(400)
+    users = _generate_test_users(400)
 
     for user in users:
         await db.save_user(user)

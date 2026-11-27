@@ -157,7 +157,7 @@ an email login is not removable, and **the last remaining method is refused
 server-side** ([hazards](hazards.md#consumers-that-must-move-together)).
 
 **`discord_id` and `contact_discord` name the Discord last signed in with**, set
-together at every Discord sign-in and pinned in `local_modifications`, and a merge
+together at every Discord sign-in, and a merge
 takes both from the same side. Removing that Discord re-points both at the
 remaining Discord login used most recently, or clears them; a login recorded before
 usernames were stored leaves `contact_discord` empty until its next sign-in. The
@@ -203,10 +203,7 @@ cannot serve: a signup link that expired before any account existed.
 chose to publish — its name reads the other way round. It is what the account
 merge carries to the survivor, what a `reset`, a magic-link signup or a first
 Discord login with that verified address lands on when the account has never had
-a login,
-where the invite is sent, and what the VEKN
-registry push submits, falling back to
-`<vekn_id>@placeholder.vekn.net` when there is none. It becomes a published
+a login, and where the invite is sent. It becomes a published
 address for exactly two roles: an NC's or Prince's row carries it into the member
 projection in plaintext and into the public one base64-cloaked, a harvester
 speed-bump rather than access control. Every other member's reaches only the
@@ -245,7 +242,7 @@ Whether the lookup skips them waits on the production count
 ([post-deploy](post-deploy.md#count-the-unverified-email-logins)).
 
 A `+tag` subaddress is deliberately not canonicalized: this is the address we
-actually send to and hand to the VEKN registry, so folding `a+vtes@x.com` to
+actually send mail to, so folding `a+vtes@x.com` to
 `a@x.com` would aim that mail at a mailbox the member may not own, and would
 turn two distinct people into one 409 at the door.
 

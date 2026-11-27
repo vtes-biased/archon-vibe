@@ -171,34 +171,6 @@ async def test_link_title_refuses_internal_addresses(
 
 
 @pytest.mark.asyncio
-async def test_self_edited_contact_fields_flagged_local(
-    test_client: AsyncClient, test_db
-):
-    """Self-edited contact fields and nickname must land in local_modifications
-    so neither sync (VEKN or legacy-archon) silently reverts them."""
-    user = await _insert_user(roles=[], vekn_id="1000004")
-    response = await test_client.patch(
-        "/auth/me",
-        json={
-            "nickname": "MyNick",
-            "contact_email": "me@example.com",
-            "contact_phone": "+33123456789",
-            "phone_is_whatsapp": True,
-        },
-        headers=make_auth_header(user.uid),
-    )
-    assert response.status_code == 200
-
-    after = await db.get_user_by_uid(user.uid)
-    assert {
-        "nickname",
-        "contact_email",
-        "contact_phone",
-        "phone_is_whatsapp",
-    } <= after.local_modifications
-
-
-@pytest.mark.asyncio
 async def test_prince_cannot_clear_their_last_contact_channel(
     test_client: AsyncClient, test_db
 ):

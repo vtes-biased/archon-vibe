@@ -237,42 +237,6 @@ LOG_PANEL = {
     "targets": [{"refId": "A", "expr": LOGS}],
 }
 
-BACKEND = '{host="archon.vekn.net", unit="archon-backend.service"}'
-
-
-def push_failures(title, subject, pattern, labels):
-    expr = (
-        f"sum by ({labels}) (count_over_time({BACKEND}"
-        f' |= "VEKN push failed: {subject}=" | regexp `{pattern}` [2h]))'
-    )
-    return {
-        "type": "table",
-        "title": title,
-        "datasource": LOKI,
-        "fieldConfig": {"defaults": {"noValue": "Nothing failing"}, "overrides": []},
-        "options": {"showHeader": True, "cellHeight": "sm"},
-        "targets": [
-            {
-                "refId": "A",
-                "expr": expr,
-                "queryType": "instant",
-                "instant": True,
-                "range": False,
-                "format": "table",
-            }
-        ],
-        "transformations": [
-            {
-                "id": "organize",
-                "options": {
-                    "excludeByName": {"Time": True},
-                    "renameByName": {"Value": "attempts (2h)"},
-                },
-            }
-        ],
-    }
-
-
 CPU_BUSY = f'1 - avg(rate(node_cpu_seconds_total{{{HOST}, mode="idle"}}[5m]))'
 MEM_AVAIL = (
     f"node_memory_MemAvailable_bytes{{{HOST}}} / node_memory_MemTotal_bytes{{{HOST}}}"
@@ -565,17 +529,6 @@ LAYOUT = [
         8,
         7,
     ),
-    (row("VEKN push"), 24, 1),
-    (
-        push_failures(
-            "Failing members",
-            "member",
-            r"member=(?P<member>\S+) reason=(?P<reason>.*)",
-            "member, reason",
-        ),
-        24,
-        6,
-    ),
     (row("Logs"), 24, 1),
     (
         ts(
@@ -591,12 +544,6 @@ LAYOUT = [
     ),
     (LOG_PANEL, 24, 16),
 ]
-if not PROD:
-    LAYOUT = [
-        entry
-        for entry in LAYOUT
-        if entry[0]["title"] not in ("VEKN push", "Failing members")
-    ]
 
 
 def dashboard() -> dict:

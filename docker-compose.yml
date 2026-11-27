@@ -58,7 +58,7 @@ services:
     profiles:
       - test
 
-  # Backend bound to the throwaway DB, VEKN sync off.
+  # Backend bound to the throwaway DB.
   backend-test:
     build:
       context: .
@@ -66,7 +66,6 @@ services:
     environment:
       DATABASE_URL: postgresql://archon:archon_dev_password@db-test:5432/archon
       ENVIRONMENT: development
-      VEKN_SYNC_ENABLED: "false"
     depends_on:
       db-test:
         condition: service_healthy
@@ -84,7 +83,6 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       DATABASE_URL: postgresql://archon:archon_dev_password@db-test:5432/archon
-      VEKN_SYNC_ENABLED: "false"
       E2E_FORCE: "1"  # db-test is guaranteed ephemeral/empty; allow the truncate
     depends_on:
       db-test:

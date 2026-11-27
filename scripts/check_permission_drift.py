@@ -34,9 +34,6 @@ ALLOWED = {
     "backend/src/routes/users.py": "resync trigger on an overlay-role change",
     # Mirrors the engine's own "empty list means unrestricted" contract.
     "backend/src/routes/tournaments.py": "engine league-gate contract",
-    # Attribution, not access: which official covers a city/country, to credit
-    # the sponsor of a legacy-imported member.
-    "backend/src/vekn_sync.py": "sponsor attribution lookup",
     # Display: badge colours, labels, sort order, filter expansion.
     "frontend/src/lib/roles.ts": "badge classes, labels, filter expansion",
     "frontend/src/lib/db.ts": "role filter expansion",

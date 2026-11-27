@@ -7,9 +7,7 @@ JWT signing key is only ever read where it already lives:
     python loadtest_users.py cleanup
 
 Users are named "Load Test NNN" with no roles and no contact; cleanup
-soft-deletes every non-deleted user carrying that name prefix. They do carry an
-unsynced vekn_id, which the hourly VEKN push would create on the real registry:
-never run this against a deployment with VEKN_PUSH=true.
+soft-deletes every non-deleted user carrying that name prefix.
 """
 
 import argparse

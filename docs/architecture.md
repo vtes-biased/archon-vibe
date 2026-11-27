@@ -86,7 +86,7 @@ all connections via their locks, any further acquire blocks and deadlocks.
   on the shared connection (one `await execute` yields mid-flight) or outlive the
   `with` block. `_acquire` records the owner task and **raises** if the ambient
   connection is reached from another task, so this fails loudly. Every spawned DB
-  task — Discord role sync, VEKN sync, push sends — fires post-commit.
+  task — Discord role sync, push sends — fires post-commit.
 - The pool is `autocommit=True`, so a multi-statement write needing consistency
   must take an explicit `conn.transaction()`. `delete_object` / `purge` are the
   fixed exemplar (object plus `avatars`/`banners`/`push_subscriptions` side rows,
@@ -122,10 +122,9 @@ The scans that stay, each deliberate:
 
 - **Whole-corpus by design**: the `/snapshot` stream and the `/stream`
   catch-up ([sync](sync.md)), `purge_deleted_objects`.
-- **Scheduled jobs**, a scan per run rather than per request: the VEKN member
-  sync, the hourly VEKN member push, the sanction cleanup, the full rating, Hall
-  of Fame and promo stock recomputes, the TWDA sync, the judge directory sync, the
-  stale-finals finish.
+- **Scheduled jobs**, a scan per run rather than per request: the sanction
+  cleanup, the full rating, Hall of Fame and promo stock recomputes, the TWDA
+  sync, the judge directory sync, the stale-finals finish.
 - **Once per boot**: the migration guards.
 - **Small partitions**: `league` and `promo` rows, read whole through
   `idx_objects_type`.
@@ -188,18 +187,18 @@ is the standing example.
 
 ## Outbound HTTP
 
-Every backend call to Discord, VEKN, GitHub and the deck providers goes through
-one process-wide `aiohttp.ClientSession` — `http_client.session()`, created on
-first use and closed in the `lifespan` teardown. A session owns a connection pool
-and a TLS context, so a session per call meant a full handshake per request,
-worst on the login path a tournament morning hammers. Its default timeout is `total=20, connect=10, sock_read=15`, well under nginx's
-60s `proxy_read_timeout`; a caller needing longer passes `timeout=` per request, as
-the TWDA archive fetch (120s) and the TWDA PR flow (30s) do. The deck providers
-take the session default.
+Every backend call to Discord, GitHub, the judge directory and the deck
+providers goes through one process-wide `aiohttp.ClientSession` —
+`http_client.session()`, created on first use and closed in the `lifespan`
+teardown. A session owns a connection pool and a TLS context, so a session per
+call meant a full handshake per request, worst on the login path a tournament
+morning hammers. Its default timeout is `total=20, connect=10, sock_read=15`,
+well under nginx's 60s `proxy_read_timeout`; a caller needing longer passes
+`timeout=` per request, as the TWDA archive fetch (120s) and the TWDA PR flow
+(30s) do. The deck providers take the session default.
 
 It carries a `DummyCookieJar`, so it stores nothing a host sets. Every caller
-authenticates by header or query parameter — VEKN by `Authorization: Bearer` or
-its `key` param, the rest by header — so no cookie is ever wanted, and one jar
+authenticates by header (or is public), so no cookie is ever wanted, and one jar
 behind a process-wide session would otherwise carry one user's OAuth exchange
 into the next caller's request.
 
@@ -1103,29 +1102,27 @@ form where the event has one, so the two URLs do not read as two pages.
 **Deceased members.** `User.deceased_at` is an in-memoriam flag with a date, plus
 `deceased_by_uid` for audit (full-only). This is **not** a soft-delete: tournament
 history, ratings and rankings are preserved and the record stays active. Set and
-cleared via `PATCH /api/users/{uid}/deceased`, requires a `vekn_id`, never pushed
-to VEKN, and tracked in `local_modifications` to block a VEKN-sync overwrite.
+cleared via `PATCH /api/users/{uid}/deceased`, requires a `vekn_id`.
 
 **Delete member.** `DELETE /api/users/{uid}`, IC-only, soft-deletes a
 VEKN-**less** account — the mirror of deceased, which targets VEKN-bearing ones.
 
 **Anonymize member.** `POST /api/users/{uid}/anonymize`, IC-only, requires a
-`vekn_id`, irreversible and never pushed to VEKN. `accounts.ANONYMIZED_FIELDS` is
+`vekn_id`, irreversible. `accounts.ANONYMIZED_FIELDS` is
 reset to defaults — name, nickname, contact, city, avatar, GitHub and community
 links — with `name` set to the literal `"Anonymized member"`, so every surface that
 reads `user.name` (lists, standings, decklists, the TWDA header, the bot) needs no
-branch of its own. Those fields are pinned in `local_modifications` against the
-VEKN member sync and the legacy merge, and `anonymized_at`/`anonymized_by_uid`
+branch of its own, and `anonymized_at`/`anonymized_by_uid`
 stamp it. Auth methods, push subscriptions, OAuth tokens and consents, the Linked
 Roles token, the avatar bytes and the owner columns are deleted; the member's
 Discord `display_name` and their `author_name` on announcements are scrubbed from
 every tournament, and again from any device snapshot go-online or sync-offline
-lands ([hazards](hazards.md)). The record is not soft-deleted, since the next sync
-would recreate it with its PII. `models.is_active_account` refuses it alongside a
+lands ([hazards](hazards.md)). The record is not soft-deleted, so historical
+references keep resolving. `models.is_active_account` refuses it alongside a
 deleted one at every sign-in and login-flow write — token minting, `/auth/refresh`,
 `get_current_user`, the `/stream` token, the Discord and GitHub callbacks — so live
 sessions die at their next request; profile edits, a VEKN claim or link onto it and a
-merge into it are refused, and the hourly member push skips it. Results, ratings, wins, sanctions, NDA records
+merge into it are refused. Results, ratings, wins, sanctions, NDA records
 and past TWDA archive credits stay attached. What was already sent — Discord posts,
 TWDA pull requests, a passkey's display name on the member's authenticator — is out
 of reach, and a connected bot keeps the old name until it reconnects.
@@ -1137,7 +1134,7 @@ ratings, wins, cooptation — stays attached. Only the account *without* the
 
 **Merge** (`POST /admin/users/merge`, IC only): the VEKN-bearing uid is always the
 survivor. Auth methods, sanctions, decks and `coopted_by` migrate from the dying
-uid, which is then soft-deleted; roles and `local_modifications` are consolidated
+uid, which is then soft-deleted; roles are consolidated
 by union, without consulting the appointment matrix. Ratings and wins are derived,
 not merged: the survivor's Hall of Fame count is recomputed on the spot, because a
 reassigned deck can complete a win they already held, while their rating waits for
@@ -1180,31 +1177,26 @@ Override tab.
 | Job | Schedule | Module |
 |---|---|---|
 | Discord Linked Roles registration | once, at startup | `roles_hook` |
-| VEKN sync (members) | every `VEKN_SYNC_INTERVAL_HOURS` from 04:00 UTC | `vekn_sync.py` |
 | Snapshot rebuild, only if the corpus moved | at startup, then checked every 15 min | `snapshots.py` |
 | OAuth cleanup | hourly | `db_oauth.py` |
-| VEKN member push batch | hourly, configurable | `vekn_push.py` |
 | Stale-finals finish | daily, 00:30 UTC | `routes/tournaments.py` |
 | Sanction cleanup | daily, 01:00 UTC | `db.py` |
 | Deleted-objects purge | daily, 01:30 UTC | `db.py` |
 | Promo stock recompute | daily, 02:00 UTC | `promo_stock.py` |
 | Rating recompute (ratings, then Hall of Fame wins) | daily, 02:30 UTC | `ratings.py` |
 | TWDA sync (reconstruction + winner decks) | daily, 05:00 UTC, own flag | `twda_import.py` |
+| Judge directory sync | daily, 05:30 UTC, own flag | `judge_directory.py` |
 
 **A restart serves within seconds**: the lifespan awaits only the schema load and
 pending [stored-value migrations](#stored-value-migrations); every "at startup" job
-is a task started behind serving. A job's full-corpus reads — including the member
-sync's co-opted-by inference — go through `batch_read_connection`, since the 30s
-guard fails them on a cold cache.
+is a task started behind serving. A job's full-corpus reads go through
+`batch_read_connection`, since the 30s guard fails them on a cold cache.
 
 **Every daily job is a `CronTrigger` at a pinned UTC hour, never an interval** —
 an interval job of a day or more can never fire here
-([hazards](hazards.md#deploy)). The VEKN sync is one too: its hours are spelled
-out from 04:00 UTC every `VEKN_SYNC_INTERVAL_HOURS` — 04:00 alone at the 24 both
-deployed environments set, clear of the 03:00 backup and ahead of the 05:00 TWDA
-sync. Not a startup kick: a kick makes every daily restart pay the sync's whole
-memory peak, so a fresh install waits for the hour or for the admin page's *Run
-now*.
+([hazards](hazards.md#deploy)). Not a startup kick: a kick makes every daily
+restart pay the job's whole memory peak, so a fresh install waits for the hour
+or for the admin page's *Run now*.
 
 The purge hard-deletes soft-deleted objects older than 30 days and also drops
 orphaned `avatars` / `banners` / `push_subscriptions` side-table rows — there is no

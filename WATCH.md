@@ -52,11 +52,11 @@ are not here: they wait on a release, not a trigger, in
     `backfill_twda.py` as the manual reconciliation. Done when no scheduled job
     fetches the archive; first re-check that nothing else depends on it.
 
-## VEKN stage 2 — the member roster sync retires
+## VEKN stage 2 — Prince / NC divergence review
 
-- **When**: vekn.net registration closes and `VEKNSyncService` stops
-  ([vekn](docs/vekn.md#stage-2--the-member-roster-retires-when-veknnet-registration-closes)).
-- **Check**: whether the roster sync still runs on production.
+- **When**: Stage 2 (member roster sync retirement) is deployed on production
+  ([vekn](docs/vekn.md#decommission)).
+- **Check**: whether the Stage 2 commit is deployed on production.
 - **Fired**: through `/intake` — review the
   [Prince / NC divergence](docs/vekn-decommission.md#prince--nc-divergence--legacy-archon-vs-the-app):
   each divergent name gets a verdict from someone who knows the appointments, and

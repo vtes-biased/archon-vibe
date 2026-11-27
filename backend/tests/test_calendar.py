@@ -236,18 +236,16 @@ async def test_calendar_token_survives_read_modify_write(test_db):
 
 @pytest.mark.asyncio
 async def test_calendar_token_preserved_by_unhydrated_writer(test_db):
-    """Regression: the nightly VEKN sync rebuilds a User (token=None) and saves it.
-
-    COALESCE must keep the stored token instead of nulling it.
+    """Regression: a writer rebuilding a User (token=None) and saving it
+    must preserve the stored token via COALESCE instead of nulling it.
     """
     user = _make_user(token="sync-safe")
     await db.save_user(user)
 
-    # Simulate vekn_sync: a fresh model for the same uid, no token field set.
     rebuilt = User(
         uid=user.uid,
         modified=datetime.now(UTC),
-        name="From VEKN",
+        name="Rebuilt User",
         country="FR",
     )
     await db.save_user(rebuilt)

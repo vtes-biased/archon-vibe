@@ -1,133 +1,45 @@
 # VEKN integration
 
-How the app talks to vekn.net, to the TWDA, and to the legacy archon database. The
-organization and its rules are [domain](domain/vekn.md); this is the plumbing. What
-retiring these syncs means is [below](#decommission); the evidence for the work waiting on it is
+How the app talks to the TWDA, the judge directory, and the legacy archon
+database. The organization and its rules are [domain](domain/vekn.md); this is
+the plumbing. Both live `www.vekn.net` syncs are retired ([below](#decommission));
+the evidence for the post-retirement curation work is
 [vekn-decommission](vekn-decommission.md).
 
 ## Feature flags
 
 | Flag | Scope | Effect |
 |---|---|---|
-| `VEKN_PUSH` | backend env | enables outbound member creation push |
-| `VITE_VEKN_PUSH` | frontend env | shows the amber pending-sync badges on unsynced members |
-| `VEKN_SYNC_ENABLED` | backend env | enables periodic inbound member roster sync |
-| `VEKN_SYNC_INTERVAL_HOURS` | backend env | inbound period from 04:00 UTC, default 6h |
-| `TWDA_SYNC_ENABLED` | backend env | enables the archive sync — separate from `VEKN_SYNC_ENABLED`, because it must outlive the VEKN API |
-| `JUDGE_SYNC_ENABLED` | backend env | enables the daily [judge directory](#judge-directory) sync — a different upstream with no credentials |
-| `VEKN_PUSH_INTERVAL_HOURS` | backend env | outbound member push period, default 1h |
+| `TWDA_SYNC_ENABLED` | backend env | enables the daily archive sync |
+| `JUDGE_SYNC_ENABLED` | backend env | enables the daily [judge directory](#judge-directory) sync — public upstream, no credentials |
 
-All VEKN member sync directions need `VEKN_API_BASE_URL`, `VEKN_API_USERNAME`,
-`VEKN_API_PASSWORD`.
+**Beta performs no outbound write, by design.** The TWDA GitHub App credentials
+are left unset there so `is_configured()` is false and every archive submission
+skips. The public archive may never take a write from a rehearsal environment —
+that is what makes beta safe to run a production script against. Its corpus is
+**not** a mirror of production and answers no question about production's row
+counts: the scripts rehearsed there have been applied there.
 
-**Beta runs inbound member sync and no outbound write, by design.** `VEKN_PUSH` is
-false there, and the TWDA GitHub App credentials are left unset so `is_configured()`
-is false and every archive submission skips. Neither vekn.net nor the public
-archive may take a write from a rehearsal environment — that is what makes beta
-safe to run a production script against. Its corpus is **not** a mirror of
-production and answers no question about production's row counts: the scripts
-rehearsed there have been applied there.
+## Member identity constraints
 
-## Outbound push
-
-Real-time member pushes are `asyncio.create_task` and never block a user request. The
-member is saved with `vekn_synced = false` before the task runs, failures are log-only,
-and the hourly batch retries every member with `vekn_synced = false`. On success,
-`push_member` sets `vekn_synced = true` and SSE-broadcasts the updated member so clients
-see the change without reconnecting.
-
-Tournament calendar and results push retired at [Stage 1](#decommission).
-
-### Push constraints
-
-- **A `vekn_id` is required to *register*, not merely to push.** The engine refuses
-  to seat a player without one (`Register`, `AddPlayer`, and the `CheckIn` walk-in
-  path all reject an empty id), so an official sponsors or links the account before
-  the player is added. That is stricter than [rules §9.6](domain/tournament-rules.md#sanctioning-and-reporting),
-  which only excludes placeholder-numbered results from the ratings. Offline play is
-  the exception: it mints local `TEMP-` ids, and go-online resolves each against a
+- **A `vekn_id` is required to *register*.** The engine refuses to seat a player
+  without one (`Register`, `AddPlayer`, and the `CheckIn` walk-in path all
+  reject an empty id), so an official sponsors or links the account before the
+  player is added. That is stricter than
+  [rules §9.6](domain/tournament-rules.md#sanctioning-and-reporting), which only
+  excludes placeholder-numbered results from the ratings. Offline play is the
+  exception: it mints local `TEMP-` ids, and go-online resolves each against a
   real account — by VEKN id, then by email — or creates a member. Which is why
   taking a tournament offline needs `sponsor_member` on top of organizer rights.
-- **Member creation requires a city.** The registry refuses a create whose
-  `firstname`, `lastname`, `email`, `country` or `city` is empty — `state` is the
-  one optional field, per its own `createPlayer` in `vekn-api/vekn/registry.php`
-  — and the tournament desk form that mints most members never asks for a city.
-  `push_member` sends the country capital in place of an empty one; the roster
-  sync writes that city back on its next pull, so the local row ends up holding
-  it too. A member with no country cannot be pushed at all and keeps its amber
-  pending-sync badge.
-- **A member the registry already knows under another id is never pushed.**
-  `createPlayer` refuses a create whose email, or whose full name as a substring,
-  matches an existing player, and names that player's `veknid`, always a different
-  id from ours, since a taken id is refused first. It means we minted an id for
-  someone vekn.net already registered, and inbound sync has usually brought their
-  registry record in as a second local account. vekn.net is the source of truth,
-  but the push does not heal it: the unique `vekn_id` index refuses moving the
-  registry id onto our member, keeping our id under the registry's name is a false
-  sync, and a substring match can name a different person. The failure line carries
-  the registry's id, and an IC reconciles the two accounts by hand.
+- **Observability** — scheduled sync jobs record last success and error in
+  process, and `GET /admin/vekn-status` (IC-gated) exposes `twda_sync` and
+  `judge_sync` on the profile Admin panel. It resets on restart.
 
-### Outage resilience
-
-The app keeps working through hours or days of vekn.net downtime and self-heals on
-recovery: local saves and the SSE broadcast always precede the push, and the next
-hourly batch drains the backlog. On top of that:
-
-- **Fail-fast** — the batch aborts the whole run on the first
-  `VEKNAPIConnectionError` (transport down, timeout, or auth failure) rather than
-  re-timing-out every pending member serially at 30–120s each; it reruns next cycle.
-  Per-member *data* errors still skip just that member. The client wraps aiohttp total
-  timeouts into that exception, because **a `ClientTimeout` breach raises
-  `asyncio.TimeoutError`, not an `aiohttp.ClientError`** — an
-  `except aiohttp.ClientError` misses timeouts entirely.
-- **No lost updates** — `push_member` re-fetches the User immediately before writing
-  back `vekn_synced`. The batch loads rows up front but may save minutes later during
-  outage-recovery backlog, so re-fetching narrows the clobber window to microseconds
-  and interim edits survive.
-- **Observability** — scheduled jobs record last success and error in process, and
-  `GET /admin/vekn-status` (IC-gated) exposes member sync, TWDA sync, judge sync and
-  batch push, so a days-long outage is visible without grepping logs. It resets on
-  restart. The batch's `errors` counts every member push that did not land, refused or
-  skipped, so a stuck item reads as non-zero every hour. Every such failure logs one
-  line, `VEKN push failed: member=<vekn id> reason=…`, which the production dashboard's
-  **VEKN push** table groups over the last two hours: the list to reconcile by hand
-  when the refusal is a registry collision.
-
-## Inbound sync
-
-### Members
-
-`VEKNSyncService` pulls the full roster and reconciles:
-
-- Creates Users for unknown VEKN IDs, **seeding roles at creation only** — Prince
-  and NC from the upstream `princeid`/`coordinatorid`, IC from a static roster.
-  This is a bootstrap seed, not a transcription of legacy archon's role history.
-  Judge ranks are **not** seeded: vekn.net has no field for them, and the
-  [judge directory](#judge-directory) is their source.
-- Updates identity — name, country, city, state — for existing members. **The
-  state disambiguates the city** in GeoNames before the most populous of that
-  name wins, so Newark, Ohio does not land in New Jersey (gh-76).
-- **Never re-writes roles on update.** A member created by this sync before the
-  legacy ETL ran keeps only its bootstrap seed, and the ETL's richer role data
-  never lands for that member. This is the intended end state: roles are
-  app-managed and archon is the system of record for them.
-- Infers `coopted_by` relationships, only where the field is unset — or names no
-  user row, as the legacy import left behind — and not in
-  `local_modifications`. A member goes to the official with the **longest**
-  matching `vekn_prefix`, so a Prince whose prefix extends their NC's keeps their
-  own members. A sponsor already recorded is never replaced by a prefix guess:
-  the legacy record wins.
-- Non-destructive: fields recorded in `local_modifications` by the profile and user
-  edit routes are never overwritten.
-
-Tracking fields on User: `vekn_synced`, `vekn_synced_at`, `local_modifications`.
-
-Manual trigger: `POST /admin/sync-vekn` (members).
-
-Inbound tournament sync retired at [Stage 1](#decommission). Existing rounds-less VEKN
-imports stay in the corpus as imported; `backend/scripts/dedup_tournaments.py` resolves
-historical duplicate pairs by soft-deleting the loser and transplanting `external_ids.vekn`
-(and any archive key as `twda_entry`) onto the survivor.
+Inbound tournament sync and member sync retired at [Decommission](#decommission).
+Existing rounds-less VEKN imports stay in the corpus as imported;
+`backend/scripts/dedup_tournaments.py` resolves historical duplicate pairs by
+soft-deleting the loser and transplanting `external_ids.vekn` (and any archive
+key as `twda_entry`) onto the survivor.
 
 ## TWDA
 
@@ -464,18 +376,16 @@ redundant against the three artefacts above. The bucket now holds `archon` and
 `globals` only, so a *"repo has no backed-up database"* warning in the nightly
 log names a **new** orphan and is worth acting on.
 
-**Single writer per field**, which is what prevents a daily flip-flop between
-syncs:
+**Single writer per field** during the parallel run:
 
 | Data | Writer |
 |---|---|
-| identity — name, country, city, state | VEKN sync |
+| identity — name, country, city, state | VEKN sync (retired) |
 | contact, nickname, discord, community links | archon sync |
-| `coopted_by` | archon sync, VEKN sync inference (fills an unset or dangling sponsor), an official's edit |
+| `coopted_by` | archon sync, an official's edit |
 | roles | nobody — seeded once by whichever creates the row first, app-managed thereafter |
 | sanctions, leagues | archon sync, upsert by source uid |
 | rich play data — rounds, seatings, decks, finals | archon sync |
-| `local_modifications` fields | nobody — local edits trump both syncs |
 
 `coopted_by` carries extra rules. Within the archon sync `remap_coopted_by` is its
 sole writer, running once the full uid map is known, and an **unresolved sponsor is
@@ -484,12 +394,11 @@ rewrote ~10k users every night, all re-downloaded by every client at its next
 reconnect. Outside the syncs it is stamped when a member is minted — sponsor,
 create, or an organizer's registration issuing the id.
 
-**An official's edit pins it.** IC, or the member's NC, sets the sponsor to any
-live VEKN member or clears it (`PATCH /users/{uid}/sponsor`), and the field joins
-`local_modifications` either way: both syncs then leave it alone, so a cleared
-sponsor stays cleared instead of being re-inferred. Setting keeps `coopted_at` —
-the official corrects who, not when; clearing drops it. An account merge takes
-the sponsor from whichever side is pinned, the survivor first.
+**An official's edit**: IC, or the member's NC, sets the sponsor to any live
+VEKN member or clears it (`PATCH /users/{uid}/sponsor`). Setting keeps
+`coopted_at` — the official corrects who, not when; clearing drops it. An
+account merge takes the survivor's sponsor, falling back to the absorbed
+account's.
 
 `coopted_by` is member-visible, `coopted_at` full-only: who sponsored a member is
 already public through the id prefix and vekn.net's registry, and it is what the
@@ -515,8 +424,7 @@ with **no round seating** is a registration artifact: dropped wholesale
 (`KNOWN_DROP`), or dropped from a single tournament's players when the account
 plays elsewhere (`KNOWN_DROP_IN_TOURNAMENT`). One who **actually played** must
 resolve to a real account: `KNOWN_REMAP` onto the member's real VEKN id, or a
-fresh VEKN id allocated and marked push-eligible so the batch push claims the
-number on vekn.net before a future vekn.net assignment can collide with it.
+fresh VEKN id allocated locally.
 
 Other invariants: deterministic deck uids (uuid5 of tournament + user + round); a
 pre-run `pg_dump` for recovery; and merge writes are **not** live-broadcast over SSE,
@@ -534,32 +442,27 @@ push dies with the read it accompanies.
 
 BCP removed the legacy `www.vekn.net` event calendar, event creation and event
 management pages. Inbound tournament sync and outbound event/results push are
-retired; Archon is the system of record for events, results and ratings. The hourly
-batch keeps running for members until stage 2.
+retired; Archon is the system of record for events, results and ratings.
 
 The historical corpus curation unblocked by this stage sits in
 [vekn-decommission](vekn-decommission.md).
 
-### Stage 2 — the member roster retires, when vekn.net registration closes
+### Stage 2 — the member roster retired (2026-11-27)
 
-`VEKNSyncService` stops, along with member creation push (`VEKN_PUSH` /
-`VITE_VEKN_PUSH`) and `audit_cities.py`, which reads the roster. It is sequenced
-second because member identity is load-bearing in a way the calendar is not — the
-engine refuses to seat a player without a `vekn_id` — and because only the officials
-review waits on it.
+BCP closed `www.vekn.net` member sync in both directions. Inbound member sync
+(`VEKNSyncService`, `POST /admin/sync-vekn`), outbound member creation push
+(`vekn_push.py`, `VEKN_PUSH` / `VITE_VEKN_PUSH`), `vekn_api.py`,
+`audit_cities.py`, the pending-sync badges, the `User` sync-tracking fields
+(`vekn_synced`, `vekn_synced_at`, `local_modifications`), and the Grafana
+`VEKN push` row are retired. Archon is the system of record for members as well
+as events, results, and ratings; `allocate_next_vekn_id` allocates from the
+first gap in our own corpus.
 
-**The precondition is a registry precondition, not a technical one.** We already
-allocate ids ourselves — `allocate_next_vekn_id` takes the first gap in *our own*
-corpus and `push_member` tells vekn.net the number rather than asking for one — so
-the roster sync's remaining job is picking up members who registered on vekn.net
-directly. While that form is open and we are no longer reading, two registrars mint
-into one namespace and collide. Closing it is what makes the stage safe; a reserved
-range for us was the alternative and costs a negotiation plus a change to the
-allocator, for no gain once vekn.net is an archive.
+The officials review unblocked by this stage sits in
+[vekn-decommission](vekn-decommission.md).
 
 ### What survives
 
-The TWDA sync, on its own flag and its own schedule, with no VEKN credentials — it
-is a different upstream and is the sole external source of historic wins (candidate
-for retirement once no non-Archon TWDA submission route remains). Submission to the
+The TWDA sync and the judge directory sync, each on its own flag and schedule,
+with no VEKN credentials — both are separate upstreams. Submission to the TWDA
 archive survives on the short event code.

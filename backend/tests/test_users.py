@@ -9,7 +9,6 @@ from httpx import AsyncClient
 from src import db
 from src.accounts import ANONYMIZED_NAME
 from src.broadcast import SSEConnection, _sse_connections
-from src.geonames import city_index
 from src.models import (
     Announcement,
     AuthMethod,
@@ -20,7 +19,6 @@ from src.models import (
     User,
 )
 from src.routes.auth import create_refresh_token
-from src.vekn_sync import VEKNSyncService
 
 from tests.conftest import make_auth_header, seed_tournament
 
@@ -34,7 +32,6 @@ async def _mk_user(country: str, roles: list[Role], vekn: str | None = None) -> 
         country=country,
         vekn_id=vekn,
         roles=list(roles),
-        local_modifications=set(),
     )
     await db.save_user(user)
     return user
@@ -79,7 +76,6 @@ async def test_create_user_dedup_email_conflict(test_db, test_client: AsyncClien
         country="US",
         vekn_id="3000002",
         contact_email="jane@example.com",
-        local_modifications=set(),
     )
     await db.save_user(existing)
 
@@ -116,28 +112,6 @@ async def test_update_user(test_client: AsyncClient, populated_db):
     assert updated_user["name"] == "Updated Name"
     assert updated_user["country"] == "CA"
     assert datetime.fromisoformat(updated_user["modified"]) > target.modified
-
-
-@pytest.mark.asyncio
-async def test_update_user_tracks_nickname_local_modification(
-    test_client: AsyncClient, populated_db
-):
-    """An official-set nickname must land in local_modifications, else the nightly
-    legacy merge (nickname is in ARCHON_USER_FIELDS) silently reverts it."""
-    admin = next(u for u in populated_db if Role.IC in u.roles)
-    target = next(u for u in populated_db if u.uid != admin.uid)
-
-    response = await test_client.put(
-        f"/api/users/{target.uid}",
-        json={"nickname": "SetByOfficial"},
-        headers=make_auth_header(admin.uid),
-    )
-    assert response.status_code == 200
-
-    saved = await db.get_user_by_uid(target.uid)
-    assert saved is not None
-    assert saved.nickname == "SetByOfficial"
-    assert "nickname" in saved.local_modifications
 
 
 @pytest.mark.asyncio
@@ -374,8 +348,8 @@ async def test_delete_member(test_db, test_client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_anonymize_member(test_db, test_client: AsyncClient):
-    """The wipe must reach every copy of the name, end the sign-in, and survive
-    the next VEKN member sync — the record keeps its uid and VEKN id."""
+    """The wipe must reach every copy of the name and end the sign-in —
+    the record keeps its uid and VEKN id."""
     ic = await _mk_user("US", [Role.IC], vekn="4000011")
     member = User(
         uid=str(uuid7()),
@@ -386,7 +360,6 @@ async def test_anonymize_member(test_db, test_client: AsyncClient):
         city="Paris",
         vekn_id="4000012",
         contact_email="real@example.com",
-        local_modifications=set(),
     )
     await db.save_user(member)
     await db.insert_auth_method(
@@ -443,18 +416,6 @@ async def test_anonymize_member(test_db, test_client: AsyncClient):
 
         resp = await test_client.post("/auth/refresh", json={"refresh_token": refresh})
         assert resp.status_code == 401
-
-        await VEKNSyncService().sync_player(
-            {
-                "veknid": 4000012,
-                "firstname": "Real",
-                "lastname": "Name",
-                "city": "Paris",
-            },
-            city_index(),
-        )
-        resynced = await db.get_user_by_uid(member.uid)
-        assert (resynced.name, resynced.city) == (ANONYMIZED_NAME, None)
 
         resp = await test_client.post(
             f"/api/users/{member.uid}/anonymize", headers=make_auth_header(ic.uid)

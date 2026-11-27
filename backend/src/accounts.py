@@ -193,12 +193,7 @@ async def merge_users(
         claimed_agenda if any(claimed_agenda) else await get_agenda(keep_uid)
     )
 
-    if "coopted_by" in keep_user.local_modifications:
-        sponsor_side = keep_user
-    elif "coopted_by" in delete_user_obj.local_modifications:
-        sponsor_side = delete_user_obj
-    else:
-        sponsor_side = keep_user if keep_user.coopted_by else delete_user_obj
+    sponsor_side = keep_user if keep_user.coopted_by else delete_user_obj
 
     discord_side = delete_user_obj if delete_user_obj.discord_id else keep_user
 
@@ -224,10 +219,6 @@ async def merge_users(
         community_links=keep_user.community_links or delete_user_obj.community_links,
         coopted_by=sponsor_side.coopted_by,
         coopted_at=sponsor_side.coopted_at,
-        vekn_synced=keep_user.vekn_synced or delete_user_obj.vekn_synced,
-        vekn_synced_at=keep_user.vekn_synced_at or delete_user_obj.vekn_synced_at,
-        local_modifications=keep_user.local_modifications
-        | delete_user_obj.local_modifications,
         vekn_prefix=keep_user.vekn_prefix or delete_user_obj.vekn_prefix,
         calendar_token=merged_calendar_token,
         agenda_hidden=merged_hidden,
@@ -275,8 +266,6 @@ UID_KEYED_FIELDS = frozenset(
         "roles",
         "coopted_by",
         "coopted_at",
-        "vekn_synced",
-        "vekn_synced_at",
         "vekn_prefix",
         "community_links",
         "promo_stock",
@@ -341,7 +330,6 @@ async def detach_user_from_vekn(
         calendar_token=feed_token,
         agenda_hidden=agenda_hidden,
         agenda_added=agenda_added,
-        local_modifications=set(),
         **_defaults(UID_KEYED_FIELDS),
     )
     personal_bd = await save_member(user, personal)
@@ -359,7 +347,6 @@ async def detach_user_from_vekn(
         calendar_token=None,
         agenda_hidden=None,
         agenda_added=None,
-        local_modifications=set(),
         **_defaults(PERSONAL_FIELDS),
     )
     vekn_bd = await save_member(user, vekn_record)
@@ -455,7 +442,6 @@ async def anonymize_user(user: User, by_uid: str) -> tuple[User, list[BroadcastD
         modified=now,
         anonymized_at=now,
         anonymized_by_uid=by_uid,
-        local_modifications=user.local_modifications | ANONYMIZED_FIELDS,
         **(_defaults(ANONYMIZED_FIELDS) | {"name": ANONYMIZED_NAME}),
     )
     broadcasts.append(await save_user(anonymized))

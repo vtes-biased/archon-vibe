@@ -210,8 +210,7 @@ and `level` labels, all set in the Fluent Bit config and the loop. Five of the s
 rules treat no data as fine, so a rename on the Fluent Bit side silences them
 rather than firing — only the silent-host rule notices, and only a change to
 `instance`. A rename there lands with the same rename in `deploy/grafana.py`,
-re-applied. The **VEKN push** table also parses the backend's own `VEKN push
-failed: member=` line shape, and a drift there reads as "Nothing failing", an all-clear.
+re-applied.
 
 **Proxy players are excluded-but-not-zeroed**, the inverse of DQ. Consumers
 iterating standings unfiltered — league scoring among them —
@@ -499,7 +498,7 @@ signed-in user's row arrives over SSE like anyone else's, and every other surfac
 reads that synced copy — so auth adopts it wholesale rather than merging field by
 field, and carries the owner-only fields forward because no projection holds them
 (`mise run model-drift` pins that list to `access_levels`), then re-reads `/auth/me` —
-on **any** bump of the own row, a rating recompute or VEKN sync as much as an
+on **any** bump of the own row, a rating recompute or judge sync as much as an
 agenda edit, since only the re-read brings in a change made on another device.
 
 The adoption is what makes a second writer on a `User` field safe: `PATCH

@@ -528,7 +528,6 @@ _SPLIT_HANDLED = {
     "calendar_token",
     "agenda_hidden",
     "agenda_added",
-    "local_modifications",
 }
 _SPLIT_SHARED = {
     "deleted_at",
@@ -572,9 +571,6 @@ _ANONYMIZE_KEPT = {
     "deceased_by_uid",
     "anonymized_at",
     "anonymized_by_uid",
-    "vekn_synced",
-    "vekn_synced_at",
-    "local_modifications",
     "vekn_prefix",
     "calendar_token",
     "agenda_hidden",

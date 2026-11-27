@@ -1,6 +1,5 @@
 """VEKN ID management API endpoints."""
 
-import asyncio
 import logging
 from datetime import UTC, datetime
 
@@ -25,7 +24,6 @@ from ..db import (
 )
 from ..middleware.auth import get_current_user
 from ..models import AuthMethodType, User
-from ..vekn_push import push_member_background
 from .auth import create_access_token, create_refresh_token
 
 encoder = msgspec.json.Encoder()
@@ -185,8 +183,6 @@ async def sponsor_new_member(request: Request, data: SponsorRequest) -> Response
         vekn_id=new_vekn_id,
         coopted_by=manager.uid,
         coopted_at=now,
-        vekn_synced=False,
-        vekn_synced_at=None,
     )
 
     bd = await save_member(target, updated)
@@ -194,9 +190,6 @@ async def sponsor_new_member(request: Request, data: SponsorRequest) -> Response
     logger.info(
         f"Sponsored new VEKN member {new_vekn_id} for user {target.uid} by {manager.uid}"
     )
-
-    # Background task — the response must not wait on a vekn.net outage.
-    asyncio.create_task(push_member_background(updated))
 
     return Response(
         content=encoder.encode(
