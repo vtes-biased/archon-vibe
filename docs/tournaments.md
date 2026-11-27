@@ -24,7 +24,7 @@ server (PyO3) behave identically.
 | `open_rounds` | bool | the non-VEKN house format, below |
 | `self_organized_rounds` | bool | players seat their own pods |
 | `standings_mode` | Private / Cutoff / Top 10 / Public | display default during the preliminaries: once the finals are seated every mode shows the full preliminary standings, the final's own placings waiting for the finish |
-| `decklists_mode` | Winner / Finalists / All | applied by the post-finish pass, [below](#engine-event-catalog) |
+| `decklists_mode` | Winner / Finalists / All, default All | applied by the post-finish pass, [below](#engine-event-catalog); defaults to `All` now that non-finalist decks are unlinked and players control finalist attribution and deck privacy |
 | `round_time`, `finals_time` | seconds; `round_time` 0 = untimed, `finals_time` 0 = use `round_time` | the shared timer |
 | `table_rooms` | named rooms over table ranges | labels in seating, print and player views |
 | `first_table_number` | int ≥ 1, default 1 | the number of the first table, for venues numbering continuously |

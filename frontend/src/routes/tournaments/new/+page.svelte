@@ -38,7 +38,7 @@
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     description: "",
     standings_mode: "Private",
-    decklists_mode: "Winner",
+    decklists_mode: "All",
     proxies: false,
     multideck: false,
     decklist_required: false,

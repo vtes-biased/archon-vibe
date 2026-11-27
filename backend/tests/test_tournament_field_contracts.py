@@ -41,7 +41,7 @@ SAMPLE_CONFIG = {
     "decklist_required": True,
     "description": "Sample description",
     "standings_mode": "Public",
-    "decklists_mode": "All",
+    "decklists_mode": "Winner",
     "max_rounds": 3,
     "max_players": 40,
     "open_rounds": True,
@@ -91,6 +91,20 @@ def test_engine_create_carries_every_config_field():
     )
     for field, value in SAMPLE_CONFIG.items():
         assert msgspec.to_builtins(getattr(created, field)) == value, field
+
+
+def test_create_defaults_decklists_mode_to_all():
+    assert CreateTournamentRequest(name="Default Event").decklists_mode == "All"
+    created = msgspec.json.decode(
+        ENGINE.create_tournament(
+            msgspec.json.encode(
+                {"name": "Default Event", "uid": "t-def", "now": "2026-01-01T00:00:00Z"}
+            ).decode(),
+            msgspec.json.encode(ACTOR).decode(),
+        ),
+        type=Tournament,
+    )
+    assert created.decklists_mode == "All"
 
 
 _ACTION_ANY_VALUE = {

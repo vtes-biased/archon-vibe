@@ -281,7 +281,7 @@ pub fn create_tournament(config_json: &str, actor_json: &str) -> Result<String, 
             && config[tournament_config::DECKLIST_REQUIRED].as_bool().unwrap_or(false),
         tournament::DESCRIPTION => config[tournament_config::DESCRIPTION].as_str().unwrap_or(""),
         tournament::STANDINGS_MODE => config[tournament_config::STANDINGS_MODE].as_str().unwrap_or("Private"),
-        tournament::DECKLISTS_MODE => config[tournament_config::DECKLISTS_MODE].as_str().unwrap_or("Winner"),
+        tournament::DECKLISTS_MODE => config[tournament_config::DECKLISTS_MODE].as_str().unwrap_or("All"),
         tournament::MAX_ROUNDS => config[tournament_config::MAX_ROUNDS].as_u32().unwrap_or(0),
         // Soft cap: UI-side warnings only (0 = none). Registration is never blocked.
         tournament::MAX_PLAYERS => config[tournament_config::MAX_PLAYERS].as_u32().unwrap_or(0),

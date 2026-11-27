@@ -23,5 +23,3 @@ the docs; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
-
-- Default new tournaments' `decklists_mode` to `All` — change the tournament creation default (frontend form, backend model/route, and engine fallback) from `Winner` to `All` so organizers share full-field decklists by default now that non-finalist decks are unlinked and players control finalist attribution and deck privacy. **Done when** newly created tournaments default to `decklists_mode: All`, existing tournaments keep their stored mode, `mise run test` and `mise run lint` pass, and `docs/tournaments.md` is updated.

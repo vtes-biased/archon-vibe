@@ -604,7 +604,7 @@ class TournamentConfig(TournamentMinimal, kw_only=True):
     decklist_required: bool = False
     description: str = ""
     standings_mode: StandingsMode = StandingsMode.PRIVATE
-    decklists_mode: DeckListsMode = DeckListsMode.WINNER
+    decklists_mode: DeckListsMode = DeckListsMode.ALL
     max_rounds: Annotated[
         int,
         msgspec.Meta(

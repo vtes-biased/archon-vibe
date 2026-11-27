@@ -535,7 +535,7 @@ class CreateTournamentRequest(msgspec.Struct):
     decklist_required: bool = False
     description: str = ""
     standings_mode: str = "Private"
-    decklists_mode: str = "Winner"
+    decklists_mode: str = "All"
     max_rounds: int = 0
     max_players: int = 0
     open_rounds: bool = False
