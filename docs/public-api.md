@@ -209,9 +209,12 @@ the app's hostname the one a login client already has. So is everything a
 `/sanctions` are not proxied here at all. An app that signs members in *and*
 reads `/v1` legitimately types both.
 
-`/docs` and `/openapi.json` are open. The owner's "no anonymous" decision was
-about the data; a reference page nobody can read before registering is a barrier
-to the consumers the API exists for.
+`/docs`, `/openapi.json`, `/llms.txt` and `/robots.txt` are open. The owner's
+"no anonymous" decision was about the data; a reference page or discovery file
+nobody can read before registering is a barrier to the consumers the API exists
+for. `/llms.txt` and `/robots.txt` are served from the canonical files in
+`frontend/static/`, bundled into the backend wheel via `force-include` and loaded
+through `importlib.resources` so both hosts serve the same content.
 
 ## Documentation
 
@@ -375,7 +378,7 @@ window.
 | app, per client, on the six streaming routes | `20r/m burst=10`, nginx's `nodelay` semantics | outbound traffic: a whole refresh is five streams and ~7 MB gzipped (tournaments 5.3, users 1.1, decks 0.6, the rest rounding error), so 20r/m is four refreshes a minute, ~28 MB/min or 3.7 Mbit/s sustained per client. The burst must clear a whole refresh or a legitimate one breaks halfway; ten leaves room for two |
 | app, per client, on every `/v1` route | `600r/m burst=100` | single-row lookups; a client resolving a page of event codes bursts legitimately. A stream spends from it too, which is noise at this rate |
 | nginx `limit_req` per address on `/v1/` | `rate=3000r/m burst=500 nodelay` | a ceiling on traffic that reaches no budget above — a 401 still costs an Ed25519 verify. Five clients' lookup budgets, so clients sharing an address are not throttled as one |
-| nginx `limit_req` per address on `/docs`, `/openapi.json` and the banner | `rate=600r/m burst=100 nodelay` | no token; generous because a page of banners bursts legitimately |
+| nginx `limit_req` per address on `/docs`, `/openapi.json`, `/llms.txt`, `/robots.txt` and the banner | `rate=600r/m burst=100 nodelay` | no token; generous because a page of banners bursts legitimately |
 | nginx `limit_conn` per address | 16 | a suspended stream holds one buffered batch (~1.8 MB) and **no** connection, so concurrency queues on the pool rather than exhausting it. Sixteen is ~29 MB and an eight-deep queue |
 | nginx `limit_req` per address on the proxied `/oauth/token` and `/oauth/revoke` | `rate=30r/m burst=5 nodelay` | each runs an Argon2 verify of the client secret, so the cost is CPU on the app's box rather than outbound traffic here, and a client mints one token an hour. The generous read zone would let an address spend 600 Argon2 verifies a minute guessing a secret |
 | status | 429, with `Retry-After` from the app | nginx defaults to 503, which reads as "outage, retry" rather than "slow down"; `limit_req_status` and `limit_conn_status` set it |
@@ -397,7 +400,7 @@ The zones are `limit_req_zone`/`limit_conn_zone` and so live in a `conf.d` file 
 they are http-context directives and cannot go in the server block. The vhost
 also sets `gzip_types application/x-ndjson` with `gzip_proxied any` — the streams
 are the bulk of the outbound traffic and nginx skips proxied responses by default; the list
-carries `application/vnd.oai.openapi+json`, Litestar's type for `/openapi.json` — and
+carries `text/plain` and `application/vnd.oai.openapi+json`, Litestar's type for `/openapi.json` — and
 `proxy_buffering off`, or a reader taking the first N lines waits for the whole
 corpus, which is the documented top-N idiom.
 

@@ -422,8 +422,12 @@ The paths browsers and crawlers request without being told are real files in
 `frontend/static/`, so nginx serves them instead of logging an `open() failed`
 404 or answering the SPA fallback: `favicon.ico` (16/32/48 from `favicon.svg`),
 `apple-touch-icon-precomposed.png` (a copy of `apple-touch-icon.png`),
-`robots.txt` (everything allowed) and `.well-known/assetlinks.json` (`[]`, no
-Android app claims the domain). They name production on both hosts.
+`robots.txt` (everything allowed), `llms.txt` (LLM discovery index pointing to
+the API reference, official V:TES rules and companion KRCG ecosystem) and
+`.well-known/assetlinks.json` (`[]`, no Android app claims the domain). They name
+production on both hosts, and `llms.txt` and `robots.txt` are also bundled into
+the backend wheel so the public API host serves the same files
+([public-api](public-api.md#auth)).
 
 Social crawlers reach an og stub through the nginx UA-split, which covers the bare
 `/`, the tournament, short-link, league and help paths — and only those; every

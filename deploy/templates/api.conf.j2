@@ -16,7 +16,7 @@ server {
   gzip_vary on;
   gzip_proxied any;
   gzip_min_length 1024;
-  gzip_types application/json application/x-ndjson application/vnd.oai.openapi+json;
+  gzip_types text/plain application/json application/x-ndjson application/vnd.oai.openapi+json;
 
   limit_conn {{ zone }}_conn 16;
   # nginx defaults both to 503, which tells a client "outage, retry" rather than
@@ -53,7 +53,7 @@ server {
     proxy_pass http://127.0.0.1:{{ backend_port }};
   }
 
-{% for path in ("/docs", "/openapi.json") %}
+{% for path in ("/docs", "/openapi.json", "/llms.txt", "/robots.txt") %}
   location = {{ path }} {
     limit_req zone={{ zone }}_read burst=100 nodelay;
     proxy_pass http://127.0.0.1:{{ api_port }};

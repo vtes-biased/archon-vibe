@@ -7,6 +7,7 @@ import gzip
 import json
 import re
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from uuid import uuid7
 
 import msgspec
@@ -50,7 +51,8 @@ from src.routes.oauth import ACCESS_TOKEN_LIFETIME, _create_oauth_jwt, ph
 from tests.conftest import seed_tournament
 
 _WRITES = ("POST", "PUT", "PATCH", "DELETE")
-_UNDOCUMENTED = ("/docs", "/openapi.json")
+_UNDOCUMENTED = ("/docs", "/openapi.json", "/llms.txt", "/robots.txt")
+_STATIC_DIR = Path(__file__).resolve().parents[2] / "frontend" / "static"
 
 
 def _paths() -> list[str]:
@@ -162,6 +164,14 @@ class TestReadOnlyAndGated:
         assert "scalar" in (await client.get("/docs")).text.lower()
         schemas = (await client.get("/openapi.json")).json()["components"]["schemas"]
         assert set(COMPONENTS) <= set(schemas)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("name", ("llms.txt", "robots.txt"))
+    async def test_discovery_files_are_open(self, client, name):
+        resp = await client.get(f"/{name}")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/plain")
+        assert resp.text == (_STATIC_DIR / name).read_text(encoding="utf-8")
 
 
 class TestDocumentedSchemaMatchesProjection:

@@ -1,0 +1,29 @@
+# Archon
+
+> The official VEKN web application and API for Vampire: The Eternal Struggle (VTES) tournaments, decklists, leagues, members and ratings.
+
+Archon is an offline-first PWA at https://archon.vekn.net/ for running VTES tournaments and managing VEKN membership. Third-party integrations use the Public API (read-only organizational data, Bearer token required) or the Member API (OAuth2 authorization code with PKCE, per-event access). Card data, rulings and rules live in the companion KRCG ecosystem below.
+
+## API
+
+- [API Reference](https://api.archon.vekn.net/docs): Interactive reference for both the Public API (read-only tournaments, decklists, leagues, members, ratings, community links, and full gzipped corpus export) and the Member API (OAuth2 login and per-tournament operations). Requires an Archon account with a VEKN ID and the DEV role to register an OAuth client.
+- [OpenAPI Schema](https://api.archon.vekn.net/openapi.json): Machine-readable OpenAPI specification for the Public API and Member API.
+
+## Official VTES Documents
+
+- [Rulebook](https://archon.vekn.net/help/rules): Official V:TES game rules.
+- [Tournament Rules](https://archon.vekn.net/help/tournament-rules): Official VEKN tournament rules.
+- [Judges' Guide](https://archon.vekn.net/help/judges-guide): Official VEKN Judges' Guide.
+- [Code of Ethics](https://archon.vekn.net/help/code-of-ethics): Official VEKN Code of Ethics.
+
+## Companion VTES Data Ecosystem
+
+- [Primogen MCP](https://mcp.krcg.org/mcp): Streamable HTTP Model Context Protocol server for VTES cards, rulings, rules, deck analysis, meta statistics, and tournaments; see [KRCG llms.txt](https://mcp.krcg.org/llms.txt) for the full KRCG service index and [Primogen](https://github.com/lionel-panhaleux/primogen) for setup.
+- [KRCG Static Resources](https://static.krcg.org/): Daily-refreshed card data ([vtes.json](https://static.krcg.org/data/vtes.json)), Tournament Winning Deck Archive ([twda.json](https://static.krcg.org/data/twda.json)), card images, icons, and fonts.
+- [KRCG API](https://api.krcg.org/docs): Free, unauthenticated REST API for card search, rulings, TWDA queries, and decklist conversion; [OpenAPI schema](https://api.krcg.org/openapi.json).
+
+## Optional
+
+- [Archon Web App](https://archon.vekn.net/): Tournament organization, VEKN membership, rankings, and league management.
+- [Source Repository](https://github.com/vtes-biased/archon-vibe): Open-source repository (MIT) and technical documentation.
+- [VEKN](https://www.vekn.net/): Vampire: Elder Kindred Network, the international V:TES players' association.

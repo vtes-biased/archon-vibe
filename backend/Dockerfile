@@ -25,7 +25,8 @@ COPY engine/ ./engine/
 COPY scripts/ ./scripts/
 RUN cd engine && /root/.local/bin/maturin build --release
 
-# Copy Python dependency files
+# Copy Python dependency files and wheel-bundled discovery files
+COPY frontend/static/llms.txt frontend/static/robots.txt ./frontend/static/
 COPY pyproject.toml uv.lock ./
 RUN test -f README.md || echo "# Archon" > README.md
 

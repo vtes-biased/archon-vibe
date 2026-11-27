@@ -5,8 +5,10 @@ import re
 import tempfile
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from importlib.resources import files
+from pathlib import Path
 
-from litestar import Litestar, Request
+from litestar import Litestar, Request, Response, get
 from litestar.config.cors import CORSConfig
 from litestar.openapi import OpenAPIConfig
 from litestar.openapi.plugins import JsonRenderPlugin, ScalarRenderPlugin
@@ -1144,8 +1146,31 @@ class _Reference(JsonRenderPlugin):
         return super().render(request, _document(openapi_schema, request.app))
 
 
+def _static_text(name: str) -> str:
+    resource = files(__package__).joinpath(name)
+    if resource.is_file():
+        return resource.read_text(encoding="utf-8")
+    return (
+        Path(__file__).resolve().parents[3] / "frontend" / "static" / name
+    ).read_text(encoding="utf-8")
+
+
+_LLMS_TXT = _static_text("llms.txt")
+_ROBOTS_TXT = _static_text("robots.txt")
+
+
+@get("/llms.txt", include_in_schema=False)
+async def llms_txt() -> Response[str]:
+    return Response(_LLMS_TXT, media_type="text/plain; charset=utf-8")
+
+
+@get("/robots.txt", include_in_schema=False)
+async def robots_txt() -> Response[str]:
+    return Response(_ROBOTS_TXT, media_type="text/plain; charset=utf-8")
+
+
 app = Litestar(
-    route_handlers=[router],
+    route_handlers=[router, llms_txt, robots_txt],
     lifespan=[lifespan],
     middleware=[RequestIdMiddleware],
     exception_handlers={HTTP_500_INTERNAL_SERVER_ERROR: internal_error_handler},

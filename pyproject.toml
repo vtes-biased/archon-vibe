@@ -47,6 +47,8 @@ only-include = ["backend/src"]
 # data (under backend/src so it sits inside the backend.src package).
 [tool.hatch.build.targets.wheel.force-include]
 "engine/data/cards.json" = "backend/src/data/cards.json"
+"frontend/static/llms.txt" = "backend/src/public_api/llms.txt"
+"frontend/static/robots.txt" = "backend/src/public_api/robots.txt"
 
 [tool.ruff]
 line-length = 88
