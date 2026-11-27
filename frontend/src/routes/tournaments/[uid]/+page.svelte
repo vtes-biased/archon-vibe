@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
-  import { untrack } from "svelte";
+  import { tick, untrack } from "svelte";
   import { deleteTournamentApi, qrCheckin } from "#lib/api.ts";
   import { tournamentAction, setTableScore } from "#lib/tournament-actions.ts";
   import { getCountries, getCountryFlag } from "#lib/geonames.ts";
@@ -180,6 +180,13 @@ import TournamentModals from "./TournamentModals.svelte";
 
   type TabId = 'players' | 'setup' | 'rounds' | 'finals';
   let activeTab = $state<TabId>('players');
+  let playersTab = $state<ReturnType<typeof PlayersTab> | null>(null);
+  async function openWinnerDeckUpload() {
+    if (!tournament?.winner) return;
+    activeTab = 'players';
+    await tick();
+    playersTab?.openDeck(tournament.winner);
+  }
   let showTools = $state(false);
   let toolsPanel = $state<'qr' | 'promos' | null>(null);
   function openTools(panel: typeof toolsPanel = null) {
@@ -900,6 +907,7 @@ import TournamentModals from "./TournamentModals.svelte";
             onAddBanner={() => bannerComp?.openCropper()}
             onRecordPromos={() => openTools('promos')}
             onFinishTournament={() => (showFinishConfirm = true)}
+            onUploadWinnerDeck={openWinnerDeckUpload}
           >
             {@render errorNotice()}
             {@render liveNotices()}
@@ -915,6 +923,7 @@ import TournamentModals from "./TournamentModals.svelte";
           <div class="p-3 sm:p-6">
             {#if activeTab === 'players'}
               <PlayersTab
+                bind:this={playersTab}
                 {tournament}
                 {playerInfo}
                 {standings}

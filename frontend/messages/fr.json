@@ -1051,7 +1051,7 @@
   "decks_submitted_note": "Decklist reçue. Vous pouvez la remplacer jusqu'au début du tournoi.",
   "decks_required_notice": "Les decklists sont obligatoires pour ce tournoi.",
   "decks_winner_nudge_self": "Bravo pour votre victoire ! Envoyez votre decklist pour qu'elle reste dans les archives.",
-  "decks_winner_nudge_organizer": "La decklist du vainqueur est manquante. Veuillez rappeler à {name} de télécharger son deck.",
+  "decks_winner_nudge_organizer": "La decklist du vainqueur est manquante. Envoyez-la vous-même ou rappelez à {name} d'envoyer son deck.",
   "decks_missing": "Manquant",
   "deck_filter_problems": "Problèmes",
   "decks_visible_heading": "Decklists",

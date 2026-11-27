@@ -25,6 +25,7 @@
     onAddBanner,
     onRecordPromos,
     onFinishTournament,
+    onUploadWinnerDeck,
     children,
   }: {
     tournament: Tournament;
@@ -38,6 +39,7 @@
     onAddBanner: () => void;
     onRecordPromos: () => void;
     onFinishTournament: () => void;
+    onUploadWinnerDeck?: () => void;
     children?: Snippet;
   } = $props();
 
@@ -305,6 +307,7 @@
       {standings}
       winnerHasDeck={!!(tournament.winner && decksByUser[tournament.winner]?.length)}
       {onImportArchon}
+      {onUploadWinnerDeck}
     />
   {/if}
 

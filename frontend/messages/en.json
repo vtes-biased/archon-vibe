@@ -1051,7 +1051,7 @@
   "decks_submitted_note": "Decklist received. You can replace it until the tournament starts.",
   "decks_required_notice": "Decklists are required for this tournament.",
   "decks_winner_nudge_self": "Congratulations on your win! Please upload your decklist so it's kept in the records.",
-  "decks_winner_nudge_organizer": "Winner's decklist is missing. Please remind {name} to upload their deck.",
+  "decks_winner_nudge_organizer": "Winner's decklist is missing. Upload it yourself or remind {name} to upload their deck.",
   "decks_missing": "Missing",
   "deck_filter_problems": "Issues",
   "decks_visible_heading": "Decklists",

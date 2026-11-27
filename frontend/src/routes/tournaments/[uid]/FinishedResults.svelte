@@ -14,12 +14,14 @@
     standings,
     winnerHasDeck = false,
     onImportArchon,
+    onUploadWinnerDeck,
   }: {
     tournament: Tournament;
     playerInfo: PlayerInfoMap;
     standings: StandingEntry[];
     winnerHasDeck?: boolean;
     onImportArchon?: () => void;
+    onUploadWinnerDeck?: () => void;
   } = $props();
 
   function seatDisplay(uid: string): string {
@@ -27,6 +29,9 @@
   }
 
   const hasStandings = $derived(standings.length > 0);
+  const winnerInRoster = $derived(
+    !!tournament.winner && (tournament.players ?? []).some(p => p.user_uid === tournament.winner),
+  );
 
   function twdaSkipReason(code: string): string {
     switch (code) {
@@ -85,9 +90,14 @@
   <!-- Every line below is one InlineNotice: tone splits by what's owed (warn)
        vs what merely happened (info). -->
 
-  {#if tournament.winner && !winnerHasDeck}
+  {#if tournament.format !== "Storyline" && tournament.winner && !winnerHasDeck}
     <InlineNotice tone="warn" icon={TriangleAlert}>
       {m.decks_winner_nudge_organizer({ name: seatDisplay(tournament.winner) })}
+      {#if onUploadWinnerDeck && winnerInRoster}
+        <button type="button" onclick={onUploadWinnerDeck} class="text-link hover:text-link-soft underline ml-1">
+          {m.deck_upload_submit()}
+        </button>
+      {/if}
     </InlineNotice>
   {/if}
 

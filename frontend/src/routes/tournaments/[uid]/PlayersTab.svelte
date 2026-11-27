@@ -217,6 +217,13 @@
     return 'valid';
   }
 
+  function deckButtonTitle(player: Player, puid: string, deckStatus: DeckStatus): string {
+    if (player.non_competing) return m.proxy_hint();
+    if (deckStatus !== 'none') return m.players_view_deck();
+    if (canEditDecks && !archivalUids.has(puid)) return m.deck_upload_submit();
+    return m.players_no_deck();
+  }
+
   $effect(() => {
     const decks = decksByUser;
     const format = tournament.format;
@@ -335,6 +342,16 @@
     await tick();
     const rows = document.querySelectorAll<HTMLElement>(`[data-player-row="${uid}"]`);
     [...rows].find(el => el.getClientRects().length > 0)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  export async function openDeck(uid: string) {
+    expandedCard = uid;
+    expandedPlayer = uid;
+    morePlayer = null;
+    uploadingFor = null;
+    uploadingRound = undefined;
+    expandedDeckRound = isMultideck ? (tournament.finals ? roundCount : PENDING) : null;
+    await findPlayer(uid);
   }
 
   // Modal entry points (modal internals live in CreateAndRegisterModal)
@@ -862,7 +879,7 @@
               {/if}
               {#if showDeckColumn}
                 {@const deckStatus = getDeckStatus(puid)}
-                <Button variant="ghost" size="sm" class="min-h-[44px]" onclick={() => togglePlayer(puid)} title={player.non_competing ? m.proxy_hint() : m.players_view_deck()}>
+                <Button variant="ghost" size="sm" class="min-h-[44px]" onclick={() => togglePlayer(puid)} title={deckButtonTitle(player, puid, deckStatus)}>
                   {#if player.non_competing}<Dices class="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" /><span class="text-ink-muted">{m.proxy_random_deck()}</span>
                   {:else if deckStatus === 'valid'}<CircleCheck class="w-3.5 h-3.5 text-info" aria-hidden="true" /><span class="text-info">{m.players_view_deck()}</span>
                   {:else if deckStatus === 'warning'}<TriangleAlert class="w-3.5 h-3.5 text-warn" aria-hidden="true" /><span class="text-warn">{m.players_view_deck()}</span>
@@ -1027,8 +1044,9 @@
               {/if}
               {#if showDeckColumn}
                 {@const deckStatus = getDeckStatus(puid)}
+                {@const deckTitle = deckButtonTitle(player, puid, deckStatus)}
                 <td class="text-center py-1.5 px-2">
-                  <button onclick={() => togglePlayer(puid)} class="p-1 hover:bg-surface-hover rounded transition-colors" title={player.non_competing ? m.proxy_hint() : m.players_view_deck()}>
+                  <button onclick={() => togglePlayer(puid)} class="p-1 hover:bg-surface-hover rounded transition-colors" title={deckTitle} aria-label={deckTitle}>
                     {#if player.non_competing}<Dices class="w-4 h-4 text-ink-faint" />
                     {:else if deckStatus === 'valid'}<CircleCheck class="w-4 h-4 text-info" />
                     {:else if deckStatus === 'warning'}<TriangleAlert class="w-4 h-4 text-warn" />
