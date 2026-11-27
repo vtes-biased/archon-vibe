@@ -307,6 +307,7 @@ export async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, exi
         attribution: op.deck.attribution ?? existing?.attribution ?? ANONYMOUS,
         public: op.deck.public || false,
         winner: op.deck.winner || false,
+        finalist: op.deck.finalist || false,
         private: op.deck.private || false,
         views: existing?.views ?? [],
       };
@@ -351,6 +352,7 @@ export async function applyDeckOps(deckOps: DeckOp[], tournamentUid: string, exi
       if (target) {
         target.public = op.public ?? false;
         target.winner = op.winner ?? false;
+        target.finalist = op.finalist ?? false;
         target.modified = new Date().toISOString();
         await saveDeck(target);
         affectedUids.push(target.uid);

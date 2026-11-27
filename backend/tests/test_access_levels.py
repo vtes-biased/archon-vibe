@@ -434,6 +434,7 @@ def _make_deck(**overrides) -> dict:
         "cards": {"100001": 4, "100002": 2},
         "attribution": {"kind": "Member", "vekn_id": "1000001", "name": ""},
         "winner": False,
+        "finalist": False,
     }
     base.update(overrides)
     return base
@@ -597,17 +598,40 @@ class TestDeckLeagueSanctionPromoApi:
             "vekn_id": "",
         }
 
-    def test_anonymous_deck_withholds_its_owner(self):
+    def test_anonymous_finalist_withholds_its_owner(self):
         d = _make_deck(
-            public=True, attribution={"kind": "Anonymous", "vekn_id": "", "name": ""}
+            public=True,
+            finalist=True,
+            attribution={"kind": "Anonymous", "vekn_id": "", "name": ""},
         )
         assert "user_uid" not in compute_member(ObjectType.DECK, d)
         assert "user_uid" not in compute_api(ObjectType.DECK, d)
+
+    def test_attributed_finalist_stays_owned(self):
+        d = _make_deck(
+            public=True,
+            finalist=True,
+            attribution={"kind": "Owner", "vekn_id": "", "name": ""},
+        )
+        assert compute_member(ObjectType.DECK, d)["user_uid"] == "u-001"
+        assert compute_api(ObjectType.DECK, d)["user_uid"] == "u-001"
+
+    def test_non_finalist_always_withholds_its_owner(self):
+        for attribution in (
+            {"kind": "Anonymous", "vekn_id": "", "name": ""},
+            {"kind": "Owner", "vekn_id": "", "name": ""},
+            {"kind": "Member", "vekn_id": "1000001", "name": ""},
+        ):
+            d = _make_deck(public=True, finalist=False, attribution=attribution)
+            assert "user_uid" not in compute_member(ObjectType.DECK, d)
+            assert "user_uid" not in compute_api(ObjectType.DECK, d)
+            assert compute_full(ObjectType.DECK, d)["user_uid"] == "u-001"
 
     def test_anonymous_winner_stays_owned(self):
         d = _make_deck(
             public=True,
             winner=True,
+            finalist=True,
             attribution={"kind": "Anonymous", "vekn_id": "", "name": ""},
         )
         assert compute_member(ObjectType.DECK, d)["user_uid"] == "u-001"

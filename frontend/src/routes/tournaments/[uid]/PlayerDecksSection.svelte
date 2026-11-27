@@ -348,8 +348,7 @@
               {@const expanded = expandedDecks.has(key)}
               {@const counts = deckCounts(deck)}
               {@const showIdentity = !!deck.user_uid
-                && (uid === winnerUid
-                  || (tournament.decklists_mode !== 'All' && deck.attribution.kind !== 'Anonymous'))}
+                && (deck.winner || (deck.finalist && deck.attribution.kind !== 'Anonymous'))}
               {@const isWinnerDeck = uid === winnerUid}
               <div class="bg-surface-muted/50 rounded-lg">
                 <button

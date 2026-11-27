@@ -276,9 +276,10 @@ turn on — a deck is served only once its event is Finished, only as far as
 — the winner's excepted — and a reopen withdraws it, so an absence is a
 correction in progress or a player's choice rather than a deletion
 ([architecture](architecture.md#cards-and-decks)). A deck's owner is its
-`user_uid` — withheld entirely on an anonymous deck, the winner's excepted, so a
-consumer keys such a deck on its own uid — and its `attribution` is a typed
-credit whose free-text name never reaches this level: members only.
+`user_uid` — kept on the winner's deck regardless of attribution, kept on a
+finalist's deck unless `Anonymous`, and always withheld on a non-finalist's
+deck, so a consumer keys an unlinked deck on its own uid — and its `attribution`
+is a typed credit whose free-text name never reaches this level: members only.
 
 **The reference is two APIs, split by `x-tagGroups`.** A reader arrives at a
 chooser — read-only data on the API host, or writing to one event on the app host

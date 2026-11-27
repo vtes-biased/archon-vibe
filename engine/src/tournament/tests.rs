@@ -979,7 +979,7 @@ fn test_storyline_refuses_deck_upload() {
 #[test]
 fn test_player_blocked_during_playing_with_existing_deck() {
     let tournament = tournament_with_player("Playing");
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "UpsertDeck",
         player_uid: "player-1",
@@ -995,7 +995,7 @@ fn test_player_blocked_during_playing_with_existing_deck() {
 #[test]
 fn test_organizer_can_upsert_during_playing() {
     let tournament = tournament_with_player("Playing");
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "UpsertDeck",
         player_uid: "player-1",
@@ -1026,7 +1026,7 @@ fn test_player_can_upload_missing_deck_after_finish() {
 fn test_owner_corrects_a_played_deck_after_finish() {
     let mut tournament = tournament_with_player("Finished");
     tournament["multideck"] = true.into();
-    let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "UpsertDeck",
         player_uid: "player-1",
@@ -1043,7 +1043,7 @@ fn test_owner_corrects_a_played_deck_after_finish() {
 #[test]
 fn test_replacing_a_deck_carries_no_credit() {
     let tournament = tournament_with_player("Waiting");
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "UpsertDeck",
         player_uid: "player-1",
@@ -1070,7 +1070,7 @@ fn test_replacing_a_deck_carries_no_credit() {
 #[test]
 fn test_only_the_owner_sets_a_deck_credit() {
     let tournament = tournament_with_player("Playing");
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "SetDeckAttribution",
         player_uid: "player-1",
@@ -1093,7 +1093,7 @@ fn test_only_the_owner_sets_a_deck_credit() {
 #[test]
 fn test_a_client_cannot_write_a_free_text_credit() {
     let tournament = tournament_with_player("Playing");
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let actor = make_player("player-1");
     for attribution in [
         json::object! { kind: "Archive", vekn_id: "", name: "Alice" },
@@ -1118,7 +1118,7 @@ fn test_a_client_cannot_write_a_free_text_credit() {
 #[test]
 fn test_the_owner_or_an_organizer_marks_a_deck_private() {
     let tournament = tournament_with_player("Playing");
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "SetDeckPrivate",
         player_uid: "player-1",
@@ -1137,7 +1137,7 @@ fn test_the_owner_or_an_organizer_marks_a_deck_private() {
 #[test]
 fn test_only_the_owner_touches_a_private_deck_once_finished_but_the_winners_content() {
     let tournament = tournament_with_player("Finished");
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "private": true, "public": false, "winner": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "private": true, "public": false, "winner": false, "finalist": false}]"#;
     let event = json::object! {
         type: "SetDeckPrivate",
         player_uid: "player-1",
@@ -1180,8 +1180,8 @@ fn test_a_private_deck_leaves_publication_but_the_winners_stays() {
     let mut tournament = finished_with_finals();
     tournament["decklists_mode"] = "All".into();
     let decks = json::array![
-        { uid: "d1", user_uid: "p1", round: 3, public: true, winner: true, private: false },
-        { uid: "d2", user_uid: "p2", round: 3, public: true, winner: false, private: false },
+        { uid: "d1", user_uid: "p1", round: 3, public: true, winner: true, finalist: true, private: false },
+        { uid: "d2", user_uid: "p2", round: 3, public: true, winner: false, finalist: true, private: false },
     ]
     .dump();
     let publication = |deck_ops: &JsonValue| -> Vec<(String, bool)> {
@@ -1208,8 +1208,8 @@ fn test_a_private_deck_leaves_publication_but_the_winners_stays() {
     assert!(publication(&deck_ops).is_empty());
 
     let decks = decks.replace(
-        r#""public":true,"winner":false,"private":false"#,
-        r#""public":false,"winner":false,"private":true"#,
+        r#""public":true,"winner":false,"finalist":true,"private":false"#,
+        r#""public":false,"winner":false,"finalist":true,"private":true"#,
     );
     let event = json::object! {
         type: "UpsertDeck",
@@ -1244,7 +1244,7 @@ fn test_upsert_deck_clears_missing_decklist() {
 fn test_delete_deck_restores_missing_decklist() {
     let mut tournament = tournament_with_player("Waiting");
     tournament["decklist_required"] = true.into();
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "DeleteDeck",
         player_uid: "player-1",
@@ -1264,7 +1264,7 @@ fn test_delete_deck_restores_missing_decklist() {
 fn test_unregister_releases_the_decks() {
     let mut tournament = tournament_with_player("Registration");
     tournament["players"][0]["state"] = "Registered".into();
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! { type: "Unregister", user_uid: "player-1" };
     let (_, deck_ops) =
         run_event_with_decks(&tournament, &event, &make_player("player-1"), decks).unwrap();
@@ -1276,7 +1276,7 @@ fn test_unregister_releases_the_decks() {
 #[test]
 fn test_player_blocked_upsert_during_playing() {
     let tournament = tournament_with_player("Playing");
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "UpsertDeck",
         player_uid: "player-1",
@@ -1312,7 +1312,7 @@ fn test_checkin_with_decklist_no_warning() {
     tournament["decklist_required"] = true.into();
     tournament["players"][0]["state"] = "Registered".into();
 
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! { type: "CheckIn", player_uid: "player-1" };
     let actor = make_organizer();
     let (raw, _) = run_event_with_decks(&tournament, &event, &actor, decks).unwrap();
@@ -1327,7 +1327,7 @@ fn test_recheckin_after_upload_clears_missing_decklist() {
     tournament["decklist_required"] = true.into();
     tournament["players"][0]["missing_decklist"] = true.into();
 
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! { type: "CheckIn", player_uid: "player-1" };
     let actor = make_player("player-1");
     let (raw, _) = run_event_with_decks(&tournament, &event, &actor, decks).unwrap();
@@ -2372,7 +2372,7 @@ fn finished_with_finals() -> JsonValue {
 fn test_reopen_tournament_keeps_the_final() {
     let tournament = finished_with_finals();
     let decks = json::array![
-        { uid: "d1", user_uid: "p1", tournament_uid: "test-tournament", round: 3, public: true, winner: false, private: false },
+        { uid: "d1", user_uid: "p1", tournament_uid: "test-tournament", round: 3, public: true, winner: false, finalist: true, private: false },
     ];
     let event = json::object! { type: "ReopenTournament" };
     let (updated_json, deck_ops) =
@@ -2430,8 +2430,8 @@ fn test_finals_rescore_moves_publication_with_the_winner() {
     // and p1's retracts, with no finish action in between.
     let tournament = finished_with_finals();
     let decks = json::array![
-        { uid: "d1", user_uid: "p1", tournament_uid: "test-tournament", round: 3, public: true, winner: false, private: false },
-        { uid: "d2", user_uid: "p2", tournament_uid: "test-tournament", round: 3, public: false, winner: false, private: false },
+        { uid: "d1", user_uid: "p1", tournament_uid: "test-tournament", round: 3, public: true, winner: false, finalist: true, private: false },
+        { uid: "d2", user_uid: "p2", tournament_uid: "test-tournament", round: 3, public: false, winner: false, finalist: true, private: false },
     ];
     let event = json::object! {
         type: "SetScore",
@@ -2472,8 +2472,8 @@ fn test_all_mode_withholds_the_deck_of_a_player_who_never_sat() {
         user_uid: "p9", state: "Registered", payment_status: "Pending", toss: 0, finalist: false,
     }).unwrap();
     let decks = json::array![
-        { uid: "d6", user_uid: "p6", round: 0, public: false, winner: false, private: false },
-        { uid: "d9", user_uid: "p9", round: json::Null, public: true, winner: false, private: false },
+        { uid: "d6", user_uid: "p6", round: 0, public: false, winner: false, finalist: false, private: false },
+        { uid: "d9", user_uid: "p9", round: json::Null, public: true, winner: false, finalist: false, private: false },
     ];
     let result =
         json::parse(&update_standings_json(&tournament.dump(), "[]", &decks.dump()).unwrap())
@@ -2499,8 +2499,9 @@ fn test_finish_finals_publishes_the_winner_deck() {
     let mut tournament = finished_with_finals();
     tournament["state"] = "Playing".into();
     let decks = json::array![
-        { uid: "d1", user_uid: "p1", tournament_uid: "test-tournament", round: 3, public: false, winner: false, private: false },
-        { uid: "d2", user_uid: "p2", tournament_uid: "test-tournament", round: 3, public: false, winner: false, private: false },
+        { uid: "d1", user_uid: "p1", tournament_uid: "test-tournament", round: 3, public: false, winner: false, finalist: false, private: false },
+        { uid: "d2", user_uid: "p2", tournament_uid: "test-tournament", round: 3, public: false, winner: false, finalist: false, private: false },
+        { uid: "d6", user_uid: "p6", tournament_uid: "test-tournament", round: 0, public: false, winner: false, finalist: false, private: false },
     ];
     let event = json::object! { type: "FinishFinals" };
     let (updated_json, deck_ops) =
@@ -2509,20 +2510,31 @@ fn test_finish_finals_publishes_the_winner_deck() {
 
     assert_eq!(updated["state"].as_str(), Some("Finished"));
     assert_eq!(updated["winner"].as_str(), Some("p1"));
-    let published: Vec<&str> = deck_ops
+    let mut ops: Vec<(&str, bool, bool, bool)> = deck_ops
         .members()
         .filter(|op| op["op"].as_str() == Some("set_publication"))
-        .filter(|op| op["public"].as_bool().unwrap_or(false))
-        .filter_map(|op| op["deck_uid"].as_str())
+        .map(|op| {
+            (
+                op["deck_uid"].as_str().unwrap(),
+                op["public"].as_bool().unwrap(),
+                op["winner"].as_bool().unwrap(),
+                op["finalist"].as_bool().unwrap(),
+            )
+        })
         .collect();
-    assert_eq!(published, vec!["d1"]); // decklists_mode Winner
+    ops.sort();
+    // decklists_mode Winner: d1 publishes (winner + finalist); d2 gets finalist=true; d6 stays unchanged.
+    assert_eq!(
+        ops,
+        vec![("d1", true, true, true), ("d2", false, false, true)]
+    );
 }
 
 #[test]
 fn test_replace_player_leaves_no_trace_of_the_wrong_member() {
     let tournament = finished_with_finals();
     let decks = json::array![
-        { uid: "d1", user_uid: "p1", tournament_uid: "test-tournament", round: 3, public: true, winner: true, private: false },
+        { uid: "d1", user_uid: "p1", tournament_uid: "test-tournament", round: 3, public: true, winner: true, finalist: true, private: false },
     ];
     let event = json::object! { type: "ReplacePlayer", player_uid: "p1", new_uid: "x1", vekn_id: "1000001" };
     let (replaced, deck_ops) =
@@ -3773,7 +3785,7 @@ fn test_checkin_refreshes_display_name_of_rostered_player() {
 #[test]
 fn test_delete_deck_success() {
     let tournament = tournament_with_player("Waiting");
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "DeleteDeck",
         player_uid: "player-1",
@@ -3789,7 +3801,7 @@ fn test_delete_deck_success() {
 #[test]
 fn test_delete_deck_auth_failure() {
     let tournament = tournament_with_player("Waiting");
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "DeleteDeck",
         player_uid: "player-1",
@@ -3808,7 +3820,7 @@ fn test_delete_deck_auth_failure() {
 #[test]
 fn test_delete_deck_playing_blocked() {
     let tournament = tournament_with_player("Playing");
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "DeleteDeck",
         player_uid: "player-1",
@@ -3825,7 +3837,7 @@ fn test_delete_deck_playing_blocked() {
 fn test_single_deck_locked_between_rounds() {
     let mut tournament = multideck_tournament("Waiting", 1);
     tournament["multideck"] = false.into();
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let actor = make_player("player-1");
     let upsert = json::object! {
         type: "UpsertDeck",
@@ -3849,7 +3861,7 @@ fn test_single_deck_locked_between_rounds() {
 fn test_owner_deletes_a_played_deck_after_finish() {
     let mut tournament = tournament_with_player("Finished");
     tournament["multideck"] = true.into();
-    let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "DeleteDeck",
         player_uid: "player-1",
@@ -3866,7 +3878,7 @@ fn test_owner_deletes_a_played_deck_after_finish() {
 #[test]
 fn test_delete_deck_organizer_always() {
     let tournament = tournament_with_player("Playing");
-    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "DeleteDeck",
         player_uid: "player-1",
@@ -3940,7 +3952,7 @@ fn test_multideck_upsert_round_0() {
 fn test_multideck_upsert_round_1_playing() {
     // A played deck already stamped: the upload is the next pending one.
     let tournament = multideck_tournament("Playing", 1);
-    let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "UpsertDeck",
         player_uid: "player-1",
@@ -3975,7 +3987,7 @@ fn test_multideck_player_upload_lands_pending() {
 fn test_multideck_delete_pending() {
     // The pending deck (no round) is the only one a player may drop.
     let tournament = multideck_tournament("Playing", 1);
-    let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0", "public": false, "winner": false, "private": false}, {"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0", "public": false, "winner": false, "finalist": false, "private": false}, {"user_uid": "player-1", "round": null, "uid": "d1", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "DeleteDeck",
         player_uid: "player-1",
@@ -3993,7 +4005,7 @@ fn test_multideck_delete_pending() {
 fn test_multideck_delete_locked_blocked() {
     // Round 0 was played, so its deck is stamped and cannot be dropped.
     let tournament = multideck_tournament("Playing", 1);
-    let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "DeleteDeck",
         player_uid: "player-1",
@@ -4010,7 +4022,7 @@ fn test_multideck_delete_locked_blocked() {
 fn test_multideck_delete_stamped_blocked() {
     // A stamped deck is a deck that was played: immutable whatever the state.
     let tournament = multideck_tournament("Waiting", 1);
-    let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "player-1", "round": 0, "uid": "d0", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let event = json::object! {
         type: "DeleteDeck",
         player_uid: "player-1",
@@ -4059,7 +4071,7 @@ fn test_multideck_lifecycle() {
         multideck: true,
     };
     let actor_p0 = make_player("p0");
-    let decks = r#"[{"user_uid": "p0", "round": 0, "uid": "d0", "public": false, "winner": false, "private": false}]"#;
+    let decks = r#"[{"user_uid": "p0", "round": 0, "uid": "d0", "public": false, "winner": false, "finalist": false, "private": false}]"#;
     let delete_result = run_event_with_decks(&updated, &delete_event, &actor_p0, decks);
     assert!(delete_result.is_err());
     assert!(delete_result

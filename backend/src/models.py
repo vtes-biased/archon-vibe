@@ -764,9 +764,10 @@ class DeckAttribution(msgspec.Struct, kw_only=True, frozen=True):
     kind: Annotated[
         AttributionKind,
         msgspec.Meta(
-            description="Who the decklist is credited to. `Anonymous` also "
-            "withholds the owner: the deck reaches other members and this API "
-            "with no `user_uid`, the winner's excepted."
+            description="Who the decklist is credited to. `user_uid` is always "
+            "kept on the winner's deck, kept on a finalist's deck unless "
+            "`Anonymous`, and always withheld on a non-finalist's deck below "
+            "full level."
         ),
     ] = AttributionKind.ANONYMOUS
     vekn_id: Annotated[
@@ -813,6 +814,7 @@ class DeckObject(BaseObject, kw_only=True):
     attribution: DeckAttribution = msgspec.field(default_factory=DeckAttribution)
     public: bool = False  # engine-set from decklists_mode, not client-writable
     winner: bool = False  # engine-set: this event's winner, whom anonymity spares
+    finalist: bool = False  # engine-set: finalist or winner
     private: bool = False
     views: list[DeckView] = msgspec.field(default_factory=list)
 

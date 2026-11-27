@@ -25,6 +25,7 @@ async def build_decks_json(tournament_uid: str, conn=None) -> str:
                 "uid": d.uid,
                 "public": d.public,
                 "winner": d.winner,
+                "finalist": d.finalist,
                 "private": d.private,
             }
             for d in decks
@@ -93,6 +94,7 @@ async def process_deck_ops(
                 )
             deck_obj.public = deck_data.get("public", False)
             deck_obj.winner = deck_data.get("winner", False)
+            deck_obj.finalist = deck_data.get("finalist", False)
             deck_obj.private = deck_data.get("private", False)
             affected.append(await save(deck_obj))
 
@@ -130,6 +132,7 @@ async def process_deck_ops(
             if target:
                 target.public = op.get("public", False)
                 target.winner = op.get("winner", False)
+                target.finalist = op.get("finalist", False)
                 target.modified = datetime.now(UTC)
                 affected.append(await save(target))
 

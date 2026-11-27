@@ -70,7 +70,7 @@
   async function load(uid: string, owner: boolean) {
     const mine = await getDecksByUser(uid);
     const shown = new Map(mine
-      .filter(d => owner || (d.public && (d.attribution.kind !== "Anonymous" || d.winner)))
+      .filter(d => owner || (d.public && (d.winner || (d.finalist && d.attribution.kind !== "Anonymous"))))
       .map(d => [d.tournament_uid, d]));
     const named = new Map((await getTournamentsNaming(uid)).map(t => [t.uid, t]));
     for (const tuid of shown.keys()) {

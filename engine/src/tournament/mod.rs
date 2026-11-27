@@ -27,11 +27,12 @@ pub use types::{ActorContext, PlayerState, SeatScore, TournamentEvent, Tournamen
 
 use crate::error::EngineError;
 use helpers::{
-    all_rounds_finished, collect_previous_rounds, compute_deck_public, compute_deck_winner,
-    count_played_rounds, count_player_rounds_played, delete_player_decks, demote_unseated_players,
-    find_player_index, past_registration_cap, player_exists, players_in_other_active_rounds,
-    recompute_deck_publication, release_stamped_decks, remap_player_uids, require_can_edit_results,
-    require_organizer, require_state, require_state_or_finished, stamp_round_decks, validate_enum,
+    all_rounds_finished, collect_previous_rounds, compute_deck_finalist, compute_deck_public,
+    compute_deck_winner, count_played_rounds, count_player_rounds_played, delete_player_decks,
+    demote_unseated_players, find_player_index, past_registration_cap, player_exists,
+    players_in_other_active_rounds, recompute_deck_publication, release_stamped_decks,
+    remap_player_uids, require_can_edit_results, require_organizer, require_state,
+    require_state_or_finished, stamp_round_decks, validate_enum,
 };
 use sanctions::{has_active_suspension, has_dq_sanction};
 use scoring::score_table;
@@ -312,6 +313,7 @@ fn parse_decks(decks_json: &str) -> Result<JsonValue, EngineError> {
         for flag in [
             deck_object::PUBLIC,
             deck_object::WINNER,
+            deck_object::FINALIST,
             deck_object::PRIVATE,
         ] {
             if !deck[flag].is_boolean() {
@@ -2605,6 +2607,7 @@ fn apply_event(
             deck_data[deck_object::PUBLIC] =
                 compute_deck_public(tournament, player_uid, private).into();
             deck_data[deck_object::WINNER] = compute_deck_winner(tournament, player_uid).into();
+            deck_data[deck_object::FINALIST] = compute_deck_finalist(tournament, player_uid).into();
             if replaced.is_some() {
                 deck_data.remove(deck_object::ATTRIBUTION);
             }

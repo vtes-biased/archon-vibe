@@ -500,6 +500,7 @@ async def _import_decks(
             attribution=DeckAttribution(kind=AttributionKind.OWNER),
             public=True,
             winner=True,
+            finalist=True,
         )
         bd = await save_deck(deck, row[2], row[1])
         if broadcast:

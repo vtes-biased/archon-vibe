@@ -233,7 +233,9 @@ DECK_API_EXCLUDE = API_SYNC_FIELDS | {"public", "private", "views"}
 
 def _published_deck(d: dict) -> dict:
     withheld = {"private", "views"}
-    if d["attribution"]["kind"] == AttributionKind.ANONYMOUS and not d.get("winner"):
+    if not d.get("winner") and (
+        not d.get("finalist") or d["attribution"]["kind"] == AttributionKind.ANONYMOUS
+    ):
         withheld.add("user_uid")
     return {k: v for k, v in d.items() if k not in withheld}
 

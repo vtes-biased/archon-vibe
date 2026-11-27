@@ -521,12 +521,14 @@ spelling still resolves. The frontend renders `printed_name` with separate badge
 than a suffixed name string.
 
 **DeckObject** fields: `tournament_uid`, `user_uid`, `round`, `name`, `comments`,
-`cards` (card_id → count), `attribution`, `private`, `public`, `winner`. The
-engine sets the last two: `public` from `decklists_mode` plus tournament state (Winner /
-Finalists / All), and `winner` from whether the owner won — a fact the deck row
-cannot otherwise reach, and which the projections need to spare the winner from
-anonymity ([tournaments](tournaments.md#engine-event-catalog)). `private` is the owner's or an
-organizer's, and forces `public` off for anyone but the winner.
+`cards` (card_id → count), `attribution`, `private`, `public`, `winner`,
+`finalist`. The engine sets the last three: `public` from `decklists_mode` plus
+tournament state (Winner / Finalists / All), `winner` from whether the owner won,
+and `finalist` from whether the owner made the final (or won) — facts the deck
+row cannot otherwise reach, and which the projections need to decide whether
+`user_uid` is published ([tournaments](tournaments.md#engine-event-catalog)).
+`private` is the owner's or an organizer's, and forces `public` off for anyone
+but the winner.
 
 **`attribution` is a typed credit**, one `kind` of `Anonymous`, `Owner`, `Member`
 (carrying a `vekn_id`) or `Archive`. **No credit a client sets carries a name**: a

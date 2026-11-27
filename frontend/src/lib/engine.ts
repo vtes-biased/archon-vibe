@@ -207,7 +207,7 @@ export function buildSanctionsPayload(sanctions: Sanction[], tournamentUid: stri
 export interface DeckOp {
   op: 'upsert' | 'delete' | 'set_round' | 'set_publication' | 'set_attribution' | 'set_private' | 'log_view' | 'reassign';
   player_uid?: string;
-  deck?: { name: string; comments: string; cards: Record<string, number>; round?: number | null; public?: boolean; winner?: boolean; private?: boolean; attribution?: DeckAttribution };
+  deck?: { name: string; comments: string; cards: Record<string, number>; round?: number | null; public?: boolean; winner?: boolean; finalist?: boolean; private?: boolean; attribution?: DeckAttribution };
   deck_uid?: string;
   deck_index?: number | null; // delete: the deck's round stamp, null being the pending deck
   round?: number | null; // set_round: the round the deck was played in; log_view: the round it was viewed in
@@ -215,6 +215,7 @@ export interface DeckOp {
   multideck?: boolean;
   public?: boolean;
   winner?: boolean;
+  finalist?: boolean;
   attribution?: DeckAttribution;
   private?: boolean;
   uids?: Record<string, string>; // reassign: old owner uid → new owner uid
@@ -233,6 +234,7 @@ function buildDecksPayload(decks: DeckObject[]): string {
       uid: d.uid,
       public: d.public,
       winner: d.winner,
+      finalist: d.finalist,
       // Withheld below full level; only the winner's private deck is ever published.
       private: d.private ?? d.winner,
     }))

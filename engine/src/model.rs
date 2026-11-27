@@ -143,6 +143,7 @@ pub mod deck_object {
     pub const ATTRIBUTION: &str = "attribution";
     pub const CARDS: &str = "cards";
     pub const COMMENTS: &str = "comments";
+    pub const FINALIST: &str = "finalist";
     pub const NAME: &str = "name";
     pub const PRIVATE: &str = "private";
     pub const PUBLIC: &str = "public";

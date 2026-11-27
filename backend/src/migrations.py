@@ -29,7 +29,36 @@ class Migration:
     rewrite: Callable[..., None]
 
 
-MIGRATIONS: tuple[Migration, ...] = ()
+def _stamp_deck_finalist(full: dict, is_finalist: bool | None) -> None:
+    full["finalist"] = bool(is_finalist)
+
+
+MIGRATIONS: tuple[Migration, ...] = (
+    Migration(
+        name="deck-finalist",
+        obj_type=ObjectType.DECK,
+        pending="""
+            SELECT d.uid,
+                   (
+                       d."full"->>'user_uid' = t."full"->>'winner'
+                       OR EXISTS (
+                           SELECT 1
+                           FROM jsonb_array_elements(
+                               coalesce(t."full"->'players', '[]'::jsonb)
+                           ) p
+                           WHERE p->>'user_uid' = d."full"->>'user_uid'
+                             AND (p->>'finalist')::boolean IS TRUE
+                       )
+                   )
+            FROM objects d
+            LEFT JOIN objects t
+              ON t.type = 'tournament' AND t.uid = d."full"->>'tournament_uid'
+            WHERE d.type = 'deck'
+              AND NOT (d."full" ? 'finalist')
+        """,
+        rewrite=_stamp_deck_finalist,
+    ),
+)
 
 _LOCK_ROW = 'SELECT "full", deleted_at FROM objects WHERE uid = %s FOR UPDATE'
 _LOCK_AUTH_METHOD = "SELECT data FROM auth_methods WHERE uid = %s FOR UPDATE"

@@ -865,13 +865,20 @@ def _build_seats(
                     s["deck"],
                     _deck_public(puid, deck_ctx),
                     puid == deck_ctx.winner_uid,
+                    puid == deck_ctx.winner_uid or puid in deck_ctx.finals_set,
                 )
             )
     return seats
 
 
 def _deck_obj(
-    tuid: str, puid: str, round_idx: int | None, krcg: dict, public: bool, winner: bool
+    tuid: str,
+    puid: str,
+    round_idx: int | None,
+    krcg: dict,
+    public: bool,
+    winner: bool,
+    finalist: bool,
 ) -> DeckObject:
     return DeckObject(
         uid=deck_uid(tuid, puid, round_idx),
@@ -885,6 +892,7 @@ def _deck_obj(
         attribution=DeckAttribution(kind=AttributionKind.OWNER),
         public=public,
         winner=winner,
+        finalist=finalist,
     )
 
 
@@ -1018,6 +1026,8 @@ def build_tournament(
                     p["deck"],
                     _deck_public(str(puid), deck_ctx),
                     str(puid) == deck_ctx.winner_uid,
+                    str(puid) == deck_ctx.winner_uid
+                    or str(puid) in deck_ctx.finals_set,
                 )
             )
 

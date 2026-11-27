@@ -340,19 +340,21 @@ pub(super) fn compute_deck_public(tournament: &JsonValue, player_uid: &str, priv
             tournament[tournament::ROUNDS].is_empty()
                 || count_player_rounds_played(tournament, player_uid) > 0
         }
-        "Finalists" => {
-            tournament[tournament::WINNER].as_str() == Some(player_uid)
-                || tournament[tournament::PLAYERS].members().any(|p| {
-                    p[player::USER_UID].as_str() == Some(player_uid)
-                        && p[player::FINALIST].as_bool().unwrap_or(false)
-                })
-        }
+        "Finalists" => compute_deck_finalist(tournament, player_uid),
         _ => tournament[tournament::WINNER].as_str() == Some(player_uid),
     }
 }
 
 pub(super) fn compute_deck_winner(tournament: &JsonValue, player_uid: &str) -> bool {
     tournament[tournament::WINNER].as_str() == Some(player_uid)
+}
+
+pub(super) fn compute_deck_finalist(tournament: &JsonValue, player_uid: &str) -> bool {
+    tournament[tournament::WINNER].as_str() == Some(player_uid)
+        || tournament[tournament::PLAYERS].members().any(|p| {
+            p[player::USER_UID].as_str() == Some(player_uid)
+                && p[player::FINALIST].as_bool().unwrap_or(false)
+        })
 }
 
 pub(super) fn recompute_deck_publication(
@@ -378,7 +380,7 @@ pub(super) fn recompute_deck_publication(
                 }
         })
     };
-    let changes: Vec<(String, bool, bool)> = decks
+    let changes: Vec<(String, bool, bool, bool)> = decks
         .members()
         .filter(|d| !touched(d))
         .filter_map(|d| {
@@ -401,16 +403,20 @@ pub(super) fn recompute_deck_publication(
             };
             let is_public = compute_deck_public(tournament, user_uid, private);
             let is_winner = compute_deck_winner(tournament, user_uid);
-            (d[deck_object::PUBLIC] != is_public || d[deck_object::WINNER] != is_winner)
-                .then(|| (deck_uid.to_string(), is_public, is_winner))
+            let is_finalist = compute_deck_finalist(tournament, user_uid);
+            (d[deck_object::PUBLIC] != is_public
+                || d[deck_object::WINNER] != is_winner
+                || d[deck_object::FINALIST] != is_finalist)
+                .then(|| (deck_uid.to_string(), is_public, is_winner, is_finalist))
         })
         .collect();
-    for (deck_uid, public, winner) in changes {
+    for (deck_uid, public, winner, finalist) in changes {
         let _ = deck_ops.push(json::object! {
             arg::OP => "set_publication",
             arg::DECK_UID => deck_uid,
             arg::PUBLIC => public,
             arg::WINNER => winner,
+            arg::FINALIST => finalist,
         });
     }
 }

@@ -414,8 +414,8 @@ export interface OfflinePlayer {
 // Standalone deck object (synced separately from tournament)
 export interface DeckObject extends BaseObject {
   tournament_uid: string;
-  // Absent below full level on an anonymous deck: the boundary withholds it, so
-  // anything keyed by owner must fall back to the deck's own uid.
+  // Absent below full level on non-finalist and anonymous finalist decks: the
+  // boundary withholds it, so anything keyed by owner must fall back to deck.uid.
   user_uid?: string;
   round: number | null;
   name: string;
@@ -424,6 +424,7 @@ export interface DeckObject extends BaseObject {
   attribution: DeckAttribution;
   public: boolean;
   winner: boolean;
+  finalist: boolean;
   private?: boolean;
   views?: DeckView[];
 }

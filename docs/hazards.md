@@ -168,7 +168,7 @@ count instead is what a soft-cancel corrupts: the count skips `Cancelled`, so
 every later value shifts by one and a deck answers for a round it was not played
 in.
 
-**The engine's decks payload is built twice** — `build_decks_json` and `buildDecksPayload` — and the engine refuses an entry missing `public`, `winner` or `private`; the frontend fills a withheld `private` from `winner`, which holds only while the member projection publishes no private deck but the winner's ([sync](sync.md#access-levels)).
+**The engine's decks payload is built twice** — `build_decks_json` and `buildDecksPayload` — and the engine refuses an entry missing `public`, `winner`, `finalist` or `private`; the frontend fills a withheld `private` from `winner`, which holds only while the member projection publishes no private deck but the winner's ([sync](sync.md#access-levels)).
 
 ## Renames and references
 

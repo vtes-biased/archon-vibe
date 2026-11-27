@@ -3,6 +3,8 @@ read-only behind a token, its reference page renders, the schema it documents is
 the projection it actually serves, and a daemon identity opens it while the app
 stays shut to that same token."""
 
+import gzip
+import json
 import re
 from datetime import UTC, datetime, timedelta
 from uuid import uuid7
@@ -11,6 +13,7 @@ import msgspec
 import pytest
 import pytest_asyncio
 import src.db as db
+import src.snapshots as snapshots
 from httpx import ASGITransport, AsyncClient
 from src.access_levels import compute_api
 from src.db_oauth import (
@@ -20,7 +23,9 @@ from src.db_oauth import (
     update_oauth_client,
 )
 from src.models import (
+    AttributionKind,
     DeckAttribution,
+    DeckListsMode,
     DeckObject,
     League,
     OAuthClient,
@@ -78,7 +83,11 @@ _SAMPLES = {
     ObjectType.DECK: (
         "DeckObject",
         _every_field(
-            DeckObject, public=True, attribution=_every_field(DeckAttribution)
+            DeckObject,
+            public=True,
+            winner=True,
+            finalist=True,
+            attribution=_every_field(DeckAttribution),
         ),
     ),
 }
@@ -394,4 +403,77 @@ class TestMemberSanctions:
                     "DELETE FROM objects WHERE uid = %s OR "
                     "(type = 'sanction' AND \"full\"->>'user_uid' = %s)",
                     (event.uid, member.uid),
+                )
+
+
+class TestExportDeckOwnership:
+    @pytest.mark.asyncio
+    async def test_export_omits_user_uid_on_non_finalists_and_anonymous_finalists(
+        self, test_client, live_api, tmp_path, monkeypatch
+    ):
+        now = datetime.now(UTC)
+        event = Tournament(
+            uid=str(uuid7()),
+            modified=now,
+            name="All-mode export check",
+            state=TournamentState.FINISHED,
+            decklists_mode=DeckListsMode.ALL,
+        )
+        await seed_tournament(event)
+
+        cases = [
+            ("winner-anon", "u-win", True, True, AttributionKind.ANONYMOUS, True),
+            ("finalist-owner", "u-fin-1", False, True, AttributionKind.OWNER, True),
+            ("finalist-anon", "u-fin-2", False, True, AttributionKind.ANONYMOUS, False),
+            ("other-owner", "u-nf-1", False, False, AttributionKind.OWNER, False),
+            ("other-anon", "u-nf-2", False, False, AttributionKind.ANONYMOUS, False),
+        ]
+        decks: list[DeckObject] = []
+        for label, user_uid, winner, finalist, kind, _ in cases:
+            deck = DeckObject(
+                uid=str(uuid7()),
+                modified=now,
+                tournament_uid=event.uid,
+                user_uid=user_uid,
+                name=label,
+                cards={"100001": 4},
+                attribution=DeckAttribution(kind=kind),
+                public=True,
+                winner=winner,
+                finalist=finalist,
+            )
+            decks.append(deck)
+            await db.save_object_from_model(ObjectType.DECK, deck)
+
+        try:
+            monkeypatch.setattr(snapshots, "SNAPSHOT_DIR", tmp_path)
+            monkeypatch.setattr(snapshots, "_built_from", None)
+            await snapshots.generate_snapshots()
+
+            client_id, secret = await _register("exporter", [OAuthScope.API_READ])
+            token = (await _mint(test_client, client_id, secret)).json()["access_token"]
+            resp = await live_api.get(
+                "/v1/export", headers={"Authorization": f"Bearer {token}"}
+            )
+            assert resp.status_code == 200, resp.text
+
+            exported = {}
+            for line in gzip.decompress(resp.content).decode().splitlines():
+                row = json.loads(line)
+                if row["type"] == "deck":
+                    exported[row["data"]["uid"]] = row["data"]
+
+            for deck, (_, user_uid, _, _, _, expect_uid) in zip(
+                decks, cases, strict=True
+            ):
+                payload = exported[deck.uid]
+                if expect_uid:
+                    assert payload["user_uid"] == user_uid, deck.name
+                else:
+                    assert "user_uid" not in payload, deck.name
+        finally:
+            async with db.get_connection() as conn:
+                await conn.execute(
+                    "DELETE FROM objects WHERE uid = ANY(%s)",
+                    ([event.uid, *(d.uid for d in decks)],),
                 )

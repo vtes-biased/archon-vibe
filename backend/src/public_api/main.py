@@ -206,10 +206,10 @@ ID. The same uid appears in the tournament's `players`, `standings` and `winner`
 **`attribution` credits the designer, and carries members only.** Its `kind` is
 `Owner`, `Member` (with a `vekn_id`), `Anonymous`, or `Archive` for a past credit
 that named someone we cannot resolve to a member — which publishes no name,
-because this API never carries free text a member did not consent to. **`Anonymous` withholds the owner as well** — such a
-deck arrives with no `user_uid` at all and can only be keyed on its own `uid`. The
-winner's deck is the exception and stays owned, the archive's own stance on a
-public win registry.
+because this API never carries free text a member did not consent to. **`user_uid`
+is kept on the winner's deck regardless of attribution, kept on a finalist's deck
+unless `Anonymous`, and always withheld on a non-finalist's deck** — an unlinked
+deck arrives with no `user_uid` at all and can only be keyed on its own `uid`.
 """.strip()
     .replace("{site}", SITE_URL)
     .replace("{api}", API_URL)

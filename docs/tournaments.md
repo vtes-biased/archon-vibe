@@ -741,8 +741,9 @@ locally, not soft-deleted and `Finished`, plus `public` for anyone but the deck'
 owner, who is entitled to all of their own. The `public` leg is what answers for
 an organizer, since they hold every non-private deck of their event at `full`
 whatever its state, and what keeps a private deck on its owner's record alone. **A profile also lists to anyone else only the decks that name their
-owner** — an anonymous deck is on nobody's record but its owner's, and the
-organizer holding it at `full` is held to the same rule.
+owner** — a non-finalist deck or an anonymous finalist deck is on nobody's
+record but its owner's, and the organizer holding it at `full` is held to the
+same rule.
 
 **Anonymous is a boundary, not a display convention.** The credit is its own
 typed field with its own event: `SetDeckAttribution` moves it in any state, on
@@ -750,12 +751,13 @@ the deck's owner's word alone, and touches no content — which is what lets it 
 on a deck the round it was played in has locked. `UpsertDeck` carries a credit
 only for a first upload; the engine strips it off a replacement, so re-uploading
 a deck never re-credits it and an organizer, who may upload for anyone, cannot
-re-credit anyone. An `Anonymous` deck reaches other members and the public API
-**with no owner at all** ([sync](sync.md#access-levels)), so the client keys it on
-the deck's own uid. The winner is the exception and stays named whatever they
-chose: the archive is a public win registry and the TWDA's stance is already
-that. In Finalists mode the deck list therefore names the winner and every
-finalist but an anonymous one.
+re-credit anyone. Every non-finalist deck and every `Anonymous` finalist deck
+reaches other members and the public API **with no owner at all**
+([sync](sync.md#access-levels)), so the client keys it on the deck's own uid.
+The winner is always named whatever they chose: the archive is a public win
+registry and the TWDA's stance is already that. A finalist is named unless they
+chose `Anonymous`; a non-finalist sits anonymously in the archive and sees their
+own deck linked only on their own profile.
 
 **Private is the disclosure boundary beside it.** `SetDeckPrivate` flags a deck
 already submitted — the upload form never offers it, and a replacement keeps the
@@ -781,7 +783,7 @@ still publishes, with no owner, and a private one keeps whatever credit it has.
 **One post-finish pass owns publication.** After every event that starts or ends
 on a `Finished` tournament, the engine recomputes each deck's `public` from the
 mode, the winner, the finalist flags and the deck's `private` — and its `winner`
-flag with it — then
+and `finalist` flags with it — then
 emits `set_publication` in both directions for every deck whose flags moved —
 skipping the decks the same event upserted or deleted, whose ops already carry
 the answer. `All` publishes a deck only for a player seated at a non-cancelled

@@ -72,3 +72,22 @@ Run locally with the production Grafana token:
 
 It worked when the **Archon production** dashboard's **VEKN push** row shows only
 `Failing members`. **Owes afterwards**: nothing.
+
+## Stamp `finalist` on stored decks and re-project
+
+**Migration** `deck-finalist`
+
+**Gated on the commit that added this section** (`git log -1 --format=%h
+-S'deck-finalist' -- docs/post-deploy.md`), which added `DeckObject.finalist` and
+stopped publishing `user_uid` on non-finalist decks in `member` and `api`. The
+lifespan migration stamps `finalist` on every stored deck and re-saves it, which
+recomputes `member` and `api` projections automatically before serving.
+
+Verify on every long-lived database (beta and production) that zero rows remain
+unmigrated:
+
+    docker compose exec -T db psql -U archon -d archon -c "SELECT count(*) FROM objects WHERE type = 'deck' AND NOT (\"full\" ? 'finalist')"
+
+It worked when both beta and production answer `0`. **Owes afterwards**: delete
+the `deck-finalist` entry from `backend/src/migrations.py` and this section in
+the same commit.
