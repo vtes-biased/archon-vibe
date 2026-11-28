@@ -14,117 +14,25 @@ upstream re-creating deleted rows or overwriting corrections.
 
 ### Duplicate tournament cleanup
 
-Data gathered 2026-08-08 from the retired `--probe-vekn` pass on prod, plus
-direct vekn.net reads for the PennyBridge pair, and re-confirmed by the
-2026-08-28 run — same set, one addition.
+Resolved on prod **2026-11-28** after Stage 1 retired the tournament sync:
 
-**Why this waited on Stage 1.** These are pairs where one real event was entered
-twice on vekn.net and **both** event ids were live upstream, so the tournament sync
-would have re-created any deleted copy on its next run. Now that Stage 1 has retired
-the tournament sync, every pair below is locally fixable with the standard
-soft-delete + transplant (`backend/scripts/dedup_tournaments.py`), no officials in
-the loop.
-
-**Prior art (already done, do not redo).** On 2026-08-08 an `--apply` run
-resolved 7 groups where exactly one id was live — AMICI NOCTIS, Alexandre Koch,
-Vozhd of Szczecin, François Villon, Draft that Was Promised (adopted vekn
-13137), 8th Tragic Love Affair, Cearense 2026. That emptied the mixed-vekn class
-(some but not all copies hold a vekn id), and the archive backfill refilled it
-with a class of its own — see [archive reconstructions] below.
-
-**A shape the audit cannot see.** Its scope is groups where *some but not all*
-copies hold a vekn id, so two live copies sharing **one** id never surface. Beta
-holds exactly that under `12642`: the event-code backfill gave one copy the code
-`12642` and minted `SCHNJG` for the other, and short links survive it either way
-because `get_tournament_by_event_code` falls back to a vekn external-id lookup.
-Production was never checked for the shape and no dedup run will report it, so
-it needs a direct query — group live tournaments by `external_ids.vekn` and keep
-the counts above one. Locally fixable whenever found: soft-delete the loser and
-the survivor keeps an id that is legitimately live, so no transplant and no
-officials.
-
-#### Strong candidates — one copy carries no results
-
-Near-certain double-entries: the empty copy is the accidental second entry.
-
-| Event | Date | Keep | Delete (empty) |
-|---|---|---|---|
-| Itaquaquecetubense 2026 | 2026-08-16 | **13478** (27 players, standings) | 13477 (0 players) |
-| 5ª Jornada Liga Levante Norte | 2026-03-29 | **13151** (26 players, 3 rounds) | 13152 (0 players) |
-| Sangrando por un sueño | 2026-01-25 | **12972** (5 players) | 12971 (0 players) |
-| Primeiro campeonato online Inconnu do home office | 2026-01-18 | **12979** (12 players) | 12931 (0 players) |
-| PennyBridge - Charisma III | 2026-05-22 / 05-23 | **13048** (12 players, results) | 13046 (0 players) |
-
-Player counts for the middle three come from the earlier dedup pass's record.
-Itaquaquecetubense was read off the corpus on 2026-08-28 — the empty copy carries
-no country and no winner either. PennyBridge was verified directly (both ids
-fetched live on vekn.net: same name, same venue Brickebacken/Örebro, same
-"3 + Final" format, only 13048 carries results).
-
-#### Needs judgement — per-copy results not yet pulled
-
-| Event | Date | vekn ids | Signal |
-|---|---|---|---|
-| Forced March | 2024-03-17 | 11252, 11263 | both rated |
-| Origins Constructed | 2019-06-13 | 9188, 9189 | consecutive ids, both rated |
-| V:TES Constructed Tournament | 2018-06-14 | 8896, 8897 | consecutive ids, both rated; generic name — plausibly two real Origins events |
-| Last Stand | 2010-09-19 | 5543, 5700 | — |
-| Praxis Seizure: Barcelona | 2010-05-30 | 34, 1329 | ids far apart — smells like a legacy re-entry |
-| Ropecon ECQ | 2009-07-31 | 5518, 6067 | — |
-| Torneio Draft de Lords of the Night | 2007-11-10 | 2717, 3270 | — |
-
-**"Both rated" argues AGAINST duplication.** Two distinct events both being
-rating-eligible is correct, and a genuine double-entry usually leaves one copy
-empty. Conventions routinely run several tournaments on one day under a generic
-name. Treat the three both-rated rows as the *weakest* candidates, not the most
-urgent — resolving them needs per-copy player/round counts, which nobody has
-pulled yet.
-
-#### Deliberately excluded
-
-- **98 `Imported VTES Event` groups** (47 in 2004, 51 in 2005). That placeholder
-  name covers hundreds of genuinely distinct legacy events, dozens per day. Pure
-  noise; never send these to officials.
-- **70 groups over 4 copies**, skipped by `PROBE_GROUP_CAP` — placeholder-shaped
-  by the same logic.
-
-98 + 11 named = the 109 "all ids live" lines the probe reported.
+- **5 strong candidates soft-deleted** via `dedup_tournaments.py --apply` (no `vekn` id transplant — each survivor already held its real id + `twda_entry`/`archon`):
+  `Itaquaquecetubense 2026` (kept `13478`, dropped `13477`), `5ª Jornada Liga Levante Norte` (kept `13151`, dropped `13152`), `Sangrando por un sueño` (kept `12972`, dropped `12971`), `Primeiro campeonato online Inconnu do home office` (kept `12979`, dropped `12931`), and `PennyBridge - Charisma III` (kept `13048`, dropped `13046`).
+- **7 "Needs judgement" pairs confirmed distinct events** (both copies kept live):
+  - Different cities or separate convention sessions with distinct TWDA entries: `Forced March` (`11252` Barberà del Vallès vs `11263` Madrid), `Origins Constructed` (`9188` 11:00 `2019oc1co` vs `9189` 16:00 `2019oc2co`), `V:TES Constructed Tournament` (`8896` 11:00 `2018ot1co` vs `8897` 16:00 `2018ot2co`), `Torneio Draft de Lords of the Night` (`2717` Rio de Janeiro vs `3270` Vitória).
+  - Completely disjoint player rosters (`shared = 0` on prod): `Last Stand` (`5543` 7p vs `5700` 20p), `Praxis Seizure: Barcelona` (`1329` 21p vs `34` 35p), `Ropecon ECQ` (`5518` 35p vs `6067` 20p).
+- **Shared `external_ids.vekn` blind spot:** verified **0** live tournaments share a `vekn` id on prod.
+- **Deliberately excluded (unchanged):** 98 `Imported VTES Event` groups (2004–2005) and 70 groups over 4 copies (`PROBE_GROUP_CAP`) — placeholder-shaped distinct legacy events.
 
 #### The day-boundary detection blind spot
 
 `DUPLICATE_GROUPS_QUERY` (`backend/src/db.py`) groups on `lower(name)` + **exact
-UTC start day**. A duplicate pair whose copies straddle midnight is therefore
-invisible to it. PennyBridge is the known member: `2026-05-22T00:00:10` vs
-`2026-05-23T00:00:10`.
+UTC start day**, so a duplicate pair straddling midnight (like `PennyBridge -
+Charisma III`) is invisible to it. Widening to ±1 day is wrong because it flags
+legitimate consecutive-day convention events (`Origins 9am`, `Czech Championship
+2007`, etc.).
 
-Naively widening the grouping to ±1 day is wrong — it would flag genuine
-consecutive-day convention events. A ±1-day scan over prod returned 9 pairs, and
-several are clearly legitimate:
-
-```
-Bachanalia 2012              6870 2012-09-15  /  6871 2012-09-16
-Blood Mill: Żarnowiec       12208 2025-08-15  / 12205 2025-08-16
-Czech Championship 2007       863 2007-10-27  /  2582 2007-10-28
-Fee Stake: Manaus           12340 2025-05-03  / 12342 2025-05-04
-Left 4 Bleed: Palace Party  12808 2025-11-22  / 12807 2025-11-21
-Origins 9am                   554 2006-06-29  /  4029 2006-06-30
-PennyBridge - Charisma III  13048 2026-05-23  / 13046 2026-05-22
-Praxis: Matias Barbosa      12608 2025-09-28  / 12557 2025-09-27
-RUMO AO BR 2026 ETAPA 2     12699 2025-09-29  / 12689 2025-09-28
-```
-
-`Origins 9am` on two consecutive days and `Czech Championship 2007` day-1/day-2
-are almost certainly real distinct events.
-
-#### Re-deriving this on prod
-
-Export `DATABASE_URL` from the backend env and run `dedup_tournaments.py`:
-
-```sh
-export DATABASE_URL=$(grep -m1 ^DATABASE_URL= /etc/archon/archon-backend.env | cut -d= -f2- | tr -d "'")
-```
-
-Ratings need no manual step after any cleanup here: `run_rating_recompute` runs daily.
+Ratings need no manual step after cleanup: `run_rating_recompute` runs daily.
 
 ### IC record curation — events to delete
 

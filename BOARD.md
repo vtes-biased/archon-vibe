@@ -24,7 +24,6 @@ the docs; asks live here. Bulky context for an in-flight line goes in
 
 Board changes ride the commit that earns them.
 
-- Clean up the all-live duplicate tournaments by soft-delete plus vekn-id transplant. Done when each group in `docs/vekn-decommission.md#duplicate-tournament-cleanup` has one live copy and its evidence section is updated.
 - Delete the mistaken historical tournament rows in `docs/vekn-decommission.md#ic-record-curation--events-to-delete` now that ICs can delete any event. Done when every listed entry is gone and its evidence section is updated.
 - Settle the winner on the rows in `docs/vekn-decommission.md#ic-record-curation--rows-that-disagree-with-the-archive-about-who-won` and correct whichever side is wrong. Done when each row's `winner` matches the record the IC accepts and its evidence section is updated.
 - Settle the eight archive-reconstruction pairs in `docs/vekn-decommission.md#archive-reconstructions-of-an-event-we-already-hold` (soft-delete same-event duplicates and transplant `external_ids.twda_entry`, or record distinct events). Done when no pair is ambiguous, the mixed-vekn class of `dedup_tournaments.py` reports only pairs it can propose, and its evidence section is updated.
