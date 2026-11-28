@@ -1320,8 +1320,8 @@ async def get_all_tournament_wins(
     if winners is not None and not winners:
         return {}
     wins: dict[str, list[str]] = {}
-    async with get_connection() as conn:
-        if winners is not None:
+    if winners is not None:
+        async with get_connection() as conn:
             # Deliberately unpaginated: `idx_objects_tournament_winner` answers
             # this directly, while a keyset `ORDER BY uid LIMIT n` invites the
             # planner onto the primary key and scans the corpus per recompute.
@@ -1332,6 +1332,7 @@ async def get_all_tournament_wins(
             _collect_wins(await result.fetchall(), wins)
             return wins
 
+    async with batch_read_connection() as conn:
         last_uid = ""
         while True:
             result = await conn.execute(
@@ -1363,7 +1364,7 @@ async def get_user_uids_with_wins() -> set[str]:
     """Users whose stored win list is non-empty — the clear side of the recompute.
     A deleted tournament, a corrected winner or a withdrawn deck leaves no
     tournament row naming them, so enumeration alone would never zero them."""
-    async with get_connection() as conn:
+    async with batch_read_connection() as conn:
         result = await conn.execute(
             "SELECT uid FROM objects WHERE type = 'user' AND deleted_at IS NULL "
             "AND jsonb_array_length(COALESCE(\"full\"->'wins', '[]'::jsonb)) > 0"

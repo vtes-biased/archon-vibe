@@ -64,13 +64,16 @@ def extract_vekn_event_id(entry: dict) -> str | None:
     """Extract VEKN event ID from a TWDA entry.
 
     Recent entries have numeric `id` matching VEKN event IDs.
-    Older entries have alphanumeric `id` but `event_link` contains the VEKN ID.
+    Older entries have alphanumeric `id` but `event.url` (or legacy `event_link`)
+    contains the VEKN ID.
     """
     entry_id = str(entry.get("id", ""))
     if entry_id.isdigit():
         return entry_id
-    # Fall back to extracting from event_link URL
-    link = entry.get("event_link", "")
+    event = entry.get("event")
+    link = (event.get("url", "") if isinstance(event, dict) else "") or entry.get(
+        "event_link", ""
+    )
     if "/event/" in link:
         return link.rsplit("/event/", 1)[-1].split("/")[0].split("?")[0]
     return None
@@ -81,32 +84,31 @@ class _TwdaCard(msgspec.Struct):
     count: int = 1
 
 
-class _TwdaCards(msgspec.Struct):
-    cards: list[_TwdaCard] = []
-
-
-class _TwdaLibrary(msgspec.Struct):
-    cards: list[_TwdaCards] = []
+class _TwdaEvent(msgspec.Struct):
+    name: str = ""
+    place: str = ""
+    date: str = ""
+    online: bool = False
+    format: str = ""
+    players_count: int = 0
+    rounds: int = 0
+    url: str = ""
 
 
 class TwdaEntry(msgspec.Struct):
     id: str
-    event: str = ""
-    place: str = ""
-    date: str = ""
-    tournament_format: str = ""
-    players_count: int = 0
     name: str = ""
-    comments: str = ""
-    crypt: _TwdaCards = msgspec.field(default_factory=_TwdaCards)
-    library: _TwdaLibrary = msgspec.field(default_factory=_TwdaLibrary)
+    comment: str = ""
+    cards: list[_TwdaCard] = []
+    event: _TwdaEvent = msgspec.field(default_factory=_TwdaEvent)
 
 
 def _flatten_twda_cards(entry: TwdaEntry) -> dict[str, int]:
-    """{card_id_str: count} over the flat crypt and the type-grouped library."""
-    cards = {str(card.id): card.count for card in entry.crypt.cards}
-    for group in entry.library.cards:
-        cards.update((str(card.id), card.count) for card in group.cards)
+    """{card_id_str: count} over the entry's card list."""
+    cards: dict[str, int] = {}
+    for card in entry.cards:
+        key = str(card.id)
+        cards[key] = cards.get(key, 0) + card.count
     return cards
 
 
@@ -188,8 +190,8 @@ def _twda_timezone(country: str | None, city: str) -> str:
 
 
 def _twda_place(entry: TwdaEntry) -> tuple[str | None, str]:
-    """(ISO country, city) from `place` — "City (STATE), Country"."""
-    place = entry.place.strip()
+    """(ISO country, city) from `event.place` — "City (STATE), Country"."""
+    place = entry.event.place.strip()
     if not place:
         return None, ""
     head, _, tail = place.rpartition(",")
@@ -198,14 +200,14 @@ def _twda_place(entry: TwdaEntry) -> tuple[str | None, str]:
 
 
 def twda_city(entry: TwdaEntry, cities: CityIndex) -> City | None:
-    *head, tail = entry.place.split(",")
+    *head, tail = entry.event.place.split(",")
     country = normalize_country(tail) if head else None
     if not country:
         return None
     if (
         head[-1].strip() == "Palma de Mallorca"
-        and _ISO_DATE_RE.match(entry.date)
-        and entry.date >= LEGACY_PLACEHOLDER_SINCE
+        and _ISO_DATE_RE.match(entry.event.date)
+        and entry.event.date >= LEGACY_PLACEHOLDER_SINCE
     ):
         return None
     for segment in reversed(head):
@@ -229,15 +231,14 @@ def reconstructed_tournament(
     arithmetic trusts a measurement.
     """
     country, place_city = _twda_place(entry)
-    day = entry.date
+    day = entry.event.date
     start = datetime.strptime(day, "%Y-%m-%d") if _ISO_DATE_RE.match(day) else None
-    rounds = re.match(r"\s*(\d+)", entry.tournament_format)
     return Tournament(
         uid=str(uuid7()),
         modified=now,
-        name=entry.event or f"VTES Tournament — {place_city or country or day}",
+        name=entry.event.name or f"VTES Tournament — {place_city or country or day}",
         format=TournamentFormat.Standard,
-        online=entry.place.strip().lower() == "online",
+        online=entry.event.online or entry.event.place.strip().lower() == "online",
         start=start,
         finish=start,
         timezone=_twda_timezone(country, place_city),
@@ -245,7 +246,7 @@ def reconstructed_tournament(
         city=city["name"] if city else None,
         city_geoname_id=city["geoname_id"] if city else None,
         state=TournamentState.FINISHED,
-        max_rounds=int(rounds.group(1)) if rounds else 0,
+        max_rounds=entry.event.rounds,
         # The archive's own file key — never `vekn`, since these have no vekn.net row.
         external_ids={"twda": entry.id},
         players=[
@@ -255,7 +256,7 @@ def reconstructed_tournament(
         winner=winner_uid,
         # The only field that survives to say how big this was. `players_count`
         # is absent on ~100 entries; 0 there means "unattested", same as anywhere.
-        reported_player_count=entry.players_count,
+        reported_player_count=entry.event.players_count,
     )
 
 
@@ -495,7 +496,7 @@ async def _import_decks(
             tournament_uid=tournament_uid,
             user_uid=winner_uid,
             name=entry.name,
-            comments=entry.comments,
+            comments=entry.comment,
             cards=cards,
             attribution=DeckAttribution(kind=AttributionKind.OWNER),
             public=True,
@@ -515,4 +516,5 @@ async def _fetch_twda() -> list[TwdaEntry]:
         TWDA_URL, timeout=aiohttp.ClientTimeout(total=120.0)
     ) as resp:
         resp.raise_for_status()
-        return msgspec.json.decode(await resp.read(), type=list[TwdaEntry])
+        entries = msgspec.json.decode(await resp.read(), type=dict[str, TwdaEntry])
+        return list(entries.values())
