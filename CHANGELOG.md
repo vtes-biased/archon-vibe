@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.5.0 — 2026-11-28
 
 - Archon no longer syncs tournaments or members with vekn.net, lifting the old limits on round counts and editing.
 - Organizers can now replace or swap a mistakenly registered player, even after a tournament has finished.
