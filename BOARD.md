@@ -23,5 +23,3 @@ the docs; asks live here. Bulky context for an in-flight line goes in
 `board/<slug>.md`, deleted with the line.
 
 Board changes ride the commit that earns them.
-
-- Review the Prince / NC divergence in `docs/vekn-decommission.md#prince--nc-divergence--legacy-archon-vs-the-app` with someone who knows the appointments and align roles (never a blind union). Done when every divergent name has a verdict reflected in roles and its evidence section is updated.
