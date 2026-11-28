@@ -4,11 +4,22 @@
       "type": "stdio",
       "command": "zsh",
       "args": [
-        "-c",
-        "GRAFANA_SERVICE_ACCOUNT_TOKEN=\"$GRAFANA_TOKEN_VTESBIASED\" exec uvx mcp-grafana --disable-write"
+        "-lc",
+        "export GRAFANA_SERVICE_ACCOUNT_TOKEN=\"$GRAFANA_TOKEN_VTESBIASED\"; if command -v mcp-grafana >/dev/null 2>&1; then exec mcp-grafana --disable-write; else exec uvx mcp-grafana --disable-write; fi"
       ],
       "env": {
         "GRAFANA_URL": "https://vtesbiased.grafana.net"
+      }
+    },
+    "grafana-codex": {
+      "type": "stdio",
+      "command": "zsh",
+      "args": [
+        "-lc",
+        "export GRAFANA_SERVICE_ACCOUNT_TOKEN=\"$GRAFANA_TOKEN_CODEX\"; if command -v mcp-grafana >/dev/null 2>&1; then exec mcp-grafana --disable-write; else exec uvx mcp-grafana --disable-write; fi"
+      ],
+      "env": {
+        "GRAFANA_URL": "https://codexofthedamned.grafana.net"
       }
     }
   }

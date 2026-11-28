@@ -459,6 +459,10 @@ journald warning for manual deletion.
 
 ### The release order
 
+Every release starts with `mise run update` and `mise run test` so nothing ships
+on stale dependencies (`mise run release` gates on `mise run deps-check`, with
+`ALLOW_STALE_DEPS=1` for emergencies).
+
 The changeset is written **before** the tag, not after the deploy. `/changeset`
 appends a `## Unreleased` block to `CHANGELOG.md`; `mise run release` rewrites that
 heading to the tag it is cutting plus today's date, commits it, pushes the branch

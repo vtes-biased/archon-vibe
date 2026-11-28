@@ -1,7 +1,6 @@
 {
   "name": "archon-grafana",
-  "displayName": "Archon Grafana (vtesbiased)",
-  "version": "1.0.0",
-  "description": "Read-only Grafana Cloud MCP server for Archon production logs and metrics (requires GRAFANA_TOKEN_VTESBIASED).",
-  "disabled": true
+  "displayName": "Archon Grafana (prod & beta)",
+  "version": "1.1.0",
+  "description": "Read-only Grafana Cloud MCP servers for Archon production (vtesbiased) and beta (codex) logs and metrics."
 }

@@ -27,7 +27,7 @@ and hooks under `.agents/`:
 - **Look it up (Antigravity)**: for Antigravity's own features (rules, skills,
   agents, hooks, plugins, MCP), read the built-in `agy-customizations` /
   `antigravity-guide` skills or `https://antigravity.google/docs`.
-- **Grafana MCP** (`.agents/plugins/archon-grafana/`): ships disabled by default
-  so contributors without `$GRAFANA_TOKEN_VTESBIASED` do not hit startup errors.
-  Enable once locally with `agy plugin enable archon-grafana` or in the
-  Customizations UI.
+- **Grafana MCP** (`.agents/plugins/archon-grafana/`): enabled for this repo,
+  exposing read-only (`--disable-write`) `grafana-vtesbiased` (prod) and
+  `grafana-codex` (beta) servers using `$GRAFANA_TOKEN_VTESBIASED` and
+  `$GRAFANA_TOKEN_CODEX` from the shell environment (no secrets in repo files).

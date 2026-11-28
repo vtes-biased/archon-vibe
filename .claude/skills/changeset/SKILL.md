@@ -10,6 +10,10 @@ deploy — the task stamps the entry with the tag it cuts, so the tag carries it
 own notes, and the frontend bundle CI builds from that tag is what shows them in
 the app's "what's new" modal. Written afterwards, an entry is one release late.
 
+Before cutting the release, always run `mise run update` and `mise run test`
+first so releases never ship on stale dependencies (`mise run release` enforces
+this via `deps-check`).
+
 Telling the people who reported the bugs is the other half, and it belongs after
 the deploy: `/post-deploy`.
 

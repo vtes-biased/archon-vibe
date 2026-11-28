@@ -19,13 +19,13 @@ case "$bump" in
 esac
 git rev-parse "$tag" >/dev/null 2>&1 && { echo "tag $tag already exists"; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "working tree not clean — commit or stash first"; exit 1; }
-# Nudges: discourage (but don't block) releasing on stale deps or with no notes
-# written. `if` keeps set -e from aborting.
-anyway=""
-if ! mise run deps-check 2>/dev/null; then   # 2>/dev/null: drop mise's task-failed line
-    echo "⚠ Dependencies are out of date — prefer 'mise run update' before cutting a release."
-    anyway=" anyway"
+# Gate: never cut a release on stale deps (ALLOW_STALE_DEPS=1 for emergencies).
+if [ "${ALLOW_STALE_DEPS:-0}" != 1 ] && ! mise run deps-check 2>/dev/null; then   # 2>/dev/null: drop mise's task-failed line
+    echo "✗ Dependencies are out of date — run 'mise run update' and 'mise run test' before cutting a release (or ALLOW_STALE_DEPS=1)."
+    exit 1
 fi
+# Nudge: discourage (but don't block) releasing with no notes written.
+anyway=""
 if ! grep -q '^## Unreleased$' CHANGELOG.md; then
     echo "⚠ No '## Unreleased' section in CHANGELOG.md — run /changeset first, or this release ships unannounced."
     anyway=" anyway"
