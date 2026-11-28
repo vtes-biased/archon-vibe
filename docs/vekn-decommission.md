@@ -36,93 +36,9 @@ Ratings need no manual step after cleanup: `run_rating_recompute` runs daily.
 
 ### IC record curation — events to delete
 
-Origin gh-6. Now that Stage 1 lifted the VEKN-footprint delete gate (organizers
-delete unfinished events; IC deletes `Finished` events via
-`delete_finished_tournament`), every row below can be deleted directly once Stage 1
-is deployed without the sync re-creating it.
+Resolved on prod **2026-11-28** (all 4 listed rows deleted; `Arraial da Vampirada` was already gone and the 3 placeholder `Finished` rows `TEST` / `vekn=9955`, `delete me` / `vekn=12797`, and `ND` / `vekn=13235` were deleted by IC).
 
-This list holds events that are simply **wrong** — created by mistake, mistyped, or
-never real — distinct from the duplicate groups above.
-
-#### 1. `Arraial da Vampirada` — mistyped year, stuck in Registration
-
-| | |
-|---|---|
-| uid | `03af3db6-f5fe-480b-949c-bf778fac2193` |
-| start / finish | **2034-12-16** 10:00 → 17:30 |
-| state | `Registration` |
-| where | Loja Homo Ludicus, Avenida Governador Gayoso e Almendra 443, São João, Teresina (Piauí), Brazil |
-| format | Standard, not online, no league |
-| vekn id | **unknown** |
-
-Owner call 2026-08-15: delete it.
-
-A real recurring Brazilian event whose year was fat-fingered. The genuine
-edition is `93232a61-8a8b-4d96-a893-34ee120035a3`, *same name, same country,
-2025-06-29, Finished*. The 2034 row is almost certainly meant to be
-**2024-12-16** (single-digit slip), which also explains the stuck `Registration`
-state — the date never arrived, so it was never run or finished. Its `modified`
-stamp of 2026-08-07 is not evidence of recent editing; a projection re-save
-sweep bumps that corpus-wide.
-
-**Why it is not harmless while it waits.** It is publicly visible, not merely
-present: the tournament page returns 200 anonymously, logged-out visitors see
-current + upcoming events ([sync](sync.md)), so it sits at the bottom of the
-upcoming list for the next eight years — and it is exported as a real VEVENT in
-the anonymous `.ics` feed, street address included:
-
-```
-DTSTART:20341216T100000Z
-SUMMARY:Arraial da Vampirada
-LOCATION:Loja Homo Ludicus\, Avenida Governador Gayoso e Almendra\, 443\, São João\, Teresina
-```
-
-Anyone subscribed to the calendar feed is carrying it.
-
-**Second, independent defect on the same row**: `timezone` is `"UTC"` while the
-venue is in Teresina (UTC−3), so the wall-clock 10:00 is anchored to UTC and the
-feed advertises 07:00 local. `timezone` is left at its model default (`models.py`) rather than set from the
-venue. Worth checking whether other rows share it — if so that is its own ask, not a
-per-row fix.
-
-Found 2026-08-15 while measuring the tournament corpus for the Hall of Fame
-rebuild — a year histogram of all 8466 live tournaments put exactly one row in
-2034.
-
-#### 2. Placeholder-named rows carrying a VEKN id
-
-Three live `Finished` tournaments with **zero players and zero rounds**, whose
-names say outright that they were never events:
-
-| uid | date | vekn id | country | name |
-|---|---|---|---|---|
-| `f880a4c5-e8cc-4c75-b8e1-9168caf04842` | 2025-11-09 | `9955` | — | `TEST` |
-| `abd7e330-8005-49d5-97ce-c650bc6edb68` | 2025-11-15 | `12797` | Portugal | `delete me` |
-| `dde82ba8-6936-4ec4-94fc-130523c02cf7` | 2026-01-01 | `13235` | Brazil | `ND` |
-
-All three carry `external_ids['vekn']`, which blocked deletion while the calendar
-sync was live; once Stage 1 is deployed an IC can delete them directly.
-
-`delete me` is the costly one: a TWDA entry submitted under event `12797` points
-at it while the real event, `Bloodshed in VdC`, holds `12794`. That is the single
-`vekn id contested` row in the Hall of Fame reconciliation, and it is the reason
-the reconciler must treat a vekn event id as evidence rather than proof
-([vekn](vekn.md)). Deleting the husk retires that special case for good.
-
-**Two further rows named `Test` are probably not this population** —
-`ebcfaea6-babb-4725-8fb4-4cc755bbfd9e` (2020-09-01, Croatia, 1 player) and
-`4218a3a4-0a2e-434a-be14-2d7135d10688` (2025-09-13, Portugal, **8 players**).
-The 8-player one should not be deleted on the strength of its name alone — that is a
-plausible real roster.
-
-**Five more placeholder-looking names are real events, not junk** — `LoB`
-(2006, US, 12 players), `QCF` twice (2006, 29 and 6 players), `NA` (2006, FR, 23
-players) and `Tournament` (2007, CZ, 16 players). All are pre-2014 legacy archon
-imports with real rosters and vekn ids; the names are terse or generic, not
-wrong. They need the *display* treatment the Hall of Fame plan already carries — a
-name synthesized from place and date — and must never be deleted.
-
-Found 2026-08-16 while deciding the Hall of Fame reconciliation queue.
+- **Kept intentionally:** `ebcfaea6-babb-4725-8fb4-4cc755bbfd9e` (`Test`, 2020-09-01 HR, 1p), `4218a3a4-0a2e-434a-be14-2d7135d10688` (`Test`, 2025-09-13 PT, 8p), and the five terse legacy names (`LoB`, `QCF` x2, `NA`, `Tournament`) which carry real rosters.
 
 ### IC record curation — rows that disagree with the archive about who won
 
