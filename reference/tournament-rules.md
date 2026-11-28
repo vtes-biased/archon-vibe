@@ -1,5 +1,15 @@
 # VEKN Tournament Rules
 
+## Preface: Statement on Safe and Welcoming Tournament Environments
+
+The Vampire: Elder Kindred Network (VEKN) believes that all official tournaments and organized play events should provide a safe, welcoming, and inclusive environment for everyone.
+
+To achieve this, tournament organizers and participants should refrain from using these events as platforms for political, ideological, religious, or other personal agendas, statements, or slogans that may make fellow players feel uncomfortable, unwelcome, or excluded.
+
+Our events should remain focused on what brings us together: our shared enjoyment of Vampire: The Eternal Struggle and the community built around it. Regardless of personal beliefs, backgrounds, or opinions, everyone should feel welcome to participate and enjoy the game in an atmosphere of mutual respect.
+
+The VEKN encourages all organizers to uphold these principles and help ensure that our tournaments remain welcoming spaces for the entire community.
+
 ## 1. General VEKN Tournament Rules
 
 The **Vampire: Elder Kindred Network (VEKN)** is the Official Players' Organization for the **Vampire: The Eternal Struggle (VTES)** card game.
