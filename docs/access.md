@@ -225,7 +225,7 @@ case its writer supplied and no caller has to think about it. An email **auth
 method's** `identifier` is lowercase by database constraint instead, and
 `get_auth_method_by_identifier` folds the address it is handed.
 
-**A member is found by address in three places, in order**: an email login's
+**A member is found by address in three places, in order**: a verified email login's
 address, the verified email Discord last reported for a linked Discord login, then
 the address of record — the last only on an account that has never had a login.
 The Discord email is kept on the auth method, never projected, so a member who
@@ -234,12 +234,6 @@ registration import or door-dedup with the same address. A deleted account match
 none of them. The address of record is self-editable and never verified, so
 letting it claim an activated account would hand a stranger's first login to
 whoever typed their address into a profile.
-
-**The email-login match still trusts `verified=false`.** Only the retired
-password signup wrote such a row, so one left on production holds an address
-nobody proved and catches that address's later Discord or magic-link sign-in.
-Whether the lookup skips them waits on the production count
-([post-deploy](post-deploy.md#count-the-unverified-email-logins)).
 
 A `+tag` subaddress is deliberately not canonicalized: this is the address we
 actually send mail to, so folding `a+vtes@x.com` to

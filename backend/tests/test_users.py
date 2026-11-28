@@ -91,6 +91,48 @@ async def test_create_user_dedup_email_conflict(test_db, test_client: AsyncClien
 
 
 @pytest.mark.asyncio
+async def test_get_user_by_email_skips_unverified_email_login(test_db):
+    """Unverified email auth methods never match get_user_by_email; verified
+    ones do."""
+    now = datetime.now(UTC)
+    unverified_user = User(
+        uid=str(uuid7()),
+        modified=now,
+        name="Unverified",
+        contact_email="shared@example.com",
+    )
+    await db.save_user(unverified_user)
+    await db.insert_auth_method(
+        AuthMethod(
+            uid=str(uuid7()),
+            modified=now,
+            user_uid=unverified_user.uid,
+            method_type=AuthMethodType.EMAIL,
+            identifier="shared@example.com",
+            credential_hash="hash",
+            verified=False,
+        )
+    )
+    assert await db.get_user_by_email("shared@example.com") is None
+
+    verified_user = User(uid=str(uuid7()), modified=now, name="Verified")
+    await db.save_user(verified_user)
+    await db.insert_auth_method(
+        AuthMethod(
+            uid=str(uuid7()),
+            modified=now,
+            user_uid=verified_user.uid,
+            method_type=AuthMethodType.EMAIL,
+            identifier="verified@example.com",
+            credential_hash="hash",
+            verified=True,
+        )
+    )
+    found = await db.get_user_by_email("VERIFIED@example.com")
+    assert found is not None and found.uid == verified_user.uid
+
+
+@pytest.mark.asyncio
 async def test_update_user(test_client: AsyncClient, populated_db):
     # IC can edit any user in any country (mock targets have random countries).
     admin = next(u for u in populated_db if Role.IC in u.roles)

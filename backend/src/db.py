@@ -721,6 +721,7 @@ async def get_user_by_email(email: str) -> User | None:
                 JOIN objects o ON o.uid = a.data->>'user_uid' AND o.type = 'user'
                 WHERE a.data->>'method_type' = 'email' AND o.deleted_at IS NULL
                   AND a.data->>'identifier' = LOWER(%(email)s)
+                  AND a.data->>'verified' = 'true'
                 UNION ALL
                 SELECT 2, o.uid, o."full" FROM auth_methods a
                 JOIN objects o ON o.uid = a.data->>'user_uid' AND o.type = 'user'
