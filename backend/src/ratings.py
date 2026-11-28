@@ -303,7 +303,7 @@ async def recompute_all_ratings() -> int:
             if t.state != "Finished" or t.deleted_at:
                 continue
             if _engine.ranking_eligibility(json_str) != "eligible":
-                continue  # house format / < 8 players / no final: never rated
+                continue
             category = rating_category_for_tournament(t)
             players_by_category[category].update(
                 p.user_uid for p in t.players if p.user_uid

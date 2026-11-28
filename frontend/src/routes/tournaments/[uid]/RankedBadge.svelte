@@ -14,7 +14,6 @@
     if (!status || status.ranked) return "";
     switch (status.reason) {
       case "few_players": return m.tournament_unranked_reason_few_players();
-      case "no_final": return m.tournament_unranked_reason_no_final();
       case "open_rounds": return m.tournament_unranked_reason_open_rounds();
       case "no_results": return m.tournament_unranked_reason_no_results();
       case "storyline": return m.tournament_unranked_reason_storyline();

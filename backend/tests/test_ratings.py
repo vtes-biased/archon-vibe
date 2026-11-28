@@ -280,10 +280,6 @@ def _sanction(user_uid: str, **overrides) -> Sanction:
 
 
 def test_ranking_eligibility_gate():
-    """Rules 3.1/3.1.6: >=8 players AND a played final for international ranking;
-    house formats never qualify. This PyO3 predicate gates ratings.py inclusion
-    and the frontend badge."""
-
     def verdict(t: Tournament) -> str:
         return _engine.ranking_eligibility(msgspec.json.encode(t).decode())
 
@@ -329,7 +325,7 @@ def test_ranking_eligibility_gate():
             ]
         ],
     )
-    assert verdict(no_final) == "no_final"
+    assert verdict(no_final) == "eligible"
 
     house = msgspec.structs.replace(eligible, open_rounds=True)
     assert verdict(house) == "open_rounds"

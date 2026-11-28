@@ -141,17 +141,21 @@ Results from tournaments run with card set restrictions are **excluded** from
 ratings (§6.1.1), as are results from invalidated events (§9.4) and results
 reported with placeholder player numbers (§9.6).
 
-**vekn.net credits a no-final top five exactly like a final.** *(Measured,
-2026-08; a fact about the upstream implementation, not about our code.)*
-Decomposing the per-player `rtp` its event API returns against
+**No-final events earn no winner or finalist bonus and no +1 GW** *(Rules Director
+ruling, 2026-11)*. An event of at least 8 players finished without a final still
+counts toward ratings for participation, VP and preliminary GW, but awards neither
+the A.2.1 finalist/winner bonus nor the A.2 tournament-win GW.
+
+**vekn.net credits a no-final top five like a final anyway** — an upstream
+implementation divergence, not the rule. *(Measured, 2026-08.)* Decomposing the
+per-player `rtp` its event API returns against
 `floor(5 + 4·(vp+vpf) + 8·(gw + [1 if winner])) + round(bonus·coef)` matches
 exactly on two no-final events: vekn 11775 (7 players, 3 rounds) — winner
 gw1/vp3 → 72 = `33 + round(90·0.437)`, ranks 2–5 each `+round(30·0.437)` = 13; and
 vekn 10320 (14 players, 2 rounds) — winner +1 GW + `round(90·0.949)` = 85, ranks
-2–5 +28. Finals events decompose identically with `vpf=0`, so the winner and
-finalist bonuses go to the top-5 **standings positions** without checking that a
-final was played. Read literally A.2 and A.2.1 credit neither — the tension is
-[with the Rules Director](../tournaments.md#no-final-rating-credit-open-with-the-rules-director).
+2–5 +28. Finals events decompose identically with `vpf=0`, so upstream awarded the
+winner and finalist bonuses to top-5 standings positions without checking that a
+final was played.
 
 ### Never chase vekn.net's stored RtP
 

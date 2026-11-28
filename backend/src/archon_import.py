@@ -507,6 +507,28 @@ async def apply_archon_import(
         type=list[Standing],
     )
 
+    if not data.finals and standings_list:
+        top = standings_list[0]
+        tied = [
+            s for s in standings_list if (s.gw, s.vp, s.tp) == (top.gw, top.vp, top.tp)
+        ]
+        if len(tied) > 1:
+            order = engine.toss_order(tournament_uid, [s.user_uid for s in tied])
+            toss_by_uid = {uid: i + 1 for i, uid in enumerate(order)}
+            for p in players_list:
+                if p.user_uid in toss_by_uid:
+                    p.toss = toss_by_uid[p.user_uid]
+            standings_list = [
+                msgspec.structs.replace(s, toss=toss_by_uid[s.user_uid])
+                if s.user_uid in toss_by_uid
+                else s
+                for s in standings_list
+            ]
+            standings_list = msgspec.json.decode(
+                engine.sort_standings(msgspec.json.encode(standings_list).decode()),
+                type=list[Standing],
+            )
+
     winner_uid = finals_winner_uid
     if not winner_uid and standings_list:
         winner_uid = standings_list[0].user_uid

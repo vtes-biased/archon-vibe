@@ -646,7 +646,7 @@ mod wasm {
             super::ratings::rating_category(format, online).to_string()
         }
 
-        /// "eligible" or the blocking reason: "open_rounds" | "no_results" | "few_players" | "no_final".
+        /// "eligible" or the blocking reason: "storyline" | "open_rounds" | "no_results" | "few_players".
         #[wasm_bindgen(js_name = rankingEligibility)]
         pub fn ranking_eligibility(&self, tournament_json: &str) -> Result<String, String> {
             let t =
@@ -961,7 +961,7 @@ mod python {
             super::ratings::rating_category(format, online).to_string()
         }
 
-        /// "eligible" or the blocking reason: "open_rounds" | "no_results" | "few_players" | "no_final".
+        /// "eligible" or the blocking reason: "storyline" | "open_rounds" | "no_results" | "few_players".
         fn ranking_eligibility(&self, tournament_json: &str) -> PyResult<String> {
             use pyo3::exceptions::PyValueError;
             let t = json::parse(tournament_json)
@@ -1058,6 +1058,11 @@ mod python {
 
         fn sort_standings(&self, standings_json: &str) -> PyResult<String> {
             py_str(sort_standings_json(standings_json))
+        }
+
+        fn toss_order(&self, tournament_uid: &str, mut uids: Vec<String>) -> Vec<String> {
+            super::tournament::lcg_shuffle(&mut uids, super::tournament::toss_seed(tournament_uid));
+            uids
         }
 
         fn table_label(&self, tournament_json: &str, table_idx: usize) -> PyResult<String> {

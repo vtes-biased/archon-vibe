@@ -25,6 +25,22 @@ pub use standings::{
 };
 pub use types::{ActorContext, PlayerState, SeatScore, TournamentEvent, TournamentState, VpError};
 
+pub fn toss_seed(tournament_uid: &str) -> u64 {
+    tournament_uid
+        .bytes()
+        .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
+}
+
+pub fn lcg_shuffle<T>(items: &mut [T], mut rng: u64) {
+    for k in (1..items.len()).rev() {
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        let swap_idx = (rng >> 33) as usize % (k + 1);
+        items.swap(k, swap_idx);
+    }
+}
+
 use crate::error::EngineError;
 use helpers::{
     all_rounds_finished, collect_previous_rounds, compute_deck_finalist, compute_deck_public,
@@ -2339,11 +2355,7 @@ fn apply_event(
             // The client applies this event through WASM before the server replays it,
             // so the shuffle must be a pure function of the tournament — an OS random
             // source would leave the two copies seating a different top five.
-            let seed: u64 = tournament[tournament::UID]
-                .as_str()
-                .unwrap_or("")
-                .bytes()
-                .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+            let seed = toss_seed(tournament[tournament::UID].as_str().unwrap_or(""));
 
             let mut toss_counter: u32 = 1;
             for group in toss_groups(&candidates) {
@@ -2351,14 +2363,7 @@ fn apply_event(
                 if tosses_are_total(&shuffled) {
                     continue;
                 }
-                let mut rng = seed.wrapping_add(group.start as u64);
-                for k in (1..shuffled.len()).rev() {
-                    rng = rng
-                        .wrapping_mul(6364136223846793005)
-                        .wrapping_add(1442695040888963407);
-                    let swap_idx = (rng >> 33) as usize % (k + 1);
-                    shuffled.swap(k, swap_idx);
-                }
+                lcg_shuffle(&mut shuffled, seed.wrapping_add(group.start as u64));
                 for s in shuffled {
                     if let Some(pi) =
                         find_player_index(&tournament[tournament::PLAYERS], &s.user_uid)
@@ -2412,6 +2417,7 @@ fn apply_event(
                 finals_table::OVERRIDE => json::Null,
                 finals_table::SEED_ORDER => JsonValue::Array(seed_order),
             };
+            tournament[tournament::WINNER] = "".into();
 
             for s in &top5 {
                 if let Some(idx) = find_player_index(&tournament[tournament::PLAYERS], &s.user_uid)
@@ -2557,6 +2563,43 @@ fn apply_event(
             for i in 0..players.len() {
                 if players[i][player::STATE].as_str() != Some("Disqualified") {
                     players[i][player::STATE] = "Finished".into();
+                }
+            }
+
+            if tournament[tournament::FINALS].is_null()
+                && !tournament[tournament::ROUNDS].is_empty()
+            {
+                let standings = compute_preliminary_standings(tournament, sanctions);
+                let eligible: Vec<&standings::Standing> = standings
+                    .iter()
+                    .filter(|s| !s.disqualified && !s.non_competing)
+                    .collect();
+                if eligible.is_empty() {
+                    tournament[tournament::WINNER] = "".into();
+                } else {
+                    let mut end = 1;
+                    while end < eligible.len() && standings::scores_tied(eligible[end], eligible[0])
+                    {
+                        end += 1;
+                    }
+                    let winner_uid = if end > 1 && !tosses_are_total(&eligible[..end]) {
+                        let seed = toss_seed(tournament[tournament::UID].as_str().unwrap_or(""));
+                        let mut shuffled: Vec<&standings::Standing> = eligible[..end].to_vec();
+                        lcg_shuffle(&mut shuffled, seed);
+                        for (idx, s) in shuffled.iter().enumerate() {
+                            if let Some(pi) =
+                                find_player_index(&tournament[tournament::PLAYERS], &s.user_uid)
+                            {
+                                tournament[tournament::PLAYERS][pi][player::TOSS] =
+                                    ((idx + 1) as u32).into();
+                            }
+                        }
+                        // cmp_rank sorts toss descending (higher toss ranks first).
+                        shuffled.last().unwrap().user_uid.clone()
+                    } else {
+                        eligible[0].user_uid.clone()
+                    };
+                    tournament[tournament::WINNER] = winner_uid.as_str().into();
                 }
             }
 
@@ -2791,15 +2834,7 @@ fn apply_event(
             if eligible.is_empty() {
                 return Err(EngineError::RaffleNoPlayers);
             }
-            // Fisher-Yates, same LCG as RandomToss.
-            let mut rng = *seed;
-            for k in (1..eligible.len()).rev() {
-                rng = rng
-                    .wrapping_mul(6364136223846793005)
-                    .wrapping_add(1442695040888963407);
-                let swap_idx = (rng >> 33) as usize % (k + 1);
-                eligible.swap(k, swap_idx);
-            }
+            lcg_shuffle(&mut eligible, *seed);
             let winners: Vec<JsonValue> = eligible
                 .into_iter()
                 .take(*count)

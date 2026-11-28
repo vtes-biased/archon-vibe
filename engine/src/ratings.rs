@@ -57,12 +57,6 @@ pub fn ranking_eligibility(t: &json::JsonValue) -> &'static str {
     if played < 8 {
         return "few_players";
     }
-    // A reconstructed VEKN import carries a winner but no finals object.
-    let has_final = !t[tournament::FINALS].is_null()
-        || !t[tournament::WINNER].as_str().unwrap_or("").is_empty();
-    if !has_final {
-        return "no_final";
-    }
     "eligible"
 }
 
@@ -191,11 +185,10 @@ mod tests {
         };
         assert_eq!(ranking_eligibility(&small), "few_players");
 
-        // Native no-final finish: the 8 prelim players still count, the missing final blocks.
         let mut no_final = eligible.clone();
         no_final["finals"] = json::JsonValue::Null;
         no_final["winner"] = "".into();
-        assert_eq!(ranking_eligibility(&no_final), "no_final");
+        assert_eq!(ranking_eligibility(&no_final), "eligible");
 
         // VEKN import: no rounds, standings carry the field, winner set, no finals.
         let import = json::object! {

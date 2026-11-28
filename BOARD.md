@@ -24,7 +24,6 @@ the docs; asks live here. Bulky context for an in-flight line goes in
 
 Board changes ride the commit that earns them.
 
-- Apply the Rules Director's ruling on no-final tournaments (no winner/finalist rating bonus and no +1 GW in any no-final event; winner is #1 on standings with a toss breaking ties, no finalists flagged). Done when `FinishTournament`, `ranking_eligibility`, and `archon_import.py` agree on no-final winner/rating semantics, covered by tests, and the ruling is recorded in `docs/domain/tournament-rules.md`, `docs/domain/vekn.md`, and `docs/tournaments.md`.
 - Clean up the all-live duplicate tournaments by soft-delete plus vekn-id transplant. Done when each group in `docs/vekn-decommission.md#duplicate-tournament-cleanup` has one live copy and its evidence section is updated.
 - Delete the mistaken historical tournament rows in `docs/vekn-decommission.md#ic-record-curation--events-to-delete` now that ICs can delete any event. Done when every listed entry is gone and its evidence section is updated.
 - Settle the winner on the rows in `docs/vekn-decommission.md#ic-record-curation--rows-that-disagree-with-the-archive-about-who-won` and correct whichever side is wrong. Done when each row's `winner` matches the record the IC accepts and its evidence section is updated.

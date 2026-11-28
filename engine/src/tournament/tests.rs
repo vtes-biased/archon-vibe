@@ -2229,6 +2229,105 @@ fn test_finish_tournament_preserves_dq() {
 }
 
 #[test]
+fn test_finish_tournament_no_final_winner_and_toss() {
+    let mut t = make_tournament();
+    t["uid"] = "t-no-final-tie".into();
+    t["state"] = "Waiting".into();
+    t["players"] = json::array![
+        { user_uid: "p1", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p2", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p3", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p4", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p5", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p6", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p7", state: "Checked-in", payment_status: "Pending", toss: 0 },
+        { user_uid: "p8", state: "Checked-in", payment_status: "Pending", toss: 0 },
+    ];
+    t["rounds"] = json::array![json::array![
+        {
+            seating: [
+                { player_uid: "p1", result: { gw: 1, vp: 2.5, tp: 60 } },
+                { player_uid: "p2", result: { gw: 0, vp: 1.0, tp: 48 } },
+                { player_uid: "p3", result: { gw: 0, vp: 0.5, tp: 24 } },
+                { player_uid: "p4", result: { gw: 0, vp: 0.0, tp: 12 } },
+            ],
+            state: "Finished",
+        },
+        {
+            seating: [
+                { player_uid: "p5", result: { gw: 1, vp: 2.5, tp: 60 } },
+                { player_uid: "p6", result: { gw: 0, vp: 1.0, tp: 48 } },
+                { player_uid: "p7", result: { gw: 0, vp: 0.5, tp: 24 } },
+                { player_uid: "p8", result: { gw: 0, vp: 0.0, tp: 12 } },
+            ],
+            state: "Finished",
+        },
+    ]];
+
+    let event = json::object! { type: "FinishTournament" };
+    let actor = make_organizer();
+    let updated = json::parse(&run_event(&t, &event, &actor).unwrap()).unwrap();
+
+    let winner = updated["winner"].as_str().unwrap();
+    assert!(winner == "p1" || winner == "p5");
+    assert_eq!(updated["standings"][0]["user_uid"].as_str(), Some(winner));
+    assert!(updated["players"]
+        .members()
+        .all(|p| !p["finalist"].as_bool().unwrap_or(false)));
+    assert!(updated["standings"]
+        .members()
+        .all(|s| !s["finalist"].as_bool().unwrap_or(false)));
+
+    let p1_toss = updated["players"][0]["toss"].as_u32().unwrap();
+    let p5_toss = updated["players"][4]["toss"].as_u32().unwrap();
+    assert_ne!(p1_toss, 0);
+    assert_ne!(p5_toss, 0);
+    assert_ne!(p1_toss, p5_toss);
+
+    assert_eq!(crate::ratings::ranking_eligibility(&updated), "eligible");
+    let empty = json::array![];
+    assert_eq!(
+        super::compute_rating_vp_gw(&updated, &empty, winner),
+        (2.5, 1.0)
+    );
+
+    let displayed = super::display_standings(&updated, &empty);
+    assert_eq!(displayed[0]["user_uid"].as_str(), Some(winner));
+    assert_eq!(displayed[0]["rank"].as_i32(), Some(1));
+    assert_eq!(displayed[0]["finalist_position"].as_i32(), Some(0));
+    assert_eq!(displayed[1]["rank"].as_i32(), Some(2));
+    assert_eq!(displayed[1]["finalist_position"].as_i32(), Some(0));
+
+    let mut manual = t.clone();
+    manual["players"][0]["toss"] = 1.into();
+    manual["players"][4]["toss"] = 2.into();
+    let manual_out = json::parse(&run_event(&manual, &event, &actor).unwrap()).unwrap();
+    assert_eq!(manual_out["winner"].as_str(), Some("p5"));
+
+    let mut two_rounds = t.clone();
+    let r2 = two_rounds["rounds"][0].clone();
+    two_rounds["rounds"].push(r2).unwrap();
+    let finished = json::parse(&run_event(&two_rounds, &event, &actor).unwrap()).unwrap();
+    assert!(!finished["winner"].as_str().unwrap_or("").is_empty());
+    let reopened = json::parse(
+        &run_event(
+            &finished,
+            &json::object! { type: "ReopenTournament" },
+            &actor,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let tossed =
+        json::parse(&run_event(&reopened, &json::object! { type: "RandomToss" }, &actor).unwrap())
+            .unwrap();
+    let with_finals =
+        json::parse(&run_event(&tossed, &json::object! { type: "StartFinals" }, &actor).unwrap())
+            .unwrap();
+    assert_eq!(with_finals["winner"].as_str(), Some(""));
+}
+
+#[test]
 fn test_cancel_round_from_waiting_removes_only_the_last_round() {
     let mut t = make_tournament();
     t["state"] = "Waiting".into();

@@ -32,12 +32,12 @@ server (PyO3) behave identically.
 
 **Ranking eligibility** — the engine's `ranking_eligibility` is the single
 predicate behind the rating inclusion filter, the ranked/unranked badge and the
-RtP column: at least 8 players who played **and** a final — a finals table or a
-named winner, which is a wider test than the `final_played` the rating bonus and
-the tournament-win GW are gated on ([hazards](hazards.md)) — never for
-open-rounds or self-organized events, never for a Storyline event (`storyline`),
-and never for a row with no play data at all (`no_results` — an archival record
-carries a winner but nothing that was played).
+RtP column: at least 8 players who played — no final required, per the Rules
+Director's ruling ([domain](domain/vekn.md#ratings)) — never for open-rounds or
+self-organized events, never for a Storyline event (`storyline`), and never for a
+row with no play data at all (`no_results` — an archival record carries a winner
+but nothing that was played). The winner/finalist rating bonus and the +1
+tournament-win GW remain gated on `final_played` ([hazards](hazards.md)).
 
 **Two counts, two questions.** `players_with_rounds` answers *who played* — seats
 across rounds and finals, or, on a rounds-less import, standings rows carrying a
@@ -445,9 +445,8 @@ comes from the rounds when present, else from the prelim-only standings row for
 round-less VEKN imports; when no `finals` object recorded the win it credits the
 tournament winner a +1 GW, covering an import whose final was played but not
 recorded. That credit needs a final in evidence — some row flagged a finalist — so
-it stays inert both for a native no-final, which leaves `winner == ""`, and for an
-importer that crowned a top seat no final produced. It returns `(0, 0)` early for DQ'd and
-non-competing players.
+it stays inert for any no-final event (native or imported), where no player is
+flagged a finalist. It returns `(0, 0)` early for DQ'd and non-competing players.
 
 `compute_final_standings` implements §3.7.5 placement: winner rank 1, other
 finalists share rank 2, non-finalists competition-ranked from `finalist_count + 1`.
@@ -483,9 +482,9 @@ handed** — never `compute_preliminary_standings` — because a round-less impo
 no rounds to recompute from and a recompute would re-judge table states the corpus
 was imported with. On top of the sheet it decides the DQ/proxy flags from the
 combined signals, zeroes the DQ'd, sorts the cascade and calls
-`compute_final_standings`. A final places only once the tournament is `Finished`:
-until then the winner is dropped and the display stays on the preliminary ranking,
-and each finalist row then carries its finals `{gw, vp, tp}` for display — a
+`compute_final_standings`. Winner placement (from a final or a no-final finish)
+applies only once the tournament is `Finished`: until then the winner is dropped
+and the display stays on the preliminary ranking, and each finalist row then carries its finals `{gw, vp, tp}` for display — a
 round-less VEKN import included, whose finals table was rebuilt from `vpf`. Toss and finalist are sourced apart: toss off the
 roster when rounds exist and off the sheet row when they do not, finalist off the
 finals seating when rounds exist and off the sheet row (roster flag as fallback)
@@ -532,35 +531,27 @@ A group only partly tossed by hand is re-tossed whole; a group already holding
 distinct non-zero tosses is left alone. The shuffle is seeded from the tournament
 uid because the client applies the event through WASM before the server replays it.
 
-`FinishTournament` without a final sets `Finished` and preliminary standings but
-sets no winner or finalist flags — first place is read off the standings, and a
-crown would read as a played final to `ranking_eligibility` — so a native no-final
-event awards no winner/finalist rating bonus and no winner GW. That is
-rules-literal — A.2 credits
-a game won "including a final round victory" and A.2.1 defines a finalist as one
-who advanced to a final — but vekn.net's own implementation credits a no-final top
-five exactly like a final, and our VEKN imports mirror that. Owner-approved interim
-position: the engine stays rules-literal, and the ranked/unranked badge makes the
-outcome read as a rule rather than a bug. It holds for an **imported** winner too —
-where a file or a summary names a winner but flags no finalist, every
-`finalist_position` is 0, so the rating, league scoring and the standings screen
-decline the bonus alike, and the +1 tournament-win GW goes with it — winner credit
-for a game never played is the same invention. A finals-less league weights
-participation over winners by design, so crediting one there cuts against the
-format. The stance bites only where **nothing** is flagged: historical VEKN imports
-stamped `finalist` on positions 1–5 whether or not a final was played, because the
-upstream record did not say, so a VEKN import keeps vekn.net's answer and only a
-locally crowned seat loses the credit. The question is with the Rules Director —
-see the open question below.
+`FinishTournament` without a final implements the Rules Director's ruling
+([domain](domain/tournament-rules.md#tournament-without-a-final-316),
+[ratings](domain/vekn.md#ratings)): it sets `Finished`, names #1 on preliminary
+standings as `winner` (breaking ties for first with the same deterministic toss as
+`RandomToss` unless the tied group already holds a total toss, and excluding DQ'd
+and proxy players), flags **no** finalists, and updates standings.
+`archon_import.py` applies the same #1 tie-break toss and no-finalist rule when
+importing a no-final sheet. Because no row carries `finalist: true`,
+`final_played` is false, so `compute_final_standings` stamps `finalist_position = 0`
+for everyone (including the winner) and `compute_rating_vp_gw` / `league.rs` award
+no +1 GW. A no-final event with at least 8 players is still `eligible` in
+`ranking_eligibility`, so it rates for participation, VP and preliminary GW with
+no winner or finalist bonus. Historical rounds-less VEKN imports that stamped
+`finalist` on positions 1–5 keep their imported flag because the upstream record
+did not distinguish played finals from no-final finishes.
 
 **A no-final finish is allowed at any size, deliberately.** §3.1.6 permits omitting
 the final only below 8 players, but force majeure cuts real events short — a venue
 closing, an emergency termination (JG §5.3) — and the app must be able to record
 what actually happened rather than refuse it. The §3.1.6 constraint on admitting
 players between rounds is likewise not enforced.
-
-Whether such an event should then count toward rankings is the genuinely open
-question, and it is the second one put below.
 
 The pre-finals panel deliberately carries no Start Finals button: the action bar
 owns every state transition and the toss-needed warning, and finishing without a
@@ -574,37 +565,6 @@ event's own top five — so `PUT /api/leagues/{uid}/final` runs `check_table_vps
 `compute_gw_finals` with the league seed order and `compute_tp` itself, with no
 sanctions and no override. Seeds are the league top five in rank order, ties
 ordered by the organizer rather than tossed.
-
-### No-final rating credit, open with the Rules Director
-
-*Asked 2026-08. The interim stance above is owner-approved and shipped; the answer
-is out of our hands.*
-
-The questions put:
-
-1. **Is the credit intended?** For a §3.1.6 no-final event, should the standings
-   leader get the winner bonus (90·coef) and the +1 winner GW, and ranks 2–5 the
-   finalist bonus (30·coef) — as vekn.net does — or is that an implementation
-   accident against a rules-literal zero?
-2. **An event that lost its final to force majeure.** §3.1.6 covers only a
-   *planned* no-final event under 8 players. Does a 20-player event that played
-   two rounds and never reached its final count toward ratings at all? Plausible
-   answers: credited like a §3.1.6 event, unranked entirely, or rated for
-   participation and VP with no winner or finalist bonus.
-3. **Finalist semantics** — is "finalist" top-5 by final standings, exactly
-   `min(5, N)`, and is a tie at 5th resolved by toss like the finals cut or are
-   all tied players credited?
-4. **Winner determination** — the standings leader under GW > VP > TP, taking the
-   same +1 GW a finals winner gets?
-
-Q1 and Q2 decide the engine. If the answer credits no-final events, three traps
-come with implementing it: the Q2 gate has to distinguish a deliberate §3.1.6
-finish from a truncated event or half-finished tournaments get credited, likely
-wanting its own action or flag rather than overloading `FinishTournament`; the
-`finalist` flag means "played the final table" to every UI surface, so rating
-derivation needs a distinct standings-finalist concept rather than a widened
-meaning; and a credited no-final event with ≥8 players is then **ranked**, so the
-ranked/unranked badge has to be reconciled.
 
 ## Engine event catalog
 

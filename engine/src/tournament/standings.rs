@@ -392,7 +392,7 @@ pub fn display_standings(tournament: &JsonValue, sanctions: &JsonValue) -> Vec<J
             .flatten()
     };
 
-    let mut winner = if rounds_less || use_finals {
+    let mut winner = if rounds_less || tournament[tournament::STATE].as_str() == Some("Finished") {
         tournament[tournament::WINNER]
             .as_str()
             .unwrap_or("")

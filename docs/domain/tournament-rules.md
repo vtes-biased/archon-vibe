@@ -148,6 +148,10 @@ the multi-deck system at the organizer's option. **A tournament begun under the
 no-final arrangement cannot admit more players between rounds if that would create
 a round with 8 or more players.**
 
+*(Rules Director ruling, 2026-11)*: in any tournament finished without a final,
+the winner is first place on preliminary standings — with a random toss breaking
+ties for first — and **no players are flagged as finalists**.
+
 ## Scoring
 
 Three point types (§3.7): **Game Wins** to the winner of each game, **Victory

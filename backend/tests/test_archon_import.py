@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from importlib.resources import files
 
+import msgspec
 import openpyxl
 import pytest
 from archon_engine import PyEngine
@@ -163,3 +164,71 @@ async def test_override_sheet_imports_table_as_judge_overridden(test_db):
         assert table.state == "Finished"
         assert table.override.judge_uid == "u1"
         assert table.override.comment == "Life Boon, game ended in time"
+
+
+@pytest.mark.asyncio
+async def test_import_no_final_breaks_first_place_tie_with_toss(test_db):
+    async with _cleanup_tournaments():
+        vekn = [f"300000{i}" for i in range(1, 9)]
+        for i in range(8):
+            await db.save_user(_user(f"u{i + 1}", vekn[i]))
+        await seed_tournament(
+            Tournament(
+                uid="t-import-no-final",
+                modified=datetime(2025, 6, 1, tzinfo=UTC),
+                name="No-Final Import",
+                format=TournamentFormat.Standard,
+                rank=TournamentRank.BASIC,
+                state=TournamentState.PLANNED,
+                organizers_uids=["u1"],
+            )
+        )
+
+        players = [
+            ArchonPlayer(
+                number=i + 1,
+                first_name="Player",
+                last_name=str(i + 1),
+                city="",
+                vekn_id=vekn[i],
+            )
+            for i in range(8)
+        ]
+        t1 = ArchonRoundTable(seats=[(1, 2.5), (2, 1.0), (3, 0.5), (4, 0.0)], number=1)
+        t2 = ArchonRoundTable(seats=[(5, 2.5), (6, 1.0), (7, 0.5), (8, 0.0)], number=2)
+        data = ArchonData(
+            event_name="No-Final Import",
+            num_rounds=1,
+            players=players,
+            rounds=[[t1, t2]],
+            finals=None,
+        )
+
+        engine = PyEngine()
+        result = await apply_archon_import("t-import-no-final", data, "u1", engine)
+        assert result.success, result.errors
+
+        updated = await db.get_tournament_by_uid("t-import-no-final")
+        assert updated.finals is None
+        assert updated.winner in ("u1", "u5")
+        assert updated.standings[0].user_uid == updated.winner
+        assert all(not p.finalist for p in updated.players)
+        assert all(not s.finalist for s in updated.standings)
+
+        toss_u1 = next(p.toss for p in updated.players if p.user_uid == "u1")
+        toss_u5 = next(p.toss for p in updated.players if p.user_uid == "u5")
+        assert {toss_u1, toss_u5} == {1, 2}
+
+        t_json = msgspec.json.encode(updated).decode()
+        assert engine.ranking_eligibility(t_json) == "eligible"
+        assert engine.compute_rating_vp_gw(t_json, "[]", updated.winner) == (2.5, 1.0)
+        final_rows = msgspec.json.decode(
+            engine.compute_final_standings(
+                msgspec.json.encode(
+                    {"standings": updated.standings, "winner": updated.winner}
+                ).decode()
+            )
+        )
+        assert final_rows[0]["user_uid"] == updated.winner
+        assert final_rows[0]["rank"] == 1
+        assert final_rows[0]["finalist_position"] == 0
