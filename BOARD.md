@@ -24,6 +24,4 @@ the docs; asks live here. Bulky context for an in-flight line goes in
 
 Board changes ride the commit that earns them.
 
-- Settle the winner on the rows in `docs/vekn-decommission.md#ic-record-curation--rows-that-disagree-with-the-archive-about-who-won` and correct whichever side is wrong. Done when each row's `winner` matches the record the IC accepts and its evidence section is updated.
-- Settle the eight archive-reconstruction pairs in `docs/vekn-decommission.md#archive-reconstructions-of-an-event-we-already-hold` (soft-delete same-event duplicates and transplant `external_ids.twda_entry`, or record distinct events). Done when no pair is ambiguous, the mixed-vekn class of `dedup_tournaments.py` reports only pairs it can propose, and its evidence section is updated.
 - Review the Prince / NC divergence in `docs/vekn-decommission.md#prince--nc-divergence--legacy-archon-vs-the-app` with someone who knows the appointments and align roles (never a blind union). Done when every divergent name has a verdict reflected in roles and its evidence section is updated.

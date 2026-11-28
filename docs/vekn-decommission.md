@@ -42,106 +42,19 @@ Resolved on prod **2026-11-28** (all 4 listed rows deleted; `Arraial da Vampirad
 
 ### IC record curation — rows that disagree with the archive about who won
 
-The first two came to us through their vekn event id, so the disagreement is between the
-vekn.net result and the winning deck the TWDA holds for the same event. The third
-has no archive entry: its legacy vekn.net sheet is visibly mis-entered (a 1 GW 4 VP
-player at `pos` 6 below a 1 GW 3.5 VP finalist) and the player it names as winner
-disputes it. One side
-is wrong and neither is ours to decide unilaterally. Once Stage 1 is deployed,
-`SetArchivalResults` ([tournaments](tournaments.md#engine-event-catalog)) accepts
-vekn-linked rows directly, so only the editorial call remains.
+Resolved on prod **2026-11-28**:
 
-| uid | date | event | our winner | the archive's |
-|---|---|---|---|---|
-| `019f1a1a-1923-766f-bba2-ae0291673caa` | 2023-10-22 | `Matusalén,¿dónde está mi promo?` | Jose Maria Prieto Amengual | Gines Quinonero |
-| `019f1a19-a603-773a-a922-d6dbe2146b47` | 2021-09-19 | `Roundhouse` | Joab Rogerio Barbosa Da Silva | Jose Roberio Barbosa Da Silva |
-| `019f1a06-a7d1-711f-b9c6-4e6f4c6ee2c9` | 2008-02-24 | `Minion Tap Newark` | Karl Schaefer | none — Karl reports he did not win (gh-57); real winner unknown |
-
-The Brazilian pair are two distinct live members whose names differ by four
-letters, so that one is as likely a transcription slip upstream as a wrong result.
-
-Two more disagreements of the same kind, reached from the archive side instead of
-the Hall of Fame's, are recorded under [archive reconstructions] below; each
-carries a reconstruction to delete as well as a winner to settle.
-
-Found 2026-08-16 by the Hall of Fame winner-identity bootstrap, which reads each
-TWDA entry's submitter against the resolved winner of the tournament it attached
-to: 3 of 1156 names mapped to two members, and these are the two that are not
-genuine homonyms. The third — two live members both named `Pedro Paulo`, in
-Fortaleza and Campina Grande — is a real homonym and needs nothing.
+- `Matusalén,¿dónde está mi promo?` (`019f1a1a-1923-766f-bba2-ae0291673caa`, 2023-10-22): already matched archive (`Ginés Quiñonero`).
+- `Roundhouse` (`019f1a19-a603-773a-a922-d6dbe2146b47`, 2021-09-19): both `Joab Rogerio Barbosa da Silva` (2 GW 9 VP) and `José Roberio Barbosa da Silva` (1 GW 4 VP) were finalists; switched winner to `José Roberio Barbosa da Silva` (TWDA `9888`) and re-imported the winning deck under him.
+- `Minion Tap Newark` (`019f1a06-a7d1-711f-b9c6-4e6f4c6ee2c9`, 2008-02-24, gh-57): cleared `winner` to empty (`Karl Schaefer` disputed winning; real winner unknown).
 
 ### Archive reconstructions of an event we already hold
 
-[archive reconstructions]: #archive-reconstructions-of-an-event-we-already-hold
+Resolved on prod **2026-11-28** — all 8 pairs settled by updating each held survivor's `winner` via `db.save_tournament`, soft-deleting the reconstruction via `dedup_tournaments.py --apply` (transplanting `external_ids.twda_entry`), and re-importing every winning deck + recomputing Hall of Fame wins via `backfill_twda.py --apply`:
 
-**The archive backfill creates this class.** `reconcile_twda.py` reconstructs an
-entry when no held copy answers for it, and a held copy whose standings yield no
-winner name answers for nothing — so the backfill mints a `players=1, decks=1`
-row beside the full vekn-linked copy of the same name and day. On prod
-2026-08-28 the report found 30 such pairs; 22 were resolved the same day and the
-8 here were not.
-
-**What separates them is whether the survivor can receive the deck back.**
-Applying a decision soft-deletes the reconstruction, and that cascades the
-archive's winning decklist — the only one we hold for these events, every
-survivor carrying `decks=0`. The transplanted key is what returns it:
-`_tournaments_by_twda_id` then resolves the entry to the survivor and
-`_import_decks` re-creates the deck there. But it writes that deck for the
-**survivor's** `winner`, and skips the row entirely when there is none. So a pair
-is safe to apply only where both copies name the same member, which is what the
-22 had and none of these eight do.
-
-#### The survivor names no winner
-
-Deleting the reconstruction loses the decklist for good: `_import_decks` skips a
-tournament whose `winner` is empty, and writing one onto a vekn-linked row is
-what the section above unblocks. The archive's winner is in our roster, so these
-are the same event and the correction is known — only the guard is in the way.
-
-| Event | Date | Held (vekn) | Players | Archive entry | Archive winner |
-|---|---|---|---|---|---|
-| Shell Game | 2006-03-05 CA | `019f1a02-033a-72c2-a31e-6f587bb89e0f` (836) | 14 | `2k6sgquebec` | François Nadeau |
-| Czestochowa by Night | 2009-03-21 PL | `019f1a06-f70c-75ca-8628-29f8b90883b1` (4026) | 23 | `2k9czestochowa` | Tomasz Pietkiewicz |
-
-Reconstructions: `01a028a7-0c3a-707d-9ab7-958f44db7050`,
-`01a028a7-60bd-7485-9760-1fe29744a65b`.
-
-#### The two copies disagree about who won
-
-Worse than losing the deck: applying would re-create the archive's decklist under
-**our** winner's name, crediting a player with a TWDA deck and a Hall of Fame win
-the archive gives to someone else. Both archive winners are in our roster, so one
-of the two results is wrong rather than describing another event — the same
-question as the two rows above, reached from the other direction.
-
-| Event | Date | Held (vekn) | Our winner | The archive's | Archive entry |
-|---|---|---|---|---|---|
-| Mind of a Killer | 2006-07-30 CA | `019f1a05-db59-76dd-80c6-8c36656dc444` (1137) | Yan Blondin | Marc Desaulniers | `2k6moakquebec` |
-| Buffet Contre les Vampires | 2007-08-04 FR | `019f1a06-f737-756e-a552-c37d657a2c55` (4028) | Arnaud Baigts | Reyda Seddiki | `2k7parisbclv` |
-
-Reconstructions: `01a028a7-031b-72dd-92a4-a81b15c2e1eb`,
-`01a028a7-2578-7494-a7b9-1c1c480a4af4`.
-
-#### The archive's winner is not in our roster
-
-Identity is unresolved, and two explanations fit the same evidence: a genuinely
-distinct event sharing a name and a day, or a member we never linked — the retired
-VEKN tournament sync dropped players whose VEKN id we do not hold, so our roster is not
-proof of who played. `Urban Jungle: Vitoria` is the clearest warning against
-reading these as distinct events: our winner is recorded under the nickname
-`Mineirinho`, which is a member-identity gap, not a second tournament.
-
-| Event | Date | Held (vekn) | Our winner | The archive's | Archive entry |
-|---|---|---|---|---|---|
-| Kindred Society Games | 2007-11-04 IT | `019f1a07-0bc3-7120-8066-5992a6da9027` (4307) | Miro Albertazzi | Mirko Anconitani | `2k7luccaitaly` |
-| The Eldest Command Undeath | 2007-11-17 ZA | `019f1a06-6683-720d-a33d-4a7a65da3099` (2535) | Eric August | Daniel Boud | `2k7capetownnovember` |
-| Urban Jungle: Vitoria | 2008-06-28 BR | `019f1a06-f00f-72ca-828c-7b63c1678f85` (3927) | Mineirinho | Leonardo Ribeiro | `2k8ujvitoria` |
-| Catch the infernal | 2013-04-07 ES | `019f1a18-a438-7280-8e61-8cf4b9b177a6` (7106) | José Manuel Escobar | Sebastià Giralt | `2013ctims` |
-
-Reconstructions: `01a028a7-1cf7-72e2-840c-fb514352ede1`,
-`01a028a7-1459-7269-bfc6-bef3725ae9aa`,
-`01a028a7-4f22-7589-8a2d-b5419892b1b3`,
-`01a028a5-fafe-71c6-8df4-974e6545d144`.
+- **2 no-winner survivors:** `Shell Game` (`2k6sgquebec` → `François Nadeau`), `Czestochowa by Night` (`2k9czestochowa` → `Tomasz Pietkiewicz`).
+- **2 winner disagreements** (both players were finalists in each event): `Mind of a Killer` (`2k6moakquebec` → `Marc Desaulniers`, reconstruction was already gone; old deck under `Yan Blondin` replaced), `Buffet Contre les Vampires` (`2k7parisbclv` → `Reyda Seddiki`).
+- **4 archive winners missing from tournament roster** (all 4 confirmed as live VEKN members in matching countries; added to `players` and set as `winner`): `Kindred Society Games` (`2k7luccaitaly` → `Mirko Anconitani`), `The Eldest Command Undeath` (`2k7capetownnovember` → `Daniel Boud`), `Urban Jungle: Vitoria` (`2k8ujvitoria` → `Leonardo Ribeiro`), `Catch the infernal` (`2013ctims` → `Sebastià Giralt`).
 
 ## Stage 2 — post-retirement officials review
 
