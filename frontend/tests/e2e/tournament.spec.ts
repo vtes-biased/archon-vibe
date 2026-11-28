@@ -52,7 +52,7 @@ async function uploadDeck(scope: ReturnType<Page['locator']>, name: string) {
   await scope.getByRole('button', { name: 'Paste Deck' }).click();
   await scope.getByPlaceholder('Deck name (optional)').fill(name);
   await scope.getByPlaceholder('Paste your deck list here...').fill(DECK_TEXT);
-  await scope.getByRole('button', { name: 'Upload Deck' }).click();
+  await scope.getByRole('button', { name: 'Upload Deck' }).filter({ hasText: 'Upload Deck' }).click();
   // Upload registered: contents stay hidden pre-round-1, replace is offered
   await expect(scope.getByRole('button', { name: 'Replace' })).toBeVisible({ timeout: 5_000 });
 }
