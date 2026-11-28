@@ -10,6 +10,19 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
+## Unreleased
+
+- Archon no longer syncs tournaments or members with vekn.net, lifting the old limits on round counts and editing.
+- Organizers can now replace or swap a mistakenly registered player, even after a tournament has finished.
+- New tournaments now default to collecting decklists from all players.
+- Organizers can now upload a missing winner's decklist directly from a finished tournament's results.
+- Published non-finalist decks are no longer linked to their player on profiles or in the public API.
+- Princes can now create leagues.
+- Princes can now filter the Members list to see the members they sponsored.
+- Member profiles now show worldwide rank beside each rating total.
+- Signing up with an email address now uses a magic link instead of a password.
+- Fixed forms silently refusing to submit on invalid inputs without showing an error.
+
 ## v1.4.0 — 2026-11-08
 
 - Organizers can now cancel a round finished by mistake, and a reopened tournament returns to the round it was playing.
