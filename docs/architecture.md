@@ -123,8 +123,8 @@ The scans that stay, each deliberate:
 - **Whole-corpus by design**: the `/snapshot` stream and the `/stream`
   catch-up ([sync](sync.md)), `purge_deleted_objects`.
 - **Scheduled jobs**, a scan per run rather than per request: the sanction
-  cleanup, the full rating, Hall of Fame and promo stock recomputes, the TWDA
-  sync, the judge directory sync, the stale-finals finish.
+  cleanup, the full rating, Hall of Fame and promo stock recomputes, the judge
+  directory sync, the stale-finals finish.
 - **Once per boot**: the migration guards.
 - **Small partitions**: `league` and `promo` rows, read whole through
   `idx_objects_type`.
@@ -1184,7 +1184,6 @@ Override tab.
 | Deleted-objects purge | daily, 01:30 UTC | `db.py` |
 | Promo stock recompute | daily, 02:00 UTC | `promo_stock.py` |
 | Rating recompute (ratings, then Hall of Fame wins) | daily, 02:30 UTC | `ratings.py` |
-| TWDA sync (reconstruction + winner decks) | daily, 05:00 UTC, own flag | `twda_import.py` |
 | Judge directory sync | daily, 05:30 UTC, own flag | `judge_directory.py` |
 
 **A restart serves within seconds**: the lifespan awaits only the schema load and

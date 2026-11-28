@@ -299,13 +299,7 @@ export async function mergeUsers(keep_uid: string, delete_uid: string): Promise<
 export interface AdminSyncResult {
   /** "started" / "already_running" for background-dispatched syncs. */
   status: string;
-  /** Only present for synchronous ops; the TWDA/judge syncs run in the background. */
   stats?: Record<string, unknown>;
-}
-
-/** IC-only: dispatch a TWDA decklist import in the background (also runs on a 24h schedule). */
-export async function syncTwdaDecks(): Promise<AdminSyncResult> {
-  return apiRequest<AdminSyncResult>('/admin/sync-twda-decks', { method: 'POST' }, { suppressErrorToast: true });
 }
 
 export async function syncJudges(): Promise<AdminSyncResult> {

@@ -319,15 +319,6 @@ Reconstructions: `01a028a7-1cf7-72e2-840c-fb514352ede1`,
 `01a028a7-4f22-7589-8a2d-b5419892b1b3`,
 `01a028a5-fafe-71c6-8df4-974e6545d144`.
 
-### Retire the daily TWDA sync
-
-It downloads and parses the whole 12 MB archive every day, on a box with no
-memory to spare, to pick up entries that arrived by routes other than ours. Once
-vekn.net no longer takes events, the app's own pull request on finish should be
-the only clean way a decklist reaches the TWDA, and syncing the archive back
-into the corpus it came from buys nothing. Re-check at stage 1 that no other
-submission route survived before deleting.
-
 ## Stage 2 — post-retirement officials review
 
 ### Prince / NC divergence — legacy archon vs the app

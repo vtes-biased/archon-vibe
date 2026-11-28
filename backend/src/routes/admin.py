@@ -49,29 +49,11 @@ class MergeRequest(msgspec.Struct):
 
 @get("/vekn-status")
 async def vekn_status(request: Request) -> dict:
-    """State is in-process (resets on restart); keys: twda_sync, judge_sync."""
     manager = await get_current_user(request)
     if not permissions.can_run_admin_sync(manager):
         raise HTTPException(status_code=403, detail="Only IC can view sync status")
 
     return {"jobs": get_status()}
-
-
-@post("/sync-twda-decks")
-async def trigger_twda_deck_import(request: Request) -> dict:
-    """Returns immediately; the outcome lands on the vekn-status panel as
-    `twda_sync`.
-    """
-    manager = await get_current_user(request)
-    if not permissions.can_run_admin_sync(manager):
-        raise HTTPException(status_code=403, detail="Only IC can trigger sync")
-
-    runner = _runners.get("twda_sync")
-    if not runner:
-        raise HTTPException(status_code=503, detail="TWDA sync is not available")
-
-    logger.info("Manual TWDA sync dispatched via admin endpoint")
-    return _dispatch("twda_sync", runner)
 
 
 @post("/sync-judges")
@@ -139,7 +121,6 @@ router = Router(
     "/admin",
     route_handlers=[
         vekn_status,
-        trigger_twda_deck_import,
         trigger_judge_sync,
         merge_user_accounts,
     ],

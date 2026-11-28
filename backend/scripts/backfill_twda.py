@@ -8,12 +8,6 @@ the Hall of Fame, then regenerate the snapshot.
       /opt/archon/backend/scripts/backfill_twda.py
     … backfill_twda.py --apply
 
-Not the recurring task's first run. That path broadcasts each object as it lands,
-which is right for a weekly delta of a handful and wrong for a burst of a
-thousand — every connected client would take the lot as individual SSE frames.
-So this suppresses broadcasting and regenerates the snapshot at the end instead,
-the way the archon migration did. Clients pick the corpus up on their next resync.
-
 Idempotent: an entry the corpus already holds is recognised by its `twda` or
 `twda_entry` external id and skipped, so a half-finished run is resumed by
 re-running. From then on the decisions file is only read for what is left.
@@ -81,7 +75,7 @@ async def run(args: argparse.Namespace) -> int:
             print("\nDry run — pass --apply to write.")
             return 0
 
-        stats = await run_twda_sync(broadcast=False, max_creates=None)
+        stats = await run_twda_sync()
         print(f"\n{stats}")
 
         # The sync recomputes only the winners it touched — every Hall of Fame

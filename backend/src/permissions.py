@@ -290,7 +290,6 @@ def can_manage_oauth_clients(user: User) -> bool:
 
 
 def can_run_admin_sync(user: User) -> bool:
-    """Trigger and inspect the VEKN/TWDA sync jobs."""
     return _check("run_admin_sync", user)
 
 

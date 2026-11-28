@@ -10,7 +10,6 @@ the evidence for the post-retirement curation work is
 
 | Flag | Scope | Effect |
 |---|---|---|
-| `TWDA_SYNC_ENABLED` | backend env | enables the daily archive sync |
 | `JUDGE_SYNC_ENABLED` | backend env | enables the daily [judge directory](#judge-directory) sync — public upstream, no credentials |
 
 **Beta performs no outbound write, by design.** The TWDA GitHub App credentials
@@ -32,8 +31,8 @@ counts: the scripts rehearsed there have been applied there.
   real account — by VEKN id, then by email — or creates a member. Which is why
   taking a tournament offline needs `sponsor_member` on top of organizer rights.
 - **Observability** — scheduled sync jobs record last success and error in
-  process, and `GET /admin/vekn-status` (IC-gated) exposes `twda_sync` and
-  `judge_sync` on the profile Admin panel. It resets on restart.
+  process, and `GET /admin/vekn-status` (IC-gated) exposes `judge_sync` on the
+  profile Admin panel. It resets on restart.
 
 Inbound tournament sync and member sync retired at [Decommission](#decommission).
 Existing rounds-less VEKN imports stay in the corpus as imported;
@@ -186,9 +185,11 @@ follows the deck pass rather than preceding it:
 a reconstruction only counts once its deck is on record
 ([the rule](tournaments.md#configuration)). The backfill depends on the ordering
 too — it regenerates the snapshot immediately afterwards, and a win list computed
-later would miss it. It runs on `twda_sync`, **its own job under
-its own flag** and recorded on the vekn-status panel: a different upstream, no VEKN
-credentials, that outlives the VEKN API.
+later would miss it. Inbound archive reconciliation is **manual only** via
+`backend/scripts/backfill_twda.py` — no scheduled job fetches the archive. Once
+vekn.net stopped taking events, the app's own pull request on finish is the
+clean route into the TWDA, so pulling the 12 MB archive daily buys nothing on a
+memory-tight box.
 
 **The archive's place names the city.** A reconstruction takes its city from the
 entry's `place`, and settling an attach fills an empty one the same way: read right
@@ -199,13 +200,6 @@ names — the `(STATE)`, a US code spelled out — before the most populous. On 
 dated 2025 or later, `Palma de Mallorca, Spain` is ignored because legacy archon
 filed unrelated events against placeholder venue 3800 (*GoblinTrader Mallorca*) and
 the archive copied that place onto them.
-
-**The scheduled run only ever does a delta.** More than `MAX_CREATES_PER_RUN`
-unsettled entries pending means it is standing in for the initial backfill, so it
-writes none and logs an error naming `backfill_twda.py` — which lifts the cap and
-suppresses broadcasting. Without that, the first scheduled run after a deploy *is*
-the backfill, at four thousand SSE frames per connected client. Decks still land
-for everything already resolved, so a capped run is useful rather than refused.
 
 **It resolves nothing at runtime, and it settles what it resolves.** An entry the
 corpus already answers for is read off the corpus; only what is left is looked up
@@ -463,6 +457,7 @@ The officials review unblocked by this stage sits in
 
 ### What survives
 
-The TWDA sync and the judge directory sync, each on its own flag and schedule,
-with no VEKN credentials — both are separate upstreams. Submission to the TWDA
-archive survives on the short event code.
+The judge directory sync survives on its own flag and schedule, with no VEKN
+credentials — a separate upstream. Submission to the TWDA archive survives on
+the short event code, and `backfill_twda.py` stays as manual archive
+reconciliation; the daily scheduled TWDA sync is retired.

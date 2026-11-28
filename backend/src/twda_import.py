@@ -22,7 +22,6 @@ import aiohttp
 import msgspec
 
 from . import http_client
-from .broadcast import broadcast_precomputed
 from .data.timezones import CITY_TZ_OVERRIDES, COUNTRY_TIMEZONE
 from .db import (
     get_connection,
@@ -53,10 +52,6 @@ logger = logging.getLogger(__name__)
 LEGACY_PLACEHOLDER_SINCE = "2025-01-01"
 
 TWDA_URL = "https://static.krcg.org/data/twda.json"
-# The scheduled task handles a delta: more than this many unsettled entries means
-# it is standing in for `backend/scripts/backfill_twda.py`, and a thousand saves
-# here is a thousand SSE frames at every connected client.
-MAX_CREATES_PER_RUN = 25
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -278,9 +273,7 @@ async def _tournaments_by_twda_id() -> dict[str, str]:
     return {row[0]: row[1] for row in rows}
 
 
-async def _settle_attachment(
-    entry_id: str, uid: str, broadcast: bool, city: City | None = None
-) -> bool:
+async def _settle_attachment(entry_id: str, uid: str, city: City | None = None) -> bool:
     """Stamp the archive key onto the tournament an `attach` names, so the next
     run reads the attachment off the corpus and never consults the file for it.
 
@@ -309,9 +302,7 @@ async def _settle_attachment(
             tournament.city = city["name"]
             tournament.city_geoname_id = city["geoname_id"]
         tournament.modified = datetime.now(UTC)
-        bd = await save_tournament(tournament, conn=conn)
-    if broadcast:
-        broadcast_precomputed(bd)
+        await save_tournament(tournament, conn=conn)
     return True
 
 
@@ -336,9 +327,7 @@ async def _winners_by_tournament_uid(
     return {row[0]: (row[1] or "", list(row[2] or []), row[3]) for row in rows}
 
 
-async def run_twda_sync(
-    *, broadcast: bool = True, max_creates: int | None = MAX_CREATES_PER_RUN
-) -> dict[str, int]:
+async def run_twda_sync() -> dict[str, int]:
     """Reconcile the whole archive against our corpus: settle every entry onto
     the event it belongs to — reconstructing the ones we lack — then give every
     resolved winner their decklist.
@@ -348,12 +337,6 @@ async def run_twda_sync(
     claims a VEKN id — and a 304 short-circuit would skip the reconciliation
     forever, silently and permanently. A 12 MB fetch against a static CDN is the
     cheaper half of that trade.
-
-    `broadcast=False` is for the one-time backfill: pushing a thousand object
-    frames at every connected client in a tight loop is a burst the recurring
-    delta never produces. `max_creates=None` lifts the delta cap for it, so the
-    scheduled task cannot become the backfill by accident — which is exactly what
-    the first run after a deploy would otherwise be.
     """
     entries = await _fetch_twda()
     decisions = load_decisions()
@@ -368,29 +351,9 @@ async def run_twda_sync(
         "stale_targets": 0,
         "orphaned": 0,
         "decks_created": 0,
-        "deferred_to_backfill": 0,
     }
     resolved: dict[str, str] = {}
     cities: CityIndex | None = None
-
-    pending = sum(
-        1
-        for entry in entries
-        if entry.id not in known
-        and decisions.get(entry.id, ("", ""))[0] in ("attach", "create")
-    )
-    # A run this size is the initial backfill, not a delta, whatever invoked it.
-    # Write nothing and say so: the decks below still land for everything already
-    # resolved, so a capped run is useful rather than merely refused.
-    bulk = max_creates is not None and pending > max_creates
-    if bulk:
-        stats["deferred_to_backfill"] = pending
-        logger.error(
-            f"TWDA sync: {pending} entries await settling, over the "
-            f"{max_creates} delta cap — writing none. Run "
-            f"backend/scripts/backfill_twda.py --apply, which suppresses "
-            f"broadcasting and regenerates the snapshot."
-        )
 
     for entry in entries:
         entry_id = entry.id
@@ -402,26 +365,18 @@ async def run_twda_sync(
         if not action:
             stats["unresolved"] += 1
             continue
-        if bulk:
-            if action == "attach":
-                resolved[entry_id] = target
-            continue
         if cities is None:
             cities = city_index()
         city = twda_city(entry, cities)
         if action == "attach":
             resolved[entry_id] = target
-            if await _settle_attachment(entry_id, target, broadcast, city):
+            if await _settle_attachment(entry_id, target, city):
                 stats["settled"] += 1
             continue
         tournament = reconstructed_tournament(entry, target, now, city)
         async with get_connection() as conn:
             tournament.event_code = await resolve_event_code(tournament, conn)
-            bd = await save_object_from_model(
-                ObjectType.TOURNAMENT, tournament, conn=conn
-            )
-        if broadcast:
-            broadcast_precomputed(bd)
+            await save_object_from_model(ObjectType.TOURNAMENT, tournament, conn=conn)
         resolved[entry_id] = tournament.uid
         stats["created"] += 1
 
@@ -437,16 +392,14 @@ async def run_twda_sync(
         )
 
     stats["decks_created"], stale, deck_winners = await _import_decks(
-        entries, resolved, now, broadcast
+        entries, resolved, now
     )
     stats["stale_targets"] = len(stale)
 
     # A reconstruction enters the Hall of Fame only once its winner's deck lands,
     # so this follows the deck pass — and stays here, ahead of the backfill
     # regenerating the snapshot a later win list would miss.
-    for _user, bd in await recompute_wins(deck_winners):
-        if broadcast:
-            broadcast_precomputed(bd)
+    await recompute_wins(deck_winners)
     if stale:
         logger.warning(
             f"TWDA sync: {len(stale)} decisions name tournaments we do not hold "
@@ -460,7 +413,6 @@ async def _import_decks(
     entries: list[TwdaEntry],
     resolved: dict[str, str],
     now: datetime,
-    broadcast: bool,
 ) -> tuple[int, list[str], set[str]]:
     """(decks created, decisions whose target we no longer hold, winners touched).
 
@@ -503,9 +455,7 @@ async def _import_decks(
             winner=True,
             finalist=True,
         )
-        bd = await save_deck(deck, row[2], row[1])
-        if broadcast:
-            broadcast_precomputed(bd)
+        await save_deck(deck, row[2], row[1])
         created += 1
         touched.add(winner_uid)
     return created, stale, touched

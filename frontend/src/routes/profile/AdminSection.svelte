@@ -3,7 +3,6 @@
   import FoldableSection from "#lib/components/FoldableSection.svelte";
   import * as m from '#lib/paraglide/messages.js';
   import {
-    syncTwdaDecks,
     syncJudges,
     getVeknStatus,
     downloadDataExport,
@@ -22,7 +21,6 @@
   let statusFailed = $state(false);
 
   const statusJobs: { key: string; label: () => string }[] = [
-    { key: 'twda_sync', label: m.admin_status_twda_sync },
     { key: 'judge_sync', label: m.admin_status_judge_sync },
   ];
 
@@ -65,13 +63,6 @@
   }
 
   const ops: Op[] = [
-    {
-      key: 'twda',
-      label: m.admin_sync_twda_label(),
-      desc: m.admin_sync_twda_desc(),
-      confirmBody: m.admin_sync_twda_confirm(),
-      run: syncTwdaDecks,
-    },
     {
       key: 'judges',
       label: m.admin_sync_judges_label(),

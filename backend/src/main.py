@@ -98,7 +98,6 @@ from .routes import (
     vekn,
 )
 from .snapshots import generate_snapshots, get_snapshot_path, snapshot_generated_at
-from .twda_import import run_twda_sync as sync_twda
 from .vekn_status import record_error, record_success
 from .version import __version__
 
@@ -142,20 +141,6 @@ def _install_fast_shutdown_signals() -> None:
             # Not in the main thread (e.g. a test client) — uvicorn didn't
             # install its handlers here either, so there is nothing to accelerate.
             pass
-
-
-async def run_twda_sync() -> None:
-    """TWDA reconciliation with status recording (vekn_status)."""
-    try:
-        logger.info("Starting TWDA sync")
-        stats = await sync_twda()
-        record_success("twda_sync", stats)
-    except TimeoutError:
-        logger.error("TWDA sync timed out")
-        record_error("twda_sync", "timed out")
-    except Exception as e:
-        logger.error(f"Error during TWDA sync: {e}", exc_info=True)
-        record_error("twda_sync", str(e))
 
 
 async def run_judge_sync() -> None:
@@ -289,18 +274,7 @@ async def lifespan(app: Litestar) -> AsyncIterator[None]:
     _scheduler.add_listener(_release_heap, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
 
     # Registered either way so the admin trigger works even with the schedule off.
-    admin.set_sync_runners(twda_sync=run_twda_sync, judge_sync=run_judge_sync)
-    if os.getenv("TWDA_SYNC_ENABLED", "false").lower() == "true":
-        _scheduler.add_job(
-            run_twda_sync,
-            trigger=CronTrigger(hour=5, timezone="UTC"),
-            id="twda_sync",
-            name="TWDA Sync",
-            replace_existing=True,
-        )
-        logger.info("TWDA sync scheduled daily at 05:00 UTC")
-    else:
-        logger.info("TWDA sync is disabled")
+    admin.set_sync_runners(judge_sync=run_judge_sync)
 
     if os.getenv("JUDGE_SYNC_ENABLED", "false").lower() == "true":
         _scheduler.add_job(

@@ -343,7 +343,6 @@ backend_env = {
     "WEBAUTHN_RP_ID": domain,
     "WEBAUTHN_RP_NAME": d.app_name,
     "WEBAUTHN_ORIGIN": site,
-    "TWDA_SYNC_ENABLED": "true",
     "JUDGE_SYNC_ENABLED": d.judge_sync,
     # Per-env keypair (beta and prod must NOT share). Rotating it invalidates
     # every existing browser subscription.

@@ -21,7 +21,6 @@ from src.models import Role, User
 from tests.conftest import make_auth_header
 
 ADMIN_SYNC_PATHS = [
-    "/admin/sync-twda-decks",
     "/admin/sync-judges",
 ]
 # Any path uid works: the IC gate fires before the tournament is ever loaded.
@@ -60,11 +59,11 @@ async def test_admin_sync_requires_ic(test_client: AsyncClient, non_ic_user, pat
 
 
 @pytest.mark.asyncio
-async def test_admin_sync_twda_allows_ic(test_client: AsyncClient, ic_user):
+async def test_admin_sync_judges_allows_ic(test_client: AsyncClient, ic_user):
     """IC clears the role gate; no runner is registered in tests, so the handler
     reports 503 rather than 403 — proving IC passed the guard."""
     resp = await test_client.post(
-        "/admin/sync-twda-decks", headers=make_auth_header(ic_user.uid)
+        "/admin/sync-judges", headers=make_auth_header(ic_user.uid)
     )
     assert resp.status_code == 503
 

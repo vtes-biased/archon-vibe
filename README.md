@@ -183,7 +183,6 @@ Setup: Create an app at [Discord Developer Portal](https://discord.com/developer
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TWDA_SYNC_ENABLED` | `false` | Enable daily TWDA archive sync |
 | `JUDGE_SYNC_ENABLED` | `false` | Enable daily VTES Exams judge directory sync |
 
 ### TWDA Auto-PR (Tournament Winning Deck Archive)

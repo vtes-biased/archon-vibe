@@ -507,8 +507,7 @@ needs `DISCORD_CLIENTID`, `DISCORD_SECRET` and `DISCORD_REDIRECT_URI`, plus
 `DISCORD_BOT_TOKEN` from the **same application** for Linked Roles
 ([discord](discord.md)). Magic links need the `MAIL_*` SMTP set.
 
-**External syncs** — `TWDA_SYNC_ENABLED` and `JUDGE_SYNC_ENABLED`
-([vekn](vekn.md#feature-flags)).
+**External syncs** — `JUDGE_SYNC_ENABLED` ([vekn](vekn.md#feature-flags)).
 
 **Web Push** — `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`; generate
 with `mise run vapid-keys`. The private key is a deploy secret. The
