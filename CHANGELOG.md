@@ -10,7 +10,7 @@ these are player-facing lines, not developer notes.
 
 <!-- New entries go directly below this line. -->
 
-## Unreleased
+## v1.5.4 — 2026-11-28
 
 - Tournaments finished without a final now crown the top preliminary player as winner, with no finalists.
 - Added the new VEKN Statement on Safe and Welcoming Tournament Environments preface to the in-app Tournament Rules.
