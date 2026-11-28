@@ -125,7 +125,7 @@ test.describe('Tournament lifecycle', () => {
     await page
       .locator('tr')
       .filter({ hasText: state.player_names[0]! })
-      .getByTitle('View')
+      .getByTitle('Upload Deck')
       .click();
     await uploadDeck(playersDesktop, 'E2E Deck v1');
     await playersDesktop.getByRole('button', { name: 'Replace' }).click();
